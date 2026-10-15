@@ -136,3 +136,26 @@ def test_run_store_allocates_unique_directories(tmp_path):
     sub = first.make_directory("trials")
     assert json.loads(first.path("a.json").read_text()) == {"x": 1}
     assert sub.is_dir() and first.path("b.txt").read_text() == "hi"
+
+
+def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
+    from mml.monitoring import reference
+
+    bundle, features = trained
+    scores = pd.Series(bundle.predict_proba(features)[:, 1], name="score")
+    bundle.reference = reference.ReferenceProfile.build(
+        features, PLAN, scores, "score", {"roc_auc": 0.9}
+    )
+    directory = bundle.save(tmp_path / "m")
+    loaded = bundle_module.ModelBundle.load(directory)
+    assert loaded.reference == bundle.reference
+    assert bundle_module.REFERENCE_FILE in loaded.info.files
+    (directory / bundle_module.REFERENCE_FILE).write_text("{}")
+    with pytest.raises(errors.ArtifactError, match="reference profile"):
+        bundle_module.ModelBundle.load(directory)
+
+
+def test_bundle_without_reference_still_loads(trained, tmp_path):
+    bundle, _ = trained
+    loaded = bundle_module.ModelBundle.load(bundle.save(tmp_path / "m"))
+    assert loaded.reference is None
