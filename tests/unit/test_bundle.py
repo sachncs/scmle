@@ -1,5 +1,6 @@
 """Tests for the model bundle and run store."""
 
+import dataclasses
 import json
 
 import numpy as np
@@ -318,3 +319,44 @@ def test_round_trip_verification_catches_a_bundle_that_drifted(
     other.pipeline = other.pipeline.fit(flipped, (flipped.num > 0).astype(int))
     with pytest.raises(errors.ArtifactError, match="does not reproduce"):
         other.verify_round_trip(tmp_path / "m", features.head(50))
+
+
+def test_inference_time_calibration_is_optional_persisted_and_verified(
+    trained, tmp_path
+):
+    bundle, features = trained
+    labels = (features.num > 0.3).astype(int)  # a noisier target than trained
+    plain = bundle.predict_proba(features)
+    report = bundle.calibrate(features, labels, method="sigmoid")
+    calibrated = bundle.predict_proba(features)
+    assert not np.allclose(plain, calibrated)
+    np.testing.assert_allclose(calibrated.sum(axis=1), 1.0, atol=1e-9)
+    assert report["brier_after"] <= report["brier_before"] + 1e-9
+    assert bundle.info.calibration.startswith("sigmoid on 200 rows")
+    bundle.save(tmp_path / "m")
+    loaded = bundle_module.ModelBundle.load(tmp_path / "m", trusted=True)
+    np.testing.assert_allclose(loaded.predict_proba(features), calibrated)
+    assert bundle.verify_round_trip(tmp_path / "m", features)["rows"] == 200
+    (tmp_path / "m" / bundle_module.CALIBRATOR_FILE).write_bytes(b"broken")
+    with pytest.raises(errors.ArtifactError, match="calibrator"):
+        bundle_module.ModelBundle.load(tmp_path / "m", trusted=True)
+
+
+def test_calibration_rejects_unknown_methods_and_regression(trained):
+    bundle, features = trained
+    with pytest.raises(errors.ConfigError, match="unknown calibration"):
+        bundle.calibrate(features, (features.num > 0).astype(int), "magic")
+    bundle.schema = dataclasses.replace(bundle.schema, classes=None)
+    with pytest.raises(errors.ArtifactError, match="only classifiers"):
+        bundle.calibrate(features, features.num)
+
+
+def test_compatibility_checks_every_recorded_library():
+    info = bundle_module.BundleInfo("m", "v1", "roc_auc")
+    assert info.compatibility_problems() == []
+    older = dataclasses.replace(
+        info, libraries={**info.libraries, "numpy": "1.0.0"}
+    )
+    assert any("numpy 1.0.0" in p for p in older.compatibility_problems())
+    pandas_off = dataclasses.replace(info, pandas="0.1.0")
+    assert any("pandas" in p for p in pandas_off.compatibility_problems())

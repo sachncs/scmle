@@ -8,6 +8,7 @@ tampering after saving, not malice at the source.
 import dataclasses
 import hashlib
 import hmac
+import importlib
 import json
 import os
 import pathlib
@@ -19,6 +20,8 @@ import joblib
 import numpy as np
 import pandas as pd
 import sklearn
+from sklearn import calibration
+from sklearn import frozen
 
 import mml
 from mml.contracts import data as data_contracts
@@ -33,6 +36,7 @@ BUNDLE_FORMAT = 1
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
+CALIBRATOR_FILE = "calibrator.joblib"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
 SIGNATURE_FILE = "signature.json"
@@ -41,6 +45,37 @@ SIGNATURE_ALGORITHM = "hmac-sha256"
 MANIFEST_FILE = "model_manifest.json"
 MAX_KNOWN_CATEGORIES = 200
 MAX_REPORTED_UNSEEN = 20
+
+
+TRACKED_LIBRARIES = (
+    "numpy",
+    "scipy",
+    "joblib",
+    "lightgbm",
+    "xgboost",
+    "catboost",
+    "imblearn",
+)
+
+
+def installed_versions() -> dict[str, str]:
+    """Versions of the tracked libraries that are installed."""
+    found = {}
+    for name in TRACKED_LIBRARIES:
+        try:
+            module = importlib.import_module(name)
+        except ImportError:
+            continue
+        found[name] = str(getattr(module, "__version__", "unknown"))
+    return found
+
+
+def brier(
+    probabilities: np.ndarray, labels: np.ndarray, classes: tuple[Any, ...]
+) -> float:
+    """Mean squared error between probabilities and one-hot labels."""
+    truth = (labels[:, None] == np.asarray(classes)[None, :]).astype(float)
+    return float(np.mean(np.sum((probabilities - truth) ** 2, axis=1)))
 
 
 def file_sha256(path: pathlib.Path) -> str:
@@ -267,6 +302,10 @@ class BundleInfo:
         model_params: Hyperparameter overrides of the selected model.
         strategy: Data strategy of the selected candidate.
         decision_threshold: Optimized binary decision threshold, if any.
+        libraries: Versions of the other libraries the pipeline depends on
+            (numpy, scipy, joblib and any installed model library).
+        calibration: Description of the probability calibration applied at
+            inference, empty if none.
     """
 
     model_name: str
@@ -281,6 +320,10 @@ class BundleInfo:
     model_params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = "default"
     decision_threshold: float | None = None
+    libraries: dict[str, str] = dataclasses.field(
+        default_factory=lambda: installed_versions()
+    )
+    calibration: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -296,6 +339,15 @@ class BundleInfo:
         running = platform.python_version()
         if minor_version(self.python) != minor_version(running):
             problems.append(f"python {self.python} (running {running})")
+        if minor_version(self.pandas) != minor_version(pd.__version__):
+            problems.append(
+                f"pandas {self.pandas} (installed {pd.__version__})"
+            )
+        current = installed_versions()
+        for library, built in sorted(self.libraries.items()):
+            now = current.get(library)
+            if now is not None and minor_version(built) != minor_version(now):
+                problems.append(f"{library} {built} (installed {now})")
         return problems
 
 
@@ -331,6 +383,7 @@ class ModelBundle:
         info: BundleInfo,
         reference: reference_module.ReferenceProfile | None = None,
         history: pd.DataFrame | None = None,
+        calibrator: Any = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -341,12 +394,15 @@ class ModelBundle:
             reference: Training-time distributions for monitoring.
             history: Recent rows per entity that series features look back
                 on, so records scored alone still get lag / rolling values.
+            calibrator: Probability calibrator fitted on labeled rows after
+                training (see `calibrate`), applied by `predict_proba`.
         """
         self.pipeline = pipeline
         self.schema = schema
         self.info = info
         self.reference = reference
         self.history = history
+        self.calibrator = calibrator
 
     @classmethod
     def create(
@@ -497,6 +553,55 @@ class ModelBundle:
             "largest_difference": worst,
         }
 
+    def calibrate(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        target: Any,
+        method: str = "sigmoid",
+    ) -> dict[str, float]:
+        """Fits an optional probability calibrator on labeled rows.
+
+        The trained pipeline is frozen; only a monotone mapping from its
+        probabilities to calibrated ones is learned. Use rows the model was
+        not trained on. `predict_proba` then returns calibrated
+        probabilities; `predict` is unchanged.
+
+        Args:
+            data: Labeled rows.
+            target: Their true labels.
+            method: `sigmoid` (Platt) or `isotonic`.
+
+        Returns:
+            Brier score before and after on the calibration rows (a
+            diagnostic; the calibrator is fitted on the same rows).
+
+        Raises:
+            ArtifactError: For regression models.
+            ConfigError: For an unknown method.
+        """
+        if self.schema.classes is None:
+            raise errors.ArtifactError("only classifiers can be calibrated")
+        if method not in ("sigmoid", "isotonic"):
+            raise errors.ConfigError(
+                f"unknown calibration method '{method}'; use sigmoid or "
+                "isotonic"
+            )
+        frame = self.prepare_frame(data)
+        labels = np.asarray(target)
+        before = self.pipeline.predict_proba(frame)
+        calibrator = calibration.CalibratedClassifierCV(
+            frozen.FrozenEstimator(self.pipeline), method=method
+        ).fit(frame, labels)
+        after = calibrator.predict_proba(frame)
+        self.calibrator = calibrator
+        self.info = dataclasses.replace(
+            self.info, calibration=f"{method} on {len(frame)} rows"
+        )
+        return {
+            "brier_before": brier(before, labels, self.schema.classes),
+            "brier_after": brier(after, labels, self.schema.classes),
+        }
+
     def series_builder(self) -> feature_graph.SeriesFeatureBuilder:
         """The builder for this model's series features, with its history."""
         return feature_graph.SeriesFeatureBuilder(
@@ -559,6 +664,12 @@ class ModelBundle:
             reference_path = root / REFERENCE_FILE
             reference_path.write_text(json.dumps(self.reference.to_dict()))
             files[REFERENCE_FILE] = file_sha256(reference_path)
+        if self.calibrator is not None:
+            calibrator_path = root / CALIBRATOR_FILE
+            joblib.dump(self.calibrator, calibrator_path)
+            files[CALIBRATOR_FILE] = file_sha256(calibrator_path)
+        elif (root / CALIBRATOR_FILE).exists():
+            (root / CALIBRATOR_FILE).unlink()
         if self.history is not None:
             history_path = root / HISTORY_FILE
             self.history.to_parquet(history_path, index=False)
@@ -673,7 +784,25 @@ class ModelBundle:
                     "checksum mismatch: series history was modified"
                 )
             history = pd.read_parquet(history_path)
-        return cls(joblib.load(model_path), schema, info, reference, history)
+        calibrator = None
+        if CALIBRATOR_FILE in info.files:
+            calibrator_path = root / CALIBRATOR_FILE
+            if (
+                not calibrator_path.exists()
+                or file_sha256(calibrator_path) != info.files[CALIBRATOR_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: calibrator was modified"
+                )
+            calibrator = joblib.load(calibrator_path)
+        return cls(
+            joblib.load(model_path),
+            schema,
+            info,
+            reference,
+            history,
+            calibrator,
+        )
 
     @property
     def features(self) -> list[str]:
@@ -806,4 +935,7 @@ class ModelBundle:
             raise errors.ArtifactError(
                 "this model does not provide probabilities"
             )
-        return self.pipeline.predict_proba(self.prepare_frame(data, mapping))
+        frame = self.prepare_frame(data, mapping)
+        if self.calibrator is not None:
+            return self.calibrator.predict_proba(frame)
+        return self.pipeline.predict_proba(frame)
