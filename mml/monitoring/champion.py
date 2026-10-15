@@ -8,6 +8,7 @@ import pandas as pd
 from mml.artifacts import bundle as bundle_module
 from mml.contracts import errors
 from mml.contracts import tasks
+from mml.evaluation import diagnostics
 from mml.evaluation import metrics
 
 BOOTSTRAPS = 300
@@ -78,6 +79,9 @@ class ChampionChallenger:
 
         The challenger is promoted only if the lower end of the 95% interval
         of its advantage is above zero, so noise cannot unseat the champion.
+        The bootstrap resamples whole groups for clustered data and
+        contiguous time blocks for temporal data, so the interval reflects
+        the independent units of observation.
 
         Args:
             data: Rows served (must satisfy both models' schemas).
@@ -101,6 +105,23 @@ class ChampionChallenger:
             )
         frame = data.reset_index(drop=True)[known].reset_index(drop=True)
         target = outcomes.reset_index(drop=True)[known].reset_index(drop=True)
+        group_name = self.champion.schema.group_column
+        time_name = self.champion.schema.time_column
+        groups = (
+            frame[group_name]
+            if group_name and group_name in frame.columns
+            else None
+        )
+        temporal = bool(
+            groups is None and time_name and time_name in frame.columns
+        )
+        if temporal:
+            order = np.argsort(
+                pd.to_datetime(frame[time_name], errors="coerce").to_numpy(),
+                kind="stable",
+            )
+            frame = frame.iloc[order].reset_index(drop=True)
+            target = target.iloc[order].reset_index(drop=True)
         champion_view = self.champion.prepare_frame(frame)
         challenger_view = self.challenger.prepare_frame(frame)
         positive = metrics.positive_label(target, task)
@@ -123,7 +144,10 @@ class ChampionChallenger:
         challenger_score = score(self.challenger, challenger_view, everything)
         rng = np.random.default_rng(self.seed)
         advantages = []
-        draws = rng.integers(0, len(target), (self.bootstraps, len(target)))
+        draws = [
+            diagnostics.resample_rows(len(target), groups, temporal, rng)
+            for count in range(self.bootstraps)
+        ]
         for rows in draws:
             try:
                 difference = score(

@@ -190,3 +190,44 @@ def test_comparison_validates_inputs(trained, tmp_path):
     few = make_frame(10, 10)
     with pytest.raises(errors.ConfigError, match="at least"):
         pair.compare(few.drop(columns="y"), few["y"])
+
+
+def test_comparison_resamples_whole_groups_and_time_blocks(
+    trained, monkeypatch
+):
+    import copy
+    import dataclasses
+
+    from mml.evaluation import diagnostics
+
+    seen = []
+    real = diagnostics.resample_rows
+
+    def spy(rows, groups, temporal, rng):
+        seen.append((groups is not None, temporal))
+        return real(rows, groups, temporal, rng)
+
+    monkeypatch.setattr(diagnostics, "resample_rows", spy)
+    holdout = make_frame(300, 12)
+    holdout["entity"] = np.arange(300) % 20
+    holdout["when"] = pd.date_range("2024-01-01", periods=300, freq="D")
+    features = holdout.drop(columns="y")
+
+    clustered = copy.copy(trained.bundle)
+    clustered.schema = dataclasses.replace(
+        trained.bundle.schema, group_column="entity"
+    )
+    champion.ChampionChallenger(clustered, clustered, bootstraps=5).compare(
+        features, holdout["y"]
+    )
+    assert seen and all(group and not block for group, block in seen)
+
+    seen.clear()
+    timed = copy.copy(trained.bundle)
+    timed.schema = dataclasses.replace(
+        trained.bundle.schema, time_column="when"
+    )
+    champion.ChampionChallenger(timed, timed, bootstraps=5).compare(
+        features, holdout["y"]
+    )
+    assert seen and all(block and not group for group, block in seen)
