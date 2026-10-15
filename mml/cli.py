@@ -160,6 +160,15 @@ class PredictCommand(Command):
         parser.add_argument("data", help="CSV or Parquet file")
         parser.add_argument("--output", default="predictions.csv")
         parser.add_argument(
+            "--rename",
+            action="append",
+            default=[],
+            metavar="INCOMING=EXPECTED",
+            help="explicitly map an incoming column name onto the schema",
+        )
+        parser.add_argument("--case-insensitive", action="store_true")
+        parser.add_argument("--strip-whitespace", action="store_true")
+        parser.add_argument(
             "--trusted",
             action="store_true",
             help="load an unsigned bundle you vouch for (pickle executes code)",
@@ -170,9 +179,14 @@ class PredictCommand(Command):
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
-        frame = pd.DataFrame({"prediction": model.predict(args.data)})
+        mapping = bundle_module.ColumnMapping(
+            dict(pair.split("=", 1) for pair in args.rename),
+            args.case_insensitive,
+            args.strip_whitespace,
+        )
+        frame = pd.DataFrame({"prediction": model.predict(args.data, mapping)})
         if model.classes is not None:
-            proba = model.predict_proba(args.data)
+            proba = model.predict_proba(args.data, mapping)
             for index, label in enumerate(model.classes):
                 frame[f"proba_{label}"] = proba[:, index]
         frame.to_csv(pathlib.Path(args.output), index=False)
