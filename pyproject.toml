@@ -29,7 +29,16 @@ all = ["magicml[boosting,catboost,optimization,tracking,distributed]"]
 magicml = "mml.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.5", "mypy>=1.10", "pandas-stubs"]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pandas-stubs",
+    "bandit>=1.9.4",
+    "pip-audit>=2.10.1",
+    "twine>=7.0.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["mml"]

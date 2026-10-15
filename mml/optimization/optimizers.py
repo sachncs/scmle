@@ -76,7 +76,7 @@ class RandomOptimizer(Optimizer):
     ) -> None:
         """Initializes the sampler and the observation history."""
         super().__init__(space, seed, greater_is_better)
-        self.rng = random.Random(seed)
+        self.rng = random.Random(seed)  # nosec B311 - seeded search, not security
         self.history: list[tuple[dict[str, Any], float]] = []
 
     def ask(self) -> dict[str, Any]:

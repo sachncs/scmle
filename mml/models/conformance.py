@@ -79,7 +79,7 @@ def check_conformance(adapter: models.ModelAdapter) -> None:
                 )
         space = adapter.search_space
         if space is not None:
-            sampled = space.sample(random.Random(0))
+            sampled = space.sample(random.Random(0))  # nosec B311 - seeded, not security
             tuned = adapter.build(task, 0, sampled)
             applied = tuned.get_params(deep=True)
             for key, value in sampled.items():
