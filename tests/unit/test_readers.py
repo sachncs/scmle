@@ -9,9 +9,7 @@ from mml.data import readers
 
 @pytest.fixture
 def frame():
-    return pd.DataFrame(
-        {"a": [1, 2, 3], "b": ["x", "y", "z"], "y": [0, 1, 0]}
-    )
+    return pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"], "y": [0, 1, 0]})
 
 
 def test_csv_and_parquet_roundtrip(tmp_path, frame):

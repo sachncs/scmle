@@ -6,7 +6,8 @@ capabilities); construction logic lives once in `SklearnAdapter.build`.
 
 import inspect
 import types
-from typing import Any, ClassVar
+from typing import Any
+from typing import ClassVar
 
 from sklearn import dummy
 from sklearn import ensemble

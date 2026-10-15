@@ -80,7 +80,7 @@ class BundleSchema:
         return record
 
     @classmethod
-    def from_dict(cls, record: dict[str, Any]) -> "BundleSchema":
+    def from_dict(cls, record: dict[str, Any]) -> BundleSchema:
         """Rebuilds a schema from `to_dict` output."""
         classes = record["classes"]
         return cls(
@@ -187,7 +187,7 @@ class ModelBundle:
         metric: str,
         model_name: str,
         model_version: str = "v1",
-    ) -> "ModelBundle":
+    ) -> ModelBundle:
         """Builds a bundle from a fitted pipeline and its training data.
 
         Args:
@@ -217,9 +217,13 @@ class ModelBundle:
             categorical=plan.categorical,
             dtypes={c: str(dev_features[c].dtype) for c in plan.features},
             known_categories=known,
-            classes=None if classes is None else tuple(np.asarray(classes).tolist()),
+            classes=None
+            if classes is None
+            else tuple(np.asarray(classes).tolist()),
         )
-        return cls(pipeline, schema, BundleInfo(model_name, model_version, metric))
+        return cls(
+            pipeline, schema, BundleInfo(model_name, model_version, metric)
+        )
 
     def save(self, directory: str | pathlib.Path) -> pathlib.Path:
         """Writes the bundle.
@@ -234,7 +238,9 @@ class ModelBundle:
         root.mkdir(parents=True, exist_ok=True)
         model_path = root / MODEL_FILE
         joblib.dump(self.pipeline, model_path)
-        (root / SCHEMA_FILE).write_text(json.dumps(self.schema.to_dict(), indent=2))
+        (root / SCHEMA_FILE).write_text(
+            json.dumps(self.schema.to_dict(), indent=2)
+        )
         info = dataclasses.replace(
             self.info, files={MODEL_FILE: file_sha256(model_path)}
         )
@@ -246,7 +252,7 @@ class ModelBundle:
         cls,
         directory: str | pathlib.Path,
         allow_version_mismatch: bool = False,
-    ) -> "ModelBundle":
+    ) -> ModelBundle:
         """Loads and verifies a bundle (trusted sources only).
 
         Args:
@@ -302,7 +308,9 @@ class ModelBundle:
         """Class labels, or None for regression."""
         return self.schema.classes
 
-    def read_frame(self, data: str | pathlib.Path | pd.DataFrame) -> pd.DataFrame:
+    def read_frame(
+        self, data: str | pathlib.Path | pd.DataFrame
+    ) -> pd.DataFrame:
         """Loads inference input from a path or copies a DataFrame."""
         if isinstance(data, pd.DataFrame):
             return data.copy()
@@ -386,5 +394,7 @@ class ModelBundle:
         if self.schema.task == "regression" or not hasattr(
             self.pipeline, "predict_proba"
         ):
-            raise errors.ArtifactError("this model does not provide probabilities")
+            raise errors.ArtifactError(
+                "this model does not provide probabilities"
+            )
         return self.pipeline.predict_proba(self.prepare_frame(data))

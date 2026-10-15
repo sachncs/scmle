@@ -41,7 +41,9 @@ def test_evaluate_classification_and_regression():
     features = pd.DataFrame({"a": np.arange(40.0)})
     labels = pd.Series([0, 1] * 20)
     classifier = dummy.DummyClassifier(strategy="prior").fit(features, labels)
-    scores = CATALOG.evaluate(classifier, features, labels, tasks.TaskType.BINARY)
+    scores = CATALOG.evaluate(
+        classifier, features, labels, tasks.TaskType.BINARY
+    )
     assert scores["roc_auc"] == 0.5
     assert scores["log_loss"] == pytest.approx(0.6931, abs=1e-3)
     values = pd.Series(np.arange(40.0))
@@ -75,7 +77,10 @@ def registry():
 
 def test_best_mean_respects_orientation(registry):
     policy = selection.BestMeanPolicy()
-    trials = [make_trial("decision_tree", 0.7), make_trial("random_forest", 0.9)]
+    trials = [
+        make_trial("decision_tree", 0.7),
+        make_trial("random_forest", 0.9),
+    ]
     higher = CATALOG.metrics["roc_auc"]
     lower = CATALOG.metrics["rmse"]
     assert policy.select(trials, higher, registry).model_name == "random_forest"

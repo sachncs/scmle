@@ -20,7 +20,7 @@ class RunStore:
         self.directory = directory
 
     @classmethod
-    def create(cls, root: str | pathlib.Path) -> "RunStore":
+    def create(cls, root: str | pathlib.Path) -> RunStore:
         """Allocates `run_YYYYMMDD_NNN` under `root` without collisions.
 
         Args:

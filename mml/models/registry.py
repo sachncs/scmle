@@ -17,9 +17,7 @@ ENTRY_POINT_GROUP = "mml.models"
 class ModelRegistry:
     """Name-indexed collection of `ModelAdapter` instances."""
 
-    def __init__(
-        self, adapters: tuple[models.ModelAdapter, ...] = ()
-    ) -> None:
+    def __init__(self, adapters: tuple[models.ModelAdapter, ...] = ()) -> None:
         """Initializes the registry.
 
         Args:
@@ -30,7 +28,7 @@ class ModelRegistry:
             self.register(adapter)
 
     @classmethod
-    def with_builtins(cls) -> "ModelRegistry":
+    def with_builtins(cls) -> ModelRegistry:
         """Creates a registry holding the built-in scikit-learn adapters."""
         return cls(tuple(a() for a in sklearn_adapters.BUILTIN_ADAPTERS))
 
@@ -47,7 +45,9 @@ class ModelRegistry:
             ConfigError: If the name is taken and `overwrite` is False.
         """
         if adapter.name in self.adapters and not overwrite:
-            raise errors.ConfigError(f"model '{adapter.name}' already registered")
+            raise errors.ConfigError(
+                f"model '{adapter.name}' already registered"
+            )
         self.adapters[adapter.name] = adapter
 
     def unregister(self, name: str) -> None:

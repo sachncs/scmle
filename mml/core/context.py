@@ -73,7 +73,9 @@ class RunContext:
     split: splitting.SplitResult | None = None
     plan: experiments.ExperimentPlan | None = None
     metric: metrics.Metric | None = None
-    trials: list[experiments.TrialResult] = dataclasses.field(default_factory=list)
+    trials: list[experiments.TrialResult] = dataclasses.field(
+        default_factory=list
+    )
     selected: experiments.TrialResult | None = None
     final_pipeline: Any = None
     evaluation: dict[str, Any] | None = None

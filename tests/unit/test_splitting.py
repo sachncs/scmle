@@ -45,7 +45,10 @@ def test_stratified_preserves_ratio_and_is_disjoint(frame):
     assert abs(result.dev_target.mean() - frame.y.mean()) < 0.03
     for train, val in manifest.folds:
         assert set(train).isdisjoint(val)
-        assert abs(result.dev_target.iloc[list(val)].mean() - frame.y.mean()) < 0.08
+        assert (
+            abs(result.dev_target.iloc[list(val)].mean() - frame.y.mean())
+            < 0.08
+        )
     assert "y" not in result.dev_features.columns
 
 
@@ -66,9 +69,10 @@ def test_temporal_split_respects_order(frame):
     manifest = split(shuffled, make_spec(time_column="t")).manifest
     times = shuffled.t
     assert manifest.strategy == "temporal"
-    assert times.iloc[list(manifest.train_ids)].max() <= times.iloc[
-        list(manifest.test_ids)
-    ].min()
+    assert (
+        times.iloc[list(manifest.train_ids)].max()
+        <= times.iloc[list(manifest.test_ids)].min()
+    )
     dev_times = times.iloc[list(manifest.train_ids)].to_numpy()
     for train, val in manifest.folds:
         assert dev_times[list(train)].max() <= dev_times[list(val)].min()

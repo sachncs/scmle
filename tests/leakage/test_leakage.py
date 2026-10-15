@@ -16,7 +16,9 @@ def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
     frame = pd.DataFrame({f"f{i}": rng.normal(size=rows) for i in range(10)})
     frame["cat"] = rng.choice(list("abcdefgh"), rows)
     frame["y"] = rng.integers(0, 2, rows)
-    result = mml.MLProject(frame, "y", output_dir=tmp_path, time_budget=120).run()
+    result = mml.MLProject(
+        frame, "y", output_dir=tmp_path, time_budget=120
+    ).run()
     assert abs(result.evaluation["test_metrics"]["roc_auc"] - 0.5) < 0.12
     assert abs(result.evaluation["selected_cv_score"] - 0.5) < 0.12
 
@@ -36,7 +38,9 @@ def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
     result = mml.MLProject(
         frame, "y", group_column="g", output_dir=tmp_path
     ).run()
-    manifest = json.loads((result.run_dir / "validation_manifest.json").read_text())
+    manifest = json.loads(
+        (result.run_dir / "validation_manifest.json").read_text()
+    )
     train_groups = set(frame.g.iloc[manifest["train_ids"]])
     test_groups = set(frame.g.iloc[manifest["test_ids"]])
     assert train_groups.isdisjoint(test_groups)

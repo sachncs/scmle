@@ -21,7 +21,8 @@ class TrialRunner:
         """
         self.context = context
         self.folds = [
-            (list(train), list(val)) for train, val in context.split.manifest.folds
+            (list(train), list(val))
+            for train, val in context.split.manifest.folds
         ]
 
     def run(self, trial_id: str, model_name: str) -> experiments.TrialResult:
@@ -66,7 +67,9 @@ class TrialRunner:
         result.fit_seconds = time.monotonic() - started
         return result
 
-    def skip(self, trial_id: str, model_name: str, reason: str) -> experiments.TrialResult:
+    def skip(
+        self, trial_id: str, model_name: str, reason: str
+    ) -> experiments.TrialResult:
         """Creates a `SKIPPED` result."""
         return experiments.TrialResult(
             trial_id,

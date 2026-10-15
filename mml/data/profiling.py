@@ -86,16 +86,16 @@ class TaskResolver:
             raise errors.BlockedError(
                 "multiclass_classification requested but target has 2 classes"
             )
-        return (
-            tasks.TaskType.BINARY if binary else tasks.TaskType.MULTICLASS
-        )
+        return tasks.TaskType.BINARY if binary else tasks.TaskType.MULTICLASS
 
     def resolve_auto(self, target: pd.Series) -> tasks.TaskType:
         """Infers the task; blocks when the choice is genuinely ambiguous."""
         classes = target.nunique(dropna=True)
         if not is_numeric_target(target):
             return (
-                tasks.TaskType.BINARY if classes == 2 else tasks.TaskType.MULTICLASS
+                tasks.TaskType.BINARY
+                if classes == 2
+                else tasks.TaskType.MULTICLASS
             )
         if classes == 2:
             return tasks.TaskType.BINARY
@@ -143,7 +143,7 @@ def summarize_target(
     ratio = float(counts.iloc[0] / counts.iloc[-1])
     summary = {
         "task": task.value,
-        "n_classes": int(len(counts)),
+        "n_classes": len(counts),
         "class_counts": {str(k): int(v) for k, v in counts.items()},
         "imbalance_ratio": ratio,
     }
@@ -171,8 +171,8 @@ class DatasetProfiler:
             DataError: If a configured column is absent from the data.
         """
         data = self.spec.data
-        roles = {c: "id column" for c in data.id_columns}
-        roles |= {c: "excluded by user" for c in data.excluded_columns}
+        roles = dict.fromkeys(data.id_columns, "id column")
+        roles |= dict.fromkeys(data.excluded_columns, "excluded by user")
         if data.group_column:
             roles[data.group_column] = "group column (used for splitting only)"
         if data.time_column:
@@ -242,8 +242,7 @@ class DatasetProfiler:
             conflicts = int((labels > 1).sum())
             if conflicts:
                 findings.append(
-                    f"{conflicts} feature combinations have inconsistent "
-                    "labels"
+                    f"{conflicts} feature combinations have inconsistent labels"
                 )
         return findings
 

@@ -101,7 +101,9 @@ class ProfileStage(Stage):
                 )
 
 
-def build_plan(context: context_module.RunContext) -> experiments.ExperimentPlan:
+def build_plan(
+    context: context_module.RunContext,
+) -> experiments.ExperimentPlan:
     """Creates the experiment plan from a profiled context."""
     approved = context.approved_plan
     planner = planner_module.Planner(context.registry, context.catalog)
@@ -128,7 +130,9 @@ class PlanStage(Stage):
         """Splits the data and plans candidates."""
         manager = splitting.SplitManager(context.spec, context.task)
         context.split = manager.split(context.frame)
-        context.write_json("validation_manifest.json", context.split.manifest.to_dict())
+        context.write_json(
+            "validation_manifest.json", context.split.manifest.to_dict()
+        )
         context.plan = build_plan(context)
         context.write_json("execution_plan.json", context.plan.to_dict())
         context.write_json(
@@ -154,7 +158,9 @@ class TrainStage(Stage):
             trial_id = f"trial_{number:03d}"
             if number > 1 and time.monotonic() >= context.deadline:
                 outcome = runner.skip(
-                    trial_id, name, "time budget exhausted before this trial started"
+                    trial_id,
+                    name,
+                    "time budget exhausted before this trial started",
                 )
             else:
                 outcome = runner.run(trial_id, name)
@@ -187,7 +193,9 @@ class FinalEvaluationStage(Stage):
 
     def describe(self, context: context_module.RunContext) -> str:
         """Names the selected model."""
-        return f"final one-time test evaluation of {context.selected.model_name}"
+        return (
+            f"final one-time test evaluation of {context.selected.model_name}"
+        )
 
     def execute(self, context: context_module.RunContext) -> None:
         """Refits on all development data and evaluates on the test set."""
@@ -276,7 +284,9 @@ class PackageStage(Stage):
         )
         board = result.leaderboard()
         board.to_parquet(store.path("leaderboard.parquet"), index=False)
-        store.write_text("report.html", report.HtmlReport().render(result, board))
+        store.write_text(
+            "report.html", report.HtmlReport().render(result, board)
+        )
         context.bundle, context.result = bundle, result
 
 

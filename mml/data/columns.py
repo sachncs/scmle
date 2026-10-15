@@ -7,7 +7,8 @@ preprocessing therefore iterate over kinds instead of branching on dtype.
 """
 
 import abc
-from typing import Any, ClassVar
+from typing import Any
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd

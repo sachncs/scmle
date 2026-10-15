@@ -28,7 +28,9 @@ def make_plan(planner, frame, budget=1800, approved=None, task=BINARY, **extra):
     )
     manifest = readers.build_manifest(frame, "y")
     profile = profiling.DatasetProfiler(spec).profile(frame, manifest, task)
-    return planner.plan(planner_module.PlanningContext(spec, profile, task, approved))
+    return planner.plan(
+        planner_module.PlanningContext(spec, profile, task, approved)
+    )
 
 
 @pytest.fixture
@@ -49,7 +51,10 @@ def test_classification_includes_baseline_linear_and_trees(planner, frame):
 
 
 def test_plan_is_deterministic(planner, frame):
-    assert make_plan(planner, frame).plan_id == make_plan(planner, frame.copy()).plan_id
+    assert (
+        make_plan(planner, frame).plan_id
+        == make_plan(planner, frame.copy()).plan_id
+    )
 
 
 def test_small_budget_prefers_fast_models(planner, frame):

@@ -3,7 +3,8 @@
 import enum
 import hashlib
 import json
-from typing import Literal, Self
+from typing import Literal
+from typing import Self
 
 import pydantic
 
@@ -97,7 +98,9 @@ class ProjectSpec(FrozenModel):
         if validation.strategy == "temporal" and not data.time_column:
             raise ValueError("strategy 'temporal' requires data.time_column")
         if validation.strategy == "stratified" and self.task == "regression":
-            raise ValueError("stratified validation is undefined for regression")
+            raise ValueError(
+                "stratified validation is undefined for regression"
+            )
         for name in ("group_column", "time_column"):
             if getattr(data, name) == data.target:
                 raise ValueError(f"data.{name} must differ from the target")

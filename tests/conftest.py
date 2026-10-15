@@ -48,7 +48,9 @@ def regression_frame():
         }
     )
     frame["y"] = (
-        3 * frame.a - 2 * frame.b + (frame.c == "p")
+        3 * frame.a
+        - 2 * frame.b
+        + (frame.c == "p")
         + rng.normal(scale=0.3, size=rows)
     )
     return frame

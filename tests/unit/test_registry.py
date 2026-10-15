@@ -1,7 +1,7 @@
 """Tests for the model registry, adapters and conformance suite."""
 
-from sklearn import dummy
 import pytest
+from sklearn import dummy
 
 from mml.contracts import errors
 from mml.contracts import models
@@ -40,9 +40,9 @@ def test_builtin_estimator_types(registry):
     assert type(registry.get("random_forest").build(BINARY, 0)).__name__ == (
         "RandomForestClassifier"
     )
-    assert type(registry.get("random_forest").build(REGRESSION, 0)).__name__ == (
-        "RandomForestRegressor"
-    )
+    assert type(
+        registry.get("random_forest").build(REGRESSION, 0)
+    ).__name__ == ("RandomForestRegressor")
     assert registry.get("random_forest").build(BINARY, 5).random_state == 5
 
 

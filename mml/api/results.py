@@ -45,7 +45,8 @@ class RunResult:
         board["selected"] = board["model_name"] == self.selected_model
         succeeded = board["status"] == str(experiments.TrialStatus.OK)
         ranked = board[succeeded].sort_values(
-            "score_mean", ascending=not self.evaluation["metric_greater_is_better"]
+            "score_mean",
+            ascending=not self.evaluation["metric_greater_is_better"],
         )
         return pd.concat([ranked, board[~succeeded]]).reset_index(drop=True)
 

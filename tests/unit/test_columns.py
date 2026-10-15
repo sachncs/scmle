@@ -41,7 +41,10 @@ def test_statistics_per_kind():
 def test_exclusion_rules():
     ids = pd.Series([f"u{i}" for i in range(50)])
     assert "id-like" in columns.CategoricalKind().exclusion_reason(ids)
-    assert columns.CategoricalKind().exclusion_reason(pd.Series(list("ab" * 25))) is None
+    assert (
+        columns.CategoricalKind().exclusion_reason(pd.Series(list("ab" * 25)))
+        is None
+    )
     assert "datetime" in columns.DatetimeKind().exclusion_reason(pd.Series([1]))
     assert columns.NumericKind().exclusion_reason(pd.Series([1])) is None
 
@@ -83,4 +86,7 @@ def test_regression_association_uses_rank_correlation():
 def test_association_with_too_few_rows_is_zero():
     kind = columns.NumericKind()
     short = pd.Series([1.0, 2.0, 3.0])
-    assert kind.association(short, pd.Series([0, 1, 0]), tasks.TaskType.BINARY) == 0.0
+    assert (
+        kind.association(short, pd.Series([0, 1, 0]), tasks.TaskType.BINARY)
+        == 0.0
+    )

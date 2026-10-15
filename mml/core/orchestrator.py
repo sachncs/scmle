@@ -29,7 +29,9 @@ from mml.models import registry as registry_module
 
 def environment_lock() -> str:
     """Lists installed distributions as sorted `name==version` lines."""
-    pins = {f"{d.metadata['Name']}=={d.version}" for d in metadata.distributions()}
+    pins = {
+        f"{d.metadata['Name']}=={d.version}" for d in metadata.distributions()
+    }
     return "\n".join(sorted(pins))
 
 
@@ -55,7 +57,9 @@ class Orchestrator:
         """
         self.spec = spec
         self.frame = frame
-        self.registry = registry or registry_module.ModelRegistry.with_builtins()
+        self.registry = (
+            registry or registry_module.ModelRegistry.with_builtins()
+        )
         self.policy = policy or selection.BestMeanPolicy()
         self.stages = stages or stages_module.default_stages()
         self.cancel_event = threading.Event()
@@ -64,8 +68,22 @@ class Orchestrator:
         """Requests cooperative cancellation of a running workflow."""
         self.cancel_event.set()
 
-    def new_context(self, **overrides) -> context_module.RunContext:
-        """Creates a run context wired with this orchestrator's services."""
+    def new_context(
+        self,
+        store: store_module.RunStore | None = None,
+        log: events.EventLog | None = None,
+        approved_plan: experiments.ExperimentPlan | None = None,
+    ) -> context_module.RunContext:
+        """Creates a run context wired with this orchestrator's services.
+
+        Args:
+            store: Run directory, or None for a side-effect-free preview.
+            log: Event log, or None for a preview.
+            approved_plan: Plan restricting which models may be considered.
+
+        Returns:
+            A fresh context.
+        """
         return context_module.RunContext(
             spec=self.spec,
             registry=self.registry,
@@ -73,7 +91,9 @@ class Orchestrator:
             policy=self.policy,
             cancel_event=self.cancel_event,
             input_frame=self.frame,
-            **overrides,
+            store=store,
+            log=log,
+            approved_plan=approved_plan,
         )
 
     def prepare(

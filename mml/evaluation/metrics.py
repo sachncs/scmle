@@ -60,7 +60,9 @@ DEFAULT_METRICS = (
     Metric("balanced_accuracy", "balanced_accuracy", True, CLASSIFICATION),
     Metric("accuracy", "accuracy", True, CLASSIFICATION),
     Metric("mae", "neg_mean_absolute_error", False, frozenset({REGRESSION})),
-    Metric("rmse", "neg_root_mean_squared_error", False, frozenset({REGRESSION})),
+    Metric(
+        "rmse", "neg_root_mean_squared_error", False, frozenset({REGRESSION})
+    ),
     Metric("r2", "r2", True, frozenset({REGRESSION})),
 )
 
@@ -68,7 +70,11 @@ DEFAULT_METRICS = (
 class MetricCatalog:
     """Resolves metric names and applies the report protocol."""
 
-    default_metric = {BINARY: "roc_auc", MULTICLASS: "log_loss", REGRESSION: "rmse"}
+    default_metric = {
+        BINARY: "roc_auc",
+        MULTICLASS: "log_loss",
+        REGRESSION: "rmse",
+    }
     report_names = {
         BINARY: (
             "roc_auc",

@@ -10,7 +10,9 @@ from mml.api import results
 class HtmlReport:
     """Renders a self-contained HTML summary of a run."""
 
-    def render(self, result: results.RunResult, leaderboard: pd.DataFrame) -> str:
+    def render(
+        self, result: results.RunResult, leaderboard: pd.DataFrame
+    ) -> str:
         """Builds the report.
 
         Args:
@@ -29,7 +31,10 @@ class HtmlReport:
             *result.profile.quality_findings,
             *result.profile.risk_findings,
         )
-        items = "".join(f"<li>{escape(f)}</li>" for f in findings) or "<li>none</li>"
+        items = (
+            "".join(f"<li>{escape(f)}</li>" for f in findings)
+            or "<li>none</li>"
+        )
         summary = escape(result.plan.summary()).replace("\n", "<br>")
         return (
             f"<!doctype html><meta charset=utf-8>"

@@ -47,7 +47,13 @@ class SplitManifest:
     def fingerprint(self) -> str:
         """Deterministic hash of the entire split."""
         payload = repr(
-            (self.strategy, self.seed, self.train_ids, self.test_ids, self.folds)
+            (
+                self.strategy,
+                self.seed,
+                self.train_ids,
+                self.test_ids,
+                self.folds,
+            )
         )
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
@@ -170,6 +176,9 @@ class SplitStrategy(abc.ABC):
     """
 
     name: ClassVar[str]
+    supported_tasks: ClassVar[frozenset[tasks.TaskType]] = frozenset(
+        tasks.TaskType
+    )
 
     def __init__(self, spec: tasks.ProjectSpec, task: tasks.TaskType) -> None:
         """Initializes the strategy.
@@ -187,7 +196,15 @@ class SplitStrategy(abc.ABC):
         self.check_task()
 
     def check_task(self) -> None:
-        """Rejects tasks the strategy cannot serve; default accepts all."""
+        """Rejects tasks outside `supported_tasks`.
+
+        Raises:
+            BlockedError: If the strategy cannot serve the task.
+        """
+        if self.task not in self.supported_tasks:
+            raise errors.BlockedError(
+                f"{self.name} validation does not support {self.task.value}"
+            )
 
     @abc.abstractmethod
     def partition(self, frame: pd.DataFrame) -> Partition:
@@ -242,13 +259,9 @@ class StratifiedSplit(RandomSplit):
     """Class-proportion preserving split for classification."""
 
     name = "stratified"
-
-    def check_task(self) -> None:
-        """Stratification needs classes."""
-        if not self.task.is_classification:
-            raise errors.BlockedError(
-                "stratified validation requires a classification task"
-            )
+    supported_tasks = frozenset(
+        {tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS}
+    )
 
     def stratify_labels(self, frame: pd.DataFrame) -> pd.Series:
         """Stratifies on the target; every class needs two examples."""
@@ -271,7 +284,9 @@ class StratifiedSplit(RandomSplit):
             )
         folds = self.validation.folds
         if rarest < folds:
-            notes.append(f"folds reduced {folds}->{rarest} (minority class size)")
+            notes.append(
+                f"folds reduced {folds}->{rarest} (minority class size)"
+            )
             folds = rarest
         splitter = model_selection.StratifiedKFold(
             n_splits=folds, shuffle=True, random_state=self.validation.seed
@@ -334,7 +349,9 @@ class TemporalSplit(SplitStrategy):
         dev_ids, test_ids = order[: rows - test_rows], order[rows - test_rows :]
         folds = self.validation.folds
         if len(dev_ids) < folds + 1:
-            raise errors.BlockedError("too few rows for temporal cross-validation")
+            raise errors.BlockedError(
+                "too few rows for temporal cross-validation"
+            )
         splitter = model_selection.TimeSeriesSplit(n_splits=folds)
         return Partition(
             dev_ids, test_ids, list(splitter.split(np.arange(len(dev_ids))))

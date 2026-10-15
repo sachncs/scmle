@@ -64,7 +64,9 @@ def test_statistics_come_from_training_rows_only(registry):
     scaler = scaler.named_steps["scale"]
     expected = features["num"].iloc[:100].median()
     imputer = pipe.named_steps["prep"].named_transformers_["numeric"]
-    assert imputer.named_steps["impute"].statistics_[0] == pytest.approx(expected)
+    assert imputer.named_steps["impute"].statistics_[0] == pytest.approx(
+        expected
+    )
     assert scaler.n_samples_seen_ == 100
 
 
@@ -76,7 +78,9 @@ def test_scaling_follows_adapter_capability(registry):
         PLAN, registry.get("random_forest"), BINARY, 0
     )
     assert "scale" in linear.named_steps["prep"].transformers[0][1].named_steps
-    assert "scale" not in forest.named_steps["prep"].transformers[0][1].named_steps
+    assert (
+        "scale" not in forest.named_steps["prep"].transformers[0][1].named_steps
+    )
 
 
 def test_clone_is_unfitted_and_refit_is_deterministic(registry):

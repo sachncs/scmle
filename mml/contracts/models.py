@@ -8,7 +8,9 @@ instead of hard-coding library-specific conditions.
 import abc
 import dataclasses
 import importlib.util
-from typing import Any, ClassVar, Protocol
+from typing import Any
+from typing import ClassVar
+from typing import Protocol
 
 from mml.contracts import tasks
 

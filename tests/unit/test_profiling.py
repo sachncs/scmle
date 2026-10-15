@@ -48,7 +48,9 @@ def test_task_resolution(classification_frame):
     assert resolve(frame, "classification") is tasks.TaskType.BINARY
     multi = frame.assign(y=np.arange(len(frame)) % 4)
     assert resolve(multi, "classification") is tasks.TaskType.MULTICLASS
-    continuous = frame.assign(y=np.random.default_rng(1).normal(size=len(frame)))
+    continuous = frame.assign(
+        y=np.random.default_rng(1).normal(size=len(frame))
+    )
     assert resolve(continuous) is tasks.TaskType.REGRESSION
     strings = frame.assign(y=np.where(frame.y == 1, "yes", "no"))
     assert resolve(strings) is tasks.TaskType.BINARY

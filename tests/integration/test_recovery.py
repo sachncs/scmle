@@ -57,9 +57,14 @@ def test_all_trials_failing_ends_in_failed_state(binary_frame, tmp_path):
     registry = registry_module.ModelRegistry((ExplodingAdapter(),))
     project = mml.MLProject(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
-    with pytest.raises(errors.MagicMLError, match="all trials failed") as caught:
+    with pytest.raises(
+        errors.MagicMLError, match="all trials failed"
+    ) as caught:
         project.run()
-    assert read_events(caught.value.details["run_dir"])[-1]["kind"] == "state.FAILED"
+    assert (
+        read_events(caught.value.details["run_dir"])[-1]["kind"]
+        == "state.FAILED"
+    )
 
 
 def test_cancellation_keeps_completed_trials(binary_frame, tmp_path):
@@ -81,7 +86,9 @@ def test_cancellation_keeps_completed_trials(binary_frame, tmp_path):
     with pytest.raises(errors.CancelledError) as caught:
         project.run()
     run_dir = caught.value.details["run_dir"]
-    assert any(name.endswith(".json") for name in os.listdir(f"{run_dir}/trials"))
+    assert any(
+        name.endswith(".json") for name in os.listdir(f"{run_dir}/trials")
+    )
     assert read_events(run_dir)[-1]["kind"] == "state.CANCELLED"
 
 

@@ -38,7 +38,9 @@ def test_roundtrip_prediction_equivalence(trained, tmp_path):
     bundle, features = trained
     bundle.save(tmp_path / "m")
     loaded = bundle_module.ModelBundle.load(tmp_path / "m")
-    np.testing.assert_array_equal(bundle.predict(features), loaded.predict(features))
+    np.testing.assert_array_equal(
+        bundle.predict(features), loaded.predict(features)
+    )
     np.testing.assert_allclose(
         bundle.predict_proba(features), loaded.predict_proba(features)
     )
@@ -90,7 +92,9 @@ def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
     path.write_text(json.dumps(manifest))
     with pytest.raises(errors.ArtifactError, match="different dependencies"):
         bundle_module.ModelBundle.load(directory)
-    relaxed = bundle_module.ModelBundle.load(directory, allow_version_mismatch=True)
+    relaxed = bundle_module.ModelBundle.load(
+        directory, allow_version_mismatch=True
+    )
     assert len(relaxed.predict(features)) == len(features)
 
 
