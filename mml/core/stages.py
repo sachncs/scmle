@@ -17,12 +17,13 @@ from mml.contracts import errors
 from mml.contracts import experiments
 from mml.core import context as context_module
 from mml.core import state as run_state
+from mml.core import strategy_search
 from mml.core import trials
 from mml.core import tuning
-from mml.data import preprocessing
 from mml.data import profiling
 from mml.data import readers
 from mml.data import splitting
+from mml.data import strategies
 from mml.intelligence import planner as planner_module
 
 LEAKAGE_MARKER = "leakage"
@@ -146,7 +147,7 @@ class PlanStage(Stage):
         context.write_json("execution_plan.json", plan.to_dict())
         context.write_json(
             "diagnostics/decision_log.json",
-            [d.to_dict() for d in plan.decisions],
+            {"plan": [d.to_dict() for d in plan.decisions], "outcomes": []},
         )
 
 
@@ -173,10 +174,7 @@ class TrainStage(Stage):
         for start in range(0, len(names), runner.workers):
             context.check_cancelled()
             chunk = names[start : start + runner.workers]
-            ids = [
-                f"trial_{start + offset + 1:03d}"
-                for offset in range(len(chunk))
-            ]
+            ids = context.allocate_trial_ids(len(chunk))
             if start > 0 and time.monotonic() >= context.deadline:
                 outcomes = [
                     runner.skip(
@@ -194,6 +192,9 @@ class TrainStage(Stage):
                 outcomes = runner.run_many(jobs)
             for outcome in outcomes:
                 context.record_trial(outcome)
+        strategy_search.StrategySearch(context, runner).search(
+            list(context.trials)
+        )
         tuning.Tuner(context, runner).tune(list(context.trials))
 
 
@@ -230,7 +231,7 @@ class FinalEvaluationStage(Stage):
         selected = require(context.selected, "selected")
         task = require(context.task, "task")
         metric = require(context.metric, "metric")
-        pipeline = preprocessing.build_pipeline(
+        pipeline = strategies.get_strategy(selected.strategy).build(
             require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
             task,
@@ -267,6 +268,7 @@ class FinalEvaluationStage(Stage):
             "selection_policy": context.policy.description,
             "selected_model": selected.model_name,
             "selected_params": selected.params,
+            "selected_strategy": selected.strategy,
             "selected_cv_score": selected.score_mean,
             "selected_cv_std": selected.score_std,
             "baseline_cv_score": baseline.score_mean if baseline else None,
@@ -309,8 +311,24 @@ class PackageStage(Stage):
             require(context.metric, "metric").name,
             selected.model_name,
             model_params=selected.params,
+            strategy=selected.strategy,
         )
         bundle.save(store.path("model"))
+        store.write_json(
+            "diagnostics/decision_log.json",
+            {
+                "plan": [
+                    d.to_dict() for d in require(context.plan, "plan").decisions
+                ],
+                "outcomes": [d.to_dict() for d in context.outcomes],
+                "selection": {
+                    "model": selected.model_name,
+                    "strategy": selected.strategy,
+                    "params": selected.params,
+                    "policy": context.policy.description,
+                },
+            },
+        )
         store.write_json("evaluation.json", evaluation)
         result = results.RunResult(
             run_id=store.run_id,

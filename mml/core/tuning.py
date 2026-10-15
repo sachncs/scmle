@@ -34,40 +34,47 @@ class Tuner:
         self.runner = runner
         self.search = context.spec.search
         self.metric = context_module.require(context.metric, "metric")
-        self.counter = 0
 
-    def next_id(self) -> str:
-        """Allocates the next trial identifier."""
-        self.counter += 1
-        return f"trial_{self.counter:03d}"
-
-    def promising_models(
+    def promising_candidates(
         self, screened: list[experiments.TrialResult]
-    ) -> list[str]:
-        """Ranks screened tunable models best-first and keeps the top few."""
+    ) -> list[tuple[str, str]]:
+        """Picks the best (model, strategy) per model, best models first.
+
+        Only successful default-hyperparameter trials compete, across all
+        strategies, and only tunable models are kept.
+
+        Args:
+            screened: Trials from screening and strategy search.
+
+        Returns:
+            Up to `search.top_models` distinct (model, strategy) pairs.
+        """
         sign = 1 if self.metric.greater_is_better else -1
         ok = [t for t in screened if t.status is Status.OK and not t.params]
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
         registry = self.context.registry
-        tunable = [
-            t.model_name
-            for t in ranked
-            if registry.get(t.model_name).search_space is not None
-        ]
-        return tunable[: self.search.top_models]
+        chosen: dict[str, str] = {}
+        for trial in ranked:
+            tunable = registry.get(trial.model_name).search_space is not None
+            if tunable and trial.model_name not in chosen:
+                chosen[trial.model_name] = trial.strategy
+        return list(chosen.items())[: self.search.top_models]
 
     def tune(self, screened: list[experiments.TrialResult]) -> None:
-        """Searches the most promising models; results go to the context.
+        """Searches the most promising candidates; results go to the context.
 
         Args:
-            screened: Default-configuration trials from the screening phase.
+            screened: Default-configuration trials from earlier phases.
         """
-        self.counter = len(screened)
-        for index, name in enumerate(self.promising_models(screened)):
-            self.tune_model(name, index)
+        if self.search.top_models == 0:
+            return
+        for index, (name, strategy) in enumerate(
+            self.promising_candidates(screened)
+        ):
+            self.tune_model(name, strategy, index)
 
-    def tune_model(self, name: str, index: int) -> None:
-        """Runs batched, pruned search for one model."""
+    def tune_model(self, name: str, strategy: str, index: int) -> None:
+        """Runs batched, pruned search for one model under one strategy."""
         context, search = self.context, self.search
         space = context_module.require(
             context.registry.get(name).search_space, f"{name}.search_space"
@@ -84,10 +91,14 @@ class Tuner:
             context.check_cancelled()
             size = min(batch_size, remaining)
             remaining -= size
-            self.run_batch(name, optimizer, size)
+            self.run_batch(name, strategy, optimizer, size)
 
     def run_batch(
-        self, name: str, optimizer: optimizers.Optimizer, size: int
+        self,
+        name: str,
+        strategy: str,
+        optimizer: optimizers.Optimizer,
+        size: int,
     ) -> None:
         """Scores a batch on the cheap rung, prunes, finishes the survivors.
 
@@ -96,16 +107,18 @@ class Tuner:
 
         Args:
             name: Model being tuned.
+            strategy: Data strategy the model is tuned under.
             optimizer: Source of configurations; told every score.
             size: Number of configurations in the batch.
         """
         multi_fold = len(self.runner.folds) > 1
         rung_folds = 1 if multi_fold else None
         proposals = [optimizer.ask() for count in range(size)]
+        ids = self.context.allocate_trial_ids(len(proposals))
         first_rung = self.runner.run_many(
             [
-                trials.TrialJob(self.next_id(), name, params, rung_folds)
-                for params in proposals
+                trials.TrialJob(trial_id, name, params, rung_folds, strategy)
+                for trial_id, params in zip(ids, proposals, strict=True)
             ]
         )
         survivors = self.survivor_ids(first_rung) if multi_fold else None
@@ -116,7 +129,9 @@ class Tuner:
                 t.trial_id: t
                 for t in self.runner.run_many(
                     [
-                        trials.TrialJob(t.trial_id, t.model_name, t.params)
+                        trials.TrialJob(
+                            t.trial_id, t.model_name, t.params, None, t.strategy
+                        )
                         for t in winners
                     ]
                 )

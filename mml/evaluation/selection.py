@@ -47,8 +47,8 @@ class BestMeanPolicy(SelectionPolicy):
     """Best mean cross-validation score; ties go to the cheaper model."""
 
     description = (
-        "best mean CV score; ties -> cheaper model; dummy baseline "
-        "excluded when other models ran"
+        "best mean CV score; ties -> cheaper model, then default strategy; "
+        "dummy baseline excluded when other models ran"
     )
 
     def select(
@@ -69,6 +69,13 @@ class BestMeanPolicy(SelectionPolicy):
         def rank(trial: experiments.TrialResult) -> tuple:
             cost = registry.get(trial.model_name).capabilities.cost
             score = round(trial.score_mean, SCORE_PRECISION)
-            return (-sign * score, cost, trial.model_name)
+            simple = trial.strategy != experiments.DEFAULT_STRATEGY
+            return (
+                -sign * score,
+                cost,
+                simple,
+                trial.model_name,
+                trial.strategy,
+            )
 
         return min(pool, key=rank)
