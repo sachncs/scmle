@@ -19,5 +19,13 @@ First public beta.
 * Monitoring (drift with sampling-noise floor, delayed labels, advisor),
   champion-challenger, model registry, batch and HTTP serving, lifecycle
   manager.
+* SVM, kNN (size-limited), CatBoost adapters; SMOTE-family and opt-in jitter
+  augmentation strategies; probability calibration strategy.
+* Full dataset fingerprint (shape, types, missingness, target, features,
+  relationships, structure, quality, operational cost, risk).
+* Structure-aware bootstrap intervals; resource governor; policy
+  checkpoints; data-access ledger and audit events; explicit inference
+  column mapping; replay verification.
+* MLflow tracking adapter and Ray execution backend.
 * CLI: `plan`, `run`, `resume`, `predict`.
 * Benchmarks on nine open datasets with a regression gate.

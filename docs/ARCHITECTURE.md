@@ -39,6 +39,21 @@ tracking database.
 7. **Package** writes the signed model bundle (schema, checksums, monitoring
    reference profile), leaderboard, decision log and HTML report.
 
+## Governance
+
+* **Policy checkpoints** (`PolicyCheckpoint`) gate the run after planning and
+  after selection. The selection gate fires *before the test set is opened*.
+  Every verdict is a `policy.approved` / `policy.rejected` event.
+* **Audit events** record the feature set and exclusions (`features.selected`),
+  the split (`split.created`), the frozen selection (`selection.frozen`) and
+  the single release of the test set (`test.opened`).
+* **Data-access ledger** (`diagnostics/data_access.json`) states what every
+  fitted operation could see and *verifies* it against the split manifest.
+* **Resource governor** applies CPU / time / memory limits cooperatively and
+  reports, per limit, how it was enforced and what was observed.
+* **Replay verification** (`MLProject.verify_replay`) classifies a rerun as
+  `exact`, `comparable` or `different`.
+
 ## Leakage guarantees
 
 * The test partition is held by `LockedTestSet`; it opens once, with a token
@@ -48,6 +63,8 @@ tracking database.
 * Thresholds are chosen from out-of-fold validation predictions only.
 * Strategy and ensemble decisions are made on validation folds that keep the
   original distribution.
+* Confidence intervals on the test metric resample the independent units of
+  observation (rows, whole groups, or contiguous time blocks).
 * `tests/leakage` proves it: rewriting the test partition's labels and
   features leaves every trial, fold score and selection unchanged.
 

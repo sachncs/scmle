@@ -11,9 +11,10 @@
 | --- | --- | --- |
 | `boosting` | LightGBM, XGBoost | adapters are rejected with a reason when absent |
 | `optimization` | Optuna | `SearchSpec(optimizer="optuna")` |
+| `sampling` | imbalanced-learn | SMOTE, Borderline-SMOTE, ADASYN strategies |
 | `tracking` | MLflow | `MlflowExperimentStore` |
-| `distributed` | Ray | `ResourceSpec(executor="ray")`; no free-threaded wheel yet |
-| `catboost` | CatBoost | no CPython 3.14 wheel yet; not part of `boosting` |
+| `distributed` | Ray | `ResourceSpec(executor="ray")`; no free-threaded (3.14t) wheel yet |
+| `catboost` | CatBoost | no free-threaded (3.14t) wheel yet; kept out of `boosting` for that reason |
 
 * **Lower bounds are tested**, not guessed: CI resolves
   `--resolution lowest-direct` and runs the unit, property and leakage suites
