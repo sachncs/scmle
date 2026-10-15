@@ -7,8 +7,10 @@ executes itself, so adding a command never touches the dispatcher.
 import abc
 import argparse
 from collections.abc import Sequence
+import json
 import pathlib
 import sys
+from typing import Any
 from typing import ClassVar
 
 import pandas as pd
@@ -80,9 +82,84 @@ class ProjectCommand(Command):
             default="random",
         )
         parser.add_argument("--output-dir", default="runs")
+        parser.add_argument(
+            "--validation",
+            choices=["auto", "stratified", "random", "group", "temporal"],
+            default="auto",
+        )
+        parser.add_argument("--folds", type=int, default=5)
+        parser.add_argument("--test-fraction", type=float, default=0.2)
+        parser.add_argument(
+            "--embargo-rows",
+            type=int,
+            default=0,
+            help="rows dropped between training and validation windows",
+        )
+        parser.add_argument(
+            "--unavailable-at-prediction",
+            nargs="*",
+            default=[],
+            help="columns known only after the outcome (excluded)",
+        )
+        parser.add_argument(
+            "--strategies",
+            nargs="*",
+            help="data strategies to evaluate (default: all standard ones)",
+        )
+        parser.add_argument(
+            "--enforcement", choices=["hard", "cooperative"], default="hard"
+        )
+        parser.add_argument(
+            "--leakage-policy", choices=["warn", "block"], default="warn"
+        )
+        parser.add_argument(
+            "--config",
+            help="JSON file with the nested sections `search`, `strategies`, "
+            "`ensemble`, `feature_graph`, `selection` and `decision` "
+            "(same fields as the specification classes)",
+        )
+
+    @staticmethod
+    def load_sections(path: str | None) -> dict[str, Any]:
+        """Reads the optional JSON file of nested specification sections.
+
+        Raises:
+            ConfigError: For unknown sections.
+        """
+        if path is None:
+            return {}
+        record = json.loads(pathlib.Path(path).read_text())
+        classes = {
+            "search": tasks.SearchSpec,
+            "strategies": tasks.StrategySpec,
+            "ensemble": tasks.EnsembleSpec,
+            "feature_graph": tasks.FeatureGraphSpec,
+            "selection": tasks.SelectionSpec,
+            "decision": tasks.DecisionSpec,
+        }
+        unknown = set(record) - set(classes)
+        if unknown:
+            raise errors.ConfigError(
+                f"unknown config sections {sorted(unknown)}; allowed: "
+                f"{sorted(classes)}"
+            )
+        return {name: classes[name](**body) for name, body in record.items()}
 
     def build_project(self, args: argparse.Namespace) -> project.MLProject:
         """Creates the project described by the arguments."""
+        sections = self.load_sections(args.config)
+        sections.setdefault(
+            "search",
+            tasks.SearchSpec(
+                top_models=args.top_models,
+                configs_per_model=args.configs_per_model,
+                optimizer=args.optimizer,
+            ),
+        )
+        if args.strategies is not None:
+            sections.setdefault(
+                "strategies", tasks.StrategySpec(names=args.strategies)
+            )
         return project.MLProject(
             args.data,
             args.target,
@@ -95,12 +172,15 @@ class ProjectCommand(Command):
             time_column=args.time_column,
             excluded_columns=args.exclude,
             seed=args.seed,
-            search=tasks.SearchSpec(
-                top_models=args.top_models,
-                configs_per_model=args.configs_per_model,
-                optimizer=args.optimizer,
-            ),
+            validation=args.validation,
+            folds=args.folds,
+            test_fraction=args.test_fraction,
+            embargo_rows=args.embargo_rows,
+            unavailable_at_prediction=args.unavailable_at_prediction,
+            enforcement=args.enforcement,
+            leakage_policy=args.leakage_policy,
             output_dir=args.output_dir,
+            **sections,
         )
 
 

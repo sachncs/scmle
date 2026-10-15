@@ -114,3 +114,54 @@ def test_predict_with_explicit_renames(binary_frame, tmp_path):
     assert cli.main(base) == cli.EXIT_FAILED  # exact names required by default
     code = cli.main([*base, "--rename", "A_value=a", "--case-insensitive"])
     assert code == 0 and len(pd.read_csv(output)) == len(binary_frame)
+
+
+def test_config_file_and_flags_reach_the_full_specification(
+    binary_frame, tmp_path
+):
+    import json
+
+    data = tmp_path / "d.csv"
+    binary_frame.to_csv(data, index=False)
+    config = tmp_path / "config.json"
+    config.write_text(
+        json.dumps(
+            {
+                "selection": {"tie_breaker": "lower_variance"},
+                "ensemble": {"size": 0},
+                "strategies": {"top_models": 0},
+                "search": {"top_models": 0},
+            }
+        )
+    )
+    args = [
+        "run",
+        str(data),
+        "--target",
+        "y",
+        "--output-dir",
+        str(tmp_path / "runs"),
+        "--time-budget",
+        "300",
+        "--config",
+        str(config),
+        "--folds",
+        "3",
+        "--enforcement",
+        "cooperative",
+        "--leakage-policy",
+        "block",
+    ]
+    assert cli.main(args) == 0
+    saved = json.loads(
+        next((tmp_path / "runs").glob("run_*"))
+        .joinpath("config.json")
+        .read_text()
+    )
+    assert saved["selection"]["tie_breaker"] == "lower_variance"
+    assert saved["validation"]["folds"] == 3
+    assert saved["resources"]["enforcement"] == "cooperative"
+    assert saved["leakage_policy"] == "block"
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"mystery": {}}))
+    assert cli.main([*args[:-8], "--config", str(bad)]) != 0
