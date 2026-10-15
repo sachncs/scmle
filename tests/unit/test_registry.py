@@ -157,8 +157,15 @@ def test_svm_and_knn_pass_conformance_and_respect_size_limits(registry):
     assert {"svm", "knn"} <= {a.name for a in small}
 
 
-def test_svm_regression_has_no_probability_argument(registry):
+def test_svm_classifier_is_calibrated_and_regressor_is_plain(registry):
     estimator = registry.get("svm").build(REGRESSION, 0, {"C": 2.0})
     assert type(estimator).__name__ == "SVR" and estimator.C == 2.0
-    classifier = registry.get("svm").build(BINARY, 3)
-    assert classifier.probability is True and classifier.random_state == 3
+    classifier = registry.get("svm").build(BINARY, 3, {"C": 0.5})
+    assert type(classifier).__name__ == "CalibratedClassifierCV"
+    assert (
+        classifier.estimator.random_state == 3 and classifier.estimator.C == 0.5
+    )
+    assert (
+        classifier.ensemble is False
+        and classifier.estimator.probability is False
+    )

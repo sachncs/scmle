@@ -1,5 +1,7 @@
 """Model registry, serving adapters and lifecycle automation."""
 
+import copy
+import dataclasses
 import json
 import urllib.error
 import urllib.request
@@ -53,8 +55,12 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     bundle_dir = trained.save(tmp_path / "export")
     first = store.register("churn", bundle_dir, {"roc_auc": 0.9}, run_id="r1")
-    second = store.register("churn", bundle_dir, {"roc_auc": 0.91}, run_id="r2")
+    newer = copy.copy(trained.bundle)
+    newer.info = dataclasses.replace(trained.bundle.info, model_version="v2")
+    changed = newer.save(tmp_path / "export2")
+    second = store.register("churn", changed, {"roc_auc": 0.91}, run_id="r2")
     assert (first.version, second.version) == (1, 2)
+    assert first.content_id != second.content_id
     store.promote("churn", 1)
     store.promote("churn", 2, "challenger")
     assert store.aliases("churn") == {"champion": 1, "challenger": 2}
@@ -210,3 +216,17 @@ def test_review_can_be_report_only(trained, tmp_path):
     )
     assert outcome.monitoring.recommendation.action == "retrain"
     assert not outcome.retrained and store.resolve("churn").version == 1
+
+
+def test_registering_identical_content_is_idempotent(trained, tmp_path):
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    bundle_dir = trained.save(tmp_path / "export")
+    first = store.register("churn", bundle_dir, run_id="r1")
+    again = store.register("churn", bundle_dir, run_id="r2")
+    copy = trained.save(tmp_path / "export_copy")
+    third = store.register("churn", copy, run_id="r3")
+    assert again.version == third.version == first.version == 1
+    assert len(store.versions("churn")) == 1
+    assert first.content_id == registry_module.content_id_of(bundle_dir)
+    audit = (store.root / "audit.jsonl").read_text().splitlines()
+    assert len(audit) == 1  # duplicates leave no extra audit noise
