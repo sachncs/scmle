@@ -140,3 +140,58 @@ def test_locked_test_set_opens_once(frame):
     assert len(features) == len(locked) == len(target)
     with pytest.raises(errors.LeakageError, match="already used"):
         locked.open(locked.issue_token())
+
+
+def temporal_spec(embargo):
+    return tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="m", target="y", time_column="t"),
+        validation=tasks.ValidationSpec(embargo_rows=embargo),
+    )
+
+
+def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
+    manifest = (
+        splitting.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
+    )
+    dev_times = frame.t.iloc[list(manifest.train_ids)].to_numpy()
+    for fit, validate in manifest.folds:
+        assert min(validate) - max(fit) > 10  # at least `embargo` rows apart
+        assert dev_times[list(fit)].max() < dev_times[list(validate)].min()
+    assert any("embargo of 10 rows" in note for note in manifest.notes)
+
+
+def test_embargo_rows_before_the_test_set_belong_to_neither_partition(frame):
+    plain = (
+        splitting.SplitManager(temporal_spec(0), BINARY).split(frame).manifest
+    )
+    embargoed = (
+        splitting.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
+    )
+    assert embargoed.test_ids == plain.test_ids
+    assert len(embargoed.train_ids) == len(plain.train_ids) - 10
+    unused = (
+        set(range(len(frame)))
+        - set(embargoed.train_ids)
+        - set(embargoed.test_ids)
+    )
+    assert len(unused) == 10
+    ordered = frame.t.sort_values().index.to_list()
+    assert (
+        set(
+            ordered[
+                len(ordered) - len(embargoed.test_ids) - 10 : len(ordered)
+                - len(embargoed.test_ids)
+            ]
+        )
+        == unused
+    )
+
+
+def test_embargo_requires_a_time_column_and_enough_rows(frame):
+    with pytest.raises(Exception, match="time_column"):
+        tasks.ProjectSpec(
+            data=tasks.DataSpec(uri="m", target="y"),
+            validation=tasks.ValidationSpec(embargo_rows=5),
+        )
+    with pytest.raises(errors.BlockedError, match="too few"):
+        splitting.SplitManager(temporal_spec(400), BINARY).split(frame)

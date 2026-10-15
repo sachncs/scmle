@@ -163,3 +163,18 @@ def test_outcome_dependent_recording_is_reported_as_possible_leakage():
         >= 0.9
     )
     assert result.column_statistics["signal"]["missingness_association"] == 0.0
+
+
+def test_features_unavailable_at_prediction_time_are_excluded_with_a_reason(
+    classification_frame,
+):
+    frame = classification_frame.assign(refund_issued=lambda f: f["y"] * 3.0)
+    result = profile(frame, unavailable_at_prediction=["refund_issued"])[1]
+    reason = result.feature_plan.dropped["refund_issued"]
+    assert "not available at prediction time" in reason
+    assert "refund_issued" not in result.feature_plan.features
+
+
+def test_target_cannot_be_declared_unavailable():
+    with pytest.raises(Exception, match="unavailable"):
+        make_spec(unavailable_at_prediction=["y"])
