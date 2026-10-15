@@ -11,6 +11,7 @@ class TrialStatus(enum.StrEnum):
     OK = "ok"
     FAILED = "failed"
     SKIPPED = "skipped"
+    PRUNED = "pruned"
 
 
 class DecisionAction(enum.StrEnum):
@@ -110,6 +111,7 @@ class TrialResult:
         fold_scores: Per-fold scores.
         fit_seconds: Wall-clock cost.
         error: Failure or skip reason, empty on success.
+        params: Hyperparameter overrides (empty for default configuration).
     """
 
     trial_id: str
@@ -121,6 +123,7 @@ class TrialResult:
     fold_scores: list[float] = dataclasses.field(default_factory=list)
     fit_seconds: float = 0.0
     error: str = ""
+    params: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""

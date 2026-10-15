@@ -5,6 +5,9 @@ and refits the whole thing per fold (fold-local fitting) and inference reuses
 the identical fitted graph.
 """
 
+from collections.abc import Mapping
+from typing import Any
+
 from sklearn import compose
 from sklearn import pipeline
 
@@ -42,6 +45,7 @@ def build_pipeline(
     adapter: models.ModelAdapter,
     task: tasks.TaskType,
     seed: int,
+    params: Mapping[str, Any] | None = None,
 ) -> pipeline.Pipeline:
     """Builds a complete, independently evaluable candidate pipeline.
 
@@ -50,6 +54,7 @@ def build_pipeline(
         adapter: Model family to place after preprocessing.
         task: Resolved task type.
         seed: Random seed forwarded to the estimator.
+        params: Hyperparameter overrides for the estimator.
 
     Returns:
         An unfitted pipeline of preprocessing followed by the estimator.
@@ -58,5 +63,5 @@ def build_pipeline(
         plan, scale=adapter.capabilities.needs_scaling
     )
     return pipeline.Pipeline(
-        [("prep", preprocessor), ("model", adapter.build(task, seed))]
+        [("prep", preprocessor), ("model", adapter.build(task, seed, params))]
     )

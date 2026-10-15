@@ -108,6 +108,7 @@ class BundleInfo:
         sklearn: scikit-learn version that built it.
         pandas: pandas version that built it.
         files: SHA-256 per stored file.
+        model_params: Hyperparameter overrides of the selected model.
     """
 
     model_name: str
@@ -119,6 +120,7 @@ class BundleInfo:
     sklearn: str = sklearn.__version__
     pandas: str = pd.__version__
     files: dict[str, str] = dataclasses.field(default_factory=dict)
+    model_params: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -187,6 +189,7 @@ class ModelBundle:
         metric: str,
         model_name: str,
         model_version: str = "v1",
+        model_params: dict[str, Any] | None = None,
     ) -> ModelBundle:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -199,6 +202,7 @@ class ModelBundle:
             metric: Optimized metric name.
             model_name: Selected model family.
             model_version: Bundle version label.
+            model_params: Hyperparameter overrides of the selected model.
 
         Returns:
             The bundle.
@@ -221,9 +225,10 @@ class ModelBundle:
             if classes is None
             else tuple(np.asarray(classes).tolist()),
         )
-        return cls(
-            pipeline, schema, BundleInfo(model_name, model_version, metric)
+        info = BundleInfo(
+            model_name, model_version, metric, model_params=model_params or {}
         )
+        return cls(pipeline, schema, info)
 
     def save(self, directory: str | pathlib.Path) -> pathlib.Path:
         """Writes the bundle.

@@ -1,6 +1,7 @@
 """Typed run result."""
 
 import dataclasses
+import json
 import pathlib
 from typing import Any
 
@@ -42,6 +43,7 @@ class RunResult:
         """Returns trials ranked best-first, failed/skipped trials last."""
         board = pd.DataFrame([t.to_dict() for t in self.trials])
         board = board.drop(columns=["fold_scores"])
+        board["params"] = board["params"].map(json.dumps)
         board["selected"] = board["model_name"] == self.selected_model
         succeeded = board["status"] == str(experiments.TrialStatus.OK)
         ranked = board[succeeded].sort_values(
