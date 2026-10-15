@@ -196,3 +196,17 @@ def test_regression_diagnostics_include_residuals(regression_frame, tmp_path):
     result = run(regression_frame, tmp_path, task="regression")
     assert "residuals" in result.diagnostics
     assert result.feature_importance().iloc[0]["feature"] in {"a", "b"}
+
+
+def test_exported_bundle_can_be_signed_and_loaded_without_trust(
+    binary_frame, tmp_path
+):
+    result = run(binary_frame, tmp_path)
+    exported = result.save(tmp_path / "signed", signing_key="shared-secret")
+    loaded = mml.ModelBundle.load(exported, signing_key="shared-secret")
+    features = binary_frame.drop(columns="y")
+    np.testing.assert_array_equal(
+        loaded.predict(features), result.predict(features)
+    )
+    with pytest.raises(Exception, match="unauthenticated"):
+        mml.ModelBundle.load(exported)
