@@ -71,6 +71,15 @@ class ResourceSpec(FrozenModel):
     gpu: Literal["auto", "disabled", "required"] = "auto"
 
 
+class SearchSpec(FrozenModel):
+    """Hyperparameter search settings (disabled when `top_models` is 0)."""
+
+    top_models: int = pydantic.Field(default=2, ge=0)
+    configs_per_model: int = pydantic.Field(default=6, ge=1)
+    optimizer: Literal["random", "optuna"] = "random"
+    prune_fraction: float = pydantic.Field(default=0.5, ge=0, lt=1)
+
+
 class ProjectSpec(FrozenModel):
     """The explicit, versioned specification of an ML project."""
 
@@ -80,6 +89,7 @@ class ProjectSpec(FrozenModel):
     metric: str | None = None
     validation: ValidationSpec = pydantic.Field(default_factory=ValidationSpec)
     resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
+    search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
     @pydantic.model_validator(mode="after")
