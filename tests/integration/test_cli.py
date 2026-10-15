@@ -61,5 +61,5 @@ def test_missing_file_returns_failure_code(tmp_path, capsys):
 
 def test_commands_are_polymorphic():
     names = [command.name for command in cli.COMMANDS]
-    assert names == ["plan", "run", "predict"]
+    assert names == ["plan", "run", "resume", "predict"]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
