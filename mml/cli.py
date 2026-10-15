@@ -61,6 +61,7 @@ class ProjectCommand(Command):
         parser.add_argument("--task", default="auto")
         parser.add_argument("--metric")
         parser.add_argument("--time-budget", type=int, default=1800)
+        parser.add_argument("--workers", type=int, default=1)
         parser.add_argument("--group-column")
         parser.add_argument("--time-column")
         parser.add_argument("--id-columns", nargs="*", default=[])
@@ -88,6 +89,7 @@ class ProjectCommand(Command):
             task=args.task,
             metric=args.metric,
             time_budget=args.time_budget,
+            workers=args.workers,
             id_columns=args.id_columns,
             group_column=args.group_column,
             time_column=args.time_column,

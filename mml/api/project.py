@@ -29,6 +29,7 @@ class MLProject:
         metric: str | None = None,
         time_budget: int = 1800,
         *,
+        workers: int = 1,
         id_columns: list[str] | None = None,
         group_column: str | None = None,
         time_column: str | None = None,
@@ -50,6 +51,7 @@ class MLProject:
                 binary/multiclass task.
             metric: Primary metric; defaults per task.
             time_budget: Wall-clock budget in seconds.
+            workers: Concurrent trial processes (1 = sequential).
             id_columns: Identifier columns excluded from features.
             group_column: Entity column that must not straddle splits.
             time_column: Column ordering rows in time.
@@ -85,7 +87,9 @@ class MLProject:
                 test_fraction=test_fraction,
                 seed=seed,
             ),
-            resources=tasks.ResourceSpec(time_budget_seconds=time_budget),
+            resources=tasks.ResourceSpec(
+                time_budget_seconds=time_budget, workers=workers
+            ),
             search=search or tasks.SearchSpec(),
             leakage_policy=leakage_policy,
         )
