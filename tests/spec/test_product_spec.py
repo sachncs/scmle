@@ -84,7 +84,7 @@ def events_of(result):
 def test_l5_to_l11_python_package_tabular_scope():
     """L5-L11: Python-first, open-source package for tabular classification/regression."""
     meta = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
-    assert meta["requires-python"].startswith(">=3.14")
+    assert meta["requires-python"].startswith(">=3.11")
     assert meta["license"] == "Apache-2.0"
     assert set(tasks.TaskType) == {
         tasks.TaskType.BINARY,
@@ -124,7 +124,7 @@ def test_l23_to_l39_decision_table(run):
     """L23-L39: each row of the non-negotiable decisions table."""
     project, result = run
     meta = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
-    assert meta["requires-python"].startswith(">=3.14")  # language
+    assert meta["requires-python"].startswith(">=3.11")  # Python 3.11+
     assert meta["license"] == "Apache-2.0" and (ROOT / "LICENSE").exists()
     assert issubclass(
         tasks.ProjectSpec, tasks.pydantic.BaseModel
@@ -785,7 +785,7 @@ def test_l411_l417_selection_constraints_measured_on_this_machine(
         and usage["p95_latency_ms"] <= 1000
         and usage["machine"]
     )
-    assert "ties -> cheaper model" in result.evaluation["selection_policy"]
+    assert "ties -> simpler_model" in result.evaluation["selection_policy"]
 
 
 # --------------------------------------------------------------- section 11

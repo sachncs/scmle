@@ -12,7 +12,7 @@ spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Python 3.14, standard and free-threaded | Implemented | `pyproject.toml`; suites run on both builds |
+| Python 3.11+ (tested 3.11 to 3.14, standard and free-threaded) | Implemented | `pyproject.toml`; CI matrix; suites run on 3.11 and 3.14 builds |
 | Open-source PyPI package, Apache-2.0 | Implemented | `LICENSE`, `.github/workflows/release.yml` |
 | Modular monolith with plugin contracts | Implemented | `mml/contracts/models.py`, `tests/unit/test_component_contracts.py` |
 | Local-first, distributed-capable | Implemented | `mml/core/execution.py`, `tests/integration/test_parallel.py`, `tests/integration/test_integrations.py` |

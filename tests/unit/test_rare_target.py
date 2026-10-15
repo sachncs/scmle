@@ -38,7 +38,7 @@ def profile_with(skew):
 
 
 def test_weights_favour_sparse_regions_of_the_target_range():
-    _, target = long_tailed()
+    target = long_tailed()[1]
     model = resampling.DensityWeightedRegressor(estimator=None)
     weights = model.weights(target.to_numpy())
     assert weights.mean() == pytest.approx(1.0)

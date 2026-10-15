@@ -11,7 +11,7 @@ uv run python -m benchmarks.check_regression results.json
 
 Rules (all enforced by CI):
 
-* Python 3.14, Google style: 80 columns, Google docstrings, `import module`
+* Python 3.11+ (keep the code importable on 3.11), Google style: 80 columns, Google docstrings, `import module`
   (not `from module import name`, except `typing`/`collections.abc`).
 * **No underscore-prefixed names** for variables, functions, classes,
   attributes or files (`tests/unit/test_conventions.py`).

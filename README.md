@@ -1,8 +1,9 @@
 # magicml
 
-Autonomous, leakage-safe ML lifecycle framework for tabular data. Python 3.14
-only (standard and free-threaded builds). The architecture is specified in
-[`product.md`](product.md); the importable package is `mml`.
+Autonomous, leakage-safe ML lifecycle framework for tabular data. Python 3.11
+or newer (tested on 3.11 to 3.14, including the free-threaded 3.14 build).
+The architecture is specified in [`product.md`](product.md); the importable
+package is `mml`.
 
 ```python
 import mml
@@ -148,9 +149,10 @@ installed into a clean environment.
   the model stored at training time (`series_history.parquet`, checksummed in
   the bundle) plus rows scored so far by the serving adapters; a record
   before an entity's stored history gets missing values by construction.
-* Profiling statistics (imbalance ratio, skew, association scores) are
-  computed on the whole dataset, as `product.md` orders profiling before
-  splitting; stratified splits use labels to choose the test rows.
+* Only the target is looked at before the split (to resolve the task and, for
+  stratified splits, to choose the test rows). All other profiling, feature
+  selection, leakage detection and the fingerprint use the development
+  partition alone.
 * The HTTP serving adapter is a minimal reference server (no authentication
   or TLS); run it behind a gateway.
 * Large deep-learning frameworks are not bundled; the neural family is a

@@ -132,6 +132,8 @@ def test_builds_produce_fittable_candidates(skewed_imbalanced):
     for name in strategies.STRATEGIES:
         if name in {"smote", "borderline_smote", "adasyn"} and not has_sampling:
             continue
+        if name == "rare_target_weighting":
+            continue  # regression only; covered in test_rare_target
         adapter = REGISTRY.get("logistic_regression")
         candidate = strategies.get_strategy(name).build(
             plan, adapter, BINARY, 0
@@ -171,6 +173,8 @@ def test_registry_and_unknown_strategy():
         "calibrated",
         "log_skewed",
         "interactions",
+        "target_encoding",
+        "rare_target_weighting",
     )
     assert "jitter_augment" not in strategies.DEFAULT_NAMES
     with pytest.raises(errors.ConfigError, match="unknown strategy"):

@@ -1,7 +1,7 @@
 # Dependency policy
 
-* **Python:** CPython 3.14 only, both the standard and the free-threaded
-  build (the suite passes on both).
+* **Python:** CPython 3.11 or newer, tested on 3.11, 3.12, 3.13 and 3.14,
+  including the free-threaded 3.14 build.
 * **Base install** is deliberately light: numpy, pandas, pyarrow, pydantic,
   scikit-learn, joblib, threadpoolctl. No GPU, service, database server or
   cloud account is required.

@@ -143,7 +143,15 @@ class IngestStage(Stage):
 
 
 class ProfileStage(Stage):
-    """Resolves the task and profiles the data."""
+    """Resolves the task, splits the data, and profiles the development rows.
+
+    Only the target is looked at to resolve the task and to split (class
+    counts for stratification, groups and time for the other protocols). Every
+    statistic that drives a modelling decision (column statistics, feature
+    selection, leakage hypotheses, the fingerprint) is then computed on the
+    development partition alone, so the locked test rows never influence
+    them.
+    """
 
     requires = (IngestStage,)
     state = run_state.RunState.PROFILING
@@ -161,14 +169,25 @@ class ProfileStage(Stage):
         """
         spec = context.spec
         frame = require(context.frame, "frame")
-        task = profiling.TaskResolver(spec).resolve(frame[spec.data.target])
+        target = frame[spec.data.target]
+        if target.isna().any():
+            raise errors.BlockedError(
+                f"target '{target.name}' has {int(target.isna().sum())} "
+                "missing values"
+            )
+        task = profiling.TaskResolver(spec).resolve(target)
         context.task = task
         context.metric = context.catalog.resolve(spec.primary_metric, task)
+        split = self.make_split(context, task, frame)
+        development = split.dev_features.assign(
+            **{spec.data.target: split.dev_target}
+        )
         profile = profiling.DatasetProfiler(spec).profile(
-            frame,
+            development,
             require(context.manifest, "manifest"),
             task,
             context.read_seconds,
+            total_rows=len(frame),
         )
         profile = attach_feature_graph(spec, profile)
         if context.cleaning_notes:
@@ -198,6 +217,31 @@ class ProfileStage(Stage):
                 raise errors.BlockedError(
                     "unresolved leakage risk: " + "; ".join(leaks)
                 )
+
+    def make_split(
+        self,
+        context: context_module.RunContext,
+        task: tasks.TaskType,
+        frame: pd.DataFrame,
+    ) -> splitting.SplitResult:
+        """Splits the dataset and records the manifest."""
+        split = splitting.SplitManager(context.spec, task).split(frame)
+        context.split = split
+        context.write_json("validation_manifest.json", split.manifest.to_dict())
+        context.track(split_fingerprint=split.manifest.fingerprint)
+        context.emit(
+            "split.created",
+            f"{split.manifest.strategy} split",
+            ("validation_manifest.json",),
+            {
+                "fingerprint": split.manifest.fingerprint,
+                "strategy": split.manifest.strategy,
+                "development_rows": len(split.manifest.train_ids),
+                "test_rows": len(split.manifest.test_ids),
+                "notes": list(split.manifest.notes),
+            },
+        )
+        return split
 
 
 def attach_feature_graph(
@@ -260,36 +304,17 @@ def build_plan(
 
 
 class PlanStage(Stage):
-    """Establishes the split manifest and the experiment plan."""
+    """Builds the experiment plan from the development-set profile."""
 
     requires = (ProfileStage,)
     state = run_state.RunState.PLANNING
 
     def describe(self, context: context_module.RunContext) -> str:
         """Names the stage."""
-        return "build split manifest and execution plan"
+        return "build execution plan"
 
     def execute(self, context: context_module.RunContext) -> None:
-        """Splits the data and plans candidates."""
-        manager = splitting.SplitManager(
-            context.spec, require(context.task, "task")
-        )
-        split = manager.split(require(context.frame, "frame"))
-        context.split = split
-        context.write_json("validation_manifest.json", split.manifest.to_dict())
-        context.track(split_fingerprint=split.manifest.fingerprint)
-        context.emit(
-            "split.created",
-            f"{split.manifest.strategy} split",
-            ("validation_manifest.json",),
-            {
-                "fingerprint": split.manifest.fingerprint,
-                "strategy": split.manifest.strategy,
-                "development_rows": len(split.manifest.train_ids),
-                "test_rows": len(split.manifest.test_ids),
-                "notes": list(split.manifest.notes),
-            },
-        )
+        """Plans candidates."""
         plan = build_plan(context)
         context.plan = plan
         context.write_json("execution_plan.json", plan.to_dict())
@@ -609,8 +634,8 @@ class FinalEvaluationStage(Stage):
             "selected_cv_std": selected.score_std,
             "cv_confidence": confidence.cv_interval(
                 selected.fold_scores,
-                float(np.mean([len(fit) for fit, _ in split.manifest.folds])),
-                float(np.mean([len(held) for _, held in split.manifest.folds])),
+                float(np.mean([len(fold[0]) for fold in split.manifest.folds])),
+                float(np.mean([len(fold[1]) for fold in split.manifest.folds])),
                 split.manifest.strategy,
             ),
             "baseline_cv_score": baseline.score_mean if baseline else None,

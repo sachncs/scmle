@@ -251,6 +251,7 @@ def build_fingerprint(
     duplicate_rows: int,
     read_seconds: float,
     leakage_flags: int,
+    total_rows: int | None = None,
 ) -> dict[str, Any]:
     """Assembles the dataset-level fingerprint.
 
@@ -263,6 +264,8 @@ def build_fingerprint(
         duplicate_rows: Number of duplicate rows.
         read_seconds: Time spent reading the data.
         leakage_flags: Number of leakage hypotheses raised.
+        total_rows: Rows in the whole dataset when `frame` is only the
+            development partition.
 
     Returns:
         A JSON-serializable mapping grouped by fingerprint dimension.
@@ -303,6 +306,7 @@ def build_fingerprint(
     return {
         "shape": {
             "rows": len(frame),
+            "total_rows": total_rows if total_rows is not None else len(frame),
             "columns": frame.shape[1],
             "effective_samples": len(frame) - duplicate_rows,
             "sparsity": zero_share,

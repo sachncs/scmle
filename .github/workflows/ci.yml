@@ -11,23 +11,29 @@ concurrency:
 
 jobs:
   quality:
-    name: lint, types, tests
+    name: lint, types, tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --python 3.14 --extra boosting --extra optimization
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy mml benchmarks
       - run: uv run pytest -q
 
   minimal-dependencies:
-    name: lowest supported dependency versions
+    name: lowest supported dependency versions (Python 3.11)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --python 3.14 --resolution lowest-direct --extra boosting --extra optimization
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --python 3.11 --resolution lowest-direct --extra boosting --extra optimization
       - run: uv run pytest -q tests/unit tests/property tests/leakage
 
   integrations:

@@ -110,3 +110,61 @@ def test_search_is_invariant_to_test_labels_and_test_features(
     )
     # Sanity: the test partition really was different.
     assert second.evaluation["test_metrics"] != first.evaluation["test_metrics"]
+
+
+def without_timings(statistics):
+    """Removes wall-clock measurements, which differ between any two runs."""
+    cleaned = json.loads(json.dumps(statistics, default=str))
+    cleaned["operational"].pop("read_seconds")
+    cleaned["ml_difficulty"].pop("seconds")
+    return cleaned
+
+
+def test_profile_and_feature_plan_never_see_the_locked_test_rows(
+    binary_frame, tmp_path
+):
+    base = support.make_project(binary_frame, "y", output_dir=tmp_path / "a")
+    base.plan()
+    from mml.data import splitting
+
+    split = splitting.SplitManager(base.spec, tasks.TaskType.BINARY).split(
+        binary_frame
+    )
+    test_positions = list(split.manifest.test_ids)
+
+    altered = binary_frame.copy()
+    altered.loc[altered.index[test_positions], "a"] = np.nan  # all missing
+    altered.loc[altered.index[test_positions], "b"] = 1e9  # absurd values
+    altered.loc[altered.index[test_positions], "c"] = "never-seen"
+    other = support.make_project(altered, "y", output_dir=tmp_path / "b")
+    other.plan()
+
+    before, after = base.profile, other.profile
+    assert before.column_statistics == after.column_statistics
+    assert before.feature_plan == after.feature_plan
+    assert without_timings(before.dataset_statistics) == without_timings(
+        after.dataset_statistics
+    )
+    rows = before.dataset_statistics["shape"]
+    assert rows["rows"] == len(split.manifest.train_ids)
+    assert rows["total_rows"] == len(binary_frame)
+    assert rows["rows"] + len(test_positions) == rows["total_rows"]
+
+
+def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
+    binary_frame, tmp_path
+):
+    from mml.data import splitting
+
+    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    split = splitting.SplitManager(project.spec, tasks.TaskType.BINARY).split(
+        binary_frame
+    )
+    test_positions = list(split.manifest.test_ids)
+    leaky = binary_frame.assign(late=np.random.default_rng(1).normal(size=500))
+    leaky.loc[leaky.index[test_positions], "late"] = (
+        leaky.loc[leaky.index[test_positions], "y"] * 5.0
+    )
+    probe = support.make_project(leaky, "y", output_dir=tmp_path / "p")
+    probe.plan()
+    assert not any("'late'" in r for r in probe.profile.risk_findings)

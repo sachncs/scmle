@@ -308,14 +308,17 @@ class DatasetProfiler:
         manifest: data_contracts.DatasetManifest,
         task: tasks.TaskType,
         read_seconds: float = 0.0,
+        total_rows: int | None = None,
     ) -> data_contracts.DatasetProfile:
         """Profiles the dataset.
 
         Args:
-            frame: The ingested dataset.
-            manifest: Its identity.
+            frame: The rows to profile (the development partition when the
+                locked test rows must not influence any statistic).
+            manifest: Identity of the whole dataset.
             task: Resolved task type.
             read_seconds: Time spent reading the data (operational cost).
+            total_rows: Rows in the whole dataset when `frame` is a subset.
 
         Returns:
             The profile including the resulting feature plan.
@@ -365,6 +368,7 @@ class DatasetProfiler:
             self.duplicate_count(frame),
             read_seconds,
             len(risks),
+            total_rows,
         )
         return data_contracts.DatasetProfile(
             manifest=manifest,
