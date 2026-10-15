@@ -22,7 +22,9 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, capsys):
     assert cli.main(["run", *common, "--time-budget", "120"]) == 0
     out = capsys.readouterr().out
     assert "selected" in out and "artifacts:" in out
-    bundle_dir = next((tmp_path / "runs").iterdir()) / "model"
+    bundle_dir = (
+        next(d for d in (tmp_path / "runs").iterdir() if d.is_dir()) / "model"
+    )
 
     features = binary_frame.drop(columns="y")
     features.to_csv(tmp_path / "new.csv", index=False)
@@ -93,7 +95,9 @@ def test_predict_with_explicit_renames(binary_frame, tmp_path):
         ]
     )
     assert code == 0
-    bundle_dir = next((tmp_path / "runs").iterdir()) / "model"
+    bundle_dir = (
+        next(d for d in (tmp_path / "runs").iterdir() if d.is_dir()) / "model"
+    )
     renamed = binary_frame.drop(columns="y").rename(
         columns={"a": "A_value", "b": "B"}
     )
