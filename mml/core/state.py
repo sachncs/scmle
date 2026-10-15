@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from mml.contracts.errors import MLForgeError
+from mml.contracts.errors import MagicMLError
 from mml.contracts.events import Event, EventLog
 
 
@@ -38,7 +38,7 @@ TERMINAL = {RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED, RunState.BL
 _ABORT = {RunState.FAILED, RunState.CANCELLED, RunState.BLOCKED}
 
 
-class InvalidTransition(MLForgeError):
+class InvalidTransition(MagicMLError):
     pass
 
 
