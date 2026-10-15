@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from magicml.contracts.tasks import DataSpec, ProjectSpec, ValidationSpec
+from mml.contracts.tasks import DataSpec, ProjectSpec, ValidationSpec
 
 
 def spec(**kw):

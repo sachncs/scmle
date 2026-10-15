@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
-from magicml.contracts.errors import DataError
-from magicml.data.readers import build_manifest, read_table
+from mml.contracts.errors import DataError
+from mml.data.readers import build_manifest, read_table
 
 
 @pytest.fixture

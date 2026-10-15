@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from magicml.contracts.data import DatasetManifest
-from magicml.contracts.errors import DataError
+from mml.contracts.data import DatasetManifest
+from mml.contracts.errors import DataError
 
 _READERS = {
     ".csv": pd.read_csv,

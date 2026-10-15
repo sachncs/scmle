@@ -1,7 +1,7 @@
 import pytest
 
-from magicml.contracts.events import EventLog
-from magicml.core.state import InvalidTransition, RunState, StateMachine
+from mml.contracts.events import EventLog
+from mml.core.state import InvalidTransition, RunState, StateMachine
 
 
 def test_happy_path_emits_event_per_transition():

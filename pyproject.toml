@@ -25,13 +25,13 @@ distributed = ["ray"]
 all = ["magicml[boosting,optimization,tracking,distributed]"]
 
 [project.scripts]
-magicml = "magicml.cli:main"
+magicml = "mml.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.5", "mypy>=1.10", "pandas-stubs"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/magicml"]
+packages = ["mml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -39,7 +39,7 @@ filterwarnings = ["ignore::UserWarning", "ignore::FutureWarning"]
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests"]
+src = [".", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

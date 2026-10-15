@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from magicml.contracts.errors import MLForgeError
-from magicml.contracts.events import Event, EventLog
+from mml.contracts.errors import MLForgeError
+from mml.contracts.events import Event, EventLog
 
 
 class RunState(StrEnum):
