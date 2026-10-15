@@ -49,26 +49,7 @@ class ServingAdapter(abc.ABC):
     def respond_locked(self, records: list[dict[str, Any]]) -> dict[str, Any]:
         """Scores records, then remembers them as series history."""
         frame = pd.DataFrame(records)
-        report = self.bundle.validate(frame)
-        predictions = self.bundle.predict(frame)
-        response: dict[str, Any] = {
-            "predictions": [
-                item.item() if hasattr(item, "item") else item
-                for item in predictions
-            ],
-            "model_version": self.bundle.info.model_version,
-            "schema_valid": report.valid,
-            "diagnostics": {
-                "ignored_columns": list(report.extra),
-                "missing_values": report.missing_value_counts,
-                "unseen_categories": report.unseen_categories,
-            },
-        }
-        if self.bundle.schema.classes is not None:
-            response["classes"] = list(self.bundle.schema.classes)
-            response["probabilities"] = self.bundle.predict_proba(
-                frame
-            ).tolist()
+        response = self.bundle.score(frame)
         self.bundle.remember(frame)
         return response
 

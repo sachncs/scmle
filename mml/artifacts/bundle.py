@@ -553,6 +553,48 @@ class ModelBundle:
             "largest_difference": worst,
         }
 
+    def score(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        mapping: ColumnMapping | None = None,
+    ) -> dict[str, Any]:
+        """Predicts and reports the schema diagnostics in one structured result.
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            Predictions, class probabilities for classifiers, the model
+            version, whether the input satisfied the schema, and diagnostics
+            (ignored columns, missing-value counts, unseen categories).
+
+        Raises:
+            SchemaError: If required columns are missing or malformed.
+        """
+        frame = self.read_frame(data)
+        if mapping is not None:
+            frame = mapping.apply(frame, [*self.features, self.schema.target])
+        report = self.validate(frame)
+        predictions = self.predict(frame)
+        result: dict[str, Any] = {
+            "predictions": [
+                item.item() if hasattr(item, "item") else item
+                for item in predictions
+            ],
+            "model_version": self.info.model_version,
+            "schema_valid": report.valid,
+            "diagnostics": {
+                "ignored_columns": list(report.extra),
+                "missing_values": report.missing_value_counts,
+                "unseen_categories": report.unseen_categories,
+            },
+        }
+        if self.schema.classes is not None:
+            result["classes"] = list(self.schema.classes)
+            result["probabilities"] = self.predict_proba(frame).tolist()
+        return result
+
     def calibrate(
         self,
         data: str | pathlib.Path | pd.DataFrame,

@@ -360,3 +360,16 @@ def test_compatibility_checks_every_recorded_library():
     assert any("numpy 1.0.0" in p for p in older.compatibility_problems())
     pandas_off = dataclasses.replace(info, pandas="0.1.0")
     assert any("pandas" in p for p in pandas_off.compatibility_problems())
+
+
+def test_score_returns_the_structured_inference_result(trained):
+    bundle, features = trained
+    messy = features.head(5).assign(junk=1)
+    result = bundle.score(messy)
+    assert len(result["predictions"]) == 5
+    assert result["model_version"] == "v1" and result["schema_valid"] is True
+    assert result["diagnostics"]["ignored_columns"] == ["junk"]
+    assert result["classes"] == [0, 1]
+    assert np.allclose(np.sum(result["probabilities"], axis=1), 1.0)
+    with pytest.raises(errors.SchemaError):
+        bundle.score(features.drop(columns="num"))
