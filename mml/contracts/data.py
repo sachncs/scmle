@@ -101,3 +101,18 @@ class DatasetProfile:
             "target": dict(self.target_summary),
             "feature_plan": self.feature_plan.to_dict(),
         }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PreprocessingOptions:
+    """Switches that shape the preprocessing transformers.
+
+    Attributes:
+        scale: Standardize numeric features.
+        log_skewed: Log-transform strongly right-skewed numeric features.
+        interactions: Add pairwise numeric interaction features.
+    """
+
+    scale: bool = False
+    log_skewed: bool = False
+    interactions: bool = False
