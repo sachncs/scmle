@@ -97,6 +97,12 @@ class StrategySpec(FrozenModel):
     top_models: int = pydantic.Field(default=2, ge=0)
 
 
+class EnsembleSpec(FrozenModel):
+    """Stacking ensemble settings (disabled when `size` < 2)."""
+
+    size: int = pydantic.Field(default=3, ge=0)
+
+
 class DecisionSpec(FrozenModel):
     """How binary probabilities become decisions (threshold optimization)."""
 
@@ -118,6 +124,7 @@ class ProjectSpec(FrozenModel):
     resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
     search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
     strategies: StrategySpec = pydantic.Field(default_factory=StrategySpec)
+    ensemble: EnsembleSpec = pydantic.Field(default_factory=EnsembleSpec)
     decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 

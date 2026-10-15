@@ -10,6 +10,7 @@ from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.models import boosting_adapters
+from mml.models import ensembles
 from mml.models import sklearn_adapters
 
 ENTRY_POINT_GROUP = "mml.models"
@@ -39,7 +40,9 @@ class ModelRegistry:
             *sklearn_adapters.BUILTIN_ADAPTERS,
             *boosting_adapters.BOOSTING_ADAPTERS,
         )
-        return cls(tuple(adapter() for adapter in classes))
+        registry = cls(tuple(adapter() for adapter in classes))
+        registry.register(ensembles.StackingAdapter(registry))
+        return registry
 
     def register(
         self, adapter: models.ModelAdapter, overwrite: bool = False
@@ -114,6 +117,8 @@ class ModelRegistry:
             key=lambda a: (a.capabilities.cost, a.name),
         )
         for adapter in ordered:
+            if not adapter.capabilities.standalone:
+                continue
             reason = adapter.rejection_reason(task, row_count)
             if reason is None:
                 compatible.append(adapter)

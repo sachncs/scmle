@@ -60,7 +60,7 @@ def check_conformance(adapter: models.ModelAdapter) -> None:
         raise errors.ConfigError(f"{name}: declares no supported tasks")
     for task in adapter.capabilities.tasks:
         features, target = toy_problem(task)
-        estimator = adapter.build(task, 0)
+        estimator = adapter.build(task, 0, adapter.conformance_params)
         for method in ("fit", "predict", "get_params", "set_params"):
             if not hasattr(estimator, method):
                 raise errors.ConfigError(f"{name}: estimator lacks '{method}'")
@@ -91,6 +91,7 @@ def check_conformance(adapter: models.ModelAdapter) -> None:
                         f"{name}: search parameter '{key}' not applied by build"
                     )
             tuned.fit(features, target)
-        first, second = adapter.build(task, 7), adapter.build(task, 7)
+        first = adapter.build(task, 7, adapter.conformance_params)
+        second = adapter.build(task, 7, adapter.conformance_params)
         if first.get_params().keys() != second.get_params().keys():
             raise errors.ConfigError(f"{name}: build is not deterministic")

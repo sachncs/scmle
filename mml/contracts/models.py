@@ -46,6 +46,8 @@ class Capabilities:
         early_stopping: Supports early stopping.
         needs_scaling: Benefits from standardized inputs.
         serializable: Can be persisted in a bundle.
+        standalone: Can be a screening candidate on its own (False for
+            meta-models assembled from other candidates).
         max_rows: Largest dataset it is practical on, if any.
         cost: Relative training cost from 1 (cheap) to 5 (expensive).
     """
@@ -58,6 +60,7 @@ class Capabilities:
     early_stopping: bool = False
     needs_scaling: bool = False
     serializable: bool = True
+    standalone: bool = True
     max_rows: int | None = None
     cost: int = 1
 
@@ -73,6 +76,8 @@ class ModelAdapter(abc.ABC):
         capabilities: Declared capabilities.
         requires: Importable modules needed at build time.
         search_space: Tunable hyperparameters, or None if not tunable.
+        conformance_params: Build parameters the conformance suite should use
+            for adapters that cannot build without them (meta-models).
     """
 
     name: ClassVar[str]
@@ -80,6 +85,7 @@ class ModelAdapter(abc.ABC):
     capabilities: ClassVar[Capabilities]
     requires: ClassVar[tuple[str, ...]] = ()
     search_space: ClassVar[search.SearchSpace | None] = None
+    conformance_params: ClassVar[Mapping[str, Any] | None] = None
 
     @abc.abstractmethod
     def build(
@@ -130,3 +136,10 @@ class ModelAdapter(abc.ABC):
         ):
             return f"dataset too large ({row_count} > {caps.max_rows} rows)"
         return None
+
+
+class AdapterResolver(Protocol):
+    """Anything that resolves a model name to its adapter (a registry)."""
+
+    def get(self, name: str) -> ModelAdapter:
+        """Returns the adapter registered under `name`."""
