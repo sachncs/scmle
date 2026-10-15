@@ -20,7 +20,7 @@ spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
 | Pydantic typed configuration | Implemented | `mml/contracts/tasks.py`, `tests/unit/test_tasks.py` |
 | Arrow-compatible tabular abstraction | Implemented | Arrow tables, Polars frames / lazyframes and anything with the Arrow stream protocol in; Arrow out; Feather and Parquet files (`mml/data/interchange.py`, `tests/integration/test_interchange.py`) |
 | Scikit-learn estimator protocol | Implemented | `mml/contracts/models.py`, `tests/unit/test_registry.py` |
-| Workflow as a graph of stages | Implemented | `mml/core/stages.py` (linear stage graph; independent trials fan out), `tests/integration/test_recovery.py` |
+| Workflow as a DAG: stages declare dependencies, a compiler validates and orders them | Implemented | `mml/core/compiler.py`, `tests/unit/test_component_contracts.py::test_the_workflow_is_a_compiled_dag_of_declared_dependencies` |
 | Multi-fidelity, budget-aware optimization | Implemented | `mml/core/tuning.py`, `tests/integration/test_tuning.py` |
 | Content-addressed, versioned artifacts | Implemented | `mml/deployment/registry.py`, `tests/integration/test_deployment.py` |
 | Event-driven telemetry and monitoring adapters | Implemented | `mml/contracts/events.py`, `mml/tracking/mlflow_store.py`, `tests/integration/test_integrations.py` |
@@ -160,6 +160,38 @@ spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
 | Distributed execution: scheduler-independent task definitions | Implemented | `mml/core/trials.py`, `tests/integration/test_integrations.py` |
 | Governance: audit trail for every automated decision | Implemented | `tests/integration/test_governance.py`, `tests/integration/test_strategy_search.py` |
 | Benchmarking: independent suite and comparison harness | Implemented | `benchmarks/run_benchmarks.py`, `tests/integration/test_open_datasets.py` |
+
+## Independent-audit follow-ups
+
+Defects an independent reviewer found against `product.md`, and where each is
+now closed.
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| Resume reuses checkpoints only for the same data | Implemented | `mml/core/stages.py::refuse_stale_resume`, `tests/integration/test_resume.py::test_resume_refuses_checkpoints_computed_on_different_data` |
+| Profiling, feature selection and leakage decisions use the development partition only | Implemented | `mml/core/stages.py::make_split`, `tests/leakage/test_leakage.py::test_profile_and_feature_plan_never_see_the_locked_test_rows` |
+| Ambiguous / degenerate targets BLOCK the run | Implemented | `mml/data/profiling.py::resolve_auto`, `tests/integration/test_edge_cases.py::test_degenerate_targets_block_the_run_with_a_clear_reason` |
+| Installed plugins are discovered and must pass the conformance suite | Implemented | `mml/models/registry.py::load_plugins`, `tests/unit/test_registry.py::test_a_default_orchestrator_discovers_conforming_plugins_only` |
+| Adapter capabilities drive preprocessing and planning (missing values, sparse input, native categoricals, serializability) and are verified by the conformance suite | Implemented | `mml/data/preprocessing.py::default_options`, `mml/models/conformance.py::check_declared_capabilities`, `tests/unit/test_capability_use.py` |
+| High-cardinality categories: native-categorical models first, regularized target encoding evaluated | Implemented | `mml/intelligence/planner.py::HighCardinalityRule`, `mml/data/strategies.py::TargetEncodingStrategy`, `tests/unit/test_capability_use.py` |
+| Short time budgets reduce search complexity | Implemented | `mml/contracts/tasks.py::effective_search`, `tests/unit/test_capability_use.py::test_short_budget_reduces_search_complexity_and_is_recorded` |
+| Regression has its own rare-target policy (inverse-density weights); classification resampling is not reused | Implemented | `mml/data/strategies.py::RareTargetStrategy`, `tests/unit/test_rare_target.py` |
+| Model selection: primary objective, uncertainty-aware ties, tie-breaker, serving constraints with a hardware safety factor | Implemented | `mml/evaluation/selection.py::BestMeanPolicy`, `mml/evaluation/resources.py`, `tests/unit/test_evaluation.py` |
+| Confidence respects dependent folds (Nadeau-Bengio) and structure (grouped / blocked bootstraps) | Implemented | `mml/evaluation/confidence.py`, `mml/monitoring/champion.py`, `tests/unit/test_confidence.py`, `tests/integration/test_monitoring.py::test_comparison_resamples_whole_groups_and_time_blocks` |
+| Inner cross-validation for calibration and stacking follows group and time structure | Implemented | `mml/data/inner_cv.py`, `tests/unit/test_inner_cv.py` |
+| Group folds keep every class in every fold; temporal folds are listed latest first | Implemented | `mml/data/splitting.py`, `tests/unit/test_splitting.py` |
+| The saved bundle is reloaded and verified against the in-memory model before a run completes | Implemented | `mml/artifacts/bundle.py::verify_round_trip`, `tests/unit/test_bundle.py` |
+| Tracking records trial strategy, the full configuration and artifact checksums | Implemented | `mml/tracking/stores.py`, `tests/integration/test_resume.py::test_tracking_database_records_runs_trials_and_lineage` |
+| The data-access ledger verifies what each fold actually received | Implemented | `mml/artifacts/ledger.py::observed_access`, `tests/integration/test_governance.py::test_ledger_checks_what_trials_actually_received` |
+| The registry authenticates bundles at registration and on load | Implemented | `mml/deployment/registry.py`, `tests/integration/test_deployment.py` |
+| Fingerprint covers ML difficulty, text / id types, scale and missingness patterns | Implemented | `mml/data/fingerprint.py`, `tests/unit/test_fingerprint.py` |
+| Inference: structured result, optional probability calibration, library compatibility checks | Implemented | `mml/artifacts/bundle.py::score`, `::calibrate`, `tests/unit/test_bundle.py` |
+| Series features have history at prediction time | Implemented | `mml/data/feature_graph.py::compute_with_history`, `tests/integration/test_feature_graph_runs.py` |
+| Resource limits are enforced: every trial supervised in its own process, killed past the time ceiling or memory limit | Implemented | `mml/core/limits.py::TrialSupervisor`, `tests/unit/test_trial_supervision.py`, `tests/integration/test_resource_limits.py::test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues` |
+| CLI exposes validation, embargo, strategies, enforcement and nested specifications | Implemented | `mml/cli.py`, `tests/integration/test_cli.py::test_config_file_and_flags_reach_the_full_specification` |
+
+Deliberate deviation: the package layout in section 3 is a recommendation; the
+code uses a flat `mml/` package (no `src/`), as the project owner instructed.
 
 ## 21. Risks
 
