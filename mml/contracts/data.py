@@ -1,14 +1,24 @@
-"""Dataset identity and profile contracts."""
-
-from __future__ import annotations
+"""Dataset identity, feature plan and profile contracts."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+import dataclasses
 from typing import Any
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class DatasetManifest:
+    """Immutable identity of an ingested dataset.
+
+    Attributes:
+        dataset_id: Short identifier derived from the content hash.
+        schema_hash: Hash of column names and dtypes.
+        data_hash: Hash of the row contents.
+        row_count: Number of rows.
+        column_count: Number of columns.
+        target: Name of the target column.
+        uri: Where the data was read from.
+    """
+
     dataset_id: str
     schema_hash: str
     data_hash: str
@@ -17,25 +27,77 @@ class DatasetManifest:
     target: str
     uri: str = ""
 
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-serializable mapping."""
+        return dataclasses.asdict(self)
 
-@dataclass(frozen=True)
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class FeaturePlan:
-    """Which columns become model features, and why others were dropped."""
+    """Which columns become features and why the others were dropped.
+
+    Attributes:
+        numeric: Numeric feature columns.
+        categorical: Categorical feature columns.
+        dropped: Mapping of dropped column to the reason.
+    """
 
     numeric: tuple[str, ...]
     categorical: tuple[str, ...]
-    dropped: Mapping[str, str] = field(default_factory=dict)
+    dropped: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     @property
     def features(self) -> tuple[str, ...]:
+        """All feature columns, numeric first."""
         return self.numeric + self.categorical
 
+    def columns_for(self, kind_name: str) -> tuple[str, ...]:
+        """Returns the feature columns of one kind.
 
-@dataclass(frozen=True)
+        Args:
+            kind_name: `numeric` or `categorical`.
+
+        Returns:
+            Matching columns, empty if the kind carries no features.
+        """
+        return getattr(self, kind_name, ())
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-serializable mapping."""
+        return {
+            "numeric": list(self.numeric),
+            "categorical": list(self.categorical),
+            "dropped": dict(self.dropped),
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class DatasetProfile:
+    """Statistical profile and findings for a dataset.
+
+    Attributes:
+        manifest: Identity of the profiled dataset.
+        column_statistics: Per-column statistics.
+        quality_findings: Data-quality observations.
+        risk_findings: Leakage / imbalance / shift hypotheses (not verdicts).
+        target_summary: Target distribution summary.
+        feature_plan: Resulting feature selection.
+    """
+
     manifest: DatasetManifest
     column_statistics: Mapping[str, Any]
     quality_findings: tuple[str, ...]
     risk_findings: tuple[str, ...]
-    target_summary: Mapping[str, Any] = field(default_factory=dict)
-    feature_plan: FeaturePlan | None = None
+    target_summary: Mapping[str, Any]
+    feature_plan: FeaturePlan
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-serializable mapping."""
+        return {
+            "manifest": self.manifest.to_dict(),
+            "columns": dict(self.column_statistics),
+            "quality_findings": list(self.quality_findings),
+            "risk_findings": list(self.risk_findings),
+            "target": dict(self.target_summary),
+            "feature_plan": self.feature_plan.to_dict(),
+        }

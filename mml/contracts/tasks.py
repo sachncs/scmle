@@ -1,28 +1,28 @@
-"""Versioned, typed project specification."""
+"""Typed, versioned project specification (pydantic)."""
 
-from __future__ import annotations
-
+import enum
 import hashlib
 import json
-from enum import StrEnum
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+import pydantic
 
 CONFIG_VERSION = 1
 
 
-class TaskType(StrEnum):
+class TaskType(enum.StrEnum):
+    """Supervised learning task kinds."""
+
     BINARY = "binary_classification"
     MULTICLASS = "multiclass_classification"
     REGRESSION = "regression"
 
     @property
     def is_classification(self) -> bool:
+        """Whether the task predicts discrete classes."""
         return self is not TaskType.REGRESSION
 
 
-# Public task requests; "classification" is resolved to binary/multiclass from the target.
 TaskRequest = Literal[
     "auto",
     "classification",
@@ -30,65 +30,90 @@ TaskRequest = Literal[
     "binary_classification",
     "multiclass_classification",
 ]
+"""Public task requests; `classification` is resolved from the target."""
 
 
-class _Spec(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+class FrozenModel(pydantic.BaseModel):
+    """Immutable pydantic base that rejects unknown fields."""
+
+    model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
 
 
-class DataSpec(_Spec):
+class DataSpec(FrozenModel):
+    """Where the data lives and what its columns mean."""
+
     uri: str
     target: str
-    id_columns: list[str] = Field(default_factory=list)
+    id_columns: list[str] = pydantic.Field(default_factory=list)
     group_column: str | None = None
     time_column: str | None = None
-    excluded_columns: list[str] = Field(default_factory=list)
+    excluded_columns: list[str] = pydantic.Field(default_factory=list)
 
 
-class ValidationSpec(_Spec):
-    strategy: Literal["auto", "stratified", "random", "group", "temporal"] = "auto"
-    test_fraction: float = Field(default=0.20, gt=0, lt=1)
-    folds: int = Field(default=5, ge=2)
+class ValidationSpec(FrozenModel):
+    """How data is partitioned for model selection and final testing."""
+
+    strategy: Literal["auto", "stratified", "random", "group", "temporal"] = (
+        "auto"
+    )
+    test_fraction: float = pydantic.Field(default=0.20, gt=0, lt=1)
+    folds: int = pydantic.Field(default=5, ge=2)
     seed: int = 42
 
 
-class ResourceSpec(_Spec):
-    time_budget_seconds: int = Field(default=1800, gt=0)
-    memory_limit_gb: float = Field(default=8.0, gt=0)
-    cpu_limit: int | None = Field(default=None, ge=1)
+class ResourceSpec(FrozenModel):
+    """Compute limits for a run."""
+
+    time_budget_seconds: int = pydantic.Field(default=1800, gt=0)
+    memory_limit_gb: float = pydantic.Field(default=8.0, gt=0)
+    cpu_limit: int | None = pydantic.Field(default=None, ge=1)
     gpu: Literal["auto", "disabled", "required"] = "auto"
 
 
-class ProjectSpec(_Spec):
+class ProjectSpec(FrozenModel):
+    """The explicit, versioned specification of an ML project."""
+
     version: int = CONFIG_VERSION
     data: DataSpec
     task: TaskRequest = "auto"
     metric: str | None = None
-    validation: ValidationSpec = Field(default_factory=ValidationSpec)
-    resources: ResourceSpec = Field(default_factory=ResourceSpec)
+    validation: ValidationSpec = pydantic.Field(default_factory=ValidationSpec)
+    resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
-    @model_validator(mode="after")
-    def _cross_field(self) -> Self:
-        d, v = self.data, self.validation
-        if v.strategy == "group" and not d.group_column:
-            raise ValueError("validation.strategy='group' requires data.group_column")
-        if v.strategy == "temporal" and not d.time_column:
-            raise ValueError("validation.strategy='temporal' requires data.time_column")
-        if v.strategy == "stratified" and self.task == "regression":
-            raise ValueError("stratified validation is not defined for regression")
-        special = {"target": d.target, "group_column": d.group_column, "time_column": d.time_column}
-        for name, col in special.items():
-            if name != "target" and col == d.target:
+    @pydantic.model_validator(mode="after")
+    def check_cross_field_rules(self) -> Self:
+        """Validates constraints that span several fields.
+
+        Returns:
+            The validated specification.
+
+        Raises:
+            ValueError: If the combination of fields is inconsistent.
+        """
+        data, validation = self.data, self.validation
+        if validation.strategy == "group" and not data.group_column:
+            raise ValueError("strategy 'group' requires data.group_column")
+        if validation.strategy == "temporal" and not data.time_column:
+            raise ValueError("strategy 'temporal' requires data.time_column")
+        if validation.strategy == "stratified" and self.task == "regression":
+            raise ValueError("stratified validation is undefined for regression")
+        for name in ("group_column", "time_column"):
+            if getattr(data, name) == data.target:
                 raise ValueError(f"data.{name} must differ from the target")
-            if col is not None and col in d.excluded_columns and name == "target":
-                raise ValueError("the target cannot be excluded")
-        if d.target in d.id_columns:
+        if data.target in data.id_columns:
             raise ValueError("the target cannot be an id column")
+        if data.target in data.excluded_columns:
+            raise ValueError("the target cannot be excluded")
         return self
 
     def canonical_json(self) -> str:
-        return json.dumps(self.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+        """Returns a key-sorted, whitespace-free JSON rendering."""
+        return json.dumps(
+            self.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+        )
 
     def config_hash(self) -> str:
-        return hashlib.sha256(self.canonical_json().encode()).hexdigest()[:16]
+        """Returns a short deterministic hash of the canonical configuration."""
+        digest = hashlib.sha256(self.canonical_json().encode()).hexdigest()
+        return digest[:16]
