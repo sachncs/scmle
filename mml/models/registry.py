@@ -1,69 +1,113 @@
-"""Model registry: third-party estimators register without core edits.
+"""Model registry: third-party adapters register without core edits.
 
-Entry-point group `mml.models` is scanned lazily; heavy imports only happen when a model
-is actually built.
+Plugins are discovered lazily through the `mml.models` entry-point group, and
+heavy imports only happen when an adapter is actually built.
 """
 
-from __future__ import annotations
+from importlib import metadata
 
-import importlib.util
-from importlib.metadata import entry_points
+from mml.contracts import errors
+from mml.contracts import models
+from mml.contracts import tasks
+from mml.models import sklearn_adapters
 
-from mml.contracts.errors import ConfigError
-from mml.contracts.models import ModelSpec
-from mml.contracts.tasks import TaskType
-
-_REGISTRY: dict[str, ModelSpec] = {}
-_DISCOVERED = False
+ENTRY_POINT_GROUP = "mml.models"
 
 
-def register_model(spec: ModelSpec, *, overwrite: bool = False) -> None:
-    if spec.name in _REGISTRY and not overwrite:
-        raise ConfigError(f"model '{spec.name}' already registered")
-    _REGISTRY[spec.name] = spec
+class ModelRegistry:
+    """Name-indexed collection of `ModelAdapter` instances."""
 
+    def __init__(
+        self, adapters: tuple[models.ModelAdapter, ...] = ()
+    ) -> None:
+        """Initializes the registry.
 
-def _discover() -> None:
-    global _DISCOVERED
-    if _DISCOVERED:
-        return
-    _DISCOVERED = True
-    from mml.models import sklearn_models  # noqa: F401  (registers built-ins)
+        Args:
+            adapters: Adapters to register immediately.
+        """
+        self.adapters: dict[str, models.ModelAdapter] = {}
+        for adapter in adapters:
+            self.register(adapter)
 
-    for ep in entry_points(group="mml.models"):
-        try:
-            obj = ep.load()
-            specs = obj() if callable(obj) else obj
-            for s in specs if isinstance(specs, (list, tuple)) else [specs]:
-                register_model(s, overwrite=True)
-        except Exception:  # a broken plugin must not break the framework
-            continue
+    @classmethod
+    def with_builtins(cls) -> "ModelRegistry":
+        """Creates a registry holding the built-in scikit-learn adapters."""
+        return cls(tuple(a() for a in sklearn_adapters.BUILTIN_ADAPTERS))
 
+    def register(
+        self, adapter: models.ModelAdapter, overwrite: bool = False
+    ) -> None:
+        """Adds an adapter.
 
-def available(spec: ModelSpec) -> bool:
-    return all(importlib.util.find_spec(m) is not None for m in spec.requires)
+        Args:
+            adapter: The adapter to add.
+            overwrite: Replace an existing adapter of the same name.
 
+        Raises:
+            ConfigError: If the name is taken and `overwrite` is False.
+        """
+        if adapter.name in self.adapters and not overwrite:
+            raise errors.ConfigError(f"model '{adapter.name}' already registered")
+        self.adapters[adapter.name] = adapter
 
-def get_model(name: str) -> ModelSpec:
-    _discover()
-    if name not in _REGISTRY:
-        raise ConfigError(f"unknown model '{name}'; registered: {sorted(_REGISTRY)}")
-    return _REGISTRY[name]
+    def unregister(self, name: str) -> None:
+        """Removes an adapter if present."""
+        self.adapters.pop(name, None)
 
+    def load_plugins(self) -> list[str]:
+        """Registers adapters advertised through entry points.
 
-def candidates(task: TaskType, n_rows: int | None = None) -> tuple[list[ModelSpec], dict[str, str]]:
-    """Compatible candidates plus {name: reason} for excluded ones."""
-    _discover()
-    ok: list[ModelSpec] = []
-    rejected: dict[str, str] = {}
-    for s in sorted(_REGISTRY.values(), key=lambda m: (m.capabilities.cost, m.name)):
-        c = s.capabilities
-        if task not in c.tasks:
-            rejected[s.name] = f"does not support {task.value}"
-        elif not available(s):
-            rejected[s.name] = f"missing dependency: {', '.join(s.requires)}"
-        elif n_rows is not None and c.max_rows is not None and n_rows > c.max_rows:
-            rejected[s.name] = f"dataset too large ({n_rows} > {c.max_rows} rows)"
-        else:
-            ok.append(s)
-    return ok, rejected
+        Returns:
+            Names of plugins that failed to load; a broken plugin never
+            breaks the framework.
+        """
+        failed = []
+        for entry in metadata.entry_points(group=ENTRY_POINT_GROUP):
+            try:
+                loaded = entry.load()
+                found = loaded() if callable(loaded) else loaded
+                items = found if isinstance(found, (list, tuple)) else [found]
+                for adapter in items:
+                    self.register(adapter, overwrite=True)
+            except Exception:  # Isolate faulty third-party code.
+                failed.append(entry.name)
+        return failed
+
+    def get(self, name: str) -> models.ModelAdapter:
+        """Returns the adapter called `name`.
+
+        Raises:
+            ConfigError: If it is not registered.
+        """
+        if name not in self.adapters:
+            raise errors.ConfigError(
+                f"unknown model '{name}'; registered: {sorted(self.adapters)}"
+            )
+        return self.adapters[name]
+
+    def candidates(
+        self, task: tasks.TaskType, row_count: int | None = None
+    ) -> tuple[list[models.ModelAdapter], dict[str, str]]:
+        """Splits adapters into compatible ones and rejection reasons.
+
+        Args:
+            task: Resolved task type.
+            row_count: Dataset size, if known.
+
+        Returns:
+            Compatible adapters sorted by (cost, name), and a mapping of
+            rejected adapter name to the reason.
+        """
+        compatible: list[models.ModelAdapter] = []
+        rejected: dict[str, str] = {}
+        ordered = sorted(
+            self.adapters.values(),
+            key=lambda a: (a.capabilities.cost, a.name),
+        )
+        for adapter in ordered:
+            reason = adapter.rejection_reason(task, row_count)
+            if reason is None:
+                compatible.append(adapter)
+            else:
+                rejected[adapter.name] = reason
+        return compatible, rejected
