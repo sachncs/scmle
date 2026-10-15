@@ -67,9 +67,19 @@ class RunResult:
         """Returns the packaged best model."""
         return self.bundle
 
-    def save(self, directory: str | pathlib.Path) -> pathlib.Path:
-        """Exports the model bundle to `directory`."""
-        return self.bundle.save(directory)
+    def save(
+        self,
+        directory: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+    ) -> pathlib.Path:
+        """Exports the model bundle to `directory`.
+
+        Args:
+            directory: Destination directory.
+            signing_key: HMAC key; defaults to `$MAGICML_SIGNING_KEY`. Signed
+                bundles load without `trusted=True`.
+        """
+        return self.bundle.save(directory, signing_key)
 
     def predict(self, data: str | pathlib.Path | pd.DataFrame) -> np.ndarray:
         """Predicts with the best model."""
