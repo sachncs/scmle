@@ -45,11 +45,31 @@ class FeaturePlan:
     numeric: tuple[str, ...]
     categorical: tuple[str, ...]
     dropped: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    derived: tuple[Any, ...] = ()
+    series: tuple[Any, ...] = ()
+    extra_inputs: tuple[str, ...] = ()
 
     @property
     def features(self) -> tuple[str, ...]:
-        """All feature columns, numeric first."""
+        """All feature columns the model consumes, numeric first."""
         return self.numeric + self.categorical
+
+    @property
+    def derived_names(self) -> frozenset[str]:
+        """Columns computed by the feature graph (row-wise or ordered)."""
+        return frozenset(n.name for n in (*self.derived, *self.series))
+
+    @property
+    def input_columns(self) -> tuple[str, ...]:
+        """Raw columns the fitted pipeline reads (plus series features).
+
+        These exist in the frame a pipeline is fitted on: model features that
+        are not computed inside the pipeline, graph-only inputs, and the
+        ordered (series) features computed at ingestion.
+        """
+        rowwise = frozenset(n.name for n in self.derived)
+        columns = [c for c in self.features if c not in rowwise]
+        return tuple(dict.fromkeys([*columns, *self.extra_inputs]))
 
     def columns_for(self, kind_name: str) -> tuple[str, ...]:
         """Returns the feature columns of one kind.
@@ -68,6 +88,9 @@ class FeaturePlan:
             "numeric": list(self.numeric),
             "categorical": list(self.categorical),
             "dropped": dict(self.dropped),
+            "derived": [n.model_dump(mode="json") for n in self.derived],
+            "series": [n.model_dump(mode="json") for n in self.series],
+            "extra_inputs": list(self.extra_inputs),
         }
 
 

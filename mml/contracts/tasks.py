@@ -3,12 +3,14 @@
 import enum
 import hashlib
 import json
+from typing import Any
 from typing import Literal
 from typing import Self
 
 import pydantic
 
 CONFIG_VERSION = 1
+GRAPH_VERSION = 1
 
 
 class TaskType(enum.StrEnum):
@@ -38,6 +40,75 @@ class FrozenModel(pydantic.BaseModel):
     """Immutable pydantic base that rejects unknown fields."""
 
     model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
+
+
+class FeatureNode(FrozenModel):
+    """One derived feature: `name = op(inputs; params)`.
+
+    Attributes:
+        name: Name of the new column; must be unique and not clash with data.
+        op: Registered operation name (for example `log1p`, `ratio`, `bin`,
+            `datepart`, `lag`, `rolling_mean`).
+        inputs: Source columns or earlier nodes.
+        params: Operation parameters.
+    """
+
+    name: str
+    op: str
+    inputs: list[str]
+    params: dict[str, Any] = pydantic.Field(default_factory=dict)
+
+
+class FeatureGraphSpec(FrozenModel):
+    """An ordered set of derived features.
+
+    Nodes are listed in dependency order: a node may only use raw columns and
+    nodes that appear before it, which makes the graph acyclic by
+    construction. The spec is part of the project configuration, so changing
+    it changes the configuration hash.
+
+    Attributes:
+        version: Graph schema version.
+        nodes: The derived features, in dependency order.
+    """
+
+    version: int = GRAPH_VERSION
+    nodes: list[FeatureNode] = pydantic.Field(default_factory=list)
+
+    @pydantic.model_validator(mode="after")
+    def check_structure(self) -> FeatureGraphSpec:
+        """Validates unique names and dependency order.
+
+        Raises:
+            ValueError: On duplicate names or a node using a later node.
+        """
+        seen: set[str] = set()
+        names = [node.name for node in self.nodes]
+        if len(names) != len(set(names)):
+            raise ValueError("feature node names must be unique")
+        for node in self.nodes:
+            if not node.inputs:
+                raise ValueError(f"node '{node.name}' has no inputs")
+            later = set(names) - seen - {node.name}
+            used = later & set(node.inputs)
+            if used or node.name in node.inputs:
+                culprits = sorted(used | ({node.name} & set(node.inputs)))
+                raise ValueError(
+                    f"node '{node.name}' depends on a node defined later or "
+                    f"on itself: {culprits}"
+                )
+            seen.add(node.name)
+        return self
+
+    def fingerprint(self) -> str:
+        """Content hash identifying this exact graph."""
+        payload = json.dumps(
+            [node.model_dump(mode="json") for node in self.nodes],
+            sort_keys=True,
+        )
+        return hashlib.sha256(
+            f"v{self.version}:{payload}".encode()
+        ).hexdigest()[:16]
 
 
 class DataSpec(FrozenModel):
@@ -138,6 +209,9 @@ class ProjectSpec(FrozenModel):
     resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
     search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
     strategies: StrategySpec = pydantic.Field(default_factory=StrategySpec)
+    feature_graph: FeatureGraphSpec = pydantic.Field(
+        default_factory=FeatureGraphSpec
+    )
     ensemble: EnsembleSpec = pydantic.Field(default_factory=EnsembleSpec)
     selection: SelectionSpec = pydantic.Field(default_factory=SelectionSpec)
     decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
