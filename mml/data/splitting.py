@@ -321,11 +321,61 @@ class GroupSplit(SplitStrategy):
         )
         dev_groups = groups[dev_ids]
         folds = min(folds, len(set(dev_groups)))
-        splitter = model_selection.GroupKFold(n_splits=folds)
-        return Partition(
-            dev_ids,
-            test_ids,
-            list(splitter.split(np.arange(len(dev_ids)), groups=dev_groups)),
+        notes: list[str] = []
+        if not self.task.is_classification:
+            splitter = model_selection.GroupKFold(n_splits=folds)
+            return Partition(
+                dev_ids,
+                test_ids,
+                list(
+                    splitter.split(np.arange(len(dev_ids)), groups=dev_groups)
+                ),
+                notes,
+            )
+        labels = frame[self.data.target].to_numpy()[dev_ids]
+        chosen = self.class_complete_folds(labels, dev_groups, folds, notes)
+        return Partition(dev_ids, test_ids, chosen, notes)
+
+    def class_complete_folds(
+        self,
+        labels: np.ndarray,
+        groups: np.ndarray,
+        folds: int,
+        notes: list[str],
+    ) -> list[Fold]:
+        """Builds group folds that each contain every class.
+
+        Every class must appear in every training and validation part, since
+        metrics such as ROC-AUC are undefined otherwise. Tries the requested
+        number of folds, then fewer.
+
+        Raises:
+            BlockedError: If no group-disjoint split keeps all classes in
+                every fold.
+        """
+        classes = set(labels.tolist())
+        positions = np.arange(len(labels))
+        for count in range(folds, 1, -1):
+            splitter = model_selection.StratifiedGroupKFold(
+                n_splits=count,
+                shuffle=True,
+                random_state=self.validation.seed,
+            )
+            candidate = list(splitter.split(positions, labels, groups))
+            if all(
+                set(labels[fit].tolist()) == classes
+                and set(labels[held].tolist()) == classes
+                for fit, held in candidate
+            ):
+                if count != folds:
+                    notes.append(
+                        f"group folds reduced {folds}->{count} so every fold "
+                        "contains every class"
+                    )
+                return candidate
+        raise errors.BlockedError(
+            "no group-disjoint split keeps every class in every fold; the "
+            "classes are concentrated in too few groups"
         )
 
 

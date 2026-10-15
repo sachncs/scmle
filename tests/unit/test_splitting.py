@@ -195,3 +195,41 @@ def test_embargo_requires_a_time_column_and_enough_rows(frame):
         )
     with pytest.raises(errors.BlockedError, match="too few"):
         splitting.SplitManager(temporal_spec(400), BINARY).split(frame)
+
+
+def group_classification_frame(groups=30, per_group=10, seed=0):
+    rng = np.random.default_rng(seed)
+    unit = np.repeat(np.arange(groups), per_group)
+    positive_groups = rng.choice(groups, groups // 3, replace=False)
+    label = np.isin(unit, positive_groups).astype(int)
+    flip = rng.random(len(label)) < 0.1
+    frame = pd.DataFrame(
+        {"unit": unit, "a": rng.normal(size=len(unit)), "y": label ^ flip}
+    )
+    return frame
+
+
+def test_group_folds_keep_groups_apart_and_every_class_in_every_fold():
+    frame = group_classification_frame()
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="x", target="y", group_column="unit"),
+        validation=tasks.ValidationSpec(strategy="group"),
+    )
+    part = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    dev_groups = frame.unit.to_numpy()[list(part.manifest.train_ids)]
+    labels = frame.y.to_numpy()[list(part.manifest.train_ids)]
+    for fit, held in part.manifest.folds:
+        assert not set(dev_groups[list(fit)]) & set(dev_groups[list(held)])
+        assert set(labels[list(fit)]) == {0, 1}
+        assert set(labels[list(held)]) == {0, 1}
+
+
+def test_group_validation_blocks_when_classes_hide_in_one_group():
+    frame = group_classification_frame(groups=8, per_group=10)
+    frame["y"] = (frame.unit == 0).astype(int)  # one group holds the class
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="x", target="y", group_column="unit"),
+        validation=tasks.ValidationSpec(strategy="group", folds=3),
+    )
+    with pytest.raises(errors.BlockedError):
+        splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
