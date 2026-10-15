@@ -619,6 +619,7 @@ class PackageStage(Stage):
             else "",
             group_column=context.spec.data.group_column,
             time_column=context.spec.data.time_column,
+            history_source=context.frame,
             reference=reference_module.ReferenceProfile.build(
                 split.dev_features,
                 profile.feature_plan,

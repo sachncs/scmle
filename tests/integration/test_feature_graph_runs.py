@@ -280,3 +280,61 @@ def test_search_is_invariant_to_future_target_rewrites_with_a_graph(tmp_path):
     assert [t.params for t in first.trials] == [t.params for t in second.trials]
     for a, b in zip(first.trials, second.trials, strict=True):
         assert a.fold_scores == pytest.approx(b.fold_scores)
+
+
+def test_a_single_new_record_gets_lag_and_rolling_values_from_stored_history(
+    tmp_path,
+):
+    frame = series_frame()
+    result = run_series(frame, tmp_path)
+    raw = frame.drop(columns=["y"])
+    unit = raw[raw.unit == "u3"].sort_values("day")
+    last, history = unit.iloc[[-1]], unit.iloc[:-1]
+    # A new day after everything the model saw: the record arrives alone.
+    new = last.copy()
+    new["day"] = last.day + pd.Timedelta(days=1)
+    new["load"] = 0.5
+    alone = result.bundle.prepare_frame(new)
+    assert alone[["load_prev", "load_change", "load_avg3"]].notna().all().all()
+    # It equals the features computed with the full history in the batch.
+    together = result.bundle.prepare_frame(pd.concat([unit, new]))
+    expected = together.iloc[[-1]]
+    pd.testing.assert_frame_equal(
+        alone.reset_index(drop=True), expected.reset_index(drop=True)
+    )
+    assert alone["load_prev"].iloc[0] == pytest.approx(last["load"].iloc[0])
+    assert len(history) > 0
+
+
+def test_history_survives_save_and_load_and_tampering_is_detected(tmp_path):
+    result = run_series(series_frame(), tmp_path / "run")
+    from mml.artifacts import bundle as bundle_module
+
+    directory = tmp_path / "saved"
+    result.bundle.save(directory)
+    assert (directory / bundle_module.HISTORY_FILE).exists()
+    loaded = bundle_module.ModelBundle.load(directory, trusted=True)
+    pd.testing.assert_frame_equal(loaded.history, result.bundle.history)
+    (directory / bundle_module.HISTORY_FILE).write_bytes(b"tampered")
+    with pytest.raises(errors.ArtifactError, match="series history"):
+        bundle_module.ModelBundle.load(directory, trusted=True)
+
+
+def test_serving_remembers_records_so_the_next_single_record_sees_them(
+    tmp_path,
+):
+    from mml.deployment import serving
+
+    result = run_series(series_frame(), tmp_path)
+    adapter = serving.BatchServing(result.bundle)
+    raw = series_frame().drop(columns=["y"])
+    last_day = raw.day.max()
+    first = raw[raw.unit == "u1"].iloc[[0]].copy()
+    first["day"] = last_day + pd.Timedelta(days=1)
+    first["load"] = 7.0
+    adapter.respond(first.to_dict(orient="records"))
+    second = first.copy()
+    second["day"] = last_day + pd.Timedelta(days=2)
+    second["load"] = 1.0
+    view = result.bundle.prepare_frame(second)
+    assert view["load_prev"].iloc[0] == pytest.approx(7.0)

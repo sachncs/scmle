@@ -144,6 +144,10 @@ installed into a clean environment.
   can overshoot once before the trial is killed; child processes spawned by
   a trial are not counted. `resources.enforcement: cooperative` turns
   supervision off.
+* Series features (lag / rolling) at prediction time use the recent rows
+  the model stored at training time (`series_history.parquet`, checksummed in
+  the bundle) plus rows scored so far by the serving adapters; a record
+  before an entity's stored history gets missing values by construction.
 * Profiling statistics (imbalance ratio, skew, association scores) are
   computed on the whole dataset, as `product.md` orders profiling before
   splitting; stratified splits use labels to choose the test rows.

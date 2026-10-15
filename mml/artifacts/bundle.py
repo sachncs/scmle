@@ -32,6 +32,7 @@ BUNDLE_FORMAT = 1
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
+HISTORY_FILE = "series_history.parquet"
 SIGNATURE_FILE = "signature.json"
 SIGNING_KEY_ENV = "MAGICML_SIGNING_KEY"
 SIGNATURE_ALGORITHM = "hmac-sha256"
@@ -327,6 +328,7 @@ class ModelBundle:
         schema: BundleSchema,
         info: BundleInfo,
         reference: reference_module.ReferenceProfile | None = None,
+        history: pd.DataFrame | None = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -335,11 +337,14 @@ class ModelBundle:
             schema: Input contract.
             info: Provenance metadata.
             reference: Training-time distributions for monitoring.
+            history: Recent rows per entity that series features look back
+                on, so records scored alone still get lag / rolling values.
         """
         self.pipeline = pipeline
         self.schema = schema
         self.info = info
         self.reference = reference
+        self.history = history
 
     @classmethod
     def create(
@@ -359,6 +364,7 @@ class ModelBundle:
         graph_fingerprint: str = "",
         group_column: str | None = None,
         time_column: str | None = None,
+        history_source: pd.DataFrame | None = None,
     ) -> ModelBundle:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -378,6 +384,8 @@ class ModelBundle:
             graph_fingerprint: Hash of the feature graph, if one was used.
             group_column: Entity column for series features.
             time_column: Ordering column for series features.
+            history_source: All rows known at training time; the recent ones
+                per entity are stored as the model's series history.
 
         Returns:
             The bundle.
@@ -428,7 +436,47 @@ class ModelBundle:
             strategy=strategy,
             decision_threshold=decision_threshold,
         )
-        return cls(pipeline, schema, info, reference)
+        bundle = cls(pipeline, schema, info, reference)
+        if schema.series and history_source is not None:
+            bundle.history = bundle.series_builder().build_history(
+                history_source
+            )
+        return bundle
+
+    def series_builder(self) -> feature_graph.SeriesFeatureBuilder:
+        """The builder for this model's series features, with its history."""
+        return feature_graph.SeriesFeatureBuilder(
+            [tasks.FeatureNode(**node) for node in self.schema.series],
+            self.schema.group_column,
+            self.schema.time_column,
+            self.history,
+        )
+
+    def remember(self, data: str | pathlib.Path | pd.DataFrame) -> None:
+        """Adds scored rows to the history later records will look back on.
+
+        Call this after scoring when the rows are real, ordered observations
+        (as the serving adapters do). Rows with the same entity and time as
+        stored ones replace them. Nothing happens for models without series
+        features.
+
+        Args:
+            data: The rows that were scored.
+        """
+        if not self.schema.series:
+            return
+        builder = self.series_builder()
+        frame = self.read_frame(data)
+        columns = builder.history_columns
+        parts = [frame[columns]]
+        if self.history is not None:
+            parts.insert(0, self.history)
+        combined = pd.concat(parts, ignore_index=True)
+        key = [
+            c for c in (self.schema.group_column, self.schema.time_column) if c
+        ]
+        combined = combined.drop_duplicates(subset=key, keep="last")
+        self.history = builder.build_history(combined)
 
     def save(
         self,
@@ -457,6 +505,12 @@ class ModelBundle:
             reference_path = root / REFERENCE_FILE
             reference_path.write_text(json.dumps(self.reference.to_dict()))
             files[REFERENCE_FILE] = file_sha256(reference_path)
+        if self.history is not None:
+            history_path = root / HISTORY_FILE
+            self.history.to_parquet(history_path, index=False)
+            files[HISTORY_FILE] = file_sha256(history_path)
+        elif (root / HISTORY_FILE).exists():
+            (root / HISTORY_FILE).unlink()
         info = dataclasses.replace(self.info, files=files)
         manifest_text = json.dumps(info.to_dict(), indent=2)
         (root / MANIFEST_FILE).write_text(manifest_text)
@@ -554,7 +608,18 @@ class ModelBundle:
             reference = reference_module.ReferenceProfile.from_dict(
                 json.loads(reference_path.read_text())
             )
-        return cls(joblib.load(model_path), schema, info, reference)
+        history = None
+        if HISTORY_FILE in info.files:
+            history_path = root / HISTORY_FILE
+            if (
+                not history_path.exists()
+                or file_sha256(history_path) != info.files[HISTORY_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: series history was modified"
+                )
+            history = pd.read_parquet(history_path)
+        return cls(joblib.load(model_path), schema, info, reference, history)
 
     @property
     def features(self) -> list[str]:
@@ -650,11 +715,7 @@ class ModelBundle:
                 {"columns": bad},
             )
         if self.schema.series:
-            frame = feature_graph.SeriesFeatureBuilder(
-                [tasks.FeatureNode(**node) for node in self.schema.series],
-                self.schema.group_column,
-                self.schema.time_column,
-            ).apply(frame)
+            frame = self.series_builder().apply(frame)
         return frame[self.schema.pipeline_columns]
 
     def predict(

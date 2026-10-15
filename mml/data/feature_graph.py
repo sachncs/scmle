@@ -8,7 +8,9 @@ Two kinds of operation exist:
 * **Ordered** operations (`lag`, `diff`, `rolling_mean`, ...) need row order.
   They are computed per group in time order, using only the current and past
   rows (never future ones, and never the target), at ingestion and again at
-  inference on the supplied batch, which must therefore contain the history.
+  inference. A saved model carries the recent history it needs (the last few
+  rows of every entity), so even a single new record gets filled-in lag and
+  rolling features; history rows from the batch itself take precedence.
 """
 
 import abc
@@ -296,6 +298,10 @@ class OrderedOp(FeatureOp):
     def compute(self, grouped: Any, params: Mapping[str, Any]) -> pd.Series:
         """Computes the feature from values already sorted by time per group."""
 
+    @abc.abstractmethod
+    def lookback(self, params: Mapping[str, Any]) -> int | None:
+        """Earlier rows needed per entity (None = all of them)."""
+
 
 class Lag(OrderedOp):
     """The value `k` rows earlier within the group."""
@@ -312,6 +318,10 @@ class Lag(OrderedOp):
     def compute(self, grouped: Any, params: Params) -> pd.Series:
         """Shifts forward in time."""
         return grouped.shift(int(params["k"]))
+
+    def lookback(self, params: Params) -> int | None:
+        """The lag distance."""
+        return int(params["k"])
 
 
 class Diff(OrderedOp):
@@ -330,6 +340,10 @@ class Diff(OrderedOp):
         """Current value minus the lagged one."""
         return grouped.transform(lambda s: s - s.shift(int(params["k"])))
 
+    def lookback(self, params: Params) -> int | None:
+        """The lag distance."""
+        return int(params["k"])
+
 
 class RollingMean(OrderedOp):
     """Mean of the last `window` rows (including the current one)."""
@@ -343,6 +357,10 @@ class RollingMean(OrderedOp):
         return grouped.transform(
             lambda s: s.rolling(window, min_periods=1).mean()
         )
+
+    def lookback(self, params: Params) -> int | None:
+        """The window."""
+        return int(params["window"])
 
 
 class RollingStd(OrderedOp):
@@ -358,6 +376,10 @@ class RollingStd(OrderedOp):
             lambda s: s.rolling(window, min_periods=2).std()
         )
 
+    def lookback(self, params: Params) -> int | None:
+        """The window."""
+        return int(params["window"])
+
 
 class ExpandingMean(OrderedOp):
     """Mean of all rows up to and including the current one."""
@@ -367,6 +389,10 @@ class ExpandingMean(OrderedOp):
     def compute(self, grouped: Any, params: Params) -> pd.Series:
         """Running mean."""
         return grouped.transform(lambda s: s.expanding().mean())
+
+    def lookback(self, params: Params) -> int | None:
+        """Every earlier row contributes."""
+        return None
 
 
 OPS: dict[str, FeatureOp] = {
@@ -491,6 +517,7 @@ class SeriesFeatureBuilder:
         nodes: list[tasks.FeatureNode],
         group_column: str | None,
         time_column: str | None,
+        history: pd.DataFrame | None = None,
     ) -> None:
         """Initializes the builder.
 
@@ -498,10 +525,70 @@ class SeriesFeatureBuilder:
             nodes: Ordered nodes, in dependency order.
             group_column: Entity column (None = one series).
             time_column: Column ordering the rows.
+            history: Earlier rows per entity (see `build_history`), used to
+                fill features of rows whose own batch lacks the past.
         """
         self.nodes = nodes
         self.group_column = group_column
         self.time_column = time_column
+        self.history = history
+
+    @property
+    def history_columns(self) -> list[str]:
+        """Columns a history frame holds."""
+        derived = {node.name for node in self.nodes}
+        raw = required_raw_inputs(self.nodes, derived)
+        names = [self.group_column, self.time_column, *raw]
+        return list(dict.fromkeys(c for c in names if c))
+
+    @property
+    def history_rows(self) -> int | None:
+        """Earlier rows to keep per entity (None = all)."""
+        total = 0
+        for node in self.nodes:
+            op = get_op(node.op)
+            if not isinstance(op, OrderedOp):
+                raise errors.ConfigError(f"{node.op} is not an ordered op")
+            needed = op.lookback(op.resolved(node))
+            if needed is None:
+                return None
+            total += needed
+        return total
+
+    def entity_keys(self, frame: pd.DataFrame) -> np.ndarray:
+        """Entity key per row (one shared key without a group column)."""
+        if self.group_column:
+            return frame[self.group_column].astype(str).to_numpy()
+        return np.zeros(len(frame), dtype=int)
+
+    def build_history(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """Keeps the rows later predictions can still need.
+
+        Args:
+            frame: Rows with at least the history columns.
+
+        Returns:
+            The most recent rows per entity in time order, enough for every
+            ordered node (all rows if some node looks back without limit).
+        """
+        columns = self.history_columns
+        subset = frame[columns].copy()
+        times = pd.to_datetime(subset[self.time_column], errors="coerce")
+        subset = subset[times.notna().to_numpy()]
+        times = times[times.notna()]
+        keys = self.entity_keys(subset)
+        order = np.lexsort((np.arange(len(subset)), times.to_numpy(), keys))
+        ordered = subset.iloc[order].reset_index(drop=True)
+        ordered_keys = keys[order]
+        rows = self.history_rows
+        if rows is None or ordered.empty:
+            return ordered
+        rank_from_end = (
+            pd.Series(np.arange(len(ordered)))
+            .groupby(ordered_keys)
+            .transform(lambda s: s.max() - s)
+        )
+        return ordered[(rank_from_end < rows).to_numpy()].reset_index(drop=True)
 
     def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
         """Returns a copy of `frame` with the ordered features appended.
@@ -512,6 +599,45 @@ class SeriesFeatureBuilder:
         """
         if not self.nodes:
             return frame
+        if self.history is None or self.history.empty:
+            return self.compute(frame)
+        return self.compute_with_history(frame)
+
+    def compute_with_history(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """Appends the features, adding stored history before the batch.
+
+        Only history strictly earlier than an entity's first row in `frame`
+        is used, so the batch's own rows always win on overlap.
+        """
+        if self.time_column not in frame.columns:
+            raise errors.DataError(
+                f"time column '{self.time_column}' is required to compute "
+                "series features"
+            )
+        times = pd.to_datetime(frame[self.time_column], errors="coerce")
+        if times.isna().any():
+            raise errors.ConfigError(
+                f"time column '{self.time_column}' has unparseable values"
+            )
+        earliest = (
+            pd.Series(times.to_numpy()).groupby(self.entity_keys(frame)).min()
+        )
+        history = self.history if self.history is not None else frame.iloc[:0]
+        past_times = pd.to_datetime(history[self.time_column])
+        limits = pd.Series(self.entity_keys(history)).map(earliest)
+        keep = (past_times.to_numpy() < limits.to_numpy()) & limits.notna()
+        past = history[np.asarray(keep)][
+            [c for c in self.history_columns if c in frame.columns]
+        ]
+        combined = pd.concat([past, frame], ignore_index=True)
+        computed = self.compute(combined).iloc[len(past) :]
+        result = frame.copy()
+        for node in self.nodes:
+            result[node.name] = computed[node.name].to_numpy()
+        return result
+
+    def compute(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """Appends the features using only the rows of `frame`."""
         if self.time_column not in frame.columns:
             raise errors.DataError(
                 f"time column '{self.time_column}' is required to compute "

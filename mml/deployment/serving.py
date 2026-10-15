@@ -28,6 +28,7 @@ class ServingAdapter(abc.ABC):
             bundle: Model to serve.
         """
         self.bundle = bundle
+        self.lock = threading.Lock()
 
     def respond(self, records: list[dict[str, Any]]) -> dict[str, Any]:
         """Scores records and builds the structured response.
@@ -42,6 +43,11 @@ class ServingAdapter(abc.ABC):
         Raises:
             SchemaError: If the records do not satisfy the model's schema.
         """
+        with self.lock:
+            return self.respond_locked(records)
+
+    def respond_locked(self, records: list[dict[str, Any]]) -> dict[str, Any]:
+        """Scores records, then remembers them as series history."""
         frame = pd.DataFrame(records)
         report = self.bundle.validate(frame)
         predictions = self.bundle.predict(frame)
@@ -63,6 +69,7 @@ class ServingAdapter(abc.ABC):
             response["probabilities"] = self.bundle.predict_proba(
                 frame
             ).tolist()
+        self.bundle.remember(frame)
         return response
 
     @abc.abstractmethod
@@ -101,6 +108,7 @@ class BatchServing(ServingAdapter):
             probabilities = self.bundle.predict_proba(frame)
             for index, label in enumerate(self.bundle.schema.classes):
                 result[f"proba_{label}"] = probabilities[:, index]
+        self.bundle.remember(frame)
         result.to_csv(destination, index=False)
         return len(result)
 
