@@ -66,6 +66,8 @@ class RunContext:
         input_frame: In-memory data, if the project was built from one.
         approved_plan: Human-approved plan restricting candidates.
         frame: Ingested dataset.
+        cleaning_notes: Data repairs made at ingestion (reported as quality
+            findings).
         manifest: Dataset identity.
         task: Resolved task type.
         profile: Dataset profile.
@@ -111,6 +113,7 @@ class RunContext:
     input_frame: pd.DataFrame | None = None
     approved_plan: experiments.ExperimentPlan | None = None
     frame: pd.DataFrame | None = None
+    cleaning_notes: list[str] = dataclasses.field(default_factory=list)
     manifest: data_contracts.DatasetManifest | None = None
     task: tasks.TaskType | None = None
     profile: data_contracts.DatasetProfile | None = None

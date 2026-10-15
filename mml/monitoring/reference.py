@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from mml.contracts import data as data_contracts
+from mml.data import columns
 
 DECILES = tuple(np.linspace(0.1, 0.9, 9))
 MAX_CATEGORIES = 50
@@ -117,7 +118,7 @@ class NumericReference(DistributionReference):
     @classmethod
     def fit(cls, values: pd.Series) -> Self:
         """Learns decile edges from reference values."""
-        numeric = pd.to_numeric(values, errors="coerce")
+        numeric = columns.to_finite(values)
         present = numeric.dropna().to_numpy(dtype=float)
         edges = (
             tuple(np.unique(np.quantile(present, DECILES)))

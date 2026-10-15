@@ -9,6 +9,7 @@ import hashlib
 import pathlib
 from typing import ClassVar
 
+import numpy as np
 import pandas as pd
 
 from mml.contracts import data as data_contracts
@@ -173,3 +174,29 @@ def build_manifest(
         target=target,
         uri=str(uri),
     )
+
+
+def replace_infinities(
+    frame: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Maps +/-inf in numeric columns to NaN (they carry no usable value).
+
+    Args:
+        frame: The ingested data (not modified).
+
+    Returns:
+        A cleaned copy (or the same frame when clean) and the number of
+        replaced values per affected column.
+    """
+    numeric = frame.select_dtypes("number")
+    infinite = np.isinf(numeric.to_numpy(dtype=float, na_value=np.nan))
+    counts = {
+        str(column): int(count)
+        for column, count in zip(
+            numeric.columns, infinite.sum(axis=0), strict=True
+        )
+        if count
+    }
+    if not counts:
+        return frame, {}
+    return frame.replace([np.inf, -np.inf], np.nan), counts

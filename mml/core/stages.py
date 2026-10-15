@@ -7,6 +7,7 @@ side-effect-free plan preview.
 """
 
 import abc
+import dataclasses
 import time
 from typing import Any
 from typing import ClassVar
@@ -75,8 +76,13 @@ class IngestStage(Stage):
             frame = context.input_frame.copy()
         else:
             frame = readers.read_table(data.uri)
-        context.frame = frame
         context.manifest = readers.build_manifest(frame, data.target, data.uri)
+        frame, infinite = readers.replace_infinities(frame)
+        context.cleaning_notes = [
+            f"column '{name}': {count} infinite value(s) treated as missing"
+            for name, count in infinite.items()
+        ]
+        context.frame = frame
         context.write_json("dataset_manifest.json", context.manifest.to_dict())
         context.track(
             dataset_id=context.manifest.dataset_id,
@@ -108,6 +114,12 @@ class ProfileStage(Stage):
         profile = profiling.DatasetProfiler(spec).profile(
             frame, require(context.manifest, "manifest"), task
         )
+        if context.cleaning_notes:
+            profile = dataclasses.replace(
+                profile,
+                quality_findings=profile.quality_findings
+                + tuple(context.cleaning_notes),
+            )
         context.profile = profile
         context.write_json("dataset_profile.json", profile.to_dict())
         context.track(

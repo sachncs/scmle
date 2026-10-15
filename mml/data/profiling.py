@@ -119,10 +119,10 @@ def column_exclusion_reason(
     kind: columns.ColumnKind, series: pd.Series, stats: dict
 ) -> str | None:
     """Returns why a column cannot be a feature, or None."""
-    if stats["n_unique"] <= 1:
-        return "constant"
     if stats["missing_rate"] > HIGH_MISSING_DROP:
         return "missing >95%"
+    if stats["n_unique"] <= 1:
+        return "constant"
     return kind.exclusion_reason(series)
 
 

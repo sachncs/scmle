@@ -28,10 +28,16 @@ MIN_MISSING_RATE = 0.05
 MIN_PRESENT_ROWS = 20
 
 
+def to_finite(series: pd.Series) -> pd.Series:
+    """Coerces to float, mapping unparseable and infinite values to NaN."""
+    numeric = pd.to_numeric(series, errors="coerce").astype(float)
+    return numeric.replace([np.inf, -np.inf], np.nan)
+
+
 def to_float(values: Any) -> np.ndarray:
-    """Coerces a 2-D block to float, mapping unparseable values to NaN."""
-    frame = pd.DataFrame(values).apply(pd.to_numeric, errors="coerce")
-    return frame.astype(float).to_numpy()
+    """Coerces a 2-D block to float; unparseable and infinite become NaN."""
+    frame = pd.DataFrame(values).apply(to_finite)
+    return frame.to_numpy()
 
 
 def to_object(values: Any) -> np.ndarray:
