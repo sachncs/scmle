@@ -1,15 +1,123 @@
-"""Trial execution: cross-validate one complete candidate pipeline."""
+"""Trial execution: cross-validate complete candidate pipelines.
+
+A trial is described by a picklable `TrialPayload` and evaluated by the
+module-level `evaluate_payload`, so the same code runs in-process or in a
+worker process depending on the execution backend.
+"""
 
 from collections.abc import Mapping
+from collections.abc import Sequence
+import dataclasses
 import time
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from sklearn import model_selection
+import threadpoolctl
 
+from mml.contracts import data as data_contracts
 from mml.contracts import experiments
+from mml.contracts import models
+from mml.contracts import tasks
 from mml.core import context as context_module
 from mml.data import preprocessing
+from mml.evaluation import metrics
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class TrialJob:
+    """What to evaluate.
+
+    Attributes:
+        trial_id: Identifier of the resulting trial.
+        model_name: Registered model to evaluate.
+        params: Hyperparameter overrides.
+        fold_count: Evaluate only the first N folds (a cheaper rung for
+            pruning); None evaluates all folds.
+    """
+
+    trial_id: str
+    model_name: str
+    params: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    fold_count: int | None = None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class TrialPayload:
+    """Everything a worker needs to evaluate one job, with no shared state.
+
+    Attributes:
+        job: The job.
+        adapter: Model adapter that builds the estimator.
+        feature_plan: Feature columns by kind.
+        task: Resolved task type.
+        seed: Random seed.
+        metric: Metric to optimize.
+        features: Development features.
+        target: Development labels.
+        folds: Cross-validation folds (positions in the development data).
+        thread_limit: Threads each worker may use (None = library default).
+    """
+
+    job: TrialJob
+    adapter: models.ModelAdapter
+    feature_plan: data_contracts.FeaturePlan
+    task: tasks.TaskType
+    seed: int
+    metric: metrics.Metric
+    features: pd.DataFrame
+    target: pd.Series
+    folds: Sequence[tuple[list[int], list[int]]]
+    thread_limit: int | None
+
+
+def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
+    """Cross-validates one job; never raises for model failures.
+
+    Args:
+        payload: Self-contained description of the work.
+
+    Returns:
+        An `OK` result with fold scores, or a `FAILED` one describing the
+        error, so one broken candidate never ends the run.
+    """
+    job, metric = payload.job, payload.metric
+    folds = payload.folds[: job.fold_count]
+    started = time.monotonic()
+    result = experiments.TrialResult(
+        job.trial_id,
+        job.model_name,
+        experiments.TrialStatus.FAILED,
+        metric.name,
+        params=dict(job.params),
+    )
+    try:
+        pipeline = preprocessing.build_pipeline(
+            payload.feature_plan,
+            payload.adapter,
+            payload.task,
+            payload.seed,
+            job.params,
+        )
+        with threadpoolctl.threadpool_limits(limits=payload.thread_limit):
+            cv = model_selection.cross_validate(
+                pipeline,
+                payload.features,
+                payload.target,
+                cv=list(folds),
+                scoring=metric.scorer_name,
+                error_score="raise",
+            )
+        scores = [metric.to_natural(float(s)) for s in cv["test_score"]]
+        result.fold_scores = scores
+        result.score_mean = float(np.mean(scores))
+        result.score_std = float(np.std(scores))
+        result.status = experiments.TrialStatus.OK
+    except Exception as error:  # Isolation: any model failure is data.
+        result.error = f"{type(error).__name__}: {error}"
+    result.fit_seconds = time.monotonic() - started
+    return result
 
 
 class TrialRunner:
@@ -32,6 +140,28 @@ class TrialRunner:
             (list(train), list(val)) for train, val in self.split.manifest.folds
         ]
 
+    @property
+    def workers(self) -> int:
+        """Concurrency of the execution backend."""
+        return self.context.backend.workers
+
+    def payload(self, job: TrialJob) -> TrialPayload:
+        """Builds the self-contained payload for a job."""
+        context = self.context
+        parallel = context.backend.workers > 1
+        return TrialPayload(
+            job=job,
+            adapter=context.registry.get(job.model_name),
+            feature_plan=self.feature_plan,
+            task=self.task,
+            seed=context.spec.validation.seed,
+            metric=self.metric,
+            features=self.split.dev_features,
+            target=self.split.dev_target,
+            folds=self.folds,
+            thread_limit=1 if parallel else None,
+        )
+
     def run(
         self,
         trial_id: str,
@@ -39,65 +169,50 @@ class TrialRunner:
         params: Mapping[str, Any] | None = None,
         fold_count: int | None = None,
     ) -> experiments.TrialResult:
-        """Cross-validates one candidate; never raises for model failures.
+        """Evaluates a single candidate.
 
         Args:
             trial_id: Identifier for the result.
             model_name: Registered model to evaluate.
             params: Hyperparameter overrides.
-            fold_count: Evaluate only the first N folds (a cheaper rung for
-                pruning); None evaluates all folds.
+            fold_count: Evaluate only the first N folds; None for all.
 
         Returns:
-            An `OK` result with fold scores, or a `FAILED` one describing the
-            error, so one broken candidate never ends the run.
+            The trial result.
         """
-        context, metric = self.context, self.metric
-        cached = self.reuse(trial_id, model_name, params, fold_count)
-        if cached is not None:
-            return cached
-        folds = self.folds if fold_count is None else self.folds[:fold_count]
-        started = time.monotonic()
-        result = experiments.TrialResult(
-            trial_id,
-            model_name,
-            experiments.TrialStatus.FAILED,
-            metric.name,
-            params=dict(params or {}),
-        )
-        try:
-            pipeline = preprocessing.build_pipeline(
-                self.feature_plan,
-                context.registry.get(model_name),
-                self.task,
-                context.spec.validation.seed,
-                params,
-            )
-            cv = model_selection.cross_validate(
-                pipeline,
-                self.split.dev_features,
-                self.split.dev_target,
-                cv=folds,
-                scoring=metric.scorer_name,
-                error_score="raise",
-            )
-            scores = [metric.to_natural(float(s)) for s in cv["test_score"]]
-            result.fold_scores = scores
-            result.score_mean = float(np.mean(scores))
-            result.score_std = float(np.std(scores))
-            result.status = experiments.TrialStatus.OK
-        except Exception as error:  # Isolation: any model failure is data.
-            result.error = f"{type(error).__name__}: {error}"
-        result.fit_seconds = time.monotonic() - started
-        return result
+        job = TrialJob(trial_id, model_name, dict(params or {}), fold_count)
+        return self.run_many([job])[0]
 
-    def reuse(
-        self,
-        trial_id: str,
-        model_name: str,
-        params: Mapping[str, Any] | None,
-        fold_count: int | None,
-    ) -> experiments.TrialResult | None:
+    def run_many(
+        self, jobs: Sequence[TrialJob]
+    ) -> list[experiments.TrialResult]:
+        """Evaluates independent jobs, concurrently if the backend allows.
+
+        Checkpointed results from an interrupted run are reused; only the
+        remaining jobs are dispatched.
+
+        Args:
+            jobs: Independent jobs.
+
+        Returns:
+            Results in the order of `jobs`.
+        """
+        results: list[experiments.TrialResult | None] = [None] * len(jobs)
+        slots: list[int] = []
+        payloads: list[TrialPayload] = []
+        for index, job in enumerate(jobs):
+            cached = self.reuse(job)
+            if cached is not None:
+                results[index] = cached
+            else:
+                slots.append(index)
+                payloads.append(self.payload(job))
+        outputs = self.context.backend.map(evaluate_payload, payloads)
+        for index, output in zip(slots, outputs, strict=True):
+            results[index] = output
+        return [r for r in results if r is not None]
+
+    def reuse(self, job: TrialJob) -> experiments.TrialResult | None:
         """Returns a checkpointed result from an interrupted run, if valid.
 
         A checkpoint is reused only if the trial id, model and parameters
@@ -106,30 +221,27 @@ class TrialRunner:
         rung that would have been computed.
 
         Args:
-            trial_id: Identifier being evaluated.
-            model_name: Model being evaluated.
-            params: Hyperparameter overrides.
-            fold_count: Requested folds, or None for all.
+            job: The job about to run.
 
         Returns:
             A result view with exactly the requested folds, or None.
         """
-        checkpoint = self.context.checkpoints.get(trial_id)
+        checkpoint = self.context.checkpoints.get(job.trial_id)
         usable = (experiments.TrialStatus.OK, experiments.TrialStatus.PRUNED)
         if (
             checkpoint is None
             or checkpoint.status not in usable
-            or checkpoint.model_name != model_name
-            or checkpoint.params != dict(params or {})
+            or checkpoint.model_name != job.model_name
+            or checkpoint.params != dict(job.params)
         ):
             return None
-        wanted = len(self.folds) if fold_count is None else fold_count
+        wanted = len(self.folds) if job.fold_count is None else job.fold_count
         if len(checkpoint.fold_scores) < wanted:
             return None
         scores = checkpoint.fold_scores[:wanted]
         return experiments.TrialResult(
-            trial_id,
-            model_name,
+            job.trial_id,
+            job.model_name,
             experiments.TrialStatus.OK,
             checkpoint.metric,
             float(np.mean(scores)),

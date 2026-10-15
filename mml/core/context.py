@@ -15,6 +15,7 @@ from mml.contracts import errors
 from mml.contracts import events
 from mml.contracts import experiments
 from mml.contracts import tasks
+from mml.core import execution
 from mml.data import splitting
 from mml.evaluation import metrics
 from mml.evaluation import selection
@@ -60,6 +61,7 @@ class RunContext:
         tracker: Experiment tracking backend (no-op by default).
         checkpoints: Completed trials from an interrupted run, by trial id,
             reused instead of recomputed when resuming.
+        backend: Where independent trials run (sequential by default).
         cancel_event: Set to request cancellation.
         input_frame: In-memory data, if the project was built from one.
         approved_plan: Human-approved plan restricting candidates.
@@ -90,6 +92,9 @@ class RunContext:
     )
     checkpoints: dict[str, experiments.TrialResult] = dataclasses.field(
         default_factory=dict
+    )
+    backend: execution.ExecutionBackend = dataclasses.field(
+        default_factory=execution.SequentialBackend
     )
     cancel_event: threading.Event = dataclasses.field(
         default_factory=threading.Event
