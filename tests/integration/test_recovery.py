@@ -115,3 +115,36 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
         spec, binary_frame, stages=stages
     ).run(tmp_path)
     assert Recording.calls == [result.selected_model]
+
+
+def test_failed_and_blocked_runs_list_their_recoverable_trials(
+    binary_frame, tmp_path
+):
+    holder = {}
+
+    class CancellingEstimator(dummy.DummyClassifier):
+        def fit(self, features, target):
+            holder["project"].cancel()
+            return super().fit(features, target)
+
+    class CancellingAdapter(ExplodingAdapter):
+        name = "late_canceller"
+
+        def build(self, task, seed, params=None):
+            return CancellingEstimator()
+
+    project = project_with(CancellingAdapter(), binary_frame, tmp_path)
+    holder["project"] = project
+    with pytest.raises(errors.CancelledError) as caught:
+        project.run()
+    recoverable = caught.value.details["recoverable_trials"]
+    assert recoverable and all(
+        name.startswith("trial_") for name in recoverable
+    )
+    assert len(recoverable) == len(set(recoverable))
+
+    ambiguous = binary_frame.assign(y=range(len(binary_frame)))
+    ambiguous["y"] = ambiguous["y"] % 5
+    with pytest.raises(errors.BlockedError) as blocked:
+        mml.MLProject(ambiguous, "y", output_dir=tmp_path / "b").run()
+    assert blocked.value.details["recoverable_trials"] == []
