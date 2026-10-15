@@ -210,3 +210,24 @@ def test_exported_bundle_can_be_signed_and_loaded_without_trust(
     )
     with pytest.raises(Exception, match="unauthenticated"):
         mml.ModelBundle.load(exported)
+
+
+def test_confidence_intervals_follow_the_data_structure(binary_frame, tmp_path):
+    frame = binary_frame.assign(
+        g=np.arange(len(binary_frame)) % 40, t=np.arange(len(binary_frame))
+    )
+    plain = run(frame, tmp_path / "p").diagnostics["metric_uncertainty"]
+    grouped = run(frame, tmp_path / "g", group_column="g").diagnostics[
+        "metric_uncertainty"
+    ]
+    temporal = run(frame, tmp_path / "t", time_column="t").diagnostics[
+        "metric_uncertainty"
+    ]
+    assert plain["resampling_unit"] == "rows"
+    assert (
+        grouped["resampling_unit"] == "groups"
+        and grouped["independent_units"] < 40
+    )
+    assert temporal["resampling_unit"] == "blocks"
+    low, high = plain["ci_95"]
+    assert low <= plain["estimate"] <= high

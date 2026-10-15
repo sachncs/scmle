@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
@@ -100,9 +101,14 @@ def test_suite_selects_by_task_and_isolates_failures():
         "calibration",
         "threshold_analysis",
         "permutation_importance",
+        "metric_uncertainty",
     }
     regression = diagnostics.run_suite(make_inputs(tasks.TaskType.REGRESSION))
-    assert set(regression) == {"residuals", "permutation_importance"}
+    assert set(regression) == {
+        "residuals",
+        "permutation_importance",
+        "metric_uncertainty",
+    }
 
     class Broken(diagnostics.Diagnostic):
         name = "broken"
@@ -122,3 +128,121 @@ def test_positive_label_comes_from_the_fitted_classes():
     inputs = make_inputs(tasks.TaskType.BINARY)
     assert inputs.positive_label == 1
     assert make_inputs(tasks.TaskType.REGRESSION).positive_label is None
+
+
+def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
+    """Rows within a cluster share a hidden effect, so they are not independent."""
+    rng = np.random.default_rng(seed)
+    rows = clusters * per_cluster
+    group = np.repeat(np.arange(clusters), per_cluster)
+    effect = np.repeat(rng.normal(scale=1.5, size=clusters), per_cluster)
+    frame = pd.DataFrame(
+        {
+            "signal": rng.normal(size=rows) + effect,
+            "noise": rng.normal(size=rows),
+            "group": np.where(group % 2 == 0, "a", "b"),
+        }
+    )
+    target = pd.Series(
+        (effect + rng.normal(scale=0.6, size=rows) > 0).astype(int)
+    )
+    split = rows // 2
+    adapter = REGISTRY.get("logistic_regression")
+    model = preprocessing.build_pipeline(
+        PLAN, adapter, tasks.TaskType.BINARY, 0
+    ).fit(frame.iloc[:split], target.iloc[:split])
+    metric = metrics.CATALOG.resolve("accuracy", tasks.TaskType.BINARY)
+    held = frame.iloc[split:]
+    return diagnostics.DiagnosticInput(
+        model,
+        held,
+        target.iloc[split:],
+        tasks.TaskType.BINARY,
+        metric,
+        PLAN,
+        0,
+        groups=pd.Series(group[split:], index=held.index) if grouped else None,
+    )
+
+
+def test_uncertainty_reports_an_interval_around_the_estimate():
+    report = diagnostics.MetricUncertainty().compute(
+        make_inputs(tasks.TaskType.BINARY)
+    )
+    low, high = report["ci_95"]
+    assert low <= report["estimate"] <= high and high - low < 0.2
+    assert report["resampling_unit"] == "rows" and report["resamples"] > 150
+    assert report["independent_units"] == report["evaluation_rows"]
+
+
+def test_group_bootstrap_is_wider_than_a_naive_row_bootstrap():
+    clustered = diagnostics.MetricUncertainty().compute(make_clustered_inputs())
+    naive = diagnostics.MetricUncertainty().compute(
+        make_clustered_inputs(grouped=False)
+    )
+    width = lambda r: r["ci_95"][1] - r["ci_95"][0]  # noqa: E731
+    assert clustered["resampling_unit"] == "groups"
+    assert (
+        clustered["independent_units"] == 20
+        and naive["independent_units"] == 300
+    )
+    assert width(clustered) > 1.5 * width(naive)
+
+
+def test_temporal_inputs_use_contiguous_blocks():
+    inputs = make_inputs(tasks.TaskType.BINARY)
+    temporal = diagnostics.DiagnosticInput(
+        inputs.estimator,
+        inputs.features,
+        inputs.target,
+        inputs.task,
+        inputs.metric,
+        inputs.feature_plan,
+        0,
+        temporal=True,
+    )
+    report = diagnostics.MetricUncertainty().compute(temporal)
+    assert report["resampling_unit"] == "blocks"
+
+
+def test_block_resamples_are_contiguous_runs():
+    rng = np.random.default_rng(0)
+    rows = diagnostics.resample_rows(100, None, True, rng)
+    assert len(rows) == 100
+    steps = np.diff(rows)
+    assert (steps == 1).mean() > 0.7  # mostly consecutive within blocks
+
+
+def test_group_resamples_keep_whole_groups_together():
+    rng = np.random.default_rng(1)
+    groups = pd.Series(np.repeat(np.arange(10), 5))
+    rows = diagnostics.resample_rows(50, groups, False, rng)
+    counts = groups.iloc[rows].value_counts()
+    assert set(counts) <= {5, 10, 15, 20, 25}  # multiples of the group size
+
+
+def test_regression_uncertainty_works():
+    report = diagnostics.MetricUncertainty().compute(
+        make_inputs(tasks.TaskType.REGRESSION)
+    )
+    assert (
+        report["metric"] == "rmse" and report["ci_95"][0] <= report["ci_95"][1]
+    )
+
+
+def test_cached_predictions_match_the_model():
+    inputs = make_inputs(tasks.TaskType.BINARY)
+    replay = diagnostics.ClassifierReplay(inputs.estimator, inputs.features)
+    subset = inputs.features.iloc[[3, 1, 2]]
+    np.testing.assert_array_equal(
+        replay.predict(subset), inputs.estimator.predict(subset)
+    )
+    np.testing.assert_allclose(
+        replay.predict_proba(subset), inputs.estimator.predict_proba(subset)
+    )
+    bare = diagnostics.CachedPredictions(
+        make_inputs(tasks.TaskType.REGRESSION).estimator,
+        make_inputs(tasks.TaskType.REGRESSION).features,
+    )
+    with pytest.raises(Exception, match="no probabilities"):
+        bare.predict_proba(inputs.features)
