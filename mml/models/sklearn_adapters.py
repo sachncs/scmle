@@ -10,6 +10,7 @@ import types
 from typing import Any
 from typing import ClassVar
 
+from sklearn import calibration
 from sklearn import dummy
 from sklearn import ensemble
 from sklearn import linear_model
@@ -28,6 +29,7 @@ REGRESSION = tasks.TaskType.REGRESSION
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 REGRESSION_ONLY = frozenset({REGRESSION})
 ALL_TASKS = CLASSIFICATION | REGRESSION_ONLY
+CALIBRATION_FOLDS = 3
 NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
 
 
@@ -221,7 +223,12 @@ class HistGradientBoostingAdapter(SklearnAdapter):
 
 
 class SupportVectorAdapter(SklearnAdapter):
-    """Support vector machine (classification with calibrated probabilities)."""
+    """Support vector machine with sigmoid-calibrated probabilities.
+
+    scikit-learn deprecated `SVC(probability=True)` in 1.9; the supported
+    equivalent is a cross-fitted `CalibratedClassifierCV(SVC(),
+    ensemble=False)`, which is also considerably faster.
+    """
 
     name = "svm"
     family = "kernel"
@@ -234,7 +241,6 @@ class SupportVectorAdapter(SklearnAdapter):
     )
     classifier = svm.SVC
     regressor = svm.SVR
-    fixed_params = types.MappingProxyType({"probability": True})
     search_space = search.SearchSpace(
         (
             search.FloatParameter("C", 1e-2, 1e2, log=True),
@@ -248,15 +254,16 @@ class SupportVectorAdapter(SklearnAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds an SVC / SVR; `probability` only exists for classifiers."""
-        estimator_class = (
-            self.classifier if task.is_classification else self.regressor
-        )
+        """Builds an SVR, or a calibrated SVC for classification."""
         kwargs: dict[str, Any] = dict(params or {})
-        if task.is_classification:
-            kwargs.update(self.fixed_params)
-            kwargs["random_state"] = seed
-        return estimator_class(**kwargs)
+        if not task.is_classification:
+            return svm.SVR(**kwargs)
+        return calibration.CalibratedClassifierCV(
+            svm.SVC(random_state=seed, **kwargs),
+            method="sigmoid",
+            ensemble=False,
+            cv=CALIBRATION_FOLDS,
+        )
 
 
 class KnnAdapter(SklearnAdapter):
