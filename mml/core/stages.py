@@ -267,6 +267,7 @@ class FinalEvaluationStage(Stage):
             "metric_greater_is_better": metric.greater_is_better,
             "selection_policy": context.policy.description,
             "selected_model": selected.model_name,
+            "selected_trial_id": selected.trial_id,
             "selected_params": selected.params,
             "selected_strategy": selected.strategy,
             "selected_cv_score": selected.score_mean,
