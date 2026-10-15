@@ -274,9 +274,11 @@ class ReferenceProfile:
         """
         references: dict[str, DistributionReference] = {}
         for column in plan.numeric:
-            references[column] = NumericReference.fit(features[column])
+            if column in features.columns:
+                references[column] = NumericReference.fit(features[column])
         for column in plan.categorical:
-            references[column] = CategoricalReference.fit(features[column])
+            if column in features.columns:
+                references[column] = CategoricalReference.fit(features[column])
         numeric_output = pd.api.types.is_numeric_dtype(output)
         output_reference = (
             NumericReference.fit(output)

@@ -316,7 +316,7 @@ class SmoteStrategy(ImbalanceStrategy):
             scale=adapter.capabilities.needs_scaling
         )
         return resampling.PreprocessedResamplingClassifier(
-            preprocessing.build_preprocessor(plan, options),
+            preprocessing.build_front_end(plan, options),
             sampler,
             adapter.build(task, seed, params),
         )
@@ -395,11 +395,13 @@ class LogSkewedStrategy(FeatureStrategy):
             return reason
         if adapter.family in ("tree", "boosting"):
             return "monotone transforms do not change tree splits"
+        stats = profile.column_statistics
         skewed = [
             name
             for name in profile.feature_plan.numeric
-            if profile.column_statistics[name].get("skew", 0.0) > SKEW_THRESHOLD
-            and profile.column_statistics[name].get("min", -1.0) >= 0
+            if name in stats
+            and stats[name].get("skew", 0.0) > SKEW_THRESHOLD
+            and stats[name].get("min", -1.0) >= 0
         ]
         if not skewed:
             return "no right-skewed non-negative numeric feature"

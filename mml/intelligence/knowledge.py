@@ -38,7 +38,7 @@ def fingerprint(
     """
     plan = profile.feature_plan
     stats = profile.column_statistics
-    features = plan.features
+    features = tuple(c for c in plan.features if c in stats)
     numeric_skews = [
         abs(stats[c].get("skew", 0.0)) for c in plan.numeric if c in stats
     ]

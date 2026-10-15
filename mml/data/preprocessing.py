@@ -15,6 +15,7 @@ from mml.contracts import data as data_contracts
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.data import columns
+from mml.data import feature_graph
 
 
 def build_preprocessor(
@@ -38,6 +39,31 @@ def build_preprocessor(
             parts.append((kind.name, transformer, list(selected)))
     return compose.ColumnTransformer(
         parts, remainder="drop", verbose_feature_names_out=False
+    )
+
+
+def build_front_end(
+    plan: data_contracts.FeaturePlan,
+    options: data_contracts.PreprocessingOptions,
+) -> Any:
+    """Builds the preprocessing front end, with the feature graph if any.
+
+    Args:
+        plan: Feature columns by kind (and row-wise graph nodes).
+        options: Preprocessing switches.
+
+    Returns:
+        The column transformer, or a pipeline of graph transformer followed
+        by the column transformer when the plan derives features.
+    """
+    preprocessor = build_preprocessor(plan, options)
+    if not plan.derived:
+        return preprocessor
+    return pipeline.Pipeline(
+        [
+            ("graph", feature_graph.FeatureGraphTransformer(plan.derived)),
+            ("prep", preprocessor),
+        ]
     )
 
 
@@ -67,7 +93,11 @@ def build_pipeline(
         options = data_contracts.PreprocessingOptions(
             scale=adapter.capabilities.needs_scaling
         )
-    preprocessor = build_preprocessor(plan, options)
-    return pipeline.Pipeline(
-        [("prep", preprocessor), ("model", adapter.build(task, seed, params))]
-    )
+    steps: list[tuple[str, Any]] = []
+    if plan.derived:
+        steps.append(
+            ("graph", feature_graph.FeatureGraphTransformer(plan.derived))
+        )
+    steps.append(("prep", build_preprocessor(plan, options)))
+    steps.append(("model", adapter.build(task, seed, params)))
+    return pipeline.Pipeline(steps)

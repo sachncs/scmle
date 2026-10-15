@@ -234,7 +234,7 @@ class PermutationImportance(Diagnostic):
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
         """Measures the metric drop when each feature is shuffled."""
-        columns = list(inputs.feature_plan.features)
+        columns = list(inputs.feature_plan.input_columns)
         scorer = inputs.metric.scorer(inputs.positive_label)
         result = inspection.permutation_importance(
             inputs.estimator,
@@ -357,7 +357,7 @@ class MetricUncertainty(Diagnostic):
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
         """Bootstraps the primary metric on the evaluation rows."""
-        features = inputs.features[list(inputs.feature_plan.features)]
+        features = inputs.features[list(inputs.feature_plan.input_columns)]
         features = features.reset_index(drop=True)
         target = inputs.target.reset_index(drop=True)
         replay_class = (
