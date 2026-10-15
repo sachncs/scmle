@@ -21,7 +21,7 @@ from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.core import context as context_module
-from mml.data import preprocessing
+from mml.data import strategies
 from mml.evaluation import metrics
 
 
@@ -35,12 +35,14 @@ class TrialJob:
         params: Hyperparameter overrides.
         fold_count: Evaluate only the first N folds (a cheaper rung for
             pruning); None evaluates all folds.
+        strategy: Name of the data strategy that builds the candidate.
     """
 
     trial_id: str
     model_name: str
     params: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     fold_count: int | None = None
+    strategy: str = experiments.DEFAULT_STRATEGY
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -50,6 +52,7 @@ class TrialPayload:
     Attributes:
         job: The job.
         adapter: Model adapter that builds the estimator.
+        strategy: Data strategy that assembles the candidate pipeline.
         feature_plan: Feature columns by kind.
         task: Resolved task type.
         seed: Random seed.
@@ -62,6 +65,7 @@ class TrialPayload:
 
     job: TrialJob
     adapter: models.ModelAdapter
+    strategy: strategies.DataStrategy
     feature_plan: data_contracts.FeaturePlan
     task: tasks.TaskType
     seed: int
@@ -91,9 +95,10 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
         experiments.TrialStatus.FAILED,
         metric.name,
         params=dict(job.params),
+        strategy=job.strategy,
     )
     try:
-        pipeline = preprocessing.build_pipeline(
+        pipeline = payload.strategy.build(
             payload.feature_plan,
             payload.adapter,
             payload.task,
@@ -152,6 +157,7 @@ class TrialRunner:
         return TrialPayload(
             job=job,
             adapter=context.registry.get(job.model_name),
+            strategy=strategies.get_strategy(job.strategy),
             feature_plan=self.feature_plan,
             task=self.task,
             seed=context.spec.validation.seed,
@@ -233,6 +239,7 @@ class TrialRunner:
             or checkpoint.status not in usable
             or checkpoint.model_name != job.model_name
             or checkpoint.params != dict(job.params)
+            or checkpoint.strategy != job.strategy
         ):
             return None
         wanted = len(self.folds) if job.fold_count is None else job.fold_count
@@ -249,6 +256,7 @@ class TrialRunner:
             list(scores),
             checkpoint.fit_seconds,
             params=dict(checkpoint.params),
+            strategy=checkpoint.strategy,
         )
 
     def skip(

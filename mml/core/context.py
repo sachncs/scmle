@@ -73,6 +73,9 @@ class RunContext:
         plan: Experiment plan.
         metric: Primary metric.
         trials: Trial results.
+        outcomes: Evidence-based decisions made while running (which
+            strategies helped), appended to the planner's decision log.
+        trial_counter: Number of trial identifiers handed out so far.
         selected: Winning trial.
         final_pipeline: Selected pipeline refit on development data.
         evaluation: Final evaluation record.
@@ -111,6 +114,10 @@ class RunContext:
     trials: list[experiments.TrialResult] = dataclasses.field(
         default_factory=list
     )
+    outcomes: list[experiments.Decision] = dataclasses.field(
+        default_factory=list
+    )
+    trial_counter: int = 0
     selected: experiments.TrialResult | None = None
     final_pipeline: Any = None
     evaluation: dict[str, Any] | None = None
@@ -153,8 +160,33 @@ class RunContext:
                 )
             )
 
+    def allocate_trial_ids(self, count: int) -> list[str]:
+        """Hands out the next `count` sequential trial identifiers."""
+        start = self.trial_counter
+        self.trial_counter += count
+        return [f"trial_{start + offset + 1:03d}" for offset in range(count)]
+
+    def add_outcome(
+        self,
+        technique: str,
+        action: experiments.DecisionAction,
+        reason: str,
+    ) -> None:
+        """Records an evidence-based decision for the decision log."""
+        self.outcomes.append(experiments.Decision(technique, action, reason))
+
     def record_trial(self, outcome: experiments.TrialResult) -> None:
-        """Appends a trial and persists, announces and tracks it."""
+        """Appends a trial and persists, announces and tracks it.
+
+        Raises:
+            MagicMLError: If a different trial already used the identifier,
+                which would silently overwrite its checkpoint.
+        """
+        if any(t.trial_id == outcome.trial_id for t in self.trials):
+            raise errors.MagicMLError(
+                f"duplicate trial id {outcome.trial_id}",
+                {"trial_id": outcome.trial_id},
+            )
         self.trials.append(outcome)
         path = f"trials/{outcome.trial_id}.json"
         self.write_json(path, outcome.to_dict())
