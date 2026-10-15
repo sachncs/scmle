@@ -113,5 +113,5 @@ def test_generators_are_pluggable():
 
     real = correlated_frame(rows=200)
     target = pd.Series([1] * 20 + [0] * 180)
-    _features, labels = ConstantOverSampler().resample(real, target, 0)
+    labels = ConstantOverSampler().resample(real, target, 0)[1]
     assert labels.value_counts().to_dict() == {0: 180, 1: 180}
