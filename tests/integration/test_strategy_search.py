@@ -3,6 +3,7 @@
 import json
 
 import numpy as np
+import pandas as pd
 import pytest
 import support
 
@@ -212,3 +213,62 @@ def test_leaderboard_marks_exactly_the_selected_trial(
     assert winner["score_mean"] == pytest.approx(
         result.evaluation["selected_cv_score"]
     )
+
+
+def numeric_imbalanced(rows=900, seed=11):
+    rng = np.random.default_rng(seed)
+    frame = pd.DataFrame(
+        {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
+    )
+    frame["y"] = (rng.random(rows) < 0.07).astype(int)
+    frame.loc[frame.y == 1, ["a", "b"]] += 1.2
+    return frame
+
+
+def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
+    tmp_path,
+):
+    pytest.importorskip("imblearn")
+    only = tasks.StrategySpec(
+        names=["smote", "borderline_smote", "adasyn"], top_models=1
+    )
+    result = run(
+        numeric_imbalanced(), tmp_path, strategies=only, metric="pr_auc"
+    )
+    tried = {t.strategy for t in result.trials if t.strategy != "default"}
+    assert tried == {"smote", "borderline_smote", "adasyn"}
+    assert {len(t.fold_scores) for t in result.trials if t.status == "ok"} == {
+        5
+    }
+    features = numeric_imbalanced().drop(columns="y")
+    assert len(result.predict(features)) == len(features)
+
+
+def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
+    from mml.data import strategies as strategy_module
+
+    monkeypatch.setattr(
+        strategy_module.importlib.util, "find_spec", lambda name: None
+    )
+    plan = mml.MLProject(
+        numeric_imbalanced(),
+        "y",
+        strategies=tasks.StrategySpec(names=["smote"]),
+    ).plan()
+    decision = next(d for d in plan.decisions if d.technique == "smote")
+    assert decision.action == "reject" and "sampling" in decision.reason
+
+
+def test_jitter_augmentation_must_be_requested_explicitly(tmp_path):
+    frame = numeric_imbalanced()
+    default_plan = mml.MLProject(frame, "y").plan()
+    assert not any(
+        d.technique == "jitter_augment" for d in default_plan.decisions
+    )
+    opted = tasks.StrategySpec(names=["jitter_augment"], top_models=1)
+    result = run(frame, tmp_path, strategies=opted, metric="pr_auc")
+    assert any(t.strategy == "jitter_augment" for t in result.trials)
+    verdicts = json.loads(
+        (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+    )["outcomes"]
+    assert any(o["technique"].startswith("jitter_augment@") for o in verdicts)

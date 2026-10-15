@@ -122,11 +122,16 @@ def test_interaction_feature_count_limits():
 
 
 def test_builds_produce_fittable_candidates(skewed_imbalanced):
+    import importlib.util
+
     profile = profile_of(skewed_imbalanced)
     plan = profile.feature_plan
     features = skewed_imbalanced.drop(columns="y")
     target = skewed_imbalanced["y"]
+    has_sampling = importlib.util.find_spec("imblearn") is not None
     for name in strategies.STRATEGIES:
+        if name in {"smote", "borderline_smote", "adasyn"} and not has_sampling:
+            continue
         adapter = REGISTRY.get("logistic_regression")
         candidate = strategies.get_strategy(name).build(
             plan, adapter, BINARY, 0
@@ -158,9 +163,83 @@ def test_registry_and_unknown_strategy():
         "class_weight",
         "random_oversample",
         "random_undersample",
+        "smote",
+        "borderline_smote",
+        "adasyn",
+        "jitter_augment",
         "calibrated",
         "log_skewed",
         "interactions",
     )
+    assert "jitter_augment" not in strategies.DEFAULT_NAMES
     with pytest.raises(errors.ConfigError, match="unknown strategy"):
         strategies.get_strategy("nope")
+
+
+def smote_profile():
+    rng = np.random.default_rng(5)
+    frame = pd.DataFrame({"a": rng.normal(size=500), "b": rng.normal(size=500)})
+    frame["y"] = (rng.random(500) < 0.08).astype(int)
+    frame.loc[frame.y == 1, "a"] += 1.5
+    return frame, profile_of(frame)
+
+
+def test_smote_family_needs_the_sampling_extra_numeric_features_and_imbalance(
+    balanced,
+):
+    imblearn = pytest.importorskip("imblearn")
+    assert imblearn
+    frame, profile = smote_profile()
+    for name in ("smote", "borderline_smote", "adasyn"):
+        assert reason(name, profile, "random_forest") is None
+        assert "balanced enough" in reason(
+            name, profile_of(balanced), "random_forest"
+        )
+    mixed = frame.assign(cat=np.where(frame.a > 0, "p", "q"))
+    assert "one-hot" in reason("smote", profile_of(mixed), "random_forest")
+    single = frame[["a", "y"]]
+    assert "two numeric" in reason("smote", profile_of(single), "random_forest")
+
+
+def test_smote_without_the_extra_explains_itself(monkeypatch):
+    profile = smote_profile()[1]
+    monkeypatch.setattr(
+        strategies.importlib.util, "find_spec", lambda name: None
+    )
+    assert "sampling" in reason("smote", profile, "random_forest")
+
+
+@pytest.mark.parametrize("name", ["smote", "borderline_smote", "adasyn"])
+def test_smote_candidates_fit_and_resample_only_the_training_fold(name):
+    pytest.importorskip("imblearn")
+    frame, profile = smote_profile()
+    adapter = REGISTRY.get("logistic_regression")
+    candidate = strategies.get_strategy(name).build(
+        profile.feature_plan, adapter, BINARY, 0
+    )
+    assert isinstance(candidate, resampling.PreprocessedResamplingClassifier)
+    features, target = frame.drop(columns="y"), frame["y"]
+    candidate.fit(features.iloc[:350], target.iloc[:350])
+    held = features.iloc[350:]
+    assert candidate.predict_proba(held).shape == (150, 2)
+    assert candidate.predict(held).shape == (150,)
+
+
+def test_jitter_is_opt_in_and_only_perturbs_synthetic_numeric_rows():
+    assert "jitter_augment" in strategies.OPT_IN
+    assert "jitter_augment" not in strategies.DEFAULT_NAMES
+    rng = np.random.default_rng(6)
+    features = pd.DataFrame(
+        {"a": rng.normal(size=200), "c": rng.choice(["x", "y"], 200)}
+    )
+    target = pd.Series([1] * 20 + [0] * 180)
+    sampled, labels = resampling.JitterOverSampler(0.1).resample(
+        features, target, 0
+    )
+    assert labels.value_counts().to_dict() == {0: 180, 1: 180}
+    originals = set(features["a"].round(12))
+    synthetic = ~sampled["a"].round(12).isin(originals)
+    assert synthetic.sum() >= 150  # nearly all extra minority rows are jittered
+    assert set(sampled["c"]) <= {"x", "y"}  # categoricals copied untouched
+    assert (labels[synthetic] == 1).all()
+    assert sampled["a"].std() < 1.5 * features["a"].std()
