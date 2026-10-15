@@ -1,28 +1,30 @@
+"""Tests for the run state machine."""
+
 import pytest
 
-from mml.contracts.events import EventLog
-from mml.core.state import InvalidTransition, RunState, StateMachine
+from mml.contracts import events
+from mml.core import state
 
 
 def test_happy_path_emits_event_per_transition():
-    log = EventLog()
-    sm = StateMachine("r1", log, "abc")
-    for s in list(RunState)[1:9]:
-        sm.transition(s, "ok")
-    assert sm.state is RunState.COMPLETED
-    assert len(log.events) == 9
+    log = events.EventLog()
+    machine = state.StateMachine("r1", log, "abc")
+    for step in state.FORWARD_ORDER[1:]:
+        machine.transition(step, "ok")
+    assert machine.state is state.RunState.COMPLETED
+    assert len(log.events) == len(state.FORWARD_ORDER)
     assert all(e.run_id == "r1" and e.config_hash == "abc" for e in log.events)
 
 
 def test_cannot_skip_states():
-    sm = StateMachine("r1", EventLog())
-    with pytest.raises(InvalidTransition):
-        sm.transition(RunState.TRAINING)
+    machine = state.StateMachine("r1", events.EventLog())
+    with pytest.raises(state.InvalidTransitionError):
+        machine.transition(state.RunState.TRAINING)
 
 
-def test_abort_and_terminal():
-    sm = StateMachine("r1", EventLog())
-    sm.transition(RunState.VALIDATING)
-    sm.transition(RunState.BLOCKED, "ambiguous target")
-    with pytest.raises(InvalidTransition):
-        sm.transition(RunState.PROFILING)
+def test_abort_then_terminal():
+    machine = state.StateMachine("r1", events.EventLog())
+    machine.transition(state.RunState.VALIDATING)
+    machine.transition(state.RunState.BLOCKED, "ambiguous target")
+    with pytest.raises(state.InvalidTransitionError):
+        machine.transition(state.RunState.PROFILING)
