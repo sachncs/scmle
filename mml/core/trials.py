@@ -53,6 +53,9 @@ class TrialRunner:
             error, so one broken candidate never ends the run.
         """
         context, metric = self.context, self.metric
+        cached = self.reuse(trial_id, model_name, params, fold_count)
+        if cached is not None:
+            return cached
         folds = self.folds if fold_count is None else self.folds[:fold_count]
         started = time.monotonic()
         result = experiments.TrialResult(
@@ -87,6 +90,54 @@ class TrialRunner:
             result.error = f"{type(error).__name__}: {error}"
         result.fit_seconds = time.monotonic() - started
         return result
+
+    def reuse(
+        self,
+        trial_id: str,
+        model_name: str,
+        params: Mapping[str, Any] | None,
+        fold_count: int | None,
+    ) -> experiments.TrialResult | None:
+        """Returns a checkpointed result from an interrupted run, if valid.
+
+        A checkpoint is reused only if the trial id, model and parameters
+        match and it covers at least the requested folds; folds are
+        deterministic, so a prefix of a full evaluation equals the cheaper
+        rung that would have been computed.
+
+        Args:
+            trial_id: Identifier being evaluated.
+            model_name: Model being evaluated.
+            params: Hyperparameter overrides.
+            fold_count: Requested folds, or None for all.
+
+        Returns:
+            A result view with exactly the requested folds, or None.
+        """
+        checkpoint = self.context.checkpoints.get(trial_id)
+        usable = (experiments.TrialStatus.OK, experiments.TrialStatus.PRUNED)
+        if (
+            checkpoint is None
+            or checkpoint.status not in usable
+            or checkpoint.model_name != model_name
+            or checkpoint.params != dict(params or {})
+        ):
+            return None
+        wanted = len(self.folds) if fold_count is None else fold_count
+        if len(checkpoint.fold_scores) < wanted:
+            return None
+        scores = checkpoint.fold_scores[:wanted]
+        return experiments.TrialResult(
+            trial_id,
+            model_name,
+            experiments.TrialStatus.OK,
+            checkpoint.metric,
+            float(np.mean(scores)),
+            float(np.std(scores)),
+            list(scores),
+            checkpoint.fit_seconds,
+            params=dict(checkpoint.params),
+        )
 
     def skip(
         self, trial_id: str, model_name: str, reason: str
