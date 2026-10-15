@@ -45,7 +45,7 @@ def test_report_states_enforcement_honestly(monkeypatch):
         and "capped" in report["cpu"]["enforcement"]
     )
     assert report["memory"]["within_limit"] is False
-    assert "cooperative" in report["memory"]["enforcement"]
-    assert "cooperative" in report["time_budget"]["enforcement"]
+    assert "no trial starts" in report["memory"]["enforcement"]
+    assert "hard ceiling" in report["time_budget"]["enforcement"]
     assert "no built-in model" in report["gpu"]["enforcement"]
     assert governor().report()["cpu"]["enforcement"] == "no cap configured"

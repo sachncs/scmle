@@ -60,8 +60,9 @@ More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 - **Secure by default.** Bundles are pickle-based, so loading is refused
   unless the HMAC signature verifies or you pass `trusted=True`; checksums
   are verified before anything is unpickled ([`docs/SECURITY.md`](docs/SECURITY.md)).
-- **Honest about limits.** CPU / time / memory limits are enforced
-  cooperatively and each run reports how every limit was applied and what was
+- **Honest about limits.** CPU / time / memory limits are enforced (no
+  trial starts past a limit; running trials hit a hard time ceiling and, on
+  Linux, a memory cap) and each run reports how every limit was applied and what was
   observed; reruns are classified `exact`, `comparable` or `different`.
 
 ## Benchmarks on open datasets
@@ -139,8 +140,9 @@ installed into a clean environment.
 
 ## Known limits
 
-* Time and memory limits are cooperative (see Guarantees): a running trial is
-  never interrupted, and worker processes are not individually memory-capped.
+* The hard time ceiling is a timer signal, delivered when the trial returns
+  to Python code (a long native call finishes first) and only in a main
+  thread; the hard memory cap needs Linux (macOS reports it cooperatively).
 * Profiling statistics (imbalance ratio, skew, association scores) are
   computed on the whole dataset, as `product.md` orders profiling before
   splitting; stratified splits use labels to choose the test rows.

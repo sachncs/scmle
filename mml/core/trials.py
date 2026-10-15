@@ -21,6 +21,7 @@ from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.core import context as context_module
+from mml.core import limits
 from mml.data import strategies
 from mml.evaluation import metrics
 
@@ -62,6 +63,8 @@ class TrialPayload:
         target: Development labels.
         folds: Cross-validation folds (positions in the development data).
         thread_limit: Threads each worker may use (None = library default).
+        ceiling_seconds: Hard time ceiling for the trial (None = none).
+        memory_gb: Hard memory cap for the trial (None = none).
     """
 
     job: TrialJob
@@ -76,6 +79,8 @@ class TrialPayload:
     target: pd.Series
     folds: Sequence[tuple[list[int], list[int]]]
     thread_limit: int | None
+    ceiling_seconds: float | None = None
+    memory_gb: float | None = None
 
 
 def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
@@ -107,7 +112,10 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
             payload.seed,
             job.params,
         )
-        with threadpoolctl.threadpool_limits(limits=payload.thread_limit):
+        with (
+            limits.hard_limits(payload.ceiling_seconds, payload.memory_gb),
+            threadpoolctl.threadpool_limits(limits=payload.thread_limit),
+        ):
             cv = model_selection.cross_validate(
                 pipeline,
                 payload.features,
@@ -170,6 +178,8 @@ class TrialRunner:
             target=self.split.dev_target,
             folds=self.folds,
             thread_limit=context.resource_governor.thread_limit,
+            ceiling_seconds=context.resource_governor.trial_ceiling_seconds(),
+            memory_gb=context.spec.resources.memory_limit_gb,
         )
 
     def run(
