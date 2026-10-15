@@ -82,7 +82,7 @@ installed):
 | credit-g (OpenML) | 1000 | binary | roc_auc | stacking | 0.8054 | 0.7849 | 0.7479 |
 | titanic (OpenML) | 1309 | binary | roc_auc | catboost | 0.9939 | 0.9947 | 0.9910 |
 | kc1 defects (OpenML) | 2109 | binary, 15% positive | pr_auc | stacking | 0.4967 | 0.5313 | 0.5249 |
-| adult income (OpenML, 12k) | 12000 | binary | roc_auc | stacking | 0.9107 | 0.9152 | 0.9066 |
+| adult income (OpenML, 12k) | 12000 | binary | roc_auc | stacking | 0.9106 | 0.9154 | 0.9066 |
 | california housing (OpenML, 10k) | 10000 | regression | rmse | stacking | 47866 | 47169 | 49378 |
 
 Honest reading: ahead of the reference on 8 of 9. The exception is wine,
