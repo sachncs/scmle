@@ -21,9 +21,9 @@ def fitted(model, rows=300):
 
 def test_bigger_models_are_larger_and_slower():
     small, features = fitted(linear_model.LogisticRegression())
-    large, _ = fitted(
+    large = fitted(
         ensemble.RandomForestClassifier(n_estimators=300, random_state=0)
-    )
+    )[0]
     tiny = resources.measure(small, features)
     big = resources.measure(large, features)
     assert big.model_mb > 10 * tiny.model_mb
