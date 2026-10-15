@@ -97,4 +97,4 @@ def test_stack_members_are_full_pipelines_cross_fitted_by_group():
     stack.fit(frame, target)
     assert stack.predict_proba(frame).shape == (len(frame), 2)
     # Raw frames (with the group column) go in; members preprocess themselves.
-    assert all(hasattr(member, "named_steps") for _, member in stack.estimators)
+    assert all(hasattr(member, "named_steps") for member in stack.estimators_)
