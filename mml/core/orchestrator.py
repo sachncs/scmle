@@ -250,6 +250,17 @@ class Orchestrator:
             checkpoints[record["trial_id"]] = experiments.TrialResult(**record)
         return checkpoints
 
+    def recoverable(self, store: store_module.RunStore) -> list[str]:
+        """Lists the trial checkpoints a failed or interrupted run can resume.
+
+        Args:
+            store: The run directory.
+        """
+        trials_dir = store.path("trials")
+        if not trials_dir.exists():
+            return []
+        return sorted(path.stem for path in trials_dir.glob("trial_*.json"))
+
     def consult_checkpoints(
         self, gate: state.RunState, context: context_module.RunContext
     ) -> None:
@@ -325,6 +336,7 @@ class Orchestrator:
             return context_module.require(context.result, "result")
         except errors.CancelledError as error:
             error.details.setdefault("run_dir", str(store.directory))
+            error.details["recoverable_trials"] = self.recoverable(store)
             machine.transition(state.RunState.CANCELLED, str(error))
             raise
         except KeyboardInterrupt as error:
@@ -334,10 +346,12 @@ class Orchestrator:
             ) from error
         except errors.BlockedError as error:
             error.details["run_dir"] = str(store.directory)
+            error.details["recoverable_trials"] = self.recoverable(store)
             machine.transition(state.RunState.BLOCKED, str(error))
             raise
         except errors.MagicMLError as error:
             error.details["run_dir"] = str(store.directory)
+            error.details["recoverable_trials"] = self.recoverable(store)
             machine.transition(
                 state.RunState.FAILED, f"{error.category}: {error}"
             )
@@ -345,5 +359,9 @@ class Orchestrator:
         except Exception as error:
             machine.transition(state.RunState.FAILED, f"internal: {error!r}")
             raise errors.MagicMLError(
-                str(error), {"run_dir": str(store.directory)}
+                str(error),
+                {
+                    "run_dir": str(store.directory),
+                    "recoverable_trials": self.recoverable(store),
+                },
             ) from error
