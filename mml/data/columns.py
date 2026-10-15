@@ -26,6 +26,30 @@ MAX_DIRECT_VALUES = 20
 MIN_ASSOCIATION_ROWS = 10
 MIN_MISSING_RATE = 0.05
 MIN_PRESENT_ROWS = 20
+OUTLIER_IQR = 1.5
+
+
+def entropy(series: pd.Series) -> float:
+    """Shannon entropy (bits) of a column's value distribution."""
+    proportions = series.dropna().value_counts(normalize=True).to_numpy()
+    if proportions.size == 0:
+        return 0.0
+    return float(-(proportions * np.log2(proportions)).sum())
+
+
+def outlier_rate(series: pd.Series) -> float:
+    """Share of values outside Tukey's 1.5 x IQR fences."""
+    values = series.dropna().to_numpy(dtype=float)
+    if len(values) < 4:
+        return 0.0
+    q1, q3 = np.percentile(values, [25, 75])
+    spread = q3 - q1
+    if spread == 0:
+        return 0.0
+    outside = (values < q1 - OUTLIER_IQR * spread) | (
+        values > q3 + OUTLIER_IQR * spread
+    )
+    return float(outside.mean())
 
 
 def to_finite(series: pd.Series) -> pd.Series:
@@ -169,11 +193,13 @@ class NumericKind(ColumnKind):
         """Adds moments and range for non-boolean columns."""
         stats = super().statistics(series)
         if not pd.api.types.is_bool_dtype(series):
+            finite = to_finite(series)
             names = ["skew", "mean", "std", "min", "max"]
-            moments = series.astype(float).agg(names).to_dict()
+            moments = finite.agg(names).to_dict()
             stats |= {
                 str(k): float(np.nan_to_num(v)) for k, v in moments.items()
             }
+            stats["outlier_rate"] = outlier_rate(finite)
         return stats
 
     def transformer(
@@ -260,6 +286,7 @@ class CategoricalKind(ColumnKind):
         stats = super().statistics(series)
         top = series.value_counts().head(5)
         stats["top"] = {str(k): int(v) for k, v in top.items()}
+        stats["entropy_bits"] = entropy(series)
         return stats
 
     def exclusion_reason(self, series: pd.Series) -> str | None:

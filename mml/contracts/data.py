@@ -82,6 +82,9 @@ class DatasetProfile:
         risk_findings: Leakage / imbalance / shift hypotheses (not verdicts).
         target_summary: Target distribution summary.
         feature_plan: Resulting feature selection.
+        dataset_statistics: Dataset-level fingerprint grouped by dimension
+            (shape, types, missingness, target, features, relationships,
+            structure, quality, operational, risk).
     """
 
     manifest: DatasetManifest
@@ -90,6 +93,9 @@ class DatasetProfile:
     risk_findings: tuple[str, ...]
     target_summary: Mapping[str, Any]
     feature_plan: FeaturePlan
+    dataset_statistics: Mapping[str, Any] = dataclasses.field(
+        default_factory=dict
+    )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -100,6 +106,7 @@ class DatasetProfile:
             "risk_findings": list(self.risk_findings),
             "target": dict(self.target_summary),
             "feature_plan": self.feature_plan.to_dict(),
+            "dataset": dict(self.dataset_statistics),
         }
 
 
