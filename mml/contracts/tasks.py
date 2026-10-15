@@ -103,6 +103,14 @@ class EnsembleSpec(FrozenModel):
     size: int = pydantic.Field(default=3, ge=0)
 
 
+class SelectionSpec(FrozenModel):
+    """Serving constraints a selected model must satisfy."""
+
+    max_model_mb: float | None = pydantic.Field(default=None, gt=0)
+    max_p95_latency_ms: float | None = pydantic.Field(default=None, gt=0)
+    max_candidates_checked: int = pydantic.Field(default=10, ge=1)
+
+
 class DecisionSpec(FrozenModel):
     """How binary probabilities become decisions (threshold optimization)."""
 
@@ -125,6 +133,7 @@ class ProjectSpec(FrozenModel):
     search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
     strategies: StrategySpec = pydantic.Field(default_factory=StrategySpec)
     ensemble: EnsembleSpec = pydantic.Field(default_factory=EnsembleSpec)
+    selection: SelectionSpec = pydantic.Field(default_factory=SelectionSpec)
     decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
