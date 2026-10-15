@@ -75,3 +75,38 @@ def test_commands_are_polymorphic():
     names = [command.name for command in cli.COMMANDS]
     assert names == ["plan", "run", "resume", "predict"]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
+
+
+def test_predict_with_explicit_renames(binary_frame, tmp_path):
+    data = tmp_path / "d.csv"
+    binary_frame.to_csv(data, index=False)
+    code = cli.main(
+        [
+            "run",
+            str(data),
+            "--target",
+            "y",
+            "--output-dir",
+            str(tmp_path / "runs"),
+            "--top-models",
+            "0",
+        ]
+    )
+    assert code == 0
+    bundle_dir = next((tmp_path / "runs").iterdir()) / "model"
+    renamed = binary_frame.drop(columns="y").rename(
+        columns={"a": "A_value", "b": "B"}
+    )
+    renamed.to_csv(tmp_path / "new.csv", index=False)
+    output = tmp_path / "pred.csv"
+    base = [
+        "predict",
+        "--trusted",
+        str(bundle_dir),
+        str(tmp_path / "new.csv"),
+        "--output",
+        str(output),
+    ]
+    assert cli.main(base) == cli.EXIT_FAILED  # exact names required by default
+    code = cli.main([*base, "--rename", "A_value=a", "--case-insensitive"])
+    assert code == 0 and len(pd.read_csv(output)) == len(binary_frame)

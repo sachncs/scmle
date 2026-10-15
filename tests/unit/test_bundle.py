@@ -235,3 +235,64 @@ def test_resaving_unsigned_removes_a_stale_signature(
     directory = bundle.save(tmp_path / "m", signing_key="k")
     bundle.save(directory)
     assert not (directory / bundle_module.SIGNATURE_FILE).exists()
+
+
+def test_default_policy_requires_exact_column_names(trained):
+    bundle, features = trained
+    renamed = features.rename(columns={"num": "NUM"})
+    with pytest.raises(errors.SchemaError, match="missing"):
+        bundle.predict(renamed)
+
+
+def test_explicit_renames_map_incoming_names(trained):
+    bundle, features = trained
+    renamed = features.rename(columns={"num": "customer_age", "cat": "segment"})
+    mapping = bundle_module.ColumnMapping(
+        {"customer_age": "num", "segment": "cat"}
+    )
+    np.testing.assert_array_equal(
+        bundle.predict(renamed, mapping), bundle.predict(features)
+    )
+    report = bundle.validate(renamed, mapping)
+    assert report.valid and report.extra == ()
+
+
+def test_case_and_whitespace_insensitive_matching_is_opt_in(trained):
+    bundle, features = trained
+    messy = features.rename(columns={"num": "  NUM ", "cat": "Cat"})
+    with pytest.raises(errors.SchemaError):
+        bundle.predict(messy)
+    loose = bundle_module.ColumnMapping(
+        case_insensitive=True, strip_whitespace=True
+    )
+    np.testing.assert_array_equal(
+        bundle.predict(messy, loose), bundle.predict(features)
+    )
+    only_case = bundle_module.ColumnMapping(case_insensitive=True)
+    with pytest.raises(errors.SchemaError):  # whitespace still differs
+        bundle.predict(messy, only_case)
+
+
+def test_ambiguous_or_unknown_mappings_are_rejected(trained):
+    bundle, features = trained
+    clash = features.rename(columns={"num": "NUM"}).assign(Num=1.0)
+    with pytest.raises(errors.SchemaError, match="ambiguous"):
+        bundle.predict(
+            clash, bundle_module.ColumnMapping(case_insensitive=True)
+        )
+    double = features.assign(other=features["num"]).rename(columns={"num": "a"})
+    with pytest.raises(errors.SchemaError, match="ambiguous"):
+        bundle.predict(
+            double, bundle_module.ColumnMapping({"a": "num", "other": "num"})
+        )
+    with pytest.raises(errors.SchemaError, match="not in the model schema"):
+        bundle.predict(features, bundle_module.ColumnMapping({"num": "ghost"}))
+
+
+def test_exact_matches_are_never_renamed(trained):
+    bundle, features = trained
+    mapping = bundle_module.ColumnMapping({"num": "cat"}, case_insensitive=True)
+    # "num" already exists exactly, so the rename request is ignored.
+    np.testing.assert_array_equal(
+        bundle.predict(features, mapping), bundle.predict(features)
+    )
