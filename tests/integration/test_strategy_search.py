@@ -194,3 +194,18 @@ def test_strategy_run_resumes_without_recomputation(
     assert [(t.trial_id, t.strategy) for t in resumed.trials] == [
         (t.trial_id, t.strategy) for t in original.trials
     ]
+
+
+def test_leaderboard_marks_exactly_the_selected_trial(
+    imbalanced_frame, tmp_path
+):
+    search = tasks.SearchSpec(top_models=1, configs_per_model=4)
+    result = run(imbalanced_frame, tmp_path, search=search)
+    board = result.leaderboard()
+    assert board["selected"].sum() == 1
+    winner = board[board["selected"]].iloc[0]
+    assert winner["trial_id"] == result.evaluation["selected_trial_id"]
+    assert winner["model_name"] == result.selected_model
+    assert winner["score_mean"] == pytest.approx(
+        result.evaluation["selected_cv_score"]
+    )
