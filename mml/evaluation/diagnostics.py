@@ -25,6 +25,7 @@ CALIBRATION_BINS = 10
 IMPORTANCE_REPEATS = 5
 MAX_SEGMENT_LEVELS = 12
 MAX_SEGMENT_FEATURES = 3
+SEGMENT_BANDS = 4
 THRESHOLDS = tuple(round(0.1 * step, 1) for step in range(1, 10))
 CLASSIFICATION = frozenset({tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS})
 BINARY_ONLY = frozenset({tasks.TaskType.BINARY})
@@ -217,6 +218,21 @@ class ResidualReport(Diagnostic):
             if frame[column].nunique() > MAX_SEGMENT_LEVELS:
                 continue
             grouped = frame.groupby(column, dropna=False)["abs_error"]
+            report["segments"][column] = {
+                str(level): {
+                    "mae": float(group.mean()),
+                    "count": len(group),
+                }
+                for level, group in grouped
+            }
+        for column in inputs.feature_plan.numeric[:MAX_SEGMENT_FEATURES]:
+            values = pd.to_numeric(frame[column], errors="coerce")
+            keys = (
+                values
+                if values.nunique() <= MAX_SEGMENT_LEVELS
+                else pd.qcut(values, SEGMENT_BANDS, duplicates="drop")
+            )
+            grouped = frame["abs_error"].groupby(keys, observed=True)
             report["segments"][column] = {
                 str(level): {
                     "mae": float(group.mean()),

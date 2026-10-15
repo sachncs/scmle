@@ -88,6 +88,11 @@ def test_residual_report_segments_and_bias():
     )
     assert abs(report["bias"]) < 0.3 and report["mae"] > 0
     assert set(report["segments"]["group"]) == {"a", "b", "c"}
+    numeric = [c for c in report["segments"] if c != "group"]
+    assert numeric, "continuous features are segmented into quantile bands"
+    bands = report["segments"][numeric[0]]
+    assert len(bands) == 4
+    assert sum(b["count"] for b in bands.values()) == 300
     assert (
         report["abs_error_quantiles"]["0.99"]
         >= report["abs_error_quantiles"]["0.5"]
