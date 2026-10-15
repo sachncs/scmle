@@ -151,8 +151,8 @@ class ImbalanceRule(PlanningRule):
         return candidates
 
 
-class TuningDeferralRule(PlanningRule):
-    """Documents that v0.1 compares default-configured pipelines."""
+class TuningRule(PlanningRule):
+    """Records whether hyperparameter search will run after screening."""
 
     def apply(
         self,
@@ -160,14 +160,28 @@ class TuningDeferralRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Records the deferral; leaves candidates unchanged."""
-        decisions.append(
-            experiments.Decision(
-                "hyperparameter_tuning",
-                Action.DEFER,
-                "v0.1 compares default-configured pipelines",
+        """Documents the search decision; leaves candidates unchanged."""
+        search = context.spec.search
+        tunable = [a.name for a in candidates if a.search_space is not None]
+        if search.top_models == 0 or not tunable:
+            decisions.append(
+                experiments.Decision(
+                    "hyperparameter_tuning",
+                    Action.DEFER,
+                    "disabled (search.top_models=0) or no tunable candidate",
+                )
             )
-        )
+        else:
+            decisions.append(
+                experiments.Decision(
+                    "hyperparameter_tuning",
+                    Action.INCLUDE,
+                    f"{search.optimizer} search on the top "
+                    f"{search.top_models} of {len(tunable)} tunable models, "
+                    f"{search.configs_per_model} configs each, "
+                    f"{search.prune_fraction:.0%} pruned after the first rung",
+                )
+            )
         return candidates
 
 
@@ -177,7 +191,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
         FastBudgetRule(),
         ApprovedModelsRule(),
         ImbalanceRule(),
-        TuningDeferralRule(),
+        TuningRule(),
     )
 
 

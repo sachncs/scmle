@@ -16,6 +16,8 @@ import pandas as pd
 from mml.api import project
 from mml.artifacts import bundle as bundle_module
 from mml.contracts import errors
+from mml.contracts import tasks
+from mml.optimization import optimizers
 
 EXIT_OK = 0
 EXIT_BLOCKED = 2
@@ -64,6 +66,18 @@ class ProjectCommand(Command):
         parser.add_argument("--id-columns", nargs="*", default=[])
         parser.add_argument("--exclude", nargs="*", default=[])
         parser.add_argument("--seed", type=int, default=42)
+        parser.add_argument(
+            "--top-models",
+            type=int,
+            default=2,
+            help="models to hyperparameter-tune (0 disables search)",
+        )
+        parser.add_argument("--configs-per-model", type=int, default=6)
+        parser.add_argument(
+            "--optimizer",
+            choices=sorted(optimizers.OPTIMIZERS),
+            default="random",
+        )
         parser.add_argument("--output-dir", default="runs")
 
     def build_project(self, args: argparse.Namespace) -> project.MLProject:
@@ -79,6 +93,11 @@ class ProjectCommand(Command):
             time_column=args.time_column,
             excluded_columns=args.exclude,
             seed=args.seed,
+            search=tasks.SearchSpec(
+                top_models=args.top_models,
+                configs_per_model=args.configs_per_model,
+                optimizer=args.optimizer,
+            ),
             output_dir=args.output_dir,
         )
 

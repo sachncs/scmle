@@ -37,6 +37,7 @@ class MLProject:
         folds: int = 5,
         test_fraction: float = 0.2,
         seed: int = 42,
+        search: tasks.SearchSpec | None = None,
         leakage_policy: LeakagePolicy = "warn",
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -57,6 +58,9 @@ class MLProject:
             folds: Cross-validation folds.
             test_fraction: Share of rows locked away for the final test.
             seed: Random seed.
+            search: Hyperparameter search settings; defaults to a small
+                pruned random search. Use `SearchSpec(top_models=0)` to
+                disable tuning.
             leakage_policy: `warn` or `block` on leakage hypotheses.
             output_dir: Parent directory for run directories.
 
@@ -82,6 +86,7 @@ class MLProject:
                 seed=seed,
             ),
             resources=tasks.ResourceSpec(time_budget_seconds=time_budget),
+            search=search or tasks.SearchSpec(),
             leakage_policy=leakage_policy,
         )
         self.output_dir = pathlib.Path(output_dir)
