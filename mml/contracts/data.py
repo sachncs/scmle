@@ -48,6 +48,10 @@ class FeaturePlan:
         high_cardinality: Categorical features with many distinct levels
             (`HIGH_CARDINALITY_LEVELS` or more), which one-hot encoding
             handles poorly.
+        group_column: Entity column, so inner cross-validation keeps entities
+            together.
+        time_column: Ordering column, so inner cross-validation keeps time
+            order.
     """
 
     numeric: tuple[str, ...]
@@ -57,6 +61,8 @@ class FeaturePlan:
     series: tuple[Any, ...] = ()
     extra_inputs: tuple[str, ...] = ()
     high_cardinality: tuple[str, ...] = ()
+    group_column: str | None = None
+    time_column: str | None = None
 
     @property
     def features(self) -> tuple[str, ...]:

@@ -123,7 +123,7 @@ def build_pipeline(
     seed: int,
     params: Mapping[str, Any] | None = None,
     options: data_contracts.PreprocessingOptions | None = None,
-) -> pipeline.Pipeline:
+) -> Any:
     """Builds a complete, independently evaluable candidate pipeline.
 
     Args:
@@ -137,6 +137,9 @@ def build_pipeline(
     Returns:
         An unfitted pipeline of preprocessing followed by the estimator.
     """
+    assembled = adapter.assemble(plan, task, seed, params)
+    if assembled is not None:
+        return assembled
     params = dict(params or {})
     if options is None:
         options = default_options(plan, adapter)

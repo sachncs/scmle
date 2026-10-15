@@ -21,6 +21,7 @@ from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
+from mml.data import inner_cv
 from mml.data import preprocessing
 from mml.models import resampling
 from mml.models import synthesis
@@ -246,7 +247,9 @@ class CalibrationStrategy(DataStrategy):
         """Wraps the standard pipeline in a cross-fitted calibrator."""
         inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
         return calibration.CalibratedClassifierCV(
-            inner, method="sigmoid", cv=CALIBRATION_FOLDS
+            inner,
+            method="sigmoid",
+            cv=inner_cv.for_plan(plan, True, CALIBRATION_FOLDS, seed),
         )
 
 

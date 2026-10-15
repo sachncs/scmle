@@ -12,9 +12,12 @@ from typing import Any
 from sklearn import ensemble
 from sklearn import linear_model
 
+from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
+from mml.data import inner_cv
+from mml.data import preprocessing
 
 STACK_FOLDS = 3
 MIN_MEMBERS = 2
@@ -48,6 +51,59 @@ class StackingAdapter(models.ModelAdapter):
         """
         self.registry = registry
 
+    @staticmethod
+    def members_of(params: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+        """Returns the member specifications.
+
+        Raises:
+            ConfigError: If fewer than two members are given.
+        """
+        members = list((params or {}).get("members", []))
+        if len(members) < MIN_MEMBERS:
+            raise errors.ConfigError("stacking needs at least two members")
+        return members
+
+    def assemble(
+        self,
+        plan: data_contracts.FeaturePlan,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator | None:
+        """Builds the stack from complete member pipelines.
+
+        Every member brings its own preprocessing, so the stack consumes the
+        raw frame and its inner cross-validation can follow the group and
+        time structure of the data.
+        """
+        members = self.members_of(params)
+        estimators = [
+            (
+                f"m{index}_{member['model']}",
+                preprocessing.build_pipeline(
+                    plan,
+                    self.registry.get(member["model"]),
+                    task,
+                    seed,
+                    member.get("params"),
+                ),
+            )
+            for index, member in enumerate(members)
+        ]
+        inner = inner_cv.for_plan(
+            plan, task.is_classification, STACK_FOLDS, seed
+        )
+        if task.is_classification:
+            return ensemble.StackingClassifier(
+                estimators,
+                final_estimator=linear_model.LogisticRegression(max_iter=1000),
+                cv=inner,
+                stack_method="auto",
+            )
+        return ensemble.StackingRegressor(
+            estimators, final_estimator=linear_model.RidgeCV(), cv=inner
+        )
+
     def build(
         self,
         task: tasks.TaskType,
@@ -68,9 +124,7 @@ class StackingAdapter(models.ModelAdapter):
         Raises:
             ConfigError: If fewer than two members are given.
         """
-        members = list((params or {}).get("members", []))
-        if len(members) < MIN_MEMBERS:
-            raise errors.ConfigError("stacking needs at least two members")
+        members = self.members_of(params)
         estimators = [
             (
                 f"m{index}_{member['model']}",

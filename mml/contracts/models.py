@@ -13,6 +13,7 @@ from typing import Any
 from typing import ClassVar
 from typing import Protocol
 
+from mml.contracts import data as data_contracts
 from mml.contracts import search
 from mml.contracts import tasks
 
@@ -112,6 +113,22 @@ class ModelAdapter(abc.ABC):
         Returns:
             A fresh estimator.
         """
+
+    def assemble(
+        self,
+        plan: data_contracts.FeaturePlan,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> Estimator | None:
+        """Builds a complete pipeline itself, if the model needs to.
+
+        Meta-models such as stacking build their members' pipelines and run
+        structure-aware inner cross-validation on the raw frame; they return
+        the finished candidate here. Ordinary adapters return None and get
+        the standard preprocessing-plus-estimator pipeline.
+        """
+        return None
 
     def categorical_params(self, indices: list[int]) -> Mapping[str, Any]:
         """Estimator parameters that mark columns as native categoricals.

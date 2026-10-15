@@ -347,6 +347,8 @@ class DatasetProfiler:
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
             dropped=dropped,
+            group_column=self.spec.data.group_column,
+            time_column=self.spec.data.time_column,
             high_cardinality=tuple(
                 c
                 for c in features["categorical"]
