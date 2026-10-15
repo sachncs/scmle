@@ -89,11 +89,22 @@ class StrategySpec(FrozenModel):
             "class_weight",
             "random_oversample",
             "random_undersample",
+            "calibrated",
             "log_skewed",
             "interactions",
         ]
     )
     top_models: int = pydantic.Field(default=2, ge=0)
+
+
+class DecisionSpec(FrozenModel):
+    """How binary probabilities become decisions (threshold optimization)."""
+
+    threshold_objective: Literal[
+        "none", "f1", "accuracy", "balanced_accuracy", "cost"
+    ] = "none"
+    false_positive_cost: float = pydantic.Field(default=1.0, gt=0)
+    false_negative_cost: float = pydantic.Field(default=1.0, gt=0)
 
 
 class ProjectSpec(FrozenModel):
@@ -107,6 +118,7 @@ class ProjectSpec(FrozenModel):
     resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
     search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
     strategies: StrategySpec = pydantic.Field(default_factory=StrategySpec)
+    decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
     @pydantic.model_validator(mode="after")

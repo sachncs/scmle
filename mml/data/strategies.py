@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from typing import Any
 from typing import ClassVar
 
+from sklearn import calibration
+
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import experiments
@@ -24,6 +26,7 @@ SKEW_THRESHOLD = 1.0
 MIN_INTERACTION_FEATURES = 2
 MAX_INTERACTION_FEATURES = 12
 DEFAULT = experiments.DEFAULT_STRATEGY
+CALIBRATION_FOLDS = 3
 
 
 class DataStrategy(abc.ABC):
@@ -204,6 +207,45 @@ class UndersampleStrategy(ResamplingStrategy):
     resampler_class = resampling.RandomUnderSampler
 
 
+class CalibrationStrategy(DataStrategy):
+    """Recalibrates predicted probabilities (sigmoid, fitted inside folds)."""
+
+    name = "calibrated"
+    description = "sigmoid probability calibration inside the training fold"
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs a probabilistic classifier worth calibrating."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        if not task.is_classification:
+            return "calibration applies to classification"
+        if not adapter.capabilities.probabilities:
+            return f"{adapter.name} does not provide probabilities"
+        if adapter.name == "logistic_regression":
+            return "logistic regression is already well calibrated"
+        return None
+
+    def build(
+        self,
+        plan: data_contracts.FeaturePlan,
+        adapter: models.ModelAdapter,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Wraps the standard pipeline in a cross-fitted calibrator."""
+        inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
+        return calibration.CalibratedClassifierCV(
+            inner, method="sigmoid", cv=CALIBRATION_FOLDS
+        )
+
+
 class FeatureStrategy(DataStrategy):
     """Base for strategies that change the numeric preprocessing.
 
@@ -296,6 +338,7 @@ STRATEGIES: dict[str, DataStrategy] = {
         ClassWeightStrategy(),
         OversampleStrategy(),
         UndersampleStrategy(),
+        CalibrationStrategy(),
         LogSkewedStrategy(),
         InteractionStrategy(),
     )
