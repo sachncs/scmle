@@ -185,3 +185,30 @@ def test_custom_tracker_is_honoured(binary_frame, tmp_path):
     result = orchestrator.run(tmp_path)
     assert recorder.seen == [t.trial_id for t in result.trials]
     assert not (tmp_path / "experiments.sqlite").exists()
+
+
+def test_resume_refuses_checkpoints_computed_on_different_data(
+    binary_frame, tmp_path
+):
+    counting, canceller = Counting, Canceller
+    counting.fits = canceller.fits = 0
+    canceller.armed = True
+    registry = registry_module.ModelRegistry.with_builtins()
+    registry.register(CancellerAdapter())
+    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    project.orchestrator.registry = registry
+    canceller.orchestrator = project.orchestrator
+    plan = dataclasses.replace(
+        project.plan(), candidate_models=("dummy", "canceller")
+    )
+    with pytest.raises(errors.CancelledError) as caught:
+        project.run(plan)
+    run_dir = caught.value.details["run_dir"]
+    canceller.armed = False
+    changed = binary_frame.copy()
+    changed.iloc[1, 1] = changed.iloc[1, 1] + 1000.0
+    orchestrator = orchestrator_module.Orchestrator.for_run_directory(
+        run_dir, frame=changed, registry=registry
+    )
+    with pytest.raises(errors.ConfigError, match="data changed"):
+        orchestrator.resume(run_dir)

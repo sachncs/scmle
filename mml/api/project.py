@@ -34,6 +34,7 @@ class MLProject:
         time_budget: int = 1800,
         *,
         workers: int = 1,
+        enforcement: Literal["hard", "cooperative"] = "hard",
         id_columns: list[str] | None = None,
         group_column: str | None = None,
         time_column: str | None = None,
@@ -66,6 +67,9 @@ class MLProject:
             metric: Primary metric; defaults per task.
             time_budget: Wall-clock budget in seconds.
             workers: Concurrent trial processes (1 = sequential).
+            enforcement: `hard` supervises every trial in its own process and
+                kills it past the time or memory limit; `cooperative` only
+                stops new trials from starting (and allows in-process hooks).
             id_columns: Identifier columns excluded from features.
             group_column: Entity column that must not straddle splits.
             time_column: Column ordering rows in time.
@@ -122,7 +126,9 @@ class MLProject:
                 seed=seed,
             ),
             resources=tasks.ResourceSpec(
-                time_budget_seconds=time_budget, workers=workers
+                time_budget_seconds=time_budget,
+                workers=workers,
+                enforcement=enforcement,
             ),
             search=search or tasks.SearchSpec(),
             strategies=strategies or tasks.StrategySpec(),

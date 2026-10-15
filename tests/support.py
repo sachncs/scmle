@@ -9,8 +9,9 @@ NO_ENSEMBLE = tasks.EnsembleSpec(size=0)
 
 
 def make_project(data, target, **kwargs):
-    """Builds a project with search, strategies and ensembles off unless overridden."""
+    """Builds a fast project: no search, strategies or ensembles by default."""
     kwargs.setdefault("search", NO_TUNING)
     kwargs.setdefault("strategies", NO_STRATEGIES)
     kwargs.setdefault("ensemble", NO_ENSEMBLE)
+    kwargs.setdefault("enforcement", "cooperative")  # fast, in-process
     return mml.MLProject(data, target, **kwargs)

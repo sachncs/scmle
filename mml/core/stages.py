@@ -8,6 +8,7 @@ side-effect-free plan preview.
 
 import abc
 import dataclasses
+import json
 import time
 from typing import Any
 from typing import ClassVar
@@ -103,11 +104,33 @@ class IngestStage(Stage):
                 },
             )
         context.frame = frame
+        self.refuse_stale_resume(context)
         context.write_json("dataset_manifest.json", context.manifest.to_dict())
         context.track(
             dataset_id=context.manifest.dataset_id,
             data_hash=context.manifest.data_hash,
         )
+
+    def refuse_stale_resume(self, context: context_module.RunContext) -> None:
+        """Rejects resuming trials computed on different data.
+
+        Raises:
+            ConfigError: If the run has checkpoints and the data hash differs
+                from the one recorded when they were computed.
+        """
+        if context.store is None or not context.checkpoints:
+            return
+        saved = context.store.path("dataset_manifest.json")
+        if not saved.exists():
+            return
+        previous = json.loads(saved.read_text()).get("data_hash")
+        current = require(context.manifest, "manifest").data_hash
+        if previous != current:
+            raise errors.ConfigError(
+                "cannot resume: the data changed since the checkpointed "
+                "trials were computed",
+                {"saved": previous, "current": current},
+            )
 
 
 class ProfileStage(Stage):

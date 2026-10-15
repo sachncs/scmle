@@ -1,12 +1,18 @@
 """Resource limits in real runs."""
 
+import dataclasses
+import time
+
 import pytest
+from sklearn import dummy
 import support
 
 from mml.contracts import errors
+from mml.contracts import models
 from mml.contracts import tasks
 from mml.core import limits
 from mml.core import orchestrator as orchestrator_module
+from mml.models import registry as registry_module
 
 
 def run_with(frame, tmp_path, **resources):
@@ -64,3 +70,56 @@ def test_disabled_gpu_is_accepted(binary_frame, tmp_path):
         binary_frame, tmp_path, time_budget_seconds=600, gpu="disabled"
     )
     assert result.evaluation["resource_limits"]["gpu"]["mode"] == "disabled"
+
+
+def test_hard_enforcement_supervises_trials_end_to_end(binary_frame, tmp_path):
+    result = run_with(
+        binary_frame, tmp_path, time_budget_seconds=600, workers=2
+    )
+    assert result.state == "COMPLETED"
+    assert all(t.status == "ok" for t in result.trials)
+    report = result.evaluation["resource_limits"]
+    assert "killed" in report["time_budget"]["enforcement"]
+
+
+class SleepyEstimator(dummy.DummyClassifier):
+    def fit(self, features, target):
+        time.sleep(120)
+        return super().fit(features, target)
+
+
+class SleepyAdapter(models.ModelAdapter):
+    name = "sleepy"
+    family = "test"
+    capabilities = models.Capabilities(
+        frozenset({tasks.TaskType.BINARY}), cost=2
+    )
+
+    def build(self, task, seed, params=None):
+        return SleepyEstimator()
+
+
+def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
+    binary_frame, tmp_path
+):
+    registry = registry_module.ModelRegistry.with_builtins()
+    registry.register(SleepyAdapter())
+    project = support.make_project(
+        binary_frame,
+        "y",
+        time_budget=6,
+        enforcement="hard",
+        output_dir=tmp_path,
+    )
+    project.orchestrator.registry = registry
+    plan = dataclasses.replace(
+        project.plan(), candidate_models=("dummy", "sleepy")
+    )
+    started = time.monotonic()
+    result = project.run(plan)
+    assert time.monotonic() - started < 100
+    assert result.state == "COMPLETED"
+    sleepy = [t for t in result.trials if t.model_name == "sleepy"]
+    assert sleepy and sleepy[0].status == "failed"
+    assert "hard time ceiling" in sleepy[0].error
+    assert result.selected_model != "sleepy"
