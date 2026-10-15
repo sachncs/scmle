@@ -57,6 +57,16 @@ class ParquetReader(TableReader):
         return pd.read_parquet(path)
 
 
+class FeatherReader(TableReader):
+    """Arrow IPC / Feather files."""
+
+    suffixes = (".feather", ".arrow")
+
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads a Feather file."""
+        return pd.read_feather(path)
+
+
 class DatasetLoader:
     """Dispatches file reads to the matching `TableReader`."""
 
@@ -66,7 +76,11 @@ class DatasetLoader:
         Args:
             readers: Readers to dispatch to; defaults to CSV and Parquet.
         """
-        self.readers = readers or (CsvReader(), ParquetReader())
+        self.readers = readers or (
+            CsvReader(),
+            ParquetReader(),
+            FeatherReader(),
+        )
 
     def supported_suffixes(self) -> list[str]:
         """Returns every suffix some reader handles, sorted."""

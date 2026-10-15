@@ -7,10 +7,12 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 
 from mml.artifacts import bundle as bundle_module
 from mml.contracts import data as data_contracts
 from mml.contracts import experiments
+from mml.data import interchange
 
 
 @dataclasses.dataclass(slots=True)
@@ -62,6 +64,10 @@ class RunResult:
             ascending=not self.evaluation["metric_greater_is_better"],
         )
         return pd.concat([ranked, board[~succeeded]]).reset_index(drop=True)
+
+    def leaderboard_arrow(self) -> pa.Table:
+        """The leaderboard as an Arrow table."""
+        return interchange.to_arrow(self.leaderboard())
 
     def load_best_model(self) -> bundle_module.ModelBundle:
         """Returns the packaged best model."""

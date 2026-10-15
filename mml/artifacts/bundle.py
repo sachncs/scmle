@@ -22,6 +22,7 @@ import sklearn
 import mml
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
+from mml.data import interchange
 from mml.data import readers
 from mml.monitoring import reference as reference_module
 
@@ -511,9 +512,9 @@ class ModelBundle:
         self, data: str | pathlib.Path | pd.DataFrame
     ) -> pd.DataFrame:
         """Loads inference input from a path or copies a DataFrame."""
-        if isinstance(data, pd.DataFrame):
-            return data.copy()
-        return readers.read_table(data)
+        if isinstance(data, (str, pathlib.Path)):
+            return readers.read_table(data)
+        return interchange.to_pandas(data)
 
     def validate(
         self,

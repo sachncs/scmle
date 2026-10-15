@@ -36,9 +36,10 @@ boosting = ["lightgbm>=4.6", "xgboost>=3.0"]
 catboost = ["catboost>=1.2.8"]  # no free-threaded (3.14t) wheel yet
 optimization = ["optuna>=4.0"]
 sampling = ["imbalanced-learn>=0.14.1"]
+polars = ["polars>=1.0"]
 tracking = ["mlflow>=3.0"]
 distributed = ["ray>=2.40"]
-all = ["magicml[boosting,catboost,optimization,sampling,tracking,distributed]"]
+all = ["magicml[boosting,catboost,optimization,sampling,polars,tracking,distributed]"]
 
 [project.scripts]
 magicml = "mml.cli:main"

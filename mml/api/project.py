@@ -1,6 +1,7 @@
 """Public API: `MLProject(...).plan()`, `.run()`, `result.predict()`."""
 
 import pathlib
+from typing import Any
 from typing import Literal
 
 import pandas as pd
@@ -13,6 +14,7 @@ from mml.contracts import tasks
 from mml.core import checkpoints as checkpoints_module
 from mml.core import context as context_module
 from mml.core import orchestrator as orchestrator_module
+from mml.data import interchange
 
 ValidationStrategy = Literal[
     "auto", "stratified", "random", "group", "temporal"
@@ -25,7 +27,7 @@ class MLProject:
 
     def __init__(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: Any,
         target: str,
         task: tasks.TaskRequest = "auto",
         metric: str | None = None,
@@ -54,7 +56,9 @@ class MLProject:
         """Defines a project.
 
         Args:
-            data: CSV/Parquet path or an in-memory DataFrame.
+            data: CSV / Parquet / Feather path, or an in-memory table:
+                pandas DataFrame, pyarrow Table, Polars frame, or anything
+                implementing the Arrow stream protocol.
             target: Name of the target column.
             task: `auto`, `classification`, `regression`, or an explicit
                 binary/multiclass task.
@@ -90,7 +94,11 @@ class MLProject:
         Raises:
             pydantic.ValidationError: If the configuration is inconsistent.
         """
-        frame = data.copy() if isinstance(data, pd.DataFrame) else None
+        frame = (
+            interchange.to_pandas(data)
+            if interchange.is_tabular(data)
+            else None
+        )
         self.spec = tasks.ProjectSpec(
             data=tasks.DataSpec(
                 uri="<in-memory>" if frame is not None else str(data),
