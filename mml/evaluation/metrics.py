@@ -4,7 +4,9 @@ Scores are always reported in natural units (log loss is positive);
 `greater_is_better` tells rankers which direction wins.
 """
 
+from collections.abc import Callable
 import dataclasses
+from typing import Any
 
 import pandas as pd
 from sklearn import metrics as sk_metrics
@@ -17,6 +19,21 @@ BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
 REGRESSION = tasks.TaskType.REGRESSION
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
+
+
+def positive_label(target: pd.Series, task: tasks.TaskType) -> Any:
+    """Returns the positive class of a binary target (None otherwise).
+
+    Follows scikit-learn's convention: the second class in sorted order,
+    which is `classes_[1]` of every fitted classifier.
+
+    Args:
+        target: Labels.
+        task: Resolved task type.
+    """
+    if task is not BINARY:
+        return None
+    return sorted(target.dropna().unique())[1]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -39,23 +56,73 @@ class Metric:
         """Converts a sign-adjusted scorer value to natural units."""
         return scorer_value if self.greater_is_better else -scorer_value
 
+    def scorer(self, positive: Any = None) -> Any:
+        """Returns the scikit-learn scorer.
+
+        Args:
+            positive: Positive class label (used by subclasses that need it).
+        """
+        return sk_metrics.get_scorer(self.scorer_name)
+
     def score(
         self,
         estimator: models.Estimator,
         features: pd.DataFrame,
         target: pd.Series,
+        positive: Any = None,
     ) -> float:
         """Scores a fitted estimator in natural units."""
-        scorer = sk_metrics.get_scorer(self.scorer_name)
+        scorer = self.scorer(positive)
         return self.to_natural(float(scorer(estimator, features, target)))
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PositiveLabelMetric(Metric):
+    """A binary metric defined relative to a positive class.
+
+    scikit-learn's stock scorers hard-code `pos_label=1`, which breaks on
+    string or other non-{0, 1} labels; this builds the scorer with the real
+    positive class instead.
+
+    Attributes:
+        score_function: Function `(y_true, y_pred_or_score, pos_label=...)`.
+        response_methods: Estimator methods supplying the prediction.
+    """
+
+    score_function: Callable[..., float] = sk_metrics.f1_score
+    response_methods: tuple[str, ...] = ("predict",)
+
+    def scorer(self, positive: Any = None) -> Any:
+        """Builds a scorer bound to `positive` (stock scorer if unknown)."""
+        if positive is None:
+            return super().scorer(None)
+        return sk_metrics.make_scorer(
+            self.score_function,
+            response_method=self.response_methods,
+            pos_label=positive,
+        )
 
 
 DEFAULT_METRICS = (
     Metric("roc_auc", "roc_auc", True, frozenset({BINARY})),
     Metric("roc_auc_ovr", "roc_auc_ovr", True, frozenset({MULTICLASS})),
-    Metric("pr_auc", "average_precision", True, frozenset({BINARY})),
+    PositiveLabelMetric(
+        "pr_auc",
+        "average_precision",
+        True,
+        frozenset({BINARY}),
+        sk_metrics.average_precision_score,
+        ("decision_function", "predict_proba"),
+    ),
     Metric("log_loss", "neg_log_loss", False, CLASSIFICATION),
-    Metric("f1", "f1", True, frozenset({BINARY})),
+    PositiveLabelMetric(
+        "f1",
+        "f1",
+        True,
+        frozenset({BINARY}),
+        sk_metrics.f1_score,
+        ("predict",),
+    ),
     Metric("f1_macro", "f1_macro", True, CLASSIFICATION),
     Metric("balanced_accuracy", "balanced_accuracy", True, CLASSIFICATION),
     Metric("accuracy", "accuracy", True, CLASSIFICATION),
@@ -144,10 +211,14 @@ class MetricCatalog:
             computed (for example a class absent from the labels).
         """
         results: dict[str, float] = {}
+        classes = getattr(estimator, "classes_", None)
+        positive = (
+            classes[1] if task is BINARY and classes is not None else None
+        )
         for name in self.report_names[task]:
             try:
                 results[name] = self.metrics[name].score(
-                    estimator, features, target
+                    estimator, features, target, positive
                 )
             except ValueError:
                 results[name] = float("nan")

@@ -57,6 +57,7 @@ class TrialPayload:
         task: Resolved task type.
         seed: Random seed.
         metric: Metric to optimize.
+        positive_label: Positive class of a binary target, else None.
         features: Development features.
         target: Development labels.
         folds: Cross-validation folds (positions in the development data).
@@ -70,6 +71,7 @@ class TrialPayload:
     task: tasks.TaskType
     seed: int
     metric: metrics.Metric
+    positive_label: Any
     features: pd.DataFrame
     target: pd.Series
     folds: Sequence[tuple[list[int], list[int]]]
@@ -111,7 +113,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
                 payload.features,
                 payload.target,
                 cv=list(folds),
-                scoring=metric.scorer_name,
+                scoring=metric.scorer(payload.positive_label),
                 error_score="raise",
             )
         scores = [metric.to_natural(float(s)) for s in cv["test_score"]]
@@ -162,6 +164,9 @@ class TrialRunner:
             task=self.task,
             seed=context.spec.validation.seed,
             metric=self.metric,
+            positive_label=metrics.positive_label(
+                self.split.dev_target, self.task
+            ),
             features=self.split.dev_features,
             target=self.split.dev_target,
             folds=self.folds,
