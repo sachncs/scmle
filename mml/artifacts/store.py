@@ -52,10 +52,13 @@ class RunStore:
         return target
 
     def write_json(self, relative: str, payload: Any) -> None:
-        """Writes `payload` as indented JSON (unknown types become strings)."""
-        self.path(relative).write_text(
-            json.dumps(payload, indent=2, default=str)
-        )
+        """Writes `payload` as indented JSON, creating parent directories.
+
+        Unknown value types are rendered as strings.
+        """
+        target = self.path(relative)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2, default=str))
 
     def write_text(self, relative: str, text: str) -> None:
         """Writes plain text."""
