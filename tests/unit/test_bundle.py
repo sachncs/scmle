@@ -75,7 +75,7 @@ def test_unknown_categories_and_missing_values_are_reported(trained):
 
 
 def test_tampering_is_detected(trained, tmp_path):
-    bundle, _ = trained
+    bundle = trained[0]
     directory = bundle.save(tmp_path / "m")
     with (directory / bundle_module.MODEL_FILE).open("ab") as handle:
         handle.write(b"x")
@@ -101,7 +101,7 @@ def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
 def test_invalid_bundles(tmp_path, trained):
     with pytest.raises(errors.ArtifactError, match="not a model bundle"):
         bundle_module.ModelBundle.load(tmp_path)
-    bundle, _ = trained
+    bundle = trained[0]
     directory = bundle.save(tmp_path / "m")
     path = directory / bundle_module.MANIFEST_FILE
     manifest = json.loads(path.read_text())

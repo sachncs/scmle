@@ -78,7 +78,7 @@ def test_explicit_requests_must_match_data(classification_frame):
 
 
 def test_feature_plan_drops_constant_and_id_like(classification_frame):
-    _, result = profile(classification_frame)
+    result = profile(classification_frame)[1]
     plan = result.feature_plan
     assert plan.numeric == ("num",) and plan.categorical == ("cat",)
     assert plan.dropped["const"] == "constant"
@@ -87,7 +87,7 @@ def test_feature_plan_drops_constant_and_id_like(classification_frame):
 
 def test_roles_are_excluded_from_features(classification_frame):
     frame = classification_frame.assign(grp=np.arange(300) % 30, rid=range(300))
-    _, result = profile(frame, group_column="grp", id_columns=["rid"])
+    result = profile(frame, group_column="grp", id_columns=["rid"])[1]
     dropped = result.feature_plan.dropped
     assert "splitting" in dropped["grp"] and dropped["rid"] == "id column"
     assert "grp" not in result.feature_plan.features
@@ -100,7 +100,7 @@ def test_missing_configured_column(classification_frame):
 
 def test_leaky_feature_flagged(classification_frame):
     leaky = classification_frame.assign(leak=classification_frame["y"] * 10 + 1)
-    _, result = profile(leaky)
+    result = profile(leaky)[1]
     assert any("'leak'" in finding for finding in result.risk_findings)
     assert not any("'num'" in finding for finding in result.risk_findings)
     assert result.column_statistics["leak"]["target_association"] >= 0.98
@@ -122,10 +122,10 @@ def test_no_usable_features_blocks():
 def test_imbalance_and_duplicates(classification_frame):
     frame = classification_frame
     skewed = pd.concat([frame[frame.y == 0], frame[frame.y == 1].head(5)])
-    _, result = profile(skewed)
+    result = profile(skewed)[1]
     assert any("imbalance" in r for r in result.risk_findings)
     duplicated = pd.concat([frame, frame.head(5)])
-    _, result = profile(duplicated)
+    result = profile(duplicated)[1]
     assert any("duplicate" in q for q in result.quality_findings)
 
 
@@ -140,6 +140,6 @@ def test_regression_target_summary():
 
 
 def test_profile_serializes(classification_frame):
-    _, result = profile(classification_frame)
+    result = profile(classification_frame)[1]
     payload = result.to_dict()
     assert payload["feature_plan"]["numeric"] == ["num"]

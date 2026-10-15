@@ -20,7 +20,7 @@ def registry():
 
 
 def test_candidates_depend_on_task(registry):
-    classifiers, _ = registry.candidates(BINARY)
+    classifiers = registry.candidates(BINARY)[0]
     regressors, rejected = registry.candidates(REGRESSION)
     assert "logistic_regression" in {a.name for a in classifiers}
     assert "logistic_regression" not in {a.name for a in regressors}
@@ -79,7 +79,7 @@ def test_rejects_missing_dependency_and_oversized_data(registry):
         requires = ("definitely_not_installed_pkg",)
 
     registry.register(NeedsPackage())
-    _, rejected = registry.candidates(BINARY, row_count=5)
+    rejected = registry.candidates(BINARY, row_count=5)[1]
     assert "missing dependency" in rejected["needs_package"]
 
     class Small(ThirdPartyAdapter):
@@ -87,7 +87,7 @@ def test_rejects_missing_dependency_and_oversized_data(registry):
         capabilities = models.Capabilities(frozenset({BINARY}), max_rows=10)
 
     registry.register(Small())
-    _, rejected = registry.candidates(BINARY, row_count=500)
+    rejected = registry.candidates(BINARY, row_count=500)[1]
     assert "too large" in rejected["small"]
 
 
