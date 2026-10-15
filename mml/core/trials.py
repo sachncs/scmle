@@ -20,9 +20,14 @@ class TrialRunner:
             context: Run context with `split`, `profile`, `task` and `metric`.
         """
         self.context = context
+        self.split = context_module.require(context.split, "split")
+        self.task = context_module.require(context.task, "task")
+        self.metric = context_module.require(context.metric, "metric")
+        self.feature_plan = context_module.require(
+            context.profile, "profile"
+        ).feature_plan
         self.folds = [
-            (list(train), list(val))
-            for train, val in context.split.manifest.folds
+            (list(train), list(val)) for train, val in self.split.manifest.folds
         ]
 
     def run(self, trial_id: str, model_name: str) -> experiments.TrialResult:
@@ -36,23 +41,22 @@ class TrialRunner:
             An `OK` result with fold scores, or a `FAILED` one describing the
             error, so one broken candidate never ends the run.
         """
-        context = self.context
-        metric = context.metric
+        context, metric = self.context, self.metric
         started = time.monotonic()
         result = experiments.TrialResult(
             trial_id, model_name, experiments.TrialStatus.FAILED, metric.name
         )
         try:
             pipeline = preprocessing.build_pipeline(
-                context.profile.feature_plan,
+                self.feature_plan,
                 context.registry.get(model_name),
-                context.task,
+                self.task,
                 context.spec.validation.seed,
             )
             cv = model_selection.cross_validate(
                 pipeline,
-                context.split.dev_features,
-                context.split.dev_target,
+                self.split.dev_features,
+                self.split.dev_target,
                 cv=self.folds,
                 scoring=metric.scorer_name,
                 error_score="raise",
@@ -75,6 +79,6 @@ class TrialRunner:
             trial_id,
             model_name,
             experiments.TrialStatus.SKIPPED,
-            self.context.metric.name,
+            self.metric.name,
             error=reason,
         )

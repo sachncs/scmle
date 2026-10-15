@@ -2,7 +2,7 @@
 
 Each `Stage` subclass owns one state of the run lifecycle and implements
 `execute`; the orchestrator treats them uniformly. Because stages only read
-and write a `RunContext`, the ingest/profile/plan prefix is reused for the
+and write a `RunContext`, the ingest/profile prefix is reused for the
 side-effect-free plan preview.
 """
 
@@ -25,6 +25,8 @@ from mml.data import splitting
 from mml.intelligence import planner as planner_module
 
 LEAKAGE_MARKER = "leakage"
+BASELINE = "dummy"
+require = context_module.require
 
 
 class Stage(abc.ABC):
@@ -58,12 +60,11 @@ class IngestStage(Stage):
         """Loads data (copying in-memory input) and builds the manifest."""
         data = context.spec.data
         if context.input_frame is not None:
-            context.frame = context.input_frame.copy()
+            frame = context.input_frame.copy()
         else:
-            context.frame = readers.read_table(data.uri)
-        context.manifest = readers.build_manifest(
-            context.frame, data.target, data.uri
-        )
+            frame = readers.read_table(data.uri)
+        context.frame = frame
+        context.manifest = readers.build_manifest(frame, data.target, data.uri)
         context.write_json("dataset_manifest.json", context.manifest.to_dict())
 
 
@@ -84,17 +85,17 @@ class ProfileStage(Stage):
                 hypothesis was raised.
         """
         spec = context.spec
-        target = context.frame[spec.data.target]
-        context.task = profiling.TaskResolver(spec).resolve(target)
-        context.metric = context.catalog.resolve(spec.metric, context.task)
-        context.profile = profiling.DatasetProfiler(spec).profile(
-            context.frame, context.manifest, context.task
+        frame = require(context.frame, "frame")
+        task = profiling.TaskResolver(spec).resolve(frame[spec.data.target])
+        context.task = task
+        context.metric = context.catalog.resolve(spec.metric, task)
+        profile = profiling.DatasetProfiler(spec).profile(
+            frame, require(context.manifest, "manifest"), task
         )
-        context.write_json("dataset_profile.json", context.profile.to_dict())
+        context.profile = profile
+        context.write_json("dataset_profile.json", profile.to_dict())
         if spec.leakage_policy == "block":
-            leaks = [
-                r for r in context.profile.risk_findings if LEAKAGE_MARKER in r
-            ]
+            leaks = [r for r in profile.risk_findings if LEAKAGE_MARKER in r]
             if leaks:
                 raise errors.BlockedError(
                     "unresolved leakage risk: " + "; ".join(leaks)
@@ -110,8 +111,8 @@ def build_plan(
     return planner.plan(
         planner_module.PlanningContext(
             context.spec,
-            context.profile,
-            context.task,
+            require(context.profile, "profile"),
+            require(context.task, "task"),
             approved.candidate_models if approved is not None else None,
         )
     )
@@ -128,16 +129,18 @@ class PlanStage(Stage):
 
     def execute(self, context: context_module.RunContext) -> None:
         """Splits the data and plans candidates."""
-        manager = splitting.SplitManager(context.spec, context.task)
-        context.split = manager.split(context.frame)
-        context.write_json(
-            "validation_manifest.json", context.split.manifest.to_dict()
+        manager = splitting.SplitManager(
+            context.spec, require(context.task, "task")
         )
-        context.plan = build_plan(context)
-        context.write_json("execution_plan.json", context.plan.to_dict())
+        split = manager.split(require(context.frame, "frame"))
+        context.split = split
+        context.write_json("validation_manifest.json", split.manifest.to_dict())
+        plan = build_plan(context)
+        context.plan = plan
+        context.write_json("execution_plan.json", plan.to_dict())
         context.write_json(
             "diagnostics/decision_log.json",
-            [d.to_dict() for d in context.plan.decisions],
+            [d.to_dict() for d in plan.decisions],
         )
 
 
@@ -148,12 +151,14 @@ class TrainStage(Stage):
 
     def describe(self, context: context_module.RunContext) -> str:
         """Reports the number of candidates."""
-        return f"{len(context.plan.candidate_models)} candidates"
+        plan = require(context.plan, "plan")
+        return f"{len(plan.candidate_models)} candidates"
 
     def execute(self, context: context_module.RunContext) -> None:
         """Runs trials in order, checkpointing each result as it finishes."""
         runner = trials.TrialRunner(context)
-        for number, name in enumerate(context.plan.candidate_models, 1):
+        plan = require(context.plan, "plan")
+        for number, name in enumerate(plan.candidate_models, 1):
             context.check_cancelled()
             trial_id = f"trial_{number:03d}"
             if number > 1 and time.monotonic() >= context.deadline:
@@ -182,7 +187,7 @@ class SelectStage(Stage):
     def execute(self, context: context_module.RunContext) -> None:
         """Chooses the winning trial."""
         context.selected = context.policy.select(
-            context.trials, context.metric, context.registry
+            context.trials, require(context.metric, "metric"), context.registry
         )
 
 
@@ -193,53 +198,53 @@ class FinalEvaluationStage(Stage):
 
     def describe(self, context: context_module.RunContext) -> str:
         """Names the selected model."""
-        return (
-            f"final one-time test evaluation of {context.selected.model_name}"
-        )
+        selected = require(context.selected, "selected")
+        return f"final one-time test evaluation of {selected.model_name}"
 
     def execute(self, context: context_module.RunContext) -> None:
         """Refits on all development data and evaluates on the test set."""
         context.check_cancelled()
-        split = context.split
+        split = require(context.split, "split")
+        selected = require(context.selected, "selected")
+        task = require(context.task, "task")
+        metric = require(context.metric, "metric")
         pipeline = preprocessing.build_pipeline(
-            context.profile.feature_plan,
-            context.registry.get(context.selected.model_name),
-            context.task,
+            require(context.profile, "profile").feature_plan,
+            context.registry.get(selected.model_name),
+            task,
             context.spec.validation.seed,
         )
         pipeline.fit(split.dev_features, split.dev_target)
-        test_features, test_target = split.locked_test.open(
-            split.locked_test.issue_token()
-        )
+        locked = split.locked_test
+        test_features, test_target = locked.open(locked.issue_token())
         baseline = next(
             (
                 t
                 for t in context.trials
-                if t.model_name == "dummy"
+                if t.model_name == BASELINE
                 and t.status is experiments.TrialStatus.OK
             ),
             None,
         )
-        selected = context.selected
         context.final_pipeline = pipeline
         context.evaluation = {
             "run_id": context.store.run_id if context.store else "",
-            "task": context.task.value,
-            "metric": context.metric.name,
-            "metric_greater_is_better": context.metric.greater_is_better,
+            "task": task.value,
+            "metric": metric.name,
+            "metric_greater_is_better": metric.greater_is_better,
             "selection_policy": context.policy.description,
             "selected_model": selected.model_name,
             "selected_cv_score": selected.score_mean,
             "selected_cv_std": selected.score_std,
             "baseline_cv_score": baseline.score_mean if baseline else None,
             "test_metrics": context.catalog.evaluate(
-                pipeline, test_features, test_target, context.task
+                pipeline, test_features, test_target, task
             ),
             "n_dev": len(split.dev_features),
             "n_test": len(test_features),
             "split_fingerprint": split.manifest.fingerprint,
             "split_strategy": split.manifest.strategy,
-            "test_set_opened": split.locked_test.opened,
+            "test_set_opened": locked.opened,
             "elapsed_seconds": time.monotonic() - context.started_at,
             "reproducibility": (
                 "same seed/data/environment replays; threaded backends may "
@@ -259,27 +264,31 @@ class PackageStage(Stage):
 
     def execute(self, context: context_module.RunContext) -> None:
         """Packages artifacts and assembles the `RunResult`."""
-        store = context.store
+        store = context.run_store
+        split = require(context.split, "split")
+        selected = require(context.selected, "selected")
+        evaluation = require(context.evaluation, "evaluation")
+        profile = require(context.profile, "profile")
         bundle = bundle_module.ModelBundle.create(
             context.final_pipeline,
-            context.profile.feature_plan,
-            context.split.dev_features,
+            profile.feature_plan,
+            split.dev_features,
             context.spec.data.target,
-            context.task.value,
-            context.metric.name,
-            context.selected.model_name,
+            require(context.task, "task").value,
+            require(context.metric, "metric").name,
+            selected.model_name,
         )
         bundle.save(store.path("model"))
-        store.write_json("evaluation.json", context.evaluation)
+        store.write_json("evaluation.json", evaluation)
         result = results.RunResult(
             run_id=store.run_id,
             run_dir=store.directory,
             state=run_state.RunState.COMPLETED.value,
-            plan=context.plan,
-            profile=context.profile,
+            plan=require(context.plan, "plan"),
+            profile=profile,
             trials=context.trials,
-            selected_model=context.selected.model_name,
-            evaluation=context.evaluation,
+            selected_model=selected.model_name,
+            evaluation=evaluation,
             bundle=bundle,
         )
         board = result.leaderboard()

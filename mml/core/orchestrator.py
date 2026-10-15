@@ -149,7 +149,7 @@ class Orchestrator:
                 "run complete",
                 ("model/", "evaluation.json"),
             )
-            return context.result
+            return context_module.require(context.result, "result")
         except errors.CancelledError as error:
             machine.transition(state.RunState.CANCELLED, str(error))
             raise

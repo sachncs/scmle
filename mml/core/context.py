@@ -21,6 +21,26 @@ from mml.evaluation import selection
 from mml.models import registry as registry_module
 
 
+def require[T](value: T | None, name: str) -> T:
+    """Returns a stage product, failing loudly if its stage has not run.
+
+    Args:
+        value: The possibly unset context field.
+        name: Field name used in the error message.
+
+    Returns:
+        `value`, narrowed to non-None.
+
+    Raises:
+        MagicMLError: If the producing stage has not executed.
+    """
+    if value is None:
+        raise errors.MagicMLError(
+            f"'{name}' is unavailable: its stage has not run yet"
+        )
+    return value
+
+
 @dataclasses.dataclass
 class RunContext:
     """Inputs, services and progressively produced artifacts of a run.
@@ -87,6 +107,11 @@ class RunContext:
     def deadline(self) -> float:
         """Monotonic time at which the budget is exhausted."""
         return self.started_at + self.spec.resources.time_budget_seconds
+
+    @property
+    def run_store(self) -> store_module.RunStore:
+        """The run store; raises for previews that have none."""
+        return require(self.store, "store")
 
     @property
     def run_directory(self) -> str:
