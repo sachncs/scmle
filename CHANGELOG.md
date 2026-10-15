@@ -35,3 +35,21 @@ First public beta.
 * MLflow tracking adapter and Ray execution backend.
 * CLI: `plan`, `run`, `resume`, `predict`.
 * Benchmarks on nine open datasets with a regression gate.
+* Python 3.11 or newer (tested 3.11 to 3.14).
+* Enforced resource limits: each trial runs in a supervised process that is
+  killed past its time ceiling or memory limit.
+* The saved model carries per-entity history, so lag / rolling features work
+  on a single new record; serving adapters keep the history current.
+* Profiling, feature selection and leakage checks use the development
+  partition only; trials record what each fold fit and scored on and the
+  ledger verifies it against the split manifest.
+* Adapter capabilities drive preprocessing and planning (native categorical
+  handling, no imputation for models that handle missing values, sparse
+  input); high-cardinality, regression rare-target and short-budget policies.
+* Group- and time-aware inner cross-validation for calibration and stacking.
+* Selection rules: tie-breaker, tolerance, one-standard-error rule, hardware
+  safety factor; Nadeau-Bengio corrected confidence interval.
+* Plugin discovery gated by the conformance suite; registry authenticates
+  bundles; tracking lineage with artifact checksums; save-and-reload parity
+  verification; optional probability calibration at inference.
+* Workflow compiler (stages declare dependencies).
