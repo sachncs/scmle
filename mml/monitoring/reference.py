@@ -20,6 +20,7 @@ DECILES = tuple(np.linspace(0.1, 0.9, 9))
 MAX_CATEGORIES = 50
 OTHER = "__other__"
 EPSILON = 1e-4
+NOISE_TAIL = 1.5
 
 
 def population_stability_index(
@@ -45,10 +46,13 @@ class DistributionReference(abc.ABC):
 
     Attributes:
         missing_rate: Share of missing values in the reference data.
+        rows: Number of non-missing reference observations (drives the
+            sampling-noise floor of PSI).
         kind: Discriminator used when persisting.
     """
 
     missing_rate: float
+    rows: int = 0
     kind: ClassVar[str]
 
     @abc.abstractmethod
@@ -64,10 +68,33 @@ class DistributionReference(abc.ABC):
         """Returns a JSON-serializable mapping."""
 
     def psi(self, values: pd.Series) -> float:
-        """PSI of new values against this reference."""
+        """Raw PSI of new values against this reference."""
         return population_stability_index(
             self.expected(), self.proportions(values)
         )
+
+    def noise_floor(self, new_rows: int) -> float:
+        """PSI level that sampling noise alone produces (no drift).
+
+        With few observations PSI is positive even without drift: its mean
+        is about `(bins - 1) * (1/n_reference + 1/n_new)` (verified by
+        simulation) and its 95th percentile about twice that, so the floor
+        is scaled by `NOISE_TAIL`. Comparing PSI to fixed thresholds without
+        removing this floor causes false alarms.
+
+        Args:
+            new_rows: Number of non-missing new observations.
+        """
+        if self.rows <= 0 or new_rows <= 0:
+            return 0.0
+        bins = len(self.expected())
+        return NOISE_TAIL * (bins - 1) * (1.0 / self.rows + 1.0 / new_rows)
+
+    def adjusted_psi(self, values: pd.Series) -> float:
+        """PSI minus its sampling-noise floor, never below zero."""
+        raw = self.psi(values)
+        floor = self.noise_floor(int(values.notna().sum()))
+        return max(raw - floor, 0.0)
 
     def unseen_rate(self, values: pd.Series) -> float:
         """Share of new values outside the reference domain (if defined)."""
@@ -97,9 +124,10 @@ class NumericReference(DistributionReference):
             if len(present)
             else ()
         )
-        reference = cls(float(numeric.isna().mean()), edges, ())
+        missing = float(numeric.isna().mean())
+        reference = cls(missing, len(present), edges, ())
         fractions = tuple(reference.proportions(numeric))
-        return cls(float(numeric.isna().mean()), edges, fractions)
+        return cls(missing, len(present), edges, fractions)
 
     def proportions(self, values: pd.Series) -> np.ndarray:
         """Bins values by the stored edges."""
@@ -122,6 +150,7 @@ class NumericReference(DistributionReference):
         return {
             "kind": self.kind,
             "missing_rate": self.missing_rate,
+            "rows": self.rows,
             "edges": list(self.edges),
             "fractions": list(self.fractions),
         }
@@ -145,7 +174,7 @@ class CategoricalReference(DistributionReference):
         top = present.value_counts(normalize=True).head(MAX_CATEGORIES)
         frequencies = {str(k): float(v) for k, v in top.items()}
         frequencies[OTHER] = max(0.0, 1.0 - sum(frequencies.values()))
-        return cls(float(values.isna().mean()), frequencies)
+        return cls(float(values.isna().mean()), len(present), frequencies)
 
     def levels(self) -> list[str]:
         """Category names in a stable order."""
@@ -182,6 +211,7 @@ class CategoricalReference(DistributionReference):
         return {
             "kind": self.kind,
             "missing_rate": self.missing_rate,
+            "rows": self.rows,
             "frequencies": self.frequencies,
         }
 
@@ -197,10 +227,13 @@ def reference_from_dict(record: dict[str, Any]) -> DistributionReference:
     if kind == "numeric":
         return NumericReference(
             record["missing_rate"],
+            record["rows"],
             tuple(record["edges"]),
             tuple(record["fractions"]),
         )
-    return CategoricalReference(record["missing_rate"], record["frequencies"])
+    return CategoricalReference(
+        record["missing_rate"], record["rows"], record["frequencies"]
+    )
 
 
 @dataclasses.dataclass(frozen=True)

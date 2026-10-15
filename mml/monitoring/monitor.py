@@ -53,11 +53,12 @@ class FeatureDrift:
 
     Attributes:
         feature: Column name.
-        psi: Population stability index vs training.
+        psi: Noise-adjusted population stability index vs training.
         status: stable / moderate / high.
         missing_rate: Missing share in the new data.
         reference_missing_rate: Missing share in training.
         unseen_rate: Share of never-seen categories (categoricals).
+        raw_psi: PSI before removing the sampling-noise floor.
     """
 
     feature: str
@@ -66,6 +67,7 @@ class FeatureDrift:
     missing_rate: float
     reference_missing_rate: float
     unseen_rate: float
+    raw_psi: float = 0.0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -75,14 +77,16 @@ class DriftReport:
     Attributes:
         rows: Rows assessed.
         features: Per-feature drift, worst first.
-        output_psi: PSI of the model's outputs.
+        output_psi: Noise-adjusted PSI of the model's outputs.
         output_status: stable / moderate / high.
+        output_raw_psi: Output PSI before removing the noise floor.
     """
 
     rows: int
     features: list[FeatureDrift]
     output_psi: float
     output_status: str
+    output_raw_psi: float = 0.0
 
     @property
     def high_share(self) -> float:
@@ -323,7 +327,7 @@ class ModelMonitor:
         features = []
         for name, ref in self.reference.features.items():
             values = frame[name]
-            psi = ref.psi(values)
+            psi = ref.adjusted_psi(values)
             features.append(
                 FeatureDrift(
                     name,
@@ -332,12 +336,18 @@ class ModelMonitor:
                     float(values.isna().mean()),
                     ref.missing_rate,
                     ref.unseen_rate(values),
+                    ref.psi(values),
                 )
             )
         features.sort(key=lambda f: -f.psi)
-        output_psi = self.reference.output.psi(self.model_output(frame))
+        output = self.model_output(frame)
+        output_psi = self.reference.output.adjusted_psi(output)
         return DriftReport(
-            len(frame), features, output_psi, self.thresholds.status(output_psi)
+            len(frame),
+            features,
+            output_psi,
+            self.thresholds.status(output_psi),
+            self.reference.output.psi(output),
         )
 
     def performance(
