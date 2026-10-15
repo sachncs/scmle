@@ -110,3 +110,53 @@ def test_all_failed_raises(registry):
     trials = [make_trial("ridge", 0.0, Status.FAILED)]
     with pytest.raises(errors.MagicMLError, match="all trials failed"):
         policy.select(trials, CATALOG.metrics["rmse"], registry)
+
+
+def string_problem():
+    rng = np.random.default_rng(0)
+    features = pd.DataFrame({"a": rng.normal(size=200)})
+    labels = pd.Series(
+        np.where(features.a + rng.normal(size=200) > 0, "true", "false")
+    )
+    return features, labels
+
+
+@pytest.mark.parametrize("name", ["pr_auc", "f1", "roc_auc"])
+def test_binary_metrics_work_with_string_labels(name):
+    from sklearn import linear_model
+
+    features, labels = string_problem()
+    model = linear_model.LogisticRegression().fit(features, labels)
+    metric = CATALOG.metrics[name]
+    positive = metrics.positive_label(labels, tasks.TaskType.BINARY)
+    assert positive == "true"
+    score = metric.score(model, features, labels, positive)
+    assert 0.6 < score <= 1.0
+
+
+def test_pr_auc_is_oriented_to_the_real_positive_class():
+    from sklearn import linear_model
+
+    features, labels = string_problem()
+    model = linear_model.LogisticRegression().fit(features, labels)
+    metric = CATALOG.metrics["pr_auc"]
+    as_true = metric.score(model, features, labels, "true")
+    as_false = metric.score(model, features, labels, "false")
+    assert as_true != pytest.approx(as_false)
+
+
+def test_evaluate_reports_f1_for_string_labels_instead_of_nan():
+    from sklearn import linear_model
+
+    features, labels = string_problem()
+    model = linear_model.LogisticRegression().fit(features, labels)
+    scores = CATALOG.evaluate(model, features, labels, tasks.TaskType.BINARY)
+    assert not any(np.isnan(value) for value in scores.values()), scores
+
+
+def test_positive_label_is_none_outside_binary_tasks():
+    labels = pd.Series([0, 1, 2])
+    assert metrics.positive_label(labels, tasks.TaskType.MULTICLASS) is None
+    assert (
+        metrics.positive_label(pd.Series([3, 7, 3]), tasks.TaskType.BINARY) == 7
+    )

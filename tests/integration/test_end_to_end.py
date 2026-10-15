@@ -157,3 +157,19 @@ def test_reruns_are_isolated_and_reproducible(binary_frame, tmp_path):
     assert first.evaluation["selected_cv_score"] == pytest.approx(
         second.evaluation["selected_cv_score"]
     )
+
+
+@pytest.mark.parametrize("metric", ["pr_auc", "f1", "roc_auc"])
+def test_string_labelled_binary_target_supports_every_binary_metric(
+    binary_frame, tmp_path, metric
+):
+    labelled = binary_frame.assign(
+        y=binary_frame.y.map({0: "false", 1: "true"})
+    )
+    result = run(labelled, tmp_path, metric=metric)
+    assert result.evaluation["metric"] == metric
+    assert not np.isnan(result.evaluation["selected_cv_score"])
+    assert not any(
+        np.isnan(v) for v in result.evaluation["test_metrics"].values()
+    )
+    assert set(result.predict(labelled.drop(columns="y"))) <= {"false", "true"}
