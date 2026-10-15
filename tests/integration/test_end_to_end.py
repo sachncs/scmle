@@ -231,3 +231,23 @@ def test_confidence_intervals_follow_the_data_structure(binary_frame, tmp_path):
     assert temporal["resampling_unit"] == "blocks"
     low, high = plain["ci_95"]
     assert low <= plain["estimate"] <= high
+
+
+def test_time_series_contracts_end_to_end(binary_frame, tmp_path):
+    frame = binary_frame.assign(
+        t=np.arange(len(binary_frame)), outcome_code=binary_frame.y * 9.0
+    )
+    project = support.make_project(
+        frame,
+        "y",
+        time_budget=300,
+        time_column="t",
+        unavailable_at_prediction=["outcome_code"],
+        output_dir=tmp_path,
+    )
+    result = project.run()
+    assert "outcome_code" not in result.bundle.features
+    assert (
+        "not available" in result.profile.feature_plan.dropped["outcome_code"]
+    )
+    assert result.evaluation["split_strategy"] == "temporal"
