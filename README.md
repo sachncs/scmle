@@ -153,8 +153,6 @@ installed into a clean environment.
   splitting; stratified splits use labels to choose the test rows.
 * The HTTP serving adapter is a minimal reference server (no authentication
   or TLS); run it behind a gateway.
-* Series (lag / rolling) features are computed on the batch you score, which
-  must therefore contain each entity's recent history.
 * Large deep-learning frameworks are not bundled; the neural family is a
   scikit-learn MLP, and PyTorch / Keras plug in through the same
   `ModelAdapter` contract.
