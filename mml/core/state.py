@@ -61,9 +61,7 @@ class StateMachine:
             )
         )
 
-    def transition(
-        self, to: RunState, reason: str = "", artifacts: tuple[str, ...] = ()
-    ) -> None:
+    def transition(self, to: RunState, reason: str = "", artifacts: tuple[str, ...] = ()) -> None:
         if self.state in TERMINAL:
             raise InvalidTransition(f"{self.state} is terminal; cannot go to {to}")
         if to not in _ABORT:
