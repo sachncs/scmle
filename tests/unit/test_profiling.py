@@ -143,3 +143,23 @@ def test_profile_serializes(classification_frame):
     result = profile(classification_frame)[1]
     payload = result.to_dict()
     assert payload["feature_plan"]["numeric"] == ["num"]
+
+
+def test_outcome_dependent_recording_is_reported_as_possible_leakage():
+    rng = np.random.default_rng(4)
+    rows = 400
+    frame = pd.DataFrame({"signal": rng.normal(size=rows)})
+    frame["y"] = rng.integers(0, 2, rows)
+    frame["discharge_code"] = np.where(
+        frame.y == 1, rng.integers(1, 5, rows), np.nan
+    )
+    result = profile(frame)[1]
+    assert any(
+        "'discharge_code'" in finding and "recorded" in finding
+        for finding in result.risk_findings
+    )
+    assert (
+        result.column_statistics["discharge_code"]["missingness_association"]
+        >= 0.9
+    )
+    assert result.column_statistics["signal"]["missingness_association"] == 0.0

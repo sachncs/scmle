@@ -115,3 +115,73 @@ def test_numeric_transformer_composes_optional_steps():
         "scale",
         "interactions",
     ]
+
+
+def make_outcome_recorded_only_frame(rows=400):
+    rng = np.random.default_rng(0)
+    target = pd.Series(rng.integers(0, 2, rows))
+    informative = pd.Series(
+        np.where(target == 1, rng.normal(size=rows), np.nan)
+    )
+    return target, informative
+
+
+def test_missingness_leak_detected_when_recorded_for_one_outcome_only():
+    target, informative = make_outcome_recorded_only_frame()
+    kind = columns.NumericKind()
+    score = kind.missingness_association(
+        informative, target, tasks.TaskType.BINARY
+    )
+    assert score >= 0.9
+
+
+def test_one_sided_presence_is_flagged_even_when_mostly_missing():
+    rng = np.random.default_rng(1)
+    target = pd.Series(rng.integers(0, 2, 500))
+    recorded = pd.Series(np.nan, index=target.index)
+    died = target.index[(target == 0)][:60]  # recorded only for outcome 0
+    recorded[died] = 1.0
+    score = columns.NumericKind().missingness_association(
+        recorded, target, tasks.TaskType.BINARY
+    )
+    assert score == 1.0
+
+
+def test_random_missingness_is_not_flagged():
+    rng = np.random.default_rng(2)
+    target = pd.Series(rng.integers(0, 2, 500))
+    values = pd.Series(rng.normal(size=500))
+    values[rng.random(500) < 0.4] = np.nan
+    kind = columns.NumericKind()
+    assert (
+        kind.missingness_association(values, target, tasks.TaskType.BINARY)
+        < 0.2
+    )
+
+
+def test_rare_or_nearly_complete_features_are_not_judged():
+    target = pd.Series([0, 1] * 100)
+    complete = pd.Series(np.arange(200.0))
+    assert (
+        columns.NumericKind().missingness_association(
+            complete, target, tasks.TaskType.BINARY
+        )
+        == 0.0
+    )
+    sparse = pd.Series([np.nan] * 190 + [1.0] * 10)
+    assert (
+        columns.NumericKind().missingness_association(
+            sparse, target, tasks.TaskType.BINARY
+        )
+        == 0.0
+    )
+
+
+def test_regression_missingness_uses_rank_correlation():
+    rng = np.random.default_rng(3)
+    target = pd.Series(rng.normal(size=400))
+    values = pd.Series(np.where(target > 0.5, 1.0, np.nan))
+    score = columns.NumericKind().missingness_association(
+        values, target, tasks.TaskType.REGRESSION
+    )
+    assert score > 0.5
