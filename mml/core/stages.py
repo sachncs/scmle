@@ -11,6 +11,8 @@ import time
 from typing import Any
 from typing import ClassVar
 
+import pandas as pd
+
 from mml.api import results
 from mml.artifacts import bundle as bundle_module
 from mml.artifacts import report
@@ -32,6 +34,7 @@ from mml.evaluation import resources
 from mml.intelligence import knowledge
 from mml.intelligence import planner as planner_module
 from mml.models import thresholds
+from mml.monitoring import reference as reference_module
 
 LEAKAGE_MARKER = "leakage"
 BASELINE = "dummy"
@@ -282,6 +285,25 @@ class SelectStage(Stage):
         )
 
 
+def reference_scores(
+    fitted: Any, features: pd.DataFrame, task: tasks.TaskType
+) -> pd.Series:
+    """Model outputs on held-out rows, used as the output-drift reference.
+
+    Args:
+        fitted: The final candidate.
+        features: Held-out features.
+        task: Resolved task type.
+
+    Returns:
+        Positive-class probabilities for binary tasks, predicted labels for
+        multiclass tasks and predictions for regression.
+    """
+    if task is tasks.TaskType.BINARY:
+        return pd.Series(fitted.predict_proba(features)[:, 1], name="score")
+    return pd.Series(fitted.predict(features), name="prediction")
+
+
 def choose_decision_threshold(
     context: context_module.RunContext, fitted: Any
 ) -> tuple[Any, dict[str, Any] | None]:
@@ -390,6 +412,9 @@ class FinalEvaluationStage(Stage):
             cv_score=selected.score_mean,
             test_metrics=test_metrics,
         )
+        context.reference_scores = reference_scores(
+            pipeline, test_features, task
+        )
         context.diagnostics = diagnostics.run_suite(
             diagnostics.DiagnosticInput(
                 pipeline,
@@ -460,6 +485,13 @@ class PackageStage(Stage):
             model_params=selected.params,
             strategy=selected.strategy,
             decision_threshold=(evaluation["decision"] or {}).get("threshold"),
+            reference=reference_module.ReferenceProfile.build(
+                split.dev_features,
+                profile.feature_plan,
+                require(context.reference_scores, "reference_scores"),
+                str(require(context.reference_scores, "reference_scores").name),
+                evaluation["test_metrics"],
+            ),
         )
         bundle.save(store.path("model"))
         store.write_json(

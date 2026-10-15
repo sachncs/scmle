@@ -79,6 +79,8 @@ class RunContext:
         trial_counter: Number of trial identifiers handed out so far.
         selected: Winning trial.
         diagnostics: Post-selection diagnostic reports by name.
+        reference_scores: Model scores / predicted classes on the held-out
+            rows, the reference for output-drift monitoring.
         refits: Candidates already refit on development data during
             constraint checks, by trial id (reused by the final evaluation).
         final_pipeline: Selected pipeline refit on development data.
@@ -127,6 +129,7 @@ class RunContext:
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
         default_factory=dict
     )
+    reference_scores: pd.Series | None = None
     refits: dict[str, Any] = dataclasses.field(default_factory=dict)
     final_pipeline: Any = None
     evaluation: dict[str, Any] | None = None
