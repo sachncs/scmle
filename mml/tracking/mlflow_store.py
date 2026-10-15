@@ -6,6 +6,7 @@ be used without changing how runs are executed.
 """
 
 import json
+import pathlib
 from typing import Any
 
 from mml.contracts import errors
@@ -54,9 +55,31 @@ class MlflowExperimentStore(stores.ExperimentStore):
         self.experiment_id = (
             existing.experiment_id
             if existing is not None
-            else self.client.create_experiment(experiment)
+            else self.client.create_experiment(
+                experiment,
+                artifact_location=self.artifact_location(tracking_uri),
+            )
         )
         self.parents: dict[str, str] = {}
+
+    @staticmethod
+    def artifact_location(tracking_uri: str | None) -> str | None:
+        """Keeps artifacts beside a SQLite store instead of the working dir.
+
+        Args:
+            tracking_uri: The MLflow tracking URI.
+
+        Returns:
+            A directory URI next to the database file, or None to use the
+            MLflow default (servers and file stores decide for themselves).
+        """
+        prefix = "sqlite:///"
+        if not tracking_uri or not tracking_uri.startswith(prefix):
+            return None
+        database = pathlib.Path(tracking_uri[len(prefix) :])
+        return (
+            (database.parent / f"{database.stem}-artifacts").resolve().as_uri()
+        )
 
     def find_parent(self, run_id: str) -> str | None:
         """Finds the MLflow run of a magicml run, across processes."""

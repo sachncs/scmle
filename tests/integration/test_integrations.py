@@ -118,3 +118,20 @@ def test_ray_run_matches_sequential(binary_frame, tmp_path):
 def test_unknown_executor_is_rejected():
     with pytest.raises(errors.ConfigError, match="unknown executor"):
         execution.create_backend(2, "spark")
+
+
+def test_mlflow_artifacts_stay_beside_the_sqlite_store(tmp_path, monkeypatch):
+    pytest.importorskip("mlflow")
+    from mml.tracking import mlflow_store
+
+    monkeypatch.chdir(tmp_path)
+    location = mlflow_store.MlflowExperimentStore.artifact_location(
+        f"sqlite:///{tmp_path / 'tracking' / 'mlflow.db'}"
+    )
+
+    assert location == (tmp_path / "tracking" / "mlflow-artifacts").as_uri()
+    assert mlflow_store.MlflowExperimentStore.artifact_location(None) is None
+    assert (
+        mlflow_store.MlflowExperimentStore.artifact_location("http://host:5000")
+        is None
+    )
