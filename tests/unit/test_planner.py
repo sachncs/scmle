@@ -68,15 +68,56 @@ def test_small_budget_prefers_fast_models(planner, frame):
     )
 
 
-def test_severe_imbalance_defers_techniques(planner, frame):
+def test_imbalance_strategies_are_planned_not_deferred(planner, frame):
     skewed = pd.concat([frame[frame.y == 0], frame[frame.y == 1].head(8)])
     plan = make_plan(planner, skewed)
-    deferred = {
-        d.technique
+    included = {
+        d.technique: d.reason
         for d in plan.decisions
-        if d.action is experiments.DecisionAction.DEFER
+        if d.action is experiments.DecisionAction.INCLUDE
     }
-    assert {"class_weighting", "resampling_inside_cv"} <= deferred
+    assert {"class_weight", "random_oversample", "random_undersample"} <= set(
+        included
+    )
+    assert "logistic_regression" in included["class_weight"]
+
+
+def test_balanced_data_rejects_imbalance_strategies_with_a_reason(
+    planner, frame
+):
+    plan = make_plan(planner, frame)
+    rejected = {
+        d.technique: d.reason
+        for d in plan.decisions
+        if d.action is experiments.DecisionAction.REJECT
+    }
+    assert "balanced enough" in rejected["random_oversample"]
+
+
+def test_strategy_search_can_be_disabled_in_the_plan(planner, frame):
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="m", target="y"),
+        strategies=tasks.StrategySpec(top_models=0),
+    )
+    manifest = readers.build_manifest(frame, "y")
+    profile = profiling.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    plan = planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
+    assert not any(
+        d.technique == "random_oversample"
+        and d.action is experiments.DecisionAction.INCLUDE
+        for d in plan.decisions
+    )
+
+
+def test_unknown_strategy_name_is_a_config_error(planner, frame):
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="m", target="y"),
+        strategies=tasks.StrategySpec(names=["bogus"]),
+    )
+    manifest = readers.build_manifest(frame, "y")
+    profile = profiling.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    with pytest.raises(errors.ConfigError, match="unknown strategy"):
+        planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
 
 
 def test_approved_subset_and_invalid_approval(planner, frame):

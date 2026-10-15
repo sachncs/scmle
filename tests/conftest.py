@@ -54,3 +54,20 @@ def regression_frame():
         + rng.normal(scale=0.3, size=rows)
     )
     return frame
+
+
+@pytest.fixture
+def imbalanced_frame():
+    rng = np.random.default_rng(3)
+    rows = 900
+    frame = pd.DataFrame(
+        {
+            "spend": rng.exponential(5.0, rows),
+            "age": rng.normal(40, 10, rows),
+            "visits": rng.exponential(2.0, rows),
+        }
+    )
+    logit = 0.25 * frame.spend + 0.05 * (frame.age - 40) - 3.2
+    probability = 1 / (1 + np.exp(-logit))
+    frame["y"] = (rng.random(rows) < probability).astype(int)
+    return frame
