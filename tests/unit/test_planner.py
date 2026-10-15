@@ -148,3 +148,35 @@ def test_no_candidates_is_an_error(frame):
     )
     with pytest.raises(errors.ConfigError, match="no candidate"):
         make_plan(empty, frame)
+
+
+def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
+    rng = np.random.default_rng(0)
+    frame = pd.DataFrame({f"f{i}": rng.normal(size=4000) for i in range(30)})
+    frame["y"] = rng.integers(0, 2, 4000)
+    base_gb = 4000 * 30 * 8 / 1024**3
+    limit = base_gb * 3.5  # fits factor <= 3, not the 6x forests or 4x kernels
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="m", target="y"),
+        resources=tasks.ResourceSpec(memory_limit_gb=limit),
+    )
+    manifest = readers.build_manifest(frame, "y")
+    profile = profiling.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    plan = planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
+    assert "random_forest" not in plan.candidate_models
+    assert "svm" not in plan.candidate_models
+    assert "logistic_regression" in plan.candidate_models
+    reasons = {
+        d.technique: d.reason for d in plan.decisions if d.action == "reject"
+    }
+    assert (
+        "exceeds the" in reasons["random_forest"]
+        and "GB limit" in reasons["random_forest"]
+    )
+
+
+def test_every_adapter_declares_a_positive_memory_factor():
+    for (
+        adapter
+    ) in registry_module.ModelRegistry.with_builtins().adapters.values():
+        assert adapter.capabilities.memory_factor >= 1.0, adapter.name

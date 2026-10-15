@@ -51,6 +51,9 @@ class Capabilities:
             meta-models assembled from other candidates).
         max_rows: Largest dataset it is practical on, if any.
         cost: Relative training cost from 1 (cheap) to 5 (expensive).
+        memory_factor: Peak training memory as a multiple of the size of the
+            numeric training matrix (rows x features x 8 bytes); the planner
+            rejects models whose estimate exceeds the memory limit.
     """
 
     tasks: frozenset[tasks.TaskType]
@@ -65,6 +68,7 @@ class Capabilities:
     standalone: bool = True
     max_rows: int | None = None
     cost: int = 1
+    memory_factor: float = 1.0
 
 
 class ModelAdapter(abc.ABC):

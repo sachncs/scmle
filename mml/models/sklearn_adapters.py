@@ -106,7 +106,7 @@ class LogisticRegressionAdapter(SklearnAdapter):
     name = "logistic_regression"
     family = "linear"
     capabilities = models.Capabilities(
-        CLASSIFICATION, sparse_input=True, needs_scaling=True
+        CLASSIFICATION, sparse_input=True, needs_scaling=True, memory_factor=2.0
     )
     classifier = linear_model.LogisticRegression
     fixed_params = types.MappingProxyType({"max_iter": 1000})
@@ -121,7 +121,10 @@ class RidgeAdapter(SklearnAdapter):
     name = "ridge"
     family = "linear"
     capabilities = models.Capabilities(
-        REGRESSION_ONLY, sparse_input=True, needs_scaling=True
+        REGRESSION_ONLY,
+        sparse_input=True,
+        needs_scaling=True,
+        memory_factor=2.0,
     )
     regressor = linear_model.Ridge
     search_space = search.SearchSpace(
@@ -135,7 +138,11 @@ class ElasticNetAdapter(SklearnAdapter):
     name = "elastic_net"
     family = "linear"
     capabilities = models.Capabilities(
-        REGRESSION_ONLY, sparse_input=True, needs_scaling=True, cost=2
+        REGRESSION_ONLY,
+        sparse_input=True,
+        needs_scaling=True,
+        cost=2,
+        memory_factor=2.0,
     )
     regressor = linear_model.ElasticNet
     fixed_params = types.MappingProxyType({"alpha": 0.1, "max_iter": 5000})
@@ -152,7 +159,9 @@ class DecisionTreeAdapter(SklearnAdapter):
 
     name = "decision_tree"
     family = "tree"
-    capabilities = models.Capabilities(ALL_TASKS, handles_missing=True)
+    capabilities = models.Capabilities(
+        ALL_TASKS, handles_missing=True, memory_factor=2.0
+    )
     classifier = tree.DecisionTreeClassifier
     regressor = tree.DecisionTreeRegressor
     search_space = search.SearchSpace(
@@ -168,7 +177,7 @@ class RandomForestAdapter(SklearnAdapter):
 
     name = "random_forest"
     family = "tree"
-    capabilities = models.Capabilities(ALL_TASKS, cost=3)
+    capabilities = models.Capabilities(ALL_TASKS, cost=3, memory_factor=6.0)
     classifier = ensemble.RandomForestClassifier
     regressor = ensemble.RandomForestRegressor
     search_space = search.SearchSpace(
@@ -186,7 +195,7 @@ class ExtraTreesAdapter(SklearnAdapter):
 
     name = "extra_trees"
     family = "tree"
-    capabilities = models.Capabilities(ALL_TASKS, cost=3)
+    capabilities = models.Capabilities(ALL_TASKS, cost=3, memory_factor=6.0)
     classifier = ensemble.ExtraTreesClassifier
     regressor = ensemble.ExtraTreesRegressor
     search_space = search.SearchSpace(
@@ -210,6 +219,7 @@ class HistGradientBoostingAdapter(SklearnAdapter):
         native_categorical=True,
         early_stopping=True,
         cost=3,
+        memory_factor=3.0,
     )
     classifier = ensemble.HistGradientBoostingClassifier
     regressor = ensemble.HistGradientBoostingRegressor
@@ -239,6 +249,7 @@ class SupportVectorAdapter(SklearnAdapter):
         needs_scaling=True,
         max_rows=20_000,
         cost=4,
+        memory_factor=4.0,
     )
     classifier = svm.SVC
     regressor = svm.SVR
@@ -278,6 +289,7 @@ class KnnAdapter(SklearnAdapter):
         needs_scaling=True,
         max_rows=50_000,
         cost=2,
+        memory_factor=3.0,
     )
     classifier = neighbors.KNeighborsClassifier
     regressor = neighbors.KNeighborsRegressor
@@ -305,6 +317,7 @@ class NeuralNetworkAdapter(SklearnAdapter):
         early_stopping=True,
         max_rows=200_000,
         cost=4,
+        memory_factor=4.0,
     )
     classifier = neural_network.MLPClassifier
     regressor = neural_network.MLPRegressor

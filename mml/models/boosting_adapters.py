@@ -100,6 +100,7 @@ class LightGbmAdapter(LazyLibraryAdapter):
         native_categorical=True,
         early_stopping=True,
         cost=3,
+        memory_factor=2.0,
     )
     fixed_params = types.MappingProxyType(
         {"verbose": -1, "subsample_freq": 1, "n_jobs": 1}
@@ -134,6 +135,7 @@ class XgboostAdapter(LazyLibraryAdapter):
         native_categorical=True,
         early_stopping=True,
         cost=3,
+        memory_factor=2.5,
     )
     fixed_params = types.MappingProxyType({"verbosity": 0, "n_jobs": 1})
     search_space = search.SearchSpace(
@@ -167,6 +169,7 @@ class CatBoostAdapter(LazyLibraryAdapter):
         early_stopping=True,
         gpu=False,
         cost=4,
+        memory_factor=3.0,
     )
     fixed_params = types.MappingProxyType(
         {"verbose": 0, "allow_writing_files": False, "thread_count": 1}

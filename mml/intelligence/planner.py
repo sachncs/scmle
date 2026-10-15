@@ -71,6 +71,41 @@ class PlanningRule(abc.ABC):
         """
 
 
+class MemoryRule(PlanningRule):
+    """Rejects models whose estimated training memory exceeds the limit.
+
+    The estimate is `rows x features x 8 bytes x memory_factor`, where the
+    factor is each adapter's declared memory characteristic.
+    """
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Drops candidates that would not fit in `memory_limit_gb`."""
+        rows = context.profile.manifest.row_count
+        width = max(len(context.profile.feature_plan.features), 1)
+        limit = context.spec.resources.memory_limit_gb
+        base_gb = rows * width * 8 / 1024**3
+        kept = []
+        for adapter in candidates:
+            estimate = base_gb * adapter.capabilities.memory_factor
+            if estimate > limit:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name,
+                        Action.REJECT,
+                        f"estimated training memory {estimate:.2f} GB exceeds "
+                        f"the {limit:g} GB limit",
+                    )
+                )
+            else:
+                kept.append(adapter)
+        return kept
+
+
 class GpuRule(PlanningRule):
     """Honours the GPU policy: `required` keeps only GPU-capable models."""
 
@@ -326,6 +361,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
     """Returns the standard rule chain."""
     return (
         GpuRule(),
+        MemoryRule(),
         FastBudgetRule(),
         ApprovedModelsRule(),
         HistoryRule(),
