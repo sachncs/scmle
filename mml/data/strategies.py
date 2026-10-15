@@ -15,6 +15,7 @@ from typing import Any
 from typing import ClassVar
 
 from sklearn import calibration
+from sklearn.utils import validation
 
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
@@ -27,6 +28,7 @@ from mml.models import resampling
 from mml.models import synthesis
 
 MIN_IMBALANCE_RATIO = 3.0
+TARGET_SKEW_THRESHOLD = 1.0
 SKEW_THRESHOLD = 1.0
 MIN_INTERACTION_FEATURES = 2
 MAX_INTERACTION_FEATURES = 12
@@ -412,6 +414,52 @@ class LogSkewedStrategy(FeatureStrategy):
         return None
 
 
+class RareTargetStrategy(DataStrategy):
+    """Regression policy for a long-tailed target: inverse-density weights.
+
+    Classification resampling does not transfer to a continuous target, so
+    rare target values are handled by weighting rows inversely to how densely
+    populated their part of the target range is. It is adopted only if it
+    helps on the original (unweighted) validation distribution.
+    """
+
+    name = "rare_target_weighting"
+    description = "inverse-density sample weights for a long-tailed target"
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs a skewed regression target and a model taking weights."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        if task.is_classification:
+            return "regression only (classification uses class weighting)"
+        skew = abs(profile.target_summary.get("skew", 0.0))
+        if skew < TARGET_SKEW_THRESHOLD:
+            return f"target is not long-tailed (|skew| {skew:.2f})"
+        if not validation.has_fit_parameter(
+            adapter.build(task, 0), "sample_weight"
+        ):
+            return f"{adapter.name} does not accept sample weights"
+        return None
+
+    def build(
+        self,
+        plan: data_contracts.FeaturePlan,
+        adapter: models.ModelAdapter,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Wraps the standard pipeline in the density-weighted regressor."""
+        inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
+        return resampling.DensityWeightedRegressor(inner)
+
+
 class TargetEncodingStrategy(DataStrategy):
     """Regularized, cross-fitted target encoding of high-cardinality columns.
 
@@ -497,6 +545,7 @@ STRATEGIES: dict[str, DataStrategy] = {
         LogSkewedStrategy(),
         InteractionStrategy(),
         TargetEncodingStrategy(),
+        RareTargetStrategy(),
     )
 }
 EXPERIMENTAL = tuple(name for name in STRATEGIES if name != DEFAULT)

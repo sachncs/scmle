@@ -174,6 +174,7 @@ class StrategySpec(FrozenModel):
             "log_skewed",
             "interactions",
             "target_encoding",
+            "rare_target_weighting",
         ]
     )
     top_models: int = pydantic.Field(default=2, ge=0)

@@ -259,3 +259,59 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
     def predict_proba(self, features: Any) -> np.ndarray:
         """Returns class probabilities (no resampling)."""
         return self.estimator_.predict_proba(features)
+
+
+class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
+    """Fits a regression pipeline with weights that favour rare target values.
+
+    Rows whose target falls in a sparsely populated region of the target's
+    range get proportionally larger weights (inverse bin frequency over
+    equal-width bins, capped at `max_weight` times the lightest row), so a
+    long tail is not ignored. This is the regression counterpart of class
+    weighting; classification resampling does not apply to a continuous
+    target. The weights are computed from the training fold only.
+
+    Attributes:
+        estimator: Unfitted pipeline whose final step is named `model`.
+        bins: Number of equal-width target bins.
+        max_weight: Largest weight relative to the smallest.
+        estimator_: Fitted clone.
+    """
+
+    def __init__(
+        self,
+        estimator: base.BaseEstimator,
+        bins: int = 10,
+        max_weight: float = 10.0,
+    ) -> None:
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Pipeline to fit with sample weights.
+            bins: Number of equal-width target bins.
+            max_weight: Largest weight relative to the smallest.
+        """
+        self.estimator = estimator
+        self.bins = bins
+        self.max_weight = max_weight
+
+    def weights(self, target: np.ndarray) -> np.ndarray:
+        """Inverse-density weights, normalized to mean 1."""
+        edges = np.histogram_bin_edges(target, bins=self.bins)
+        index = np.clip(np.digitize(target, edges[1:-1]), 0, len(edges) - 2)
+        counts = np.bincount(index, minlength=len(edges) - 1).astype(float)
+        raw = 1.0 / counts[index]
+        raw = np.minimum(raw, raw.min() * self.max_weight)
+        return raw * len(raw) / raw.sum()
+
+    def fit(self, features: Any, target: Any) -> Self:
+        """Fits the pipeline with density weights on the model step."""
+        values = np.asarray(target, dtype=float)
+        self.estimator_ = base.clone(self.estimator).fit(
+            features, values, model__sample_weight=self.weights(values)
+        )
+        return self
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Predicts with the fitted pipeline."""
+        return self.estimator_.predict(features)
