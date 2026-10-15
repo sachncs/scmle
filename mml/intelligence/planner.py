@@ -1,95 +1,250 @@
-"""Candidate-plan generation.
+"""Candidate-plan generation through composable planning rules.
 
-The planner decides which experiments are worth trying and records why; the evaluation
-layer decides whether they help. Nothing here asserts a technique will improve performance.
+The planner decides which experiments are worth trying and records why; the
+evaluation layer decides whether they help. Nothing here asserts that a
+technique will improve performance. Each `PlanningRule` is an independent,
+polymorphic policy applied in order to the candidate list.
 """
 
-from __future__ import annotations
-
+import abc
+import dataclasses
 import hashlib
 
-from mml.contracts.data import DatasetProfile
-from mml.contracts.errors import ConfigError
-from mml.contracts.experiments import Decision, ExperimentPlan
-from mml.contracts.tasks import ProjectSpec, TaskType
-from mml.data.splitting import resolve_strategy
-from mml.evaluation.metrics import resolve_metric
-from mml.models.registry import candidates
+from mml.contracts import data as data_contracts
+from mml.contracts import errors
+from mml.contracts import experiments
+from mml.contracts import models
+from mml.contracts import tasks
+from mml.data import splitting
+from mml.evaluation import metrics
+from mml.models import registry as registry_module
 
 FAST_BUDGET_SECONDS = 300
+SEVERE_IMBALANCE = 10.0
+FAST_EXCEPTION = "hist_gradient_boosting"
+
+Action = experiments.DecisionAction
 
 
-def make_plan(
-    spec: ProjectSpec,
-    profile: DatasetProfile,
-    task: TaskType,
-    allowed_models: tuple[str, ...] | None = None,
-) -> ExperimentPlan:
-    metric = resolve_metric(spec.metric, task)
-    strategy = resolve_strategy(spec, task)
-    ok, rejected = candidates(task, profile.manifest.row_count)
-    decisions: list[Decision] = []
-    warnings: list[str] = list(profile.risk_findings)
+@dataclasses.dataclass(frozen=True, slots=True)
+class PlanningContext:
+    """Facts available to planning rules.
 
-    for name, why in sorted(rejected.items()):
-        decisions.append(Decision(name, "reject", why))
+    Attributes:
+        spec: Project specification.
+        profile: Dataset profile.
+        task: Resolved task type.
+        approved_models: Models a human approved, or None for no restriction.
+    """
 
-    chosen = list(ok)
-    if spec.resources.time_budget_seconds < FAST_BUDGET_SECONDS:
-        slow = [
-            m for m in chosen if m.capabilities.cost >= 3 and m.name != "hist_gradient_boosting"
-        ]
-        chosen = [m for m in chosen if m not in slow]
-        for m in slow:
-            decisions.append(
-                Decision(
-                    m.name, "reject", f"time budget < {FAST_BUDGET_SECONDS}s: fast models only"
+    spec: tasks.ProjectSpec
+    profile: data_contracts.DatasetProfile
+    task: tasks.TaskType
+    approved_models: tuple[str, ...] | None = None
+
+
+class PlanningRule(abc.ABC):
+    """A policy that filters candidates and records its decisions."""
+
+    @abc.abstractmethod
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Applies the rule.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log to append to.
+
+        Returns:
+            The candidates that remain.
+
+        Raises:
+            ConfigError: If the rule's input is inconsistent.
+        """
+
+
+class FastBudgetRule(PlanningRule):
+    """Prefers fast models when the time budget is small."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Drops expensive models under a tight budget."""
+        if context.spec.resources.time_budget_seconds >= FAST_BUDGET_SECONDS:
+            return candidates
+        kept = []
+        for adapter in candidates:
+            expensive = adapter.capabilities.cost >= 3
+            if expensive and adapter.name != FAST_EXCEPTION:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name,
+                        Action.REJECT,
+                        f"time budget < {FAST_BUDGET_SECONDS}s: "
+                        "fast models only",
+                    )
                 )
-            )
+            else:
+                kept.append(adapter)
+        return kept
 
-    if allowed_models is not None:
-        unknown = set(allowed_models) - {m.name for m in ok}
+
+class ApprovedModelsRule(PlanningRule):
+    """Restricts candidates to a human-approved subset."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Keeps only approved models; rejects unknown approvals."""
+        approved = context.approved_models
+        if approved is None:
+            return candidates
+        unknown = set(approved) - {a.name for a in candidates}
         if unknown:
-            raise ConfigError(f"approved models not compatible with this plan: {sorted(unknown)}")
-        for m in [m for m in chosen if m.name not in allowed_models]:
-            decisions.append(Decision(m.name, "reject", "not in approved plan"))
-        chosen = [m for m in chosen if m.name in allowed_models]
+            raise errors.ConfigError(
+                f"approved models not compatible with this plan: "
+                f"{sorted(unknown)}"
+            )
+        for adapter in candidates:
+            if adapter.name not in approved:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name, Action.REJECT, "not in approved plan"
+                    )
+                )
+        return [a for a in candidates if a.name in approved]
 
-    for m in chosen:
-        decisions.append(
-            Decision(m.name, "include", f"{m.family} candidate (cost {m.capabilities.cost})")
-        )
 
-    if task.is_classification and profile.target_summary.get("imbalance_ratio", 1) >= 10:
+class ImbalanceRule(PlanningRule):
+    """Defers rebalancing techniques when classes are severely skewed."""
+
+    techniques = ("class_weighting", "resampling_inside_cv")
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Records deferred techniques; leaves candidates unchanged."""
+        ratio = context.profile.target_summary.get("imbalance_ratio", 1.0)
+        if context.task.is_classification and ratio >= SEVERE_IMBALANCE:
+            decisions.extend(
+                experiments.Decision(
+                    technique,
+                    Action.DEFER,
+                    "severe imbalance; scheduled for the M3 strategy search",
+                )
+                for technique in self.techniques
+            )
+        return candidates
+
+
+class TuningDeferralRule(PlanningRule):
+    """Documents that v0.1 compares default-configured pipelines."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Records the deferral; leaves candidates unchanged."""
         decisions.append(
-            Decision(
-                "class_weighting", "defer", "severe imbalance; scheduled for the M3 strategy search"
+            experiments.Decision(
+                "hyperparameter_tuning",
+                Action.DEFER,
+                "v0.1 compares default-configured pipelines",
             )
         )
-        decisions.append(
-            Decision(
-                "resampling_inside_cv",
-                "defer",
-                "severe imbalance; scheduled for the M3 strategy search",
-            )
-        )
-    decisions.append(
-        Decision("hyperparameter_tuning", "defer", "v0.1 compares default-configured pipelines")
+        return candidates
+
+
+def default_rules() -> tuple[PlanningRule, ...]:
+    """Returns the standard rule chain."""
+    return (
+        FastBudgetRule(),
+        ApprovedModelsRule(),
+        ImbalanceRule(),
+        TuningDeferralRule(),
     )
 
-    names = tuple(m.name for m in chosen)
-    if not names:
-        raise ConfigError("planner produced no candidate models")
-    pid = hashlib.sha256(
-        f"{spec.config_hash()}|{profile.manifest.data_hash}|{names}".encode()
-    ).hexdigest()[:10]
-    return ExperimentPlan(
-        plan_id=f"plan_{pid}",
-        task=task.value,
-        metric=metric.name,
-        validation_strategy=strategy,
-        candidate_models=names,
-        optimization_budget_seconds=spec.resources.time_budget_seconds,
-        decisions=tuple(decisions),
-        warnings=tuple(warnings),
-    )
+
+class Planner:
+    """Builds an `ExperimentPlan` from a profile."""
+
+    def __init__(
+        self,
+        registry: registry_module.ModelRegistry,
+        catalog: metrics.MetricCatalog = metrics.CATALOG,
+        rules: tuple[PlanningRule, ...] | None = None,
+    ) -> None:
+        """Initializes the planner.
+
+        Args:
+            registry: Source of candidate adapters.
+            catalog: Metric catalog used to resolve the primary metric.
+            rules: Rule chain; defaults to `default_rules()`.
+        """
+        self.registry = registry
+        self.catalog = catalog
+        self.rules = rules if rules is not None else default_rules()
+
+    def plan(self, context: PlanningContext) -> experiments.ExperimentPlan:
+        """Creates the plan.
+
+        Args:
+            context: Planning facts.
+
+        Returns:
+            A deterministic, auditable plan.
+
+        Raises:
+            ConfigError: If no candidate model remains.
+        """
+        spec, profile, task = context.spec, context.profile, context.task
+        metric = self.catalog.resolve(spec.metric, task)
+        compatible, rejected = self.registry.candidates(
+            task, profile.manifest.row_count
+        )
+        decisions = [
+            experiments.Decision(name, Action.REJECT, reason)
+            for name, reason in sorted(rejected.items())
+        ]
+        candidates = compatible
+        for rule in self.rules:
+            candidates = rule.apply(context, candidates, decisions)
+        if not candidates:
+            raise errors.ConfigError("planner produced no candidate models")
+        decisions += [
+            experiments.Decision(
+                a.name,
+                Action.INCLUDE,
+                f"{a.family} candidate (cost {a.capabilities.cost})",
+            )
+            for a in candidates
+        ]
+        names = tuple(a.name for a in candidates)
+        identity = f"{spec.config_hash()}|{profile.manifest.data_hash}|{names}"
+        plan_id = hashlib.sha256(identity.encode()).hexdigest()[:10]
+        return experiments.ExperimentPlan(
+            plan_id=f"plan_{plan_id}",
+            task=task.value,
+            metric=metric.name,
+            validation_strategy=splitting.resolve_strategy_name(spec, task),
+            candidate_models=names,
+            optimization_budget_seconds=spec.resources.time_budget_seconds,
+            decisions=tuple(decisions),
+            warnings=profile.risk_findings,
+        )
