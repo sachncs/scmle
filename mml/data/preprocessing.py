@@ -1,65 +1,62 @@
-"""Candidate pipelines: preprocessing + estimator as one unit.
+"""Candidate pipelines: preprocessing and estimator as one unit.
 
-Everything is a single sklearn Pipeline, so cross-validation clones and refits the whole
-thing per fold (fold-local fitting) and inference reuses the identical fitted graph.
+Everything is a single scikit-learn `Pipeline`, so cross-validation clones
+and refits the whole thing per fold (fold-local fitting) and inference reuses
+the identical fitted graph.
 """
 
-from __future__ import annotations
+from sklearn import compose
+from sklearn import pipeline
 
-import numpy as np
-import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
-
-from mml.contracts.data import FeaturePlan
-from mml.contracts.models import ModelSpec
-from mml.contracts.tasks import TaskType
-
-MISSING_TOKEN = "__missing__"
+from mml.contracts import data as data_contracts
+from mml.contracts import models
+from mml.contracts import tasks
+from mml.data import columns
 
 
-def _to_float(X):
-    return pd.DataFrame(X).apply(pd.to_numeric, errors="coerce").astype(float).to_numpy()
+def build_preprocessor(
+    plan: data_contracts.FeaturePlan, scale: bool
+) -> compose.ColumnTransformer:
+    """Builds the column transformer for a feature plan.
+
+    Args:
+        plan: Feature columns grouped by kind.
+        scale: Whether numeric features should be standardized.
+
+    Returns:
+        An unfitted transformer that drops every non-feature column.
+    """
+    parts = []
+    for kind in columns.KINDS:
+        selected = plan.columns_for(kind.name)
+        transformer = kind.transformer(scale)
+        if selected and transformer is not None:
+            parts.append((kind.name, transformer, list(selected)))
+    return compose.ColumnTransformer(
+        parts, remainder="drop", verbose_feature_names_out=False
+    )
 
 
-def _to_object(X):
-    return pd.DataFrame(X).astype(object).where(lambda d: d.notna(), np.nan).to_numpy()
+def build_pipeline(
+    plan: data_contracts.FeaturePlan,
+    adapter: models.ModelAdapter,
+    task: tasks.TaskType,
+    seed: int,
+) -> pipeline.Pipeline:
+    """Builds a complete, independently evaluable candidate pipeline.
 
+    Args:
+        plan: Feature columns grouped by kind.
+        adapter: Model family to place after preprocessing.
+        task: Resolved task type.
+        seed: Random seed forwarded to the estimator.
 
-def build_preprocessor(plan: FeaturePlan, scale: bool) -> ColumnTransformer:
-    transformers = []
-    if plan.numeric:
-        steps = [
-            ("cast", FunctionTransformer(_to_float, feature_names_out="one-to-one")),
-            ("impute", SimpleImputer(strategy="median", keep_empty_features=True)),
-        ]
-        if scale:
-            steps.append(("scale", StandardScaler()))
-        transformers.append(("num", Pipeline(steps), list(plan.numeric)))
-    if plan.categorical:
-        steps = [
-            ("cast", FunctionTransformer(_to_object, feature_names_out="one-to-one")),
-            ("impute", SimpleImputer(strategy="constant", fill_value=MISSING_TOKEN)),
-            (
-                "onehot",
-                OneHotEncoder(
-                    handle_unknown="infrequent_if_exist",
-                    min_frequency=0.005,
-                    max_categories=50,
-                    sparse_output=False,
-                ),
-            ),
-        ]
-        transformers.append(("cat", Pipeline(steps), list(plan.categorical)))
-    return ColumnTransformer(transformers, remainder="drop", verbose_feature_names_out=False)
-
-
-def build_pipeline(plan: FeaturePlan, model: ModelSpec, task: TaskType, seed: int) -> Pipeline:
-    return Pipeline(
-        [
-            ("prep", build_preprocessor(plan, scale=model.capabilities.needs_scaling)),
-            ("model", model.factory(task, seed)),
-        ]
+    Returns:
+        An unfitted pipeline of preprocessing followed by the estimator.
+    """
+    preprocessor = build_preprocessor(
+        plan, scale=adapter.capabilities.needs_scaling
+    )
+    return pipeline.Pipeline(
+        [("prep", preprocessor), ("model", adapter.build(task, seed))]
     )
