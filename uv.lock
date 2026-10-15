@@ -1005,6 +1005,77 @@ wheels = [
 ]
 
 [[package]]
+name = "magicml"
+version = "0.1.0.dev0"
+source = { editable = "." }
+dependencies = [
+    { name = "joblib" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "pydantic" },
+    { name = "scikit-learn" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "catboost" },
+    { name = "lightgbm" },
+    { name = "mlflow" },
+    { name = "optuna" },
+    { name = "ray" },
+    { name = "xgboost" },
+]
+boosting = [
+    { name = "catboost" },
+    { name = "lightgbm" },
+    { name = "xgboost" },
+]
+distributed = [
+    { name = "ray" },
+]
+optimization = [
+    { name = "optuna" },
+]
+tracking = [
+    { name = "mlflow" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pandas-stubs" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "catboost", marker = "extra == 'boosting'" },
+    { name = "joblib", specifier = ">=1.3" },
+    { name = "lightgbm", marker = "extra == 'boosting'" },
+    { name = "magicml", extras = ["boosting", "optimization", "tracking", "distributed"], marker = "extra == 'all'" },
+    { name = "mlflow", marker = "extra == 'tracking'" },
+    { name = "optuna", marker = "extra == 'optimization'" },
+    { name = "pandas", specifier = ">=2.2" },
+    { name = "pyarrow", specifier = ">=15" },
+    { name = "pydantic", specifier = ">=2.6" },
+    { name = "ray", marker = "extra == 'distributed'" },
+    { name = "scikit-learn", specifier = ">=1.4" },
+    { name = "xgboost", marker = "extra == 'boosting'" },
+]
+provides-extras = ["boosting", "optimization", "tracking", "distributed", "all"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6" },
+    { name = "mypy", specifier = ">=1.10" },
+    { name = "pandas-stubs" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "ruff", specifier = ">=0.5" },
+]
+
+[[package]]
 name = "mako"
 version = "1.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1172,77 +1243,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/4c/da/e226d475789bbb8caf68aafa3cbf2b715e5f6eda00f7f659b7eda6fba1ef/mlflow_tracing-3.17.1.tar.gz", hash = "sha256:c154492045b5f3544ab07fd9ab9d7c07febfb53065d43f1a07f33a31c46b3505", size = 1688196, upload-time = "2026-10-13T08:59:23.98Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/19/2ba5a327efa9a45ea46c927103a7c57b24441375d8b3435f6b27d187ac91/mlflow_tracing-3.17.1-py3-none-any.whl", hash = "sha256:4f6405e48efdf9330101aa059383103e1e15559664ec792290b9b95556f9e851", size = 1981200, upload-time = "2026-10-13T08:59:22.314Z" },
-]
-
-[[package]]
-name = "mlforge"
-version = "0.1.0.dev0"
-source = { editable = "." }
-dependencies = [
-    { name = "joblib" },
-    { name = "pandas" },
-    { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "scikit-learn" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "catboost" },
-    { name = "lightgbm" },
-    { name = "mlflow" },
-    { name = "optuna" },
-    { name = "ray" },
-    { name = "xgboost" },
-]
-boosting = [
-    { name = "catboost" },
-    { name = "lightgbm" },
-    { name = "xgboost" },
-]
-distributed = [
-    { name = "ray" },
-]
-optimization = [
-    { name = "optuna" },
-]
-tracking = [
-    { name = "mlflow" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "hypothesis" },
-    { name = "mypy" },
-    { name = "pandas-stubs" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "catboost", marker = "extra == 'boosting'" },
-    { name = "joblib", specifier = ">=1.3" },
-    { name = "lightgbm", marker = "extra == 'boosting'" },
-    { name = "mlflow", marker = "extra == 'tracking'" },
-    { name = "mlforge", extras = ["boosting", "optimization", "tracking", "distributed"], marker = "extra == 'all'" },
-    { name = "optuna", marker = "extra == 'optimization'" },
-    { name = "pandas", specifier = ">=2.2" },
-    { name = "pyarrow", specifier = ">=15" },
-    { name = "pydantic", specifier = ">=2.6" },
-    { name = "ray", marker = "extra == 'distributed'" },
-    { name = "scikit-learn", specifier = ">=1.4" },
-    { name = "xgboost", marker = "extra == 'boosting'" },
-]
-provides-extras = ["boosting", "optimization", "tracking", "distributed", "all"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "hypothesis", specifier = ">=6" },
-    { name = "mypy", specifier = ">=1.10" },
-    { name = "pandas-stubs" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "ruff", specifier = ">=0.5" },
 ]
 
 [[package]]
