@@ -166,3 +166,34 @@ def test_svm_classifier_is_calibrated_and_regressor_is_plain(registry):
         classifier.estimator.random_state == 3 and classifier.estimator.C == 0.5
     )
     assert classifier.ensemble is False
+
+
+def test_neural_family_registers_through_the_same_plugin_contract(registry):
+    adapter = registry.get("neural_network")
+    conformance.check_conformance(adapter)
+    assert adapter.family == "neural" and adapter.capabilities.early_stopping
+    compatible, _ = registry.candidates(BINARY, row_count=1_000)
+    assert "neural_network" in {a.name for a in compatible}
+    tuned = adapter.build(
+        BINARY, 0, {"hidden_layer_sizes": (16,), "alpha": 0.01}
+    )
+    assert tuned.hidden_layer_sizes == (16,) and tuned.alpha == 0.01
+    assert registry.candidates(BINARY, row_count=500_000)[1]["neural_network"]
+
+
+def test_a_third_party_deep_learning_adapter_needs_no_core_edit(registry):
+    from sklearn import neural_network
+
+    class TinyNet(models.ModelAdapter):
+        name = "tiny_net"
+        family = "neural"
+        capabilities = models.Capabilities(frozenset({BINARY}), gpu=True)
+
+        def build(self, task, seed, params=None):
+            return neural_network.MLPClassifier(
+                (4,), max_iter=200, random_state=seed
+            )
+
+    registry.register(TinyNet())
+    conformance.check_conformance(registry.get("tiny_net"))
+    assert registry.get("tiny_net").capabilities.gpu is True

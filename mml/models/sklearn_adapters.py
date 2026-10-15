@@ -15,6 +15,7 @@ from sklearn import dummy
 from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import neighbors
+from sklearn import neural_network
 from sklearn import svm
 from sklearn import tree
 
@@ -288,6 +289,39 @@ class KnnAdapter(SklearnAdapter):
     )
 
 
+class NeuralNetworkAdapter(SklearnAdapter):
+    """Multi-layer perceptron: the deep-learning family plugin.
+
+    Deep architectures register exactly like this: a `ModelAdapter` with
+    declared capabilities and a search space. Larger frameworks (PyTorch,
+    Keras) plug in through the same contract and the `mml.models` entry point.
+    """
+
+    name = "neural_network"
+    family = "neural"
+    capabilities = models.Capabilities(
+        ALL_TASKS,
+        needs_scaling=True,
+        early_stopping=True,
+        max_rows=200_000,
+        cost=4,
+    )
+    classifier = neural_network.MLPClassifier
+    regressor = neural_network.MLPRegressor
+    fixed_params = types.MappingProxyType(
+        {"max_iter": 300, "early_stopping": True, "n_iter_no_change": 10}
+    )
+    search_space = search.SearchSpace(
+        (
+            search.ChoiceParameter(
+                "hidden_layer_sizes", ((32,), (64,), (64, 32), (128, 64))
+            ),
+            search.FloatParameter("alpha", 1e-5, 1e-1, log=True),
+            search.FloatParameter("learning_rate_init", 1e-4, 1e-2, log=True),
+        )
+    )
+
+
 BUILTIN_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     DummyAdapter,
     LogisticRegressionAdapter,
@@ -299,4 +333,5 @@ BUILTIN_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     HistGradientBoostingAdapter,
     SupportVectorAdapter,
     KnnAdapter,
+    NeuralNetworkAdapter,
 )
