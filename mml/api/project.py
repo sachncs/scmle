@@ -112,6 +112,29 @@ class MLProject:
         """
         return self.orchestrator.run(self.output_dir, plan)
 
+    @classmethod
+    def resume(
+        cls,
+        run_directory: str | pathlib.Path,
+        data: pd.DataFrame | None = None,
+    ) -> results.RunResult:
+        """Continues an interrupted run from its saved configuration.
+
+        Completed trials are reused; the rest are computed.
+
+        Args:
+            run_directory: Directory of a cancelled, failed or crashed run.
+            data: The original in-memory data, required only if the project
+                was created from a DataFrame rather than a file.
+
+        Returns:
+            The completed run.
+        """
+        orchestrator = orchestrator_module.Orchestrator.for_run_directory(
+            run_directory, frame=data
+        )
+        return orchestrator.resume(run_directory)
+
     def cancel(self) -> None:
         """Requests cancellation of a running workflow."""
         self.orchestrator.cancel()

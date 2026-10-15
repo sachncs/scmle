@@ -128,6 +128,24 @@ class RunCommand(ProjectCommand):
         return EXIT_OK
 
 
+class ResumeCommand(Command):
+    """Continues an interrupted run."""
+
+    name = "resume"
+    help = "continue a cancelled, failed or crashed run, reusing its trials"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the run directory argument."""
+        parser.add_argument("run_directory")
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Resumes the run and prints the result summary."""
+        result = project.MLProject.resume(args.run_directory)
+        print(result.summary())
+        print(f"artifacts: {result.run_dir}")
+        return EXIT_OK
+
+
 class PredictCommand(Command):
     """Scores a dataset with a saved bundle."""
 
@@ -153,7 +171,12 @@ class PredictCommand(Command):
         return EXIT_OK
 
 
-COMMANDS: tuple[Command, ...] = (PlanCommand(), RunCommand(), PredictCommand())
+COMMANDS: tuple[Command, ...] = (
+    PlanCommand(),
+    RunCommand(),
+    ResumeCommand(),
+    PredictCommand(),
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
