@@ -73,7 +73,9 @@ def test_a_winning_stack_is_selected_refit_and_packaged(
         assert result.selected_model == "stacking"
         assert result.bundle.info.model_params["members"]
         features = regression_frame.drop(columns="y")
-        loaded = mml.ModelBundle.load(result.save(tmp_path / "bundle"))
+        loaded = mml.ModelBundle.load(
+            result.save(tmp_path / "bundle"), trusted=True
+        )
         np.testing.assert_allclose(
             result.predict(features), loaded.predict(features)
         )

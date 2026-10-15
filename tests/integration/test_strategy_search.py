@@ -87,7 +87,9 @@ def test_adopted_strategy_is_used_for_the_final_model(
         result.evaluation["selected_cv_score"]
     )
     features = imbalanced_frame.drop(columns="y")
-    loaded = mml.ModelBundle.load(result.save(tmp_path / "exported"))
+    loaded = mml.ModelBundle.load(
+        result.save(tmp_path / "exported"), trusted=True
+    )
     np.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)
     )

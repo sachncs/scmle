@@ -58,7 +58,9 @@ def test_params_survive_in_leaderboard_and_bundle(binary_frame, tmp_path):
         .map(lambda value: isinstance(json.loads(value), dict))
         .all()
     )
-    loaded = mml.ModelBundle.load(result.save(tmp_path / "exported"))
+    loaded = mml.ModelBundle.load(
+        result.save(tmp_path / "exported"), trusted=True
+    )
     assert loaded.info.model_params == result.bundle.info.model_params
     features = binary_frame.drop(columns="y")
     np.testing.assert_allclose(

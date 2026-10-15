@@ -30,12 +30,24 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, capsys):
     code = cli.main(
         [
             "predict",
+            "--trusted",
             str(bundle_dir),
             str(tmp_path / "new.csv"),
             "--output",
             str(output),
         ]
     )
+    refused = cli.main(
+        [
+            "predict",
+            str(bundle_dir),
+            str(tmp_path / "new.csv"),
+            "--output",
+            str(output),
+        ]
+    )
+    assert refused == cli.EXIT_FAILED
+    assert "unauthenticated" in capsys.readouterr().err
     predictions = pd.read_csv(output)
     assert code == 0 and len(predictions) == len(binary_frame)
     assert {"prediction", "proba_0", "proba_1"} <= set(predictions.columns)

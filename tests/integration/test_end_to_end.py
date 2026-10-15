@@ -68,7 +68,7 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
     assert "trial.ok" in read_kinds(result.run_dir)
 
     exported = result.save(tmp_path / "exported")
-    loaded = mml.ModelBundle.load(exported)
+    loaded = mml.ModelBundle.load(exported, trusted=True)
     features = binary_frame.drop(columns="y")
     np.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)

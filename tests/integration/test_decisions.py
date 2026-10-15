@@ -43,7 +43,9 @@ def test_threshold_choice_never_uses_the_test_rows(imbalanced_frame, tmp_path):
     result = run(imbalanced_frame, tmp_path, decision)
     chosen = result.evaluation["decision"]
     assert chosen["validation_rows"] <= result.evaluation["n_dev"]
-    reloaded = mml.ModelBundle.load(result.save(tmp_path / "bundle"))
+    reloaded = mml.ModelBundle.load(
+        result.save(tmp_path / "bundle"), trusted=True
+    )
     assert reloaded.info.decision_threshold == chosen["threshold"]
 
 
