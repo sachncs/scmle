@@ -205,6 +205,37 @@ class TuningRule(PlanningRule):
         return candidates
 
 
+class EnsembleRule(PlanningRule):
+    """Records whether a stacking ensemble will be assembled."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Documents the ensemble decision; leaves candidates unchanged."""
+        size = context.spec.ensemble.size
+        distinct = sum(
+            1 for a in candidates if a.family not in ("baseline", "ensemble")
+        )
+        if size < 2 or distinct < 2:
+            reason = (
+                "disabled (ensemble.size < 2)"
+                if size < 2
+                else "fewer than two eligible distinct models"
+            )
+            action = Action.DEFER
+        else:
+            reason = (
+                f"stack the best of up to {size} distinct models; adopted "
+                "only if it beats its best member in cross-validation"
+            )
+            action = Action.INCLUDE
+        decisions.append(experiments.Decision("stacking", action, reason))
+        return candidates
+
+
 def default_rules() -> tuple[PlanningRule, ...]:
     """Returns the standard rule chain."""
     return (
@@ -212,6 +243,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
         ApprovedModelsRule(),
         StrategyRule(),
         TuningRule(),
+        EnsembleRule(),
     )
 
 

@@ -18,6 +18,7 @@ from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import tasks
 from mml.core import context as context_module
+from mml.core import ensemble_search
 from mml.core import state as run_state
 from mml.core import strategy_search
 from mml.core import trials
@@ -200,6 +201,9 @@ class TrainStage(Stage):
             list(context.trials)
         )
         tuning.Tuner(context, runner).tune(list(context.trials))
+        ensemble_search.EnsembleSearch(context, runner).search(
+            list(context.trials)
+        )
 
 
 class SelectStage(Stage):
