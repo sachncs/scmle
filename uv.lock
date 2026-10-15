@@ -1164,14 +1164,16 @@ wheels = [
 
 [[package]]
 name = "magicml"
-version = "0.1.0.dev0"
+version = "0.1.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "joblib" },
+    { name = "numpy" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "scikit-learn" },
+    { name = "threadpoolctl" },
 ]
 
 [package.optional-dependencies]
@@ -1214,31 +1216,33 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "catboost", marker = "extra == 'catboost'" },
-    { name = "joblib", specifier = ">=1.3" },
-    { name = "lightgbm", marker = "extra == 'boosting'" },
+    { name = "catboost", marker = "extra == 'catboost'", specifier = ">=1.2.8" },
+    { name = "joblib", specifier = ">=1.5" },
+    { name = "lightgbm", marker = "extra == 'boosting'", specifier = ">=4.6" },
     { name = "magicml", extras = ["boosting", "catboost", "optimization", "tracking", "distributed"], marker = "extra == 'all'" },
-    { name = "mlflow", marker = "extra == 'tracking'" },
-    { name = "optuna", marker = "extra == 'optimization'" },
-    { name = "pandas", specifier = ">=2.2" },
-    { name = "pyarrow", specifier = ">=15" },
-    { name = "pydantic", specifier = ">=2.6" },
-    { name = "ray", marker = "extra == 'distributed'" },
-    { name = "scikit-learn", specifier = ">=1.4" },
-    { name = "xgboost", marker = "extra == 'boosting'" },
+    { name = "mlflow", marker = "extra == 'tracking'", specifier = ">=3.0" },
+    { name = "numpy", specifier = ">=2.3" },
+    { name = "optuna", marker = "extra == 'optimization'", specifier = ">=4.0" },
+    { name = "pandas", specifier = ">=3.0" },
+    { name = "pyarrow", specifier = ">=22" },
+    { name = "pydantic", specifier = ">=2.12" },
+    { name = "ray", marker = "extra == 'distributed'", specifier = ">=2.40" },
+    { name = "scikit-learn", specifier = ">=1.8" },
+    { name = "threadpoolctl", specifier = ">=3.6" },
+    { name = "xgboost", marker = "extra == 'boosting'", specifier = ">=3.0" },
 ]
 provides-extras = ["boosting", "catboost", "optimization", "tracking", "distributed", "all"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bandit", specifier = ">=1.9.4" },
-    { name = "hypothesis", specifier = ">=6" },
-    { name = "mypy", specifier = ">=1.10" },
-    { name = "pandas-stubs" },
-    { name = "pip-audit", specifier = ">=2.10.1" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "ruff", specifier = ">=0.5" },
-    { name = "twine", specifier = ">=7.0.0" },
+    { name = "bandit", specifier = ">=1.9" },
+    { name = "hypothesis", specifier = ">=6.140" },
+    { name = "mypy", specifier = ">=1.18" },
+    { name = "pandas-stubs", specifier = ">=3.0" },
+    { name = "pip-audit", specifier = ">=2.9" },
+    { name = "pytest", specifier = ">=9.0" },
+    { name = "ruff", specifier = ">=0.14" },
+    { name = "twine", specifier = ">=6.2" },
 ]
 
 [[package]]

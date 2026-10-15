@@ -1,6 +1,6 @@
 """magicml: autonomous, leakage-safe ML lifecycle framework."""
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0b1"
 
 from mml.api.project import MLProject
 from mml.api.results import RunResult
