@@ -23,6 +23,7 @@ from mml.contracts import experiments
 from mml.contracts import tasks
 from mml.core import context as context_module
 from mml.core import execution
+from mml.core import limits
 from mml.core import stages as stages_module
 from mml.core import state
 from mml.evaluation import metrics
@@ -99,7 +100,8 @@ class Orchestrator:
             catalog=metrics.CATALOG,
             policy=self.policy,
             backend=execution.create_backend(
-                self.spec.resources.workers, self.spec.resources.executor
+                limits.ResourceGovernor(self.spec.resources).workers,
+                self.spec.resources.executor,
             ),
             cancel_event=self.cancel_event,
             input_frame=self.frame,

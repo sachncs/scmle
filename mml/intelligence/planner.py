@@ -71,6 +71,38 @@ class PlanningRule(abc.ABC):
         """
 
 
+class GpuRule(PlanningRule):
+    """Honours the GPU policy: `required` keeps only GPU-capable models."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Filters for GPU capability when a GPU is required.
+
+        Raises:
+            BlockedError: If a GPU is required but no candidate can use one.
+        """
+        if context.spec.resources.gpu != "required":
+            return candidates
+        capable = [a for a in candidates if a.capabilities.gpu]
+        if not capable:
+            raise errors.BlockedError(
+                "resources.gpu='required' but no compatible model can use a "
+                "GPU; set gpu='auto' or install a GPU-capable adapter"
+            )
+        for adapter in candidates:
+            if adapter not in capable:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name, Action.REJECT, "gpu required"
+                    )
+                )
+        return capable
+
+
 class FastBudgetRule(PlanningRule):
     """Prefers fast models when the time budget is small."""
 
@@ -293,6 +325,7 @@ class EnsembleRule(PlanningRule):
 def default_rules() -> tuple[PlanningRule, ...]:
     """Returns the standard rule chain."""
     return (
+        GpuRule(),
         FastBudgetRule(),
         ApprovedModelsRule(),
         HistoryRule(),

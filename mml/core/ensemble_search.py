@@ -5,7 +5,6 @@ distinct model is combined into a stack and cross-validated like any other
 candidate. The ensemble is adopted only if it beats its best member.
 """
 
-import time
 
 from mml.contracts import experiments
 from mml.core import context as context_module
@@ -69,7 +68,7 @@ class EnsembleSearch:
         size = self.context.spec.ensemble.size
         if (
             size < ensembles.MIN_MEMBERS
-            or time.monotonic() >= self.context.deadline
+            or self.context.resource_governor.skip_reason(first=False)
         ):
             return
         members = self.members(evaluated, size)

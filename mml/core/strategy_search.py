@@ -6,7 +6,6 @@ on the *original* validation folds. A strategy is adopted only if it beats the
 same model's default pipeline; every verdict is written to the decision log.
 """
 
-import time
 
 from mml.contracts import experiments
 from mml.core import context as context_module
@@ -84,7 +83,7 @@ class StrategySearch:
             screened, self.metric.greater_is_better, spec.top_models, baselines
         )
         for leader in leaders:
-            if time.monotonic() >= self.context.deadline:
+            if self.context.resource_governor.skip_reason(first=False):
                 break
             self.context.check_cancelled()
             self.search_model(leader, spec.names)

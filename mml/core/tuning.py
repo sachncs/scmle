@@ -7,7 +7,6 @@ cross-validation; the rest are recorded as pruned.
 """
 
 import math
-import time
 
 from mml.contracts import experiments
 from mml.core import context as context_module
@@ -87,7 +86,10 @@ class Tuner:
         )
         batch_size = max(MIN_BATCH, math.ceil(search.configs_per_model / 3))
         remaining = search.configs_per_model
-        while remaining > 0 and time.monotonic() < context.deadline:
+        while (
+            remaining > 0
+            and context.resource_governor.skip_reason(first=False) is None
+        ):
             context.check_cancelled()
             size = min(batch_size, remaining)
             remaining -= size

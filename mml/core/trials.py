@@ -155,7 +155,6 @@ class TrialRunner:
     def payload(self, job: TrialJob) -> TrialPayload:
         """Builds the self-contained payload for a job."""
         context = self.context
-        parallel = context.backend.workers > 1
         return TrialPayload(
             job=job,
             adapter=context.registry.get(job.model_name),
@@ -170,7 +169,7 @@ class TrialRunner:
             features=self.split.dev_features,
             target=self.split.dev_target,
             folds=self.folds,
-            thread_limit=1 if parallel else None,
+            thread_limit=context.resource_governor.thread_limit,
         )
 
     def run(

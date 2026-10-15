@@ -16,6 +16,7 @@ from mml.contracts import events
 from mml.contracts import experiments
 from mml.contracts import tasks
 from mml.core import execution
+from mml.core import limits
 from mml.data import splitting
 from mml.evaluation import metrics
 from mml.evaluation import selection
@@ -62,6 +63,7 @@ class RunContext:
         checkpoints: Completed trials from an interrupted run, by trial id,
             reused instead of recomputed when resuming.
         backend: Where independent trials run (sequential by default).
+        governor: Applies and reports the resource limits.
         cancel_event: Set to request cancellation.
         input_frame: In-memory data, if the project was built from one.
         approved_plan: Human-approved plan restricting candidates.
@@ -108,6 +110,7 @@ class RunContext:
     backend: execution.ExecutionBackend = dataclasses.field(
         default_factory=execution.SequentialBackend
     )
+    governor: limits.ResourceGovernor | None = None
     cancel_event: threading.Event = dataclasses.field(
         default_factory=threading.Event
     )
@@ -141,6 +144,15 @@ class RunContext:
     bundle: bundle_module.ModelBundle | None = None
     result: results.RunResult | None = None
     started_at: float = dataclasses.field(default_factory=time.monotonic)
+
+    @property
+    def resource_governor(self) -> limits.ResourceGovernor:
+        """The governor, created on first use from the specification."""
+        if self.governor is None:
+            self.governor = limits.ResourceGovernor(
+                self.spec.resources, self.started_at
+            )
+        return self.governor
 
     @property
     def deadline(self) -> float:

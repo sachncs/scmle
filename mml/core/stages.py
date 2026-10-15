@@ -206,13 +206,10 @@ class TrainStage(Stage):
             context.check_cancelled()
             chunk = names[start : start + runner.workers]
             ids = context.allocate_trial_ids(len(chunk))
-            if start > 0 and time.monotonic() >= context.deadline:
+            reason = context.resource_governor.skip_reason(first=start == 0)
+            if reason is not None:
                 outcomes = [
-                    runner.skip(
-                        trial_id,
-                        name,
-                        "time budget exhausted before this trial started",
-                    )
+                    runner.skip(trial_id, name, reason)
                     for trial_id, name in zip(ids, chunk, strict=True)
                 ]
             else:
@@ -465,6 +462,7 @@ class FinalEvaluationStage(Stage):
             "split_strategy": split.manifest.strategy,
             "decision": decision,
             "resources": usage.to_dict(),
+            "resource_limits": context.resource_governor.report(),
             "test_set_opened": locked.opened,
             "diagnostics": sorted(context.diagnostics),
             "elapsed_seconds": time.monotonic() - context.started_at,
