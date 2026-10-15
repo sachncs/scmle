@@ -39,7 +39,7 @@ def test_breast_cancer_beats_baseline_and_generalizes(tmp_path):
 
 
 def test_wine_multiclass(tmp_path):
-    _, result = run_dataset(by_name("wine"), tmp_path)
+    result = run_dataset(by_name("wine"), tmp_path)[1]
     assert result.evaluation["task"] == "multiclass_classification"
     assert result.evaluation["test_metrics"]["accuracy"] > 0.9
     assert result.evaluation["test_metrics"]["log_loss"] < 0.4
@@ -52,7 +52,7 @@ def test_digits_many_classes(tmp_path):
 
 
 def test_diabetes_regression_beats_mean_baseline(tmp_path):
-    _, result = run_dataset(by_name("diabetes_progression"), tmp_path)
+    result = run_dataset(by_name("diabetes_progression"), tmp_path)[1]
     evaluation = result.evaluation
     assert evaluation["task"] == "regression"
     assert (
