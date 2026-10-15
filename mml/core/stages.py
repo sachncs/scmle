@@ -28,6 +28,7 @@ from mml.data import readers
 from mml.data import splitting
 from mml.data import strategies
 from mml.evaluation import diagnostics
+from mml.evaluation import resources
 from mml.intelligence import planner as planner_module
 from mml.models import thresholds
 
@@ -207,7 +208,7 @@ class TrainStage(Stage):
 
 
 class SelectStage(Stage):
-    """Applies the selection policy."""
+    """Applies the selection policy and the serving constraints."""
 
     state = run_state.RunState.SELECTING
 
@@ -215,10 +216,64 @@ class SelectStage(Stage):
         """Names the policy."""
         return context.policy.description
 
+    def limits(
+        self, context: context_module.RunContext
+    ) -> resources.ResourceLimits:
+        """Builds the serving limits from the specification."""
+        spec = context.spec.selection
+        return resources.ResourceLimits(
+            spec.max_model_mb, spec.max_p95_latency_ms
+        )
+
     def execute(self, context: context_module.RunContext) -> None:
-        """Chooses the winning trial."""
-        context.selected = context.policy.select(
+        """Chooses the best trial that satisfies the serving constraints.
+
+        Candidates are walked in policy order; each is refit and measured on
+        this machine, and the first one within every limit wins.
+
+        Raises:
+            BlockedError: If no checked candidate satisfies the constraints.
+        """
+        ranked = context.policy.rank(
             context.trials, require(context.metric, "metric"), context.registry
+        )
+        limits = self.limits(context)
+        if not limits.active:
+            context.selected = ranked[0]
+            return
+        split = require(context.split, "split")
+        task = require(context.task, "task")
+        plan = require(context.profile, "profile").feature_plan
+        checked = ranked[: context.spec.selection.max_candidates_checked]
+        for trial in checked:
+            candidate = strategies.get_strategy(trial.strategy).build(
+                plan,
+                context.registry.get(trial.model_name),
+                task,
+                context.spec.validation.seed,
+                trial.params,
+            )
+            candidate.fit(split.dev_features, split.dev_target)
+            usage = resources.measure(candidate, split.dev_features)
+            broken = limits.violations(usage)
+            label = f"{trial.model_name}/{trial.strategy}"
+            if broken:
+                context.add_outcome(
+                    label, experiments.DecisionAction.REJECT, "; ".join(broken)
+                )
+                continue
+            context.add_outcome(
+                label,
+                experiments.DecisionAction.INCLUDE,
+                f"within serving limits ({usage.model_mb:.2f} MB, p95 "
+                f"{usage.p95_latency_ms:.1f} ms on {usage.machine})",
+            )
+            context.refits[trial.trial_id] = candidate
+            context.selected = trial
+            return
+        raise errors.BlockedError(
+            f"none of the top {len(checked)} candidates satisfies the "
+            "serving constraints; relax the limits or allow more candidates"
         )
 
 
@@ -296,14 +351,16 @@ class FinalEvaluationStage(Stage):
         selected = require(context.selected, "selected")
         task = require(context.task, "task")
         metric = require(context.metric, "metric")
-        pipeline = strategies.get_strategy(selected.strategy).build(
-            require(context.profile, "profile").feature_plan,
-            context.registry.get(selected.model_name),
-            task,
-            context.spec.validation.seed,
-            selected.params,
-        )
-        pipeline.fit(split.dev_features, split.dev_target)
+        pipeline = context.refits.get(selected.trial_id)
+        if pipeline is None:
+            pipeline = strategies.get_strategy(selected.strategy).build(
+                require(context.profile, "profile").feature_plan,
+                context.registry.get(selected.model_name),
+                task,
+                context.spec.validation.seed,
+                selected.params,
+            )
+            pipeline.fit(split.dev_features, split.dev_target)
         pipeline, decision = choose_decision_threshold(context, pipeline)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
@@ -317,6 +374,7 @@ class FinalEvaluationStage(Stage):
             None,
         )
         context.final_pipeline = pipeline
+        usage = resources.measure(pipeline, split.dev_features)
         test_metrics = context.catalog.evaluate(
             pipeline, test_features, test_target, task
         )
@@ -358,6 +416,7 @@ class FinalEvaluationStage(Stage):
             "split_fingerprint": split.manifest.fingerprint,
             "split_strategy": split.manifest.strategy,
             "decision": decision,
+            "resources": usage.to_dict(),
             "test_set_opened": locked.opened,
             "diagnostics": sorted(context.diagnostics),
             "elapsed_seconds": time.monotonic() - context.started_at,

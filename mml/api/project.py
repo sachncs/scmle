@@ -41,6 +41,7 @@ class MLProject:
         search: tasks.SearchSpec | None = None,
         strategies: tasks.StrategySpec | None = None,
         ensemble: tasks.EnsembleSpec | None = None,
+        selection: tasks.SelectionSpec | None = None,
         decision: tasks.DecisionSpec | None = None,
         leakage_policy: LeakagePolicy = "warn",
         output_dir: str | pathlib.Path = "runs",
@@ -69,6 +70,7 @@ class MLProject:
             strategies: Which data strategies to evaluate; defaults to all.
                 Use `StrategySpec(top_models=0)` to disable.
             ensemble: Stacking settings; `EnsembleSpec(size=0)` disables.
+            selection: Serving constraints (max model size, p95 latency).
             decision: Threshold optimization for binary tasks (objective
                 f1, accuracy, balanced_accuracy or an explicit cost).
             leakage_policy: `warn` or `block` on leakage hypotheses.
@@ -101,6 +103,7 @@ class MLProject:
             search=search or tasks.SearchSpec(),
             strategies=strategies or tasks.StrategySpec(),
             ensemble=ensemble or tasks.EnsembleSpec(),
+            selection=selection or tasks.SelectionSpec(),
             decision=decision or tasks.DecisionSpec(),
             leakage_policy=leakage_policy,
         )
