@@ -76,7 +76,7 @@ class FeatureGraphSpec(FrozenModel):
     nodes: list[FeatureNode] = pydantic.Field(default_factory=list)
 
     @pydantic.model_validator(mode="after")
-    def check_structure(self) -> FeatureGraphSpec:
+    def check_structure(self) -> Self:
         """Validates unique names and dependency order.
 
         Raises:
