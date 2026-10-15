@@ -16,7 +16,9 @@ from sklearn import impute
 from sklearn import pipeline
 from sklearn import preprocessing
 
+from mml.contracts import data as data_contracts
 from mml.contracts import tasks
+from mml.data import transformers
 
 MISSING_TOKEN = "__missing__"
 ID_UNIQUE_RATIO = 0.95
@@ -82,11 +84,13 @@ class ColumnKind(abc.ABC):
         """Returns why the column cannot be a feature, if it cannot."""
         return None
 
-    def transformer(self, scale: bool) -> Any | None:
+    def transformer(
+        self, options: data_contracts.PreprocessingOptions
+    ) -> Any | None:
         """Builds the preprocessing transformer, or None for non-features.
 
         Args:
-            scale: Whether numeric features should be standardized.
+            options: Preprocessing switches.
         """
         return None
 
@@ -121,17 +125,17 @@ class NumericKind(ColumnKind):
         """Adds moments and range for non-boolean columns."""
         stats = super().statistics(series)
         if not pd.api.types.is_bool_dtype(series):
-            values = series.astype(float)
+            names = ["skew", "mean", "std", "min", "max"]
+            moments = series.astype(float).agg(names).to_dict()
             stats |= {
-                "mean": float(values.mean()),
-                "std": float(values.std()),
-                "min": float(values.min()),
-                "max": float(values.max()),
+                str(k): float(np.nan_to_num(v)) for k, v in moments.items()
             }
         return stats
 
-    def transformer(self, scale: bool) -> pipeline.Pipeline:
-        """Casts to float, imputes the median, optionally standardizes."""
+    def transformer(
+        self, options: data_contracts.PreprocessingOptions
+    ) -> pipeline.Pipeline:
+        """Casts, imputes, then optionally log-transforms, scales, crosses."""
         steps = [
             (
                 "cast",
@@ -146,8 +150,19 @@ class NumericKind(ColumnKind):
                 ),
             ),
         ]
-        if scale:
+        if options.log_skewed:
+            steps.append(("log", transformers.SkewedLogTransformer()))
+        if options.scale:
             steps.append(("scale", preprocessing.StandardScaler()))
+        if options.interactions:
+            steps.append(
+                (
+                    "interactions",
+                    preprocessing.PolynomialFeatures(
+                        degree=2, interaction_only=True, include_bias=False
+                    ),
+                )
+            )
         return pipeline.Pipeline(steps)
 
     def association(
@@ -209,7 +224,9 @@ class CategoricalKind(ColumnKind):
             return "id-like (near-unique text)"
         return None
 
-    def transformer(self, scale: bool) -> pipeline.Pipeline:
+    def transformer(
+        self, options: data_contracts.PreprocessingOptions
+    ) -> pipeline.Pipeline:
         """Casts to object, imputes a token, one-hot encodes."""
         return pipeline.Pipeline(
             [

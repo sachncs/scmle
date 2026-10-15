@@ -4,8 +4,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from mml.contracts import data as data_contracts
 from mml.contracts import tasks
 from mml.data import columns
+
+OPTIONS_SCALED = data_contracts.PreprocessingOptions(scale=True)
+OPTIONS_PLAIN = data_contracts.PreprocessingOptions()
 
 
 def test_kind_detection():
@@ -50,14 +54,14 @@ def test_exclusion_rules():
 
 
 def test_transformers_exist_only_for_feature_kinds():
-    assert columns.NumericKind().transformer(scale=True) is not None
-    assert columns.CategoricalKind().transformer(scale=False) is not None
-    assert columns.DatetimeKind().transformer(scale=True) is None
+    assert columns.NumericKind().transformer(OPTIONS_SCALED) is not None
+    assert columns.CategoricalKind().transformer(OPTIONS_PLAIN) is not None
+    assert columns.DatetimeKind().transformer(OPTIONS_SCALED) is None
 
 
 def test_scale_flag_controls_scaler():
-    scaled = columns.NumericKind().transformer(scale=True)
-    unscaled = columns.NumericKind().transformer(scale=False)
+    scaled = columns.NumericKind().transformer(OPTIONS_SCALED)
+    unscaled = columns.NumericKind().transformer(OPTIONS_PLAIN)
     assert "scale" in scaled.named_steps and "scale" not in unscaled.named_steps
 
 
@@ -90,3 +94,24 @@ def test_association_with_too_few_rows_is_zero():
         kind.association(short, pd.Series([0, 1, 0]), tasks.TaskType.BINARY)
         == 0.0
     )
+
+
+def test_numeric_statistics_include_skew():
+    values = pd.Series(np.r_[np.ones(95), [50.0, 60.0, 70.0, 80.0, 90.0]])
+    stats = columns.NumericKind().statistics(values)
+    assert stats["skew"] > 1.0 and stats["max"] == 90.0
+
+
+def test_numeric_transformer_composes_optional_steps():
+    full = columns.NumericKind().transformer(
+        data_contracts.PreprocessingOptions(
+            scale=True, log_skewed=True, interactions=True
+        )
+    )
+    assert list(full.named_steps) == [
+        "cast",
+        "impute",
+        "log",
+        "scale",
+        "interactions",
+    ]
