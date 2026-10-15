@@ -5,17 +5,75 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
+  quality:
+    name: lint, types, tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - name: Install
-        run: uv sync --python 3.14
-      - name: Lint
-        run: uv run ruff check . && uv run ruff format --check .
-      - name: Type check
-        run: uv run mypy mml
-      - name: Test
-        run: uv run pytest -q
+      - run: uv sync --python 3.14 --extra boosting --extra optimization
+      - run: uv run ruff check . && uv run ruff format --check .
+      - run: uv run mypy mml benchmarks
+      - run: uv run pytest -q
+
+  minimal-dependencies:
+    name: lowest supported dependency versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.14 --resolution lowest-direct --extra boosting --extra optimization
+      - run: uv run pytest -q tests/unit tests/property tests/leakage
+
+  base-install:
+    name: base install without extras
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.14
+      - run: uv run pytest -q tests/unit tests/property tests/integration/test_end_to_end.py
+
+  benchmarks:
+    name: benchmark regression gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.14 --extra boosting --extra optimization
+      - run: uv run python -m benchmarks.run_benchmarks --offline --budget 240 --workers 2 --output results.json
+      - run: uv run python -m benchmarks.check_regression results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: results.json
+
+  security:
+    name: static analysis and dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.14
+      - run: uv run bandit -q -r mml
+      - run: uv run pip-audit --skip-editable
+
+  package:
+    name: build and verify distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build --python 3.14
+      - run: uv run --python 3.14 twine check dist/*
+      - name: Install the wheel into a clean environment
+        run: |
+          uv venv --python 3.14 /tmp/wheel-env
+          uv pip install --python /tmp/wheel-env/bin/python dist/*.whl
+          /tmp/wheel-env/bin/magicml --help
+          /tmp/wheel-env/bin/python -c "import mml; print(mml.__version__)"

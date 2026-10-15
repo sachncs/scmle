@@ -1,0 +1,23 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # PyPI trusted publishing; no API token is stored.
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.14 --extra boosting --extra optimization
+      - run: uv run pytest -q
+      - run: uv run python -m benchmarks.run_benchmarks --offline --budget 240 --workers 2 --output results.json
+      - run: uv run python -m benchmarks.check_regression results.json
+      - run: uv build --python 3.14
+      - run: uv run twine check dist/*
+      - uses: pypa/gh-action-pypi-publish@release/v1
