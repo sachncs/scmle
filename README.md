@@ -78,14 +78,14 @@ installed):
 | dataset | rows | task | metric | selected | cv | test | reference |
 | --- | ---: | --- | --- | --- | ---: | ---: | ---: |
 | breast_cancer | 569 | binary | roc_auc | svm / log_skewed | 0.9950 | 0.9957 | 0.9901 |
-| wine | 178 | multiclass | log_loss | stacking | 0.0546 | 0.0480 | 0.0099 |
+| wine | 178 | multiclass | log_loss | lightgbm | 0.0561 | 0.0126 | 0.0099 |
 | digits | 1797 | multiclass | log_loss | lightgbm | 0.0806 | 0.0919 | 0.1394 |
 | diabetes | 442 | regression | rmse | ridge | 55.76 | 53.59 | 57.01 |
-| credit-g (OpenML) | 1000 | binary | roc_auc | stacking | 0.8054 | 0.7849 | 0.7479 |
-| titanic (OpenML) | 1309 | binary | roc_auc | catboost | 0.9939 | 0.9947 | 0.9910 |
-| kc1 defects (OpenML) | 2109 | binary, 15% positive | pr_auc | stacking | 0.4967 | 0.5313 | 0.5249 |
-| adult income (OpenML, 12k) | 12000 | binary | roc_auc | stacking | 0.9106 | 0.9154 | 0.9066 |
-| california housing (OpenML, 10k) | 10000 | regression | rmse | stacking | 47866 | 47169 | 49378 |
+| credit-g (OpenML) | 1000 | binary | roc_auc | catboost / calibrated | 0.8047 | 0.7842 | 0.7479 |
+| titanic (OpenML) | 1309 | binary | roc_auc | catboost / target_encoding | 0.9946 | 0.9940 | 0.9910 |
+| kc1 defects (OpenML) | 2109 | binary, 15% positive | pr_auc | catboost | 0.4828 | 0.5422 | 0.5249 |
+| adult income (OpenML, 12k) | 12000 | binary | roc_auc | logistic_regression / target_encoding | 0.9094 | 0.9146 | 0.9066 |
+| california housing (OpenML, 10k) | 10000 | regression | rmse | stacking | 47921 | 47090 | 49378 |
 
 Honest reading: ahead of the reference on 8 of 9. The exception is wine,
 whose locked test set has only 36 rows, where one confident mistake dominates
