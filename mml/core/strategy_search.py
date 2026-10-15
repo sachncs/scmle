@@ -6,7 +6,6 @@ on the *original* validation folds. A strategy is adopted only if it beats the
 same model's default pipeline; every verdict is written to the decision log.
 """
 
-
 from mml.contracts import experiments
 from mml.core import context as context_module
 from mml.core import trials

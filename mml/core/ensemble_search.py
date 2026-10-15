@@ -5,7 +5,6 @@ distinct model is combined into a stack and cross-validated like any other
 candidate. The ensemble is adopted only if it beats its best member.
 """
 
-
 from mml.contracts import experiments
 from mml.core import context as context_module
 from mml.core import trials

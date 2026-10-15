@@ -438,6 +438,13 @@ class FinalEvaluationStage(Stage):
                 metric,
                 require(context.profile, "profile").feature_plan,
                 context.spec.validation.seed,
+                groups=(
+                    test_features[context.spec.data.group_column]
+                    if split.manifest.strategy == "group"
+                    and context.spec.data.group_column
+                    else None
+                ),
+                temporal=split.manifest.strategy == "temporal",
             )
         )
         for name, report_body in context.diagnostics.items():

@@ -12,10 +12,12 @@ from typing import ClassVar
 
 import numpy as np
 import pandas as pd
+from sklearn import base
 from sklearn import inspection
 from sklearn import metrics as sk_metrics
 
 from mml.contracts import data as data_contracts
+from mml.contracts import errors
 from mml.contracts import tasks
 from mml.evaluation import metrics as metric_module
 
@@ -42,6 +44,10 @@ class DiagnosticInput:
         metric: Primary metric.
         feature_plan: Feature columns by kind.
         seed: Random seed.
+        groups: Entity labels of the evaluation rows, when the data has
+            repeated entities (resampling then draws whole groups).
+        temporal: Whether rows are chronologically ordered and serially
+            dependent (resampling then draws contiguous blocks).
     """
 
     estimator: Any
@@ -51,6 +57,8 @@ class DiagnosticInput:
     metric: metric_module.Metric
     feature_plan: data_contracts.FeaturePlan
     seed: int
+    groups: pd.Series | None = None
+    temporal: bool = False
 
     @property
     def positive_label(self) -> Any:
@@ -250,6 +258,163 @@ class PermutationImportance(Diagnostic):
         }
 
 
+class CachedPredictions(base.BaseEstimator):
+    """Replays a fitted model's predictions by row label.
+
+    Lets a bootstrap re-score thousands of resamples without re-predicting:
+    the wrapped estimator runs once, and every later call is a lookup on the
+    (unique) index of the rows it is handed.
+
+    Attributes:
+        predictions: Predicted labels / values by row label.
+        probabilities: Class probabilities by row label (classifiers).
+        classes_: Class labels of the wrapped model, if any.
+    """
+
+    def __init__(self, estimator: Any, features: pd.DataFrame) -> None:
+        """Predicts every row once.
+
+        Args:
+            estimator: Fitted model.
+            features: Rows with a unique index.
+        """
+        self.classes_ = getattr(estimator, "classes_", None)
+        self.predictions = pd.Series(
+            np.asarray(estimator.predict(features)), index=features.index
+        )
+        self.probabilities = (
+            pd.DataFrame(
+                estimator.predict_proba(features), index=features.index
+            )
+            if self.classes_ is not None and hasattr(estimator, "predict_proba")
+            else None
+        )
+
+    def predict(self, features: pd.DataFrame) -> np.ndarray:
+        """Looks up predictions for the given rows."""
+        return self.predictions.loc[features.index].to_numpy()
+
+    def predict_proba(self, features: pd.DataFrame) -> np.ndarray:
+        """Looks up probabilities for the given rows."""
+        if self.probabilities is None:
+            raise errors.ArtifactError("the model has no probabilities")
+        return self.probabilities.loc[features.index].to_numpy()
+
+
+class ClassifierReplay(base.ClassifierMixin, CachedPredictions):
+    """Cached predictions that scikit-learn treats as a classifier."""
+
+
+class RegressorReplay(base.RegressorMixin, CachedPredictions):
+    """Cached predictions that scikit-learn treats as a regressor."""
+
+
+def resample_rows(
+    rows: int,
+    groups: pd.Series | None,
+    temporal: bool,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Draws one bootstrap resample that respects the data's dependence.
+
+    Args:
+        rows: Number of evaluation rows.
+        groups: Entity labels, if rows are clustered by entity.
+        temporal: Whether to draw contiguous blocks.
+        rng: Source of randomness.
+
+    Returns:
+        Row positions of the resample.
+    """
+    if groups is not None:
+        members = (
+            groups.reset_index(drop=True).groupby(groups.to_numpy()).indices
+        )
+        labels = list(members)
+        drawn = rng.integers(0, len(labels), len(labels))
+        return np.concatenate([members[labels[i]] for i in drawn])
+    if temporal:
+        length = max(5, int(np.sqrt(rows)))
+        starts = rng.integers(0, max(rows - length, 1), -(-rows // length))
+        blocks = np.concatenate(
+            [np.arange(s, min(s + length, rows)) for s in starts]
+        )
+        return blocks[:rows]
+    return rng.integers(0, rows, rows)
+
+
+class MetricUncertainty(Diagnostic):
+    """Bootstrap confidence interval for the primary test metric.
+
+    Resampling follows the independent units of observation: whole groups
+    for clustered data, contiguous blocks for temporal data, and rows
+    otherwise, so intervals are not falsely narrow.
+    """
+
+    name = "metric_uncertainty"
+    resamples = 200
+    confidence = 95
+
+    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+        """Bootstraps the primary metric on the evaluation rows."""
+        features = inputs.features[list(inputs.feature_plan.features)]
+        features = features.reset_index(drop=True)
+        target = inputs.target.reset_index(drop=True)
+        replay_class = (
+            RegressorReplay
+            if inputs.task is tasks.TaskType.REGRESSION
+            else ClassifierReplay
+        )
+        replay = replay_class(inputs.estimator, features)
+        metric, positive = inputs.metric, inputs.positive_label
+        estimate = metric.score(replay, features, target, positive)
+        groups = (
+            inputs.groups.reset_index(drop=True)
+            if inputs.groups is not None
+            else None
+        )
+        rng = np.random.default_rng(inputs.seed)
+        scores: list[float] = []
+        unit = (
+            "groups"
+            if groups is not None
+            else "blocks"
+            if inputs.temporal
+            else "rows"
+        )
+        draws = [
+            resample_rows(len(target), groups, inputs.temporal, rng)
+            for count in range(self.resamples)
+        ]
+        for rows in draws:
+            try:
+                scores.append(
+                    metric.score(
+                        replay,
+                        features.iloc[rows],
+                        target.iloc[rows],
+                        positive,
+                    )
+                )
+            except ValueError:  # A resample missing a class.
+                continue
+        low, high = np.percentile(
+            scores,
+            [(100 - self.confidence) / 2, 100 - (100 - self.confidence) / 2],
+        )
+        return {
+            "metric": metric.name,
+            "estimate": float(estimate),
+            f"ci_{self.confidence}": [float(low), float(high)],
+            "resampling_unit": unit,
+            "resamples": len(scores),
+            "evaluation_rows": len(target),
+            "independent_units": int(groups.nunique())
+            if groups is not None
+            else len(target),
+        }
+
+
 def default_suite() -> tuple[Diagnostic, ...]:
     """Returns the standard diagnostics."""
     return (
@@ -258,6 +423,7 @@ def default_suite() -> tuple[Diagnostic, ...]:
         ThresholdReport(),
         ResidualReport(),
         PermutationImportance(),
+        MetricUncertainty(),
     )
 
 
