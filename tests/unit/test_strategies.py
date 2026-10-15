@@ -167,6 +167,7 @@ def test_registry_and_unknown_strategy():
         "borderline_smote",
         "adasyn",
         "jitter_augment",
+        "copula_augment",
         "calibrated",
         "log_skewed",
         "interactions",

@@ -272,3 +272,21 @@ def test_jitter_augmentation_must_be_requested_explicitly(tmp_path):
         (result.run_dir / "diagnostics" / "decision_log.json").read_text()
     )["outcomes"]
     assert any(o["technique"].startswith("jitter_augment@") for o in verdicts)
+
+
+def test_copula_augmentation_is_opt_in_and_judged_on_original_folds(tmp_path):
+    frame = numeric_imbalanced()
+    assert not any(
+        d.technique == "copula_augment"
+        for d in mml.MLProject(frame, "y").plan().decisions
+    )
+    opted = tasks.StrategySpec(names=["copula_augment"], top_models=1)
+    result = run(frame, tmp_path, strategies=opted, metric="pr_auc")
+    tried = [t for t in result.trials if t.strategy == "copula_augment"]
+    assert tried and tried[0].status == "ok" and len(tried[0].fold_scores) == 5
+    verdicts = json.loads(
+        (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+    )["outcomes"]
+    assert any(o["technique"].startswith("copula_augment@") for o in verdicts)
+    features = frame.drop(columns="y")
+    assert len(result.predict(features)) == len(features)
