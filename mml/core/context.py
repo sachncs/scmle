@@ -77,6 +77,7 @@ class RunContext:
             strategies helped), appended to the planner's decision log.
         trial_counter: Number of trial identifiers handed out so far.
         selected: Winning trial.
+        diagnostics: Post-selection diagnostic reports by name.
         final_pipeline: Selected pipeline refit on development data.
         evaluation: Final evaluation record.
         bundle: Packaged model.
@@ -119,6 +120,9 @@ class RunContext:
     )
     trial_counter: int = 0
     selected: experiments.TrialResult | None = None
+    diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
+        default_factory=dict
+    )
     final_pipeline: Any = None
     evaluation: dict[str, Any] | None = None
     bundle: bundle_module.ModelBundle | None = None

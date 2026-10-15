@@ -36,6 +36,22 @@ class HtmlReport:
             or "<li>none</li>"
         )
         summary = escape(result.plan.summary()).replace("\n", "<br>")
+        importance = result.feature_importance().head(10)
+        importance_html = (
+            importance.to_html(
+                index=False, border=0, float_format=lambda v: f"{v:.4f}"
+            )
+            if len(importance)
+            else "<p>unavailable</p>"
+        )
+        calibration = result.diagnostics.get("calibration", {})
+        calibration_html = (
+            f"<p>Brier score {calibration['brier_score']:.4f}, expected "
+            f"calibration error {calibration['expected_calibration_error']:.4f}"
+            "</p>"
+            if "brier_score" in calibration
+            else ""
+        )
         return (
             f"<!doctype html><meta charset=utf-8>"
             f"<title>{escape(result.run_id)}</title>"
@@ -43,5 +59,7 @@ class HtmlReport:
             f"<h2>Leaderboard</h2>{leaderboard.to_html(index=False, border=0)}"
             f"<h2>Final test metrics ({escape(result.selected_model)})</h2>"
             f"<table>{metric_rows}</table>"
+            f"<h2>Feature importance (permutation)</h2>{importance_html}"
+            f"{calibration_html}"
             f"<h2>Findings</h2><ul>{items}</ul>"
         )

@@ -24,6 +24,7 @@ from mml.data import profiling
 from mml.data import readers
 from mml.data import splitting
 from mml.data import strategies
+from mml.evaluation import diagnostics
 from mml.intelligence import planner as planner_module
 
 LEAKAGE_MARKER = "leakage"
@@ -260,6 +261,19 @@ class FinalEvaluationStage(Stage):
             cv_score=selected.score_mean,
             test_metrics=test_metrics,
         )
+        context.diagnostics = diagnostics.run_suite(
+            diagnostics.DiagnosticInput(
+                pipeline,
+                test_features,
+                test_target,
+                task,
+                metric,
+                require(context.profile, "profile").feature_plan,
+                context.spec.validation.seed,
+            )
+        )
+        for name, report_body in context.diagnostics.items():
+            context.write_json(f"diagnostics/{name}.json", report_body)
         context.evaluation = {
             "run_id": context.store.run_id if context.store else "",
             "task": task.value,
@@ -279,6 +293,7 @@ class FinalEvaluationStage(Stage):
             "split_fingerprint": split.manifest.fingerprint,
             "split_strategy": split.manifest.strategy,
             "test_set_opened": locked.opened,
+            "diagnostics": sorted(context.diagnostics),
             "elapsed_seconds": time.monotonic() - context.started_at,
             "reproducibility": (
                 "same seed/data/environment replays; threaded backends may "
@@ -341,6 +356,7 @@ class PackageStage(Stage):
             selected_model=selected.model_name,
             evaluation=evaluation,
             bundle=bundle,
+            diagnostics=context.diagnostics,
         )
         board = result.leaderboard()
         board.to_parquet(store.path("leaderboard.parquet"), index=False)

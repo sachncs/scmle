@@ -27,6 +27,7 @@ class RunResult:
         selected_model: Winning model name.
         evaluation: Final evaluation record (also saved as JSON).
         bundle: The packaged inference pipeline.
+        diagnostics: Post-selection diagnostic reports by name.
     """
 
     run_id: str
@@ -38,6 +39,14 @@ class RunResult:
     selected_model: str
     evaluation: dict[str, Any]
     bundle: bundle_module.ModelBundle
+    diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
+        default_factory=dict
+    )
+
+    def feature_importance(self) -> pd.DataFrame:
+        """Returns permutation importance, most important feature first."""
+        report = self.diagnostics.get("permutation_importance", {})
+        return pd.DataFrame(report.get("features", []))
 
     def leaderboard(self) -> pd.DataFrame:
         """Returns trials ranked best-first, failed/skipped trials last."""
