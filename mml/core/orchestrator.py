@@ -140,6 +140,31 @@ class Orchestrator:
             tracker = tracking_stores.SqliteExperimentStore(path)
         return tuple(tracker.history())
 
+    def apply_plan(self, approved: experiments.ExperimentPlan | None) -> None:
+        """Makes an approved or modified plan binding on the specification.
+
+        The plan's validation strategy, time budget and metric replace the
+        configured ones (and are validated with the rest of the
+        specification); its candidate models restrict the search, and its
+        task must match what the data resolves to.
+
+        Args:
+            approved: The plan, or None to keep the specification as is.
+
+        Raises:
+            ValidationError: If the plan contradicts the specification, for
+                example group validation without a group column.
+        """
+        if approved is None:
+            return
+        record = self.spec.model_dump()
+        record["validation"]["strategy"] = approved.validation_strategy
+        record["resources"]["time_budget_seconds"] = (
+            approved.optimization_budget_seconds
+        )
+        record["metric"] = approved.metric
+        self.spec = tasks.ProjectSpec.model_validate(record)
+
     def prepare(
         self, approved: experiments.ExperimentPlan | None = None
     ) -> context_module.RunContext:
@@ -151,6 +176,7 @@ class Orchestrator:
         Returns:
             A context whose `profile` and `plan` are populated.
         """
+        self.apply_plan(approved)
         context = self.new_context(approved_plan=approved)
         context.history = self.load_history(self.tracker)
         stages_module.IngestStage().execute(context)
@@ -179,6 +205,7 @@ class Orchestrator:
             MagicMLError: Any other framework failure; unexpected errors are
                 wrapped. The run directory is in `details["run_dir"]`.
         """
+        self.apply_plan(approved)
         store = store_module.RunStore.create(output_dir)
         store.write_json("config.json", json.loads(self.spec.canonical_json()))
         store.write_text("environment.lock", environment_lock())

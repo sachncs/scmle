@@ -228,3 +228,25 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     )
     with pytest.raises(errors.ConfigError, match="data changed"):
         orchestrator.resume(run_dir)
+
+
+def test_every_trial_records_its_evaluation_config_and_runtime(
+    binary_frame, tmp_path
+):
+    result = support.make_project(
+        binary_frame, "y", output_dir=tmp_path, folds=4, seed=7
+    ).run()
+    for trial in result.trials:
+        assert trial.evaluation_config == {
+            "metric": "roc_auc",
+            "folds": 4,
+            "seed": 7,
+        }
+        assert trial.runtime["python"].count(".") == 2
+    record = json.loads(
+        (result.run_dir / "trials" / "trial_002.json").read_text()
+    )
+    assert record["evaluation_config"]["folds"] == 4
+    lightgbm = [t for t in result.trials if t.model_name == "lightgbm"]
+    for trial in lightgbm:
+        assert "lightgbm" in trial.runtime["libraries"]

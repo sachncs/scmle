@@ -9,6 +9,8 @@ from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 import hashlib
+import importlib.metadata
+import platform
 import time
 from typing import Any
 
@@ -91,6 +93,17 @@ def access_record(row_ids: pd.Index) -> dict[str, Any]:
     return {"rows": len(ordered), "digest": digest[:16]}
 
 
+def runtime_requirements(adapter: models.ModelAdapter) -> dict[str, Any]:
+    """Python version and versions of the libraries the model needs."""
+    needed = {}
+    for module in adapter.requires:
+        try:
+            needed[module] = importlib.metadata.version(module)
+        except importlib.metadata.PackageNotFoundError:
+            needed[module] = "unknown"
+    return {"python": platform.python_version(), "libraries": needed}
+
+
 def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
     """Cross-validates one job; never raises for model failures.
 
@@ -111,6 +124,12 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
         metric.name,
         params=dict(job.params),
         strategy=job.strategy,
+        evaluation_config={
+            "metric": metric.name,
+            "folds": len(folds),
+            "seed": payload.seed,
+        },
+        runtime=runtime_requirements(payload.adapter),
     )
     try:
         pipeline = payload.strategy.build(
@@ -320,6 +339,11 @@ class TrialRunner:
             params=dict(checkpoint.params),
             strategy=checkpoint.strategy,
             observed_access=list(checkpoint.observed_access[:wanted]),
+            evaluation_config={
+                **checkpoint.evaluation_config,
+                "folds": wanted,
+            },
+            runtime=dict(checkpoint.runtime),
         )
 
     def skip(

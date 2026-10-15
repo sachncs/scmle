@@ -176,6 +176,12 @@ class ProfileStage(Stage):
                 "missing values"
             )
         task = profiling.TaskResolver(spec).resolve(target)
+        approved = context.approved_plan
+        if approved is not None and approved.task != task.value:
+            raise errors.ConfigError(
+                f"the approved plan is for {approved.task} but the data "
+                f"resolves to {task.value}"
+            )
         context.task = task
         context.metric = context.catalog.resolve(spec.primary_metric, task)
         split = self.make_split(context, task, frame)

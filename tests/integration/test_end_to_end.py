@@ -251,3 +251,45 @@ def test_time_series_contracts_end_to_end(binary_frame, tmp_path):
         "not available" in result.profile.feature_plan.dropped["outcome_code"]
     )
     assert result.evaluation["split_strategy"] == "temporal"
+
+
+def test_a_modified_plan_changes_validation_budget_and_metric(
+    binary_frame, tmp_path
+):
+    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    plan = project.plan()
+    modified = dataclasses.replace(
+        plan,
+        validation_strategy="random",
+        metric="pr_auc",
+        optimization_budget_seconds=250,
+        candidate_models=("dummy", "logistic_regression"),
+    )
+    result = project.run(modified)
+    assert result.evaluation["split_strategy"] == "random"
+    assert result.evaluation["metric"] == "pr_auc"
+    saved = json.loads((result.run_dir / "config.json").read_text())
+    assert saved["validation"]["strategy"] == "random"
+    assert saved["resources"]["time_budget_seconds"] == 250
+    assert saved["metric"] == "pr_auc"
+    assert {t.model_name for t in result.trials} == {
+        "dummy",
+        "logistic_regression",
+    }
+
+
+def test_a_plan_for_another_task_or_an_impossible_strategy_is_refused(
+    binary_frame, tmp_path
+):
+    import pydantic
+
+    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
+    plan = project.plan()
+    wrong_task = dataclasses.replace(plan, task="regression")
+    with pytest.raises(errors.ConfigError, match="approved plan is for"):
+        project.run(wrong_task)
+    impossible = dataclasses.replace(plan, validation_strategy="group")
+    with pytest.raises(pydantic.ValidationError, match="group_column"):
+        support.make_project(binary_frame, "y", output_dir=tmp_path / "x").run(
+            impossible
+        )

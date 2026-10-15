@@ -14,6 +14,13 @@ from mml.contracts import data as data_contracts
 from mml.contracts import experiments
 from mml.data import interchange
 
+LEADERBOARD_DETAILS = (
+    "fold_scores",
+    "observed_access",
+    "evaluation_config",
+    "runtime",
+)
+
 
 @dataclasses.dataclass(slots=True)
 class RunResult:
@@ -53,7 +60,7 @@ class RunResult:
     def leaderboard(self) -> pd.DataFrame:
         """Returns trials ranked best-first, failed/skipped trials last."""
         board = pd.DataFrame([t.to_dict() for t in self.trials])
-        board = board.drop(columns=["fold_scores"])
+        board = board.drop(columns=list(LEADERBOARD_DETAILS))
         board["params"] = board["params"].map(json.dumps)
         board["selected"] = (
             board["trial_id"] == self.evaluation["selected_trial_id"]

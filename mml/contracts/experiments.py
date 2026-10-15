@@ -138,6 +138,10 @@ class TrialResult:
         observed_access: What each fold's fit and scoring actually received:
             per fold the row count and a digest of the row ids. The ledger
             checks these observations against the split manifest.
+        evaluation_config: How the candidate was evaluated (metric, folds,
+            seed), so a trial is reproducible from its own record.
+        runtime: Runtime requirements of the candidate (Python version and
+            the libraries its model needs).
     """
 
     trial_id: str
@@ -154,6 +158,8 @@ class TrialResult:
     observed_access: list[dict[str, Any]] = dataclasses.field(
         default_factory=list
     )
+    evaluation_config: dict[str, Any] = dataclasses.field(default_factory=dict)
+    runtime: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
