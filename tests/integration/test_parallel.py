@@ -1,6 +1,7 @@
 """Parallel trial execution."""
 
 import pytest
+import support
 
 import mml
 from mml.contracts import errors
@@ -36,7 +37,7 @@ def test_parallel_run_matches_sequential_run(binary_frame, tmp_path):
     search = tasks.SearchSpec(top_models=1, configs_per_model=4)
 
     def run(workers):
-        return mml.MLProject(
+        return support.make_project(
             binary_frame,
             "y",
             time_budget=300,

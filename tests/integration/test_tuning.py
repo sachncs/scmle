@@ -4,6 +4,7 @@ import json
 
 import numpy as np
 import pytest
+import support
 
 import mml
 from mml.contracts import tasks
@@ -12,7 +13,7 @@ SEARCH = tasks.SearchSpec(top_models=1, configs_per_model=6, prune_fraction=0.5)
 
 
 def run(frame, tmp_path, search=SEARCH, **kwargs):
-    project = mml.MLProject(
+    project = support.make_project(
         frame,
         "y",
         time_budget=300,
@@ -75,7 +76,7 @@ def test_tuning_can_be_disabled(binary_frame, tmp_path):
 
 
 def test_plan_documents_the_search(binary_frame):
-    plan = mml.MLProject(binary_frame, "y", search=SEARCH).plan()
+    plan = support.make_project(binary_frame, "y", search=SEARCH).plan()
     decision = next(
         d for d in plan.decisions if d.technique == "hyperparameter_tuning"
     )
@@ -83,7 +84,7 @@ def test_plan_documents_the_search(binary_frame):
 
 
 def test_search_stops_when_budget_is_exhausted(binary_frame, tmp_path):
-    result = mml.MLProject(
+    result = support.make_project(
         binary_frame, "y", time_budget=1, output_dir=tmp_path, search=SEARCH
     ).run()
     assert result.state == "COMPLETED"

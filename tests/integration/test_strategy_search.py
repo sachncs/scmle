@@ -4,6 +4,7 @@ import json
 
 import numpy as np
 import pytest
+import support
 
 import mml
 from mml.contracts import tasks
@@ -13,7 +14,7 @@ NO_SEARCH = tasks.SearchSpec(top_models=0)
 
 
 def run(frame, tmp_path, strategies=STRATEGIES, search=NO_SEARCH, **kwargs):
-    project = mml.MLProject(
+    project = support.make_project(
         frame,
         "y",
         time_budget=600,

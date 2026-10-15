@@ -1,6 +1,7 @@
 """Threshold optimization and probability calibration, end to end."""
 
 import numpy as np
+import support
 
 import mml
 from mml.contracts import tasks
@@ -9,7 +10,7 @@ NO_SEARCH = tasks.SearchSpec(top_models=0)
 
 
 def run(frame, tmp_path, decision=None, strategies=None, **kwargs):
-    project = mml.MLProject(
+    project = support.make_project(
         frame,
         "y",
         time_budget=600,

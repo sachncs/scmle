@@ -111,7 +111,7 @@ def test_resume_of_tuned_run_recomputes_nothing(
     binary_frame, tmp_path, monkeypatch
 ):
     search = tasks.SearchSpec(top_models=1, configs_per_model=4)
-    original = mml.MLProject(
+    original = support.make_project(
         binary_frame, "y", time_budget=300, output_dir=tmp_path, search=search
     ).run()
     # Simulate a crash after the last trial: drop everything after TRAINING.
