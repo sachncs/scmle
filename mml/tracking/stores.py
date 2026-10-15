@@ -7,6 +7,8 @@ example MLflow) implement the same interface.
 """
 
 import abc
+from collections.abc import Iterator
+import contextlib
 import json
 import pathlib
 import sqlite3
@@ -145,7 +147,7 @@ class SqliteExperimentStore(ExperimentStore):
         """
         self.path = pathlib.Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.connect() as connection:
+        with self.session() as connection:
             connection.executescript(SCHEMA)
             self.migrate(connection)
 
@@ -158,6 +160,20 @@ class SqliteExperimentStore(ExperimentStore):
             if column not in existing:
                 connection.execute(f"ALTER TABLE runs ADD COLUMN {column} TEXT")
 
+    @contextlib.contextmanager
+    def session(self) -> Iterator[sqlite3.Connection]:
+        """Opens a transaction and always closes the connection.
+
+        `with sqlite3.connect(...)` only commits or rolls back; it never
+        closes, which leaks a connection per call.
+        """
+        connection = self.connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def connect(self) -> sqlite3.Connection:
         """Opens a short-lived connection with row access by name."""
         connection = sqlite3.connect(self.path)
@@ -168,7 +184,7 @@ class SqliteExperimentStore(ExperimentStore):
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
         """Inserts the run, or refreshes it when resuming."""
-        with self.connect() as connection:
+        with self.session() as connection:
             connection.execute(
                 "INSERT INTO runs (run_id, config_hash, state, started_at, "
                 "updated_at, run_dir) VALUES (?, ?, 'CREATED', ?, ?, ?) "
@@ -191,7 +207,7 @@ class SqliteExperimentStore(ExperimentStore):
             for k, v in fields.items()
         }
         assignments = ", ".join(f"{column} = ?" for column in values)
-        with self.connect() as connection:
+        with self.session() as connection:
             # Column names come from the COLUMNS whitelist checked above and
             # every value is bound as a parameter, so this is not injectable.
             connection.execute(
@@ -202,7 +218,7 @@ class SqliteExperimentStore(ExperimentStore):
 
     def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
         """Upserts a trial."""
-        with self.connect() as connection:
+        with self.session() as connection:
             connection.execute(
                 "INSERT OR REPLACE INTO trials VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (
@@ -222,7 +238,7 @@ class SqliteExperimentStore(ExperimentStore):
 
     def runs(self) -> list[dict[str, Any]]:
         """Returns runs newest first."""
-        with self.connect() as connection:
+        with self.session() as connection:
             rows = connection.execute(
                 "SELECT * FROM runs ORDER BY started_at DESC, run_id DESC"
             ).fetchall()
@@ -230,7 +246,7 @@ class SqliteExperimentStore(ExperimentStore):
 
     def trials(self, run_id: str) -> list[dict[str, Any]]:
         """Returns a run's trials ordered by trial id."""
-        with self.connect() as connection:
+        with self.session() as connection:
             rows = connection.execute(
                 "SELECT * FROM trials WHERE run_id = ? ORDER BY trial_id",
                 (run_id,),
@@ -239,7 +255,7 @@ class SqliteExperimentStore(ExperimentStore):
 
     def history(self) -> list[experiments.HistoricalRun]:
         """Returns completed, fingerprinted runs, oldest first."""
-        with self.connect() as connection:
+        with self.session() as connection:
             rows = connection.execute(
                 "SELECT * FROM runs WHERE state = 'COMPLETED' AND "
                 "fingerprint IS NOT NULL AND selected_model IS NOT NULL "
