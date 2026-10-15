@@ -159,10 +159,17 @@ class PredictCommand(Command):
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("data", help="CSV or Parquet file")
         parser.add_argument("--output", default="predictions.csv")
+        parser.add_argument(
+            "--trusted",
+            action="store_true",
+            help="load an unsigned bundle you vouch for (pickle executes code)",
+        )
 
     def execute(self, args: argparse.Namespace) -> int:
         """Writes predictions (and probabilities for classifiers)."""
-        model = bundle_module.ModelBundle.load(args.bundle)
+        model = bundle_module.ModelBundle.load(
+            args.bundle, trusted=args.trusted
+        )
         frame = pd.DataFrame({"prediction": model.predict(args.data)})
         if model.classes is not None:
             proba = model.predict_proba(args.data)
