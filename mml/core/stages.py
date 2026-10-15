@@ -18,6 +18,7 @@ from mml.contracts import experiments
 from mml.core import context as context_module
 from mml.core import state as run_state
 from mml.core import trials
+from mml.core import tuning
 from mml.data import preprocessing
 from mml.data import profiling
 from mml.data import readers
@@ -173,6 +174,7 @@ class TrainStage(Stage):
             path = f"trials/{trial_id}.json"
             context.write_json(path, outcome.to_dict())
             context.emit(f"trial.{outcome.status}", name, (path,))
+        tuning.Tuner(context, runner).tune(list(context.trials))
 
 
 class SelectStage(Stage):
@@ -213,6 +215,7 @@ class FinalEvaluationStage(Stage):
             context.registry.get(selected.model_name),
             task,
             context.spec.validation.seed,
+            selected.params,
         )
         pipeline.fit(split.dev_features, split.dev_target)
         locked = split.locked_test
@@ -234,6 +237,7 @@ class FinalEvaluationStage(Stage):
             "metric_greater_is_better": metric.greater_is_better,
             "selection_policy": context.policy.description,
             "selected_model": selected.model_name,
+            "selected_params": selected.params,
             "selected_cv_score": selected.score_mean,
             "selected_cv_std": selected.score_std,
             "baseline_cv_score": baseline.score_mean if baseline else None,
@@ -277,6 +281,7 @@ class PackageStage(Stage):
             require(context.task, "task").value,
             require(context.metric, "metric").name,
             selected.model_name,
+            model_params=selected.params,
         )
         bundle.save(store.path("model"))
         store.write_json("evaluation.json", evaluation)

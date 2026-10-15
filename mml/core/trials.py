@@ -1,6 +1,8 @@
 """Trial execution: cross-validate one complete candidate pipeline."""
 
+from collections.abc import Mapping
 import time
+from typing import Any
 
 import numpy as np
 from sklearn import model_selection
@@ -30,21 +32,35 @@ class TrialRunner:
             (list(train), list(val)) for train, val in self.split.manifest.folds
         ]
 
-    def run(self, trial_id: str, model_name: str) -> experiments.TrialResult:
-        """Cross-validates one model; never raises for model failures.
+    def run(
+        self,
+        trial_id: str,
+        model_name: str,
+        params: Mapping[str, Any] | None = None,
+        fold_count: int | None = None,
+    ) -> experiments.TrialResult:
+        """Cross-validates one candidate; never raises for model failures.
 
         Args:
             trial_id: Identifier for the result.
             model_name: Registered model to evaluate.
+            params: Hyperparameter overrides.
+            fold_count: Evaluate only the first N folds (a cheaper rung for
+                pruning); None evaluates all folds.
 
         Returns:
             An `OK` result with fold scores, or a `FAILED` one describing the
             error, so one broken candidate never ends the run.
         """
         context, metric = self.context, self.metric
+        folds = self.folds if fold_count is None else self.folds[:fold_count]
         started = time.monotonic()
         result = experiments.TrialResult(
-            trial_id, model_name, experiments.TrialStatus.FAILED, metric.name
+            trial_id,
+            model_name,
+            experiments.TrialStatus.FAILED,
+            metric.name,
+            params=dict(params or {}),
         )
         try:
             pipeline = preprocessing.build_pipeline(
@@ -52,12 +68,13 @@ class TrialRunner:
                 context.registry.get(model_name),
                 self.task,
                 context.spec.validation.seed,
+                params,
             )
             cv = model_selection.cross_validate(
                 pipeline,
                 self.split.dev_features,
                 self.split.dev_target,
-                cv=self.folds,
+                cv=folds,
                 scoring=metric.scorer_name,
                 error_score="raise",
             )
