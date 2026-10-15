@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS runs (
     run_dir TEXT,
     fingerprint TEXT,
     task TEXT,
-    selected_strategy TEXT
+    selected_strategy TEXT,
+    config_json TEXT,
+    artifacts TEXT
 );
 CREATE TABLE IF NOT EXISTS trials (
     run_id TEXT NOT NULL,
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS trials (
     params TEXT,
     fold_scores TEXT,
     error TEXT,
+    strategy TEXT,
     PRIMARY KEY (run_id, trial_id)
 );
 """
@@ -136,6 +139,8 @@ class SqliteExperimentStore(ExperimentStore):
             "test_metrics",
             "fingerprint",
             "task",
+            "config_json",
+            "artifacts",
         }
     )
 
@@ -156,9 +161,21 @@ class SqliteExperimentStore(ExperimentStore):
         existing = {
             row["name"] for row in connection.execute("PRAGMA table_info(runs)")
         }
-        for column in ("fingerprint", "task", "selected_strategy"):
+        for column in (
+            "fingerprint",
+            "task",
+            "selected_strategy",
+            "config_json",
+            "artifacts",
+        ):
             if column not in existing:
                 connection.execute(f"ALTER TABLE runs ADD COLUMN {column} TEXT")
+        trial_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(trials)")
+        }
+        if "strategy" not in trial_columns:
+            connection.execute("ALTER TABLE trials ADD COLUMN strategy TEXT")
 
     @contextlib.contextmanager
     def session(self) -> Iterator[sqlite3.Connection]:
@@ -220,7 +237,10 @@ class SqliteExperimentStore(ExperimentStore):
         """Upserts a trial."""
         with self.session() as connection:
             connection.execute(
-                "INSERT OR REPLACE INTO trials VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO trials (run_id, trial_id, model_name, "
+                "status, metric, score_mean, score_std, fit_seconds, params, "
+                "fold_scores, error, strategy) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     run_id,
                     trial.trial_id,
@@ -233,6 +253,7 @@ class SqliteExperimentStore(ExperimentStore):
                     json.dumps(trial.params, default=str),
                     json.dumps(trial.fold_scores),
                     trial.error,
+                    trial.strategy,
                 ),
             )
 

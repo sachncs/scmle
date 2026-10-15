@@ -317,6 +317,7 @@ class Orchestrator:
             str(store.directory),
             events.utc_timestamp(),
         )
+        tracker.update_run(store.run_id, config_json=self.spec.canonical_json())
         log.subscribe(functools.partial(tracker.listen, store.run_id))
         machine = state.StateMachine(
             store.run_id, log, self.spec.config_hash(), reason

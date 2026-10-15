@@ -697,12 +697,28 @@ class PackageStage(Stage):
             bundle=bundle,
             diagnostics=context.diagnostics,
         )
+        context.track(artifacts=self.lineage(store))
         board = result.leaderboard()
         board.to_parquet(store.path("leaderboard.parquet"), index=False)
         store.write_text(
             "report.html", report.HtmlReport().render(result, board)
         )
         context.bundle, context.result = bundle, result
+
+    def lineage(self, store: Any) -> dict[str, str]:
+        """Checksums of the artifacts a run produced, for tracking lineage."""
+        names = (
+            "config.json",
+            "dataset_manifest.json",
+            "evaluation.json",
+            f"model/{bundle_module.MANIFEST_FILE}",
+            f"model/{bundle_module.MODEL_FILE}",
+        )
+        return {
+            name: bundle_module.file_sha256(store.path(name))
+            for name in names
+            if store.path(name).exists()
+        }
 
 
 def default_stages() -> tuple[Stage, ...]:

@@ -167,6 +167,22 @@ def test_tracking_database_records_runs_trials_and_lineage(
         first.evaluation["test_metrics"]["roc_auc"]
     )
     assert len(store.trials(first.run_id)) == len(first.trials)
+    assert {t["strategy"] for t in store.trials(first.run_id)} >= {"default"}
+    config = json.loads(row["config_json"])
+    assert (
+        config["data"]["target"] == "y" and config["validation"]["seed"] == 42
+    )
+    lineage = json.loads(row["artifacts"])
+    from mml.artifacts import bundle as bundle_module
+
+    assert {
+        "config.json",
+        "evaluation.json",
+        f"model/{bundle_module.MANIFEST_FILE}",
+    } <= set(lineage)
+
+    for name, digest in lineage.items():
+        assert bundle_module.file_sha256(first.run_dir / name) == digest
 
 
 def test_custom_tracker_is_honoured(binary_frame, tmp_path):

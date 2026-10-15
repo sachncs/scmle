@@ -13,6 +13,7 @@ from mml.contracts import experiments
 from mml.tracking import stores
 
 RUN_TAG = "mml.run_id"
+LINEAGE_ARTIFACTS = frozenset({"config_json", "artifacts"})
 PARENT_TAG = "mlflow.parentRunId"
 TERMINAL = {
     "COMPLETED": "FINISHED",
@@ -108,6 +109,11 @@ class MlflowExperimentStore(stores.ExperimentStore):
                         self.client.log_metric(
                             parent, f"test.{key}", float(number)
                         )
+            elif name in LINEAGE_ARTIFACTS:
+                text = (
+                    json.dumps(value) if isinstance(value, dict) else str(value)
+                )
+                self.client.log_text(parent, text, f"{name}.json")
             else:
                 text = (
                     json.dumps(value) if isinstance(value, dict) else str(value)
