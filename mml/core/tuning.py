@@ -31,7 +31,7 @@ class Tuner:
         """
         self.context = context
         self.runner = runner
-        self.search = context.spec.search
+        self.search = context.spec.effective_search()
         self.metric = context_module.require(context.metric, "metric")
 
     def promising_candidates(

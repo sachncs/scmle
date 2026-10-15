@@ -17,6 +17,8 @@ from mml.contracts import tasks
 from mml.data import columns
 from mml.data import feature_graph
 
+SPARSE_THRESHOLD = 0.3
+
 
 def build_preprocessor(
     plan: data_contracts.FeaturePlan,
@@ -32,14 +34,37 @@ def build_preprocessor(
         An unfitted transformer that drops every non-feature column.
     """
     parts = []
+    special = split_high_cardinality(plan, options)
+    if special:
+        encoder = columns.CategoricalKind().high_cardinality_transformer(
+            options.high_cardinality
+        )
+        parts.append(("high_cardinality", encoder, list(special)))
     for kind in columns.KINDS:
-        selected = plan.columns_for(kind.name)
+        selected = [c for c in plan.columns_for(kind.name) if c not in special]
         transformer = kind.transformer(options)
         if selected and transformer is not None:
-            parts.append((kind.name, transformer, list(selected)))
+            parts.append((kind.name, transformer, selected))
     return compose.ColumnTransformer(
-        parts, remainder="drop", verbose_feature_names_out=False
+        parts,
+        remainder="drop",
+        verbose_feature_names_out=False,
+        sparse_threshold=SPARSE_THRESHOLD if options.sparse else 0.0,
     )
+
+
+def split_high_cardinality(
+    plan: data_contracts.FeaturePlan,
+    options: data_contracts.PreprocessingOptions,
+) -> tuple[str, ...]:
+    """Columns that get a special encoder instead of one-hot encoding.
+
+    They are placed first in the transformed matrix, so their positions are
+    `0..len-1`, which native-categorical estimators can be told about.
+    """
+    if options.high_cardinality == "onehot":
+        return ()
+    return tuple(c for c in plan.categorical if c in plan.high_cardinality)
 
 
 def build_front_end(
@@ -67,6 +92,30 @@ def build_front_end(
     )
 
 
+def default_options(
+    plan: data_contracts.FeaturePlan, adapter: models.ModelAdapter
+) -> data_contracts.PreprocessingOptions:
+    """Preprocessing switches implied by an adapter's capabilities.
+
+    Scaling for models that benefit from it, no imputation for models that
+    handle missing values, sparse one-hot output for sparse-capable models on
+    high-cardinality data, and integer-coded native categoricals where the
+    adapter supports them.
+    """
+    caps = adapter.capabilities
+    native = bool(
+        plan.high_cardinality
+        and caps.native_categorical
+        and adapter.categorical_params([0])
+    )
+    return data_contracts.PreprocessingOptions(
+        scale=caps.needs_scaling,
+        impute=not caps.handles_missing,
+        high_cardinality="ordinal" if native else "onehot",
+        sparse=caps.sparse_input and bool(plan.high_cardinality),
+    )
+
+
 def build_pipeline(
     plan: data_contracts.FeaturePlan,
     adapter: models.ModelAdapter,
@@ -83,16 +132,17 @@ def build_pipeline(
         task: Resolved task type.
         seed: Random seed forwarded to the estimator.
         params: Hyperparameter overrides for the estimator.
-        options: Preprocessing switches; by default only scaling, and only
-            for adapters that benefit from it.
+        options: Preprocessing switches; by default `default_options`.
 
     Returns:
         An unfitted pipeline of preprocessing followed by the estimator.
     """
+    params = dict(params or {})
     if options is None:
-        options = data_contracts.PreprocessingOptions(
-            scale=adapter.capabilities.needs_scaling
-        )
+        options = default_options(plan, adapter)
+    special = split_high_cardinality(plan, options)
+    if options.high_cardinality == "ordinal" and special:
+        params |= adapter.categorical_params(list(range(len(special))))
     steps: list[tuple[str, Any]] = []
     if plan.derived:
         steps.append(

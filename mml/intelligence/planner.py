@@ -21,7 +21,7 @@ from mml.evaluation import metrics
 from mml.intelligence import knowledge
 from mml.models import registry as registry_module
 
-FAST_BUDGET_SECONDS = 300
+FAST_BUDGET_SECONDS = tasks.FAST_BUDGET_SECONDS
 FAST_EXCEPTION = "hist_gradient_boosting"
 
 Action = experiments.DecisionAction
@@ -147,9 +147,21 @@ class FastBudgetRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Drops expensive models under a tight budget."""
-        if context.spec.resources.time_budget_seconds >= FAST_BUDGET_SECONDS:
+        """Drops expensive models and shrinks the search on a tight budget."""
+        if not context.spec.fast_budget:
             return candidates
+        search = context.spec.effective_search()
+        decisions.append(
+            experiments.Decision(
+                "reduce_search_complexity",
+                Action.INCLUDE,
+                f"time budget < {FAST_BUDGET_SECONDS}s: tune at most "
+                f"{search.top_models} model(s) with "
+                f"{search.configs_per_model} config(s) each and try strategies "
+                f"on at most {context.spec.effective_strategies().top_models} "
+                "model(s)",
+            )
+        )
         kept = []
         for adapter in candidates:
             expensive = adapter.capabilities.cost >= 3
@@ -165,6 +177,93 @@ class FastBudgetRule(PlanningRule):
             else:
                 kept.append(adapter)
         return kept
+
+
+class SerializableRule(PlanningRule):
+    """Rejects models that cannot be persisted in a bundle."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Drops adapters whose models are not serializable."""
+        kept = []
+        for adapter in candidates:
+            if adapter.capabilities.serializable:
+                kept.append(adapter)
+            else:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name,
+                        Action.REJECT,
+                        "model cannot be serialized into a bundle",
+                    )
+                )
+        return kept
+
+
+class HighCardinalityRule(PlanningRule):
+    """Plans for categorical features with many levels.
+
+    Native-categorical models are searched first, and regularized target
+    encoding is evaluated as a data strategy; neither is assumed to help.
+    """
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Prefers native-categorical models when such features exist."""
+        wide = context.profile.feature_plan.high_cardinality
+        if not wide:
+            return candidates
+        native = [
+            a
+            for a in candidates
+            if a.capabilities.native_categorical
+            and a.categorical_params([0])
+            and a.family != "baseline"
+        ]
+        if native:
+            decisions.append(
+                experiments.Decision(
+                    "native_categorical_boosting",
+                    Action.INCLUDE,
+                    f"{len(wide)} high-cardinality categorical feature(s) "
+                    f"({', '.join(wide)}); searched first: "
+                    + ", ".join(a.name for a in native),
+                )
+            )
+        else:
+            decisions.append(
+                experiments.Decision(
+                    "native_categorical_boosting",
+                    Action.DEFER,
+                    "no compatible model handles categoricals natively",
+                )
+            )
+        strategies_spec = context.spec.effective_strategies()
+        enabled = (
+            "target_encoding" in strategies_spec.names
+            and strategies_spec.top_models > 0
+        )
+        decisions.append(
+            experiments.Decision(
+                "regularized_target_encoding",
+                Action.INCLUDE if enabled else Action.DEFER,
+                "evaluated as the 'target_encoding' strategy on the original "
+                "validation folds"
+                if enabled
+                else "strategy search disabled or 'target_encoding' not listed",
+            )
+        )
+        baselines = [a for a in candidates if a.family == "baseline"]
+        rest = [a for a in candidates if a not in baselines + native]
+        return baselines + native + rest
 
 
 class ApprovedModelsRule(PlanningRule):
@@ -257,7 +356,7 @@ class StrategyRule(PlanningRule):
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
         """Documents strategy applicability; leaves candidates unchanged."""
-        spec = context.spec.strategies
+        spec = context.spec.effective_strategies()
         for name in spec.names:
             strategy = strategies.get_strategy(name)
             reasons = {
@@ -302,7 +401,7 @@ class TuningRule(PlanningRule):
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
         """Documents the search decision; leaves candidates unchanged."""
-        search = context.spec.search
+        search = context.spec.effective_search()
         tunable = [a.name for a in candidates if a.search_space is not None]
         if search.top_models == 0 or not tunable:
             decisions.append(
@@ -362,8 +461,10 @@ def default_rules() -> tuple[PlanningRule, ...]:
     return (
         GpuRule(),
         MemoryRule(),
+        SerializableRule(),
         FastBudgetRule(),
         ApprovedModelsRule(),
+        HighCardinalityRule(),
         HistoryRule(),
         StrategyRule(),
         TuningRule(),

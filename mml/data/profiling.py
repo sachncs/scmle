@@ -347,6 +347,12 @@ class DatasetProfiler:
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
             dropped=dropped,
+            high_cardinality=tuple(
+                c
+                for c in features["categorical"]
+                if statistics[c]["n_unique"]
+                >= data_contracts.HIGH_CARDINALITY_LEVELS
+            ),
         )
         dataset_statistics = fingerprint.build_fingerprint(
             frame,

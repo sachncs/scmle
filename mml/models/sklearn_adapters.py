@@ -223,6 +223,11 @@ class HistGradientBoostingAdapter(SklearnAdapter):
     )
     classifier = ensemble.HistGradientBoostingClassifier
     regressor = ensemble.HistGradientBoostingRegressor
+
+    def categorical_params(self, indices: list[int]) -> dict[str, Any]:
+        """Marks the integer-coded columns as categorical."""
+        return {"categorical_features": list(indices)}
+
     search_space = search.SearchSpace(
         (
             search.FloatParameter("learning_rate", 0.02, 0.3, log=True),

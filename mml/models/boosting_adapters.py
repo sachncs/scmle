@@ -41,6 +41,7 @@ class LazyLibraryAdapter(models.ModelAdapter):
     classifier_name: ClassVar[str]
     regressor_name: ClassVar[str]
     fixed_params: ClassVar[types.MappingProxyType] = NO_PARAMS
+    fit_param_names: ClassVar[tuple[str, ...]] = ()
 
     def build(
         self,
@@ -71,12 +72,25 @@ class LazyLibraryAdapter(models.ModelAdapter):
             if task.is_classification
             else self.regressor_name
         )
+        given = dict(params or {})
+        fit_params = {
+            name: given.pop(name)
+            for name in self.fit_param_names
+            if name in given
+        }
         kwargs: dict[str, Any] = {
             **self.fixed_params,
             "random_state": seed,
-            **(params or {}),
+            **given,
         }
         estimator = getattr(module, class_name)(**kwargs)
+        if fit_params:
+            wrapper = (
+                wrappers.FitParamsClassifier
+                if task.is_classification
+                else wrappers.FitParamsRegressor
+            )
+            estimator = wrapper(estimator, fit_params)
         if task.is_classification and self.needs_integer_labels:
             return wrappers.LabelEncodedClassifier(estimator)
         if task.is_classification and self.flatten_predictions:
@@ -93,6 +107,7 @@ class LightGbmAdapter(LazyLibraryAdapter):
     requires = ("lightgbm",)
     classifier_name = "LGBMClassifier"
     regressor_name = "LGBMRegressor"
+    fit_param_names = ("categorical_feature",)
     capabilities = models.Capabilities(
         ALL_TASKS,
         sparse_input=True,
@@ -117,6 +132,10 @@ class LightGbmAdapter(LazyLibraryAdapter):
         )
     )
 
+    def categorical_params(self, indices: list[int]) -> dict[str, Any]:
+        """Marks the integer-coded columns as categorical."""
+        return {"categorical_feature": list(indices)}
+
 
 class XgboostAdapter(LazyLibraryAdapter):
     """XGBoost gradient boosting."""
@@ -132,7 +151,7 @@ class XgboostAdapter(LazyLibraryAdapter):
         ALL_TASKS,
         sparse_input=True,
         handles_missing=True,
-        native_categorical=True,
+        native_categorical=False,
         early_stopping=True,
         cost=3,
         memory_factor=2.5,
@@ -165,7 +184,7 @@ class CatBoostAdapter(LazyLibraryAdapter):
         ALL_TASKS,
         sparse_input=True,
         handles_missing=True,
-        native_categorical=True,
+        native_categorical=False,
         early_stopping=True,
         gpu=False,
         cost=4,

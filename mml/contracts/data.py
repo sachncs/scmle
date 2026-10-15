@@ -4,6 +4,8 @@ from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
+HIGH_CARDINALITY_LEVELS = 20
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DatasetManifest:
@@ -40,6 +42,12 @@ class FeaturePlan:
         numeric: Numeric feature columns.
         categorical: Categorical feature columns.
         dropped: Mapping of dropped column to the reason.
+        derived: Row-wise feature-graph nodes computed inside the pipeline.
+        series: Ordered (time-series) feature-graph nodes.
+        extra_inputs: Raw columns only the feature graph reads.
+        high_cardinality: Categorical features with many distinct levels
+            (`HIGH_CARDINALITY_LEVELS` or more), which one-hot encoding
+            handles poorly.
     """
 
     numeric: tuple[str, ...]
@@ -48,6 +56,7 @@ class FeaturePlan:
     derived: tuple[Any, ...] = ()
     series: tuple[Any, ...] = ()
     extra_inputs: tuple[str, ...] = ()
+    high_cardinality: tuple[str, ...] = ()
 
     @property
     def features(self) -> tuple[str, ...]:
@@ -91,6 +100,7 @@ class FeaturePlan:
             "derived": [n.model_dump(mode="json") for n in self.derived],
             "series": [n.model_dump(mode="json") for n in self.series],
             "extra_inputs": list(self.extra_inputs),
+            "high_cardinality": list(self.high_cardinality),
         }
 
 
@@ -141,8 +151,18 @@ class PreprocessingOptions:
         scale: Standardize numeric features.
         log_skewed: Log-transform strongly right-skewed numeric features.
         interactions: Add pairwise numeric interaction features.
+        impute: Impute missing numeric values (off for models that handle
+            missing values natively).
+        high_cardinality: How high-cardinality categorical features are
+            encoded: `onehot`, `target` (regularized, cross-fitted target
+            encoding) or `ordinal` (integer codes for native categorical
+            handling).
+        sparse: Emit sparse one-hot output (for sparse-capable models).
     """
 
     scale: bool = False
     log_skewed: bool = False
     interactions: bool = False
+    impute: bool = True
+    high_cardinality: str = "onehot"
+    sparse: bool = False

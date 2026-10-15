@@ -10,6 +10,9 @@ from typing import Self
 import pydantic
 
 CONFIG_VERSION = 1
+FAST_BUDGET_SECONDS = 300
+FAST_SEARCH_MODELS = 1
+FAST_SEARCH_CONFIGS = 3
 GRAPH_VERSION = 1
 
 
@@ -170,6 +173,7 @@ class StrategySpec(FrozenModel):
             "calibrated",
             "log_skewed",
             "interactions",
+            "target_encoding",
         ]
     )
     top_models: int = pydantic.Field(default=2, ge=0)
@@ -251,6 +255,36 @@ class ProjectSpec(FrozenModel):
                 "validation.embargo_rows requires data.time_column"
             )
         return self
+
+    @property
+    def fast_budget(self) -> bool:
+        """Whether the time budget is short enough to shrink the search."""
+        return self.resources.time_budget_seconds < FAST_BUDGET_SECONDS
+
+    def effective_search(self) -> SearchSpec:
+        """The search settings in force: reduced under a short budget."""
+        if not self.fast_budget:
+            return self.search
+        return self.search.model_copy(
+            update={
+                "top_models": min(self.search.top_models, FAST_SEARCH_MODELS),
+                "configs_per_model": min(
+                    self.search.configs_per_model, FAST_SEARCH_CONFIGS
+                ),
+            }
+        )
+
+    def effective_strategies(self) -> StrategySpec:
+        """The strategy settings in force: reduced under a short budget."""
+        if not self.fast_budget:
+            return self.strategies
+        return self.strategies.model_copy(
+            update={
+                "top_models": min(
+                    self.strategies.top_models, FAST_SEARCH_MODELS
+                )
+            }
+        )
 
     def canonical_json(self) -> str:
         """Returns a key-sorted, whitespace-free JSON rendering."""

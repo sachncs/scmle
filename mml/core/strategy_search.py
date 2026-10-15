@@ -69,7 +69,7 @@ class StrategySearch:
         Args:
             screened: Default-configuration trials from the screening phase.
         """
-        spec = self.context.spec.strategies
+        spec = self.context.spec.effective_strategies()
         if not spec.names or spec.top_models == 0:
             return
         registry = self.context.registry

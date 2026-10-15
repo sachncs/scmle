@@ -8,6 +8,7 @@ original validation distribution, so a technique is adopted only on evidence.
 
 import abc
 from collections.abc import Mapping
+import dataclasses
 import importlib
 import importlib.util
 from typing import Any
@@ -366,8 +367,8 @@ class FeatureStrategy(DataStrategy):
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
         """Builds the pipeline with the strategy's numeric steps."""
-        options = data_contracts.PreprocessingOptions(
-            scale=adapter.capabilities.needs_scaling,
+        options = dataclasses.replace(
+            preprocessing.default_options(plan, adapter),
             log_skewed=self.log_skewed,
             interactions=self.interactions,
         )
@@ -406,6 +407,50 @@ class LogSkewedStrategy(FeatureStrategy):
         if not skewed:
             return "no right-skewed non-negative numeric feature"
         return None
+
+
+class TargetEncodingStrategy(DataStrategy):
+    """Regularized, cross-fitted target encoding of high-cardinality columns.
+
+    Replaces one-hot encoding of categorical features with many levels by a
+    smoothed target encoding that is fitted inside each training fold, with
+    internal cross-fitting so no row sees its own label.
+    """
+
+    name = "target_encoding"
+    description = "regularized target encoding of high-cardinality categories"
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs at least one high-cardinality categorical feature."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        if not profile.feature_plan.high_cardinality:
+            return "no high-cardinality categorical feature"
+        return None
+
+    def build(
+        self,
+        plan: data_contracts.FeaturePlan,
+        adapter: models.ModelAdapter,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Builds the pipeline with target-encoded high-cardinality columns."""
+        options = dataclasses.replace(
+            preprocessing.default_options(plan, adapter),
+            high_cardinality="target",
+            sparse=False,
+        )
+        return preprocessing.build_pipeline(
+            plan, adapter, task, seed, params, options
+        )
 
 
 class InteractionStrategy(FeatureStrategy):
@@ -448,6 +493,7 @@ STRATEGIES: dict[str, DataStrategy] = {
         CalibrationStrategy(),
         LogSkewedStrategy(),
         InteractionStrategy(),
+        TargetEncodingStrategy(),
     )
 }
 EXPERIMENTAL = tuple(name for name in STRATEGIES if name != DEFAULT)

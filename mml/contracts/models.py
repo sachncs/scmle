@@ -41,7 +41,9 @@ class Capabilities:
         tasks: Supported task types.
         sparse_input: Accepts sparse matrices.
         probabilities: Provides `predict_proba` for classification.
-        native_categorical: Handles categorical features natively.
+        native_categorical: The pipeline can hand it high-cardinality
+            columns as integer codes marked categorical (the adapter
+            implements `categorical_params`).
         handles_missing: Handles missing values natively.
         early_stopping: Supports early stopping.
         needs_scaling: Benefits from standardized inputs.
@@ -110,6 +112,21 @@ class ModelAdapter(abc.ABC):
         Returns:
             A fresh estimator.
         """
+
+    def categorical_params(self, indices: list[int]) -> Mapping[str, Any]:
+        """Estimator parameters that mark columns as native categoricals.
+
+        Adapters declaring `native_categorical` override this; the pipeline
+        then feeds high-cardinality columns as integer codes and passes
+        their positions here instead of one-hot encoding them.
+
+        Args:
+            indices: Positions of the categorical columns in the matrix.
+
+        Returns:
+            Parameter overrides, empty if the adapter cannot use them.
+        """
+        return {}
 
     def is_available(self) -> bool:
         """Whether every required module is importable (checked lazily)."""

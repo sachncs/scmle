@@ -1,10 +1,13 @@
 """Shared contract checks every model adapter must pass."""
 
+import io
 import random
 from typing import Any
 
+import joblib
 import numpy as np
 import pandas as pd
+from scipy import sparse
 
 from mml.contracts import errors
 from mml.contracts import models
@@ -44,6 +47,69 @@ def applied_value(params: dict[str, Any], key: str) -> Any:
         return params[key]
     nested = [v for k, v in params.items() if k.endswith(f"__{key}")]
     return nested[0] if nested else ABSENT
+
+
+def check_declared_capabilities(
+    adapter: models.ModelAdapter,
+    task: tasks.TaskType,
+    features: pd.DataFrame,
+    target: pd.Series,
+) -> None:
+    """Verifies the capabilities the pipeline relies on actually work.
+
+    The pipeline skips imputation for models declaring `handles_missing`,
+    emits sparse matrices for `sparse_input`, marks columns categorical for
+    `native_categorical` and persists with joblib for `serializable`, so each
+    declaration is exercised here.
+
+    Raises:
+        ConfigError: If a declared capability is not honoured.
+    """
+    name, caps = adapter.name, adapter.capabilities
+    if caps.handles_missing:
+        holes = features.copy()
+        holes.iloc[::7, 0] = np.nan
+        fitted = adapter.build(task, 0, adapter.conformance_params).fit(
+            holes, target
+        )
+        if len(np.asarray(fitted.predict(holes))) != len(holes):
+            raise errors.ConfigError(f"{name}: failed on missing values")
+    if caps.sparse_input:
+        matrix = sparse.csr_matrix(features.to_numpy())
+        fitted = adapter.build(task, 0, adapter.conformance_params).fit(
+            matrix, target
+        )
+        if len(np.asarray(fitted.predict(matrix))) != len(features):
+            raise errors.ConfigError(f"{name}: failed on sparse input")
+    if caps.native_categorical:
+        extra = adapter.categorical_params([0])
+        if not extra:
+            raise errors.ConfigError(
+                f"{name}: declares native_categorical but categorical_params "
+                "returns nothing"
+            )
+        codes = features.copy()
+        codes["a"] = np.arange(len(codes)) % 5
+        params = {**(adapter.conformance_params or {}), **extra}
+        fitted = adapter.build(task, 0, params).fit(codes, target)
+        if len(np.asarray(fitted.predict(codes))) != len(codes):
+            raise errors.ConfigError(f"{name}: failed with native categoricals")
+    if caps.serializable:
+        fitted = adapter.build(task, 0, adapter.conformance_params).fit(
+            features, target
+        )
+        buffer = io.BytesIO()
+        joblib.dump(fitted, buffer)
+        buffer.seek(0)
+        restored = joblib.load(buffer)
+        if not np.array_equal(
+            np.asarray(restored.predict(features)),
+            np.asarray(fitted.predict(features)),
+        ):
+            raise errors.ConfigError(
+                f"{name}: declares serializable but predictions changed "
+                "after a save / load round trip"
+            )
 
 
 def check_conformance(adapter: models.ModelAdapter) -> None:
@@ -91,6 +157,7 @@ def check_conformance(adapter: models.ModelAdapter) -> None:
                         f"{name}: search parameter '{key}' not applied by build"
                     )
             tuned.fit(features, target)
+        check_declared_capabilities(adapter, task, features, target)
         first = adapter.build(task, 7, adapter.conformance_params)
         second = adapter.build(task, 7, adapter.conformance_params)
         if first.get_params().keys() != second.get_params().keys():

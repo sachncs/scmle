@@ -243,13 +243,16 @@ class NumericKind(ColumnKind):
                     to_float, feature_names_out="one-to-one"
                 ),
             ),
-            (
-                "impute",
-                impute.SimpleImputer(
-                    strategy="median", keep_empty_features=True
-                ),
-            ),
         ]
+        if options.impute:
+            steps.append(
+                (
+                    "impute",
+                    impute.SimpleImputer(
+                        strategy="median", keep_empty_features=True
+                    ),
+                )
+            )
         if options.log_skewed:
             steps.append(("log", transformers.SkewedLogTransformer()))
         if options.scale:
@@ -327,6 +330,17 @@ class CategoricalKind(ColumnKind):
         self, options: data_contracts.PreprocessingOptions
     ) -> pipeline.Pipeline:
         """Casts to object, imputes a token, one-hot encodes."""
+        return self.encoded_with(
+            preprocessing.OneHotEncoder(
+                handle_unknown="infrequent_if_exist",
+                min_frequency=0.005,
+                max_categories=50,
+                sparse_output=options.sparse,
+            )
+        )
+
+    def encoded_with(self, encoder: Any) -> pipeline.Pipeline:
+        """Casts to object, imputes a missing token, then applies `encoder`."""
         return pipeline.Pipeline(
             [
                 (
@@ -341,17 +355,35 @@ class CategoricalKind(ColumnKind):
                         strategy="constant", fill_value=MISSING_TOKEN
                     ),
                 ),
-                (
-                    "onehot",
-                    preprocessing.OneHotEncoder(
-                        handle_unknown="infrequent_if_exist",
-                        min_frequency=0.005,
-                        max_categories=50,
-                        sparse_output=False,
-                    ),
-                ),
+                ("encode", encoder),
             ]
         )
+
+    def high_cardinality_transformer(
+        self, encoding: str, seed: int = 0
+    ) -> pipeline.Pipeline | None:
+        """Encoder for high-cardinality columns, or None for plain one-hot.
+
+        Args:
+            encoding: `target` (smoothed, cross-fitted target encoding, so
+                the encoding of a training row never sees its own label) or
+                `ordinal` (integer codes, unseen levels -1, for models that
+                treat the codes as categories natively).
+            seed: Random seed for the cross-fitting folds.
+        """
+        if encoding == "target":
+            return self.encoded_with(
+                preprocessing.TargetEncoder(
+                    smooth="auto", cv=5, random_state=seed
+                )
+            )
+        if encoding == "ordinal":
+            return self.encoded_with(
+                preprocessing.OrdinalEncoder(
+                    handle_unknown="use_encoded_value", unknown_value=-1
+                )
+            )
+        return None
 
     def association(
         self, series: pd.Series, target: pd.Series, task: tasks.TaskType
