@@ -1,56 +1,81 @@
 """Typed run result."""
 
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from pathlib import Path
+import dataclasses
+import pathlib
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from mml.artifacts.bundle import ModelBundle
-from mml.contracts.data import DatasetProfile
-from mml.contracts.experiments import ExperimentPlan, TrialResult
+from mml.artifacts import bundle as bundle_module
+from mml.contracts import data as data_contracts
+from mml.contracts import experiments
 
 
-@dataclass
+@dataclasses.dataclass(slots=True)
 class RunResult:
+    """Everything a completed run produced.
+
+    Attributes:
+        run_id: Run identifier.
+        run_dir: Directory holding all artifacts.
+        state: Terminal state name.
+        plan: The executed plan.
+        profile: Dataset profile.
+        trials: All trials in execution order.
+        selected_model: Winning model name.
+        evaluation: Final evaluation record (also saved as JSON).
+        bundle: The packaged inference pipeline.
+    """
+
     run_id: str
-    run_dir: Path
+    run_dir: pathlib.Path
     state: str
-    plan: ExperimentPlan
-    profile: DatasetProfile
-    trials: list[TrialResult]
+    plan: experiments.ExperimentPlan
+    profile: data_contracts.DatasetProfile
+    trials: list[experiments.TrialResult]
     selected_model: str
-    evaluation: dict
-    bundle: ModelBundle
-    decision_log: list[dict] = field(default_factory=list)
+    evaluation: dict[str, Any]
+    bundle: bundle_module.ModelBundle
 
     def leaderboard(self) -> pd.DataFrame:
-        rows = [t.to_dict() for t in self.trials]
-        df = pd.DataFrame(rows).drop(columns=["fold_scores"])
-        df["selected"] = df["model_name"] == self.selected_model
-        gib = self.evaluation["metric_greater_is_better"]
-        ok = df["status"] == "ok"
-        ranked = df[ok].sort_values("score_mean", ascending=not gib)
-        return pd.concat([ranked, df[~ok]]).reset_index(drop=True)
+        """Returns trials ranked best-first, failed/skipped trials last."""
+        board = pd.DataFrame([t.to_dict() for t in self.trials])
+        board = board.drop(columns=["fold_scores"])
+        board["selected"] = board["model_name"] == self.selected_model
+        succeeded = board["status"] == str(experiments.TrialStatus.OK)
+        ranked = board[succeeded].sort_values(
+            "score_mean", ascending=not self.evaluation["metric_greater_is_better"]
+        )
+        return pd.concat([ranked, board[~succeeded]]).reset_index(drop=True)
 
-    def load_best_model(self) -> ModelBundle:
+    def load_best_model(self) -> bundle_module.ModelBundle:
+        """Returns the packaged best model."""
         return self.bundle
 
-    def save(self, directory: str | Path) -> Path:
+    def save(self, directory: str | pathlib.Path) -> pathlib.Path:
+        """Exports the model bundle to `directory`."""
         return self.bundle.save(directory)
 
-    def predict(self, data: str | Path | pd.DataFrame) -> np.ndarray:
+    def predict(self, data: str | pathlib.Path | pd.DataFrame) -> np.ndarray:
+        """Predicts with the best model."""
         return self.bundle.predict(data)
 
-    def predict_proba(self, data: str | Path | pd.DataFrame) -> np.ndarray:
+    def predict_proba(
+        self, data: str | pathlib.Path | pd.DataFrame
+    ) -> np.ndarray:
+        """Predicts class probabilities with the best model."""
         return self.bundle.predict_proba(data)
 
     def summary(self) -> str:
-        e = self.evaluation
-        test = ", ".join(f"{k}={v:.4f}" for k, v in e["test_metrics"].items())
+        """Returns a one-line human-readable result."""
+        evaluation = self.evaluation
+        test = ", ".join(
+            f"{name}={value:.4f}"
+            for name, value in evaluation["test_metrics"].items()
+        )
         return (
             f"{self.run_id}: selected {self.selected_model} "
-            f"(cv {e['metric']}={e['selected_cv_score']:.4f}); test: {test}"
+            f"(cv {evaluation['metric']}="
+            f"{evaluation['selected_cv_score']:.4f}); test: {test}"
         )
