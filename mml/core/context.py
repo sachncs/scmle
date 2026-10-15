@@ -175,9 +175,20 @@ class RunContext:
             self.store.write_json(relative, payload)
 
     def emit(
-        self, kind: str, reason: str = "", artifacts: tuple[str, ...] = ()
+        self,
+        kind: str,
+        reason: str = "",
+        artifacts: tuple[str, ...] = (),
+        data: dict[str, Any] | None = None,
     ) -> None:
-        """Records an event if the run is persisted."""
+        """Records an event if the run is persisted.
+
+        Args:
+            kind: Dotted event type.
+            reason: Why it happened.
+            artifacts: Run-relative artifact paths it refers to.
+            data: Structured payload (for example hashes and counts).
+        """
         if self.log is not None and self.store is not None:
             self.log.emit(
                 events.Event(
@@ -186,6 +197,7 @@ class RunContext:
                     reason,
                     self.spec.config_hash(),
                     artifacts,
+                    data or {},
                 )
             )
 

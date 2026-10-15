@@ -16,6 +16,7 @@ import pandas as pd
 
 from mml.api import results
 from mml.artifacts import bundle as bundle_module
+from mml.artifacts import ledger
 from mml.artifacts import report
 from mml.contracts import errors
 from mml.contracts import experiments
@@ -127,6 +128,16 @@ class ProfileStage(Stage):
             )
         context.profile = profile
         context.write_json("dataset_profile.json", profile.to_dict())
+        context.emit(
+            "features.selected",
+            "feature set and exclusions fixed from the profile",
+            ("dataset_profile.json",),
+            {
+                "numeric": list(profile.feature_plan.numeric),
+                "categorical": list(profile.feature_plan.categorical),
+                "dropped": dict(profile.feature_plan.dropped),
+            },
+        )
         context.track(
             fingerprint=knowledge.fingerprint(profile, task), task=task.value
         )
@@ -173,6 +184,18 @@ class PlanStage(Stage):
         context.split = split
         context.write_json("validation_manifest.json", split.manifest.to_dict())
         context.track(split_fingerprint=split.manifest.fingerprint)
+        context.emit(
+            "split.created",
+            f"{split.manifest.strategy} split",
+            ("validation_manifest.json",),
+            {
+                "fingerprint": split.manifest.fingerprint,
+                "strategy": split.manifest.strategy,
+                "development_rows": len(split.manifest.train_ids),
+                "test_rows": len(split.manifest.test_ids),
+                "notes": list(split.manifest.notes),
+            },
+        )
         plan = build_plan(context)
         context.plan = plan
         context.write_json("execution_plan.json", plan.to_dict())
@@ -238,6 +261,20 @@ class SelectStage(Stage):
         """Names the policy."""
         return context.policy.description
 
+    def announce(self, context: context_module.RunContext) -> None:
+        """Audits that the selection is frozen before the test set opens."""
+        selected = require(context.selected, "selected")
+        context.emit(
+            "selection.frozen",
+            f"{selected.model_name}/{selected.strategy}",
+            (f"trials/{selected.trial_id}.json",),
+            {
+                "trial_id": selected.trial_id,
+                "params": selected.params,
+                "cv_score": selected.score_mean,
+            },
+        )
+
     def limits(
         self, context: context_module.RunContext
     ) -> resources.ResourceLimits:
@@ -262,6 +299,7 @@ class SelectStage(Stage):
         limits = self.limits(context)
         if not limits.active:
             context.selected = ranked[0]
+            self.announce(context)
             return
         split = require(context.split, "split")
         task = require(context.task, "task")
@@ -292,6 +330,7 @@ class SelectStage(Stage):
             )
             context.refits[trial.trial_id] = candidate
             context.selected = trial
+            self.announce(context)
             return
         raise errors.BlockedError(
             f"none of the top {len(checked)} candidates satisfies the "
@@ -405,6 +444,14 @@ class FinalEvaluationStage(Stage):
         pipeline, decision = choose_decision_threshold(context, pipeline)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
+        context.emit(
+            "test.opened",
+            "locked test set released once, after selection was frozen",
+            data={
+                "rows": len(test_features),
+                "fingerprint": split.manifest.fingerprint,
+            },
+        )
         baseline = next(
             (
                 t
@@ -516,6 +563,15 @@ class PackageStage(Stage):
             ),
         )
         bundle.save(store.path("model"))
+        store.write_json(
+            "diagnostics/data_access.json",
+            ledger.build_ledger(
+                split,
+                context.trials,
+                int(split.locked_test.opened),
+                evaluation["decision"] is not None,
+            ),
+        )
         store.write_json(
             "diagnostics/decision_log.json",
             {
