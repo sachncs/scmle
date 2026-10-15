@@ -11,6 +11,7 @@ from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data import columns
+from mml.data import fingerprint
 
 LEAK_ASSOCIATION = 0.98
 MISSINGNESS_LEAK = 0.9
@@ -217,6 +218,12 @@ class DatasetProfiler:
                 )
         return statistics, dropped, features, quality
 
+    def duplicate_count(self, frame: pd.DataFrame) -> int:
+        """Counts rows duplicated apart from their identifier columns."""
+        data = self.spec.data
+        deduplicated = frame.drop(columns=list(data.id_columns))
+        return int(deduplicated.duplicated().sum())
+
     def duplicate_findings(
         self,
         frame: pd.DataFrame,
@@ -225,8 +232,7 @@ class DatasetProfiler:
     ) -> list[str]:
         """Reports duplicate rows and, for classification, label conflicts."""
         data = self.spec.data
-        deduplicated = frame.drop(columns=list(data.id_columns))
-        duplicates = int(deduplicated.duplicated().sum())
+        duplicates = self.duplicate_count(frame)
         if not duplicates:
             return []
         findings = [f"{duplicates} duplicate rows"]
@@ -280,6 +286,7 @@ class DatasetProfiler:
         frame: pd.DataFrame,
         manifest: data_contracts.DatasetManifest,
         task: tasks.TaskType,
+        read_seconds: float = 0.0,
     ) -> data_contracts.DatasetProfile:
         """Profiles the dataset.
 
@@ -287,6 +294,7 @@ class DatasetProfiler:
             frame: The ingested dataset.
             manifest: Its identity.
             task: Resolved task type.
+            read_seconds: Time spent reading the data (operational cost).
 
         Returns:
             The profile including the resulting feature plan.
@@ -314,15 +322,27 @@ class DatasetProfiler:
         quality += self.duplicate_findings(frame, usable, task)
         risks = self.leakage_findings(frame, statistics, usable, task)
         target_summary, target_risks = summarize_target(target, task)
+        feature_plan = data_contracts.FeaturePlan(
+            numeric=tuple(features["numeric"]),
+            categorical=tuple(features["categorical"]),
+            dropped=dropped,
+        )
+        dataset_statistics = fingerprint.build_fingerprint(
+            frame,
+            self.spec,
+            task,
+            feature_plan,
+            statistics,
+            self.duplicate_count(frame),
+            read_seconds,
+            len(risks),
+        )
         return data_contracts.DatasetProfile(
             manifest=manifest,
             column_statistics=statistics,
             quality_findings=tuple(quality),
             risk_findings=tuple(risks + target_risks),
             target_summary=target_summary,
-            feature_plan=data_contracts.FeaturePlan(
-                numeric=tuple(features["numeric"]),
-                categorical=tuple(features["categorical"]),
-                dropped=dropped,
-            ),
+            feature_plan=feature_plan,
+            dataset_statistics=dataset_statistics,
         )

@@ -72,10 +72,12 @@ class IngestStage(Stage):
     def execute(self, context: context_module.RunContext) -> None:
         """Loads data (copying in-memory input) and builds the manifest."""
         data = context.spec.data
+        started = time.monotonic()
         if context.input_frame is not None:
             frame = context.input_frame.copy()
         else:
             frame = readers.read_table(data.uri)
+        context.read_seconds = time.monotonic() - started
         context.manifest = readers.build_manifest(frame, data.target, data.uri)
         frame, infinite = readers.replace_infinities(frame)
         context.cleaning_notes = [
@@ -112,7 +114,10 @@ class ProfileStage(Stage):
         context.task = task
         context.metric = context.catalog.resolve(spec.metric, task)
         profile = profiling.DatasetProfiler(spec).profile(
-            frame, require(context.manifest, "manifest"), task
+            frame,
+            require(context.manifest, "manifest"),
+            task,
+            context.read_seconds,
         )
         if context.cleaning_notes:
             profile = dataclasses.replace(
