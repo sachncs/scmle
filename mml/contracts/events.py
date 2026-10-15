@@ -1,5 +1,6 @@
 """Event contract and the append-only event log."""
 
+from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 import datetime
@@ -51,6 +52,15 @@ class EventLog:
         """
         self.path = path
         self.events: list[Event] = []
+        self.listeners: list[Callable[[Event], None]] = []
+
+    def subscribe(self, listener: Callable[[Event], None]) -> None:
+        """Registers a callback invoked for every emitted event.
+
+        Args:
+            listener: Function receiving each event after it is recorded.
+        """
+        self.listeners.append(listener)
 
     def emit(self, event: Event) -> None:
         """Records an event.
@@ -62,6 +72,8 @@ class EventLog:
         if self.path is not None:
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(event.to_json() + "\n")
+        for listener in self.listeners:
+            listener(event)
 
     def kinds(self) -> Sequence[str]:
         """Returns the kinds of all recorded events, in order."""

@@ -50,7 +50,11 @@ class StateMachine:
     """Tracks the current run state and records every transition."""
 
     def __init__(
-        self, run_id: str, log: events.EventLog, config_hash: str = ""
+        self,
+        run_id: str,
+        log: events.EventLog,
+        config_hash: str = "",
+        reason: str = "run created",
     ) -> None:
         """Initializes the machine in `CREATED` and emits the first event.
 
@@ -58,12 +62,13 @@ class StateMachine:
             run_id: Identifier attached to every event.
             log: Destination for transition events.
             config_hash: Configuration hash attached to every event.
+            reason: Why the machine was created (for example a resume).
         """
         self.run_id = run_id
         self.log = log
         self.config_hash = config_hash
         self.state = RunState.CREATED
-        self.emit(self.state, "run created")
+        self.emit(self.state, reason)
 
     def emit(
         self,

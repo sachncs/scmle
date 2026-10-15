@@ -83,6 +83,25 @@ class ExperimentPlan:
         lines += [f"  WARNING: {warning}" for warning in self.warnings]
         return "\n".join(lines)
 
+    @classmethod
+    def from_dict(cls, record: dict[str, Any]) -> ExperimentPlan:
+        """Rebuilds a plan from `to_dict` output."""
+        return cls(
+            plan_id=record["plan_id"],
+            task=record["task"],
+            metric=record["metric"],
+            validation_strategy=record["validation_strategy"],
+            candidate_models=tuple(record["candidate_models"]),
+            optimization_budget_seconds=record["optimization_budget_seconds"],
+            decisions=tuple(
+                Decision(
+                    d["technique"], DecisionAction(d["action"]), d["reason"]
+                )
+                for d in record["decisions"]
+            ),
+            warnings=tuple(record["warnings"]),
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
         return {

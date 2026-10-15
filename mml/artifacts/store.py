@@ -41,6 +41,24 @@ class RunStore:
             except FileExistsError:
                 number += 1
 
+    @classmethod
+    def open(cls, directory: str | pathlib.Path) -> RunStore:
+        """Opens an existing run directory (for resume).
+
+        Args:
+            directory: A directory previously created by `create`.
+
+        Returns:
+            A store over it.
+
+        Raises:
+            FileNotFoundError: If the directory does not exist.
+        """
+        path = pathlib.Path(directory)
+        if not path.is_dir():
+            raise FileNotFoundError(f"run directory not found: {path}")
+        return cls(path.name, path)
+
     def path(self, relative: str) -> pathlib.Path:
         """Returns an absolute path inside the run directory."""
         return self.directory / relative
