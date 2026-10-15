@@ -18,11 +18,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-boosting = ["lightgbm", "xgboost", "catboost"]
+boosting = ["lightgbm", "xgboost"]
+catboost = ["catboost"]  # needs a CPython 3.14 wheel; build from source otherwise
 optimization = ["optuna"]
 tracking = ["mlflow"]
 distributed = ["ray"]
-all = ["magicml[boosting,optimization,tracking,distributed]"]
+all = ["magicml[boosting,catboost,optimization,tracking,distributed]"]
 
 [project.scripts]
 magicml = "mml.cli:main"

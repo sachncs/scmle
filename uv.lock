@@ -1026,9 +1026,11 @@ all = [
     { name = "xgboost" },
 ]
 boosting = [
-    { name = "catboost" },
     { name = "lightgbm" },
     { name = "xgboost" },
+]
+catboost = [
+    { name = "catboost" },
 ]
 distributed = [
     { name = "ray" },
@@ -1051,10 +1053,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "catboost", marker = "extra == 'boosting'" },
+    { name = "catboost", marker = "extra == 'catboost'" },
     { name = "joblib", specifier = ">=1.3" },
     { name = "lightgbm", marker = "extra == 'boosting'" },
-    { name = "magicml", extras = ["boosting", "optimization", "tracking", "distributed"], marker = "extra == 'all'" },
+    { name = "magicml", extras = ["boosting", "catboost", "optimization", "tracking", "distributed"], marker = "extra == 'all'" },
     { name = "mlflow", marker = "extra == 'tracking'" },
     { name = "optuna", marker = "extra == 'optimization'" },
     { name = "pandas", specifier = ">=2.2" },
@@ -1064,7 +1066,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.4" },
     { name = "xgboost", marker = "extra == 'boosting'" },
 ]
-provides-extras = ["boosting", "optimization", "tracking", "distributed", "all"]
+provides-extras = ["boosting", "catboost", "optimization", "tracking", "distributed", "all"]
 
 [package.metadata.requires-dev]
 dev = [
