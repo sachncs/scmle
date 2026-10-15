@@ -22,6 +22,8 @@ import sklearn
 import mml
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
+from mml.contracts import tasks
+from mml.data import feature_graph
 from mml.data import interchange
 from mml.data import readers
 from mml.monitoring import reference as reference_module
@@ -177,6 +179,14 @@ class BundleSchema:
         dtypes: Training dtype per feature.
         known_categories: Categories seen in training per categorical column.
         classes: Class labels for classification, else None.
+        extra_inputs: Raw columns the caller must supply because the feature
+            graph reads them, although the model does not use them directly.
+        series: Ordered (time-series) feature nodes recomputed on the input
+            batch at inference, as plain dictionaries.
+        series_columns: Columns those nodes produce that the pipeline reads.
+        graph_fingerprint: Hash of the feature graph, empty without one.
+        group_column: Entity column the series nodes group by, if any.
+        time_column: Column ordering the rows for series nodes, if any.
     """
 
     target: str
@@ -186,11 +196,24 @@ class BundleSchema:
     dtypes: dict[str, str]
     known_categories: dict[str, list[str]]
     classes: tuple[Any, ...] | None
+    extra_inputs: tuple[str, ...] = ()
+    series: tuple[dict[str, Any], ...] = ()
+    series_columns: tuple[str, ...] = ()
+    graph_fingerprint: str = ""
+    group_column: str | None = None
+    time_column: str | None = None
 
     @property
     def features(self) -> list[str]:
-        """All feature columns, numeric first."""
-        return list(self.numeric + self.categorical)
+        """Columns the caller must supply: model features, then graph inputs."""
+        return list(
+            dict.fromkeys(self.numeric + self.categorical + self.extra_inputs)
+        )
+
+    @property
+    def pipeline_columns(self) -> list[str]:
+        """Columns the fitted pipeline reads (supplied plus computed series)."""
+        return list(dict.fromkeys([*self.features, *self.series_columns]))
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -198,6 +221,9 @@ class BundleSchema:
         record["numeric"] = list(self.numeric)
         record["categorical"] = list(self.categorical)
         record["classes"] = None if self.classes is None else list(self.classes)
+        record["extra_inputs"] = list(self.extra_inputs)
+        record["series"] = list(self.series)
+        record["series_columns"] = list(self.series_columns)
         return record
 
     @classmethod
@@ -212,6 +238,12 @@ class BundleSchema:
             dtypes=record["dtypes"],
             known_categories=record["known_categories"],
             classes=None if classes is None else tuple(classes),
+            extra_inputs=tuple(record.get("extra_inputs", ())),
+            series=tuple(record.get("series", ())),
+            series_columns=tuple(record.get("series_columns", ())),
+            graph_fingerprint=record.get("graph_fingerprint", ""),
+            group_column=record.get("group_column"),
+            time_column=record.get("time_column"),
         )
 
 
@@ -324,6 +356,9 @@ class ModelBundle:
         strategy: str = "default",
         decision_threshold: float | None = None,
         reference: reference_module.ReferenceProfile | None = None,
+        graph_fingerprint: str = "",
+        group_column: str | None = None,
+        time_column: str | None = None,
     ) -> ModelBundle:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -340,27 +375,50 @@ class ModelBundle:
             strategy: Data strategy of the selected candidate.
             decision_threshold: Optimized binary decision threshold, if any.
             reference: Training-time distributions for monitoring.
+            graph_fingerprint: Hash of the feature graph, if one was used.
+            group_column: Entity column for series features.
+            time_column: Ordering column for series features.
 
         Returns:
             The bundle.
         """
+        computed = plan.derived_names
+        series_names = {n.name for n in plan.series}
+        numeric = tuple(c for c in plan.numeric if c not in computed)
+        categorical = tuple(c for c in plan.categorical if c not in computed)
+        extra = tuple(
+            c
+            for c in plan.extra_inputs
+            if c not in computed and c not in numeric + categorical
+        )
+        series_columns = tuple(
+            c for c in (*plan.features, *plan.extra_inputs) if c in series_names
+        )
         known = {
             column: sorted(map(str, dev_features[column].dropna().unique()))[
                 :MAX_KNOWN_CATEGORIES
             ]
-            for column in plan.categorical
+            for column in categorical
         }
         classes = getattr(pipeline, "classes_", None)
         schema = BundleSchema(
             target=target,
             task=task,
-            numeric=plan.numeric,
-            categorical=plan.categorical,
-            dtypes={c: str(dev_features[c].dtype) for c in plan.features},
+            numeric=numeric,
+            categorical=categorical,
+            dtypes={
+                c: str(dev_features[c].dtype) for c in (*numeric, *categorical)
+            },
             known_categories=known,
             classes=None
             if classes is None
             else tuple(np.asarray(classes).tolist()),
+            extra_inputs=extra,
+            series=tuple(n.model_dump(mode="json") for n in plan.series),
+            series_columns=series_columns,
+            graph_fingerprint=graph_fingerprint,
+            group_column=group_column,
+            time_column=time_column,
         )
         info = BundleInfo(
             model_name,
@@ -591,7 +649,13 @@ class ModelBundle:
                 f"non-numeric values in numeric columns: {bad}",
                 {"columns": bad},
             )
-        return frame[self.features]
+        if self.schema.series:
+            frame = feature_graph.SeriesFeatureBuilder(
+                [tasks.FeatureNode(**node) for node in self.schema.series],
+                self.schema.group_column,
+                self.schema.time_column,
+            ).apply(frame)
+        return frame[self.schema.pipeline_columns]
 
     def predict(
         self,

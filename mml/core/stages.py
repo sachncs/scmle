@@ -18,6 +18,7 @@ from mml.api import results
 from mml.artifacts import bundle as bundle_module
 from mml.artifacts import ledger
 from mml.artifacts import report
+from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import tasks
@@ -27,6 +28,7 @@ from mml.core import state as run_state
 from mml.core import strategy_search
 from mml.core import trials
 from mml.core import tuning
+from mml.data import feature_graph
 from mml.data import profiling
 from mml.data import readers
 from mml.data import splitting
@@ -85,6 +87,21 @@ class IngestStage(Stage):
             f"column '{name}': {count} infinite value(s) treated as missing"
             for name, count in infinite.items()
         ]
+        graph = context.spec.feature_graph
+        if graph.nodes:
+            feature_graph.validate_graph(graph, set(frame.columns), data)
+            ordered = feature_graph.split_nodes(graph)[0]
+            frame = feature_graph.SeriesFeatureBuilder(
+                ordered, data.group_column, data.time_column
+            ).apply(frame)
+            context.emit(
+                "features.graph",
+                f"feature graph v{graph.version} {graph.fingerprint()}",
+                data={
+                    "fingerprint": graph.fingerprint(),
+                    "nodes": [n.model_dump(mode="json") for n in graph.nodes],
+                },
+            )
         context.frame = frame
         context.write_json("dataset_manifest.json", context.manifest.to_dict())
         context.track(
@@ -120,6 +137,7 @@ class ProfileStage(Stage):
             task,
             context.read_seconds,
         )
+        profile = attach_feature_graph(spec, profile)
         if context.cleaning_notes:
             profile = dataclasses.replace(
                 profile,
@@ -147,6 +165,48 @@ class ProfileStage(Stage):
                 raise errors.BlockedError(
                     "unresolved leakage risk: " + "; ".join(leaks)
                 )
+
+
+def attach_feature_graph(
+    spec: tasks.ProjectSpec, profile: data_contracts.DatasetProfile
+) -> data_contracts.DatasetProfile:
+    """Adds the feature graph to the profile's feature plan.
+
+    Row-wise nodes become numeric model features computed inside the
+    pipeline; ordered nodes are already columns of the profiled frame. Raw
+    columns the graph reads but the model does not use are recorded as
+    `extra_inputs`, so inference knows what the caller must supply.
+
+    Args:
+        spec: Project specification.
+        profile: Profile whose plan lacks the graph.
+
+    Returns:
+        A profile whose feature plan carries the graph.
+    """
+    graph = spec.feature_graph
+    if not graph.nodes:
+        return profile
+    ordered, rowwise = feature_graph.split_nodes(graph)
+    plan = profile.feature_plan
+    computed = {n.name for n in graph.nodes}
+    needed = feature_graph.required_raw_inputs(graph.nodes, computed)
+    if ordered:
+        needed += [
+            c
+            for c in (spec.data.group_column, spec.data.time_column)
+            if c and c not in needed
+        ]
+    used = set(plan.features) | {n.name for n in rowwise}
+    extra = tuple(c for c in needed if c not in used)
+    new_plan = dataclasses.replace(
+        plan,
+        numeric=plan.numeric + tuple(n.name for n in rowwise),
+        derived=tuple(rowwise),
+        series=tuple(ordered),
+        extra_inputs=extra,
+    )
+    return dataclasses.replace(profile, feature_plan=new_plan)
 
 
 def build_plan(
@@ -554,6 +614,11 @@ class PackageStage(Stage):
             model_params=selected.params,
             strategy=selected.strategy,
             decision_threshold=(evaluation["decision"] or {}).get("threshold"),
+            graph_fingerprint=context.spec.feature_graph.fingerprint()
+            if context.spec.feature_graph.nodes
+            else "",
+            group_column=context.spec.data.group_column,
+            time_column=context.spec.data.time_column,
             reference=reference_module.ReferenceProfile.build(
                 split.dev_features,
                 profile.feature_plan,

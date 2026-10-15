@@ -47,6 +47,7 @@ class MLProject:
         search: tasks.SearchSpec | None = None,
         strategies: tasks.StrategySpec | None = None,
         ensemble: tasks.EnsembleSpec | None = None,
+        feature_graph: tasks.FeatureGraphSpec | None = None,
         selection: tasks.SelectionSpec | None = None,
         decision: tasks.DecisionSpec | None = None,
         leakage_policy: LeakagePolicy = "warn",
@@ -83,6 +84,8 @@ class MLProject:
             strategies: Which data strategies to evaluate; defaults to all.
                 Use `StrategySpec(top_models=0)` to disable.
             ensemble: Stacking settings; `EnsembleSpec(size=0)` disables.
+            feature_graph: Declarative derived features (row-wise, fitted and
+                time-series operations), versioned with the configuration.
             selection: Serving constraints (max model size, p95 latency).
             decision: Threshold optimization for binary tasks (objective
                 f1, accuracy, balanced_accuracy or an explicit cost).
@@ -124,6 +127,7 @@ class MLProject:
             search=search or tasks.SearchSpec(),
             strategies=strategies or tasks.StrategySpec(),
             ensemble=ensemble or tasks.EnsembleSpec(),
+            feature_graph=feature_graph or tasks.FeatureGraphSpec(),
             selection=selection or tasks.SelectionSpec(),
             decision=decision or tasks.DecisionSpec(),
             leakage_policy=leakage_policy,
