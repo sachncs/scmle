@@ -4,6 +4,7 @@ Concrete adapters only declare data (estimator classes, parameters,
 capabilities); construction logic lives once in `SklearnAdapter.build`.
 """
 
+from collections.abc import Mapping
 import inspect
 import types
 from typing import Any
@@ -16,6 +17,7 @@ from sklearn import tree
 
 from mml.contracts import errors
 from mml.contracts import models
+from mml.contracts import search
 from mml.contracts import tasks
 
 BINARY = tasks.TaskType.BINARY
@@ -33,15 +35,28 @@ class SklearnAdapter(models.ModelAdapter):
     Attributes:
         classifier: Estimator class used for classification tasks.
         regressor: Estimator class used for regression tasks.
-        params: Fixed constructor parameters.
+        fixed_params: Constructor parameters applied to every build.
     """
 
     classifier: ClassVar[type | None] = None
     regressor: ClassVar[type | None] = None
-    params: ClassVar[types.MappingProxyType] = NO_PARAMS
+    fixed_params: ClassVar[types.MappingProxyType] = NO_PARAMS
 
-    def build(self, task: tasks.TaskType, seed: int) -> models.Estimator:
+    def build(
+        self,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
         """Instantiates the class matching `task`, seeding it if supported.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides applied over `fixed_params`.
+
+        Returns:
+            An unfitted estimator.
 
         Raises:
             ConfigError: If the adapter declares no class for the task.
@@ -53,7 +68,7 @@ class SklearnAdapter(models.ModelAdapter):
             raise errors.ConfigError(
                 f"{self.name}: no estimator class for {task.value}"
             )
-        kwargs: dict[str, Any] = dict(self.params)
+        kwargs: dict[str, Any] = {**self.fixed_params, **(params or {})}
         if "random_state" in inspect.signature(estimator_class).parameters:
             kwargs["random_state"] = seed
         return estimator_class(**kwargs)
@@ -68,7 +83,12 @@ class DummyAdapter(models.ModelAdapter):
         ALL_TASKS, sparse_input=True, handles_missing=True
     )
 
-    def build(self, task: tasks.TaskType, seed: int) -> models.Estimator:
+    def build(
+        self,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
         """Returns a prior classifier or a mean regressor."""
         if task.is_classification:
             return dummy.DummyClassifier(strategy="prior")
@@ -84,7 +104,10 @@ class LogisticRegressionAdapter(SklearnAdapter):
         CLASSIFICATION, sparse_input=True, needs_scaling=True
     )
     classifier = linear_model.LogisticRegression
-    params = types.MappingProxyType({"max_iter": 1000})
+    fixed_params = types.MappingProxyType({"max_iter": 1000})
+    search_space = search.SearchSpace(
+        (search.FloatParameter("C", 1e-3, 1e2, log=True),)
+    )
 
 
 class RidgeAdapter(SklearnAdapter):
@@ -96,6 +119,9 @@ class RidgeAdapter(SklearnAdapter):
         REGRESSION_ONLY, sparse_input=True, needs_scaling=True
     )
     regressor = linear_model.Ridge
+    search_space = search.SearchSpace(
+        (search.FloatParameter("alpha", 1e-3, 1e3, log=True),)
+    )
 
 
 class ElasticNetAdapter(SklearnAdapter):
@@ -107,7 +133,13 @@ class ElasticNetAdapter(SklearnAdapter):
         REGRESSION_ONLY, sparse_input=True, needs_scaling=True, cost=2
     )
     regressor = linear_model.ElasticNet
-    params = types.MappingProxyType({"alpha": 0.1, "max_iter": 5000})
+    fixed_params = types.MappingProxyType({"alpha": 0.1, "max_iter": 5000})
+    search_space = search.SearchSpace(
+        (
+            search.FloatParameter("alpha", 1e-3, 10.0, log=True),
+            search.FloatParameter("l1_ratio", 0.05, 0.95),
+        )
+    )
 
 
 class DecisionTreeAdapter(SklearnAdapter):
@@ -118,6 +150,12 @@ class DecisionTreeAdapter(SklearnAdapter):
     capabilities = models.Capabilities(ALL_TASKS, handles_missing=True)
     classifier = tree.DecisionTreeClassifier
     regressor = tree.DecisionTreeRegressor
+    search_space = search.SearchSpace(
+        (
+            search.IntParameter("max_depth", 2, 20),
+            search.IntParameter("min_samples_leaf", 1, 30, log=True),
+        )
+    )
 
 
 class RandomForestAdapter(SklearnAdapter):
@@ -128,6 +166,14 @@ class RandomForestAdapter(SklearnAdapter):
     capabilities = models.Capabilities(ALL_TASKS, cost=3)
     classifier = ensemble.RandomForestClassifier
     regressor = ensemble.RandomForestRegressor
+    search_space = search.SearchSpace(
+        (
+            search.IntParameter("n_estimators", 50, 300),
+            search.IntParameter("max_depth", 3, 25),
+            search.IntParameter("min_samples_leaf", 1, 20, log=True),
+            search.ChoiceParameter("max_features", ("sqrt", 0.5, 1.0)),
+        )
+    )
 
 
 class ExtraTreesAdapter(SklearnAdapter):
@@ -138,6 +184,14 @@ class ExtraTreesAdapter(SklearnAdapter):
     capabilities = models.Capabilities(ALL_TASKS, cost=3)
     classifier = ensemble.ExtraTreesClassifier
     regressor = ensemble.ExtraTreesRegressor
+    search_space = search.SearchSpace(
+        (
+            search.IntParameter("n_estimators", 50, 300),
+            search.IntParameter("max_depth", 3, 25),
+            search.IntParameter("min_samples_leaf", 1, 20, log=True),
+            search.ChoiceParameter("max_features", ("sqrt", 0.5, 1.0)),
+        )
+    )
 
 
 class HistGradientBoostingAdapter(SklearnAdapter):
@@ -154,6 +208,14 @@ class HistGradientBoostingAdapter(SklearnAdapter):
     )
     classifier = ensemble.HistGradientBoostingClassifier
     regressor = ensemble.HistGradientBoostingRegressor
+    search_space = search.SearchSpace(
+        (
+            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
+            search.IntParameter("max_leaf_nodes", 8, 64),
+            search.IntParameter("min_samples_leaf", 5, 50),
+            search.FloatParameter("l2_regularization", 1e-4, 1.0, log=True),
+        )
+    )
 
 
 BUILTIN_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (

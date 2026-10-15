@@ -51,7 +51,7 @@ class ThirdPartyAdapter(models.ModelAdapter):
     family = "baseline"
     capabilities = models.Capabilities(frozenset({BINARY}))
 
-    def build(self, task, seed):
+    def build(self, task, seed, params=None):
         return dummy.DummyClassifier(strategy="prior")
 
 
@@ -108,7 +108,7 @@ def test_conformance_catches_bad_adapters():
     class Bad(ThirdPartyAdapter):
         name = "bad"
 
-        def build(self, task, seed):
+        def build(self, task, seed, params=None):
             return NoProba()
 
     with pytest.raises(errors.ConfigError, match="predict_proba"):

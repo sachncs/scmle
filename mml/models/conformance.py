@@ -1,5 +1,7 @@
 """Shared contract checks every model adapter must pass."""
 
+import random
+
 import numpy as np
 import pandas as pd
 
@@ -57,6 +59,17 @@ def check_conformance(adapter: models.ModelAdapter) -> None:
                 raise errors.ConfigError(
                     f"{name}: predict_proba rows must sum to 1"
                 )
+        space = adapter.search_space
+        if space is not None:
+            sampled = space.sample(random.Random(0))
+            tuned = adapter.build(task, 0, sampled)
+            applied = tuned.get_params()
+            for key, value in sampled.items():
+                if key not in applied or applied[key] != value:
+                    raise errors.ConfigError(
+                        f"{name}: search parameter '{key}' not applied by build"
+                    )
+            tuned.fit(features, target)
         first, second = adapter.build(task, 7), adapter.build(task, 7)
         if first.get_params().keys() != second.get_params().keys():
             raise errors.ConfigError(f"{name}: build is not deterministic")

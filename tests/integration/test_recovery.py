@@ -27,7 +27,7 @@ class ExplodingAdapter(models.ModelAdapter):
     family = "test"
     capabilities = models.Capabilities(BINARY, cost=1)
 
-    def build(self, task, seed):
+    def build(self, task, seed, params=None):
         return ExplodingEstimator()
 
 
@@ -78,7 +78,7 @@ def test_cancellation_keeps_completed_trials(binary_frame, tmp_path):
     class CancellingAdapter(ExplodingAdapter):
         name = "canceller"
 
-        def build(self, task, seed):
+        def build(self, task, seed, params=None):
             return CancellingEstimator()
 
     project = project_with(CancellingAdapter(), binary_frame, tmp_path)

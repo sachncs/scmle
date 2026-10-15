@@ -6,12 +6,14 @@ instead of hard-coding library-specific conditions.
 """
 
 import abc
+from collections.abc import Mapping
 import dataclasses
 import importlib.util
 from typing import Any
 from typing import ClassVar
 from typing import Protocol
 
+from mml.contracts import search
 from mml.contracts import tasks
 
 
@@ -70,20 +72,28 @@ class ModelAdapter(abc.ABC):
         family: Coarse family used for reporting (linear, tree, ...).
         capabilities: Declared capabilities.
         requires: Importable modules needed at build time.
+        search_space: Tunable hyperparameters, or None if not tunable.
     """
 
     name: ClassVar[str]
     family: ClassVar[str]
     capabilities: ClassVar[Capabilities]
     requires: ClassVar[tuple[str, ...]] = ()
+    search_space: ClassVar[search.SearchSpace | None] = None
 
     @abc.abstractmethod
-    def build(self, task: tasks.TaskType, seed: int) -> Estimator:
+    def build(
+        self,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> Estimator:
         """Creates an unfitted estimator.
 
         Args:
             task: Resolved task type.
             seed: Random seed for deterministic behaviour.
+            params: Hyperparameter overrides from the search space.
 
         Returns:
             A fresh estimator.
