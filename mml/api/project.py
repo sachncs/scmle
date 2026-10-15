@@ -109,6 +109,7 @@ class MLProject:
         )
         self.output_dir = pathlib.Path(output_dir)
         self.orchestrator = orchestrator_module.Orchestrator(self.spec, frame)
+        self.orchestrator.tracking_path = self.output_dir / "experiments.sqlite"
         self.profile: data_contracts.DatasetProfile | None = None
 
     def plan(self) -> experiments.ExperimentPlan:

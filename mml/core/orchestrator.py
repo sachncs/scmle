@@ -70,6 +70,7 @@ class Orchestrator:
         self.policy = policy or selection.BestMeanPolicy()
         self.stages = stages or stages_module.default_stages()
         self.tracker = tracker
+        self.tracking_path: pathlib.Path | None = None
         self.cancel_event = threading.Event()
 
     def cancel(self) -> None:
@@ -105,6 +106,25 @@ class Orchestrator:
             approved_plan=approved_plan,
         )
 
+    def load_history(
+        self, tracker: tracking_stores.ExperimentStore | None
+    ) -> tuple[experiments.HistoricalRun, ...]:
+        """Reads past runs for meta-learning without creating a database.
+
+        Args:
+            tracker: The store to read, or None to look for an existing
+                database at `tracking_path`.
+
+        Returns:
+            Past runs, empty when no tracking database exists yet.
+        """
+        if tracker is None:
+            path = self.tracking_path
+            if path is None or not path.exists():
+                return ()
+            tracker = tracking_stores.SqliteExperimentStore(path)
+        return tuple(tracker.history())
+
     def prepare(
         self, approved: experiments.ExperimentPlan | None = None
     ) -> context_module.RunContext:
@@ -117,6 +137,7 @@ class Orchestrator:
             A context whose `profile` and `plan` are populated.
         """
         context = self.new_context(approved_plan=approved)
+        context.history = self.load_history(self.tracker)
         stages_module.IngestStage().execute(context)
         stages_module.ProfileStage().execute(context)
         context.plan = stages_module.build_plan(context)
@@ -254,6 +275,7 @@ class Orchestrator:
         )
         context = self.new_context(store=store, log=log, approved_plan=approved)
         context.tracker = tracker
+        context.history = self.load_history(tracker)
         context.checkpoints = checkpoints
         try:
             for stage in self.stages:

@@ -73,6 +73,7 @@ class RunContext:
         plan: Experiment plan.
         metric: Primary metric.
         trials: Trial results.
+        history: Past runs available for meta-learning.
         outcomes: Evidence-based decisions made while running (which
             strategies helped), appended to the planner's decision log.
         trial_counter: Number of trial identifiers handed out so far.
@@ -117,6 +118,7 @@ class RunContext:
     trials: list[experiments.TrialResult] = dataclasses.field(
         default_factory=list
     )
+    history: tuple[experiments.HistoricalRun, ...] = ()
     outcomes: list[experiments.Decision] = dataclasses.field(
         default_factory=list
     )

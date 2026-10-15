@@ -18,6 +18,7 @@ from mml.contracts import tasks
 from mml.data import splitting
 from mml.data import strategies
 from mml.evaluation import metrics
+from mml.intelligence import knowledge
 from mml.models import registry as registry_module
 
 FAST_BUDGET_SECONDS = 300
@@ -35,12 +36,14 @@ class PlanningContext:
         profile: Dataset profile.
         task: Resolved task type.
         approved_models: Models a human approved, or None for no restriction.
+        history: Past runs available for meta-learning.
     """
 
     spec: tasks.ProjectSpec
     profile: data_contracts.DatasetProfile
     task: tasks.TaskType
     approved_models: tuple[str, ...] | None = None
+    history: tuple[experiments.HistoricalRun, ...] = ()
 
 
 class PlanningRule(abc.ABC):
@@ -124,6 +127,57 @@ class ApprovedModelsRule(PlanningRule):
                     )
                 )
         return [a for a in candidates if a.name in approved]
+
+
+class HistoryRule(PlanningRule):
+    """Searches models that won on similar past datasets first.
+
+    Only the order changes; every candidate is still evaluated, and runs on
+    the same dataset are excluded from the evidence.
+    """
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Moves historically successful models ahead of the others."""
+        manifest = context.profile.manifest
+        learner = knowledge.MetaLearner(list(context.history))
+        recommendations = learner.recommend(
+            knowledge.fingerprint(context.profile, context.task),
+            context.task,
+            manifest.dataset_id,
+            manifest.data_hash,
+        )
+        weights = dict(recommendations)
+        baselines = [a for a in candidates if a.family == "baseline"]
+        preferred = sorted(
+            (a for a in candidates if a.name in weights and a not in baselines),
+            key=lambda a: -weights[a.name],
+        )
+        if not preferred:
+            decisions.append(
+                experiments.Decision(
+                    "meta_learning",
+                    Action.DEFER,
+                    "no comparable history on other datasets",
+                )
+            )
+            return candidates
+        rest = [a for a in candidates if a not in baselines + preferred]
+        decisions.append(
+            experiments.Decision(
+                "meta_learning",
+                Action.INCLUDE,
+                "searched first, from similar past datasets: "
+                + ", ".join(
+                    f"{a.name} ({weights[a.name]:.2f})" for a in preferred
+                ),
+            )
+        )
+        return baselines + preferred + rest
 
 
 class StrategyRule(PlanningRule):
@@ -241,6 +295,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
     return (
         FastBudgetRule(),
         ApprovedModelsRule(),
+        HistoryRule(),
         StrategyRule(),
         TuningRule(),
         EnsembleRule(),

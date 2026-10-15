@@ -29,6 +29,7 @@ from mml.data import splitting
 from mml.data import strategies
 from mml.evaluation import diagnostics
 from mml.evaluation import resources
+from mml.intelligence import knowledge
 from mml.intelligence import planner as planner_module
 from mml.models import thresholds
 
@@ -106,6 +107,9 @@ class ProfileStage(Stage):
         )
         context.profile = profile
         context.write_json("dataset_profile.json", profile.to_dict())
+        context.track(
+            fingerprint=knowledge.fingerprint(profile, task), task=task.value
+        )
         if spec.leakage_policy == "block":
             leaks = [r for r in profile.risk_findings if LEAKAGE_MARKER in r]
             if leaks:
@@ -126,6 +130,7 @@ def build_plan(
             require(context.profile, "profile"),
             require(context.task, "task"),
             approved.candidate_models if approved is not None else None,
+            context.history,
         )
     )
 
@@ -379,6 +384,7 @@ class FinalEvaluationStage(Stage):
             pipeline, test_features, test_target, task
         )
         context.track(
+            selected_strategy=selected.strategy,
             selected_model=selected.model_name,
             metric=metric.name,
             cv_score=selected.score_mean,
