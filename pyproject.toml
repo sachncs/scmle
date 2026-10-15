@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mlforge"
+version = "0.1.0.dev0"
+description = "Autonomous, leakage-safe ML lifecycle framework for tabular data"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "pydantic>=2.6",
+    "pandas>=2.2",
+    "pyarrow>=15",
+    "scikit-learn>=1.4",
+    "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+boosting = ["lightgbm", "xgboost", "catboost"]
+optimization = ["optuna"]
+tracking = ["mlflow"]
+distributed = ["ray"]
+all = ["mlforge[boosting,optimization,tracking,distributed]"]
+
+[project.scripts]
+mlforge = "mlforge.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.5", "mypy>=1.10", "pandas-stubs"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mlforge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::UserWarning", "ignore::FutureWarning"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.14"
+ignore_missing_imports = true
+check_untyped_defs = true
