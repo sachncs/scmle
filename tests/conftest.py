@@ -1,37 +1,54 @@
+"""Shared fixtures."""
+
 import numpy as np
 import pandas as pd
 import pytest
 
 
 @pytest.fixture
-def binary_df():
+def binary_frame():
     rng = np.random.default_rng(0)
-    n = 500
-    df = pd.DataFrame(
-        {"a": rng.normal(size=n), "b": rng.normal(size=n), "c": rng.choice(list("xyz"), n)}
+    rows = 500
+    frame = pd.DataFrame(
+        {
+            "a": rng.normal(size=rows),
+            "b": rng.normal(size=rows),
+            "c": rng.choice(list("xyz"), rows),
+        }
     )
-    df.loc[::13, "a"] = np.nan
-    df["y"] = (
-        (df.a.fillna(0) + 0.5 * df.b + (df.c == "x")) + rng.normal(scale=0.5, size=n) > 0.5
-    ).astype(int)
-    return df
+    frame.loc[::13, "a"] = np.nan
+    signal = frame.a.fillna(0) + 0.5 * frame.b + (frame.c == "x")
+    noise = rng.normal(scale=0.5, size=rows)
+    frame["y"] = (signal + noise > 0.5).astype(int)
+    return frame
 
 
 @pytest.fixture
-def multiclass_df():
+def multiclass_frame():
     rng = np.random.default_rng(1)
-    n = 600
-    df = pd.DataFrame({"a": rng.normal(size=n), "b": rng.normal(size=n)})
-    df["y"] = pd.cut(df.a + df.b, [-9, -0.7, 0.7, 9], labels=["lo", "mid", "hi"]).astype(str)
-    return df
+    rows = 600
+    frame = pd.DataFrame(
+        {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
+    )
+    frame["y"] = pd.cut(
+        frame.a + frame.b, [-9, -0.7, 0.7, 9], labels=["lo", "mid", "hi"]
+    ).astype(str)
+    return frame
 
 
 @pytest.fixture
-def regression_df():
+def regression_frame():
     rng = np.random.default_rng(2)
-    n = 500
-    df = pd.DataFrame(
-        {"a": rng.normal(size=n), "b": rng.normal(size=n), "c": rng.choice(list("pq"), n)}
+    rows = 500
+    frame = pd.DataFrame(
+        {
+            "a": rng.normal(size=rows),
+            "b": rng.normal(size=rows),
+            "c": rng.choice(list("pq"), rows),
+        }
     )
-    df["y"] = 3 * df.a - 2 * df.b + (df.c == "p") + rng.normal(scale=0.3, size=n)
-    return df
+    frame["y"] = (
+        3 * frame.a - 2 * frame.b + (frame.c == "p")
+        + rng.normal(scale=0.3, size=rows)
+    )
+    return frame
