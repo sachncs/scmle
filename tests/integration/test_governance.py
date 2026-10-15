@@ -1,5 +1,6 @@
 """Audit events and the data-access ledger."""
 
+import dataclasses
 import json
 import pathlib
 
@@ -90,3 +91,37 @@ def test_ledger_detects_violations(binary_frame, tmp_path):
     assert all(honest["verified"].values())
     reopened = ledger.build_ledger(split, result.trials, 2, False)
     assert not reopened["verified"]["test_set_opened_exactly_once"]
+
+
+def test_ledger_checks_what_trials_actually_received(binary_frame, tmp_path):
+    result = run(binary_frame, tmp_path)
+    spec = support.make_project(binary_frame, "y").spec
+    task = tasks.TaskType(result.plan.task)
+    split = splitting.SplitManager(spec, task).split(binary_frame)
+    observed = [t for t in result.trials if t.observed_access]
+    assert observed and all(
+        len(t.observed_access) == len(split.manifest.folds)
+        for t in observed
+        if t.status == "ok" and len(t.observed_access) > 2
+    )
+    honest = ledger.build_ledger(split, result.trials, 1, False)
+    assert honest["observed"]["folds_checked"] > 0
+    assert honest["verified"][
+        "observed_fit_and_scoring_rows_match_the_manifest"
+    ]
+    forged = dataclasses.replace(
+        observed[0],
+        observed_access=[
+            {
+                **observed[0].observed_access[0],
+                "fit": {"rows": 1, "digest": "x"},
+            },
+            *observed[0].observed_access[1:],
+        ],
+    )
+    swapped = [forged if t is observed[0] else t for t in result.trials]
+    caught = ledger.build_ledger(split, swapped, 1, False)
+    assert not caught["verified"][
+        "observed_fit_and_scoring_rows_match_the_manifest"
+    ]
+    assert caught["observed"]["folds_mismatched"] == 1

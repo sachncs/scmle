@@ -8,12 +8,13 @@ worker process depending on the execution backend.
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
+import hashlib
 import time
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn import model_selection
+from sklearn import base
 import threadpoolctl
 
 from mml.contracts import data as data_contracts
@@ -83,6 +84,13 @@ class TrialPayload:
     memory_gb: float | None = None
 
 
+def access_record(row_ids: pd.Index) -> dict[str, Any]:
+    """Row count and digest of the rows a fit or scoring call received."""
+    ordered = sorted(map(str, row_ids))
+    digest = hashlib.sha256("\x1f".join(ordered).encode()).hexdigest()
+    return {"rows": len(ordered), "digest": digest[:16]}
+
+
 def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
     """Cross-validates one job; never raises for model failures.
 
@@ -112,16 +120,32 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
             payload.seed,
             job.params,
         )
+        scorer = metric.scorer(payload.positive_label)
+        raw_scores = []
         with threadpoolctl.threadpool_limits(limits=payload.thread_limit):
-            cv = model_selection.cross_validate(
-                pipeline,
-                payload.features,
-                payload.target,
-                cv=list(folds),
-                scoring=metric.scorer(payload.positive_label),
-                error_score="raise",
-            )
-        scores = [metric.to_natural(float(s)) for s in cv["test_score"]]
+            for fit_list, evaluate_list in folds:
+                fit = np.asarray(fit_list)
+                evaluate = np.asarray(evaluate_list)
+                candidate = base.clone(pipeline)
+                candidate.fit(
+                    payload.features.iloc[fit], payload.target.iloc[fit]
+                )
+                raw_scores.append(
+                    scorer(
+                        candidate,
+                        payload.features.iloc[evaluate],
+                        payload.target.iloc[evaluate],
+                    )
+                )
+                result.observed_access.append(
+                    {
+                        "fit": access_record(payload.features.index.take(fit)),
+                        "evaluate": access_record(
+                            payload.features.index.take(evaluate)
+                        ),
+                    }
+                )
+        scores = [metric.to_natural(float(s)) for s in raw_scores]
         result.fold_scores = scores
         result.score_mean = float(np.mean(scores))
         result.score_std = float(np.std(scores))
@@ -295,6 +319,7 @@ class TrialRunner:
             checkpoint.fit_seconds,
             params=dict(checkpoint.params),
             strategy=checkpoint.strategy,
+            observed_access=list(checkpoint.observed_access[:wanted]),
         )
 
     def skip(

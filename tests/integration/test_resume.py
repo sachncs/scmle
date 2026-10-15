@@ -118,10 +118,10 @@ def test_resume_of_tuned_run_recomputes_nothing(
     (original.run_dir / "evaluation.json").unlink()
     shutil.rmtree(original.run_dir / "model")
     calls = []
-    real = trials_module.model_selection.cross_validate
+    real = trials_module.evaluate_payload
     monkeypatch.setattr(
-        trials_module.model_selection,
-        "cross_validate",
+        trials_module,
+        "evaluate_payload",
         lambda *a, **k: calls.append(1) or real(*a, **k),
     )
     resumed = mml.MLProject.resume(original.run_dir, data=binary_frame)

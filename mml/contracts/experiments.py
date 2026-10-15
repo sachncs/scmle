@@ -135,6 +135,9 @@ class TrialResult:
         error: Failure or skip reason, empty on success.
         params: Hyperparameter overrides (empty for default configuration).
         strategy: Data strategy the candidate was built with.
+        observed_access: What each fold's fit and scoring actually received:
+            per fold the row count and a digest of the row ids. The ledger
+            checks these observations against the split manifest.
     """
 
     trial_id: str
@@ -148,6 +151,9 @@ class TrialResult:
     error: str = ""
     params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = DEFAULT_STRATEGY
+    observed_access: list[dict[str, Any]] = dataclasses.field(
+        default_factory=list
+    )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
