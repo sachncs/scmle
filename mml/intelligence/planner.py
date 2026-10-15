@@ -16,11 +16,11 @@ from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.data import splitting
+from mml.data import strategies
 from mml.evaluation import metrics
 from mml.models import registry as registry_module
 
 FAST_BUDGET_SECONDS = 300
-SEVERE_IMBALANCE = 10.0
 FAST_EXCEPTION = "hist_gradient_boosting"
 
 Action = experiments.DecisionAction
@@ -126,10 +126,8 @@ class ApprovedModelsRule(PlanningRule):
         return [a for a in candidates if a.name in approved]
 
 
-class ImbalanceRule(PlanningRule):
-    """Defers rebalancing techniques when classes are severely skewed."""
-
-    techniques = ("class_weighting", "resampling_inside_cv")
+class StrategyRule(PlanningRule):
+    """Records which data strategies will be evaluated and which cannot."""
 
     def apply(
         self,
@@ -137,17 +135,39 @@ class ImbalanceRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Records deferred techniques; leaves candidates unchanged."""
-        ratio = context.profile.target_summary.get("imbalance_ratio", 1.0)
-        if context.task.is_classification and ratio >= SEVERE_IMBALANCE:
-            decisions.extend(
-                experiments.Decision(
-                    technique,
-                    Action.DEFER,
-                    "severe imbalance; scheduled for the M3 strategy search",
+        """Documents strategy applicability; leaves candidates unchanged."""
+        spec = context.spec.strategies
+        for name in spec.names:
+            strategy = strategies.get_strategy(name)
+            reasons = {
+                a.name: strategy.applicability(context.profile, context.task, a)
+                for a in candidates
+            }
+            applicable = sorted(n for n, r in reasons.items() if r is None)
+            if applicable and spec.top_models > 0:
+                decisions.append(
+                    experiments.Decision(
+                        name,
+                        Action.INCLUDE,
+                        f"{strategy.description}; evaluated on the top "
+                        f"{spec.top_models} screened models where applicable "
+                        f"(applies to: {', '.join(applicable)})",
+                    )
                 )
-                for technique in self.techniques
-            )
+            else:
+                why = (
+                    "strategy search disabled (strategies.top_models=0)"
+                    if applicable
+                    else next(
+                        (r for r in reasons.values() if r),
+                        "no candidate models",
+                    )
+                )
+                decisions.append(
+                    experiments.Decision(
+                        name, Action.REJECT, f"not applicable: {why}"
+                    )
+                )
         return candidates
 
 
@@ -190,7 +210,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
     return (
         FastBudgetRule(),
         ApprovedModelsRule(),
-        ImbalanceRule(),
+        StrategyRule(),
         TuningRule(),
     )
 
