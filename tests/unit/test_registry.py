@@ -197,3 +197,49 @@ def test_a_third_party_deep_learning_adapter_needs_no_core_edit(registry):
     registry.register(TinyNet())
     conformance.check_conformance(registry.get("tiny_net"))
     assert registry.get("tiny_net").capabilities.gpu is True
+
+
+def test_a_default_orchestrator_discovers_conforming_plugins_only(
+    monkeypatch, binary_frame
+):
+    from mml.core import orchestrator as orchestrator_module
+
+    class NoProba:
+        def fit(self, features, target):
+            return self
+
+        def predict(self, features):
+            return [0] * len(features)
+
+        def get_params(self, deep=True):
+            return {}
+
+        def set_params(self, **params):
+            return self
+
+    class NonConforming(ThirdPartyAdapter):
+        name = "non_conforming"
+
+        def build(self, task, seed, params=None):
+            return NoProba()
+
+    class Entry:
+        def __init__(self, name, adapters):
+            self.name, self.adapters = name, adapters
+
+        def load(self):
+            return lambda: self.adapters
+
+    monkeypatch.setattr(
+        registry_module.metadata,
+        "entry_points",
+        lambda group: [
+            Entry("good", [ThirdPartyAdapter()]),
+            Entry("bad", [NonConforming()]),
+        ],
+    )
+    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="<in-memory>", target="y"))
+    engine = orchestrator_module.Orchestrator(spec, binary_frame)
+    assert "third_party" in engine.registry.adapters
+    assert "non_conforming" not in engine.registry.adapters
+    assert "predict_proba" in engine.registry.plugin_failures["bad"]

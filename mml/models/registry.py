@@ -11,6 +11,7 @@ from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.models import boosting_adapters
+from mml.models import conformance
 from mml.models import ensembles
 from mml.models import sklearn_adapters
 
@@ -27,6 +28,7 @@ class ModelRegistry:
             adapters: Adapters to register immediately.
         """
         self.adapters: dict[str, models.ModelAdapter] = {}
+        self.plugin_failures: dict[str, str] = {}
         for adapter in adapters:
             self.register(adapter)
 
@@ -70,20 +72,28 @@ class ModelRegistry:
     def load_plugins(self) -> list[str]:
         """Registers adapters advertised through entry points.
 
+        Every plugin adapter must pass the shared conformance suite before it
+        is registered. Reasons for failures are kept in `plugin_failures`.
+
         Returns:
-            Names of plugins that failed to load; a broken plugin never
-            breaks the framework.
+            Names of plugins that failed to load or conform; a broken plugin
+            never breaks the framework.
         """
         failed = []
+        self.plugin_failures = {}
         for entry in metadata.entry_points(group=ENTRY_POINT_GROUP):
             try:
                 loaded = entry.load()
                 found = loaded() if callable(loaded) else loaded
                 items = found if isinstance(found, (list, tuple)) else [found]
                 for adapter in items:
+                    conformance.check_conformance(adapter)
                     self.register(adapter, overwrite=True)
-            except Exception:  # Isolate faulty third-party code.
+            except Exception as error:  # Isolate faulty third-party code.
                 failed.append(entry.name)
+                self.plugin_failures[entry.name] = (
+                    f"{type(error).__name__}: {error}"
+                )
         return failed
 
     def get(self, name: str) -> models.ModelAdapter:

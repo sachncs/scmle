@@ -60,7 +60,8 @@ class Orchestrator:
         Args:
             spec: Project specification.
             frame: In-memory dataset, if not read from `spec.data.uri`.
-            registry: Model registry; defaults to the built-in adapters.
+            registry: Model registry; defaults to the built-in adapters plus
+                every installed plugin that passes the conformance suite.
             policy: Selection policy; defaults to best mean CV score.
             stages: Stage sequence; defaults to the standard workflow.
             checkpoints: Approval gates consulted after the planning and
@@ -70,9 +71,10 @@ class Orchestrator:
         """
         self.spec = spec
         self.frame = frame
-        self.registry = (
-            registry or registry_module.ModelRegistry.with_builtins()
-        )
+        if registry is None:
+            registry = registry_module.ModelRegistry.with_builtins()
+            registry.load_plugins()
+        self.registry = registry
         self.policy = policy or selection.BestMeanPolicy()
         self.stages = stages or stages_module.default_stages()
         self.tracker = tracker
@@ -323,6 +325,8 @@ class Orchestrator:
         context.tracker = tracker
         context.history = self.load_history(tracker)
         context.checkpoints = checkpoints
+        for name, reason in self.registry.plugin_failures.items():
+            context.emit("plugin.rejected", f"{name}: {reason}")
         try:
             for stage in self.stages:
                 context.check_cancelled()
