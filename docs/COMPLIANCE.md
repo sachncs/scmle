@@ -14,7 +14,7 @@ Status is **Implemented**, **Partial** (what is missing is stated) or
 | Local-first, distributed-capable | Implemented | `mml/core/execution.py`, `tests/integration/test_parallel.py`, `tests/integration/test_integrations.py` |
 | Declarative Python API | Implemented | `mml/api/project.py`, `tests/integration/test_end_to_end.py` |
 | Pydantic typed configuration | Implemented | `mml/contracts/tasks.py`, `tests/unit/test_tasks.py` |
-| Arrow-compatible tabular abstraction | Partial | pandas frames with Parquet/pyarrow I/O (`mml/data/readers.py`); no Polars adapter (reader contract is the extension point) |
+| Arrow-compatible tabular abstraction | Implemented | Arrow tables, Polars frames / lazyframes and anything with the Arrow stream protocol in; Arrow out; Feather and Parquet files (`mml/data/interchange.py`, `tests/integration/test_interchange.py`) |
 | Scikit-learn estimator protocol | Implemented | `mml/contracts/models.py`, `tests/unit/test_registry.py` |
 | Workflow as a graph of stages | Implemented | `mml/core/stages.py` (linear stage graph; independent trials fan out), `tests/integration/test_recovery.py` |
 | Multi-fidelity, budget-aware optimization | Implemented | `mml/core/tuning.py`, `tests/integration/test_tuning.py` |
@@ -88,7 +88,7 @@ Status is **Implemented**, **Partial** (what is missing is stated) or
 | --- | --- | --- |
 | No rebalancing baseline, class weights, random over/under | Implemented | `tests/integration/test_strategy_search.py` |
 | SMOTE variants for compatible tabular data | Implemented | `tests/unit/test_strategies.py`, `tests/integration/test_strategy_search.py` |
-| Synthetic tabular generation as research plugin | Partial | experimental jitter augmenter only (`mml/models/resampling.py`); the `Resampler` contract is the plugin point for stronger generators |
+| Synthetic tabular generation as research plugin | Implemented | `SyntheticGenerator` contract, Gaussian-copula generator and `FidelityEvaluator` (`mml/models/synthesis.py`, `tests/unit/test_synthesis.py`); opt-in `copula_augment` strategy judged on the original folds (`tests/integration/test_strategy_search.py`) |
 | Calibration evaluated separately | Implemented | `tests/integration/test_decisions.py` |
 | Threshold optimization with explicit objective | Implemented | `tests/unit/test_thresholds.py`, `tests/integration/test_decisions.py` |
 | Sampling inside folds, evidence on original validation distribution | Implemented | `tests/unit/test_resampling.py` |
@@ -147,9 +147,9 @@ Status is **Implemented**, **Partial** (what is missing is stated) or
 | v0.1 scope and the five first-sprint outcomes | Implemented | `README.md`, `docs/ARCHITECTURE.md` |
 | Frozen API: `plan()`, `run(plan)`, `leaderboard()`, `save`, `predict`, `task="classification"` alias | Implemented | `tests/integration/test_end_to_end.py` |
 | Deep learning as plugins | Implemented | `tests/unit/test_registry.py` |
-| Time-series: separate validation and feature-availability contracts | Implemented | `tests/unit/test_splitting.py`, `tests/unit/test_profiling.py`, `tests/integration/test_end_to_end.py` (embargoed temporal validation; `unavailable_at_prediction`). Time-series feature *generation* is not provided |
+| Time-series: separate validation and feature-availability contracts | Implemented | `tests/unit/test_splitting.py`, `tests/unit/test_profiling.py`, `tests/integration/test_end_to_end.py` (embargoed temporal validation; `unavailable_at_prediction`); lag / diff / rolling / expanding features per group in time order with no future rows (`tests/unit/test_feature_graph.py`, `tests/integration/test_feature_graph.py`) |
 | Augmentation: pluggable generator and evaluator interfaces | Implemented | `mml/models/resampling.py` (generator = `Resampler`), strategy evaluation = `DataStrategy` |
-| Feature engineering: versioned, fitted transformation graph | Partial | fitted per-fold transformers inside the bundle (`mml/data/transformers.py`); no free-form feature-graph DSL |
+| Feature engineering: versioned, fitted transformation graph | Implemented | declarative `FeatureGraphSpec` (versioned, fingerprinted, acyclic by construction), 18 operations, statistics learned on the training fold, packaged in the bundle (`mml/data/feature_graph.py`, `tests/unit/test_feature_graph.py`, `tests/integration/test_feature_graph.py`) |
 | Meta-learning: fingerprint + experiment history | Implemented | `tests/integration/test_meta_learning.py` |
 | Human approval: policy checkpoints | Implemented | `tests/integration/test_checkpoints.py` |
 | Production monitoring: prediction/label event schema | Implemented | `tests/integration/test_monitoring.py` |

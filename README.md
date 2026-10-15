@@ -25,21 +25,24 @@ More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
    recording such as Titanic's `boat` / `body`).
 2. **Splits** without leakage (stratified / random / group / temporal) behind
    a locked test set that opens once.
-3. **Searches** every compatible model family (scikit-learn, LightGBM,
+3. **Engineers features** declaratively (`FeatureGraphSpec`: ratios, bins,
+   clipping, datetime parts, lags and rolling statistics per entity), with
+   every statistic learned on the training fold only.
+4. **Searches** every compatible model family (scikit-learn, LightGBM,
    XGBoost, CatBoost, SVM, kNN), then evaluates data strategies on the
    original validation folds (class weighting, random and SMOTE-family
-   resampling, calibration, log / interaction features), tunes the winners
+   resampling, copula augmentation, calibration, log / interaction features), tunes the winners
    with pruned search (random or Optuna), and assembles a cross-fitted stack
    that is adopted only if it beats its best member. Trials run in parallel
    (process pool or Ray) with failure isolation and resumable checkpoints.
-4. **Selects** by cross-validation under optional serving constraints (model
+5. **Selects** by cross-validation under optional serving constraints (model
    size, p95 latency), optimizes the decision threshold on out-of-fold
    predictions against an explicit cost or metric, evaluates once on the
    locked test set, and explains the result (diagnostics, permutation
    importance, structure-aware confidence intervals).
-5. **Packages** a signed, checksummed bundle with schema and a monitoring
+6. **Packages** a signed, checksummed bundle with schema and a monitoring
    reference, plus a decision log with the evidence behind every choice.
-6. **Operates**: monitors drift and delayed-label performance, compares a
+7. **Operates**: monitors drift and delayed-label performance, compares a
    challenger against the champion, versions and promotes models, and serves
    them in batch or over HTTP.
 
@@ -143,9 +146,11 @@ installed into a clean environment.
   splitting; stratified splits use labels to choose the test rows.
 * The HTTP serving adapter is a minimal reference server (no authentication
   or TLS); run it behind a gateway.
-* Not implemented: synthetic tabular generators beyond the experimental
-  jitter augmenter, deep-learning model families, and time-series-specific
-  feature-availability contracts (kept as extension points).
+* Series (lag / rolling) features are computed on the batch you score, which
+  must therefore contain each entity's recent history.
+* Large deep-learning frameworks are not bundled; the neural family is a
+  scikit-learn MLP, and PyTorch / Keras plug in through the same
+  `ModelAdapter` contract.
 * No GPU-capable model is bundled, so `gpu="required"` blocks a run.
 * Ray and CatBoost have no free-threaded (3.14t) wheels yet.
 * The PyPI names `mlforge` and `magicml` are both taken; choose a distribution

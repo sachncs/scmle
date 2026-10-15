@@ -13,6 +13,7 @@ from mml.core import checkpoints
 from mml.core import execution
 from mml.core import stages
 from mml.data import columns
+from mml.data import feature_graph
 from mml.data import readers
 from mml.data import splitting
 from mml.data import strategies
@@ -23,6 +24,7 @@ from mml.intelligence import planner
 from mml.models import boosting_adapters
 from mml.models import resampling
 from mml.models import sklearn_adapters
+from mml.models import synthesis
 from mml.models import thresholds
 from mml.monitoring import monitor
 from mml.optimization import optimizers
@@ -57,6 +59,8 @@ def concrete_subclasses(base, *modules):
         (stages.Stage, [stages]),
         (checkpoints.PolicyCheckpoint, [checkpoints]),
         (resampling.Resampler, [resampling]),
+        (feature_graph.FeatureOp, [feature_graph]),
+        (synthesis.SyntheticGenerator, [synthesis]),
         (thresholds.ThresholdObjective, [thresholds]),
         (monitor.AdvisoryRule, [monitor]),
         (execution.ExecutionBackend, [execution]),

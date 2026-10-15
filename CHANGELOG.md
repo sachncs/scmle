@@ -26,6 +26,12 @@ First public beta.
 * Structure-aware bootstrap intervals; resource governor; policy
   checkpoints; data-access ledger and audit events; explicit inference
   column mapping; replay verification.
+* Declarative, versioned feature-transformation graph (18 operations,
+  fold-fitted statistics, datetime parts, per-entity lag / diff / rolling
+  features) packaged in the bundle.
+* Arrow-compatible interchange (Arrow, Polars, Feather); Gaussian-copula
+  synthetic data with a fidelity evaluator; neural-network family;
+  feature-availability contract and temporal embargo.
 * MLflow tracking adapter and Ray execution backend.
 * CLI: `plan`, `run`, `resume`, `predict`.
 * Benchmarks on nine open datasets with a regression gate.

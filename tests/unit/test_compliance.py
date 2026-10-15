@@ -55,12 +55,12 @@ def test_matrix_is_substantial_and_labels_every_row():
     assert len(risk_rows) <= 8  # only the risk table lacks a status column
 
 
-def test_partial_rows_state_what_is_missing():
+def test_no_requirement_is_left_partial():
+    """Every spec requirement is Implemented; reintroducing a gap must be
+    a deliberate edit of this test, not a silent drift."""
     partial = [
         line
         for line in MATRIX.read_text().splitlines()
         if "| Partial |" in line
     ]
-    assert partial and all(
-        ";" in row or " no " in row or "only" in row for row in partial
-    )
+    assert partial == []

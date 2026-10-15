@@ -81,6 +81,8 @@ Add a subclass; no core edits are needed.
 | --- | --- | --- |
 | a file format | `TableReader` | `DatasetLoader(readers=...)` |
 | a column family | `ColumnKind` | `columns.KINDS` |
+| a feature operation | `FeatureOp` | `feature_graph.OPS` |
+| a synthetic-data generator | `SyntheticGenerator` | `GeneratorOverSampler.generator_class` |
 | a validation protocol | `SplitStrategy` | `splitting.STRATEGIES` |
 | a model family | `ModelAdapter` | `ModelRegistry.register` or the `mml.models` entry point |
 | a data strategy | `DataStrategy` | `strategies.STRATEGIES` |
