@@ -34,6 +34,8 @@ class VersionRecord:
         config: Project configuration the model was trained with.
         run_id: Originating run, if any.
         path: Bundle directory relative to the registry root.
+        content_id: SHA-256 of the bundle manifest, which embeds the checksum
+            of every file, so identical bundles share an id.
     """
 
     model: str
@@ -43,6 +45,13 @@ class VersionRecord:
     config: dict[str, Any]
     run_id: str
     path: str
+    content_id: str = ""
+
+
+def content_id_of(bundle_directory: str | pathlib.Path) -> str:
+    """Content address of a bundle: the hash of its checksummed manifest."""
+    manifest = pathlib.Path(bundle_directory) / bundle_module.MANIFEST_FILE
+    return bundle_module.file_sha256(manifest)
 
 
 class ModelRegistryStore:
@@ -100,16 +109,22 @@ class ModelRegistryStore:
             run_id: Originating run identifier.
 
         Returns:
-            The new version's record.
+            The new version's record, or the existing one when a bundle with
+            identical content is already registered (registration is
+            idempotent for the same content).
 
         Raises:
             ArtifactError: If the bundle fails verification.
         """
         bundle_module.ModelBundle.load(bundle_directory, trusted=True)
+        content_id = content_id_of(bundle_directory)
         index = self.read_index()
         entry = index["models"].setdefault(
             model, {"versions": {}, "aliases": {}}
         )
+        for known in entry["versions"].values():
+            if known.get("content_id") == content_id:
+                return VersionRecord(**known)
         version = max((int(v) for v in entry["versions"]), default=0) + 1
         relative = f"{model}/v{version}"
         shutil.copytree(bundle_directory, self.root / relative)
@@ -121,6 +136,7 @@ class ModelRegistryStore:
             dict(config or {}),
             run_id,
             relative,
+            content_id,
         )
         entry["versions"][str(version)] = dataclasses.asdict(record)
         self.write_index(index)
