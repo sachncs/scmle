@@ -168,3 +168,42 @@ def test_a_model_is_imported_only_when_it_is_built():
         """
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
+    from mml.contracts import errors
+    from mml.core import compiler
+
+    default = stages.default_stages()
+    kinds = [type(s) for s in default]
+    assert kinds[0] is stages.IngestStage and kinds[-1] is stages.PackageStage
+    shuffled = list(reversed(default))
+    assert [type(s) for s in compiler.compile_workflow(shuffled)] == kinds
+    with pytest.raises(errors.ConfigError, match="requires"):
+        compiler.compile_workflow(default[1:])
+    with pytest.raises(errors.ConfigError, match="more than once"):
+        compiler.compile_workflow([*default, default[0]])
+
+    class Left:
+        requires = ()
+
+    class Right:
+        requires = (Left,)
+
+    Left.requires = (Right,)
+    with pytest.raises(errors.ConfigError, match="cycle"):
+        compiler.compile_workflow([Left(), Right()])
+
+
+def test_a_replacement_stage_subclass_satisfies_dependencies():
+    from mml.core import compiler
+
+    class Custom(stages.TrainStage):
+        pass
+
+    swapped = [
+        Custom() if isinstance(s, stages.TrainStage) else s
+        for s in stages.default_stages()
+    ]
+    ordered = compiler.compile_workflow(swapped)
+    assert [type(s) for s in ordered].count(Custom) == 1

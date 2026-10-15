@@ -23,6 +23,7 @@ from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import tasks
+from mml.core import compiler
 from mml.core import context as context_module
 from mml.core import ensemble_search
 from mml.core import state as run_state
@@ -51,9 +52,12 @@ class Stage(abc.ABC):
 
     Attributes:
         state: Lifecycle state the run is in while the stage executes.
+        requires: Stages that must run before this one (the workflow is
+            ordered by `compiler.compile_workflow`).
     """
 
     state: ClassVar[run_state.RunState]
+    requires: ClassVar[tuple[type, ...]] = ()
 
     @abc.abstractmethod
     def describe(self, context: context_module.RunContext) -> str:
@@ -139,6 +143,7 @@ class IngestStage(Stage):
 class ProfileStage(Stage):
     """Resolves the task and profiles the data."""
 
+    requires = (IngestStage,)
     state = run_state.RunState.PROFILING
 
     def describe(self, context: context_module.RunContext) -> str:
@@ -255,6 +260,7 @@ def build_plan(
 class PlanStage(Stage):
     """Establishes the split manifest and the experiment plan."""
 
+    requires = (ProfileStage,)
     state = run_state.RunState.PLANNING
 
     def describe(self, context: context_module.RunContext) -> str:
@@ -294,6 +300,7 @@ class PlanStage(Stage):
 class TrainStage(Stage):
     """Cross-validates every candidate within the time budget."""
 
+    requires = (PlanStage,)
     state = run_state.RunState.TRAINING
 
     def describe(self, context: context_module.RunContext) -> str:
@@ -341,6 +348,7 @@ class TrainStage(Stage):
 class SelectStage(Stage):
     """Applies the selection policy and the serving constraints."""
 
+    requires = (TrainStage,)
     state = run_state.RunState.SELECTING
 
     def describe(self, context: context_module.RunContext) -> str:
@@ -505,6 +513,7 @@ def choose_decision_threshold(
 class FinalEvaluationStage(Stage):
     """Refits the frozen candidate and opens the locked test set once."""
 
+    requires = (SelectStage,)
     state = run_state.RunState.TESTING
 
     def describe(self, context: context_module.RunContext) -> str:
@@ -618,6 +627,7 @@ class FinalEvaluationStage(Stage):
 class PackageStage(Stage):
     """Writes the model bundle, leaderboard and report."""
 
+    requires = (FinalEvaluationStage,)
     state = run_state.RunState.PACKAGING
 
     def describe(self, context: context_module.RunContext) -> str:
@@ -723,12 +733,14 @@ class PackageStage(Stage):
 
 def default_stages() -> tuple[Stage, ...]:
     """Returns the standard stage sequence, one per lifecycle state."""
-    return (
-        IngestStage(),
-        ProfileStage(),
-        PlanStage(),
-        TrainStage(),
-        SelectStage(),
-        FinalEvaluationStage(),
-        PackageStage(),
+    return compiler.compile_workflow(
+        (
+            IngestStage(),
+            ProfileStage(),
+            PlanStage(),
+            TrainStage(),
+            SelectStage(),
+            FinalEvaluationStage(),
+            PackageStage(),
+        )
     )

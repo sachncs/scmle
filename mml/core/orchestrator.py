@@ -23,6 +23,7 @@ from mml.contracts import events
 from mml.contracts import experiments
 from mml.contracts import tasks
 from mml.core import checkpoints as checkpoints_module
+from mml.core import compiler
 from mml.core import context as context_module
 from mml.core import execution
 from mml.core import limits
@@ -76,7 +77,9 @@ class Orchestrator:
             registry.load_plugins()
         self.registry = registry
         self.policy = policy or selection.BestMeanPolicy(spec.selection)
-        self.stages = stages or stages_module.default_stages()
+        self.stages = compiler.compile_workflow(
+            stages or stages_module.default_stages()
+        )
         self.tracker = tracker
         self.checkpoints = checkpoints
         self.tracking_path: pathlib.Path | None = None
