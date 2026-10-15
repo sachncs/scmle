@@ -8,8 +8,8 @@ the importable package is `mml`.
 import mml
 
 project = mml.MLProject("customers.parquet", target="churn", metric="roc_auc")
-print(project.plan().summary())      # inspect before any training
-result = project.run()               # profile, split, search, test, package
+print(project.plan().summary())  # inspect before any training
+result = project.run()  # profile, split, search, test, package
 print(result.leaderboard())
 result.save("artifacts/churn_model")
 result.predict("new_customers.parquet")
