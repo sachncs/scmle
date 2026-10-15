@@ -156,7 +156,7 @@ def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
 
 
 def test_bundle_without_reference_still_loads(trained, tmp_path):
-    bundle, _ = trained
+    bundle = trained[0]
     loaded = bundle_module.ModelBundle.load(
         bundle.save(tmp_path / "m"), trusted=True
     )
@@ -199,7 +199,7 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
     trained, tmp_path, monkeypatch
 ):
     monkeypatch.delenv(bundle_module.SIGNING_KEY_ENV, raising=False)
-    bundle, _ = trained
+    bundle = trained[0]
     good = bundle.save(tmp_path / "good", signing_key="k")
     evil = bundle.save(tmp_path / "evil", signing_key="k")
     (evil / bundle_module.MODEL_FILE).write_bytes(b"malicious pickle")
@@ -231,7 +231,7 @@ def test_resaving_unsigned_removes_a_stale_signature(
     trained, tmp_path, monkeypatch
 ):
     monkeypatch.delenv(bundle_module.SIGNING_KEY_ENV, raising=False)
-    bundle, _ = trained
+    bundle = trained[0]
     directory = bundle.save(tmp_path / "m", signing_key="k")
     bundle.save(directory)
     assert not (directory / bundle_module.SIGNATURE_FILE).exists()
