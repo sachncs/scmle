@@ -411,12 +411,12 @@ class TemporalSplit(SplitStrategy):
                 f"embargo of {embargo} rows between development and test and "
                 "between each training window and its validation window"
             )
-        return Partition(
-            dev_ids,
-            test_ids,
-            list(splitter.split(np.arange(len(dev_ids)))),
-            notes,
+        notes.append(
+            "folds are listed latest window first, so cheap first-rung "
+            "evaluations use the largest training window"
         )
+        windows = list(splitter.split(np.arange(len(dev_ids))))
+        return Partition(dev_ids, test_ids, windows[::-1], notes)
 
 
 STRATEGIES: dict[str, type[SplitStrategy]] = {

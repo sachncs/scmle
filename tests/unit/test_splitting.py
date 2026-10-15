@@ -233,3 +233,22 @@ def test_group_validation_blocks_when_classes_hide_in_one_group():
     )
     with pytest.raises(errors.BlockedError):
         splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+
+
+def test_temporal_folds_are_listed_latest_window_first():
+    rows = 200
+    frame = pd.DataFrame(
+        {
+            "t": pd.date_range("2024-01-01", periods=rows),
+            "a": np.arange(rows, dtype=float),
+            "y": np.arange(rows) % 2,
+        }
+    )
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="x", target="y", time_column="t"),
+        validation=tasks.ValidationSpec(strategy="temporal", folds=4),
+    )
+    part = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    sizes = [len(fit) for fit, held in part.manifest.folds]
+    assert sizes == sorted(sizes, reverse=True)  # largest training first
+    assert any("latest window first" in n for n in part.manifest.notes)
