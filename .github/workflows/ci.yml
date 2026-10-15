@@ -30,6 +30,17 @@ jobs:
       - run: uv sync --python 3.14 --resolution lowest-direct --extra boosting --extra optimization
       - run: uv run pytest -q tests/unit tests/property tests/leakage
 
+  integrations:
+    name: MLflow and Ray integrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.14 --extra optimization --extra tracking --extra distributed
+      - run: uv run pytest -q tests/integration/test_integrations.py
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"
+
   base-install:
     name: base install without extras
     runs-on: ubuntu-latest
