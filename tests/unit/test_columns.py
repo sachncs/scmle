@@ -205,3 +205,27 @@ def test_all_missing_columns_are_reported_as_missing_not_constant():
         )
         == "missing >95%"
     )
+
+
+def test_threshold_association_finds_sharp_boundaries_that_bins_blur():
+    rng = np.random.default_rng(0)
+    values = pd.Series(rng.normal(size=300))
+    separable = (values > 0.123).astype(int)
+    assert columns.threshold_association(values, separable) == pytest.approx(
+        1.0
+    )
+    assert (
+        columns.NumericKind().association(
+            values, separable, tasks.TaskType.BINARY
+        )
+        >= 0.98
+    )
+    noise = pd.Series(rng.integers(0, 2, 300))
+    assert columns.threshold_association(values, noise) < 0.5
+
+
+def test_threshold_association_handles_degenerate_labels():
+    values = pd.Series(np.arange(50.0))
+    assert columns.threshold_association(values, pd.Series([1] * 50)) == 0.0
+    multi = pd.Series(np.repeat([0, 1, 2], [20, 15, 15]))
+    assert columns.threshold_association(values, multi) == pytest.approx(1.0)

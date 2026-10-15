@@ -4,6 +4,10 @@ Status is **Implemented**, **Partial** (what is missing is stated) or
 **Extension point** (the contract exists, no implementation ships).
 `tests/unit/test_compliance.py` fails if any cited file or test is missing.
 
+**Executable verification:** `tests/spec/test_product_spec.py` holds one direct
+check per normative statement and table of `product.md`, each named after the
+spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
+
 ## 1. Architecture decisions
 
 | Requirement | Status | Evidence |
@@ -78,7 +82,7 @@ Status is **Implemented**, **Partial** (what is missing is stated) or
 | Baselines, linear, trees, HistGradientBoosting | Implemented | `tests/unit/test_registry.py` |
 | XGBoost, LightGBM, CatBoost | Implemented | `tests/unit/test_boosting.py` |
 | SVM and kNN when dataset size permits | Implemented | `tests/unit/test_registry.py` |
-| Adapter declares capabilities; planner reads them | Implemented | `tests/unit/test_contracts.py` |
+| Adapter declares capabilities (tasks, sparse, probabilities, native categoricals, missing values, early stopping, memory, serialization); planner reads them | Implemented | `tests/unit/test_contracts.py`, `tests/unit/test_planner.py`, `tests/spec/test_product_spec.py` |
 | Optuna as optional backend behind our interface | Implemented | `mml/optimization/optimizers.py`, `tests/unit/test_optimizers.py` |
 | Deep learning as model-family plugins | Implemented | `tests/unit/test_registry.py` (MLP family and third-party GPU-flagged adapter) |
 
