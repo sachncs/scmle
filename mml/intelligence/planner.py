@@ -505,7 +505,7 @@ class Planner:
             ConfigError: If no candidate model remains.
         """
         spec, profile, task = context.spec, context.profile, context.task
-        metric = self.catalog.resolve(spec.metric, task)
+        metric = self.catalog.resolve(spec.primary_metric, task)
         compatible, rejected = self.registry.candidates(
             task, profile.manifest.row_count
         )

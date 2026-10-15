@@ -46,10 +46,13 @@ class ResourceLimits:
     Attributes:
         max_model_mb: Largest allowed serialized size.
         max_p95_latency_ms: Largest allowed p95 single-row latency.
+        latency_safety_factor: Multiplier on the measured latency, for
+            serving hardware slower than this machine.
     """
 
     max_model_mb: float | None = None
     max_p95_latency_ms: float | None = None
+    latency_safety_factor: float = 1.0
 
     @property
     def active(self) -> bool:
@@ -65,12 +68,14 @@ class ResourceLimits:
             broken.append(
                 f"model size {usage.model_mb:.2f} MB > {self.max_model_mb} MB"
             )
-        if (
-            self.max_p95_latency_ms is not None
-            and usage.p95_latency_ms > self.max_p95_latency_ms
+        scaled = usage.p95_latency_ms * self.latency_safety_factor
+        if self.max_p95_latency_ms is not None and (
+            scaled > self.max_p95_latency_ms
         ):
             broken.append(
-                f"p95 latency {usage.p95_latency_ms:.1f} ms > "
+                f"p95 latency {scaled:.1f} ms (measured "
+                f"{usage.p95_latency_ms:.1f} ms x safety factor "
+                f"{self.latency_safety_factor:g}) > "
                 f"{self.max_p95_latency_ms} ms"
             )
         return broken

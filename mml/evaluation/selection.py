@@ -1,10 +1,11 @@
 """Model selection policies."""
 
 import abc
-from typing import ClassVar
+import math
 
 from mml.contracts import errors
 from mml.contracts import experiments
+from mml.contracts import tasks
 from mml.evaluation import metrics
 from mml.models import registry as registry_module
 
@@ -19,7 +20,7 @@ class SelectionPolicy(abc.ABC):
         description: Human-readable rule recorded in the evaluation report.
     """
 
-    description: ClassVar[str]
+    description: str
 
     @abc.abstractmethod
     def rank(
@@ -53,12 +54,40 @@ class SelectionPolicy(abc.ABC):
 
 
 class BestMeanPolicy(SelectionPolicy):
-    """Best mean cross-validation score; ties go to the simpler candidate."""
+    """Best mean cross-validation score, with an explicit tie policy.
 
-    description = (
-        "best mean CV score; ties -> cheaper model, then default strategy; "
-        "dummy baseline excluded when other models ran"
-    )
+    Candidates whose score is indistinguishable from the best (within
+    `tie_tolerance`, and with `uncertainty="one_standard_error"` within one
+    standard error of the best mean) are ordered by the configured
+    `tie_breaker`; everyone else follows by score. The dummy baseline is
+    excluded whenever another model ran.
+
+    Attributes:
+        rule: The selection settings.
+    """
+
+    def __init__(self, rule: tasks.SelectionSpec | None = None) -> None:
+        """Initializes the policy.
+
+        Args:
+            rule: Selection settings; defaults to the plain best-mean rule.
+        """
+        self.rule = rule or tasks.SelectionSpec()
+        self.description = self.describe(self.rule)
+
+    @staticmethod
+    def describe(rule: tasks.SelectionSpec) -> str:
+        """Human-readable rule recorded in the evaluation report."""
+        tie = f"{rule.tie_tolerance:g}" if rule.tie_tolerance else "exact"
+        noise = (
+            "; scores within one standard error of the best are ties"
+            if rule.uncertainty == "one_standard_error"
+            else ""
+        )
+        return (
+            f"best mean CV score; {tie} ties -> {rule.tie_breaker}{noise}; "
+            "dummy baseline excluded when other models ran"
+        )
 
     def rank(
         self,
@@ -66,7 +95,7 @@ class BestMeanPolicy(SelectionPolicy):
         metric: metrics.Metric,
         registry: registry_module.ModelRegistry,
     ) -> list[experiments.TrialResult]:
-        """Sorts successful trials by score, then simplicity."""
+        """Sorts by score, resolving ties with the configured tie-breaker."""
         ok = [t for t in trials if t.status is experiments.TrialStatus.OK]
         if not ok:
             raise errors.MagicMLError(
@@ -75,17 +104,36 @@ class BestMeanPolicy(SelectionPolicy):
         pool = [t for t in ok if t.model_name != BASELINE] or ok
         sign = 1 if metric.greater_is_better else -1
 
-        def order(trial: experiments.TrialResult) -> tuple:
+        def by_score(trial: experiments.TrialResult) -> tuple:
+            return (-sign * round(trial.score_mean, SCORE_PRECISION),)
+
+        def tie_key(trial: experiments.TrialResult) -> tuple:
             cost = registry.get(trial.model_name).capabilities.cost
-            score = round(trial.score_mean, SCORE_PRECISION)
-            simple = trial.strategy != experiments.DEFAULT_STRATEGY
+            plain = trial.strategy == experiments.DEFAULT_STRATEGY
+            ordering = (
+                (round(trial.score_std, SCORE_PRECISION),)
+                if self.rule.tie_breaker == "lower_variance"
+                else ()
+            )
             return (
-                -sign * score,
+                *ordering,
                 cost,
-                simple,
+                not plain,
                 trial.model_name,
                 trial.strategy,
                 trial.trial_id,
             )
 
-        return sorted(pool, key=order)
+        ordered = sorted(pool, key=lambda t: (*by_score(t), *tie_key(t)))
+        best = ordered[0]
+        folds = max(len(best.fold_scores), 1)
+        tolerance = self.rule.tie_tolerance
+        if self.rule.uncertainty == "one_standard_error":
+            tolerance = max(tolerance, best.score_std / math.sqrt(folds))
+        tied = [
+            t
+            for t in ordered
+            if sign * (best.score_mean - t.score_mean) <= tolerance + 1e-12
+        ]
+        rest = [t for t in ordered if t not in tied]
+        return sorted(tied, key=tie_key) + rest

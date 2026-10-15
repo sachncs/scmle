@@ -153,7 +153,7 @@ class ProfileStage(Stage):
         frame = require(context.frame, "frame")
         task = profiling.TaskResolver(spec).resolve(frame[spec.data.target])
         context.task = task
-        context.metric = context.catalog.resolve(spec.metric, task)
+        context.metric = context.catalog.resolve(spec.primary_metric, task)
         profile = profiling.DatasetProfiler(spec).profile(
             frame,
             require(context.manifest, "manifest"),
@@ -364,7 +364,9 @@ class SelectStage(Stage):
         """Builds the serving limits from the specification."""
         spec = context.spec.selection
         return resources.ResourceLimits(
-            spec.max_model_mb, spec.max_p95_latency_ms
+            spec.max_model_mb,
+            spec.max_p95_latency_ms,
+            spec.latency_safety_factor,
         )
 
     def execute(self, context: context_module.RunContext) -> None:

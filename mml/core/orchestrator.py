@@ -75,7 +75,7 @@ class Orchestrator:
             registry = registry_module.ModelRegistry.with_builtins()
             registry.load_plugins()
         self.registry = registry
-        self.policy = policy or selection.BestMeanPolicy()
+        self.policy = policy or selection.BestMeanPolicy(spec.selection)
         self.stages = stages or stages_module.default_stages()
         self.tracker = tracker
         self.checkpoints = checkpoints

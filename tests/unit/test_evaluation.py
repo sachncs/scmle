@@ -160,3 +160,81 @@ def test_positive_label_is_none_outside_binary_tasks():
     assert (
         metrics.positive_label(pd.Series([3, 7, 3]), tasks.TaskType.BINARY) == 7
     )
+
+
+def scored_trial(name, score, std, folds=5):
+    return TrialResult(
+        f"t_{name}",
+        name,
+        Status.OK,
+        "m",
+        score_mean=score,
+        score_std=std,
+        fold_scores=[score] * folds,
+    )
+
+
+def test_tolerance_turns_small_gaps_into_ties_resolved_by_simplicity(registry):
+    trials = [
+        scored_trial("random_forest", 0.801, 0.01),
+        scored_trial("decision_tree", 0.800, 0.01),
+    ]
+    auc = CATALOG.metrics["roc_auc"]
+    strict = selection.BestMeanPolicy().select(trials, auc, registry)
+    assert strict.model_name == "random_forest"
+    loose = selection.BestMeanPolicy(
+        tasks.SelectionSpec(tie_tolerance=0.005)
+    ).select(trials, auc, registry)
+    assert loose.model_name == "decision_tree"  # cheaper wins the tie
+
+
+def test_one_standard_error_rule_treats_noise_as_a_tie(registry):
+    trials = [
+        scored_trial("random_forest", 0.810, 0.05),
+        scored_trial("decision_tree", 0.790, 0.05),
+    ]
+    auc = CATALOG.metrics["roc_auc"]
+    rule = tasks.SelectionSpec(uncertainty="one_standard_error")
+    policy = selection.BestMeanPolicy(rule)
+    assert policy.select(trials, auc, registry).model_name == "decision_tree"
+    assert "one standard error" in policy.description
+
+
+def test_lower_variance_tie_breaker_prefers_the_steadier_model(registry):
+    trials = [
+        scored_trial("decision_tree", 0.800, 0.08),
+        scored_trial("random_forest", 0.800, 0.01),
+    ]
+    auc = CATALOG.metrics["roc_auc"]
+    policy = selection.BestMeanPolicy(
+        tasks.SelectionSpec(tie_breaker="lower_variance")
+    )
+    assert policy.select(trials, auc, registry).model_name == "random_forest"
+    default = selection.BestMeanPolicy().select(trials, auc, registry)
+    assert default.model_name == "decision_tree"
+
+
+def test_maximize_sets_the_metric_and_conflicts_are_rejected():
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="x", target="y"),
+        selection=tasks.SelectionSpec(maximize="pr_auc"),
+    )
+    assert spec.primary_metric == "pr_auc"
+    with pytest.raises(ValueError, match="conflicts with metric"):
+        tasks.ProjectSpec(
+            data=tasks.DataSpec(uri="x", target="y"),
+            metric="roc_auc",
+            selection=tasks.SelectionSpec(maximize="pr_auc"),
+        )
+
+
+def test_latency_safety_factor_scales_the_measured_latency():
+    from mml.evaluation import resources
+
+    usage = resources.ResourceUsage(1.0, 10.0, 30, "test machine")
+    plain = resources.ResourceLimits(max_p95_latency_ms=15.0)
+    assert plain.violations(usage) == []
+    slower = resources.ResourceLimits(
+        max_p95_latency_ms=15.0, latency_safety_factor=2.0
+    )
+    assert "safety factor 2" in slower.violations(usage)[0]

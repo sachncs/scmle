@@ -186,11 +186,34 @@ class EnsembleSpec(FrozenModel):
 
 
 class SelectionSpec(FrozenModel):
-    """Serving constraints a selected model must satisfy."""
+    """How the winning model is chosen and which constraints it must meet.
 
+    Attributes:
+        maximize: Metric to optimize (the project's `metric`; setting both
+            to different values is an error).
+        max_model_mb: Largest allowed serialized size.
+        max_p95_latency_ms: Largest allowed p95 single-row latency.
+        latency_safety_factor: Multiplier applied to the p95 latency measured
+            on this machine before it is compared with the limit, to account
+            for slower serving hardware.
+        max_candidates_checked: How many ranked candidates are measured.
+        tie_breaker: How candidates with indistinguishable scores are
+            ordered: `simpler_model` (cheaper model family, default
+            strategy) or `lower_variance` (steadier across folds).
+        tie_tolerance: Absolute score difference regarded as a tie.
+        uncertainty: `one_standard_error` also treats every candidate within
+            one standard error of the best mean score as tied, so noise is
+            not mistaken for a real difference.
+    """
+
+    maximize: str | None = None
     max_model_mb: float | None = pydantic.Field(default=None, gt=0)
     max_p95_latency_ms: float | None = pydantic.Field(default=None, gt=0)
+    latency_safety_factor: float = pydantic.Field(default=1.0, ge=1.0)
     max_candidates_checked: int = pydantic.Field(default=10, ge=1)
+    tie_breaker: Literal["simpler_model", "lower_variance"] = "simpler_model"
+    tie_tolerance: float = pydantic.Field(default=0.0, ge=0.0)
+    uncertainty: Literal["none", "one_standard_error"] = "none"
 
 
 class DecisionSpec(FrozenModel):
@@ -250,11 +273,22 @@ class ProjectSpec(FrozenModel):
             raise ValueError("the target cannot be excluded")
         if data.target in data.unavailable_at_prediction:
             raise ValueError("the target cannot be unavailable at prediction")
+        wanted = self.selection.maximize
+        if wanted and self.metric and wanted != self.metric:
+            raise ValueError(
+                f"selection.maximize '{wanted}' conflicts with metric "
+                f"'{self.metric}'"
+            )
         if validation.embargo_rows and not data.time_column:
             raise ValueError(
                 "validation.embargo_rows requires data.time_column"
             )
         return self
+
+    @property
+    def primary_metric(self) -> str | None:
+        """The metric to optimize: `metric`, else `selection.maximize`."""
+        return self.metric or self.selection.maximize
 
     @property
     def fast_budget(self) -> bool:
