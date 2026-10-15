@@ -57,9 +57,9 @@ def test_objectives_on_known_decisions():
 def test_ties_prefer_thresholds_near_one_half():
     probability = np.array([0.1, 0.9])
     actual = np.array([False, True])
-    best, _ = thresholds.optimize_threshold(
+    best = thresholds.optimize_threshold(
         probability, actual, thresholds.AccuracyObjective()
-    )
+    )[0]
     assert 0.1 < best <= 0.9 and abs(best - 0.5) <= 0.4
 
 
