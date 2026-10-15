@@ -146,5 +146,5 @@ def test_failed_and_blocked_runs_list_their_recoverable_trials(
     ambiguous = binary_frame.assign(y=range(len(binary_frame)))
     ambiguous["y"] = ambiguous["y"] % 5
     with pytest.raises(errors.BlockedError) as blocked:
-        mml.MLProject(ambiguous, "y", output_dir=tmp_path / "b").run()
+        support.make_project(ambiguous, "y", output_dir=tmp_path / "b").run()
     assert blocked.value.details["recoverable_trials"] == []
