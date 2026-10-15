@@ -96,3 +96,37 @@ def test_wrapper_survives_pickling_and_cloning():
     model = wrappers.LabelEncodedClassifier(tree.DecisionTreeClassifier())
     assert base.clone(model).get_params()["estimator"] is not None
     assert pickle.loads(pickle.dumps(model)).estimator is not None
+
+
+def test_catboost_passes_conformance_when_installed():
+    pytest.importorskip("catboost")
+    adapter = registry_module.ModelRegistry.with_builtins().get("catboost")
+    conformance.check_conformance(adapter)
+
+
+def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
+    pytest.importorskip("catboost")
+    import support
+
+    from mml.contracts import tasks
+
+    only = tasks.StrategySpec(top_models=0)
+    project = support.make_project(
+        multiclass_frame,
+        "y",
+        task="classification",
+        time_budget=600,
+        output_dir=tmp_path,
+        strategies=only,
+    )
+    plan = project.plan()
+    assert "catboost" in plan.candidate_models
+    result = project.run()
+    assert {"catboost"} <= {
+        t.model_name for t in result.trials if t.status == "ok"
+    }
+    assert set(result.predict(multiclass_frame.drop(columns="y"))) <= {
+        "lo",
+        "mid",
+        "hi",
+    }

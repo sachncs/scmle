@@ -142,3 +142,23 @@ def test_plugin_loading_isolates_failures(registry, monkeypatch):
     )
     assert registry.load_plugins() == ["broken"]
     assert "third_party" in registry.adapters
+
+
+def test_svm_and_knn_pass_conformance_and_respect_size_limits(registry):
+    for name in ("svm", "knn"):
+        conformance.check_conformance(registry.get(name))
+    compatible, rejected = registry.candidates(BINARY, row_count=100_000)
+    assert (
+        "svm" not in {a.name for a in compatible}
+        and "too large" in rejected["svm"]
+    )
+    assert "too large" in rejected["knn"]
+    small, _ = registry.candidates(BINARY, row_count=1_000)
+    assert {"svm", "knn"} <= {a.name for a in small}
+
+
+def test_svm_regression_has_no_probability_argument(registry):
+    estimator = registry.get("svm").build(REGRESSION, 0, {"C": 2.0})
+    assert type(estimator).__name__ == "SVR" and estimator.C == 2.0
+    classifier = registry.get("svm").build(BINARY, 3)
+    assert classifier.probability is True and classifier.random_state == 3

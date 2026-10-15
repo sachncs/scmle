@@ -61,6 +61,8 @@ def test_adapters_apply_sampled_params():
 def test_every_tunable_builtin_samples_valid_configurations():
     registry = registry_module.ModelRegistry.with_builtins()
     for adapter in registry.adapters.values():
+        if not adapter.is_available():
+            continue  # Optional library not installed in this environment.
         conformance.check_conformance(adapter)
         assert (
             adapter.search_space is None
