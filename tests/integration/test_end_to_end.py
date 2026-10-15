@@ -173,3 +173,26 @@ def test_string_labelled_binary_target_supports_every_binary_metric(
         np.isnan(v) for v in result.evaluation["test_metrics"].values()
     )
     assert set(result.predict(labelled.drop(columns="y"))) <= {"false", "true"}
+
+
+def test_diagnostics_are_written_and_exposed(binary_frame, tmp_path):
+    result = run(binary_frame, tmp_path)
+    names = set(result.evaluation["diagnostics"])
+    assert {
+        "classification_report",
+        "calibration",
+        "permutation_importance",
+    } <= names
+    for name in names:
+        assert (result.run_dir / "diagnostics" / f"{name}.json").exists()
+    importance = result.feature_importance()
+    assert list(importance.columns) == ["feature", "importance", "std"]
+    assert importance.iloc[0]["feature"] in {"a", "b", "c"}
+    html = (result.run_dir / "report.html").read_text()
+    assert "Feature importance" in html and "Brier score" in html
+
+
+def test_regression_diagnostics_include_residuals(regression_frame, tmp_path):
+    result = run(regression_frame, tmp_path, task="regression")
+    assert "residuals" in result.diagnostics
+    assert result.feature_importance().iloc[0]["feature"] in {"a", "b"}
