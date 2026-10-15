@@ -81,6 +81,21 @@ class SearchSpec(FrozenModel):
     prune_fraction: float = pydantic.Field(default=0.5, ge=0, lt=1)
 
 
+class StrategySpec(FrozenModel):
+    """Which data strategies to evaluate (imbalance and feature variants)."""
+
+    names: list[str] = pydantic.Field(
+        default_factory=lambda: [
+            "class_weight",
+            "random_oversample",
+            "random_undersample",
+            "log_skewed",
+            "interactions",
+        ]
+    )
+    top_models: int = pydantic.Field(default=2, ge=0)
+
+
 class ProjectSpec(FrozenModel):
     """The explicit, versioned specification of an ML project."""
 
@@ -91,6 +106,7 @@ class ProjectSpec(FrozenModel):
     validation: ValidationSpec = pydantic.Field(default_factory=ValidationSpec)
     resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
     search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
+    strategies: StrategySpec = pydantic.Field(default_factory=StrategySpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
     @pydantic.model_validator(mode="after")

@@ -4,6 +4,8 @@ import dataclasses
 import enum
 from typing import Any
 
+DEFAULT_STRATEGY = "default"
+
 
 class TrialStatus(enum.StrEnum):
     """Terminal status of a trial."""
@@ -131,6 +133,7 @@ class TrialResult:
         fit_seconds: Wall-clock cost.
         error: Failure or skip reason, empty on success.
         params: Hyperparameter overrides (empty for default configuration).
+        strategy: Data strategy the candidate was built with.
     """
 
     trial_id: str
@@ -143,6 +146,7 @@ class TrialResult:
     fit_seconds: float = 0.0
     error: str = ""
     params: dict[str, Any] = dataclasses.field(default_factory=dict)
+    strategy: str = DEFAULT_STRATEGY
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""

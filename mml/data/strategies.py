@@ -13,6 +13,7 @@ from typing import ClassVar
 
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
+from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.data import preprocessing
@@ -22,7 +23,7 @@ MIN_IMBALANCE_RATIO = 3.0
 SKEW_THRESHOLD = 1.0
 MIN_INTERACTION_FEATURES = 2
 MAX_INTERACTION_FEATURES = 12
-DEFAULT = "default"
+DEFAULT = experiments.DEFAULT_STRATEGY
 
 
 class DataStrategy(abc.ABC):

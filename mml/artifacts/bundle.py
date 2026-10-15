@@ -109,6 +109,7 @@ class BundleInfo:
         pandas: pandas version that built it.
         files: SHA-256 per stored file.
         model_params: Hyperparameter overrides of the selected model.
+        strategy: Data strategy of the selected candidate.
     """
 
     model_name: str
@@ -121,6 +122,7 @@ class BundleInfo:
     pandas: str = pd.__version__
     files: dict[str, str] = dataclasses.field(default_factory=dict)
     model_params: dict[str, Any] = dataclasses.field(default_factory=dict)
+    strategy: str = "default"
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -190,6 +192,7 @@ class ModelBundle:
         model_name: str,
         model_version: str = "v1",
         model_params: dict[str, Any] | None = None,
+        strategy: str = "default",
     ) -> ModelBundle:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -203,6 +206,7 @@ class ModelBundle:
             model_name: Selected model family.
             model_version: Bundle version label.
             model_params: Hyperparameter overrides of the selected model.
+            strategy: Data strategy of the selected candidate.
 
         Returns:
             The bundle.
@@ -226,7 +230,11 @@ class ModelBundle:
             else tuple(np.asarray(classes).tolist()),
         )
         info = BundleInfo(
-            model_name, model_version, metric, model_params=model_params or {}
+            model_name,
+            model_version,
+            metric,
+            model_params=model_params or {},
+            strategy=strategy,
         )
         return cls(pipeline, schema, info)
 
