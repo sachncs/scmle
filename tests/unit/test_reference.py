@@ -73,3 +73,40 @@ def test_profile_roundtrips_through_json():
     )
     assert isinstance(labels.output, reference.CategoricalReference)
     assert reference.ReferenceProfile.from_dict(labels.to_dict()) == labels
+
+
+def test_noise_floor_shrinks_with_sample_size():
+    rng = np.random.default_rng(5)
+    small = reference.NumericReference.fit(pd.Series(rng.normal(size=100)))
+    large = reference.NumericReference.fit(pd.Series(rng.normal(size=10000)))
+    assert small.rows == 100 and large.rows == 10000
+    assert small.noise_floor(500) > 5 * large.noise_floor(500)
+    assert small.noise_floor(0) == 0.0
+
+
+def fresh_reference(rng, rows=120):
+    return reference.NumericReference.fit(pd.Series(rng.normal(size=rows)))
+
+
+def test_noise_floor_tracks_simulated_psi_without_drift():
+    rng = np.random.default_rng(7)
+    simulated = [
+        fresh_reference(rng).psi(pd.Series(rng.normal(size=600)))
+        for trial in range(60)
+    ]
+    floor = fresh_reference(rng).noise_floor(600)
+    assert np.mean(simulated) < floor < 3 * np.mean(simulated)
+    assert np.mean([value > floor for value in simulated]) < 0.15
+
+
+def test_adjusted_psi_cuts_false_alarms_but_keeps_real_drift():
+    rng = np.random.default_rng(6)
+    pairs = [
+        (fresh_reference(rng), pd.Series(rng.normal(size=600)))
+        for trial in range(60)
+    ]
+    raw_alarms = sum(ref.psi(new) >= 0.1 for ref, new in pairs)
+    adjusted_alarms = sum(ref.adjusted_psi(new) >= 0.1 for ref, new in pairs)
+    assert raw_alarms > 15 and adjusted_alarms <= 2
+    shifted = pd.Series(rng.normal(loc=2.0, size=600))
+    assert fresh_reference(rng).adjusted_psi(shifted) > 0.25
