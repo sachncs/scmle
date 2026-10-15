@@ -9,6 +9,7 @@ from importlib import metadata
 from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
+from mml.models import boosting_adapters
 from mml.models import sklearn_adapters
 
 ENTRY_POINT_GROUP = "mml.models"
@@ -29,8 +30,16 @@ class ModelRegistry:
 
     @classmethod
     def with_builtins(cls) -> ModelRegistry:
-        """Creates a registry holding the built-in scikit-learn adapters."""
-        return cls(tuple(a() for a in sklearn_adapters.BUILTIN_ADAPTERS))
+        """Creates a registry with the scikit-learn and boosting adapters.
+
+        Boosting adapters register unconditionally; they are rejected at
+        planning time when their library is not installed.
+        """
+        classes = (
+            *sklearn_adapters.BUILTIN_ADAPTERS,
+            *boosting_adapters.BOOSTING_ADAPTERS,
+        )
+        return cls(tuple(adapter() for adapter in classes))
 
     def register(
         self, adapter: models.ModelAdapter, overwrite: bool = False
