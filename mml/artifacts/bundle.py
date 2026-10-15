@@ -7,7 +7,9 @@ tampering after saving, not malice at the source.
 
 import dataclasses
 import hashlib
+import hmac
 import json
+import os
 import pathlib
 import platform
 from typing import Any
@@ -27,6 +29,9 @@ BUNDLE_FORMAT = 1
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
+SIGNATURE_FILE = "signature.json"
+SIGNING_KEY_ENV = "MAGICML_SIGNING_KEY"
+SIGNATURE_ALGORITHM = "hmac-sha256"
 MANIFEST_FILE = "model_manifest.json"
 MAX_KNOWN_CATEGORIES = 200
 MAX_REPORTED_UNSEEN = 20
@@ -44,6 +49,53 @@ def file_sha256(path: pathlib.Path) -> str:
 def minor_version(version: str) -> list[str]:
     """Returns the `[major, minor]` components of a version string."""
     return version.split(".")[:2]
+
+
+def resolve_key(signing_key: str | bytes | None) -> bytes | None:
+    """Returns the signing key from the argument or the environment."""
+    key = (
+        signing_key
+        if signing_key is not None
+        else os.environ.get(SIGNING_KEY_ENV)
+    )
+    if key is None or key == "":
+        return None
+    return key.encode() if isinstance(key, str) else key
+
+
+def sign_manifest(manifest_bytes: bytes, key: bytes) -> str:
+    """HMAC-SHA256 of the manifest (which carries every file checksum)."""
+    return hmac.new(key, manifest_bytes, hashlib.sha256).hexdigest()
+
+
+def verify_signature(
+    root: pathlib.Path, signing_key: str | bytes | None
+) -> bool:
+    """Checks the manifest signature.
+
+    Args:
+        root: Bundle directory.
+        signing_key: HMAC key (defaults to the environment).
+
+    Returns:
+        True when a signature exists and verifies; False when the bundle
+        is unsigned or no key is available.
+
+    Raises:
+        ArtifactError: If a signature exists but does not verify.
+    """
+    signature_path = root / SIGNATURE_FILE
+    key = resolve_key(signing_key)
+    if not signature_path.exists() or key is None:
+        return False
+    recorded = json.loads(signature_path.read_text()).get("signature", "")
+    expected = sign_manifest((root / MANIFEST_FILE).read_bytes(), key)
+    if not hmac.compare_digest(recorded, expected):
+        raise errors.ArtifactError(
+            "bundle signature is invalid: the bundle was modified or "
+            "signed with a different key"
+        )
+    return True
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -253,11 +305,17 @@ class ModelBundle:
         )
         return cls(pipeline, schema, info, reference)
 
-    def save(self, directory: str | pathlib.Path) -> pathlib.Path:
-        """Writes the bundle.
+    def save(
+        self,
+        directory: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+    ) -> pathlib.Path:
+        """Writes the bundle, signing it when a key is available.
 
         Args:
             directory: Destination directory (created if needed).
+            signing_key: HMAC key; defaults to `$MAGICML_SIGNING_KEY`. An
+                unsigned bundle can only be loaded with `trusted=True`.
 
         Returns:
             The directory path.
@@ -275,19 +333,42 @@ class ModelBundle:
             reference_path.write_text(json.dumps(self.reference.to_dict()))
             files[REFERENCE_FILE] = file_sha256(reference_path)
         info = dataclasses.replace(self.info, files=files)
-        (root / MANIFEST_FILE).write_text(json.dumps(info.to_dict(), indent=2))
+        manifest_text = json.dumps(info.to_dict(), indent=2)
+        (root / MANIFEST_FILE).write_text(manifest_text)
+        signature_path = root / SIGNATURE_FILE
+        key = resolve_key(signing_key)
+        if key is not None:
+            signature = sign_manifest(manifest_text.encode(), key)
+            signature_path.write_text(
+                json.dumps(
+                    {"algorithm": SIGNATURE_ALGORITHM, "signature": signature}
+                )
+            )
+        elif signature_path.exists():
+            signature_path.unlink()
         return root
 
     @classmethod
     def load(
         cls,
         directory: str | pathlib.Path,
+        trusted: bool = False,
+        signing_key: str | bytes | None = None,
         allow_version_mismatch: bool = False,
     ) -> ModelBundle:
-        """Loads and verifies a bundle (trusted sources only).
+        """Loads and verifies a bundle.
+
+        Bundles are pickle-based, and unpickling executes code, so loading is
+        refused unless the bundle is authentic: either its HMAC signature
+        verifies against `signing_key` / `$MAGICML_SIGNING_KEY`, or the caller
+        vouches for its source with `trusted=True`. Checksums and signatures
+        are verified *before* anything is unpickled. An invalid signature is
+        always an error, even with `trusted=True`.
 
         Args:
             directory: Bundle directory.
+            trusted: Load an unsigned bundle you vouch for.
+            signing_key: HMAC key used to verify the signature.
             allow_version_mismatch: Load despite differing dependency
                 versions.
 
@@ -295,8 +376,8 @@ class ModelBundle:
             The verified bundle.
 
         Raises:
-            ArtifactError: If files are missing, the checksum fails, the
-                format is unsupported or dependencies are incompatible.
+            ArtifactError: If the bundle is unauthenticated, tampered with,
+                incomplete, or incompatible.
         """
         root = pathlib.Path(directory)
         try:
@@ -313,6 +394,14 @@ class ModelBundle:
                 f"unsupported bundle format {manifest.get('format')}"
             )
         info = BundleInfo(**manifest)
+        authentic = verify_signature(root, signing_key)
+        if not authentic and not trusted:
+            raise errors.ArtifactError(
+                "refusing to load an unauthenticated bundle: it is pickle-"
+                "based and loading executes code. Sign bundles with "
+                f"${SIGNING_KEY_ENV}, or pass trusted=True if you trust its "
+                "source."
+            )
         model_path = root / MODEL_FILE
         if not model_path.exists():
             raise errors.ArtifactError(f"missing {MODEL_FILE}")
