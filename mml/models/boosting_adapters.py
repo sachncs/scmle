@@ -30,11 +30,14 @@ class LazyLibraryAdapter(models.ModelAdapter):
         regressor_name: Regressor class name inside the library.
         needs_integer_labels: Wrap classifiers so arbitrary class labels
             work even though the library only accepts 0..K-1.
+        flatten_predictions: Wrap classifiers whose `predict` returns column
+            vectors so predictions are 1-D.
         fixed_params: Constructor parameters applied to every build.
     """
 
     library: ClassVar[str]
     needs_integer_labels: ClassVar[bool] = False
+    flatten_predictions: ClassVar[bool] = False
     classifier_name: ClassVar[str]
     regressor_name: ClassVar[str]
     fixed_params: ClassVar[types.MappingProxyType] = NO_PARAMS
@@ -76,6 +79,8 @@ class LazyLibraryAdapter(models.ModelAdapter):
         estimator = getattr(module, class_name)(**kwargs)
         if task.is_classification and self.needs_integer_labels:
             return wrappers.LabelEncodedClassifier(estimator)
+        if task.is_classification and self.flatten_predictions:
+            return wrappers.FlatPredictionClassifier(estimator)
         return estimator
 
 
@@ -149,6 +154,7 @@ class CatBoostAdapter(LazyLibraryAdapter):
 
     name = "catboost"
     family = "boosting"
+    flatten_predictions = True
     library = "catboost"
     requires = ("catboost",)
     classifier_name = "CatBoostClassifier"

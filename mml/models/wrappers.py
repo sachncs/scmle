@@ -1,6 +1,7 @@
 """Estimator wrappers adapting third-party quirks to the framework."""
 
 from typing import Any
+from typing import Self
 
 import numpy as np
 from sklearn import base
@@ -45,4 +46,39 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
 
     def predict_proba(self, features: Any) -> np.ndarray:
         """Returns class probabilities in `classes_` order."""
+        return self.estimator_.predict_proba(features)
+
+
+class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):
+    """Guarantees 1-D predictions from libraries that return column vectors.
+
+    CatBoost's multiclass `predict` returns shape `(n, 1)`; the framework's
+    contract is `(n,)`.
+
+    Attributes:
+        estimator: Unfitted classifier.
+        estimator_: Fitted clone.
+        classes_: Class labels.
+    """
+
+    def __init__(self, estimator: base.BaseEstimator) -> None:
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Classifier whose `predict` may be 2-D.
+        """
+        self.estimator = estimator
+
+    def fit(self, features: Any, target: Any) -> Self:
+        """Fits a clone of the wrapped classifier."""
+        self.estimator_ = base.clone(self.estimator).fit(features, target)
+        self.classes_ = np.asarray(self.estimator_.classes_).ravel()
+        return self
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Predicts, flattened to one dimension."""
+        return np.asarray(self.estimator_.predict(features)).ravel()
+
+    def predict_proba(self, features: Any) -> np.ndarray:
+        """Returns class probabilities."""
         return self.estimator_.predict_proba(features)
