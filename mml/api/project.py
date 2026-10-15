@@ -39,6 +39,7 @@ class MLProject:
         test_fraction: float = 0.2,
         seed: int = 42,
         search: tasks.SearchSpec | None = None,
+        strategies: tasks.StrategySpec | None = None,
         leakage_policy: LeakagePolicy = "warn",
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -63,6 +64,8 @@ class MLProject:
             search: Hyperparameter search settings; defaults to a small
                 pruned random search. Use `SearchSpec(top_models=0)` to
                 disable tuning.
+            strategies: Which data strategies to evaluate; defaults to all.
+                Use `StrategySpec(top_models=0)` to disable.
             leakage_policy: `warn` or `block` on leakage hypotheses.
             output_dir: Parent directory for run directories.
 
@@ -91,6 +94,7 @@ class MLProject:
                 time_budget_seconds=time_budget, workers=workers
             ),
             search=search or tasks.SearchSpec(),
+            strategies=strategies or tasks.StrategySpec(),
             leakage_policy=leakage_policy,
         )
         self.output_dir = pathlib.Path(output_dir)
