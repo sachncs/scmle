@@ -98,6 +98,72 @@ def verify_signature(
     return True
 
 
+@dataclasses.dataclass(frozen=True)
+class ColumnMapping:
+    """Explicit policy for reconciling incoming column names with a schema.
+
+    Nothing is renamed implicitly: the default policy requires exact names.
+
+    Attributes:
+        renames: Incoming name -> expected name.
+        case_insensitive: Match remaining columns ignoring letter case.
+        strip_whitespace: Match remaining columns ignoring surrounding
+            whitespace.
+    """
+
+    renames: dict[str, str] = dataclasses.field(default_factory=dict)
+    case_insensitive: bool = False
+    strip_whitespace: bool = False
+
+    def normalize(self, name: str) -> str:
+        """Applies the matching normalizations to a column name."""
+        if self.strip_whitespace:
+            name = name.strip()
+        return name.lower() if self.case_insensitive else name
+
+    def apply(self, frame: pd.DataFrame, expected: list[str]) -> pd.DataFrame:
+        """Renames incoming columns according to the policy.
+
+        Args:
+            frame: Incoming data (not modified).
+            expected: Column names the model expects.
+
+        Returns:
+            A frame whose matching columns carry the expected names.
+
+        Raises:
+            SchemaError: If two incoming columns map to the same expected
+                column, or a rename target does not exist in the schema.
+        """
+        unknown = sorted(set(self.renames.values()) - set(expected))
+        if unknown:
+            raise errors.SchemaError(
+                f"rename targets not in the model schema: {unknown}",
+                {"unknown": unknown},
+            )
+        by_key = {self.normalize(name): name for name in expected}
+        mapping: dict[str, str] = {}
+        for column in map(str, frame.columns):
+            if column in expected:
+                continue
+            target = self.renames.get(column)
+            if target is None and (
+                self.case_insensitive or self.strip_whitespace
+            ):
+                target = by_key.get(self.normalize(column))
+            if target is not None:
+                mapping[column] = target
+        targets = list(mapping.values())
+        clashes = sorted({t for t in targets if targets.count(t) > 1})
+        clashes += [t for t in mapping.values() if t in frame.columns]
+        if clashes:
+            raise errors.SchemaError(
+                f"ambiguous column mapping onto {sorted(set(clashes))}",
+                {"ambiguous": sorted(set(clashes))},
+            )
+        return frame.rename(columns=mapping)
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class BundleSchema:
     """Input contract of a trained model.
@@ -449,16 +515,23 @@ class ModelBundle:
             return data.copy()
         return readers.read_table(data)
 
-    def validate(self, data: str | pathlib.Path | pd.DataFrame) -> SchemaReport:
+    def validate(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        mapping: ColumnMapping | None = None,
+    ) -> SchemaReport:
         """Checks input against the schema without predicting.
 
         Args:
             data: DataFrame or path to CSV/Parquet.
+            mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
             Missing/extra columns, missing-value counts and unseen categories.
         """
         frame = self.read_frame(data)
+        if mapping is not None:
+            frame = mapping.apply(frame, [*self.features, self.schema.target])
         wanted = self.features
         present = [c for c in wanted if c in frame.columns]
         unseen = {}
@@ -484,15 +557,23 @@ class ModelBundle:
         )
 
     def prepare_frame(
-        self, data: str | pathlib.Path | pd.DataFrame
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        mapping: ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Validates input and returns the feature columns.
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            mapping: Explicit column-name policy; exact names if omitted.
 
         Raises:
             SchemaError: On missing columns or non-numeric values in numeric
                 columns.
         """
         frame = self.read_frame(data)
+        if mapping is not None:
+            frame = mapping.apply(frame, [*self.features, self.schema.target])
         report = self.validate(frame)
         if not report.valid:
             raise errors.SchemaError(
@@ -511,14 +592,29 @@ class ModelBundle:
             )
         return frame[self.features]
 
-    def predict(self, data: str | pathlib.Path | pd.DataFrame) -> np.ndarray:
-        """Predicts labels or values through the full fitted pipeline."""
-        return self.pipeline.predict(self.prepare_frame(data))
+    def predict(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        mapping: ColumnMapping | None = None,
+    ) -> np.ndarray:
+        """Predicts labels or values through the full fitted pipeline.
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            mapping: Explicit column-name policy; exact names if omitted.
+        """
+        return self.pipeline.predict(self.prepare_frame(data, mapping))
 
     def predict_proba(
-        self, data: str | pathlib.Path | pd.DataFrame
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        mapping: ColumnMapping | None = None,
     ) -> np.ndarray:
         """Predicts class probabilities.
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            mapping: Explicit column-name policy; exact names if omitted.
 
         Raises:
             ArtifactError: For regression models or estimators without
@@ -530,4 +626,4 @@ class ModelBundle:
             raise errors.ArtifactError(
                 "this model does not provide probabilities"
             )
-        return self.pipeline.predict_proba(self.prepare_frame(data))
+        return self.pipeline.predict_proba(self.prepare_frame(data, mapping))
