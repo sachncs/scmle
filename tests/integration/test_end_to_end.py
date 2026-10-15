@@ -6,6 +6,7 @@ import pathlib
 
 import numpy as np
 import pytest
+import support
 
 import mml
 from mml.contracts import errors
@@ -17,7 +18,7 @@ def read_kinds(run_dir):
 
 
 def run(frame, tmp_path, **kwargs):
-    project = mml.MLProject(
+    project = support.make_project(
         frame, "y", time_budget=120, output_dir=tmp_path, **kwargs
     )
     return project.run()
@@ -98,7 +99,7 @@ def test_regression_is_ranked_by_lower_rmse(regression_frame, tmp_path):
 
 def test_csv_input_and_plan_without_side_effects(binary_frame, tmp_path):
     binary_frame.to_csv(tmp_path / "d.csv", index=False)
-    project = mml.MLProject(
+    project = support.make_project(
         tmp_path / "d.csv", "y", output_dir=tmp_path / "runs"
     )
     plan = project.plan()
@@ -108,7 +109,7 @@ def test_csv_input_and_plan_without_side_effects(binary_frame, tmp_path):
 
 
 def test_approved_plan_restricts_models(binary_frame, tmp_path):
-    project = mml.MLProject(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     plan = dataclasses.replace(
         project.plan(), candidate_models=("dummy", "logistic_regression")
     )

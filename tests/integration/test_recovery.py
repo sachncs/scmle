@@ -5,8 +5,8 @@ import os
 
 import pytest
 from sklearn import dummy
+import support
 
-import mml
 from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
@@ -39,7 +39,7 @@ def read_events(run_dir):
 def project_with(adapter, frame, tmp_path, **kwargs):
     registry = registry_module.ModelRegistry.with_builtins()
     registry.register(adapter)
-    project = mml.MLProject(frame, "y", output_dir=tmp_path, **kwargs)
+    project = support.make_project(frame, "y", output_dir=tmp_path, **kwargs)
     project.orchestrator.registry = registry
     return project
 
@@ -55,7 +55,7 @@ def test_failed_trial_is_isolated(binary_frame, tmp_path):
 
 def test_all_trials_failing_ends_in_failed_state(binary_frame, tmp_path):
     registry = registry_module.ModelRegistry((ExplodingAdapter(),))
-    project = mml.MLProject(binary_frame, "y", output_dir=tmp_path)
+    project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
     with pytest.raises(
         errors.MagicMLError, match="all trials failed"
@@ -93,7 +93,7 @@ def test_cancellation_keeps_completed_trials(binary_frame, tmp_path):
 
 
 def test_budget_exhaustion_skips_later_trials(binary_frame, tmp_path):
-    result = mml.MLProject(
+    result = support.make_project(
         binary_frame, "y", time_budget=1, output_dir=tmp_path
     ).run()
     assert result.trials[0].status == "ok" and result.state == "COMPLETED"
@@ -110,7 +110,7 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
             super().execute(context)
 
     stages = (*stages_module.default_stages()[:-1], Recording())
-    spec = mml.MLProject(binary_frame, "y").spec
+    spec = support.make_project(binary_frame, "y").spec
     result = orchestrator_module.Orchestrator(
         spec, binary_frame, stages=stages
     ).run(tmp_path)
