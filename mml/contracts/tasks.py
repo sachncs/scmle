@@ -144,6 +144,7 @@ class ResourceSpec(FrozenModel):
     workers: int = pydantic.Field(default=1, ge=1)
     executor: Literal["process", "ray"] = "process"
     gpu: Literal["auto", "disabled", "required"] = "auto"
+    enforcement: Literal["hard", "cooperative"] = "hard"
 
 
 class SearchSpec(FrozenModel):

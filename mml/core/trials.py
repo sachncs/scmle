@@ -112,10 +112,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
             payload.seed,
             job.params,
         )
-        with (
-            limits.hard_limits(payload.ceiling_seconds, payload.memory_gb),
-            threadpoolctl.threadpool_limits(limits=payload.thread_limit),
-        ):
+        with threadpoolctl.threadpool_limits(limits=payload.thread_limit):
             cv = model_selection.cross_validate(
                 pipeline,
                 payload.features,
@@ -133,6 +130,30 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
         result.error = f"{type(error).__name__}: {error}"
     result.fit_seconds = time.monotonic() - started
     return result
+
+
+def guarded_evaluate(payload: TrialPayload) -> experiments.TrialResult:
+    """Evaluates a job in a supervised process under hard limits.
+
+    A trial killed for exceeding a limit, or lost with its process, becomes a
+    `FAILED` result so the run continues.
+    """
+    supervisor = limits.TrialSupervisor(
+        payload.ceiling_seconds, payload.memory_gb
+    )
+    try:
+        return supervisor.run(evaluate_payload, payload)
+    except limits.TrialLimitError as error:
+        job = payload.job
+        return experiments.TrialResult(
+            job.trial_id,
+            job.model_name,
+            experiments.TrialStatus.FAILED,
+            payload.metric.name,
+            params=dict(job.params),
+            strategy=job.strategy,
+            error=f"TrialLimitError: {error}",
+        )
 
 
 class TrialRunner:
@@ -163,6 +184,7 @@ class TrialRunner:
     def payload(self, job: TrialJob) -> TrialPayload:
         """Builds the self-contained payload for a job."""
         context = self.context
+        governor = context.resource_governor
         return TrialPayload(
             job=job,
             adapter=context.registry.get(job.model_name),
@@ -177,8 +199,8 @@ class TrialRunner:
             features=self.split.dev_features,
             target=self.split.dev_target,
             folds=self.folds,
-            thread_limit=context.resource_governor.thread_limit,
-            ceiling_seconds=context.resource_governor.trial_ceiling_seconds(),
+            thread_limit=governor.thread_limit,
+            ceiling_seconds=governor.trial_ceiling_seconds(),
             memory_gb=context.spec.resources.memory_limit_gb,
         )
 
@@ -227,7 +249,9 @@ class TrialRunner:
             else:
                 slots.append(index)
                 payloads.append(self.payload(job))
-        outputs = self.context.backend.map(evaluate_payload, payloads)
+        governor = self.context.resource_governor
+        function = guarded_evaluate if governor.hard else evaluate_payload
+        outputs = self.context.backend.map(function, payloads)
         for index, output in zip(slots, outputs, strict=True):
             results[index] = output
         return [r for r in results if r is not None]

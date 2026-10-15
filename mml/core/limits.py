@@ -1,28 +1,30 @@
-"""Resource limits: enforce what can be enforced, report what cannot.
+"""Resource limits: enforced by supervising each trial in its own process.
 
-* Time budget: no new trial starts after the budget, and a running trial is
-  interrupted by a hard ceiling (the remaining budget plus a grace share)
-  delivered as a timer signal, so it fails instead of overrunning.
+* Time budget: no new trial starts after the budget, and a running trial that
+  passes its hard ceiling (the remaining budget plus a grace share) is
+  killed and recorded as failed, whatever code it is executing.
+* Memory: no new trial starts above the limit, and a trial whose resident
+  memory exceeds the limit is killed and recorded as failed. Resident memory
+  is sampled while the trial runs, so a very fast allocation spike can
+  overshoot by one sampling interval.
 * CPU: the worker count is capped at `cpu_limit` and each worker's math
   libraries are limited to its share of the CPUs.
-* Memory: no new trial starts above the limit, and where the operating
-  system honours address-space limits (Linux) each trial runs under a hard
-  cap, so an allocation beyond it fails the trial. macOS cannot enforce
-  this; there the limit stays cooperative and the report says so.
 * GPU: no built-in model uses a GPU; `gpu="required"` blocks the run.
+
+Supervision applies when `ResourceSpec.enforcement` is `hard` (the default);
+`cooperative` only stops new trials from starting.
 """
 
-from collections.abc import Iterator
-import contextlib
+from collections.abc import Callable
 import dataclasses
+import multiprocessing
+from multiprocessing import connection
+import os
 import resource
-import signal
+import subprocess  # nosec B404
 import sys
-import threading
 import time
-from types import FrameType
 from typing import Any
-from typing import Never
 
 from mml.contracts import errors
 from mml.contracts import tasks
@@ -31,66 +33,12 @@ BYTES_PER_GB = 1024**3
 KILOBYTES = 1024
 GRACE_SHARE = 0.1
 MIN_CEILING_SECONDS = 1.0
-HARD_MEMORY_SUPPORTED = sys.platform.startswith("linux")
+POLL_SECONDS = 0.1
+PRELOAD_MODULES = ["numpy", "pandas", "sklearn"]
 
 
 class TrialLimitError(errors.MagicMLError):
-    """Raised inside a trial that exceeded its hard time ceiling."""
-
-
-def current_address_space() -> int:
-    """Bytes of address space this process holds now (Linux only)."""
-    with open("/proc/self/statm", encoding="ascii") as handle:
-        pages = int(handle.read().split()[0])
-    return pages * resource.getpagesize()
-
-
-@contextlib.contextmanager
-def hard_limits(
-    ceiling_seconds: float | None, memory_gb: float | None
-) -> Iterator[None]:
-    """Applies a hard time ceiling and (on Linux) a memory cap to a block.
-
-    The time ceiling uses a timer signal, so it only applies in the main
-    thread; elsewhere the block runs unbounded and the governor's report
-    states that. Previous handlers and limits are always restored.
-
-    Args:
-        ceiling_seconds: Seconds before `TrialLimitError` is raised.
-        memory_gb: Address-space cap in gigabytes.
-
-    Yields:
-        None.
-    """
-    previous_handler = None
-    previous_memory = None
-    use_timer = threading.current_thread() is threading.main_thread()
-    if ceiling_seconds is None or not use_timer:
-        use_timer = False
-    else:
-
-        def interrupt(signum: int, frame: FrameType | None) -> Never:
-            raise TrialLimitError(
-                f"trial exceeded its {ceiling_seconds:.1f}s hard time ceiling"
-            )
-
-        previous_handler = signal.signal(signal.SIGALRM, interrupt)
-        signal.setitimer(signal.ITIMER_REAL, ceiling_seconds)
-    if memory_gb is not None and HARD_MEMORY_SUPPORTED:
-        previous_memory = resource.getrlimit(resource.RLIMIT_AS)
-        hard = previous_memory[1]
-        wanted = current_address_space() + int(memory_gb * BYTES_PER_GB)
-        if hard != resource.RLIM_INFINITY:
-            wanted = min(wanted, hard)
-        resource.setrlimit(resource.RLIMIT_AS, (wanted, hard))
-    try:
-        yield
-    finally:
-        if previous_memory is not None:
-            resource.setrlimit(resource.RLIMIT_AS, previous_memory)
-        if use_timer:
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, previous_handler)
+    """Raised when a supervised trial was stopped or lost."""
 
 
 def peak_memory_gb() -> float:
@@ -99,6 +47,107 @@ def peak_memory_gb() -> float:
     own = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * scale
     children = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss * scale
     return max(own, children) / BYTES_PER_GB
+
+
+def resident_bytes(pid: int) -> int:
+    """Current resident memory of a process, 0 if it is gone."""
+    statm = f"/proc/{pid}/statm"
+    if os.path.exists(statm):
+        with open(statm, encoding="ascii") as handle:
+            return int(handle.read().split()[1]) * resource.getpagesize()
+    completed = subprocess.run(  # nosec B603 B607
+        ["ps", "-o", "rss=", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    text = completed.stdout.strip()
+    return int(text) * KILOBYTES if text.isdigit() else 0
+
+
+def child_main(
+    channel: connection.Connection,
+    function: Callable[[Any], Any],
+    argument: Any,
+) -> None:
+    """Runs `function(argument)` in the supervised process."""
+    try:
+        channel.send((True, function(argument)))
+    except BaseException as error:  # Reported to the supervisor.
+        channel.send((False, f"{type(error).__name__}: {error}"))
+    finally:
+        channel.close()
+
+
+@dataclasses.dataclass(frozen=True)
+class TrialSupervisor:
+    """Runs one call in a separate process under hard limits.
+
+    Attributes:
+        ceiling_seconds: Wall-clock limit (None = unlimited).
+        memory_gb: Resident-memory limit in gigabytes (None = unlimited).
+    """
+
+    ceiling_seconds: float | None = None
+    memory_gb: float | None = None
+
+    def run(self, function: Callable[[Any], Any], argument: Any) -> Any:
+        """Calls `function(argument)` in a child process and returns its value.
+
+        Args:
+            function: Picklable module-level function.
+            argument: Picklable argument.
+
+        Raises:
+            TrialLimitError: If the child exceeded a limit, died, or raised.
+        """
+        context = multiprocessing.get_context("forkserver")
+        context.set_forkserver_preload(PRELOAD_MODULES)
+        receiver, sender = context.Pipe(duplex=False)
+        process = context.Process(
+            target=child_main, args=(sender, function, argument)
+        )
+        started = time.monotonic()
+        process.start()
+        sender.close()
+        try:
+            while not receiver.poll(POLL_SECONDS):
+                reason = self.violation(process, time.monotonic() - started)
+                if reason:
+                    raise TrialLimitError(reason)
+                if not process.is_alive() and not receiver.poll(0):
+                    raise TrialLimitError(
+                        f"trial process died (exit code {process.exitcode})"
+                    )
+            succeeded, value = receiver.recv()
+        except EOFError as error:
+            raise TrialLimitError("trial process died unexpectedly") from error
+        finally:
+            if process.is_alive():
+                process.kill()
+            process.join()
+            receiver.close()
+        if not succeeded:
+            raise TrialLimitError(value)
+        return value
+
+    def violation(
+        self, process: multiprocessing.process.BaseProcess, elapsed: float
+    ) -> str | None:
+        """Why the running trial must be killed, or None."""
+        if self.ceiling_seconds is not None and elapsed > self.ceiling_seconds:
+            return (
+                f"trial exceeded its {self.ceiling_seconds:.1f}s hard time "
+                "ceiling and was killed"
+            )
+        if self.memory_gb is not None and process.pid is not None:
+            used = resident_bytes(process.pid) / BYTES_PER_GB
+            if used > self.memory_gb:
+                return (
+                    f"trial used {used:.2f} GB, above the "
+                    f"{self.memory_gb:.2f} GB memory limit, and was killed"
+                )
+        return None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -131,6 +180,17 @@ class ResourceGovernor:
         """Whether peak memory is above the configured limit."""
         return peak_memory_gb() > self.spec.memory_limit_gb
 
+    @property
+    def hard(self) -> bool:
+        """Whether trials run under process supervision."""
+        return self.spec.enforcement == "hard"
+
+    def enforcement_text(self, hard_part: str) -> str:
+        """Describes how a limit is applied under the current mode."""
+        if self.hard:
+            return f"no trial starts past the limit; {hard_part}"
+        return "cooperative: no trial starts past the limit"
+
     def trial_ceiling_seconds(self) -> float:
         """Hard time ceiling for a trial dispatched now."""
         budget = self.spec.time_budget_seconds
@@ -160,9 +220,10 @@ class ResourceGovernor:
             "time_budget": {
                 "limit_seconds": self.spec.time_budget_seconds,
                 "elapsed_seconds": elapsed,
-                "enforcement": "no trial starts after the budget; running "
-                "trials are interrupted at the hard ceiling (remaining "
-                f"budget + {GRACE_SHARE:.0%} grace) in a main thread",
+                "enforcement": self.enforcement_text(
+                    "running trials are killed at the hard ceiling "
+                    f"(remaining budget + {GRACE_SHARE:.0%} grace)"
+                ),
                 "within_limit": elapsed <= self.spec.time_budget_seconds,
             },
             "cpu": {
@@ -176,11 +237,10 @@ class ResourceGovernor:
             "memory": {
                 "limit_gb": self.spec.memory_limit_gb,
                 "observed_peak_gb": peak,
-                "enforcement": "no trial starts above the limit; each trial "
-                "runs under a hard cap on address-space growth"
-                if HARD_MEMORY_SUPPORTED
-                else "cooperative only on this platform: no trial starts "
-                "above the limit (the OS cannot cap address space)",
+                "enforcement": self.enforcement_text(
+                    "running trials above the limit are killed "
+                    "(resident memory sampled while they run)"
+                ),
                 "within_limit": peak <= self.spec.memory_limit_gb,
             },
             "gpu": {

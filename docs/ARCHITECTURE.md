@@ -49,8 +49,8 @@ tracking database.
   the single release of the test set (`test.opened`).
 * **Data-access ledger** (`diagnostics/data_access.json`) states what every
   fitted operation could see and *verifies* it against the split manifest.
-* **Resource governor** applies CPU / time / memory limits (hard per-trial time ceiling,
-  Linux memory cap, no new trial past a limit) and
+* **Resource governor** applies CPU / time / memory limits (every trial supervised in its own
+  process, killed at a hard time ceiling or memory limit) and
   reports, per limit, how it was enforced and what was observed.
 * **Replay verification** (`MLProject.verify_replay`) classifies a rerun as
   `exact`, `comparable` or `different`.
