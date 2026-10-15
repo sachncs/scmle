@@ -153,3 +153,30 @@ class TrialResult:
         record = dataclasses.asdict(self)
         record["status"] = str(self.status)
         return record
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class HistoricalRun:
+    """What is remembered about a past run, for meta-learning.
+
+    Attributes:
+        run_id: Run identifier.
+        dataset_id: Dataset identity (content derived).
+        data_hash: Hash of the dataset contents.
+        task: Task type value.
+        metric: Optimized metric name.
+        fingerprint: Numeric dataset fingerprint.
+        selected_model: Winning model name.
+        selected_strategy: Winning data strategy.
+        cv_score: Cross-validation score of the winner.
+    """
+
+    run_id: str
+    dataset_id: str
+    data_hash: str
+    task: str
+    metric: str
+    fingerprint: dict[str, float]
+    selected_model: str
+    selected_strategy: str
+    cv_score: float

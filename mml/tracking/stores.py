@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS runs (
     metric TEXT,
     cv_score REAL,
     test_metrics TEXT,
-    run_dir TEXT
+    run_dir TEXT,
+    fingerprint TEXT,
+    task TEXT,
+    selected_strategy TEXT
 );
 CREATE TABLE IF NOT EXISTS trials (
     run_id TEXT NOT NULL,
@@ -73,6 +76,10 @@ class ExperimentStore(abc.ABC):
     def trials(self, run_id: str) -> list[dict[str, Any]]:
         """Returns a run's trials in insertion order."""
 
+    @abc.abstractmethod
+    def history(self) -> list[experiments.HistoricalRun]:
+        """Returns completed runs that carry a dataset fingerprint."""
+
     def listen(self, run_id: str, event: events.Event) -> None:
         """Mirrors state-change events into the run's `state` column.
 
@@ -106,6 +113,10 @@ class NullExperimentStore(ExperimentStore):
         """Returns nothing."""
         return []
 
+    def history(self) -> list[experiments.HistoricalRun]:
+        """Returns nothing."""
+        return []
+
 
 class SqliteExperimentStore(ExperimentStore):
     """Local SQLite tracking database (one file, no services)."""
@@ -117,9 +128,12 @@ class SqliteExperimentStore(ExperimentStore):
             "split_fingerprint",
             "state",
             "selected_model",
+            "selected_strategy",
             "metric",
             "cv_score",
             "test_metrics",
+            "fingerprint",
+            "task",
         }
     )
 
@@ -133,6 +147,16 @@ class SqliteExperimentStore(ExperimentStore):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            self.migrate(connection)
+
+    def migrate(self, connection: sqlite3.Connection) -> None:
+        """Adds columns introduced after a database was first created."""
+        existing = {
+            row["name"] for row in connection.execute("PRAGMA table_info(runs)")
+        }
+        for column in ("fingerprint", "task", "selected_strategy"):
+            if column not in existing:
+                connection.execute(f"ALTER TABLE runs ADD COLUMN {column} TEXT")
 
     def connect(self) -> sqlite3.Connection:
         """Opens a short-lived connection with row access by name."""
@@ -210,3 +234,28 @@ class SqliteExperimentStore(ExperimentStore):
                 (run_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def history(self) -> list[experiments.HistoricalRun]:
+        """Returns completed, fingerprinted runs, oldest first."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM runs WHERE state = 'COMPLETED' AND "
+                "fingerprint IS NOT NULL AND selected_model IS NOT NULL "
+                "ORDER BY started_at, run_id"
+            ).fetchall()
+        return [
+            experiments.HistoricalRun(
+                run_id=row["run_id"],
+                dataset_id=row["dataset_id"] or "",
+                data_hash=row["data_hash"] or "",
+                task=row["task"] or "",
+                metric=row["metric"] or "",
+                fingerprint=json.loads(row["fingerprint"]),
+                selected_model=row["selected_model"],
+                selected_strategy=row["selected_strategy"] or "default",
+                cv_score=row["cv_score"]
+                if row["cv_score"] is not None
+                else float("nan"),
+            )
+            for row in rows
+        ]
