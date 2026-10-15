@@ -1,0 +1,6 @@
+{
+  "breast_cancer": {"metric": "roc_auc", "bound": 0.985},
+  "wine": {"metric": "log_loss", "bound": 0.25},
+  "digits": {"metric": "log_loss", "bound": 0.20},
+  "diabetes_progression": {"metric": "rmse", "bound": 60.0}
+}
