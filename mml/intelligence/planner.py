@@ -527,13 +527,24 @@ class Planner:
             for a in candidates
         ]
         names = tuple(a.name for a in candidates)
-        identity = f"{spec.config_hash()}|{profile.manifest.data_hash}|{names}"
+        strategy = splitting.resolve_strategy_name(spec, task)
+        resolved = tasks.ProjectSpec.model_validate(
+            spec.model_dump()
+            | {
+                "metric": metric.name,
+                "validation": spec.validation.model_dump()
+                | {"strategy": strategy},
+            }
+        )
+        identity = (
+            f"{resolved.config_hash()}|{profile.manifest.data_hash}|{names}"
+        )
         plan_id = hashlib.sha256(identity.encode()).hexdigest()[:10]
         return experiments.ExperimentPlan(
             plan_id=f"plan_{plan_id}",
             task=task.value,
             metric=metric.name,
-            validation_strategy=splitting.resolve_strategy_name(spec, task),
+            validation_strategy=strategy,
             candidate_models=names,
             optimization_budget_seconds=spec.resources.time_budget_seconds,
             decisions=tuple(decisions),
