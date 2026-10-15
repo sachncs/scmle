@@ -158,6 +158,7 @@ def test_registry_and_unknown_strategy():
         "class_weight",
         "random_oversample",
         "random_undersample",
+        "calibrated",
         "log_skewed",
         "interactions",
     )
