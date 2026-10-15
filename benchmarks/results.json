@@ -12,7 +12,7 @@
       "test_score": 0.9957010582010583,
       "reference_test": 0.9900793650793651,
       "trials": 28,
-      "seconds": 126.51339333306532,
+      "seconds": 126.75712029100396,
       "findings": [],
       "error": ""
     },
@@ -28,7 +28,7 @@
       "test_score": 0.04801474758172297,
       "reference_test": 0.009887081031650943,
       "trials": 28,
-      "seconds": 8.318625583080575,
+      "seconds": 8.326089125010185,
       "findings": [],
       "error": ""
     },
@@ -44,7 +44,7 @@
       "test_score": 0.09189559396009818,
       "reference_test": 0.13937637894988164,
       "trials": 27,
-      "seconds": 286.1581866670167,
+      "seconds": 285.85209300008137,
       "findings": [
         "column 'pixel_0_0' dropped: constant",
         "column 'pixel_4_0' dropped: constant",
@@ -64,7 +64,7 @@
       "test_score": 53.586306819054165,
       "reference_test": 57.008044540919535,
       "trials": 28,
-      "seconds": 4.911600999999791,
+      "seconds": 4.880706583964638,
       "findings": [],
       "error": ""
     },
@@ -80,7 +80,7 @@
       "test_score": 0.7848809523809523,
       "reference_test": 0.7478571428571429,
       "trials": 28,
-      "seconds": 50.53332162508741,
+      "seconds": 50.54086308309343,
       "findings": [],
       "error": ""
     },
@@ -96,7 +96,7 @@
       "test_score": 0.9946604938271605,
       "reference_test": 0.9910185185185185,
       "trials": 27,
-      "seconds": 17.799518084037118,
+      "seconds": 17.800424041924998,
       "findings": [
         "column 'name' dropped: id-like (near-unique text)",
         "column 'cabin' is 77% missing",
@@ -120,7 +120,7 @@
       "test_score": 0.5312712905042027,
       "reference_test": 0.5248868948224219,
       "trials": 38,
-      "seconds": 85.60090949991718,
+      "seconds": 85.92868875002023,
       "findings": [
         "897 duplicate rows",
         "20 feature combinations have inconsistent labels"
@@ -139,7 +139,7 @@
       "test_score": 0.9154096135196103,
       "reference_test": 0.906638362222753,
       "trials": 33,
-      "seconds": 99.6307839169167,
+      "seconds": 99.6765442090109,
       "findings": [
         "8 duplicate rows",
         "3 feature combinations have inconsistent labels"
@@ -158,7 +158,7 @@
       "test_score": 47169.39361280817,
       "reference_test": 49377.866806686834,
       "trials": 26,
-      "seconds": 64.77018091699574,
+      "seconds": 64.69347362499684,
       "findings": [],
       "error": ""
     }
