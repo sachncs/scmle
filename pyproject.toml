@@ -38,11 +38,31 @@ testpaths = ["tests"]
 filterwarnings = ["ignore::UserWarning", "ignore::FutureWarning"]
 
 [tool.ruff]
-line-length = 100
-src = [".", "tests"]
+line-length = 80
+indent-width = 4
+target-version = "py314"
+src = ["."]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "W", "F", "I", "UP", "B", "N", "D", "ANN", "SIM", "RUF", "C4", "SLF"]
+ignore = ["ANN401", "RUF012"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+force-single-line = true
+known-first-party = ["mml"]
+case-sensitive = false
+order-by-type = false
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ANN", "E501", "SLF"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
 
 [tool.mypy]
 python_version = "3.14"
