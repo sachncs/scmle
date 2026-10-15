@@ -6,6 +6,7 @@ from typing import Literal
 import pandas as pd
 
 from mml.api import results
+from mml.artifacts import reproducibility
 from mml.contracts import data as data_contracts
 from mml.contracts import experiments
 from mml.contracts import tasks
@@ -159,6 +160,34 @@ class MLProject:
             run_directory, frame=data
         )
         return orchestrator.resume(run_directory)
+
+    @classmethod
+    def verify_replay(
+        cls,
+        run_directory: str | pathlib.Path,
+        data: pd.DataFrame | None = None,
+        output_dir: str | pathlib.Path | None = None,
+    ) -> reproducibility.ReplayVerdict:
+        """Re-executes a finished run's configuration and compares the runs.
+
+        Args:
+            run_directory: A completed run directory.
+            data: The original in-memory data, if the run used a DataFrame.
+            output_dir: Where to write the rerun (default: next to the
+                original).
+
+        Returns:
+            Whether the rerun is `exact`, `comparable` or `different`.
+        """
+        original = pathlib.Path(run_directory)
+        orchestrator = orchestrator_module.Orchestrator.for_run_directory(
+            original, frame=data
+        )
+        rerun = orchestrator.run(output_dir or original.parent)
+        return reproducibility.compare_runs(
+            reproducibility.load_run(original),
+            reproducibility.load_run(rerun.run_dir),
+        )
 
     def cancel(self) -> None:
         """Requests cancellation of a running workflow."""
