@@ -1,0 +1,23 @@
+# Changelog
+
+## 0.1.0b1
+
+First public beta.
+
+* Typed, versioned project specification; deterministic config hash.
+* Leakage-safe workflow: locked test set, fold-local fitting, split
+  strategies (stratified, random, group, temporal), leakage hypotheses
+  including outcome-dependent recording.
+* Model registry with scikit-learn, LightGBM and XGBoost adapters, cross-fitted
+  stacking, pruned hyperparameter search (random or Optuna), data strategies
+  (class weighting, resampling, calibration, log and interaction features),
+  threshold optimization, serving-constraint selection.
+* Diagnostics and explainability; decision log; HTML report.
+* Resumable runs, SQLite (and MLflow) tracking, parallel trials (process
+  pool or Ray), meta-learning from run history.
+* Signed, checksummed bundles; refuses unauthenticated loading by default.
+* Monitoring (drift with sampling-noise floor, delayed labels, advisor),
+  champion-challenger, model registry, batch and HTTP serving, lifecycle
+  manager.
+* CLI: `plan`, `run`, `resume`, `predict`.
+* Benchmarks on nine open datasets with a regression gate.
