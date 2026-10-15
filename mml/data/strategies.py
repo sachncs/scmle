@@ -22,6 +22,7 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.data import preprocessing
 from mml.models import resampling
+from mml.models import synthesis
 
 MIN_IMBALANCE_RATIO = 3.0
 SKEW_THRESHOLD = 1.0
@@ -260,6 +261,18 @@ class JitterStrategy(ResamplingStrategy):
     resampler_class = resampling.JitterOverSampler
 
 
+class CopulaAugmentStrategy(ResamplingStrategy):
+    """Experimental augmentation: Gaussian-copula synthetic minority rows.
+
+    Opt-in only; adopted only when it beats the un-augmented baseline on the
+    original validation folds.
+    """
+
+    name = "copula_augment"
+    description = "EXPERIMENTAL Gaussian-copula synthetic minority rows"
+    resampler_class = synthesis.CopulaOverSampler
+
+
 class SmoteStrategy(ImbalanceStrategy):
     """SMOTE-family oversampling on the encoded training fold.
 
@@ -429,13 +442,14 @@ STRATEGIES: dict[str, DataStrategy] = {
         BorderlineSmoteStrategy(),
         AdasynStrategy(),
         JitterStrategy(),
+        CopulaAugmentStrategy(),
         CalibrationStrategy(),
         LogSkewedStrategy(),
         InteractionStrategy(),
     )
 }
 EXPERIMENTAL = tuple(name for name in STRATEGIES if name != DEFAULT)
-OPT_IN = frozenset({"jitter_augment"})
+OPT_IN = frozenset({"jitter_augment", "copula_augment"})
 DEFAULT_NAMES = tuple(n for n in EXPERIMENTAL if n not in OPT_IN)
 
 

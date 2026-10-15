@@ -27,6 +27,7 @@ dependencies = [
     "pyarrow>=22",
     "pydantic>=2.12",
     "scikit-learn>=1.8",
+    "scipy>=1.15",
     "joblib>=1.5",
     "threadpoolctl>=3.6",
 ]
