@@ -8,6 +8,8 @@ original validation distribution, so a technique is adopted only on evidence.
 
 import abc
 from collections.abc import Mapping
+import importlib
+import importlib.util
 from typing import Any
 from typing import ClassVar
 
@@ -246,6 +248,91 @@ class CalibrationStrategy(DataStrategy):
         )
 
 
+class JitterStrategy(ResamplingStrategy):
+    """Experimental augmentation: jittered minority copies in each fold.
+
+    Not part of the default strategy list; request it explicitly with
+    `StrategySpec(names=["jitter_augment"])`.
+    """
+
+    name = "jitter_augment"
+    description = "EXPERIMENTAL jittered minority augmentation inside the fold"
+    resampler_class = resampling.JitterOverSampler
+
+
+class SmoteStrategy(ImbalanceStrategy):
+    """SMOTE-family oversampling on the encoded training fold.
+
+    Attributes:
+        sampler_name: Class name in `imblearn.over_sampling`.
+    """
+
+    sampler_name: ClassVar[str] = "SMOTE"
+    min_features: ClassVar[int] = 2
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs imbalanced-learn and a purely numeric feature space."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        if importlib.util.find_spec("imblearn") is None:
+            return "needs the 'sampling' extra (imbalanced-learn)"
+        if profile.feature_plan.categorical:
+            return "interpolating one-hot categories is not meaningful"
+        if len(profile.feature_plan.numeric) < self.min_features:
+            return "needs at least two numeric features"
+        return None
+
+    def build(
+        self,
+        plan: data_contracts.FeaturePlan,
+        adapter: models.ModelAdapter,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Builds preprocess -> resample -> model with the SMOTE variant."""
+        over_sampling = importlib.import_module("imblearn.over_sampling")
+        sampler = getattr(over_sampling, self.sampler_name)(random_state=seed)
+        options = data_contracts.PreprocessingOptions(
+            scale=adapter.capabilities.needs_scaling
+        )
+        return resampling.PreprocessedResamplingClassifier(
+            preprocessing.build_preprocessor(plan, options),
+            sampler,
+            adapter.build(task, seed, params),
+        )
+
+
+class BorderlineSmoteStrategy(SmoteStrategy):
+    """Borderline-SMOTE: synthesizes only near the decision boundary."""
+
+    name = "borderline_smote"
+    description = "Borderline-SMOTE oversampling inside the training fold"
+    sampler_name = "BorderlineSMOTE"
+
+
+class PlainSmoteStrategy(SmoteStrategy):
+    """Classic SMOTE."""
+
+    name = "smote"
+    description = "SMOTE oversampling inside the training fold"
+    sampler_name = "SMOTE"
+
+
+class AdasynStrategy(SmoteStrategy):
+    """ADASYN: more synthetic rows where minority density is low."""
+
+    name = "adasyn"
+    description = "ADASYN oversampling inside the training fold"
+    sampler_name = "ADASYN"
+
+
 class FeatureStrategy(DataStrategy):
     """Base for strategies that change the numeric preprocessing.
 
@@ -338,12 +425,18 @@ STRATEGIES: dict[str, DataStrategy] = {
         ClassWeightStrategy(),
         OversampleStrategy(),
         UndersampleStrategy(),
+        PlainSmoteStrategy(),
+        BorderlineSmoteStrategy(),
+        AdasynStrategy(),
+        JitterStrategy(),
         CalibrationStrategy(),
         LogSkewedStrategy(),
         InteractionStrategy(),
     )
 }
 EXPERIMENTAL = tuple(name for name in STRATEGIES if name != DEFAULT)
+OPT_IN = frozenset({"jitter_augment"})
+DEFAULT_NAMES = tuple(n for n in EXPERIMENTAL if n not in OPT_IN)
 
 
 def get_strategy(name: str) -> DataStrategy:
