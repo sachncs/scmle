@@ -1,0 +1,62 @@
+"""Run directory management (the evidence plane's local backend)."""
+
+import datetime
+import json
+import pathlib
+from typing import Any
+
+
+class RunStore:
+    """A uniquely named run directory with typed write helpers."""
+
+    def __init__(self, run_id: str, directory: pathlib.Path) -> None:
+        """Initializes the store over an existing directory.
+
+        Args:
+            run_id: Identifier of the run.
+            directory: The run directory.
+        """
+        self.run_id = run_id
+        self.directory = directory
+
+    @classmethod
+    def create(cls, root: str | pathlib.Path) -> "RunStore":
+        """Allocates `run_YYYYMMDD_NNN` under `root` without collisions.
+
+        Args:
+            root: Parent directory (created if needed).
+
+        Returns:
+            A store for the new directory.
+        """
+        parent = pathlib.Path(root)
+        parent.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d")
+        number = 1
+        while True:
+            run_id = f"run_{stamp}_{number:03d}"
+            try:
+                (parent / run_id).mkdir()
+                return cls(run_id, parent / run_id)
+            except FileExistsError:
+                number += 1
+
+    def path(self, relative: str) -> pathlib.Path:
+        """Returns an absolute path inside the run directory."""
+        return self.directory / relative
+
+    def make_directory(self, relative: str) -> pathlib.Path:
+        """Creates (if needed) and returns a subdirectory."""
+        target = self.path(relative)
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    def write_json(self, relative: str, payload: Any) -> None:
+        """Writes `payload` as indented JSON (unknown types become strings)."""
+        self.path(relative).write_text(
+            json.dumps(payload, indent=2, default=str)
+        )
+
+    def write_text(self, relative: str, text: str) -> None:
+        """Writes plain text."""
+        self.path(relative).write_text(text)
