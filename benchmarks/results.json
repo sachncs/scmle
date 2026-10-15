@@ -12,7 +12,7 @@
       "test_score": 0.996031746031746,
       "reference_test": 0.9900793650793651,
       "trials": 21,
-      "seconds": 4.718410707893781,
+      "seconds": 3.882344917044975,
       "findings": [],
       "error": ""
     },
@@ -28,7 +28,7 @@
       "test_score": 0.012626722967911624,
       "reference_test": 0.009887081031650943,
       "trials": 21,
-      "seconds": 1.7466957080177963,
+      "seconds": 1.478156124940142,
       "findings": [],
       "error": ""
     },
@@ -44,7 +44,7 @@
       "test_score": 0.0983672626538954,
       "reference_test": 0.13937637894988164,
       "trials": 20,
-      "seconds": 33.60092200001236,
+      "seconds": 27.829034292022698,
       "findings": [
         "column 'pixel_0_0' dropped: constant",
         "column 'pixel_4_0' dropped: constant",
@@ -64,7 +64,7 @@
       "test_score": 53.586306819054165,
       "reference_test": 57.008044540919535,
       "trials": 23,
-      "seconds": 1.6637797500006855,
+      "seconds": 1.3404384170426056,
       "findings": [],
       "error": ""
     },
@@ -80,7 +80,7 @@
       "test_score": 0.8102380952380953,
       "reference_test": 0.7478571428571429,
       "trials": 22,
-      "seconds": 5.93247350002639,
+      "seconds": 5.262009958038107,
       "findings": [],
       "error": ""
     },
@@ -96,7 +96,7 @@
       "test_score": 0.995462962962963,
       "reference_test": 0.9910185185185185,
       "trials": 22,
-      "seconds": 3.4756262499140576,
+      "seconds": 2.908783165970817,
       "findings": [
         "column 'name' dropped: id-like (near-unique text)",
         "column 'cabin' is 77% missing",
@@ -110,7 +110,7 @@
     },
     {
       "name": "kc1_defects",
-      "status": "error",
+      "status": "ok",
       "rows": 2109,
       "task": "binary_classification",
       "metric": "pr_auc",
@@ -118,14 +118,14 @@
       "cv_score": 0.47962378099528824,
       "baseline_cv": 0.15471177988868015,
       "test_score": 0.4637653968575743,
-      "reference_test": NaN,
+      "reference_test": 0.5248868948224219,
       "trials": 27,
-      "seconds": 9.391215916024521,
+      "seconds": 8.398931000032462,
       "findings": [
         "897 duplicate rows",
         "20 feature combinations have inconsistent labels"
       ],
-      "error": "Traceback (most recent call last):\n  File \"/Users/sachin/Documents/Codex/github-repos/mml/benchmarks/run_benchmarks.py\", line 106, in run_one\n    record.reference_test = reference.reference_score(\n                            ~~~~~~~~~~~~~~~~~~~~~~~~~^\n        frame,\n        ^^^^^^\n    ...<4 lines>...\n        record.task != \"regression\",\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/Users/sachin/Documents/Codex/github-repos/mml/benchmarks/reference.py\", line 65, in reference_score\n    float(scorer(estimator, features.iloc[test], frame[target].iloc[test]))\n          ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/sachin/Documents/Codex/github-repos/mml/.venv/lib/python3.14t/site-packages/sklearn/utils/validation.py\", line 80, in inner_f\n    return f(*args, **kwargs)\n  File \"/Users/sachin/Documents/Codex/github-repos/mml/.venv/lib/python3.14t/site-packages/sklearn/metrics/_scorer.py\", line 328, in __call__\n    return self._score(partial(_cached_call, None), estimator, X, y_true, **kwargs)\n           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: pos_label=1 is not a valid label: It should be one of ['false' 'true']\n"
+      "error": ""
     },
     {
       "name": "adult_income",
@@ -139,7 +139,7 @@
       "test_score": 0.9144456122471672,
       "reference_test": 0.906638362222753,
       "trials": 28,
-      "seconds": 16.9623474170221,
+      "seconds": 15.302003041957505,
       "findings": [
         "8 duplicate rows",
         "3 feature combinations have inconsistent labels"
@@ -158,7 +158,7 @@
       "test_score": 48795.96792233372,
       "reference_test": 49377.866806686834,
       "trials": 21,
-      "seconds": 19.727440832997672,
+      "seconds": 19.14892104198225,
       "findings": [],
       "error": ""
     }
