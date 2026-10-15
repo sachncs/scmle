@@ -130,15 +130,9 @@ def summarize_target(
 ) -> tuple[dict, list[str]]:
     """Summarizes the target distribution and imbalance risk."""
     if not task.is_classification:
-        return (
-            {
-                "task": task.value,
-                "mean": float(target.mean()),
-                "std": float(target.std()),
-                "skew": float(target.skew()),
-            },
-            [],
-        )
+        moments = target.astype(float).agg(["mean", "std", "skew"])
+        stats = {str(k): float(v) for k, v in moments.to_dict().items()}
+        return {"task": task.value, **stats}, []
     counts = target.value_counts()
     ratio = float(counts.iloc[0] / counts.iloc[-1])
     summary = {

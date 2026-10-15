@@ -14,6 +14,7 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import tree
 
+from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
 
@@ -40,10 +41,18 @@ class SklearnAdapter(models.ModelAdapter):
     params: ClassVar[types.MappingProxyType] = NO_PARAMS
 
     def build(self, task: tasks.TaskType, seed: int) -> models.Estimator:
-        """Instantiates the class matching `task`, seeding it if supported."""
+        """Instantiates the class matching `task`, seeding it if supported.
+
+        Raises:
+            ConfigError: If the adapter declares no class for the task.
+        """
         estimator_class = (
             self.classifier if task.is_classification else self.regressor
         )
+        if estimator_class is None:
+            raise errors.ConfigError(
+                f"{self.name}: no estimator class for {task.value}"
+            )
         kwargs: dict[str, Any] = dict(self.params)
         if "random_state" in inspect.signature(estimator_class).parameters:
             kwargs["random_state"] = seed
