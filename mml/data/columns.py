@@ -24,6 +24,8 @@ MISSING_TOKEN = "__missing__"
 ID_UNIQUE_RATIO = 0.95
 MAX_DIRECT_VALUES = 20
 MIN_ASSOCIATION_ROWS = 10
+MIN_MISSING_RATE = 0.05
+MIN_PRESENT_ROWS = 20
 
 
 def to_float(values: Any) -> np.ndarray:
@@ -99,6 +101,42 @@ class ColumnKind(abc.ABC):
     ) -> float:
         """Returns a [0, 1] single-feature association with the target."""
         return 0.0
+
+    def missingness_association(
+        self, series: pd.Series, target: pd.Series, task: tasks.TaskType
+    ) -> float:
+        """Measures how strongly *being missing* tells the target apart.
+
+        Values recorded only for some outcomes (a discharge code, a recovered
+        body, a lifeboat) are a classic leakage pattern that value-based
+        associations cannot see, because the informative rows are the
+        missing ones.
+
+        Args:
+            series: Feature values.
+            target: Labels or values.
+            task: Resolved task type.
+
+        Returns:
+            A score in [0, 1]; 1.0 when the feature is recorded for only one
+            outcome class, otherwise the gain of the missingness indicator.
+        """
+        indicator = series.isna()
+        rate = float(indicator.mean())
+        present = int((~indicator).sum())
+        if rate < MIN_MISSING_RATE or present < MIN_PRESENT_ROWS:
+            return 0.0
+        if not task.is_classification:
+            corr = indicator.astype(float).corr(
+                target.astype(float), method="spearman"
+            )
+            return float(abs(corr)) if pd.notna(corr) else 0.0
+        gain = purity_association(indicator, target)
+        one_sided = (
+            target[~indicator].nunique() == 1
+            and target[indicator].nunique() > 1
+        )
+        return max(gain, 1.0 if one_sided else 0.0)
 
     def usable_rows(
         self, series: pd.Series, target: pd.Series

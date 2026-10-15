@@ -13,6 +13,7 @@ from mml.contracts import tasks
 from mml.data import columns
 
 LEAK_ASSOCIATION = 0.98
+MISSINGNESS_LEAK = 0.9
 HIGH_MISSING_DROP = 0.95
 HIGH_MISSING_WARN = 0.30
 SEVERE_IMBALANCE = 10.0
@@ -254,12 +255,23 @@ class DatasetProfiler:
             series = frame[name]
             kind = columns.kind_of(series)
             score = kind.association(series, target, task)
+            missing_score = kind.missingness_association(series, target, task)
             statistics[name]["target_association"] = round(score, 4)
+            statistics[name]["missingness_association"] = round(
+                missing_score, 4
+            )
             if score >= LEAK_ASSOCIATION:
                 findings.append(
                     f"feature '{name}' is almost perfectly associated with "
                     f"the target ({score:.3f}): possible leakage (or an "
                     "exceptionally strong predictor); review before trusting"
+                )
+            if missing_score >= MISSINGNESS_LEAK:
+                findings.append(
+                    f"whether feature '{name}' is recorded almost determines "
+                    f"the target ({missing_score:.3f}): possible leakage "
+                    "(information captured only for some outcomes); review "
+                    "before trusting"
                 )
         return findings
 
