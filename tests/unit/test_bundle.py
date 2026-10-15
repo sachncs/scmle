@@ -296,3 +296,25 @@ def test_exact_matches_are_never_renamed(trained):
     np.testing.assert_array_equal(
         bundle.predict(features, mapping), bundle.predict(features)
     )
+
+
+def test_round_trip_verification_passes_and_reports_the_tolerance(
+    trained, tmp_path
+):
+    bundle, features = trained
+    bundle.save(tmp_path / "m")
+    record = bundle.verify_round_trip(tmp_path / "m", features.head(50))
+    assert record["rows"] == 50
+    assert record["largest_difference"] <= record["tolerance"]
+
+
+def test_round_trip_verification_catches_a_bundle_that_drifted(
+    trained, tmp_path
+):
+    bundle, features = trained
+    bundle.save(tmp_path / "m")
+    other = bundle_module.ModelBundle.load(tmp_path / "m", trusted=True)
+    flipped = features.assign(num=-features.num)
+    other.pipeline = other.pipeline.fit(flipped, (flipped.num > 0).astype(int))
+    with pytest.raises(errors.ArtifactError, match="does not reproduce"):
+        other.verify_round_trip(tmp_path / "m", features.head(50))

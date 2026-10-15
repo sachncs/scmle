@@ -64,6 +64,9 @@ class Stage(abc.ABC):
         """Performs the stage, reading and writing the context."""
 
 
+PARITY_ROWS = 200
+
+
 class IngestStage(Stage):
     """Reads the dataset and fingerprints it."""
 
@@ -654,6 +657,9 @@ class PackageStage(Stage):
             ),
         )
         bundle.save(store.path("model"))
+        evaluation["artifact_verification"] = bundle.verify_round_trip(
+            store.path("model"), split.dev_features.head(PARITY_ROWS)
+        )
         store.write_json(
             "diagnostics/data_access.json",
             ledger.build_ledger(

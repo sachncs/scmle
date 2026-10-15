@@ -34,6 +34,7 @@ MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
 HISTORY_FILE = "series_history.parquet"
+PARITY_TOLERANCE = 1e-9
 SIGNATURE_FILE = "signature.json"
 SIGNING_KEY_ENV = "MAGICML_SIGNING_KEY"
 SIGNATURE_ALGORITHM = "hmac-sha256"
@@ -443,6 +444,58 @@ class ModelBundle:
                 history_source
             )
         return bundle
+
+    def verify_round_trip(
+        self,
+        directory: str | pathlib.Path,
+        sample: pd.DataFrame,
+        tolerance: float = PARITY_TOLERANCE,
+    ) -> dict[str, Any]:
+        """Reloads the saved bundle and checks it predicts like this one.
+
+        Args:
+            directory: Where the bundle was saved.
+            sample: Raw rows to score with both copies.
+            tolerance: Largest allowed absolute probability difference;
+                labels and regression values must match to the same
+                tolerance.
+
+        Returns:
+            The verification record (rows, tolerance, largest difference).
+
+        Raises:
+            ArtifactError: If the reloaded bundle disagrees with this one.
+        """
+        reloaded = ModelBundle.load(directory, trusted=True)
+        before = np.asarray(self.predict(sample))
+        after = np.asarray(reloaded.predict(sample))
+        if before.dtype.kind in "fiu":
+            worst = float(np.max(np.abs(before - after), initial=0.0))
+        else:
+            worst = float(np.sum(before != after))
+        if self.schema.classes is not None:
+            worst = max(
+                worst,
+                float(
+                    np.max(
+                        np.abs(
+                            self.predict_proba(sample)
+                            - reloaded.predict_proba(sample)
+                        ),
+                        initial=0.0,
+                    )
+                ),
+            )
+        if worst > tolerance:
+            raise errors.ArtifactError(
+                "the saved bundle does not reproduce this model's "
+                f"predictions (largest difference {worst:.3g} > {tolerance:g})"
+            )
+        return {
+            "rows": len(sample),
+            "tolerance": tolerance,
+            "largest_difference": worst,
+        }
 
     def series_builder(self) -> feature_graph.SeriesFeatureBuilder:
         """The builder for this model's series features, with its history."""
