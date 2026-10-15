@@ -153,7 +153,7 @@ def test_svm_and_knn_pass_conformance_and_respect_size_limits(registry):
         and "too large" in rejected["svm"]
     )
     assert "too large" in rejected["knn"]
-    small, _ = registry.candidates(BINARY, row_count=1_000)
+    small = registry.candidates(BINARY, row_count=1_000)[0]
     assert {"svm", "knn"} <= {a.name for a in small}
 
 
