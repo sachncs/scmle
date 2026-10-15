@@ -21,10 +21,12 @@ import mml
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.data import readers
+from mml.monitoring import reference as reference_module
 
 BUNDLE_FORMAT = 1
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
+REFERENCE_FILE = "reference.json"
 MANIFEST_FILE = "model_manifest.json"
 MAX_KNOWN_CATEGORIES = 200
 MAX_REPORTED_UNSEEN = 20
@@ -169,7 +171,11 @@ class ModelBundle:
     """A fitted pipeline plus the schema and metadata needed to serve it."""
 
     def __init__(
-        self, pipeline: Any, schema: BundleSchema, info: BundleInfo
+        self,
+        pipeline: Any,
+        schema: BundleSchema,
+        info: BundleInfo,
+        reference: reference_module.ReferenceProfile | None = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -177,10 +183,12 @@ class ModelBundle:
             pipeline: Fitted preprocessing + estimator pipeline.
             schema: Input contract.
             info: Provenance metadata.
+            reference: Training-time distributions for monitoring.
         """
         self.pipeline = pipeline
         self.schema = schema
         self.info = info
+        self.reference = reference
 
     @classmethod
     def create(
@@ -196,6 +204,7 @@ class ModelBundle:
         model_params: dict[str, Any] | None = None,
         strategy: str = "default",
         decision_threshold: float | None = None,
+        reference: reference_module.ReferenceProfile | None = None,
     ) -> ModelBundle:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -211,6 +220,7 @@ class ModelBundle:
             model_params: Hyperparameter overrides of the selected model.
             strategy: Data strategy of the selected candidate.
             decision_threshold: Optimized binary decision threshold, if any.
+            reference: Training-time distributions for monitoring.
 
         Returns:
             The bundle.
@@ -241,7 +251,7 @@ class ModelBundle:
             strategy=strategy,
             decision_threshold=decision_threshold,
         )
-        return cls(pipeline, schema, info)
+        return cls(pipeline, schema, info, reference)
 
     def save(self, directory: str | pathlib.Path) -> pathlib.Path:
         """Writes the bundle.
@@ -259,9 +269,12 @@ class ModelBundle:
         (root / SCHEMA_FILE).write_text(
             json.dumps(self.schema.to_dict(), indent=2)
         )
-        info = dataclasses.replace(
-            self.info, files={MODEL_FILE: file_sha256(model_path)}
-        )
+        files = {MODEL_FILE: file_sha256(model_path)}
+        if self.reference is not None:
+            reference_path = root / REFERENCE_FILE
+            reference_path.write_text(json.dumps(self.reference.to_dict()))
+            files[REFERENCE_FILE] = file_sha256(reference_path)
+        info = dataclasses.replace(self.info, files=files)
         (root / MANIFEST_FILE).write_text(json.dumps(info.to_dict(), indent=2))
         return root
 
@@ -314,7 +327,20 @@ class ModelBundle:
                 + "; ".join(problems),
                 {"mismatches": problems},
             )
-        return cls(joblib.load(model_path), schema, info)
+        reference = None
+        reference_path = root / REFERENCE_FILE
+        if REFERENCE_FILE in info.files:
+            if (
+                not reference_path.exists()
+                or file_sha256(reference_path) != info.files[REFERENCE_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: reference profile was modified"
+                )
+            reference = reference_module.ReferenceProfile.from_dict(
+                json.loads(reference_path.read_text())
+            )
+        return cls(joblib.load(model_path), schema, info, reference)
 
     @property
     def features(self) -> list[str]:
