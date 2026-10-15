@@ -21,6 +21,7 @@ from mml.contracts import errors
 from mml.contracts import events
 from mml.contracts import experiments
 from mml.contracts import tasks
+from mml.core import checkpoints as checkpoints_module
 from mml.core import context as context_module
 from mml.core import execution
 from mml.core import limits
@@ -51,6 +52,7 @@ class Orchestrator:
         policy: selection.SelectionPolicy | None = None,
         stages: tuple[stages_module.Stage, ...] | None = None,
         tracker: tracking_stores.ExperimentStore | None = None,
+        checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
     ) -> None:
         """Initializes the orchestrator.
 
@@ -60,6 +62,8 @@ class Orchestrator:
             registry: Model registry; defaults to the built-in adapters.
             policy: Selection policy; defaults to best mean CV score.
             stages: Stage sequence; defaults to the standard workflow.
+            checkpoints: Approval gates consulted after the planning and
+                selection stages; any rejection blocks the run.
             tracker: Experiment store; defaults to a SQLite database next to
                 the run directories.
         """
@@ -71,6 +75,7 @@ class Orchestrator:
         self.policy = policy or selection.BestMeanPolicy()
         self.stages = stages or stages_module.default_stages()
         self.tracker = tracker
+        self.checkpoints = checkpoints
         self.tracking_path: pathlib.Path | None = None
         self.cancel_event = threading.Event()
 
@@ -245,6 +250,31 @@ class Orchestrator:
             checkpoints[record["trial_id"]] = experiments.TrialResult(**record)
         return checkpoints
 
+    def consult_checkpoints(
+        self, gate: state.RunState, context: context_module.RunContext
+    ) -> None:
+        """Asks every checkpoint registered for `gate` and audits the verdicts.
+
+        Raises:
+            BlockedError: If any checkpoint rejects.
+        """
+        for checkpoint in self.checkpoints:
+            if gate not in checkpoint.gates:
+                continue
+            verdict = checkpoint.review(
+                checkpoints_module.describe(gate, context)
+            )
+            context.emit(
+                f"policy.{'approved' if verdict.approved else 'rejected'}",
+                verdict.reason,
+                data={"gate": gate.value, "reviewer": verdict.reviewer},
+            )
+            if not verdict.approved:
+                raise errors.BlockedError(
+                    f"{gate.value} not approved by {verdict.reviewer}: "
+                    f"{verdict.reason or 'no reason given'}"
+                )
+
     def execute(
         self,
         store: store_module.RunStore,
@@ -286,6 +316,7 @@ class Orchestrator:
                 context.check_cancelled()
                 machine.transition(stage.state, stage.describe(context))
                 stage.execute(context)
+                self.consult_checkpoints(stage.state, context)
             machine.transition(
                 state.RunState.COMPLETED,
                 "run complete",

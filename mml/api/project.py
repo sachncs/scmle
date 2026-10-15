@@ -9,6 +9,7 @@ from mml.api import results
 from mml.contracts import data as data_contracts
 from mml.contracts import experiments
 from mml.contracts import tasks
+from mml.core import checkpoints as checkpoints_module
 from mml.core import context as context_module
 from mml.core import orchestrator as orchestrator_module
 
@@ -44,6 +45,7 @@ class MLProject:
         selection: tasks.SelectionSpec | None = None,
         decision: tasks.DecisionSpec | None = None,
         leakage_policy: LeakagePolicy = "warn",
+        checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
         """Defines a project.
@@ -74,6 +76,8 @@ class MLProject:
             decision: Threshold optimization for binary tasks (objective
                 f1, accuracy, balanced_accuracy or an explicit cost).
             leakage_policy: `warn` or `block` on leakage hypotheses.
+            checkpoints: Approval gates after planning and selection (the
+                latter fires before the test set is opened).
             output_dir: Parent directory for run directories.
 
         Raises:
@@ -108,7 +112,9 @@ class MLProject:
             leakage_policy=leakage_policy,
         )
         self.output_dir = pathlib.Path(output_dir)
-        self.orchestrator = orchestrator_module.Orchestrator(self.spec, frame)
+        self.orchestrator = orchestrator_module.Orchestrator(
+            self.spec, frame, checkpoints=checkpoints
+        )
         self.orchestrator.tracking_path = self.output_dir / "experiments.sqlite"
         self.profile: data_contracts.DatasetProfile | None = None
 
