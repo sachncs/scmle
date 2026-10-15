@@ -30,6 +30,7 @@ from mml.core import execution
 from mml.core import stages
 from mml.core import state
 from mml.data import columns
+from mml.data import strategies as strategies_module
 from mml.deployment import lifecycle
 from mml.models import conformance
 from mml.models import registry as registry_module
@@ -442,9 +443,14 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
         < kinds.index("test.opened")
     )
     assert result.evaluation["test_set_opened"] is True
-    assert (
-        any(t.strategy != "default" for t in result.trials) or True
-    )  # strategies attempted if applicable
+    planned = {
+        d.technique
+        for d in result.plan.decisions
+        if d.action == "include" and d.technique in strategies_module.STRATEGIES
+    }
+    attempted = {t.strategy for t in result.trials} - {"default"}
+    assert attempted <= planned  # nothing outside the plan was tried
+    assert bool(attempted) == bool(planned)  # applicable strategies were tried
     assert (
         result.run_dir / "model"
     ).exists()  # artifact verification and registration
@@ -933,9 +939,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     renamed = features.rename(columns={"a": "alpha"})
     mapping = bundle_module.ColumnMapping({"alpha": "a"})
     np.testing.assert_array_equal(
-        result.predict(renamed, mapping)
-        if False
-        else result.bundle.predict(renamed, mapping),
+        result.bundle.predict(renamed, mapping),
         result.predict(features),
     )  # explicit mapping
     with pytest.raises(errors.SchemaError) as caught:
@@ -1017,24 +1021,38 @@ def test_l554_l606_roadmap_deliverables(frame, tmp_path):
     ).exists()  # M4
 
 
-def test_l610_l629_backlog_priorities():
-    """L610-L629: each backlog row has an implementation entry point."""
+def test_l610_l629_backlog_priorities(run):
+    """L610-L629: each backlog row has a working implementation."""
+    from mml.contracts import models as model_contracts
     from mml.deployment import registry
     from mml.deployment import serving
     from mml.evaluation import diagnostics
+    from mml.intelligence import knowledge
+    from mml.models import ensembles
+    from mml.models import synthesis
     from mml.monitoring import monitor
 
-    assert mml.MLProject and mml.ModelBundle  # P0 project API / artifacts
-    assert registry.ModelRegistryStore and serving.HttpServing  # P2 deployment
-    assert monitor.ModelMonitor  # P2 monitoring
-    assert diagnostics.PermutationImportance  # P1 explainability
-    from mml.models import ensembles  # P2 ensembles / augmentation
-    from mml.models import synthesis  # P2 ensembles / augmentation
-
-    assert ensembles.StackingAdapter and synthesis.GaussianCopulaGenerator
-    from mml.intelligence import knowledge  # P2 meta-learning
-
-    assert knowledge.MetaLearner
+    result = run[1]
+    assert len(result.predict(make_frame().drop(columns="y"))) == len(
+        make_frame()
+    )  # P0 project API and inference-ready artifact
+    assert issubclass(serving.HttpServing, serving.ServingAdapter)  # P2
+    assert callable(registry.ModelRegistryStore.promote)  # P2 deployment
+    report = monitor.ModelMonitor(result.bundle).assess(
+        make_frame(seed=3).drop(columns="y"), make_frame(seed=3)["y"]
+    )
+    assert report.recommendation.action  # P2 monitoring
+    assert issubclass(
+        diagnostics.PermutationImportance, diagnostics.Diagnostic
+    )  # P1 explainability
+    assert "permutation_importance" in result.diagnostics
+    assert issubclass(ensembles.StackingAdapter, model_contracts.ModelAdapter)
+    generator = synthesis.GaussianCopulaGenerator().fit(
+        make_frame()[["a", "b"]]
+    )
+    fake = generator.sample(30, np.random.default_rng(0))
+    assert fake.shape == (30, 2)  # P2 augmentation
+    assert knowledge.MetaLearner([]).recommend  # P2 meta-learning
 
 
 def test_l637_l669_test_categories_and_quality_gates(run):
@@ -1096,25 +1114,30 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
     )  # distributed: optional
 
 
-def test_l739_l747_first_sprint_outcomes():
+def test_l739_l747_first_sprint_outcomes(run):
     """L739-L747: the five concrete outcomes."""
-    assert (
-        ROOT / "docs" / "ARCHITECTURE.md"
-    ).exists()  # 1 published architecture
-    assert (ROOT / "pyproject.toml").exists() and (
-        ROOT / "tests"
-    ).is_dir()  # 2 package skeleton + tests
+    assert (ROOT / "docs" / "ARCHITECTURE.md").read_text().strip()  # 1
+    assert (ROOT / "pyproject.toml").exists() and list(
+        (ROOT / "tests").rglob("test_*.py")
+    )  # 2 package skeleton + tests
     from mml.data import profiling
     from mml.data import readers
     from mml.data import splitting
 
-    assert (
-        readers.build_manifest and profiling.DatasetProfiler
-    )  # 3 ingestion + profiling
+    frame = make_frame()
+    manifest = readers.build_manifest(frame, "y", "<memory>")
+    assert manifest.row_count == len(frame)  # 3 ingestion
+    profile = profiling.DatasetProfiler(
+        tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
+    ).profile(frame, manifest, tasks.TaskType.BINARY)
+    assert set(profile.feature_plan.features) == {"a", "b", "c"}  # profiling
     assert {"stratified", "random", "group", "temporal"} == set(
         splitting.STRATEGIES
     )  # 4 split manager
-    assert mml.MLProject  # 5 end-to-end training path with saved artifacts
+    result = run[1]
+    assert (
+        result.state == "COMPLETED" and (result.run_dir / "model").exists()
+    )  # 5 end-to-end training path with saved artifacts
 
 
 def test_l751_l761_frozen_api(frame, tmp_path):
@@ -1151,41 +1174,103 @@ def test_l751_l761_frozen_api(frame, tmp_path):
 
 
 def test_l765_l778_future_expansion_commitments(frame, tmp_path):
-    """L765-L778: each architectural commitment has a concrete hook."""
+    """L765-L778: each architectural commitment works, not merely exists."""
+    import pickle
+
     from mml.core import checkpoints as policy
+    from mml.core import trials
     from mml.data import feature_graph
+    from mml.data import splitting
     from mml.intelligence import knowledge
     from mml.models import registry as models_registry
     from mml.models import resampling
     from mml.models import synthesis
     from mml.monitoring import events as monitor_events
 
-    assert (
-        "neural_network"
-        in models_registry.ModelRegistry.with_builtins().adapters
-    )  # deep learning plugins
-    assert tasks.ValidationSpec(embargo_rows=2) and tasks.DataSpec(
-        uri="x", target="y", unavailable_at_prediction=["c"]
-    )  # time-series contracts
-    assert (
-        resampling.Resampler and synthesis.SyntheticGenerator
-    )  # augmentation interfaces
-    assert (
-        feature_graph.FeatureGraphTransformer
-        and tasks.FeatureGraphSpec().fingerprint()
-    )  # feature graph
-    assert knowledge.fingerprint  # meta-learning fingerprint
-    assert policy.PolicyCheckpoint  # human approval
-    assert (
-        monitor_events.PredictionEvent and monitor_events.OutcomeEvent
-    )  # prediction/label schema
-    assert execution.ExecutionBackend  # distributed execution
-    assert (frame is not None) and (tmp_path is not None)
-    from mml.core import trials
+    registry = models_registry.ModelRegistry.with_builtins()
+    neural = registry.get("neural_network")  # deep learning: a plugin family
+    conformance.check_conformance(neural)
 
-    assert dataclasses.is_dataclass(
-        trials.TrialJob
-    )  # scheduler-independent task definitions
+    series = pd.DataFrame(
+        {
+            "t": pd.date_range("2024-01-01", periods=120),
+            "a": np.arange(120.0),
+            "y": np.arange(120) % 2,
+        }
+    )
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(
+            uri="x",
+            target="y",
+            time_column="t",
+            unavailable_at_prediction=["a"],
+        ),
+        validation=tasks.ValidationSpec(
+            strategy="temporal", folds=3, embargo_rows=5
+        ),
+    )
+    split = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(series)
+    gaps = [min(held) - max(fit) for fit, held in split.manifest.folds]
+    assert all(gap > 5 for gap in gaps)  # time-series: embargo is honoured
+    profile = mml.MLProject(
+        series.drop(columns="a").assign(b=np.arange(120.0) % 7),
+        "y",
+        time_column="t",
+    )
+    profile.plan()
+    assert "t" not in profile.profile.feature_plan.features
+
+    generator = synthesis.GaussianCopulaGenerator().fit(frame[["a", "b"]])
+    fake = generator.sample(40, np.random.default_rng(0))
+    report = synthesis.FidelityEvaluator().evaluate(frame[["a", "b"]], fake)
+    assert fake.shape == (40, 2) and report.max_marginal_ks < 0.5
+    assert issubclass(synthesis.GeneratorOverSampler, resampling.Resampler)
+
+    one = tasks.FeatureGraphSpec(
+        nodes=[tasks.FeatureNode(name="sq", op="square", inputs=["b"])]
+    )
+    two = tasks.FeatureGraphSpec(
+        nodes=[tasks.FeatureNode(name="sq", op="sqrt", inputs=["b"])]
+    )
+    assert one.fingerprint() != two.fingerprint()  # versioned graph
+    graph = feature_graph.FeatureGraphTransformer(tuple(one.nodes))
+    out = graph.fit(frame[["b"]]).transform(frame[["b"]])
+    np.testing.assert_allclose(out["sq"], frame["b"] ** 2)
+
+    vector = knowledge.fingerprint(
+        mml_profile(frame), tasks.TaskType.BINARY
+    )  # meta-learning fingerprint
+    assert set(vector) == set(knowledge.FIELDS)
+
+    rejecting = policy.CallbackCheckpoint(lambda review: False)
+    gated = mml.MLProject(
+        frame, "y", output_dir=tmp_path, checkpoints=(rejecting,)
+    )
+    with pytest.raises(errors.BlockedError):
+        gated.run()  # human approval: a rejection stops the run
+
+    prediction = monitor_events.PredictionEvent(
+        "e1", "v1", "2026-01-01T00:00:00Z", {"a": 1.0}, 1, 0.8
+    )
+    outcome = monitor_events.OutcomeEvent("e1", "2026-01-02T00:00:00Z", 1)
+    assert prediction.event_id == outcome.event_id  # label schema joins
+
+    job = trials.TrialJob("trial_001", "dummy", {"strategy": "x"})
+    assert pickle.loads(pickle.dumps(job)) == job  # scheduler-independent
+    for backend in (execution.SequentialBackend(), execution.ProcessBackend(2)):
+        assert backend.map(abs, [-1, -2, -3]) == [1, 2, 3]
+
+
+def mml_profile(frame):
+    """Profile of `frame` for fingerprint checks."""
+    from mml.data import profiling
+    from mml.data import readers
+
+    manifest = readers.build_manifest(frame, "y", "<memory>")
+    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
+    return profiling.DatasetProfiler(spec).profile(
+        frame, manifest, tasks.TaskType.BINARY
+    )
 
 
 def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
