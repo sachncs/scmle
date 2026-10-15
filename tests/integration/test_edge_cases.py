@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 import support
 
 from mml.contracts import errors
@@ -176,3 +177,21 @@ def test_dataset_with_index_not_starting_at_zero(tmp_path):
     frame = base()
     frame.index = frame.index + 1000
     check_inference(run(frame, tmp_path), frame)
+
+
+def test_degenerate_targets_block_the_run_with_a_clear_reason(tmp_path):
+    features = base().drop(columns="y")
+    rows = len(features)
+    cases = {
+        "single": features.assign(y="only"),
+        "identifier": features.assign(y=[f"id{i}" for i in range(rows)]),
+        "constant": features.assign(y=1.0),
+    }
+    reasons = {
+        "single": "nothing to learn",
+        "identifier": "identifier or free text",
+        "constant": "nothing to learn",
+    }
+    for name, frame in cases.items():
+        with pytest.raises(errors.BlockedError, match=reasons[name]):
+            run(frame, tmp_path / name)

@@ -5,6 +5,7 @@ heavy imports only happen when an adapter is actually built.
 """
 
 from importlib import metadata
+from typing import Self
 
 from mml.contracts import errors
 from mml.contracts import models
@@ -30,7 +31,7 @@ class ModelRegistry:
             self.register(adapter)
 
     @classmethod
-    def with_builtins(cls) -> ModelRegistry:
+    def with_builtins(cls) -> Self:
         """Creates a registry with the scikit-learn and boosting adapters.
 
         Boosting adapters register unconditionally; they are rejected at

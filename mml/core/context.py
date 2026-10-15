@@ -4,6 +4,7 @@ import dataclasses
 import threading
 import time
 from typing import Any
+from typing import TypeVar
 
 import pandas as pd
 
@@ -23,8 +24,10 @@ from mml.evaluation import selection
 from mml.models import registry as registry_module
 from mml.tracking import stores as tracking_stores
 
+T = TypeVar("T")
 
-def require[T](value: T | None, name: str) -> T:
+
+def require(value: T | None, name: str) -> T:
     """Returns a stage product, failing loudly if its stage has not run.
 
     Args:

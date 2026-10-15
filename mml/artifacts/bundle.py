@@ -13,6 +13,7 @@ import os
 import pathlib
 import platform
 from typing import Any
+from typing import Self
 
 import joblib
 import numpy as np
@@ -228,7 +229,7 @@ class BundleSchema:
         return record
 
     @classmethod
-    def from_dict(cls, record: dict[str, Any]) -> BundleSchema:
+    def from_dict(cls, record: dict[str, Any]) -> Self:
         """Rebuilds a schema from `to_dict` output."""
         classes = record["classes"]
         return cls(
@@ -365,7 +366,7 @@ class ModelBundle:
         group_column: str | None = None,
         time_column: str | None = None,
         history_source: pd.DataFrame | None = None,
-    ) -> ModelBundle:
+    ) -> Self:
         """Builds a bundle from a fitted pipeline and its training data.
 
         Args:
@@ -534,7 +535,7 @@ class ModelBundle:
         trusted: bool = False,
         signing_key: str | bytes | None = None,
         allow_version_mismatch: bool = False,
-    ) -> ModelBundle:
+    ) -> Self:
         """Loads and verifies a bundle.
 
         Bundles are pickle-based, and unpickling executes code, so loading is

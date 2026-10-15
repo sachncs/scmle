@@ -30,7 +30,7 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
         """
         self.estimator = estimator
 
-    def fit(self, features: Any, target: Any) -> LabelEncodedClassifier:
+    def fit(self, features: Any, target: Any) -> Self:
         """Encodes the labels and fits the wrapped classifier."""
         self.encoder_ = preprocessing.LabelEncoder().fit(target)
         self.classes_ = self.encoder_.classes_

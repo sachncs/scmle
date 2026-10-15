@@ -12,6 +12,7 @@ import json
 import pathlib
 import threading
 from typing import Any
+from typing import Self
 
 import pandas as pd
 
@@ -223,7 +224,7 @@ class Orchestrator:
     @classmethod
     def for_run_directory(
         cls, run_directory: str | pathlib.Path, **kwargs: Any
-    ) -> Orchestrator:
+    ) -> Self:
         """Builds an orchestrator from a saved run's configuration.
 
         Args:

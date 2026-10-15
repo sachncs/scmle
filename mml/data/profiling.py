@@ -18,6 +18,8 @@ MISSINGNESS_LEAK = 0.9
 HIGH_MISSING_DROP = 0.95
 HIGH_MISSING_WARN = 0.30
 SEVERE_IMBALANCE = 10.0
+TEXT_TARGET_MIN_CLASSES = 20
+TEXT_TARGET_MAX_RATIO = 0.5
 AMBIGUOUS_MAX_VALUES = 10
 AMBIGUOUS_MAX_RATIO = 0.05
 
@@ -93,6 +95,21 @@ class TaskResolver:
     def resolve_auto(self, target: pd.Series) -> tasks.TaskType:
         """Infers the task; blocks when the choice is genuinely ambiguous."""
         classes = target.nunique(dropna=True)
+        if classes < 2:
+            raise errors.BlockedError(
+                f"target '{target.name}' has {classes} distinct value(s); "
+                "there is nothing to learn"
+            )
+        if (
+            not is_numeric_target(target)
+            and classes > TEXT_TARGET_MIN_CLASSES
+            and classes / max(len(target), 1) > TEXT_TARGET_MAX_RATIO
+        ):
+            raise errors.BlockedError(
+                f"target '{target.name}' is non-numeric with {classes} "
+                "distinct values: it looks like an identifier or free text, "
+                "not a class label; choose another target"
+            )
         if not is_numeric_target(target):
             return (
                 tasks.TaskType.BINARY

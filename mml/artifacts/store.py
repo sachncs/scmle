@@ -4,6 +4,7 @@ import datetime
 import json
 import pathlib
 from typing import Any
+from typing import Self
 
 
 class RunStore:
@@ -20,7 +21,7 @@ class RunStore:
         self.directory = directory
 
     @classmethod
-    def create(cls, root: str | pathlib.Path) -> RunStore:
+    def create(cls, root: str | pathlib.Path) -> Self:
         """Allocates `run_YYYYMMDD_NNN` under `root` without collisions.
 
         Args:
@@ -42,7 +43,7 @@ class RunStore:
                 number += 1
 
     @classmethod
-    def open(cls, directory: str | pathlib.Path) -> RunStore:
+    def open(cls, directory: str | pathlib.Path) -> Self:
         """Opens an existing run directory (for resume).
 
         Args:

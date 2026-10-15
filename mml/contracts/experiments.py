@@ -3,6 +3,7 @@
 import dataclasses
 import enum
 from typing import Any
+from typing import Self
 
 DEFAULT_STRATEGY = "default"
 
@@ -86,7 +87,7 @@ class ExperimentPlan:
         return "\n".join(lines)
 
     @classmethod
-    def from_dict(cls, record: dict[str, Any]) -> ExperimentPlan:
+    def from_dict(cls, record: dict[str, Any]) -> Self:
         """Rebuilds a plan from `to_dict` output."""
         return cls(
             plan_id=record["plan_id"],
