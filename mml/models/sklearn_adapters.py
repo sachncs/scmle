@@ -13,6 +13,8 @@ from typing import ClassVar
 from sklearn import dummy
 from sklearn import ensemble
 from sklearn import linear_model
+from sklearn import neighbors
+from sklearn import svm
 from sklearn import tree
 
 from mml.contracts import errors
@@ -218,6 +220,67 @@ class HistGradientBoostingAdapter(SklearnAdapter):
     )
 
 
+class SupportVectorAdapter(SklearnAdapter):
+    """Support vector machine (classification with calibrated probabilities)."""
+
+    name = "svm"
+    family = "kernel"
+    capabilities = models.Capabilities(
+        ALL_TASKS,
+        sparse_input=True,
+        needs_scaling=True,
+        max_rows=20_000,
+        cost=4,
+    )
+    classifier = svm.SVC
+    regressor = svm.SVR
+    fixed_params = types.MappingProxyType({"probability": True})
+    search_space = search.SearchSpace(
+        (
+            search.FloatParameter("C", 1e-2, 1e2, log=True),
+            search.FloatParameter("gamma", 1e-4, 1.0, log=True),
+        )
+    )
+
+    def build(
+        self,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Builds an SVC / SVR; `probability` only exists for classifiers."""
+        estimator_class = (
+            self.classifier if task.is_classification else self.regressor
+        )
+        kwargs: dict[str, Any] = dict(params or {})
+        if task.is_classification:
+            kwargs.update(self.fixed_params)
+            kwargs["random_state"] = seed
+        return estimator_class(**kwargs)
+
+
+class KnnAdapter(SklearnAdapter):
+    """k-nearest neighbours."""
+
+    name = "knn"
+    family = "neighbors"
+    capabilities = models.Capabilities(
+        ALL_TASKS,
+        sparse_input=True,
+        needs_scaling=True,
+        max_rows=50_000,
+        cost=2,
+    )
+    classifier = neighbors.KNeighborsClassifier
+    regressor = neighbors.KNeighborsRegressor
+    search_space = search.SearchSpace(
+        (
+            search.IntParameter("n_neighbors", 3, 50),
+            search.ChoiceParameter("weights", ("uniform", "distance")),
+        )
+    )
+
+
 BUILTIN_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     DummyAdapter,
     LogisticRegressionAdapter,
@@ -227,4 +290,6 @@ BUILTIN_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     RandomForestAdapter,
     ExtraTreesAdapter,
     HistGradientBoostingAdapter,
+    SupportVectorAdapter,
+    KnnAdapter,
 )

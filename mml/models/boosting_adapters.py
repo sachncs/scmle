@@ -144,7 +144,39 @@ class XgboostAdapter(LazyLibraryAdapter):
     )
 
 
+class CatBoostAdapter(LazyLibraryAdapter):
+    """CatBoost gradient boosting (`catboost` extra)."""
+
+    name = "catboost"
+    family = "boosting"
+    library = "catboost"
+    requires = ("catboost",)
+    classifier_name = "CatBoostClassifier"
+    regressor_name = "CatBoostRegressor"
+    capabilities = models.Capabilities(
+        ALL_TASKS,
+        sparse_input=True,
+        handles_missing=True,
+        native_categorical=True,
+        early_stopping=True,
+        gpu=False,
+        cost=4,
+    )
+    fixed_params = types.MappingProxyType(
+        {"verbose": 0, "allow_writing_files": False, "thread_count": 1}
+    )
+    search_space = search.SearchSpace(
+        (
+            search.IntParameter("iterations", 100, 500),
+            search.IntParameter("depth", 3, 8),
+            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
+            search.FloatParameter("l2_leaf_reg", 1.0, 10.0, log=True),
+        )
+    )
+
+
 BOOSTING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     LightGbmAdapter,
     XgboostAdapter,
+    CatBoostAdapter,
 )
