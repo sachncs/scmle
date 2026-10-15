@@ -77,3 +77,24 @@ def test_manifest_deterministic_and_input_immutable(frame):
 def test_manifest_requires_target(frame):
     with pytest.raises(errors.DataError, match="target"):
         readers.build_manifest(frame, "nope")
+
+
+def test_replace_infinities_reports_counts_and_leaves_input_untouched():
+    frame = pd.DataFrame(
+        {
+            "a": [1.0, float("inf"), 3.0],
+            "b": [float("-inf"), 2.0, float("inf")],
+            "s": ["x", "y", "z"],
+        }
+    )
+    before = frame.copy()
+    cleaned, counts = readers.replace_infinities(frame)
+    assert counts == {"a": 1, "b": 2}
+    assert cleaned["a"].isna().sum() == 1 and cleaned["b"].isna().sum() == 2
+    pd.testing.assert_frame_equal(frame, before)
+
+
+def test_replace_infinities_returns_same_frame_when_clean():
+    frame = pd.DataFrame({"a": [1.0, 2.0], "s": ["x", "y"]})
+    cleaned, counts = readers.replace_infinities(frame)
+    assert counts == {} and cleaned is frame

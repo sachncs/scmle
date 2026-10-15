@@ -185,3 +185,23 @@ def test_regression_missingness_uses_rank_correlation():
         values, target, tasks.TaskType.REGRESSION
     )
     assert score > 0.5
+
+
+def test_to_finite_maps_text_and_infinities_to_nan():
+    values = pd.Series([1.0, np.inf, -np.inf, "x", None, "3"])
+    result = columns.to_finite(values)
+    assert result.isna().tolist() == [False, True, True, True, True, False]
+    assert result.iloc[5] == 3.0
+
+
+def test_all_missing_columns_are_reported_as_missing_not_constant():
+    from mml.data import profiling
+
+    assert (
+        profiling.column_exclusion_reason(
+            columns.NumericKind(),
+            pd.Series([np.nan] * 10),
+            {"n_unique": 0, "missing_rate": 1.0},
+        )
+        == "missing >95%"
+    )
