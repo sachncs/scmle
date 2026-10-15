@@ -110,6 +110,7 @@ class BundleInfo:
         files: SHA-256 per stored file.
         model_params: Hyperparameter overrides of the selected model.
         strategy: Data strategy of the selected candidate.
+        decision_threshold: Optimized binary decision threshold, if any.
     """
 
     model_name: str
@@ -123,6 +124,7 @@ class BundleInfo:
     files: dict[str, str] = dataclasses.field(default_factory=dict)
     model_params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = "default"
+    decision_threshold: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -193,6 +195,7 @@ class ModelBundle:
         model_version: str = "v1",
         model_params: dict[str, Any] | None = None,
         strategy: str = "default",
+        decision_threshold: float | None = None,
     ) -> ModelBundle:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -207,6 +210,7 @@ class ModelBundle:
             model_version: Bundle version label.
             model_params: Hyperparameter overrides of the selected model.
             strategy: Data strategy of the selected candidate.
+            decision_threshold: Optimized binary decision threshold, if any.
 
         Returns:
             The bundle.
@@ -235,6 +239,7 @@ class ModelBundle:
             metric,
             model_params=model_params or {},
             strategy=strategy,
+            decision_threshold=decision_threshold,
         )
         return cls(pipeline, schema, info)
 

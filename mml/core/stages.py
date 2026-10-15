@@ -8,6 +8,7 @@ side-effect-free plan preview.
 
 import abc
 import time
+from typing import Any
 from typing import ClassVar
 
 from mml.api import results
@@ -15,6 +16,7 @@ from mml.artifacts import bundle as bundle_module
 from mml.artifacts import report
 from mml.contracts import errors
 from mml.contracts import experiments
+from mml.contracts import tasks
 from mml.core import context as context_module
 from mml.core import state as run_state
 from mml.core import strategy_search
@@ -26,6 +28,7 @@ from mml.data import splitting
 from mml.data import strategies
 from mml.evaluation import diagnostics
 from mml.intelligence import planner as planner_module
+from mml.models import thresholds
 
 LEAKAGE_MARKER = "leakage"
 BASELINE = "dummy"
@@ -215,6 +218,63 @@ class SelectStage(Stage):
         )
 
 
+def choose_decision_threshold(
+    context: context_module.RunContext, fitted: Any
+) -> tuple[Any, dict[str, Any] | None]:
+    """Optimizes the binary decision threshold on out-of-fold predictions.
+
+    Only development data is used: each validation row is scored by a model
+    that never saw it, so the locked test set stays untouched.
+
+    Args:
+        context: Run context holding the split and the selected trial.
+        fitted: The selected candidate, already refit on development data.
+
+    Returns:
+        The estimator to evaluate (wrapped with the threshold when one was
+        optimized) and a description of the decision, or None when disabled
+        or not applicable.
+    """
+    decision = context.spec.decision
+    task = require(context.task, "task")
+    if decision.threshold_objective == "none" or task is not (
+        tasks.TaskType.BINARY
+    ):
+        return fitted, None
+    split = require(context.split, "split")
+    selected = require(context.selected, "selected")
+    strategy = strategies.get_strategy(selected.strategy)
+    adapter = context.registry.get(selected.model_name)
+    plan = require(context.profile, "profile").feature_plan
+    seed = context.spec.validation.seed
+    probabilities, positions = thresholds.out_of_fold_probabilities(
+        lambda: strategy.build(plan, adapter, task, seed, selected.params),
+        split.dev_features,
+        split.dev_target,
+        split.manifest.folds,
+    )
+    positive = fitted.classes_[1]
+    actual = (split.dev_target.iloc[positions] == positive).to_numpy()
+    kind = thresholds.OBJECTIVES[decision.threshold_objective]
+    objective = (
+        kind(decision.false_positive_cost, decision.false_negative_cost)
+        if decision.threshold_objective == "cost"
+        else kind()
+    )
+    threshold, score = thresholds.optimize_threshold(
+        probabilities, actual, objective
+    )
+    description = {
+        "objective": decision.threshold_objective,
+        "threshold": threshold,
+        "validation_score": score,
+        "validation_rows": len(positions),
+    }
+    return thresholds.ThresholdClassifier.around_fitted(fitted, threshold), (
+        description
+    )
+
+
 class FinalEvaluationStage(Stage):
     """Refits the frozen candidate and opens the locked test set once."""
 
@@ -240,6 +300,7 @@ class FinalEvaluationStage(Stage):
             selected.params,
         )
         pipeline.fit(split.dev_features, split.dev_target)
+        pipeline, decision = choose_decision_threshold(context, pipeline)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
         baseline = next(
@@ -292,6 +353,7 @@ class FinalEvaluationStage(Stage):
             "n_test": len(test_features),
             "split_fingerprint": split.manifest.fingerprint,
             "split_strategy": split.manifest.strategy,
+            "decision": decision,
             "test_set_opened": locked.opened,
             "diagnostics": sorted(context.diagnostics),
             "elapsed_seconds": time.monotonic() - context.started_at,
@@ -328,6 +390,7 @@ class PackageStage(Stage):
             selected.model_name,
             model_params=selected.params,
             strategy=selected.strategy,
+            decision_threshold=(evaluation["decision"] or {}).get("threshold"),
         )
         bundle.save(store.path("model"))
         store.write_json(

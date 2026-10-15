@@ -40,6 +40,7 @@ class MLProject:
         seed: int = 42,
         search: tasks.SearchSpec | None = None,
         strategies: tasks.StrategySpec | None = None,
+        decision: tasks.DecisionSpec | None = None,
         leakage_policy: LeakagePolicy = "warn",
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -66,6 +67,8 @@ class MLProject:
                 disable tuning.
             strategies: Which data strategies to evaluate; defaults to all.
                 Use `StrategySpec(top_models=0)` to disable.
+            decision: Threshold optimization for binary tasks (objective
+                f1, accuracy, balanced_accuracy or an explicit cost).
             leakage_policy: `warn` or `block` on leakage hypotheses.
             output_dir: Parent directory for run directories.
 
@@ -95,6 +98,7 @@ class MLProject:
             ),
             search=search or tasks.SearchSpec(),
             strategies=strategies or tasks.StrategySpec(),
+            decision=decision or tasks.DecisionSpec(),
             leakage_policy=leakage_policy,
         )
         self.output_dir = pathlib.Path(output_dir)
