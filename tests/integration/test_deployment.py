@@ -54,11 +54,15 @@ def post(url, payload):
 def test_registry_versions_aliases_and_audit(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     bundle_dir = trained.save(tmp_path / "export")
-    first = store.register("churn", bundle_dir, {"roc_auc": 0.9}, run_id="r1")
+    first = store.register(
+        "churn", bundle_dir, {"roc_auc": 0.9}, run_id="r1", trusted=True
+    )
     newer = copy.copy(trained.bundle)
     newer.info = dataclasses.replace(trained.bundle.info, model_version="v2")
     changed = newer.save(tmp_path / "export2")
-    second = store.register("churn", changed, {"roc_auc": 0.91}, run_id="r2")
+    second = store.register(
+        "churn", changed, {"roc_auc": 0.91}, run_id="r2", trusted=True
+    )
     assert (first.version, second.version) == (1, 2)
     assert first.content_id != second.content_id
     store.promote("churn", 1)
@@ -92,7 +96,7 @@ def test_registry_rejects_bad_requests(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     with pytest.raises(errors.ArtifactError, match="unknown model"):
         store.versions("ghost")
-    store.register("m", trained.save(tmp_path / "export"))
+    store.register("m", trained.save(tmp_path / "export"), trusted=True)
     with pytest.raises(errors.ArtifactError, match="not registered"):
         store.promote("m", 9)
     with pytest.raises(errors.ArtifactError, match="no alias"):
@@ -100,7 +104,7 @@ def test_registry_rejects_bad_requests(trained, tmp_path):
     broken = tmp_path / "broken"
     broken.mkdir()
     with pytest.raises(errors.ArtifactError):
-        store.register("m", broken)
+        store.register("m", broken, trusted=True)
 
 
 def test_registry_refuses_tampered_bundles(trained, tmp_path):
@@ -109,7 +113,7 @@ def test_registry_refuses_tampered_bundles(trained, tmp_path):
         handle.write(b"x")
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     with pytest.raises(errors.ArtifactError, match="checksum"):
-        store.register("m", bundle_dir)
+        store.register("m", bundle_dir, trusted=True)
     assert not (tmp_path / "registry" / "m").exists()
 
 
@@ -221,12 +225,40 @@ def test_review_can_be_report_only(trained, tmp_path):
 def test_registering_identical_content_is_idempotent(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     bundle_dir = trained.save(tmp_path / "export")
-    first = store.register("churn", bundle_dir, run_id="r1")
-    again = store.register("churn", bundle_dir, run_id="r2")
+    first = store.register("churn", bundle_dir, run_id="r1", trusted=True)
+    again = store.register("churn", bundle_dir, run_id="r2", trusted=True)
     copy = trained.save(tmp_path / "export_copy")
-    third = store.register("churn", copy, run_id="r3")
+    third = store.register("churn", copy, run_id="r3", trusted=True)
     assert again.version == third.version == first.version == 1
     assert len(store.versions("churn")) == 1
     assert first.content_id == registry_module.content_id_of(bundle_dir)
     audit = (store.root / "audit.jsonl").read_text().splitlines()
     assert len(audit) == 1  # duplicates leave no extra audit noise
+
+
+def test_registry_refuses_unsigned_bundles_unless_vouched_for(
+    trained, tmp_path
+):
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    bundle_dir = trained.save(tmp_path / "export")
+    with pytest.raises(errors.ArtifactError, match="unauthenticated"):
+        store.register("m", bundle_dir)
+    assert not (tmp_path / "registry" / "m").exists()
+    record = store.register("m", bundle_dir, trusted=True)
+    assert record.signed is False
+
+
+def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
+    trained, tmp_path
+):
+    key = "registry-test-key"
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    bundle_dir = trained.bundle.save(tmp_path / "export", signing_key=key)
+    record = store.register("m", bundle_dir, signing_key=key)
+    assert record.signed is True
+    store.promote("m", record.version)
+    features = make_frame(10, 3).drop(columns="y")
+    loaded = store.load("m", signing_key=key)
+    assert len(loaded.predict(features)) == 10
+    with pytest.raises(errors.ArtifactError, match="unauthenticated"):
+        store.load("m")  # a signed bundle needs its key at load time

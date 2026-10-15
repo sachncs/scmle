@@ -74,6 +74,7 @@ class LifecycleManager:
             metrics=result.evaluation["test_metrics"],
             config=result.plan.to_dict() | {"project": read_run_config(result)},
             run_id=result.run_id,
+            trusted=True,  # exported moments ago by this very process
         )
         if promote:
             self.registry.promote(self.model, record.version)

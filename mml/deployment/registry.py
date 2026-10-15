@@ -36,6 +36,8 @@ class VersionRecord:
         path: Bundle directory relative to the registry root.
         content_id: SHA-256 of the bundle manifest, which embeds the checksum
             of every file, so identical bundles share an id.
+        signed: Whether the bundle's HMAC signature verified at registration
+            (otherwise the registrant vouched for it with `trusted=True`).
     """
 
     model: str
@@ -46,6 +48,7 @@ class VersionRecord:
     run_id: str
     path: str
     content_id: str = ""
+    signed: bool = False
 
 
 def content_id_of(bundle_directory: str | pathlib.Path) -> str:
@@ -96,10 +99,14 @@ class ModelRegistryStore:
         metrics: dict[str, float] | None = None,
         config: dict[str, Any] | None = None,
         run_id: str = "",
+        trusted: bool = False,
+        signing_key: str | bytes | None = None,
     ) -> VersionRecord:
         """Registers a bundle as the next version of `model`.
 
-        The bundle is verified (checksums, compatibility) before it is copied.
+        The bundle is verified (checksums, compatibility, and authenticity)
+        before it is copied. Bundles are pickle-based, so an unsigned bundle
+        is refused unless the registrant vouches for it with `trusted=True`.
 
         Args:
             model: Model name.
@@ -107,6 +114,9 @@ class ModelRegistryStore:
             metrics: Held-out metrics to record.
             config: Training configuration to record.
             run_id: Originating run identifier.
+            trusted: Vouch for an unsigned bundle you produced or trust.
+            signing_key: HMAC key verifying the bundle's signature (defaults
+                to `$MAGICML_SIGNING_KEY`).
 
         Returns:
             The new version's record, or the existing one when a bundle with
@@ -114,9 +124,15 @@ class ModelRegistryStore:
             idempotent for the same content).
 
         Raises:
-            ArtifactError: If the bundle fails verification.
+            ArtifactError: If the bundle fails verification or is
+                unauthenticated and not vouched for.
         """
-        bundle_module.ModelBundle.load(bundle_directory, trusted=True)
+        bundle_module.ModelBundle.load(
+            bundle_directory, trusted=trusted, signing_key=signing_key
+        )
+        signed = bundle_module.verify_signature(
+            pathlib.Path(bundle_directory), signing_key
+        )
         content_id = content_id_of(bundle_directory)
         index = self.read_index()
         entry = index["models"].setdefault(
@@ -137,6 +153,7 @@ class ModelRegistryStore:
             run_id,
             relative,
             content_id,
+            signed,
         )
         entry["versions"][str(version)] = dataclasses.asdict(record)
         self.write_index(index)
@@ -203,10 +220,24 @@ class ModelRegistryStore:
         return versions[number]
 
     def load(
-        self, model: str, ref: str | int = CHAMPION
+        self,
+        model: str,
+        ref: str | int = CHAMPION,
+        signing_key: str | bytes | None = None,
     ) -> bundle_module.ModelBundle:
-        """Loads a registered bundle by alias or version (trusted store)."""
+        """Loads a registered bundle by alias or version.
+
+        A bundle registered as signed is authenticated again with the key; one
+        the registrant vouched for is loaded as the registrant vouched.
+
+        Args:
+            model: Model name.
+            ref: Alias or version number.
+            signing_key: HMAC key for signed bundles.
+        """
         record = self.resolve(model, ref)
         return bundle_module.ModelBundle.load(
-            self.root / record.path, trusted=True
+            self.root / record.path,
+            trusted=not record.signed,
+            signing_key=signing_key,
         )
