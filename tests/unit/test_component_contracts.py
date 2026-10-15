@@ -32,7 +32,9 @@ from mml.tracking import stores
 def concrete_subclasses(base, *modules):
     found = []
     for module in modules:
-        for _, member in inspect.getmembers(module, inspect.isclass):
+        for member in dict(
+            inspect.getmembers(module, inspect.isclass)
+        ).values():
             if (
                 issubclass(member, base)
                 and member is not base

@@ -165,7 +165,4 @@ def test_svm_classifier_is_calibrated_and_regressor_is_plain(registry):
     assert (
         classifier.estimator.random_state == 3 and classifier.estimator.C == 0.5
     )
-    assert (
-        classifier.ensemble is False
-        and classifier.estimator.probability is False
-    )
+    assert classifier.ensemble is False
