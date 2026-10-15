@@ -88,6 +88,7 @@ def test_fingerprint_covers_every_dimension():
         "target",
         "features",
         "relationships",
+        "ml_difficulty",
         "structure",
         "quality",
         "operational",
@@ -138,3 +139,43 @@ def test_profile_serializes_the_fingerprint():
     payload = profile_of(frame_with_everything()).to_dict()
     assert payload["dataset"]["shape"]["columns"] == 6
     assert payload["columns"]["num"]["outlier_rate"] >= 0
+
+
+def test_ml_difficulty_reports_baselines_and_headroom():
+    rng = np.random.default_rng(0)
+    rows = 800
+    frame = pd.DataFrame(
+        {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
+    )
+    frame["y"] = (frame.a * frame.b > 0).astype(int)  # purely non-linear
+    stats = profile_of(frame).dataset_statistics["ml_difficulty"]
+    assert stats["available"] and stats["metric"] == "roc_auc"
+    assert stats["constant_baseline"] == pytest.approx(0.5, abs=0.02)
+    assert stats["linear_baseline"] < 0.6  # a line cannot separate XOR
+    assert stats["nonlinearity_gain"] > 0.3  # trees can
+    assert stats["separability"] == stats["linear_baseline"]
+
+
+def test_missingness_patterns_types_and_scale_are_described():
+    rng = np.random.default_rng(1)
+    rows = 600
+    frame = pd.DataFrame(
+        {
+            "small": rng.normal(size=rows),
+            "huge": rng.normal(size=rows) * 1e6,
+            "other": rng.normal(size=rows),
+            "note": [f"free text comment number {i} " * 3 for i in range(rows)],
+        }
+    )
+    blank = np.arange(rows) % 7 == 0
+    frame.loc[blank, ["small", "other"]] = np.nan  # they go missing together
+    frame["y"] = (rng.random(rows) < 0.5).astype(int)
+    result = profile_of(frame).dataset_statistics
+    patterns = result["missingness"]["patterns"]
+    assert patterns["pattern_count"] == 2
+    assert patterns["co_missing"] == 1
+    assert patterns["top_pattern_share"] == pytest.approx(
+        blank.mean(), abs=0.01
+    )
+    assert result["types"]["text_like"] == 1
+    assert result["features"]["scale_orders_of_magnitude"] > 5

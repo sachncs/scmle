@@ -6,14 +6,21 @@ uncertainty: they describe the data and raise hypotheses, never verdicts.
 """
 
 import itertools
+import time
 from typing import Any
 
 import numpy as np
 import pandas as pd
+from sklearn import dummy
+from sklearn import ensemble
+from sklearn import linear_model
+from sklearn import model_selection
+from sklearn import pipeline
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
 from mml.data import columns
+from mml.data import preprocessing
 from mml.monitoring import reference
 
 BYTES_PER_MB = 1024 * 1024
@@ -22,6 +29,10 @@ MAX_CORRELATION_COLUMNS = 150
 REDUNDANT_CORRELATION = 0.95
 MAX_REDUNDANT_PAIRS = 20
 THIRDS = 3
+CO_MISSING = 0.8
+TEXT_MEAN_LENGTH = 40
+DIFFICULTY_ROWS = 2000
+DIFFICULTY_FOLDS = 3
 
 
 def redundant_pairs(
@@ -72,6 +83,138 @@ def order_drift(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
         ref = reference.NumericReference.fit(head[column])
         worst = max(worst, ref.adjusted_psi(tail[column]))
     return float(worst)
+
+
+def missingness_patterns(features: pd.DataFrame) -> dict[str, Any]:
+    """Summarizes how values go missing together.
+
+    Returns:
+        The number of distinct row-level missingness patterns, the share of
+        the most common non-empty pattern, and how many column pairs go
+        missing together (indicator correlation above 0.8).
+    """
+    missing = features.isna()
+    holes = missing.loc[:, missing.any()]
+    if holes.empty:
+        return {"pattern_count": 1, "top_pattern_share": 0.0, "co_missing": 0}
+    keys = holes.astype(int).astype(str).agg("".join, axis=1)
+    counts = keys.value_counts()
+    silent = "0" * holes.shape[1]
+    partial = counts[counts.index != silent]
+    pairs = 0
+    if holes.shape[1] > 1:
+        corr = holes.astype(float).corr().abs().to_numpy()
+        pairs = int(
+            ((corr > CO_MISSING) & ~np.eye(len(corr), dtype=bool)).sum() // 2
+        )
+    return {
+        "pattern_count": len(counts),
+        "top_pattern_share": float(partial.iloc[0] / len(keys))
+        if len(partial)
+        else 0.0,
+        "co_missing": pairs,
+    }
+
+
+def text_like_columns(
+    frame: pd.DataFrame, plan: data_contracts.FeaturePlan
+) -> list[str]:
+    """Categorical columns holding free text rather than short labels."""
+    found = []
+    for name in (*plan.categorical, *plan.dropped):
+        if name not in frame.columns or pd.api.types.is_numeric_dtype(
+            frame[name]
+        ):
+            continue
+        lengths = frame[name].dropna().astype(str).str.len()
+        if len(lengths) and lengths.mean() > TEXT_MEAN_LENGTH:
+            found.append(name)
+    return found
+
+
+def scale_range(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
+    """Orders of magnitude between the widest and narrowest numeric column."""
+    spreads = [
+        float(frame[c].astype(float).std())
+        for c in numeric
+        if frame[c].astype(float).std() > 0
+    ]
+    if len(spreads) < 2:
+        return 0.0
+    return float(np.log10(max(spreads) / min(spreads)))
+
+
+def ml_difficulty(
+    frame: pd.DataFrame,
+    spec: tasks.ProjectSpec,
+    task: tasks.TaskType,
+    plan: data_contracts.FeaturePlan,
+) -> dict[str, Any]:
+    """Cheap baselines that show how hard the problem looks.
+
+    A few-second cross-validation on a subsample compares a constant
+    predictor, a linear model and a boosted-tree model, so the planner and the
+    user can see the headroom: baseline performance, the gain from
+    non-linearity, and (for classification) how separable the classes are.
+    Baselines are hypotheses about difficulty, not model selection.
+    """
+    sample = frame
+    if len(sample) > DIFFICULTY_ROWS:
+        sample = sample.sample(DIFFICULTY_ROWS, random_state=0)
+    features = sample[list(plan.features)]
+    target = sample[spec.data.target]
+    if task.is_classification:
+        scoring = (
+            "roc_auc"
+            if task is tasks.TaskType.BINARY
+            else ("balanced_accuracy")
+        )
+        estimators = {
+            "constant": dummy.DummyClassifier(strategy="prior"),
+            "linear": linear_model.LogisticRegression(max_iter=300),
+            "nonlinear": ensemble.HistGradientBoostingClassifier(
+                max_iter=60, random_state=0
+            ),
+        }
+    else:
+        scoring = "r2"
+        estimators = {
+            "constant": dummy.DummyRegressor(),
+            "linear": linear_model.Ridge(),
+            "nonlinear": ensemble.HistGradientBoostingRegressor(
+                max_iter=60, random_state=0
+            ),
+        }
+    options = data_contracts.PreprocessingOptions(scale=True)
+    scores: dict[str, float] = {}
+    started = time.monotonic()
+    try:
+        for name, estimator in estimators.items():
+            model = pipeline.Pipeline(
+                [
+                    ("prep", preprocessing.build_preprocessor(plan, options)),
+                    ("model", estimator),
+                ]
+            )
+            result = model_selection.cross_val_score(
+                model, features, target, cv=DIFFICULTY_FOLDS, scoring=scoring
+            )
+            scores[name] = float(np.nanmean(result))
+    except ValueError as error:
+        return {"available": False, "reason": str(error)[:200]}
+    gain = scores["nonlinear"] - scores["linear"]
+    return {
+        "available": True,
+        "metric": scoring,
+        "rows": len(sample),
+        "constant_baseline": scores["constant"],
+        "linear_baseline": scores["linear"],
+        "nonlinear_baseline": scores["nonlinear"],
+        "nonlinearity_gain": gain,
+        "headroom_over_constant": scores["nonlinear"] - scores["constant"],
+        "separability": scores["linear"] if task.is_classification else None,
+        "seconds": time.monotonic() - started,
+    }
 
 
 def structure(frame: pd.DataFrame, spec: tasks.ProjectSpec) -> dict[str, Any]:
@@ -139,6 +282,10 @@ def build_fingerprint(
         kind: sum(1 for s in column_statistics.values() if s["kind"] == kind)
         for kind in ("numeric", "categorical", "datetime")
     }
+    kinds["text_like"] = len(text_like_columns(frame, plan))
+    kinds["id_like"] = sum(
+        1 for reason in plan.dropped.values() if reason.startswith("id-like")
+    ) + len(spec.data.id_columns)
     target_block: dict[str, Any] = {"cardinality": int(target.nunique())}
     if task.is_classification:
         counts = target.value_counts()
@@ -169,6 +316,7 @@ def build_fingerprint(
             "rows_with_any_missing": float(missing.any(axis=1).mean())
             if missing.size
             else 0.0,
+            "patterns": missingness_patterns(features),
         },
         "target": target_block,
         "features": {
@@ -186,6 +334,7 @@ def build_fingerprint(
             )
             if plan.numeric
             else 0.0,
+            "scale_orders_of_magnitude": scale_range(frame, plan.numeric),
             "mean_categorical_entropy_bits": float(
                 np.mean(
                     [
@@ -207,6 +356,7 @@ def build_fingerprint(
                 default=0.0,
             ),
         },
+        "ml_difficulty": ml_difficulty(frame, spec, task, plan),
         "structure": structure(frame, spec),
         "quality": {
             "duplicate_rows": duplicate_rows,

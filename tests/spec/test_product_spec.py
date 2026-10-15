@@ -543,14 +543,19 @@ def test_l293_l307_fingerprint_dimensions(run):
         "target",
         "features",
         "relationships",
+        "ml_difficulty",
         "structure",
         "quality",
         "operational",
         "risk",
     } <= dims
-    assert (
-        result.evaluation["baseline_cv_score"] is not None
-    )  # ML difficulty (baseline performance)
+    difficulty = result.profile.dataset_statistics["ml_difficulty"]
+    assert difficulty["available"]  # ML difficulty: baselines and headroom
+    assert {
+        "constant_baseline",
+        "linear_baseline",
+        "nonlinearity_gain",
+    } <= set(difficulty)
     stats = result.profile.column_statistics["a"]
     assert {"outlier_rate", "std"} <= set(stats)  # scale, outliers
     assert result.profile.dataset_statistics["shape"]["effective_samples"] > 0
