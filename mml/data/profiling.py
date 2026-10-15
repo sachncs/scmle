@@ -169,6 +169,10 @@ class DatasetProfiler:
         data = self.spec.data
         roles = dict.fromkeys(data.id_columns, "id column")
         roles |= dict.fromkeys(data.excluded_columns, "excluded by user")
+        roles |= dict.fromkeys(
+            data.unavailable_at_prediction,
+            "not available at prediction time (feature-availability contract)",
+        )
         if data.group_column:
             roles[data.group_column] = "group column (used for splitting only)"
         if data.time_column:

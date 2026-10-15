@@ -346,15 +346,26 @@ class TemporalSplit(SplitStrategy):
         order = np.argsort(times.to_numpy(), kind="stable")
         rows = len(frame)
         test_rows = max(1, round(rows * self.validation.test_fraction))
-        dev_ids, test_ids = order[: rows - test_rows], order[rows - test_rows :]
+        embargo = self.validation.embargo_rows
+        dev_ids = order[: rows - test_rows - embargo]
+        test_ids = order[rows - test_rows :]
         folds = self.validation.folds
-        if len(dev_ids) < folds + 1:
+        if len(dev_ids) < folds + 1 + embargo:
             raise errors.BlockedError(
                 "too few rows for temporal cross-validation"
             )
-        splitter = model_selection.TimeSeriesSplit(n_splits=folds)
+        splitter = model_selection.TimeSeriesSplit(n_splits=folds, gap=embargo)
+        notes = []
+        if embargo:
+            notes.append(
+                f"embargo of {embargo} rows between development and test and "
+                "between each training window and its validation window"
+            )
         return Partition(
-            dev_ids, test_ids, list(splitter.split(np.arange(len(dev_ids))))
+            dev_ids,
+            test_ids,
+            list(splitter.split(np.arange(len(dev_ids)))),
+            notes,
         )
 
 

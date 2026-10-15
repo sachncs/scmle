@@ -49,6 +49,7 @@ class DataSpec(FrozenModel):
     group_column: str | None = None
     time_column: str | None = None
     excluded_columns: list[str] = pydantic.Field(default_factory=list)
+    unavailable_at_prediction: list[str] = pydantic.Field(default_factory=list)
 
 
 class ValidationSpec(FrozenModel):
@@ -60,6 +61,7 @@ class ValidationSpec(FrozenModel):
     test_fraction: float = pydantic.Field(default=0.20, gt=0, lt=1)
     folds: int = pydantic.Field(default=5, ge=2)
     seed: int = 42
+    embargo_rows: int = pydantic.Field(default=0, ge=0)
 
 
 class ResourceSpec(FrozenModel):
@@ -167,6 +169,12 @@ class ProjectSpec(FrozenModel):
             raise ValueError("the target cannot be an id column")
         if data.target in data.excluded_columns:
             raise ValueError("the target cannot be excluded")
+        if data.target in data.unavailable_at_prediction:
+            raise ValueError("the target cannot be unavailable at prediction")
+        if validation.embargo_rows and not data.time_column:
+            raise ValueError(
+                "validation.embargo_rows requires data.time_column"
+            )
         return self
 
     def canonical_json(self) -> str:
