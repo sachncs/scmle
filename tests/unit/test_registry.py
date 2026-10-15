@@ -172,7 +172,7 @@ def test_neural_family_registers_through_the_same_plugin_contract(registry):
     adapter = registry.get("neural_network")
     conformance.check_conformance(adapter)
     assert adapter.family == "neural" and adapter.capabilities.early_stopping
-    compatible, _ = registry.candidates(BINARY, row_count=1_000)
+    compatible = registry.candidates(BINARY, row_count=1_000)[0]
     assert "neural_network" in {a.name for a in compatible}
     tuned = adapter.build(
         BINARY, 0, {"hidden_layer_sizes": (16,), "alpha": 0.01}
