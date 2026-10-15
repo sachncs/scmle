@@ -19,6 +19,7 @@ from mml.data import splitting
 from mml.evaluation import metrics
 from mml.evaluation import selection
 from mml.models import registry as registry_module
+from mml.tracking import stores as tracking_stores
 
 
 def require[T](value: T | None, name: str) -> T:
@@ -56,6 +57,9 @@ class RunContext:
         policy: Model selection policy.
         store: Run directory, or None for previews.
         log: Event log, or None for previews.
+        tracker: Experiment tracking backend (no-op by default).
+        checkpoints: Completed trials from an interrupted run, by trial id,
+            reused instead of recomputed when resuming.
         cancel_event: Set to request cancellation.
         input_frame: In-memory data, if the project was built from one.
         approved_plan: Human-approved plan restricting candidates.
@@ -81,6 +85,12 @@ class RunContext:
     policy: selection.SelectionPolicy
     store: store_module.RunStore | None = None
     log: events.EventLog | None = None
+    tracker: tracking_stores.ExperimentStore = dataclasses.field(
+        default_factory=tracking_stores.NullExperimentStore
+    )
+    checkpoints: dict[str, experiments.TrialResult] = dataclasses.field(
+        default_factory=dict
+    )
     cancel_event: threading.Event = dataclasses.field(
         default_factory=threading.Event
     )
@@ -137,6 +147,20 @@ class RunContext:
                     artifacts,
                 )
             )
+
+    def record_trial(self, outcome: experiments.TrialResult) -> None:
+        """Appends a trial and persists, announces and tracks it."""
+        self.trials.append(outcome)
+        path = f"trials/{outcome.trial_id}.json"
+        self.write_json(path, outcome.to_dict())
+        self.emit(f"trial.{outcome.status}", outcome.model_name, (path,))
+        if self.store is not None:
+            self.tracker.record_trial(self.store.run_id, outcome)
+
+    def track(self, **fields: Any) -> None:
+        """Updates the tracked run row if the run is persisted."""
+        if self.store is not None:
+            self.tracker.update_run(self.store.run_id, **fields)
 
     def check_cancelled(self) -> None:
         """Raises if cancellation was requested.

@@ -67,6 +67,10 @@ class IngestStage(Stage):
         context.frame = frame
         context.manifest = readers.build_manifest(frame, data.target, data.uri)
         context.write_json("dataset_manifest.json", context.manifest.to_dict())
+        context.track(
+            dataset_id=context.manifest.dataset_id,
+            data_hash=context.manifest.data_hash,
+        )
 
 
 class ProfileStage(Stage):
@@ -136,6 +140,7 @@ class PlanStage(Stage):
         split = manager.split(require(context.frame, "frame"))
         context.split = split
         context.write_json("validation_manifest.json", split.manifest.to_dict())
+        context.track(split_fingerprint=split.manifest.fingerprint)
         plan = build_plan(context)
         context.plan = plan
         context.write_json("execution_plan.json", plan.to_dict())
@@ -170,10 +175,7 @@ class TrainStage(Stage):
                 )
             else:
                 outcome = runner.run(trial_id, name)
-            context.trials.append(outcome)
-            path = f"trials/{trial_id}.json"
-            context.write_json(path, outcome.to_dict())
-            context.emit(f"trial.{outcome.status}", name, (path,))
+            context.record_trial(outcome)
         tuning.Tuner(context, runner).tune(list(context.trials))
 
 
@@ -230,6 +232,15 @@ class FinalEvaluationStage(Stage):
             None,
         )
         context.final_pipeline = pipeline
+        test_metrics = context.catalog.evaluate(
+            pipeline, test_features, test_target, task
+        )
+        context.track(
+            selected_model=selected.model_name,
+            metric=metric.name,
+            cv_score=selected.score_mean,
+            test_metrics=test_metrics,
+        )
         context.evaluation = {
             "run_id": context.store.run_id if context.store else "",
             "task": task.value,
@@ -241,9 +252,7 @@ class FinalEvaluationStage(Stage):
             "selected_cv_score": selected.score_mean,
             "selected_cv_std": selected.score_std,
             "baseline_cv_score": baseline.score_mean if baseline else None,
-            "test_metrics": context.catalog.evaluate(
-                pipeline, test_features, test_target, task
-            ),
+            "test_metrics": test_metrics,
             "n_dev": len(split.dev_features),
             "n_test": len(test_features),
             "split_fingerprint": split.manifest.fingerprint,

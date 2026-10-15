@@ -56,15 +56,6 @@ class Tuner:
         ]
         return tunable[: self.search.top_models]
 
-    def record(self, outcome: experiments.TrialResult) -> None:
-        """Appends a trial to the context and persists/announces it."""
-        self.context.trials.append(outcome)
-        path = f"trials/{outcome.trial_id}.json"
-        self.context.write_json(path, outcome.to_dict())
-        self.context.emit(
-            f"trial.{outcome.status}", outcome.model_name, (path,)
-        )
-
     def tune(self, screened: list[experiments.TrialResult]) -> None:
         """Searches the most promising models; results go to the context.
 
@@ -115,7 +106,7 @@ class Tuner:
         survivors = self.survivor_ids(first_rung) if multi_fold else None
         for trial in first_rung:
             if trial.status is not Status.OK:
-                self.record(trial)
+                self.context.record_trial(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
             elif trial.trial_id in survivors:
@@ -140,7 +131,7 @@ class Tuner:
     ) -> None:
         """Tells the optimizer the trial's score and records the trial."""
         optimizer.tell(trial.params, trial.score_mean)
-        self.record(trial)
+        self.context.record_trial(trial)
 
     def finish(
         self, trial: experiments.TrialResult, optimizer: optimizers.Optimizer
@@ -149,4 +140,4 @@ class Tuner:
         full = self.runner.run(trial.trial_id, trial.model_name, trial.params)
         if full.status is Status.OK:
             optimizer.tell(full.params, full.score_mean)
-        self.record(full)
+        self.context.record_trial(full)
