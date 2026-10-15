@@ -100,6 +100,117 @@ class RandomUnderSampler(Resampler):
         return rng.permutation(np.concatenate(chosen))
 
 
+class JitterOverSampler(Resampler):
+    """Experimental: oversamples with Gaussian-jittered copies of minority rows.
+
+    Synthetic rows copy a real minority row and add noise (a fraction of the
+    column's standard deviation) to its numeric columns; categorical values
+    are copied unchanged. Treat it as an experiment: it is only adopted when
+    it beats the un-augmented baseline on the original validation folds.
+
+    Attributes:
+        scale: Noise standard deviation as a fraction of each column's std.
+    """
+
+    name = "jitter_oversample"
+
+    def __init__(self, scale: float = 0.05) -> None:
+        """Initializes the sampler.
+
+        Args:
+            scale: Noise level relative to each numeric column's std.
+        """
+        self.scale = scale
+
+    def indices(
+        self, target: pd.Series, rng: np.random.Generator
+    ) -> np.ndarray:
+        """Chooses source rows exactly like plain oversampling."""
+        return RandomOverSampler().indices(target, rng)
+
+    def resample(
+        self, features: pd.DataFrame, target: pd.Series, seed: int
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        """Oversamples, then jitters every repeated (synthetic) copy."""
+        rng = np.random.default_rng(seed)
+        chosen = self.indices(target, rng)
+        sampled = features.iloc[chosen].reset_index(drop=True)
+        repeated = pd.Series(chosen).duplicated().to_numpy()
+        numeric = [
+            column
+            for column in features.columns
+            if pd.api.types.is_numeric_dtype(features[column])
+            and not pd.api.types.is_bool_dtype(features[column])
+        ]
+        for column in numeric:
+            spread = float(pd.to_numeric(features[column]).std() or 0.0)
+            noise = rng.normal(0.0, self.scale * spread, repeated.sum())
+            values = (
+                sampled[column].to_numpy(dtype=float, na_value=np.nan).copy()
+            )
+            values[repeated] = values[repeated] + noise
+            sampled[column] = values
+        return sampled, target.iloc[chosen].reset_index(drop=True)
+
+
+class PreprocessedResamplingClassifier(
+    base.ClassifierMixin, base.BaseEstimator
+):
+    """Resamples in *feature space*, after preprocessing, inside `fit`.
+
+    Interpolating samplers such as SMOTE need numeric matrices, so the
+    preprocessor is fitted on the training fold, the encoded training rows
+    are resampled, and the model is fitted on the result. Prediction applies
+    the fitted preprocessor only; validation rows are never resampled.
+
+    Attributes:
+        preprocessor: Unfitted column transformer.
+        sampler: Unfitted imbalanced-learn style sampler (`fit_resample`).
+        estimator: Unfitted classifier.
+        preprocessor_: Fitted preprocessor.
+        estimator_: Fitted classifier.
+        classes_: Class labels.
+    """
+
+    def __init__(
+        self,
+        preprocessor: base.BaseEstimator,
+        sampler: Any,
+        estimator: base.BaseEstimator,
+    ) -> None:
+        """Initializes the wrapper.
+
+        Args:
+            preprocessor: Preprocessing transformer.
+            sampler: Sampler with `fit_resample(features, target)`.
+            estimator: Classifier trained on the resampled matrix.
+        """
+        self.preprocessor = preprocessor
+        self.sampler = sampler
+        self.estimator = estimator
+
+    def fit(self, features: Any, target: Any) -> Self:
+        """Fits the preprocessor, resamples the encoded rows, fits the model."""
+        self.preprocessor_ = base.clone(self.preprocessor).fit(features, target)
+        encoded = self.preprocessor_.transform(features)
+        resampled, labels = base.clone(self.sampler).fit_resample(
+            encoded, np.asarray(target)
+        )
+        self.estimator_ = base.clone(self.estimator).fit(resampled, labels)
+        self.classes_ = self.estimator_.classes_
+        return self
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Predicts from the preprocessed rows (no resampling)."""
+        return self.estimator_.predict(self.preprocessor_.transform(features))
+
+    def predict_proba(self, features: Any) -> np.ndarray:
+        """Returns class probabilities (no resampling)."""
+        return self.estimator_.predict_proba(
+            self.preprocessor_.transform(features)
+        )
+
+
 class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
     """Fits a classifier on a resampled copy of its training data.
 
