@@ -13,6 +13,7 @@ import time
 from typing import Any
 from typing import ClassVar
 
+import numpy as np
 import pandas as pd
 
 from mml.api import results
@@ -35,6 +36,7 @@ from mml.data import profiling
 from mml.data import readers
 from mml.data import splitting
 from mml.data import strategies
+from mml.evaluation import confidence
 from mml.evaluation import diagnostics
 from mml.evaluation import resources
 from mml.intelligence import knowledge
@@ -605,6 +607,12 @@ class FinalEvaluationStage(Stage):
             "selected_strategy": selected.strategy,
             "selected_cv_score": selected.score_mean,
             "selected_cv_std": selected.score_std,
+            "cv_confidence": confidence.cv_interval(
+                selected.fold_scores,
+                float(np.mean([len(fit) for fit, _ in split.manifest.folds])),
+                float(np.mean([len(held) for _, held in split.manifest.folds])),
+                split.manifest.strategy,
+            ),
             "baseline_cv_score": baseline.score_mean if baseline else None,
             "test_metrics": test_metrics,
             "n_dev": len(split.dev_features),
