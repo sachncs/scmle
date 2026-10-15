@@ -1,47 +1,58 @@
-"""Leakage-aware splitting: immutable split manifest + sealed test partition.
+"""Leakage-aware splitting: strategies, immutable manifest, sealed test set.
 
-Row identifiers are positional indices into the ingested frame. The test partition is held
-behind LockedTestSet, which can be opened exactly once, only with the token the orchestrator
-issues after model selection.
+Row identifiers are positional indices into the ingested frame. Each
+`SplitStrategy` subclass owns one validation protocol; `SplitManager` selects
+and applies it. The test partition lives behind `LockedTestSet`, which opens
+exactly once, with the token the orchestrator issues after selection.
 """
 
-from __future__ import annotations
-
+import abc
+import dataclasses
 import hashlib
 import secrets
-from dataclasses import dataclass
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import (
-    GroupKFold,
-    GroupShuffleSplit,
-    KFold,
-    StratifiedKFold,
-    TimeSeriesSplit,
-    train_test_split,
-)
+from sklearn import model_selection
 
-from mml.contracts.errors import BlockedError, LeakageError
-from mml.contracts.tasks import ProjectSpec, TaskType
+from mml.contracts import errors
+from mml.contracts import tasks
+
+Fold = tuple[np.ndarray, np.ndarray]
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class SplitManifest:
+    """Immutable record of how rows were partitioned.
+
+    Attributes:
+        strategy: Name of the strategy that produced the split.
+        seed: Random seed used.
+        train_ids: Row ids of the development partition.
+        test_ids: Row ids of the locked test partition.
+        folds: Cross-validation folds as positions within the development
+            partition.
+        notes: Adjustments made while splitting (for example fewer folds).
+    """
+
     strategy: str
     seed: int
     train_ids: tuple[int, ...]
     test_ids: tuple[int, ...]
-    # folds hold positions *within the development (train) partition*
     folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
     notes: tuple[str, ...] = ()
 
     @property
     def fingerprint(self) -> str:
-        payload = repr((self.strategy, self.seed, self.train_ids, self.test_ids, self.folds))
+        """Deterministic hash of the entire split."""
+        payload = repr(
+            (self.strategy, self.seed, self.train_ids, self.test_ids, self.folds)
+        )
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
     def to_dict(self) -> dict:
+        """Returns a JSON-serializable mapping."""
         return {
             "strategy": self.strategy,
             "seed": self.seed,
@@ -50,45 +61,306 @@ class SplitManifest:
             "n_test": len(self.test_ids),
             "train_ids": list(self.train_ids),
             "test_ids": list(self.test_ids),
-            "folds": [{"train": list(t), "val": list(v)} for t, v in self.folds],
+            "folds": [
+                {"train": list(train), "val": list(val)}
+                for train, val in self.folds
+            ],
             "notes": list(self.notes),
         }
 
 
-class LockedTestSet:
-    """Holds the test partition; unavailable to search, openable once after selection."""
+@dataclasses.dataclass(slots=True)
+class Partition:
+    """Raw output of a split strategy.
 
-    def __init__(self, X: pd.DataFrame, y: pd.Series, ids: tuple[int, ...]) -> None:
-        self._X, self._y = X, y
-        self.ids = ids
-        self._token = secrets.token_hex(8)
-        self._opened = False
+    Attributes:
+        dev_ids: Row ids available for model development.
+        test_ids: Row ids reserved for the final test.
+        folds: Cross-validation folds over positions in `dev_ids`.
+        notes: Adjustments made while splitting.
+    """
+
+    dev_ids: np.ndarray
+    test_ids: np.ndarray
+    folds: list[Fold]
+    notes: list[str] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass(slots=True)
+class LockedTestSet:
+    """Holds the test partition; unavailable to search, openable once.
+
+    Python cannot hide attributes, so the lock is a protocol: trial code only
+    receives development data, and `open` enforces a one-time, token-gated
+    release that is recorded.
+
+    Attributes:
+        features: Test features.
+        target: Test labels.
+        ids: Row ids of the test rows.
+        token: Secret issued by `issue_token` (excluded from repr).
+        opened: Whether the set has been released.
+    """
+
+    features: pd.DataFrame = dataclasses.field(repr=False)
+    target: pd.Series = dataclasses.field(repr=False)
+    ids: tuple[int, ...]
+    token: str = dataclasses.field(
+        default_factory=lambda: secrets.token_hex(8), repr=False
+    )
+    opened: bool = False
 
     def issue_token(self) -> str:
-        """Called by the orchestrator when selection is frozen."""
-        return self._token
+        """Returns the release token; call only once selection is frozen."""
+        return self.token
 
     def open(self, token: str) -> tuple[pd.DataFrame, pd.Series]:
-        if token != self._token:
-            raise LeakageError("test set is locked: invalid token")
-        if self._opened:
-            raise LeakageError("test set was already used for final evaluation")
-        self._opened = True
-        return self._X, self._y
+        """Releases the test data a single time.
+
+        Args:
+            token: The token from `issue_token`.
+
+        Returns:
+            Test features and labels.
+
+        Raises:
+            LeakageError: On a wrong token or a repeated release.
+        """
+        if token != self.token:
+            raise errors.LeakageError("test set is locked: invalid token")
+        if self.opened:
+            raise errors.LeakageError(
+                "test set was already used for final evaluation"
+            )
+        self.opened = True
+        return self.features, self.target
 
     def __len__(self) -> int:
+        """Number of test rows."""
         return len(self.ids)
 
-    def __repr__(self) -> str:
-        return f"LockedTestSet(n={len(self.ids)}, opened={self._opened})"
+
+@dataclasses.dataclass(slots=True)
+class SplitResult:
+    """Everything produced by splitting a dataset.
+
+    Attributes:
+        manifest: Immutable split record.
+        dev_features: Development features (target removed).
+        dev_target: Development labels.
+        locked_test: The sealed test partition.
+    """
+
+    manifest: SplitManifest
+    dev_features: pd.DataFrame
+    dev_target: pd.Series
+    locked_test: LockedTestSet
 
 
-def resolve_strategy(spec: ProjectSpec, task: TaskType) -> str:
-    s = spec.validation.strategy
-    if s != "auto":
-        if s == "stratified" and not task.is_classification:
-            raise BlockedError("stratified validation requires a classification task")
-        return s
+def to_ids(values: np.ndarray) -> tuple[int, ...]:
+    """Converts an index array to a tuple of Python ints."""
+    return tuple(int(v) for v in values)
+
+
+class SplitStrategy(abc.ABC):
+    """One validation protocol (holdout + cross-validation folds).
+
+    Attributes:
+        name: Strategy name used in configuration.
+    """
+
+    name: ClassVar[str]
+
+    def __init__(self, spec: tasks.ProjectSpec, task: tasks.TaskType) -> None:
+        """Initializes the strategy.
+
+        Args:
+            spec: Project specification.
+            task: Resolved task type.
+
+        Raises:
+            BlockedError: If the strategy cannot serve the task.
+        """
+        self.data = spec.data
+        self.validation = spec.validation
+        self.task = task
+        self.check_task()
+
+    def check_task(self) -> None:
+        """Rejects tasks the strategy cannot serve; default accepts all."""
+
+    @abc.abstractmethod
+    def partition(self, frame: pd.DataFrame) -> Partition:
+        """Splits the frame into development, test and folds.
+
+        Args:
+            frame: The full dataset including the target column.
+
+        Returns:
+            The partition.
+
+        Raises:
+            BlockedError: If a leakage-free split is impossible.
+        """
+
+
+class RandomSplit(SplitStrategy):
+    """Shuffled holdout and K-fold; the default for regression."""
+
+    name = "random"
+
+    def stratify_labels(self, frame: pd.DataFrame) -> pd.Series | None:
+        """Labels to stratify the holdout on; none for plain random."""
+        return None
+
+    def cross_validation_folds(
+        self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
+    ) -> list[Fold]:
+        """Builds shuffled K-fold splits over positions in `dev_ids`."""
+        splitter = model_selection.KFold(
+            n_splits=self.validation.folds,
+            shuffle=True,
+            random_state=self.validation.seed,
+        )
+        return list(splitter.split(np.arange(len(dev_ids))))
+
+    def partition(self, frame: pd.DataFrame) -> Partition:
+        """Random holdout followed by K-fold on the development rows."""
+        dev_ids, test_ids = model_selection.train_test_split(
+            np.arange(len(frame)),
+            test_size=self.validation.test_fraction,
+            random_state=self.validation.seed,
+            stratify=self.stratify_labels(frame),
+        )
+        dev_ids, test_ids = np.sort(dev_ids), np.sort(test_ids)
+        notes: list[str] = []
+        folds = self.cross_validation_folds(frame, dev_ids, notes)
+        return Partition(dev_ids, test_ids, folds, notes)
+
+
+class StratifiedSplit(RandomSplit):
+    """Class-proportion preserving split for classification."""
+
+    name = "stratified"
+
+    def check_task(self) -> None:
+        """Stratification needs classes."""
+        if not self.task.is_classification:
+            raise errors.BlockedError(
+                "stratified validation requires a classification task"
+            )
+
+    def stratify_labels(self, frame: pd.DataFrame) -> pd.Series:
+        """Stratifies on the target; every class needs two examples."""
+        labels = frame[self.data.target]
+        if (labels.value_counts() < 2).any():
+            raise errors.BlockedError(
+                "a class has fewer than 2 examples: cannot stratify"
+            )
+        return labels
+
+    def cross_validation_folds(
+        self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
+    ) -> list[Fold]:
+        """Stratified K-fold, shrinking K to the rarest class if needed."""
+        labels = frame[self.data.target].iloc[dev_ids]
+        rarest = int(labels.value_counts().min())
+        if rarest < 2:
+            raise errors.BlockedError(
+                "insufficient minority-class examples after test split"
+            )
+        folds = self.validation.folds
+        if rarest < folds:
+            notes.append(f"folds reduced {folds}->{rarest} (minority class size)")
+            folds = rarest
+        splitter = model_selection.StratifiedKFold(
+            n_splits=folds, shuffle=True, random_state=self.validation.seed
+        )
+        return list(splitter.split(np.arange(len(dev_ids)), labels))
+
+
+class GroupSplit(SplitStrategy):
+    """Keeps every group wholly inside one partition."""
+
+    name = "group"
+
+    def partition(self, frame: pd.DataFrame) -> Partition:
+        """Group-disjoint holdout and group K-fold."""
+        groups = frame[self.data.group_column].to_numpy()
+        if pd.isna(groups).any():
+            raise errors.BlockedError(
+                f"group column '{self.data.group_column}' has missing values"
+            )
+        folds = self.validation.folds
+        if len(set(groups)) < folds + 2:
+            raise errors.BlockedError(
+                f"need at least {folds + 2} groups for group validation"
+            )
+        holdout = model_selection.GroupShuffleSplit(
+            n_splits=1,
+            test_size=self.validation.test_fraction,
+            random_state=self.validation.seed,
+        )
+        dev_ids, test_ids = next(
+            holdout.split(np.arange(len(frame)), groups=groups)
+        )
+        dev_groups = groups[dev_ids]
+        folds = min(folds, len(set(dev_groups)))
+        splitter = model_selection.GroupKFold(n_splits=folds)
+        return Partition(
+            dev_ids,
+            test_ids,
+            list(splitter.split(np.arange(len(dev_ids)), groups=dev_groups)),
+        )
+
+
+class TemporalSplit(SplitStrategy):
+    """Trains on the past and evaluates on the future."""
+
+    name = "temporal"
+
+    def partition(self, frame: pd.DataFrame) -> Partition:
+        """Chronological holdout and expanding-window folds."""
+        column = self.data.time_column
+        times = pd.to_datetime(frame[column], errors="coerce")
+        if times.isna().any():
+            raise errors.BlockedError(
+                f"time column '{column}' has unparseable/missing values: "
+                "ordering ambiguous"
+            )
+        order = np.argsort(times.to_numpy(), kind="stable")
+        rows = len(frame)
+        test_rows = max(1, round(rows * self.validation.test_fraction))
+        dev_ids, test_ids = order[: rows - test_rows], order[rows - test_rows :]
+        folds = self.validation.folds
+        if len(dev_ids) < folds + 1:
+            raise errors.BlockedError("too few rows for temporal cross-validation")
+        splitter = model_selection.TimeSeriesSplit(n_splits=folds)
+        return Partition(
+            dev_ids, test_ids, list(splitter.split(np.arange(len(dev_ids))))
+        )
+
+
+STRATEGIES: dict[str, type[SplitStrategy]] = {
+    strategy.name: strategy
+    for strategy in (RandomSplit, StratifiedSplit, GroupSplit, TemporalSplit)
+}
+
+
+def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
+    """Chooses the split strategy for a project.
+
+    Args:
+        spec: Project specification.
+        task: Resolved task type.
+
+    Returns:
+        The explicit strategy, or for `auto` the one matching the data
+        structure: temporal, then group, then stratified / random.
+    """
+    requested = spec.validation.strategy
+    if requested != "auto":
+        return requested
     if spec.data.time_column:
         return "temporal"
     if spec.data.group_column:
@@ -96,83 +368,50 @@ def resolve_strategy(spec: ProjectSpec, task: TaskType) -> str:
     return "stratified" if task.is_classification else "random"
 
 
-def _ids(a: np.ndarray) -> tuple[int, ...]:
-    return tuple(int(i) for i in a)
+class SplitManager:
+    """Selects and applies the validation protocol for a project."""
 
+    def __init__(self, spec: tasks.ProjectSpec, task: tasks.TaskType) -> None:
+        """Initializes the manager.
 
-def make_split(
-    df: pd.DataFrame, spec: ProjectSpec, task: TaskType
-) -> tuple[SplitManifest, pd.DataFrame, pd.Series, LockedTestSet]:
-    """Return (manifest, dev features, dev target, locked test)."""
-    d, v = spec.data, spec.validation
-    strategy = resolve_strategy(spec, task)
-    n = len(df)
-    y_all = df[d.target]
-    idx = np.arange(n)
-    notes: list[str] = []
-    folds_n = v.folds
+        Args:
+            spec: Project specification.
+            task: Resolved task type.
+        """
+        self.spec = spec
+        self.task = task
+        self.strategy_name = resolve_strategy_name(spec, task)
 
-    if strategy == "temporal":
-        t = pd.to_datetime(df[d.time_column], errors="coerce")
-        if t.isna().any():
-            raise BlockedError(
-                f"time column '{d.time_column}' has unparseable/missing values: ordering ambiguous"
-            )
-        order = np.argsort(t.to_numpy(), kind="stable")
-        n_test = max(1, int(round(n * v.test_fraction)))
-        dev_ids, test_ids = order[: n - n_test], order[n - n_test :]
-        if len(dev_ids) < folds_n + 1:
-            raise BlockedError("too few rows for temporal cross-validation")
-        tscv = TimeSeriesSplit(n_splits=folds_n)
-        folds = [(tr, va) for tr, va in tscv.split(np.arange(len(dev_ids)))]
-    elif strategy == "group":
-        groups = df[d.group_column].to_numpy()
-        if pd.isna(groups).any():
-            raise BlockedError(f"group column '{d.group_column}' has missing values")
-        if len(set(groups)) < folds_n + 2:
-            raise BlockedError(f"need at least {folds_n + 2} groups for group validation")
-        gss = GroupShuffleSplit(n_splits=1, test_size=v.test_fraction, random_state=v.seed)
-        dev_ids, test_ids = next(gss.split(idx, groups=groups))
-        dev_groups = groups[dev_ids]
-        folds_n = min(folds_n, len(set(dev_groups)))
-        folds = list(GroupKFold(n_splits=folds_n).split(np.arange(len(dev_ids)), groups=dev_groups))
-    else:
-        stratify = y_all if strategy == "stratified" else None
-        if strategy == "stratified":
-            if (y_all.value_counts() < 2).any():
-                raise BlockedError("a class has fewer than 2 examples: cannot stratify")
-        dev_ids, test_ids = train_test_split(
-            idx, test_size=v.test_fraction, random_state=v.seed, stratify=stratify
+    def split(self, frame: pd.DataFrame) -> SplitResult:
+        """Splits the dataset.
+
+        Args:
+            frame: The full dataset including the target column.
+
+        Returns:
+            Manifest, development data and the sealed test set.
+        """
+        strategy = STRATEGIES[self.strategy_name](self.spec, self.task)
+        part = strategy.partition(frame)
+        manifest = SplitManifest(
+            strategy=self.strategy_name,
+            seed=self.spec.validation.seed,
+            train_ids=to_ids(part.dev_ids),
+            test_ids=to_ids(part.test_ids),
+            folds=tuple((to_ids(a), to_ids(b)) for a, b in part.folds),
+            notes=tuple(part.notes),
         )
-        dev_ids, test_ids = np.sort(dev_ids), np.sort(test_ids)
-        if strategy == "stratified":
-            min_class = int(y_all.iloc[dev_ids].value_counts().min())
-            if min_class < 2:
-                raise BlockedError("insufficient minority-class examples after test split")
-            if min_class < folds_n:
-                notes.append(f"folds reduced {folds_n}->{min_class} (minority class size)")
-                folds_n = min_class
-            skf = StratifiedKFold(n_splits=folds_n, shuffle=True, random_state=v.seed)
-            folds = list(skf.split(np.arange(len(dev_ids)), y_all.iloc[dev_ids]))
-        else:
-            kf = KFold(n_splits=folds_n, shuffle=True, random_state=v.seed)
-            folds = list(kf.split(np.arange(len(dev_ids))))
-
-    manifest = SplitManifest(
-        strategy=strategy,
-        seed=v.seed,
-        train_ids=_ids(dev_ids),
-        test_ids=_ids(test_ids),
-        folds=tuple((_ids(a), _ids(b)) for a, b in folds),
-        notes=tuple(notes),
-    )
-    drop = [d.target]
-    X = df.drop(columns=drop)
-    dev_X = X.iloc[dev_ids].reset_index(drop=True)
-    dev_y = y_all.iloc[dev_ids].reset_index(drop=True)
-    locked = LockedTestSet(
-        X.iloc[test_ids].reset_index(drop=True),
-        y_all.iloc[test_ids].reset_index(drop=True),
-        manifest.test_ids,
-    )
-    return manifest, dev_X, dev_y, locked
+        target_name = self.spec.data.target
+        features = frame.drop(columns=[target_name])
+        target = frame[target_name]
+        locked = LockedTestSet(
+            features.iloc[part.test_ids].reset_index(drop=True),
+            target.iloc[part.test_ids].reset_index(drop=True),
+            manifest.test_ids,
+        )
+        return SplitResult(
+            manifest,
+            features.iloc[part.dev_ids].reset_index(drop=True),
+            target.iloc[part.dev_ids].reset_index(drop=True),
+            locked,
+        )
