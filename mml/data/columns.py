@@ -15,6 +15,7 @@ import pandas as pd
 from sklearn import impute
 from sklearn import pipeline
 from sklearn import preprocessing
+from sklearn import tree as sk_tree
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
@@ -23,6 +24,7 @@ from mml.data import transformers
 MISSING_TOKEN = "__missing__"  # nosec B105 - category placeholder, not a secret
 ID_UNIQUE_RATIO = 0.95
 MAX_DIRECT_VALUES = 20
+TREE_LEAVES = 20
 MIN_ASSOCIATION_ROWS = 10
 MIN_MISSING_RATE = 0.05
 MIN_PRESENT_ROWS = 20
@@ -88,6 +90,34 @@ def purity_association(key: pd.Series, target: pd.Series) -> float:
         lambda labels: labels.value_counts().iloc[0]
     )
     return float((group_majority.sum() - majority) / (len(target) - majority))
+
+
+def threshold_association(values: pd.Series, labels: pd.Series) -> float:
+    """Class-separation gain of a small decision tree on one numeric feature.
+
+    Fixed-width or quantile bins blur a sharp threshold (the bin that
+    straddles it is impure), so a feature that separates the classes
+    perfectly could score below the leakage cut-off. A depth-limited tree
+    places its splits where the classes change, so a threshold rule scores
+    1.0 while noise stays low (leaves must hold several rows).
+
+    Args:
+        values: Numeric feature values.
+        labels: Class labels.
+
+    Returns:
+        In-sample accuracy gain over predicting the majority class, in [0, 1].
+    """
+    majority = labels.value_counts(normalize=True).iloc[0]
+    if majority >= 1.0:
+        return 0.0
+    tree = sk_tree.DecisionTreeClassifier(
+        max_leaf_nodes=TREE_LEAVES,
+        min_samples_leaf=max(3, len(values) // 100),
+        random_state=0,
+    ).fit(values.to_numpy().reshape(-1, 1), labels)
+    accuracy = float(tree.score(values.to_numpy().reshape(-1, 1), labels))
+    return max(0.0, (accuracy - majority) / (1.0 - majority))
 
 
 class ColumnKind(abc.ABC):
@@ -249,10 +279,8 @@ class NumericKind(ColumnKind):
             )
             return float(abs(corr)) if pd.notna(corr) else 0.0
         if values.nunique() <= MAX_DIRECT_VALUES:
-            key = values
-        else:
-            key = pd.qcut(values.astype(float), 20, duplicates="drop")
-        return purity_association(key, labels)
+            return purity_association(values, labels)
+        return threshold_association(values.astype(float), labels)
 
 
 class DatetimeKind(ColumnKind):
