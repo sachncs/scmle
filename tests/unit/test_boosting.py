@@ -130,3 +130,38 @@ def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
         "mid",
         "hi",
     }
+
+
+def test_flat_prediction_wrapper_flattens_column_vectors():
+    import numpy as np
+    import pandas as pd
+    from sklearn import tree
+
+    from mml.models import wrappers
+
+    class ColumnVectorTree(tree.DecisionTreeClassifier):
+        def predict(self, features):
+            return super().predict(features).reshape(-1, 1)
+
+    rng = np.random.default_rng(0)
+    features = pd.DataFrame({"a": rng.normal(size=80)})
+    target = pd.Series((features.a > 0).astype(int))
+    plain = ColumnVectorTree().fit(features, target)
+    assert plain.predict(features).ndim == 2
+    wrapped = wrappers.FlatPredictionClassifier(ColumnVectorTree()).fit(
+        features, target
+    )
+    assert wrapped.predict(features).shape == (80,)
+    assert wrapped.predict_proba(features).shape == (80, 2)
+    assert list(wrapped.classes_) == [0, 1]
+
+
+def test_catboost_multiclass_predictions_are_one_dimensional(multiclass_frame):
+    pytest.importorskip("catboost")
+    from mml.contracts import tasks
+
+    adapter = registry_module.ModelRegistry.with_builtins().get("catboost")
+    estimator = adapter.build(tasks.TaskType.MULTICLASS, 0, {"iterations": 20})
+    features = multiclass_frame.drop(columns="y")
+    estimator.fit(features, multiclass_frame["y"])
+    assert estimator.predict(features).shape == (len(features),)
