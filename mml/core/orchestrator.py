@@ -98,7 +98,9 @@ class Orchestrator:
             registry=self.registry,
             catalog=metrics.CATALOG,
             policy=self.policy,
-            backend=execution.create_backend(self.spec.resources.workers),
+            backend=execution.create_backend(
+                self.spec.resources.workers, self.spec.resources.executor
+            ),
             cancel_event=self.cancel_event,
             input_frame=self.frame,
             store=store,

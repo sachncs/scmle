@@ -69,6 +69,7 @@ class ResourceSpec(FrozenModel):
     memory_limit_gb: float = pydantic.Field(default=8.0, gt=0)
     cpu_limit: int | None = pydantic.Field(default=None, ge=1)
     workers: int = pydantic.Field(default=1, ge=1)
+    executor: Literal["process", "ray"] = "process"
     gpu: Literal["auto", "disabled", "required"] = "auto"
 
 

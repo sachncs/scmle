@@ -87,13 +87,62 @@ class ProcessBackend(ExecutionBackend):
         return list(parallel(joblib.delayed(function)(item) for item in items))
 
 
-def create_backend(workers: int) -> ExecutionBackend:
-    """Chooses the backend for a worker count.
+class RayBackend(ExecutionBackend):
+    """Runs items as Ray tasks (`distributed` extra), local or cluster."""
+
+    name = "ray"
+
+    def __init__(self, workers: int) -> None:
+        """Starts (or joins) a Ray runtime.
+
+        Args:
+            workers: CPUs to claim when starting a local runtime.
+
+        Raises:
+            ConfigError: If Ray is not installed.
+        """
+        try:
+            import ray
+        except ImportError as error:
+            raise errors.ConfigError(
+                "RayBackend needs the 'distributed' extra (ray)"
+            ) from error
+        self.ray = ray
+        self.workers = max(workers, 1)
+        if not ray.is_initialized():
+            ray.init(
+                num_cpus=self.workers,
+                ignore_reinit_error=True,
+                include_dashboard=False,
+                logging_level="ERROR",
+            )
+
+    def map(
+        self, function: Callable[[Any], Any], items: Sequence[Any]
+    ) -> list[Any]:
+        """Submits one Ray task per item and gathers results in order."""
+        if not items:
+            return []
+        remote = self.ray.remote(function)
+        return list(self.ray.get([remote.remote(item) for item in items]))
+
+
+def create_backend(workers: int, executor: str = "process") -> ExecutionBackend:
+    """Chooses the backend for a worker count and executor.
 
     Args:
         workers: Requested concurrency.
+        executor: `process` (loky pool) or `ray`.
 
     Returns:
-        Sequential for one worker, otherwise a process pool.
+        Sequential for one worker with the process executor, otherwise a
+        process pool or a Ray backend.
+
+    Raises:
+        ConfigError: For an unknown executor.
     """
+    if executor == "ray":
+        return RayBackend(workers)
+    if executor != "process":
+        raise errors.ConfigError(f"unknown executor '{executor}'")
     return SequentialBackend() if workers <= 1 else ProcessBackend(workers)
