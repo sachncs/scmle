@@ -1,62 +1,175 @@
-"""Dataset ingestion (CSV / Parquet) and manifest construction."""
+"""Dataset ingestion and manifest construction.
 
-from __future__ import annotations
+Readers are polymorphic: `DatasetLoader` dispatches on file suffix to a
+`TableReader` subclass, so supporting a new format means adding one class.
+"""
 
+import abc
 import hashlib
-from pathlib import Path
+import pathlib
+from typing import ClassVar
 
 import pandas as pd
 
-from mml.contracts.data import DatasetManifest
-from mml.contracts.errors import DataError
-
-_READERS = {
-    ".csv": pd.read_csv,
-    ".parquet": pd.read_parquet,
-    ".pq": pd.read_parquet,
-}
+from mml.contracts import data as data_contracts
+from mml.contracts import errors
 
 
-def read_table(uri: str | Path) -> pd.DataFrame:
-    """Read a CSV/Parquet file. Raises DataError with a precise reason on failure."""
-    path = Path(uri)
-    if not path.exists():
-        raise DataError(f"dataset not found: {path}")
-    reader = _READERS.get(path.suffix.lower())
-    if reader is None:
-        raise DataError(f"unsupported file type '{path.suffix}'; use one of {sorted(_READERS)}")
-    try:
-        df = reader(path)
-    except Exception as exc:  # parser errors vary by engine
-        raise DataError(f"failed to read {path.name}: {exc}") from exc
-    if df.empty:
-        raise DataError(f"{path.name} contains no rows")
-    if df.columns.duplicated().any():
-        dupes = sorted(set(df.columns[df.columns.duplicated()].astype(str)))
-        raise DataError(f"duplicate column names: {dupes}")
-    return df
+class TableReader(abc.ABC):
+    """Reads one tabular file format into a DataFrame.
+
+    Attributes:
+        suffixes: Lower-case file suffixes the reader handles.
+    """
+
+    suffixes: ClassVar[tuple[str, ...]]
+
+    @abc.abstractmethod
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads `path`.
+
+        Args:
+            path: Existing file with a supported suffix.
+
+        Returns:
+            The parsed table.
+        """
 
 
-def schema_hash(df: pd.DataFrame) -> str:
-    payload = "|".join(f"{c}:{t}" for c, t in zip(df.columns, df.dtypes.astype(str), strict=True))
+class CsvReader(TableReader):
+    """Comma-separated values."""
+
+    suffixes = (".csv",)
+
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads a CSV file."""
+        return pd.read_csv(path)
+
+
+class ParquetReader(TableReader):
+    """Apache Parquet."""
+
+    suffixes = (".parquet", ".pq")
+
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads a Parquet file."""
+        return pd.read_parquet(path)
+
+
+class DatasetLoader:
+    """Dispatches file reads to the matching `TableReader`."""
+
+    def __init__(self, readers: tuple[TableReader, ...] | None = None) -> None:
+        """Initializes the loader.
+
+        Args:
+            readers: Readers to dispatch to; defaults to CSV and Parquet.
+        """
+        self.readers = readers or (CsvReader(), ParquetReader())
+
+    def supported_suffixes(self) -> list[str]:
+        """Returns every suffix some reader handles, sorted."""
+        return sorted(s for reader in self.readers for s in reader.suffixes)
+
+    def reader_for(self, path: pathlib.Path) -> TableReader:
+        """Selects the reader for `path`.
+
+        Args:
+            path: File whose suffix decides the reader.
+
+        Returns:
+            The matching reader.
+
+        Raises:
+            DataError: If no reader supports the suffix.
+        """
+        suffix = path.suffix.lower()
+        for reader in self.readers:
+            if suffix in reader.suffixes:
+                return reader
+        raise errors.DataError(
+            f"unsupported file type '{path.suffix}'; "
+            f"use one of {self.supported_suffixes()}"
+        )
+
+    def load(self, uri: str | pathlib.Path) -> pd.DataFrame:
+        """Reads and sanity-checks a dataset.
+
+        Args:
+            uri: Path to a supported file.
+
+        Returns:
+            A non-empty DataFrame with unique column names.
+
+        Raises:
+            DataError: If the file is missing, unreadable, empty or has
+                duplicate column names.
+        """
+        path = pathlib.Path(uri)
+        if not path.exists():
+            raise errors.DataError(f"dataset not found: {path}")
+        reader = self.reader_for(path)
+        try:
+            frame = reader.load(path)
+        except Exception as error:  # Parser errors vary by engine.
+            raise errors.DataError(
+                f"failed to read {path.name}: {error}"
+            ) from error
+        if frame.empty:
+            raise errors.DataError(f"{path.name} contains no rows")
+        duplicated = frame.columns[frame.columns.duplicated()]
+        if len(duplicated):
+            names = sorted(set(duplicated.astype(str)))
+            raise errors.DataError(f"duplicate column names: {names}")
+        return frame
+
+
+def read_table(uri: str | pathlib.Path) -> pd.DataFrame:
+    """Reads a CSV or Parquet dataset with the default loader."""
+    return DatasetLoader().load(uri)
+
+
+def schema_hash(frame: pd.DataFrame) -> str:
+    """Returns a short hash of column names and dtypes."""
+    pairs = zip(frame.columns, frame.dtypes.astype(str), strict=True)
+    payload = "|".join(f"{name}:{dtype}" for name, dtype in pairs)
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
-def data_hash(df: pd.DataFrame) -> str:
-    row_hashes = pd.util.hash_pandas_object(df, index=False).to_numpy()
-    return hashlib.sha256(row_hashes.tobytes()).hexdigest()[:16]
+def data_hash(frame: pd.DataFrame) -> str:
+    """Returns a short hash of the row contents (index ignored)."""
+    rows = pd.util.hash_pandas_object(frame, index=False).to_numpy()
+    return hashlib.sha256(rows.tobytes()).hexdigest()[:16]
 
 
-def build_manifest(df: pd.DataFrame, target: str, uri: str = "") -> DatasetManifest:
-    if target not in df.columns:
-        raise DataError(f"target column '{target}' not found; columns: {list(df.columns)[:20]}")
-    s, d = schema_hash(df), data_hash(df)
-    return DatasetManifest(
-        dataset_id=f"ds_{d[:8]}",
-        schema_hash=s,
-        data_hash=d,
-        row_count=len(df),
-        column_count=df.shape[1],
+def build_manifest(
+    frame: pd.DataFrame, target: str, uri: str = ""
+) -> data_contracts.DatasetManifest:
+    """Builds the immutable identity of a dataset.
+
+    Args:
+        frame: The ingested data (not modified).
+        target: Name of the target column.
+        uri: Where the data came from.
+
+    Returns:
+        The dataset manifest.
+
+    Raises:
+        DataError: If `target` is not a column.
+    """
+    if target not in frame.columns:
+        raise errors.DataError(
+            f"target column '{target}' not found; "
+            f"columns: {list(frame.columns)[:20]}"
+        )
+    content_hash = data_hash(frame)
+    return data_contracts.DatasetManifest(
+        dataset_id=f"ds_{content_hash[:8]}",
+        schema_hash=schema_hash(frame),
+        data_hash=content_hash,
+        row_count=len(frame),
+        column_count=frame.shape[1],
         target=target,
         uri=str(uri),
     )
