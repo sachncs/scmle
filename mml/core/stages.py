@@ -161,21 +161,39 @@ class TrainStage(Stage):
         return f"{len(plan.candidate_models)} candidates"
 
     def execute(self, context: context_module.RunContext) -> None:
-        """Runs trials in order, checkpointing each result as it finishes."""
+        """Screens candidates, then tunes the most promising ones.
+
+        Candidates run in chunks of `backend.workers`; the budget is checked
+        before every chunk but the first, and results are recorded in
+        candidate order regardless of the backend.
+        """
         runner = trials.TrialRunner(context)
         plan = require(context.plan, "plan")
-        for number, name in enumerate(plan.candidate_models, 1):
+        names = plan.candidate_models
+        for start in range(0, len(names), runner.workers):
             context.check_cancelled()
-            trial_id = f"trial_{number:03d}"
-            if number > 1 and time.monotonic() >= context.deadline:
-                outcome = runner.skip(
-                    trial_id,
-                    name,
-                    "time budget exhausted before this trial started",
-                )
+            chunk = names[start : start + runner.workers]
+            ids = [
+                f"trial_{start + offset + 1:03d}"
+                for offset in range(len(chunk))
+            ]
+            if start > 0 and time.monotonic() >= context.deadline:
+                outcomes = [
+                    runner.skip(
+                        trial_id,
+                        name,
+                        "time budget exhausted before this trial started",
+                    )
+                    for trial_id, name in zip(ids, chunk, strict=True)
+                ]
             else:
-                outcome = runner.run(trial_id, name)
-            context.record_trial(outcome)
+                jobs = [
+                    trials.TrialJob(trial_id, name)
+                    for trial_id, name in zip(ids, chunk, strict=True)
+                ]
+                outcomes = runner.run_many(jobs)
+            for outcome in outcomes:
+                context.record_trial(outcome)
         tuning.Tuner(context, runner).tune(list(context.trials))
 
 

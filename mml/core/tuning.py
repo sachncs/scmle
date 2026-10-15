@@ -91,6 +91,9 @@ class Tuner:
     ) -> None:
         """Scores a batch on the cheap rung, prunes, finishes the survivors.
 
+        Both rungs are dispatched through the execution backend, so a batch
+        runs concurrently when workers are available.
+
         Args:
             name: Model being tuned.
             optimizer: Source of configurations; told every score.
@@ -98,19 +101,33 @@ class Tuner:
         """
         multi_fold = len(self.runner.folds) > 1
         rung_folds = 1 if multi_fold else None
-        proposals = (optimizer.ask() for count in range(size))
-        first_rung = [
-            self.runner.run(self.next_id(), name, params, rung_folds)
-            for params in proposals
-        ]
+        proposals = [optimizer.ask() for count in range(size)]
+        first_rung = self.runner.run_many(
+            [
+                trials.TrialJob(self.next_id(), name, params, rung_folds)
+                for params in proposals
+            ]
+        )
         survivors = self.survivor_ids(first_rung) if multi_fold else None
+        finished = {}
+        if survivors:
+            winners = [t for t in first_rung if t.trial_id in survivors]
+            finished = {
+                t.trial_id: t
+                for t in self.runner.run_many(
+                    [
+                        trials.TrialJob(t.trial_id, t.model_name, t.params)
+                        for t in winners
+                    ]
+                )
+            }
         for trial in first_rung:
             if trial.status is not Status.OK:
                 self.context.record_trial(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
-            elif trial.trial_id in survivors:
-                self.finish(trial, optimizer)
+            elif trial.trial_id in finished:
+                self.complete(finished[trial.trial_id], optimizer)
             else:
                 trial.status = Status.PRUNED
                 trial.error = "pruned after the first rung"
@@ -129,15 +146,7 @@ class Tuner:
     def complete(
         self, trial: experiments.TrialResult, optimizer: optimizers.Optimizer
     ) -> None:
-        """Tells the optimizer the trial's score and records the trial."""
-        optimizer.tell(trial.params, trial.score_mean)
+        """Tells the optimizer the trial's score (if any) and records it."""
+        if trial.status in (Status.OK, Status.PRUNED):
+            optimizer.tell(trial.params, trial.score_mean)
         self.context.record_trial(trial)
-
-    def finish(
-        self, trial: experiments.TrialResult, optimizer: optimizers.Optimizer
-    ) -> None:
-        """Re-evaluates a surviving configuration on all folds."""
-        full = self.runner.run(trial.trial_id, trial.model_name, trial.params)
-        if full.status is Status.OK:
-            optimizer.tell(full.params, full.score_mean)
-        self.context.record_trial(full)
