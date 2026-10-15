@@ -91,3 +91,27 @@ def test_null_store_is_a_safe_noop():
     null.listen("r", events.Event("r", "state.X"))
     assert null.runs() == [] and null.trials("r") == []
     assert isinstance(null, stores.ExperimentStore)
+
+
+def test_every_operation_closes_its_connection(tmp_path):
+    import gc
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ResourceWarning)
+        store = stores.SqliteExperimentStore(tmp_path / "leak.sqlite")
+        store.start_run("r", "h", "d", "2026-10-15T00:00:00+00:00")
+        store.update_run("r", state="TRAINING", fingerprint={"a": 1.0})
+        store.record_trial("r", make_trial())
+        store.runs()
+        store.trials("r")
+        store.history()
+        gc.collect()
+
+
+def test_a_failed_update_rolls_back_and_still_closes(tmp_path):
+    store = stores.SqliteExperimentStore(tmp_path / "rollback.sqlite")
+    store.start_run("r", "h", "d", "2026-10-15T00:00:00+00:00")
+    with pytest.raises(ValueError):
+        store.update_run("r", bogus=1)
+    assert store.runs()[0]["state"] == "CREATED"
