@@ -32,8 +32,8 @@ def test_a_wrong_token_is_refused_by_the_vault_process(sealed):
         sealed.open("guess")
 
     assert sealed.opened is False
-    features, __ = sealed.open(sealed.issue_token())
-    assert len(features) == 3
+    released = sealed.open(sealed.issue_token())
+    assert len(released[0]) == 3
 
 
 def test_this_process_keeps_only_the_ids(sealed):
