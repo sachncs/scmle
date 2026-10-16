@@ -312,6 +312,22 @@ def build_plan(
     )
 
 
+def advise(context: context_module.RunContext) -> tuple[Any, ...]:
+    """Derives and stores the recommendations for the user.
+
+    Args:
+        context: A context whose profile is populated.
+
+    Returns:
+        The recommendations, also kept on the context.
+    """
+    advice = recommendations.recommend(
+        require(context.profile, "profile"), context.spec
+    )
+    context.recommendations = advice
+    return advice
+
+
 class PlanStage(Stage):
     """Builds the experiment plan from the development-set profile."""
 
@@ -331,10 +347,7 @@ class PlanStage(Stage):
             "diagnostics/decision_log.json",
             {"plan": [d.to_dict() for d in plan.decisions], "outcomes": []},
         )
-        advice = recommendations.recommend(
-            require(context.profile, "profile"), context.spec
-        )
-        context.recommendations = advice
+        advice = advise(context)
         context.write_json(
             "diagnostics/recommendations.json",
             [item.to_dict() for item in advice],

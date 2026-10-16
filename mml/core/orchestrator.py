@@ -182,6 +182,7 @@ class Orchestrator:
         stages_module.IngestStage().execute(context)
         stages_module.ProfileStage().execute(context)
         context.plan = stages_module.build_plan(context)
+        stages_module.advise(context)
         return context
 
     def run(
