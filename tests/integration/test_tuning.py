@@ -111,7 +111,7 @@ def test_optuna_backend(binary_frame, tmp_path):
     assert any(t.params for t in result.trials) and result.state == "COMPLETED"
 
 
-def test_cli_exposes_search_options(binary_frame, tmp_path, capsys):
+def test_cli_exposes_search_options(binary_frame, tmp_path, caplog):
     from mml import cli
 
     path = tmp_path / "d.csv"
@@ -132,4 +132,4 @@ def test_cli_exposes_search_options(binary_frame, tmp_path, capsys):
             "300",
         ]
     )
-    assert code == 0 and "selected" in capsys.readouterr().out
+    assert code == 0 and "selected" in caplog.text

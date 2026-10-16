@@ -138,6 +138,34 @@ class GpuRule(PlanningRule):
         return capable
 
 
+class SharedProcessRule(PlanningRule):
+    """Rejects models needing their own process when trials share one."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Drops isolated-process models under cooperative enforcement."""
+        if context.spec.resources.enforcement == "hard":
+            return candidates
+        kept = []
+        for adapter in candidates:
+            if adapter.capabilities.isolated_process:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name,
+                        Action.REJECT,
+                        "its native runtime cannot share a process with "
+                        "other models; use resources.enforcement='hard'",
+                    )
+                )
+            else:
+                kept.append(adapter)
+        return kept
+
+
 class FastBudgetRule(PlanningRule):
     """Prefers fast models when the time budget is small."""
 
@@ -437,7 +465,10 @@ class EnsembleRule(PlanningRule):
         """Documents the ensemble decision; leaves candidates unchanged."""
         size = context.spec.ensemble.size
         distinct = sum(
-            1 for a in candidates if a.family not in ("baseline", "ensemble")
+            1
+            for a in candidates
+            if a.family not in ("baseline", "ensemble")
+            and not a.capabilities.isolated_process
         )
         if size < 2 or distinct < 2:
             reason = (
@@ -460,6 +491,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
     """Returns the standard rule chain."""
     return (
         GpuRule(),
+        SharedProcessRule(),
         MemoryRule(),
         SerializableRule(),
         FastBudgetRule(),

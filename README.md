@@ -6,12 +6,15 @@ The architecture is specified in [`product.md`](product.md); the importable
 package is `mml`.
 
 ```python
+import logging
+
 import mml
 
+logging.basicConfig(level=logging.INFO)
 project = mml.MLProject("customers.parquet", target="churn", metric="roc_auc")
-print(project.plan().summary())  # inspect before any training
+logging.info(project.plan().summary())  # inspect before any training
 result = project.run()  # profile, split, search, test, package
-print(result.leaderboard())
+logging.info("\n%s", result.leaderboard())
 result.save("artifacts/churn", signing_key="...")  # signed bundle
 result.predict("new_customers.parquet")
 ```

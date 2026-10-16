@@ -11,6 +11,7 @@ log loss gets an upper bound.
 
 import argparse
 import json
+import logging
 import pathlib
 import sys
 
@@ -56,18 +57,26 @@ def violations(results: list[dict], baseline: dict[str, dict]) -> list[str]:
     return problems
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Checks a results file against the baseline."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("results")
     parser.add_argument("--baseline", default=str(BASELINE))
     args = parser.parse_args(argv)
+    logging.basicConfig(
+        level=logging.INFO, format="%(message)s", stream=sys.stdout
+    )
     results = json.loads(pathlib.Path(args.results).read_text())["results"]
     baseline = json.loads(pathlib.Path(args.baseline).read_text())
     problems = violations(results, baseline)
     for problem in problems:
-        print(f"REGRESSION {problem}", file=sys.stderr)
-    print(f"checked {len(baseline)} benchmarks, {len(problems)} regression(s)")
+        LOGGER.error("REGRESSION %s", problem)
+    LOGGER.info(
+        "checked %d benchmarks, %d regression(s)", len(baseline), len(problems)
+    )
     return 1 if problems else 0
 
 

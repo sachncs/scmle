@@ -5,8 +5,11 @@ from collections.abc import Sequence
 import dataclasses
 import datetime
 import json
+import logging
 import pathlib
 from typing import Any
+
+LOGGER = logging.getLogger(__name__)
 
 
 def utc_timestamp() -> str:
@@ -69,6 +72,7 @@ class EventLog:
             event: The event to append.
         """
         self.events.append(event)
+        LOGGER.info("[%s] %s: %s", event.run_id, event.kind, event.reason)
         if self.path is not None:
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(event.to_json() + "\n")

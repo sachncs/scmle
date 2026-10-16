@@ -1,12 +1,15 @@
 """Tests for the PyTorch model families."""
 
+import dataclasses
 import io
 
 import joblib
 import numpy as np
 import pytest
 from scipy import sparse
+import support
 
+import mml
 from mml.contracts import errors
 from mml.contracts import tasks
 from mml.models import conformance
@@ -135,3 +138,53 @@ def test_adapters_pass_conformance_and_support_every_task(name):
 
     assert adapter.capabilities.tasks == frozenset(tasks.TaskType)
     assert adapter.rejection_reason(tasks.TaskType.BINARY) is None
+
+
+def test_a_pytorch_model_family_trains_packages_and_predicts(
+    binary_frame, tmp_path
+):
+    pytest.importorskip("torch")
+    project = support.make_project(
+        binary_frame,
+        "y",
+        time_budget=600,
+        output_dir=tmp_path,
+        enforcement="hard",
+    )
+    plan = project.plan()
+    only_torch = dataclasses.replace(
+        plan, candidate_models=("dummy", "torch_residual")
+    )
+
+    result = project.run(only_torch)
+
+    assert result.selected_model == "torch_residual"
+    features = binary_frame.drop(columns="y").head(20)
+    result.save(tmp_path / "net")
+    reloaded = mml.load_model(tmp_path / "net", trusted=True)
+    np.testing.assert_array_equal(
+        reloaded.predict(features), result.predict(features)
+    )
+    assert reloaded.predict_proba(features).shape == (20, 2)
+
+
+def test_serving_limits_are_checked_for_a_pytorch_candidate(
+    binary_frame, tmp_path
+):
+    project = support.make_project(
+        binary_frame,
+        "y",
+        time_budget=600,
+        output_dir=tmp_path,
+        enforcement="hard",
+        selection=tasks.SelectionSpec(max_model_mb=50.0),
+    )
+    only_torch = dataclasses.replace(
+        project.plan(), candidate_models=("torch_mlp",)
+    )
+
+    result = project.run(only_torch)
+
+    assert result.selected_model == "torch_mlp"
+    log = (result.run_dir / "diagnostics" / "decision_log.json").read_text()
+    assert "within serving limits" in log

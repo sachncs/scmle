@@ -1,9 +1,13 @@
 """Quickstart: plan, run and predict on a synthetic churn-like dataset."""
 
+import logging
+
 import numpy as np
 import pandas as pd
 
 import mml
+
+LOGGER = logging.getLogger(__name__)
 
 
 def make_dataset(rows: int = 800) -> pd.DataFrame:
@@ -24,13 +28,17 @@ def make_dataset(rows: int = 800) -> pd.DataFrame:
 
 def main() -> None:
     """Runs the full workflow and prints a summary."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    LOGGER.setLevel(logging.INFO)
     data = make_dataset()
     project = mml.MLProject(data, "churn", metric="roc_auc", time_budget=120)
-    print(project.plan().summary())
+    LOGGER.info(project.plan().summary())
     result = project.run()
-    print(result.summary())
-    print(result.leaderboard()[["model_name", "status", "score_mean"]])
-    print(result.predict(data.drop(columns="churn").head(5)))
+    LOGGER.info(result.summary())
+    LOGGER.info(
+        "\n%s", result.leaderboard()[["model_name", "status", "score_mean"]]
+    )
+    LOGGER.info("%s", result.predict(data.drop(columns="churn").head(5)))
 
 
 if __name__ == "__main__":

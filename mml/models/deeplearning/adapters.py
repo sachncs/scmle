@@ -1,8 +1,6 @@
 """PyTorch model-family adapters (`deeplearning` extra)."""
 
 from collections.abc import Mapping
-import functools
-import importlib
 from typing import Any
 from typing import ClassVar
 
@@ -21,16 +19,6 @@ COMMON_SPACE = (
 )
 
 
-@functools.cache
-def torch_importable() -> bool:
-    """Whether PyTorch is installed and actually imports."""
-    try:
-        importlib.import_module("torch")
-    except ImportError:
-        return False
-    return True
-
-
 class TorchAdapter(models.ModelAdapter):
     """A PyTorch tabular network family.
 
@@ -47,14 +35,11 @@ class TorchAdapter(models.ModelAdapter):
         early_stopping=True,
         needs_scaling=True,
         gpu=True,
+        isolated_process=True,
         max_rows=500_000,
         cost=4,
         memory_factor=4.0,
     )
-
-    def is_available(self) -> bool:
-        """Whether torch is installed and imports on this platform."""
-        return super().is_available() and torch_importable()
 
     def build(
         self,

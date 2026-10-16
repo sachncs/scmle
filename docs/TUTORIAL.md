@@ -3,13 +3,18 @@
 ## 1. Plan, run, predict
 
 ```python
+import logging
+
 import mml
 
+logging.basicConfig(level=logging.INFO)
 project = mml.MLProject("customers.parquet", target="churn", metric="roc_auc")
-print(project.plan().summary())  # nothing is trained or written
+logging.info(project.plan().summary())  # nothing is trained or written
 result = project.run()
-print(result.leaderboard()[["model_name", "strategy", "status", "score_mean"]])
-print(result.feature_importance().head())
+logging.info(
+    "\n%s", result.leaderboard()[["model_name", "status", "score_mean"]]
+)
+logging.info("\n%s", result.feature_importance().head())
 result.save("artifacts/churn", signing_key="...")  # or set MAGICML_SIGNING_KEY
 ```
 
@@ -97,7 +102,7 @@ from mml.core import policies
 
 
 def reviewer(review):  # review.gate is PLANNING or SELECTING
-    print(review.summary)
+    logging.info(review.summary)
     return input("approve? [y/N] ").lower() == "y"
 
 
@@ -112,7 +117,7 @@ locked. `diagnostics/data_access.json` and the `policy.*`, `split.created`,
 
 ```python
 verdict = mml.MLProject.verify_replay("runs/run_20261015_001", data=data)
-print(verdict.level)  # exact | comparable | different
+logging.info(verdict.level)  # exact | comparable | different
 ```
 
 ## 6. Interrupted runs
@@ -133,7 +138,7 @@ api = serving.HttpServing(bundle)
 api.start()  # POST /predict {"records": [...]}
 
 report = monitor.ModelMonitor(bundle).assess(recent_rows, outcomes=known_labels)
-print(report.recommendation)  # none / investigate / retrain
+logging.info(report.recommendation)  # none / investigate / retrain
 
 store = registry.ModelRegistryStore("registry")
 manager = lifecycle.LifecycleManager(store, "churn", "work")

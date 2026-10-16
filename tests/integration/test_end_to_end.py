@@ -327,27 +327,3 @@ def test_planning_writes_recommendations_the_project_can_return(
         (result.run_dir / "diagnostics" / "recommendations.json").read_text()
     )
     assert [item["topic"] for item in written] == [i.topic for i in advice]
-
-
-def test_a_pytorch_model_family_trains_packages_and_predicts(
-    binary_frame, tmp_path
-):
-    pytest.importorskip("torch")
-    project = support.make_project(
-        binary_frame, "y", time_budget=600, output_dir=tmp_path
-    )
-    plan = project.plan()
-    only_torch = dataclasses.replace(
-        plan, candidate_models=("dummy", "torch_residual")
-    )
-
-    result = project.run(only_torch)
-
-    assert result.selected_model == "torch_residual"
-    features = binary_frame.drop(columns="y").head(20)
-    result.save(tmp_path / "net")
-    reloaded = mml.load_model(tmp_path / "net", trusted=True)
-    np.testing.assert_array_equal(
-        reloaded.predict(features), result.predict(features)
-    )
-    assert reloaded.predict_proba(features).shape == (20, 2)

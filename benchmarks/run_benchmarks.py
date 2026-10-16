@@ -8,7 +8,9 @@ Usage:
 import argparse
 import dataclasses
 import json
+import logging
 import pathlib
+import sys
 import tempfile
 import time
 import traceback
@@ -17,6 +19,8 @@ from typing import Any
 from benchmarks import datasets
 from benchmarks import reference
 import mml
+
+LOGGER = logging.getLogger(__name__)
 
 HIGHER_IS_BETTER = {"roc_auc", "pr_auc", "r2", "accuracy"}
 
@@ -175,6 +179,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--output", default="benchmarks/results.json")
     args = parser.parse_args(argv)
+    logging.basicConfig(
+        level=logging.WARNING, format="%(message)s", stream=sys.stdout
+    )
+    LOGGER.setLevel(logging.INFO)
 
     chosen = [
         d
@@ -185,20 +193,20 @@ def main(argv: list[str] | None = None) -> int:
     records: list[BenchmarkRecord] = []
     with tempfile.TemporaryDirectory() as scratch:
         for dataset in chosen:
-            print(f"running {dataset.name} ...", flush=True)
+            LOGGER.info("running %s ...", dataset.name)
             records.append(
                 run_one(
                     dataset, args.budget, args.workers, pathlib.Path(scratch)
                 )
             )
-    print(to_markdown(records))
+    LOGGER.info("%s", to_markdown(records))
     payload: dict[str, Any] = {
         "results": [dataclasses.asdict(r) for r in records]
     }
     pathlib.Path(args.output).write_text(json.dumps(payload, indent=2))
     for record in records:
         if record.status != "ok":
-            print(f"\n{record.name} failed:\n{record.error}")
+            LOGGER.error("%s failed:\n%s", record.name, record.error)
     return 0 if all(r.status == "ok" for r in records) else 1
 
 

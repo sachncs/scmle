@@ -5,7 +5,7 @@ import pandas as pd
 from mml import cli
 
 
-def test_plan_run_predict_roundtrip(binary_frame, tmp_path, capsys):
+def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
     data = tmp_path / "d.csv"
     binary_frame.to_csv(data, index=False)
     common = [
@@ -16,12 +16,13 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, capsys):
         str(tmp_path / "runs"),
     ]
     assert cli.main(["plan", *common, "--time-budget", "120"]) == 0
-    assert "Candidates:" in capsys.readouterr().out
+    assert "Candidates:" in caplog.text
+    caplog.clear()
     assert not (tmp_path / "runs").exists()
 
     assert cli.main(["run", *common, "--time-budget", "120"]) == 0
-    out = capsys.readouterr().out
-    assert "selected" in out and "artifacts:" in out
+    assert "selected" in caplog.text and "artifacts:" in caplog.text
+    caplog.clear()
     bundle_dir = (
         next(d for d in (tmp_path / "runs").iterdir() if d.is_dir()) / "model"
     )
@@ -49,13 +50,13 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, capsys):
         ]
     )
     assert refused == cli.EXIT_FAILED
-    assert "unauthenticated" in capsys.readouterr().err
+    assert "unauthenticated" in caplog.text
     predictions = pd.read_csv(output)
     assert code == 0 and len(predictions) == len(binary_frame)
     assert {"prediction", "proba_0", "proba_1"} <= set(predictions.columns)
 
 
-def test_blocked_run_returns_exit_code_two(binary_frame, tmp_path, capsys):
+def test_blocked_run_returns_exit_code_two(binary_frame, tmp_path, caplog):
     broken = binary_frame.assign(y=range(len(binary_frame)))
     broken["y"] = broken["y"] % 5
     path = tmp_path / "d.csv"
@@ -64,13 +65,13 @@ def test_blocked_run_returns_exit_code_two(binary_frame, tmp_path, capsys):
         ["run", str(path), "--target", "y", "--output-dir", str(tmp_path / "r")]
     )
     assert code == cli.EXIT_BLOCKED
-    assert "blocked:" in capsys.readouterr().err
+    assert "blocked:" in caplog.text
 
 
-def test_missing_file_returns_failure_code(tmp_path, capsys):
+def test_missing_file_returns_failure_code(tmp_path, caplog):
     code = cli.main(["plan", str(tmp_path / "nope.csv"), "--target", "y"])
     assert code == cli.EXIT_FAILED
-    assert "data error" in capsys.readouterr().err
+    assert "data error" in caplog.text
 
 
 def test_commands_are_polymorphic():

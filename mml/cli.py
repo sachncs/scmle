@@ -7,6 +7,7 @@ executes itself, so adding a command never touches the dispatcher.
 import abc
 import argparse
 from collections.abc import Sequence
+import logging
 import pathlib
 import sys
 from typing import ClassVar
@@ -21,6 +22,7 @@ from mml.core import config
 from mml.inference import mapping as mapping_module
 from mml.optimization import optimizers
 
+LOGGER = logging.getLogger(__name__)
 EXIT_OK = 0
 EXIT_BLOCKED = 2
 EXIT_FAILED = 1
@@ -166,7 +168,7 @@ class PlanCommand(ProjectCommand):
 
     def execute(self, args: argparse.Namespace) -> int:
         """Prints the plan summary."""
-        print(self.build_project(args).plan().summary())
+        LOGGER.info(self.build_project(args).plan().summary())
         return EXIT_OK
 
 
@@ -179,8 +181,8 @@ class RunCommand(ProjectCommand):
     def execute(self, args: argparse.Namespace) -> int:
         """Runs the project and prints the result summary."""
         result = self.build_project(args).run()
-        print(result.summary())
-        print(f"artifacts: {result.run_dir}")
+        LOGGER.info("%s", result.summary())
+        LOGGER.info("artifacts: %s", result.run_dir)
         return EXIT_OK
 
 
@@ -197,8 +199,8 @@ class ResumeCommand(Command):
     def execute(self, args: argparse.Namespace) -> int:
         """Resumes the run and prints the result summary."""
         result = project.MLProject.resume(args.run_directory)
-        print(result.summary())
-        print(f"artifacts: {result.run_dir}")
+        LOGGER.info("%s", result.summary())
+        LOGGER.info("artifacts: %s", result.run_dir)
         return EXIT_OK
 
 
@@ -244,7 +246,7 @@ class PredictCommand(Command):
             for index, label in enumerate(model.classes):
                 frame[f"proba_{label}"] = proba[:, index]
         frame.to_csv(pathlib.Path(args.output), index=False)
-        print(f"wrote {len(frame)} predictions to {args.output}")
+        LOGGER.info("wrote %d predictions to %s", len(frame), args.output)
         return EXIT_OK
 
 
@@ -259,6 +261,12 @@ COMMANDS: tuple[Command, ...] = (
 def build_parser() -> argparse.ArgumentParser:
     """Builds the argument parser from the registered commands."""
     parser = argparse.ArgumentParser(prog="magicml")
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="verbosity of the log written to standard error",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in COMMANDS:
         command.configure(
@@ -277,14 +285,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         0 on success, 2 when the run was blocked, 1 on other failures.
     """
     args = build_parser().parse_args(argv)
+    logging.basicConfig(level=args.log_level, format="%(message)s")
     command = next(c for c in COMMANDS if c.name == args.command)
     try:
         return command.execute(args)
     except errors.BlockedError as error:
-        print(f"blocked: {error}", file=sys.stderr)
+        LOGGER.error("blocked: %s", error)
         return EXIT_BLOCKED
     except errors.MagicMLError as error:
-        print(f"{error.category} error: {error}", file=sys.stderr)
+        LOGGER.error("%s error: %s", error.category, error)
         return EXIT_FAILED
 
 
