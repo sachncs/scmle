@@ -31,6 +31,7 @@ from mml.core import stages
 from mml.core import state
 from mml.data.validation import columns
 from mml.governance import lifecycle
+from mml.inference import mapping as mapping_module
 from mml.models import conformance
 from mml.models import registry as registry_module
 from mml.sampling import strategies as strategies_module
@@ -948,7 +949,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
         == 3
     )
     renamed = features.rename(columns={"a": "alpha"})
-    mapping = bundle_module.ColumnMapping({"alpha": "a"})
+    mapping = mapping_module.ColumnMapping({"alpha": "a"})
     np.testing.assert_array_equal(
         result.bundle.predict(renamed, mapping),
         result.predict(features),

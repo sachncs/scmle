@@ -19,6 +19,7 @@ from mml.api import project
 from mml.artifacts import bundle as bundle_module
 from mml.contracts import errors
 from mml.contracts import tasks
+from mml.inference import mapping as mapping_module
 from mml.optimization import optimizers
 
 EXIT_OK = 0
@@ -259,7 +260,7 @@ class PredictCommand(Command):
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
-        mapping = bundle_module.ColumnMapping(
+        mapping = mapping_module.ColumnMapping(
             dict(pair.split("=", 1) for pair in args.rename),
             args.case_insensitive,
             args.strip_whitespace,

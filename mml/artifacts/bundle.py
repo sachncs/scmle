@@ -24,12 +24,15 @@ from sklearn import calibration
 from sklearn import frozen
 
 import mml
+from mml.contracts import artifacts as artifact_contracts
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data.readers import interchange
 from mml.data.readers import tabular
 from mml.features import graph as feature_graph
+from mml.inference import mapping as mapping_module
+from mml.inference import validation
 from mml.monitoring import reference as reference_module
 
 BUNDLE_FORMAT = 1
@@ -44,7 +47,6 @@ SIGNING_KEY_ENV = "MAGICML_SIGNING_KEY"
 SIGNATURE_ALGORITHM = "hmac-sha256"
 MANIFEST_FILE = "model_manifest.json"
 MAX_KNOWN_CATEGORIES = 200
-MAX_REPORTED_UNSEEN = 20
 
 
 TRACKED_LIBRARIES = (
@@ -139,152 +141,6 @@ def verify_signature(
     return True
 
 
-@dataclasses.dataclass(frozen=True)
-class ColumnMapping:
-    """Explicit policy for reconciling incoming column names with a schema.
-
-    Nothing is renamed implicitly: the default policy requires exact names.
-
-    Attributes:
-        renames: Incoming name -> expected name.
-        case_insensitive: Match remaining columns ignoring letter case.
-        strip_whitespace: Match remaining columns ignoring surrounding
-            whitespace.
-    """
-
-    renames: dict[str, str] = dataclasses.field(default_factory=dict)
-    case_insensitive: bool = False
-    strip_whitespace: bool = False
-
-    def normalize(self, name: str) -> str:
-        """Applies the matching normalizations to a column name."""
-        if self.strip_whitespace:
-            name = name.strip()
-        return name.lower() if self.case_insensitive else name
-
-    def apply(self, frame: pd.DataFrame, expected: list[str]) -> pd.DataFrame:
-        """Renames incoming columns according to the policy.
-
-        Args:
-            frame: Incoming data (not modified).
-            expected: Column names the model expects.
-
-        Returns:
-            A frame whose matching columns carry the expected names.
-
-        Raises:
-            SchemaError: If two incoming columns map to the same expected
-                column, or a rename target does not exist in the schema.
-        """
-        unknown = sorted(set(self.renames.values()) - set(expected))
-        if unknown:
-            raise errors.SchemaError(
-                f"rename targets not in the model schema: {unknown}",
-                {"unknown": unknown},
-            )
-        by_key = {self.normalize(name): name for name in expected}
-        mapping: dict[str, str] = {}
-        for column in map(str, frame.columns):
-            if column in expected:
-                continue
-            target = self.renames.get(column)
-            if target is None and (
-                self.case_insensitive or self.strip_whitespace
-            ):
-                target = by_key.get(self.normalize(column))
-            if target is not None:
-                mapping[column] = target
-        targets = list(mapping.values())
-        clashes = sorted({t for t in targets if targets.count(t) > 1})
-        clashes += [t for t in mapping.values() if t in frame.columns]
-        if clashes:
-            raise errors.SchemaError(
-                f"ambiguous column mapping onto {sorted(set(clashes))}",
-                {"ambiguous": sorted(set(clashes))},
-            )
-        return frame.rename(columns=mapping)
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class BundleSchema:
-    """Input contract of a trained model.
-
-    Attributes:
-        target: Name of the target column.
-        task: Task type value.
-        numeric: Numeric feature columns.
-        categorical: Categorical feature columns.
-        dtypes: Training dtype per feature.
-        known_categories: Categories seen in training per categorical column.
-        classes: Class labels for classification, else None.
-        extra_inputs: Raw columns the caller must supply because the feature
-            graph reads them, although the model does not use them directly.
-        series: Ordered (time-series) feature nodes recomputed on the input
-            batch at inference, as plain dictionaries.
-        series_columns: Columns those nodes produce that the pipeline reads.
-        graph_fingerprint: Hash of the feature graph, empty without one.
-        group_column: Entity column the series nodes group by, if any.
-        time_column: Column ordering the rows for series nodes, if any.
-    """
-
-    target: str
-    task: str
-    numeric: tuple[str, ...]
-    categorical: tuple[str, ...]
-    dtypes: dict[str, str]
-    known_categories: dict[str, list[str]]
-    classes: tuple[Any, ...] | None
-    extra_inputs: tuple[str, ...] = ()
-    series: tuple[dict[str, Any], ...] = ()
-    series_columns: tuple[str, ...] = ()
-    graph_fingerprint: str = ""
-    group_column: str | None = None
-    time_column: str | None = None
-
-    @property
-    def features(self) -> list[str]:
-        """Columns the caller must supply: model features, then graph inputs."""
-        return list(
-            dict.fromkeys(self.numeric + self.categorical + self.extra_inputs)
-        )
-
-    @property
-    def pipeline_columns(self) -> list[str]:
-        """Columns the fitted pipeline reads (supplied plus computed series)."""
-        return list(dict.fromkeys([*self.features, *self.series_columns]))
-
-    def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
-        record = dataclasses.asdict(self)
-        record["numeric"] = list(self.numeric)
-        record["categorical"] = list(self.categorical)
-        record["classes"] = None if self.classes is None else list(self.classes)
-        record["extra_inputs"] = list(self.extra_inputs)
-        record["series"] = list(self.series)
-        record["series_columns"] = list(self.series_columns)
-        return record
-
-    @classmethod
-    def from_dict(cls, record: dict[str, Any]) -> Self:
-        """Rebuilds a schema from `to_dict` output."""
-        classes = record["classes"]
-        return cls(
-            target=record["target"],
-            task=record["task"],
-            numeric=tuple(record["numeric"]),
-            categorical=tuple(record["categorical"]),
-            dtypes=record["dtypes"],
-            known_categories=record["known_categories"],
-            classes=None if classes is None else tuple(classes),
-            extra_inputs=tuple(record.get("extra_inputs", ())),
-            series=tuple(record.get("series", ())),
-            series_columns=tuple(record.get("series_columns", ())),
-            graph_fingerprint=record.get("graph_fingerprint", ""),
-            group_column=record.get("group_column"),
-            time_column=record.get("time_column"),
-        )
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class BundleInfo:
     """Provenance and compatibility metadata of a bundle.
@@ -351,35 +207,13 @@ class BundleInfo:
         return problems
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class SchemaReport:
-    """Result of validating input data against a bundle schema.
-
-    Attributes:
-        missing: Required columns absent from the input.
-        extra: Input columns the model ignores.
-        missing_value_counts: Missing values per present feature.
-        unseen_categories: Categories never seen in training.
-    """
-
-    missing: tuple[str, ...]
-    extra: tuple[str, ...]
-    missing_value_counts: dict[str, int]
-    unseen_categories: dict[str, list[str]]
-
-    @property
-    def valid(self) -> bool:
-        """Whether every required column is present."""
-        return not self.missing
-
-
 class ModelBundle:
     """A fitted pipeline plus the schema and metadata needed to serve it."""
 
     def __init__(
         self,
         pipeline: Any,
-        schema: BundleSchema,
+        schema: artifact_contracts.BundleSchema,
         info: BundleInfo,
         reference: reference_module.ReferenceProfile | None = None,
         history: pd.DataFrame | None = None,
@@ -467,7 +301,7 @@ class ModelBundle:
             for column in categorical
         }
         classes = getattr(pipeline, "classes_", None)
-        schema = BundleSchema(
+        schema = artifact_contracts.BundleSchema(
             target=target,
             task=task,
             numeric=numeric,
@@ -556,7 +390,7 @@ class ModelBundle:
     def score(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: ColumnMapping | None = None,
+        mapping: mapping_module.ColumnMapping | None = None,
     ) -> dict[str, Any]:
         """Predicts and reports the schema diagnostics in one structured result.
 
@@ -768,7 +602,7 @@ class ModelBundle:
         root = pathlib.Path(directory)
         try:
             manifest = json.loads((root / MANIFEST_FILE).read_text())
-            schema = BundleSchema.from_dict(
+            schema = artifact_contracts.BundleSchema.from_dict(
                 json.loads((root / SCHEMA_FILE).read_text())
             )
         except FileNotFoundError as error:
@@ -867,8 +701,8 @@ class ModelBundle:
     def validate(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: ColumnMapping | None = None,
-    ) -> SchemaReport:
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> artifact_contracts.SchemaReport:
         """Checks input against the schema without predicting.
 
         Args:
@@ -881,34 +715,12 @@ class ModelBundle:
         frame = self.read_frame(data)
         if mapping is not None:
             frame = mapping.apply(frame, [*self.features, self.schema.target])
-        wanted = self.features
-        present = [c for c in wanted if c in frame.columns]
-        unseen = {}
-        for column in self.schema.categorical:
-            if column in frame.columns:
-                known = set(self.schema.known_categories[column])
-                new = sorted(set(frame[column].dropna().astype(str)) - known)
-                if new:
-                    unseen[column] = new[:MAX_REPORTED_UNSEEN]
-        return SchemaReport(
-            missing=tuple(c for c in wanted if c not in frame.columns),
-            extra=tuple(
-                c
-                for c in frame.columns
-                if c not in wanted and c != self.schema.target
-            ),
-            missing_value_counts={
-                c: int(frame[c].isna().sum())
-                for c in present
-                if frame[c].isna().any()
-            },
-            unseen_categories=unseen,
-        )
+        return validation.InputValidator(self.schema).report(frame)
 
     def prepare_frame(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: ColumnMapping | None = None,
+        mapping: mapping_module.ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Validates input and returns the feature columns.
 
@@ -923,22 +735,7 @@ class ModelBundle:
         frame = self.read_frame(data)
         if mapping is not None:
             frame = mapping.apply(frame, [*self.features, self.schema.target])
-        report = self.validate(frame)
-        if not report.valid:
-            raise errors.SchemaError(
-                f"input is missing required columns: {list(report.missing)}",
-                {"missing": list(report.missing)},
-            )
-        bad = []
-        for column in self.schema.numeric:
-            coerced = pd.to_numeric(frame[column], errors="coerce")
-            if (coerced.isna() & frame[column].notna()).any():
-                bad.append(column)
-        if bad:
-            raise errors.SchemaError(
-                f"non-numeric values in numeric columns: {bad}",
-                {"columns": bad},
-            )
+        validation.InputValidator(self.schema).check(frame)
         if self.schema.series:
             frame = self.series_builder().apply(frame)
         return frame[self.schema.pipeline_columns]
@@ -946,7 +743,7 @@ class ModelBundle:
     def predict(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: ColumnMapping | None = None,
+        mapping: mapping_module.ColumnMapping | None = None,
     ) -> np.ndarray:
         """Predicts labels or values through the full fitted pipeline.
 
@@ -959,7 +756,7 @@ class ModelBundle:
     def predict_proba(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: ColumnMapping | None = None,
+        mapping: mapping_module.ColumnMapping | None = None,
     ) -> np.ndarray:
         """Predicts class probabilities.
 

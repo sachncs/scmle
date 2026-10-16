@@ -145,7 +145,7 @@ manager.review(
 Inference is strict about column names unless you state a policy:
 
 ```python
-policy = mml.artifacts.bundle.ColumnMapping(
+policy = mml.inference.mapping.ColumnMapping(
     {"cust_age": "age"}, case_insensitive=True
 )
 bundle.predict(new_rows, policy)
