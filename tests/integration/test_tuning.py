@@ -1,6 +1,7 @@
 """Hyperparameter search with pruning, end to end."""
 
 import json
+import logging
 
 import numpy as np
 import pytest
@@ -112,6 +113,7 @@ def test_optuna_backend(binary_frame, tmp_path):
 
 
 def test_cli_exposes_search_options(binary_frame, tmp_path, caplog):
+    caplog.set_level(logging.INFO)
     from mml import cli
 
     path = tmp_path / "d.csv"

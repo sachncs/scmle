@@ -1,11 +1,14 @@
 """Tests for the command-line interface."""
 
+import logging
+
 import pandas as pd
 
 from mml import cli
 
 
 def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
+    caplog.set_level(logging.INFO)
     data = tmp_path / "d.csv"
     binary_frame.to_csv(data, index=False)
     common = [
