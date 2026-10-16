@@ -15,6 +15,7 @@ from typing import ClassVar
 
 import numpy as np
 import pandas as pd
+from sklearn import base
 
 from mml.api import results
 from mml.artifacts import bundle as bundle_module
@@ -31,6 +32,7 @@ from mml.data.readers import tabular
 from mml.data.splitting import splitters
 from mml.data.validation import target as target_module
 from mml.evaluation import confidence
+from mml.evaluation import conformal
 from mml.evaluation import diagnostics
 from mml.evaluation import fit_health
 from mml.evaluation import resources
@@ -719,6 +721,66 @@ class PackageStage(Stage):
         """Names the stage."""
         return "write bundle and reports"
 
+    def conformal_calibration(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+        bundle: bundle_module.ModelBundle,
+    ) -> conformal.ConformalCalibrator | None:
+        """Calibrates intervals or sets from out-of-fold predictions.
+
+        The selected candidate is refit on each cross-validation fold's
+        training rows and scored on its held-out rows, so every calibration
+        score comes from a model that never saw that row.
+
+        Returns:
+            The calibrator, or None when the time budget is spent or too few
+            held-out rows exist.
+        """
+        if context.resource_governor.skip_reason(first=False):
+            return None
+        split = require(context.split, "split")
+        task = require(context.task, "task")
+        template = strategies.get_strategy(selected.strategy).build(
+            require(context.profile, "profile").feature_plan,
+            context.registry.get(selected.model_name),
+            task,
+            context.spec.validation.seed,
+            selected.params,
+        )
+        held_labels: list[Any] = []
+        held_scores: list[Any] = []
+        classes = list(bundle.classes or ())
+        for fit_positions, evaluate_positions in split.manifest.folds:
+            fit = np.asarray(fit_positions)
+            evaluate = np.asarray(evaluate_positions)
+            candidate = base.clone(template).fit(
+                split.dev_features.iloc[fit], split.dev_target.iloc[fit]
+            )
+            rows = split.dev_features.iloc[evaluate]
+            held_labels.extend(split.dev_target.iloc[evaluate])
+            if task is tasks.TaskType.REGRESSION:
+                held_scores.extend(candidate.predict(rows))
+                continue
+            known = list(candidate.classes_)
+            probabilities = candidate.predict_proba(rows)
+            held_scores.extend(
+                [
+                    probabilities[i, known.index(c)] if c in known else 0.0
+                    for c in classes
+                ]
+                for i in range(len(rows))
+            )
+        if len(held_labels) < conformal.MIN_CALIBRATION_ROWS:
+            return None
+        if task is tasks.TaskType.REGRESSION:
+            return conformal.ConformalCalibrator.for_regression(
+                held_labels, held_scores
+            )
+        return conformal.ConformalCalibrator.for_classification(
+            held_labels, np.asarray(held_scores), classes
+        )
+
     def execute(self, context: context_module.RunContext) -> None:
         """Packages artifacts and assembles the `RunResult`."""
         store = context.run_store
@@ -751,6 +813,7 @@ class PackageStage(Stage):
                 evaluation["test_metrics"],
             ),
         )
+        bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.save(store.path("model"))
         evaluation["artifact_verification"] = bundle.verify_round_trip(
             store.path("model"), split.dev_features.head(PARITY_ROWS)

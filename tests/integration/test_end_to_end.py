@@ -5,6 +5,7 @@ import json
 import pathlib
 
 import numpy as np
+import pandas as pd
 import pytest
 import support
 
@@ -363,3 +364,46 @@ def test_reliability_checks_run_and_reach_the_report(binary_frame, tmp_path):
     page = (result.run_dir / "report.html").read_text()
     assert "Reliability checks" in page and "Fit health" in page
     assert "Development versus test rows" in page
+
+
+def test_regression_bundles_return_calibrated_intervals(tmp_path):
+    rng = np.random.default_rng(11)
+    frame = pd.DataFrame({"x": rng.normal(size=900)})
+    frame["y"] = 4 * frame.x + rng.normal(0, 1.0, 900)
+    result = support.make_project(
+        frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    new = pd.DataFrame({"x": rng.normal(size=3000)})
+    truth = 4 * new.x + rng.normal(0, 1.0, 3000)
+    narrow = result.bundle.predict_interval(new, coverage=0.5)
+    wide = result.bundle.predict_interval(new, coverage=0.95)
+
+    covered_wide = ((truth >= wide["lower"]) & (truth <= wide["upper"])).mean()
+    assert covered_wide > 0.9
+    assert (wide["upper"] - wide["lower"]).mean() > (
+        narrow["upper"] - narrow["lower"]
+    ).mean()
+    with pytest.raises(errors.ArtifactError, match="classification"):
+        result.bundle.predict_set(new)
+
+
+def test_classification_bundles_return_prediction_sets_that_survive_saving(
+    binary_frame, tmp_path
+):
+    result = support.make_project(
+        binary_frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+    result.save(tmp_path / "model")
+    reloaded = mml.load_model(tmp_path / "model", trusted=True)
+    rows = binary_frame.drop(columns="y")
+
+    sets = reloaded.predict_set(rows, coverage=0.9)
+    covered = np.mean(
+        [label in s for label, s in zip(binary_frame["y"], sets, strict=True)]
+    )
+
+    assert covered > 0.85
+    assert sets == result.bundle.predict_set(rows, coverage=0.9)
+    with pytest.raises(errors.ArtifactError, match="regression"):
+        reloaded.predict_interval(rows)

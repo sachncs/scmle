@@ -30,6 +30,7 @@ from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data.readers import interchange
 from mml.data.readers import tabular
+from mml.evaluation import conformal as conformal_module
 from mml.explainability import local
 from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
@@ -41,6 +42,7 @@ MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
 CALIBRATOR_FILE = "calibrator.joblib"
+CONFORMAL_FILE = "conformal.json"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
 SIGNATURE_FILE = "signature.json"
@@ -220,6 +222,7 @@ class ModelBundle:
         reference: reference_module.ReferenceProfile | None = None,
         history: pd.DataFrame | None = None,
         calibrator: Any = None,
+        conformal: conformal_module.ConformalCalibrator | None = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -232,6 +235,8 @@ class ModelBundle:
                 on, so records scored alone still get lag / rolling values.
             calibrator: Probability calibrator fitted on labeled rows after
                 training (see `calibrate`), applied by `predict_proba`.
+            conformal: Out-of-fold nonconformity scores that turn
+                predictions into intervals or sets with a coverage level.
         """
         self.pipeline = pipeline
         self.schema = schema
@@ -239,6 +244,7 @@ class ModelBundle:
         self.reference = reference
         self.history = history
         self.calibrator = calibrator
+        self.conformal = conformal
 
     @classmethod
     def create(
@@ -548,6 +554,10 @@ class ModelBundle:
             files[CALIBRATOR_FILE] = file_sha256(calibrator_path)
         elif (root / CALIBRATOR_FILE).exists():
             (root / CALIBRATOR_FILE).unlink()
+        if self.conformal is not None:
+            conformal_path = root / CONFORMAL_FILE
+            conformal_path.write_text(json.dumps(self.conformal.to_dict()))
+            files[CONFORMAL_FILE] = file_sha256(conformal_path)
         if self.history is not None:
             history_path = root / HISTORY_FILE
             self.history.to_parquet(history_path, index=False)
@@ -673,6 +683,19 @@ class ModelBundle:
                     "checksum mismatch: calibrator was modified"
                 )
             calibrator = joblib.load(calibrator_path)
+        calibrated = None
+        if CONFORMAL_FILE in info.files:
+            conformal_path = root / CONFORMAL_FILE
+            if (
+                not conformal_path.exists()
+                or file_sha256(conformal_path) != info.files[CONFORMAL_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: conformal scores were modified"
+                )
+            calibrated = conformal_module.ConformalCalibrator.from_dict(
+                json.loads(conformal_path.read_text())
+            )
         return cls(
             joblib.load(model_path),
             schema,
@@ -680,6 +703,7 @@ class ModelBundle:
             reference,
             history,
             calibrator,
+            calibrated,
         )
 
     @property
@@ -826,3 +850,63 @@ class ModelBundle:
         return local.OcclusionExplainer(score, self.schema.features).explain(
             rows, reference
         )
+
+    def predict_interval(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        coverage: float = conformal_module.DEFAULT_COVERAGE,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> pd.DataFrame:
+        """Prediction intervals with a stated coverage (regression).
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            coverage: Share of new rows the interval should contain.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            Columns `prediction`, `lower` and `upper`.
+
+        Raises:
+            ArtifactError: For classification models or bundles saved
+                without conformal scores.
+        """
+        calibrator = self.require_conformal("regression")
+        predictions = np.asarray(self.predict(data, mapping), dtype=float)
+        lower, upper = calibrator.interval(predictions, coverage)
+        return pd.DataFrame(
+            {"prediction": predictions, "lower": lower, "upper": upper}
+        )
+
+    def predict_set(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        coverage: float = conformal_module.DEFAULT_COVERAGE,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> list[list[Any]]:
+        """Prediction sets with a stated coverage (classification).
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            coverage: Share of new rows whose true label the set contains.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            For each row the labels that cannot be ruled out.
+
+        Raises:
+            ArtifactError: For regression models or bundles saved without
+                conformal scores.
+        """
+        calibrator = self.require_conformal("classification")
+        return calibrator.sets(self.predict_proba(data, mapping), coverage)
+
+    def require_conformal(
+        self, kind: str
+    ) -> conformal_module.ConformalCalibrator:
+        """Returns the calibrator of the right kind or explains its absence."""
+        if self.conformal is None or self.conformal.kind != kind:
+            raise errors.ArtifactError(
+                f"this bundle has no {kind} conformal calibration"
+            )
+        return self.conformal

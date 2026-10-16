@@ -17,15 +17,26 @@ def test_regression_intervals_cover_at_the_requested_rate():
     rng = np.random.default_rng(0)
     predicted, observed = noisy_regression(2000, rng)
     calibrator = conformal.ConformalCalibrator.for_regression(
-        observed, predicted, coverage=0.9
+        observed, predicted
     )
 
     new_predicted, new_observed = noisy_regression(20000, rng)
-    low, high = calibrator.interval(new_predicted)
+    low, high = calibrator.interval(new_predicted, coverage=0.9)
     covered = ((new_observed >= low) & (new_observed <= high)).mean()
 
     assert 0.88 < covered < 0.92
-    assert calibrator.margin == pytest.approx(1.645, abs=0.12)
+    assert calibrator.margin(0.9) == pytest.approx(1.645, abs=0.12)
+
+
+def test_any_coverage_level_can_be_asked_for_later():
+    rng = np.random.default_rng(6)
+    predicted, observed = noisy_regression(3000, rng)
+    calibrator = conformal.ConformalCalibrator.for_regression(
+        observed, predicted
+    )
+
+    assert calibrator.margin(0.5) < calibrator.margin(0.8)
+    assert calibrator.margin(0.8) < calibrator.margin(0.95)
 
 
 def test_classification_sets_cover_and_shrink_when_the_model_is_sure():
@@ -36,10 +47,10 @@ def test_classification_sets_cover_and_shrink_when_the_model_is_sure():
     logits[np.arange(3000), [classes.index(x) for x in labels]] += 2.0
     probabilities = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
     calibrator = conformal.ConformalCalibrator.for_classification(
-        labels, probabilities, classes, coverage=0.9
+        labels, probabilities, classes
     )
 
-    sets = calibrator.sets(probabilities)
+    sets = calibrator.sets(probabilities, coverage=0.9)
     covered = np.mean(
         [label in s for label, s in zip(labels, sets, strict=True)]
     )
@@ -52,10 +63,11 @@ def test_too_few_rows_or_bad_coverage_is_rejected():
     values = np.arange(10.0)
     with pytest.raises(ValueError, match="at least"):
         conformal.ConformalCalibrator.for_regression(values, values + 1)
+    calibrator = conformal.ConformalCalibrator.for_regression(
+        np.arange(50.0), np.arange(50.0) + 1
+    )
     with pytest.raises(ValueError, match="strictly between"):
-        conformal.ConformalCalibrator.for_regression(
-            np.arange(50.0), np.arange(50.0), coverage=1.0
-        )
+        calibrator.margin(1.0)
 
 
 def test_demanding_coverage_with_few_rows_gives_an_infinite_margin():
