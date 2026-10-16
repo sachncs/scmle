@@ -52,6 +52,7 @@ class HtmlReport:
             if "brier_score" in calibration
             else ""
         )
+        reliability = self.reliability(result)
         return (
             f"<!doctype html><meta charset=utf-8>"
             f"<title>{escape(result.run_id)}</title>"
@@ -61,5 +62,43 @@ class HtmlReport:
             f"<table>{metric_rows}</table>"
             f"<h2>Feature importance (permutation)</h2>{importance_html}"
             f"{calibration_html}"
+            f"<h2>Reliability checks</h2>{reliability}"
             f"<h2>Findings</h2><ul>{items}</ul>"
+        )
+
+    @staticmethod
+    def reliability(result: results.RunResult) -> str:
+        """Summarizes fit health, shift, robustness and weak subgroups."""
+        escape = html.escape
+        lines = []
+        health = result.evaluation.get("fit_health")
+        if health:
+            lines.append(
+                f"Fit health: <b>{escape(health['verdict'])}</b> "
+                f"({escape(health['note'])})"
+            )
+        shift = result.diagnostics.get("adversarial_validation", {})
+        if shift.get("available"):
+            lines.append(
+                f"Development versus test rows: {escape(shift['verdict'])} "
+                f"(separability AUC {shift['auc']:.2f})"
+            )
+        robust = result.diagnostics.get("robustness", {})
+        if robust.get("scenarios"):
+            fragile = robust["fragile_under"]
+            lines.append(
+                "Robustness: fragile under "
+                + (", ".join(map(escape, fragile)) if fragile else "none")
+            )
+        worst = result.diagnostics.get("slice_performance", {}).get("worst")
+        if worst:
+            top = worst[0]
+            lines.append(
+                f"Weakest slice: {escape(top['feature'])} = "
+                f"{escape(top['slice'])} ({top['rows']} rows, "
+                f"{top['gap']:+.3f} versus overall)"
+            )
+        return (
+            "".join(f"<p>{line}</p>" for line in lines)
+            or "<p>no checks were available</p>"
         )

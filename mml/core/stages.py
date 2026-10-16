@@ -34,11 +34,11 @@ from mml.evaluation import confidence
 from mml.evaluation import diagnostics
 from mml.evaluation import fit_health
 from mml.evaluation import resources
+from mml.evaluation import suite
 from mml.experimentation import ensemble_search
 from mml.experimentation import strategy_search
 from mml.experimentation import trials
 from mml.experimentation import tuning
-from mml.explainability import suite as explanation_suite
 from mml.features import graph as feature_graph
 from mml.governance import ledger
 from mml.intelligence import knowledge
@@ -665,8 +665,9 @@ class FinalEvaluationStage(Stage):
                     else None
                 ),
                 temporal=split.manifest.strategy == "temporal",
+                reference_features=split.dev_features,
             ),
-            diagnostics.default_suite() + explanation_suite.default_suite(),
+            suite.full_suite(),
         )
         for name, report_body in context.diagnostics.items():
             context.write_json(f"diagnostics/{name}.json", report_body)

@@ -9,8 +9,8 @@ from mml.contracts import tasks
 from mml.data.curation import preprocessing
 from mml.evaluation import diagnostics
 from mml.evaluation import metrics
+from mml.evaluation import suite as full_suite
 from mml.explainability import importance
-from mml.explainability import suite as suite_module
 from mml.models import registry as registry_module
 
 REGISTRY = registry_module.ModelRegistry.with_builtins()
@@ -102,7 +102,7 @@ def test_residual_report_segments_and_bias():
 
 
 def test_suite_selects_by_task_and_isolates_failures():
-    suite = diagnostics.default_suite() + suite_module.default_suite()
+    suite = full_suite.full_suite()
     binary = diagnostics.run_suite(make_inputs(tasks.TaskType.BINARY), suite)
     assert set(binary) == {
         "classification_report",
@@ -111,6 +111,9 @@ def test_suite_selects_by_task_and_isolates_failures():
         "permutation_importance",
         "partial_dependence",
         "metric_uncertainty",
+        "slice_performance",
+        "robustness",
+        "adversarial_validation",
     }
     regression = diagnostics.run_suite(
         make_inputs(tasks.TaskType.REGRESSION), suite
@@ -120,6 +123,9 @@ def test_suite_selects_by_task_and_isolates_failures():
         "permutation_importance",
         "partial_dependence",
         "metric_uncertainty",
+        "slice_performance",
+        "robustness",
+        "adversarial_validation",
     }
 
     class Broken(diagnostics.Diagnostic):

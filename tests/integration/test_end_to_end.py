@@ -349,3 +349,17 @@ def test_fit_health_is_recorded_for_the_selected_model_and_each_trial(
     }
     assert "train_scores" not in board.columns
     assert all(len(t.train_scores) == len(t.fold_scores) for t in result.trials)
+
+
+def test_reliability_checks_run_and_reach_the_report(binary_frame, tmp_path):
+    result = support.make_project(
+        binary_frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    assert {"slice_performance", "robustness", "adversarial_validation"} <= set(
+        result.diagnostics
+    )
+    assert result.diagnostics["adversarial_validation"]["available"] is True
+    page = (result.run_dir / "report.html").read_text()
+    assert "Reliability checks" in page and "Fit health" in page
+    assert "Development versus test rows" in page
