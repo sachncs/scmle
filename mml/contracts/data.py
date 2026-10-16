@@ -164,6 +164,9 @@ class PreprocessingOptions:
             encoding) or `ordinal` (integer codes for native categorical
             handling).
         sparse: Emit sparse one-hot output (for sparse-capable models).
+        construct: Append differences and ratios of the numeric features
+            most associated with the target.
+        select: Keep only the columns an L1-penalised linear model uses.
     """
 
     scale: bool = False
@@ -172,3 +175,5 @@ class PreprocessingOptions:
     impute: bool = True
     high_cardinality: str = "onehot"
     sparse: bool = False
+    construct: bool = False
+    select: bool = False

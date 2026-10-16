@@ -14,6 +14,7 @@ from sklearn import pipeline
 from mml.contracts import data as data_contracts
 from mml.contracts import models
 from mml.contracts import tasks
+from mml.data.curation import selection
 from mml.data.validation import columns
 from mml.features import graph as feature_graph
 
@@ -45,6 +46,14 @@ def build_preprocessor(
         transformer = kind.transformer(options)
         if selected and transformer is not None:
             parts.append((kind.name, transformer, selected))
+    if options.construct:
+        parts.append(
+            (
+                "constructed",
+                columns.NumericKind().transformer(options),
+                compose.make_column_selector(pattern=f"^{selection.PREFIX}"),
+            )
+        )
     return compose.ColumnTransformer(
         parts,
         remainder="drop",
@@ -151,6 +160,19 @@ def build_pipeline(
         steps.append(
             ("graph", feature_graph.FeatureGraphTransformer(plan.derived))
         )
+    if options.construct:
+        steps.append(
+            ("construct", selection.FeatureConstructor(tuple(plan.numeric)))
+        )
     steps.append(("prep", build_preprocessor(plan, options)))
+    if options.select:
+        steps.append(
+            (
+                "select",
+                selection.SparseSelector(
+                    classification=task.is_classification, random_state=seed
+                ),
+            )
+        )
     steps.append(("model", adapter.build(task, seed, params)))
     return pipeline.Pipeline(steps)

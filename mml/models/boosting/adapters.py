@@ -87,8 +87,8 @@ class LazyLibraryAdapter(models.ModelAdapter):
         }
         estimator = getattr(module, class_name)(**kwargs)
         if self.stopping_rounds:
-            estimator = early_stopping.HoldoutEarlyStopping(
-                estimator, self.stopping_rounds, random_state=seed
+            estimator = early_stopping.wrap(
+                estimator, self.stopping_rounds, seed
             )
         if fit_params:
             wrapper = (

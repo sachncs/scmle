@@ -173,6 +173,8 @@ class StrategySpec(FrozenModel):
             "calibrated",
             "log_skewed",
             "interactions",
+            "construct_features",
+            "select_features",
             "target_encoding",
             "rare_target_weighting",
         ]

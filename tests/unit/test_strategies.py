@@ -173,6 +173,8 @@ def test_registry_and_unknown_strategy():
         "calibrated",
         "log_skewed",
         "interactions",
+        "construct_features",
+        "select_features",
         "target_encoding",
         "rare_target_weighting",
     )
@@ -248,3 +250,125 @@ def test_jitter_is_opt_in_and_only_perturbs_synthetic_numeric_rows():
     assert set(sampled["c"]) <= {"x", "y"}  # categoricals copied untouched
     assert (labels[synthetic] == 1).all()
     assert sampled["a"].std() < 1.5 * features["a"].std()
+
+
+def ratio_problem(rows=900, seed=3):
+    rng = np.random.default_rng(seed)
+    frame = pd.DataFrame(
+        {
+            "price": rng.uniform(1, 10, rows),
+            "quantity": rng.uniform(1, 10, rows),
+            "noise": rng.normal(size=rows),
+        }
+    )
+    frame["y"] = (frame.price / frame.quantity > 1).astype(int)
+    return frame
+
+
+def wide_problem(rows=800, noise_columns=10, seed=4):
+    rng = np.random.default_rng(seed)
+    frame = pd.DataFrame(
+        {f"n{i}": rng.normal(size=rows) for i in range(noise_columns)}
+    )
+    frame["s0"] = rng.normal(size=rows)
+    frame["s1"] = rng.normal(size=rows)
+    frame["y"] = (frame.s0 + frame.s1 + rng.normal(0, 0.5, rows) > 0).astype(
+        int
+    )
+    return frame
+
+
+def cross_validated(frame, strategy_name, model):
+    from sklearn import model_selection
+
+    profile = profile_of(frame)
+    strategy = strategies.get_strategy(strategy_name)
+    estimator = strategy.build(
+        profile.feature_plan, REGISTRY.get(model), BINARY, 0
+    )
+    return model_selection.cross_val_score(
+        estimator,
+        frame.drop(columns="y"),
+        frame["y"],
+        cv=4,
+        scoring="roc_auc",
+    ).mean()
+
+
+def test_constructed_ratios_let_a_linear_model_learn_a_ratio_target():
+    from sklearn import model_selection
+
+    rng = np.random.default_rng(5)
+    frame = pd.DataFrame(
+        {
+            "price": rng.uniform(1, 10, 900),
+            "quantity": rng.uniform(1, 10, 900),
+            "noise": rng.normal(size=900),
+        }
+    )
+    frame["y"] = frame.price / frame.quantity + rng.normal(0, 0.05, 900)
+    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
+    profile = profiling.DatasetProfiler(spec).profile(
+        frame,
+        tabular.build_manifest(frame, "y"),
+        tasks.TaskType.REGRESSION,
+    )
+
+    def r2(name):
+        estimator = strategies.get_strategy(name).build(
+            profile.feature_plan,
+            REGISTRY.get("ridge"),
+            tasks.TaskType.REGRESSION,
+            0,
+        )
+        return model_selection.cross_val_score(
+            estimator, frame.drop(columns="y"), frame["y"], cv=4, scoring="r2"
+        ).mean()
+
+    assert r2("construct_features") > r2("default") + 0.2
+
+
+def test_feature_selection_keeps_the_signal_and_drops_noise_columns():
+    frame = wide_problem()
+    profile = profile_of(frame)
+    pipeline = strategies.get_strategy("select_features").build(
+        profile.feature_plan, REGISTRY.get("logistic_regression"), BINARY, 0
+    )
+
+    pipeline.fit(frame.drop(columns="y"), frame["y"])
+    kept = pipeline.named_steps["select"].support_
+
+    assert kept.sum() < 8
+    names = list(pipeline.named_steps["prep"].get_feature_names_out())
+    kept_names = [n for n, flag in zip(names, kept, strict=True) if flag]
+    assert {"s0", "s1"} <= set(kept_names)
+
+
+def test_selection_scores_as_well_as_the_full_set_with_fewer_features():
+    frame = wide_problem()
+
+    full = cross_validated(frame, "default", "logistic_regression")
+    chosen = cross_validated(frame, "select_features", "logistic_regression")
+
+    assert chosen >= full - 0.01
+
+
+def test_applicability_of_the_feature_strategies_is_explained():
+    single = pd.DataFrame({"a": np.arange(100.0), "y": [0, 1] * 50})
+    profile = profile_of(single)
+
+    assert "fewer than two numeric" in reason(
+        "construct_features", profile, "logistic_regression"
+    )
+    assert "fewer than 6 features" in reason(
+        "select_features", profile, "logistic_regression"
+    )
+    assert (
+        reason(
+            "select_features", profile_of(wide_problem()), "logistic_regression"
+        )
+        is None
+    )
+    assert "baseline" in reason(
+        "construct_features", profile_of(ratio_problem()), "dummy"
+    )

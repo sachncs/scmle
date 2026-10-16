@@ -32,6 +32,7 @@ TARGET_SKEW_THRESHOLD = 1.0
 SKEW_THRESHOLD = 1.0
 MIN_INTERACTION_FEATURES = 2
 MAX_INTERACTION_FEATURES = 12
+MIN_SELECTION_FEATURES = 6
 DEFAULT = experiments.DEFAULT_STRATEGY
 CALIBRATION_FOLDS = 3
 
@@ -358,10 +359,14 @@ class FeatureStrategy(DataStrategy):
     Attributes:
         log_skewed: Log-transform right-skewed numeric features.
         interactions: Add pairwise numeric interactions.
+        construct: Append differences and ratios of the best numeric pairs.
+        select: Keep only columns an L1-penalised linear model uses.
     """
 
     log_skewed: ClassVar[bool] = False
     interactions: ClassVar[bool] = False
+    construct: ClassVar[bool] = False
+    select: ClassVar[bool] = False
 
     def build(
         self,
@@ -376,7 +381,11 @@ class FeatureStrategy(DataStrategy):
             preprocessing.default_options(plan, adapter),
             log_skewed=self.log_skewed,
             interactions=self.interactions,
+            construct=self.construct,
+            select=self.select,
         )
+        if self.select:
+            options = dataclasses.replace(options, scale=True)
         return preprocessing.build_pipeline(
             plan, adapter, task, seed, params, options
         )
@@ -529,6 +538,51 @@ class InteractionStrategy(FeatureStrategy):
         return None
 
 
+class ConstructFeaturesStrategy(FeatureStrategy):
+    """Adds differences and ratios of the numeric features that matter most."""
+
+    name = "construct_features"
+    description = "differences and ratios of the most target-related features"
+    construct = True
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs at least two numeric features to combine."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        if len(profile.feature_plan.numeric) < MIN_INTERACTION_FEATURES:
+            return "fewer than two numeric features to combine"
+        return None
+
+
+class SelectFeaturesStrategy(FeatureStrategy):
+    """Drops columns an L1-penalised linear model gives no weight."""
+
+    name = "select_features"
+    description = "keep only the features a sparse linear model uses"
+    select = True
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs enough features for removal to be meaningful."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        plan = profile.feature_plan
+        if len(plan.numeric) + len(plan.categorical) < MIN_SELECTION_FEATURES:
+            return f"fewer than {MIN_SELECTION_FEATURES} features"
+        return None
+
+
 STRATEGIES: dict[str, DataStrategy] = {
     strategy.name: strategy
     for strategy in (
@@ -544,6 +598,8 @@ STRATEGIES: dict[str, DataStrategy] = {
         CalibrationStrategy(),
         LogSkewedStrategy(),
         InteractionStrategy(),
+        ConstructFeaturesStrategy(),
+        SelectFeaturesStrategy(),
         TargetEncodingStrategy(),
         RareTargetStrategy(),
     )

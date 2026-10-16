@@ -16,11 +16,11 @@ def noisy_problem(rows=1500, seed=0):
 def test_lightgbm_stops_well_before_the_round_limit():
     lightgbm = pytest.importorskip("lightgbm")
     features, target = noisy_problem()
-    model = early_stopping.HoldoutEarlyStopping(
+    model = early_stopping.wrap(
         lightgbm.LGBMClassifier(
             n_estimators=600, learning_rate=0.2, verbose=-1, n_jobs=1
         ),
-        rounds=15,
+        15,
     ).fit(features, target)
 
     assert model.best_iteration_ is not None and model.best_iteration_ < 300
@@ -31,9 +31,9 @@ def test_lightgbm_stops_well_before_the_round_limit():
 def test_xgboost_stops_early_and_still_predicts():
     xgboost = pytest.importorskip("xgboost")
     features, target = noisy_problem()
-    model = early_stopping.HoldoutEarlyStopping(
+    model = early_stopping.wrap(
         xgboost.XGBClassifier(n_estimators=600, learning_rate=0.3, n_jobs=1),
-        rounds=15,
+        15,
     ).fit(features, target)
 
     assert model.best_iteration_ is not None and model.best_iteration_ < 300
@@ -45,11 +45,11 @@ def test_regression_with_lightgbm_stops_early():
     rng = np.random.default_rng(2)
     features = rng.normal(size=(1200, 4))
     target = features[:, 0] + rng.normal(0, 2.0, 1200)
-    model = early_stopping.HoldoutEarlyStopping(
+    model = early_stopping.wrap(
         lightgbm.LGBMRegressor(
             n_estimators=500, learning_rate=0.2, verbose=-1, n_jobs=1
         ),
-        rounds=10,
+        10,
     ).fit(features, target)
 
     assert model.best_iteration_ < 250
@@ -59,7 +59,7 @@ def test_regression_with_lightgbm_stops_early():
 def test_too_little_data_trains_without_a_holdout():
     lightgbm = pytest.importorskip("lightgbm")
     features, target = noisy_problem(rows=40)
-    model = early_stopping.HoldoutEarlyStopping(
+    model = early_stopping.wrap(
         lightgbm.LGBMClassifier(n_estimators=20, verbose=-1, n_jobs=1)
     ).fit(features, target)
 
@@ -70,7 +70,7 @@ def test_too_little_data_trains_without_a_holdout():
 def test_catboost_stops_early_on_its_holdout():
     catboost = pytest.importorskip("catboost")
     features, target = noisy_problem(rows=1200)
-    model = early_stopping.HoldoutEarlyStopping(
+    model = early_stopping.wrap(
         catboost.CatBoostClassifier(
             iterations=500,
             learning_rate=0.3,
@@ -78,8 +78,46 @@ def test_catboost_stops_early_on_its_holdout():
             allow_writing_files=False,
             thread_count=1,
         ),
-        rounds=15,
+        15,
     ).fit(features, target)
 
     assert model.best_iteration_ is not None and model.best_iteration_ < 250
     assert model.predict_proba(features).shape == (1200, 2)
+
+
+def test_a_scikit_learn_scorer_treats_the_wrapper_as_a_classifier():
+    from sklearn import base
+    from sklearn import metrics
+
+    lightgbm = pytest.importorskip("lightgbm")
+    features, target = noisy_problem()
+    model = early_stopping.wrap(
+        lightgbm.LGBMClassifier(n_estimators=40, verbose=-1, n_jobs=1)
+    ).fit(features, target)
+
+    scorer = metrics.get_scorer("roc_auc")
+
+    assert base.is_classifier(model)
+    assert 0.5 < scorer(model, features, target) <= 1.0
+
+
+def test_regressors_are_typed_as_regressors():
+    from sklearn import base
+
+    lightgbm = pytest.importorskip("lightgbm")
+    wrapped = early_stopping.wrap(lightgbm.LGBMRegressor(verbose=-1))
+
+    assert base.is_regressor(wrapped) and not base.is_classifier(wrapped)
+
+
+def test_string_labels_survive_early_stopping():
+    lightgbm = pytest.importorskip("lightgbm")
+    features, numeric = noisy_problem()
+    labels = np.where(numeric == 1, "late", "early")
+    model = early_stopping.wrap(
+        lightgbm.LGBMClassifier(n_estimators=50, verbose=-1, n_jobs=1)
+    ).fit(features, labels)
+
+    assert set(model.classes_) == {"early", "late"}
+    assert set(model.predict(features)) <= {"early", "late"}
+    assert model.predict_proba(features).shape == (len(labels), 2)

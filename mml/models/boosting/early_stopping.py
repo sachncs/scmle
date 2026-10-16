@@ -7,12 +7,14 @@ wrapper carves the holdout out of the training rows it receives and wires
 the right stopping arguments for each library.
 """
 
+import inspect
 from typing import Any
 from typing import Self
 
 import numpy as np
 from sklearn import base
 from sklearn import model_selection
+from sklearn import preprocessing
 
 DEFAULT_ROUNDS = 25
 DEFAULT_FRACTION = 0.15
@@ -62,6 +64,9 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         """
         self.estimator_ = base.clone(self.estimator)
         self.best_iteration_: int | None = None
+        if base.is_classifier(self.estimator):
+            self.encoder_ = preprocessing.LabelEncoder().fit(target)
+            target = self.encoder_.transform(target)
         if len(target) < MIN_ROWS:
             self.estimator_.fit(features, target, **fit_params)
             return self
@@ -109,12 +114,14 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         if self.library == "lightgbm":
             import lightgbm
 
-            return {
-                "eval_set": [validation],
-                "callbacks": [
-                    lightgbm.early_stopping(self.rounds, verbose=False)
-                ],
-            }
+            stopper = [lightgbm.early_stopping(self.rounds, verbose=False)]
+            if "eval_X" in inspect.signature(self.estimator_.fit).parameters:
+                return {
+                    "eval_X": validation[0],
+                    "eval_y": validation[1],
+                    "callbacks": stopper,
+                }
+            return {"eval_set": [validation], "callbacks": stopper}
         if self.library == "xgboost":
             self.estimator_.set_params(early_stopping_rounds=self.rounds)
             return {"eval_set": [validation], "verbose": False}
@@ -131,14 +138,47 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         return int(getter()) if callable(getter) else None
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts with the stopped model."""
-        return np.asarray(self.estimator_.predict(features))
+        """Predicts with the stopped model, in the original labels."""
+        predicted = np.asarray(self.estimator_.predict(features))
+        if hasattr(self, "encoder_"):
+            return self.encoder_.inverse_transform(predicted.astype(int))
+        return predicted
 
     def predict_proba(self, features: Any) -> np.ndarray:
         """Class probabilities of the stopped model."""
         return np.asarray(self.estimator_.predict_proba(features))
 
+
+class EarlyStoppingClassifier(base.ClassifierMixin, HoldoutEarlyStopping):
+    """Early-stopped boosting classifier."""
+
     @property
     def classes_(self) -> np.ndarray:
         """Class labels of the fitted model."""
-        return np.asarray(self.estimator_.classes_)
+        return np.asarray(self.encoder_.classes_)
+
+
+class EarlyStoppingRegressor(base.RegressorMixin, HoldoutEarlyStopping):
+    """Early-stopped boosting regressor."""
+
+
+def wrap(
+    estimator: base.BaseEstimator, rounds: int = DEFAULT_ROUNDS, seed: int = 0
+) -> HoldoutEarlyStopping:
+    """Wraps an estimator in the early-stopping wrapper of its kind.
+
+    Args:
+        estimator: Unfitted boosting classifier or regressor.
+        rounds: Rounds without improvement before stopping.
+        seed: Seed of the holdout split.
+
+    Returns:
+        A classifier or regressor wrapper, so scikit-learn scorers treat it
+        as the right kind of estimator.
+    """
+    kind = (
+        EarlyStoppingClassifier
+        if base.is_classifier(estimator)
+        else EarlyStoppingRegressor
+    )
+    return kind(estimator, rounds, random_state=seed)
