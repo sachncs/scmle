@@ -44,7 +44,8 @@ class SliceReport(diagnostics.Diagnostic):
             inputs.target,
             inputs.positive_label,
         )
-        scored, skipped = [], 0
+        scored: list[dict[str, Any]] = []
+        skipped = 0
         for feature, labels in self.assignments(inputs):
             for level in labels.dropna().unique():
                 rows = (labels == level).to_numpy()
@@ -66,7 +67,7 @@ class SliceReport(diagnostics.Diagnostic):
                         "gap": float(gap),
                     }
                 )
-        scored.sort(key=lambda item: -float(item["gap"]))
+        scored.sort(key=lambda item: -item["gap"])
         return {
             "metric": metric.name,
             "overall": float(overall),
