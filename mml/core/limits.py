@@ -51,8 +51,26 @@ def peak_memory_gb() -> float:
     return max(own, children) / BYTES_PER_GB
 
 
-def process_table() -> dict[int, tuple[int, int]]:
-    """Maps every live pid to its (parent pid, resident bytes)."""
+def proc_table() -> dict[int, tuple[int, int]]:
+    """Process table from `/proc` (Linux), without needing `ps`."""
+    table: dict[int, tuple[int, int]] = {}
+    page = resource.getpagesize()
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        try:
+            with open(f"/proc/{name}/stat", encoding="ascii") as handle:
+                after_name = handle.read().rsplit(")", 1)[1].split()
+            with open(f"/proc/{name}/statm", encoding="ascii") as handle:
+                resident = int(handle.read().split()[1]) * page
+        except (OSError, IndexError, ValueError):
+            continue
+        table[int(name)] = (int(after_name[1]), resident)
+    return table
+
+
+def ps_table() -> dict[int, tuple[int, int]]:
+    """Process table from `ps` (macOS and other Unix systems)."""
     completed = subprocess.run(  # nosec B603 B607
         ["ps", "-A", "-o", "pid=,ppid=,rss="],
         capture_output=True,
@@ -65,6 +83,13 @@ def process_table() -> dict[int, tuple[int, int]]:
         if len(fields) == PS_FIELDS and all(f.isdigit() for f in fields):
             table[int(fields[0])] = (int(fields[1]), int(fields[2]) * KILOBYTES)
     return table
+
+
+def process_table() -> dict[int, tuple[int, int]]:
+    """Maps every live pid to its (parent pid, resident bytes)."""
+    if os.path.isdir("/proc/self"):
+        return proc_table()
+    return ps_table()
 
 
 def process_tree(root: int) -> dict[int, int]:
