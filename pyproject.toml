@@ -101,3 +101,13 @@ docstring-code-format = true
 python_version = "3.11"
 ignore_missing_imports = true
 check_untyped_defs = true
+
+# On Linux, take the CPU build of PyTorch: the default wheel drags in several
+# gigabytes of CUDA libraries that CPU-only machines and CI do not need.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]

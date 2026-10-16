@@ -36,6 +36,16 @@ jobs:
       - run: uv sync --python 3.11 --resolution lowest-direct --extra boosting --extra optimization
       - run: uv run pytest -q tests/unit tests/property tests/leakage
 
+  deep-learning:
+    name: PyTorch model families (CPU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --python 3.12 --extra deeplearning --extra boosting
+      - run: uv run pytest -q tests/unit/test_deeplearning.py tests/unit/test_training.py
+
   integrations:
     name: MLflow and Ray integrations
     runs-on: ubuntu-latest
