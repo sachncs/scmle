@@ -18,12 +18,12 @@ from mml.data.validation import columns
 from mml.evaluation import diagnostics
 from mml.evaluation import selection
 from mml.experimentation import stores
-from mml.features import graph as feature_graph
+from mml.features import feature_graph
 from mml.inference import serving
 from mml.intelligence import planner
 from mml.models import thresholds
-from mml.models.boosting import adapters as boosting_adapters
-from mml.models.sklearn import adapters as sklearn_adapters
+from mml.models.boosting import boosters
+from mml.models.sklearn import classical
 from mml.monitoring import monitor
 from mml.optimization import optimizers
 from mml.sampling import resampling
@@ -87,9 +87,7 @@ def test_every_concrete_component_implements_its_abstract_interface(
 
 
 def test_every_model_adapter_declares_complete_metadata():
-    adapters = (
-        sklearn_adapters.BUILTIN_ADAPTERS + boosting_adapters.BOOSTING_ADAPTERS
-    )
+    adapters = classical.BUILTIN_ADAPTERS + boosters.BOOSTING_ADAPTERS
     names = set()
     for cls in adapters:
         assert not inspect.isabstract(cls)

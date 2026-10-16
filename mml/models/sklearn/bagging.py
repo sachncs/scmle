@@ -16,7 +16,7 @@ from sklearn import ensemble
 from mml.contracts import models
 from mml.contracts import search
 from mml.contracts import tasks
-from mml.models.sklearn import adapters
+from mml.models.sklearn import classical
 
 BAG_PARAMS = ("n_estimators", "max_samples", "max_features", "bootstrap")
 DEFAULT_MEMBERS = 25
@@ -88,21 +88,21 @@ class BaggedTreeAdapter(BaggedAdapter):
     """Bagged deep decision trees."""
 
     name = "bagged_decision_tree"
-    base = adapters.DecisionTreeAdapter
+    base = classical.DecisionTreeAdapter
 
 
 class BaggedKnnAdapter(BaggedAdapter):
     """Bagged nearest neighbours."""
 
     name = "bagged_knn"
-    base = adapters.KnnAdapter
+    base = classical.KnnAdapter
 
 
 class BaggedLogisticAdapter(BaggedAdapter):
     """Bagged logistic regression."""
 
     name = "bagged_logistic_regression"
-    base = adapters.LogisticRegressionAdapter
+    base = classical.LogisticRegressionAdapter
 
 
 BAGGING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (

@@ -7,7 +7,7 @@ import pytest
 from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import tasks
-from mml.data.profiling import profiler as profiling
+from mml.data.profiling import profiler
 from mml.data.readers import tabular
 from mml.intelligence import planner as planner_module
 from mml.models import registry as registry_module
@@ -30,7 +30,7 @@ def make_plan(planner, frame, budget=1800, approved=None, task=BINARY, **extra):
         **extra,
     )
     manifest = tabular.build_manifest(frame, "y")
-    profile = profiling.DatasetProfiler(spec).profile(frame, manifest, task)
+    profile = profiler.DatasetProfiler(spec).profile(frame, manifest, task)
     return planner.plan(
         planner_module.PlanningContext(spec, profile, task, approved)
     )
@@ -103,7 +103,7 @@ def test_strategy_search_can_be_disabled_in_the_plan(planner, frame):
         strategies=tasks.StrategySpec(top_models=0),
     )
     manifest = tabular.build_manifest(frame, "y")
-    profile = profiling.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
     plan = planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
     assert not any(
         d.technique == "random_oversample"
@@ -118,7 +118,7 @@ def test_unknown_strategy_name_is_a_config_error(planner, frame):
         strategies=tasks.StrategySpec(names=["bogus"]),
     )
     manifest = tabular.build_manifest(frame, "y")
-    profile = profiling.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
     with pytest.raises(errors.ConfigError, match="unknown strategy"):
         planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
 
@@ -164,7 +164,7 @@ def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
         resources=tasks.ResourceSpec(memory_limit_gb=limit),
     )
     manifest = tabular.build_manifest(frame, "y")
-    profile = profiling.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
     plan = planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
     assert "random_forest" not in plan.candidate_models
     assert "svm" not in plan.candidate_models

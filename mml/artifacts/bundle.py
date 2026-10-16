@@ -31,7 +31,7 @@ from mml.contracts import tasks
 from mml.data.readers import interchange
 from mml.data.readers import tabular
 from mml.explainability import local
-from mml.features import graph as feature_graph
+from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
 from mml.inference import validation
 from mml.monitoring import reference as reference_module

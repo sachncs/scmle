@@ -16,7 +16,7 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.data.curation import selection
 from mml.data.validation import columns
-from mml.features import graph as feature_graph
+from mml.features import feature_graph
 
 SPARSE_THRESHOLD = 0.3
 

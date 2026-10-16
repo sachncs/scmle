@@ -26,7 +26,7 @@ from mml.contracts import tasks
 from mml.core import compiler
 from mml.core import context as context_module
 from mml.core import state as run_state
-from mml.data.profiling import profiler as profiling
+from mml.data.profiling import profiler
 from mml.data.readers import tabular
 from mml.data.splitting import splitters
 from mml.data.validation import target as target_module
@@ -39,7 +39,7 @@ from mml.experimentation import ensemble_search
 from mml.experimentation import strategy_search
 from mml.experimentation import trials
 from mml.experimentation import tuning
-from mml.features import graph as feature_graph
+from mml.features import feature_graph
 from mml.governance import ledger
 from mml.intelligence import knowledge
 from mml.intelligence import planner as planner_module
@@ -192,7 +192,7 @@ class ProfileStage(Stage):
         development = split.dev_features.assign(
             **{spec.data.target: split.dev_target}
         )
-        profile = profiling.DatasetProfiler(spec).profile(
+        profile = profiler.DatasetProfiler(spec).profile(
             development,
             require(context.manifest, "manifest"),
             task,

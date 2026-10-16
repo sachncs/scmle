@@ -8,7 +8,7 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.models import conformance
 from mml.models import registry as registry_module
-from mml.models.sklearn import adapters as sklearn_adapters
+from mml.models.sklearn import classical
 
 BINARY = tasks.TaskType.BINARY
 REGRESSION = tasks.TaskType.REGRESSION
@@ -30,7 +30,7 @@ def test_candidates_depend_on_task(registry):
 
 
 @pytest.mark.parametrize(
-    "adapter_class", sklearn_adapters.BUILTIN_ADAPTERS, ids=lambda c: c.name
+    "adapter_class", classical.BUILTIN_ADAPTERS, ids=lambda c: c.name
 )
 def test_builtins_pass_conformance(adapter_class):
     conformance.check_conformance(adapter_class())

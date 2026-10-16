@@ -23,7 +23,7 @@ spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
 | Workflow as a DAG: stages declare dependencies, a compiler validates and orders them | Implemented | `mml/core/compiler.py`, `tests/unit/test_component_contracts.py::test_the_workflow_is_a_compiled_dag_of_declared_dependencies` |
 | Multi-fidelity, budget-aware optimization | Implemented | `mml/experimentation/tuning.py`, `tests/integration/test_tuning.py` |
 | Content-addressed, versioned artifacts | Implemented | `mml/governance/registry.py`, `tests/integration/test_deployment.py` |
-| Event-driven telemetry and monitoring adapters | Implemented | `mml/contracts/events.py`, `mml/integrations/mlflow.py`, `tests/integration/test_integrations.py` |
+| Event-driven telemetry and monitoring adapters | Implemented | `mml/contracts/events.py`, `mml/integrations/mlflow_store.py`, `tests/integration/test_integrations.py` |
 | Reproducibility: config, data fingerprints, seeds, environments | Implemented | `mml/artifacts/reproducibility.py`, `tests/integration/test_reproducibility.py` |
 | Deployment is an optional adapter | Implemented | `mml/inference/serving.py`, `tests/integration/test_deployment.py` |
 | No mandatory Kubernetes / cloud / DB / GPU / tracker | Implemented | base install in `.github/workflows/ci.yml`, `tests/unit/test_component_contracts.py` |
@@ -33,7 +33,7 @@ spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Package organization (api, contracts, core, intelligence, data, models, optimization, evaluation, artifacts, monitoring, deployment, integrations) | Implemented | `docs/ARCHITECTURE.md` (integrations live in `mml/integrations/mlflow.py` and `mml/core/scheduler.py`) |
+| Package organization (api, contracts, core, intelligence, data, models, optimization, evaluation, artifacts, monitoring, deployment, integrations) | Implemented | `docs/ARCHITECTURE.md` (integrations live in `mml/integrations/mlflow_store.py` and `mml/core/scheduler.py`) |
 | Modules interact only through typed contracts | Implemented | `tests/unit/test_component_contracts.py` |
 | `DataSpec` / `ValidationSpec` / `ResourceSpec` with cross-field validation | Implemented | `tests/unit/test_tasks.py` |
 | Config serializable, hashable after canonicalization, saved with every run | Implemented | `tests/unit/test_tasks.py`, `tests/integration/test_end_to_end.py` |
@@ -153,7 +153,7 @@ spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
 | Deep learning as plugins | Implemented | `tests/unit/test_registry.py` |
 | Time-series: separate validation and feature-availability contracts | Implemented | `tests/unit/test_splitting.py`, `tests/unit/test_profiling.py`, `tests/integration/test_end_to_end.py` (embargoed temporal validation; `unavailable_at_prediction`); lag / diff / rolling / expanding features per group in time order with no future rows (`tests/unit/test_feature_graph.py`, `tests/integration/test_feature_graph_runs.py`) |
 | Augmentation: pluggable generator and evaluator interfaces | Implemented | `mml/sampling/resampling.py` (generator = `Resampler`), strategy evaluation = `DataStrategy` |
-| Feature engineering: versioned, fitted transformation graph | Implemented | declarative `FeatureGraphSpec` (versioned, fingerprinted, acyclic by construction), 18 operations, statistics learned on the training fold, packaged in the bundle (`mml/features/graph.py`, `tests/unit/test_feature_graph.py`, `tests/integration/test_feature_graph_runs.py`) |
+| Feature engineering: versioned, fitted transformation graph | Implemented | declarative `FeatureGraphSpec` (versioned, fingerprinted, acyclic by construction), 18 operations, statistics learned on the training fold, packaged in the bundle (`mml/features/feature_graph.py`, `tests/unit/test_feature_graph.py`, `tests/integration/test_feature_graph_runs.py`) |
 | Meta-learning: fingerprint + experiment history | Implemented | `tests/integration/test_meta_learning.py` |
 | Human approval: policy checkpoints | Implemented | `tests/integration/test_checkpoints.py` |
 | Production monitoring: prediction/label event schema | Implemented | `tests/integration/test_monitoring.py` |
@@ -186,7 +186,7 @@ now closed.
 | The registry authenticates bundles at registration and on load | Implemented | `mml/governance/registry.py`, `tests/integration/test_deployment.py` |
 | Fingerprint covers ML difficulty, text / id types, scale and missingness patterns | Implemented | `mml/intelligence/fingerprint.py`, `tests/unit/test_fingerprint.py` |
 | Inference: structured result, optional probability calibration, library compatibility checks | Implemented | `mml/artifacts/bundle.py::score`, `::calibrate`, `tests/unit/test_bundle.py` |
-| Series features have history at prediction time | Implemented | `mml/features/graph.py::compute_with_history`, `tests/integration/test_feature_graph_runs.py` |
+| Series features have history at prediction time | Implemented | `mml/features/feature_graph.py::compute_with_history`, `tests/integration/test_feature_graph_runs.py` |
 | Resource limits are enforced: every trial supervised in its own process, killed past the time ceiling or memory limit | Implemented | `mml/core/limits.py::TrialSupervisor`, `tests/unit/test_trial_supervision.py`, `tests/integration/test_resource_limits.py::test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues` |
 | CLI exposes validation, embargo, strategies, enforcement and nested specifications | Implemented | `mml/cli.py`, `tests/integration/test_cli.py::test_config_file_and_flags_reach_the_full_specification` |
 

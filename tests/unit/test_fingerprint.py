@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from mml.contracts import tasks
-from mml.data.profiling import profiler as profiling
+from mml.data.profiling import profiler
 from mml.data.readers import tabular
 from mml.data.validation import columns
 from mml.intelligence import fingerprint
@@ -16,7 +16,7 @@ def profile_of(frame, task=tasks.TaskType.BINARY, **data_overrides):
         data=tasks.DataSpec(uri="m", target="y", **data_overrides)
     )
     manifest = tabular.build_manifest(frame, "y")
-    return profiling.DatasetProfiler(spec).profile(frame, manifest, task, 0.25)
+    return profiler.DatasetProfiler(spec).profile(frame, manifest, task, 0.25)
 
 
 def test_entropy_of_known_distributions():

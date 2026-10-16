@@ -6,7 +6,7 @@ import pytest
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data.profiling import profiler as profiling
+from mml.data.profiling import profiler
 from mml.data.readers import tabular
 from mml.models import registry as registry_module
 from mml.sampling import resampling
@@ -19,7 +19,7 @@ BINARY = tasks.TaskType.BINARY
 def profile_of(frame, task=BINARY):
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
     manifest = tabular.build_manifest(frame, "y")
-    return profiling.DatasetProfiler(spec).profile(frame, manifest, task)
+    return profiler.DatasetProfiler(spec).profile(frame, manifest, task)
 
 
 @pytest.fixture
@@ -308,7 +308,7 @@ def test_constructed_ratios_let_a_linear_model_learn_a_ratio_target():
     )
     frame["y"] = frame.price / frame.quantity + rng.normal(0, 0.05, 900)
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
-    profile = profiling.DatasetProfiler(spec).profile(
+    profile = profiler.DatasetProfiler(spec).profile(
         frame,
         tabular.build_manifest(frame, "y"),
         tasks.TaskType.REGRESSION,

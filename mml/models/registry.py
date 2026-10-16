@@ -12,10 +12,10 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.models import conformance
 from mml.models import ensembles
-from mml.models.boosting import adapters as boosting_adapters
-from mml.models.deeplearning import adapters as deep_adapters
-from mml.models.sklearn import adapters as sklearn_adapters
+from mml.models.boosting import boosters
+from mml.models.deeplearning import networks
 from mml.models.sklearn import bagging
+from mml.models.sklearn import classical
 
 ENTRY_POINT_GROUP = "mml.models"
 
@@ -44,9 +44,9 @@ class ModelRegistry:
         planning time when their library is not installed.
         """
         classes = (
-            *sklearn_adapters.BUILTIN_ADAPTERS,
-            *boosting_adapters.BOOSTING_ADAPTERS,
-            *deep_adapters.DEEP_LEARNING_ADAPTERS,
+            *classical.BUILTIN_ADAPTERS,
+            *boosters.BOOSTING_ADAPTERS,
+            *networks.DEEP_LEARNING_ADAPTERS,
             *bagging.BAGGING_ADAPTERS,
         )
         registry = cls(tuple(adapter() for adapter in classes))

@@ -102,9 +102,9 @@ def create_backend(workers: int, executor: str = "process") -> ExecutionBackend:
         ConfigError: For an unknown executor.
     """
     if executor == "ray":
-        from mml.integrations import ray as ray_integration
+        from mml.integrations import ray_backend
 
-        return ray_integration.RayBackend(workers)
+        return ray_backend.RayBackend(workers)
     if executor != "process":
         raise errors.ConfigError(f"unknown executor '{executor}'")
     return SequentialBackend() if workers <= 1 else ProcessBackend(workers)

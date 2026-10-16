@@ -6,7 +6,7 @@ from mml.contracts import errors
 from mml.contracts import tasks
 from mml.models import conformance
 from mml.models import registry as registry_module
-from mml.models.boosting import adapters as boosting_adapters
+from mml.models.boosting import boosters
 from mml.models.boosting import early_stopping
 
 
@@ -20,7 +20,7 @@ def test_adapters_pass_conformance_when_installed(library):
 def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
     registry = registry_module.ModelRegistry.with_builtins()
     monkeypatch.setattr(
-        boosting_adapters.XgboostAdapter, "requires", ("not_installed_pkg",)
+        boosters.XgboostAdapter, "requires", ("not_installed_pkg",)
     )
     compatible, rejected = registry.candidates(tasks.TaskType.BINARY)
     assert "missing dependency" in rejected["xgboost"]
@@ -29,15 +29,15 @@ def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
 
 def test_build_without_library_raises_config_error(monkeypatch):
     monkeypatch.setattr(
-        boosting_adapters.XgboostAdapter, "requires", ("not_installed_pkg",)
+        boosters.XgboostAdapter, "requires", ("not_installed_pkg",)
     )
     with pytest.raises(errors.ConfigError, match="boosting"):
-        boosting_adapters.XgboostAdapter().build(tasks.TaskType.BINARY, 0)
+        boosters.XgboostAdapter().build(tasks.TaskType.BINARY, 0)
 
 
 def test_params_override_fixed_params_and_seed_is_applied():
     pytest.importorskip("lightgbm")
-    estimator = boosting_adapters.LightGbmAdapter().build(
+    estimator = boosters.LightGbmAdapter().build(
         tasks.TaskType.REGRESSION, 5, {"num_leaves": 9}
     )
     params = estimator.get_params()

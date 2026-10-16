@@ -33,7 +33,7 @@ from mml.data.validation import columns
 from mml.data.validation import target as target_module
 from mml.governance import lifecycle
 from mml.inference import mapping as mapping_module
-from mml.integrations import ray as ray_integration
+from mml.integrations import ray_backend
 from mml.models import conformance
 from mml.models import registry as registry_module
 from mml.sampling import strategies as strategies_module
@@ -146,7 +146,7 @@ def test_l23_to_l39_decision_table(run):
     assert {"sequential", "process", "ray"} <= {
         scheduler.SequentialBackend.name,
         scheduler.ProcessBackend.name,
-        ray_integration.RayBackend.name,
+        ray_backend.RayBackend.name,
     }  # local-first, distributed-capable
     assert (
         result.evaluation["split_fingerprint"]
@@ -388,7 +388,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
 def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     """L210-L224: key invariant of each module in the I/O matrix."""
     project, result = run
-    from mml.data.profiling import profiler as profiling
+    from mml.data.profiling import profiler
     from mml.data.readers import tabular
     from mml.data.splitting import splitters
 
@@ -399,7 +399,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     spec = project.spec
     manifest = tabular.build_manifest(frame, "y")
     task = target_module.TaskResolver(spec).resolve(frame["y"])
-    profiling.DatasetProfiler(spec).profile(frame, manifest, task)
+    profiler.DatasetProfiler(spec).profile(frame, manifest, task)
     pd.testing.assert_frame_equal(
         frame, before
     )  # profiling: no fitted state, no mutation
@@ -730,7 +730,7 @@ def test_l374_l393_balancing_and_augmentation(frame):
         and "copula_augment" in strategies.OPT_IN
     )  # research plugins
     from mml.contracts import data as data_contracts
-    from mml.data.profiling import profiler as profiling
+    from mml.data.profiling import profiler
     from mml.data.readers import tabular
     from mml.sampling import resampling
 
@@ -739,7 +739,7 @@ def test_l374_l393_balancing_and_augmentation(frame):
     # Regression does not reuse classification resampling.
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
     reg = pd.DataFrame({"x": np.arange(100.0), "y": np.arange(100.0) * 2})
-    profile = profiling.DatasetProfiler(spec).profile(
+    profile = profiler.DatasetProfiler(spec).profile(
         reg, tabular.build_manifest(reg, "y"), tasks.TaskType.REGRESSION
     )
     adapter = registry_module.ModelRegistry.with_builtins().get("ridge")
@@ -1138,7 +1138,7 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
         ).run()
         assert result.state == "COMPLETED"
     assert issubclass(
-        ray_integration.RayBackend, scheduler.ExecutionBackend
+        ray_backend.RayBackend, scheduler.ExecutionBackend
     )  # distributed: optional
 
 
@@ -1148,14 +1148,14 @@ def test_l739_l747_first_sprint_outcomes(run):
     assert (ROOT / "pyproject.toml").exists() and list(
         (ROOT / "tests").rglob("test_*.py")
     )  # 2 package skeleton + tests
-    from mml.data.profiling import profiler as profiling
+    from mml.data.profiling import profiler
     from mml.data.readers import tabular
     from mml.data.splitting import splitters
 
     frame = make_frame()
     manifest = tabular.build_manifest(frame, "y", "<memory>")
     assert manifest.row_count == len(frame)  # 3 ingestion
-    profile = profiling.DatasetProfiler(
+    profile = profiler.DatasetProfiler(
         tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
     ).profile(frame, manifest, tasks.TaskType.BINARY)
     assert set(profile.feature_plan.features) == {"a", "b", "c"}  # profiling
@@ -1205,10 +1205,10 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     """L765-L778: each architectural commitment works, not merely exists."""
     import pickle
 
-    from mml.core import policies as policy
+    from mml.core import policies
     from mml.data.splitting import splitters
     from mml.experimentation import trials
-    from mml.features import graph as feature_graph
+    from mml.features import feature_graph
     from mml.intelligence import knowledge
     from mml.models import registry as models_registry
     from mml.monitoring import events as monitor_events
@@ -1270,7 +1270,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     )  # meta-learning fingerprint
     assert set(vector) == set(knowledge.FIELDS)
 
-    rejecting = policy.CallbackCheckpoint(lambda review: False)
+    rejecting = policies.CallbackCheckpoint(lambda review: False)
     gated = mml.MLProject(
         frame, "y", output_dir=tmp_path, checkpoints=(rejecting,)
     )
@@ -1291,12 +1291,12 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
 
 def mml_profile(frame):
     """Profile of `frame` for fingerprint checks."""
-    from mml.data.profiling import profiler as profiling
+    from mml.data.profiling import profiler
     from mml.data.readers import tabular
 
     manifest = tabular.build_manifest(frame, "y", "<memory>")
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
-    return profiling.DatasetProfiler(spec).profile(
+    return profiler.DatasetProfiler(spec).profile(
         frame, manifest, tasks.TaskType.BINARY
     )
 
