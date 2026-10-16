@@ -163,10 +163,14 @@ installed into a clean environment.
   partition alone.
 * The HTTP serving adapter is a minimal reference server (no authentication
   or TLS); run it behind a gateway.
-* Large deep-learning frameworks are not bundled; the neural family is a
-  scikit-learn MLP, and PyTorch / Keras plug in through the same
-  `ModelAdapter` contract.
-* No GPU-capable model is bundled, so `gpu="required"` blocks a run.
+* PyTorch model families ship with the `deeplearning` extra and run in a
+  separate worker process (two OpenMP runtimes in one process crash); Keras
+  and pretrained tabular foundation models (TabPFN) are not bundled, but
+  plug in through the same `ModelAdapter` contract.
+* `gpu="required"` blocks a run unless PyTorch can see a CUDA device.
+* The test-set vault keeps the locked rows out of trial processes. It cannot
+  stop a process from reading the original data file when a path was given,
+  and a caller's own in-memory DataFrame still holds every row.
 * Ray and CatBoost have no free-threaded (3.14t) wheels yet.
 * The PyPI names `mlforge` and `magicml` are both taken; choose a distribution
   name before publishing.

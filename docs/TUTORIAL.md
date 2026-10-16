@@ -169,7 +169,36 @@ magicml resume runs/run_20261015_001
 magicml predict artifacts/churn new.csv --output scored.csv   # signed bundles
 ```
 
-## 9. Extending
+## 9. Beyond the basics
+
+```python
+from mml.contracts import tasks
+
+# Skip whole families, or single models.
+project = mml.MLProject(
+    data, "churn", models=tasks.ModelSpec(exclude_families=["deep_learning"])
+)
+
+# Prefer the simpler model unless the best is credibly better.
+selection = tasks.SelectionSpec(uncertainty="bayesian", rope=0.005)
+
+# Series data: rolling-origin validation and delayed columns.
+project = mml.MLProject(
+    data, "demand", time_column="week", validation="rolling",
+    horizon_rows=52, window_rows=520, feature_delays={"survey": 4},
+)
+
+# After a run: reliability checks, explanations and calibrated uncertainty.
+result.evaluation["fit_health"]            # healthy / overfit / underfit
+result.diagnostics["robustness"]           # score under degraded input
+result.diagnostics["slice_performance"]    # weakest subgroups
+result.diagnostics["adversarial_validation"]  # development vs test shift
+result.explain(rows, background)           # per-prediction attribution
+result.bundle.predict_interval(rows, coverage=0.9)   # regression
+result.bundle.predict_set(rows, coverage=0.9)        # classification
+```
+
+## 10. Extending
 
 Subclass `ModelAdapter` and pass `check_conformance`, or register it through
 the `mml.models` entry point. See `docs/ARCHITECTURE.md` for every extension
