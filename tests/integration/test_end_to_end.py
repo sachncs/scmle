@@ -310,3 +310,20 @@ def test_a_run_explains_individual_predictions_against_a_background(
     assert len(table) == 3 and table["prediction"].between(0, 1).all()
     assert table[["a", "b", "c"]].abs().to_numpy().sum() > 0
     assert "partial_dependence" in result.diagnostics
+
+
+def test_planning_writes_recommendations_the_project_can_return(
+    binary_frame, tmp_path
+):
+    project = support.make_project(
+        binary_frame.head(150), "y", time_budget=300, output_dir=tmp_path
+    )
+
+    advice = project.recommendations()
+    result = project.run()
+
+    assert any(item.topic == "small data" for item in advice)
+    written = json.loads(
+        (result.run_dir / "diagnostics" / "recommendations.json").read_text()
+    )
+    assert [item["topic"] for item in written] == [i.topic for i in advice]

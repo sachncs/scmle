@@ -42,6 +42,7 @@ from mml.features import graph as feature_graph
 from mml.governance import ledger
 from mml.intelligence import knowledge
 from mml.intelligence import planner as planner_module
+from mml.intelligence import recommendations
 from mml.models import thresholds
 from mml.monitoring import reference as reference_module
 from mml.sampling import strategies
@@ -329,6 +330,19 @@ class PlanStage(Stage):
         context.write_json(
             "diagnostics/decision_log.json",
             {"plan": [d.to_dict() for d in plan.decisions], "outcomes": []},
+        )
+        advice = recommendations.recommend(
+            require(context.profile, "profile"), context.spec
+        )
+        context.recommendations = advice
+        context.write_json(
+            "diagnostics/recommendations.json",
+            [item.to_dict() for item in advice],
+        )
+        context.emit(
+            "plan.recommendations",
+            f"{len(advice)} recommendation(s) for the user",
+            ("diagnostics/recommendations.json",),
         )
 
 

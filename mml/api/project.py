@@ -15,6 +15,7 @@ from mml.core import context as context_module
 from mml.core import orchestrator as orchestrator_module
 from mml.core import policies as checkpoints_module
 from mml.data.readers import interchange
+from mml.intelligence import recommendations as recommendations_module
 
 ValidationStrategy = Literal[
     "auto", "stratified", "random", "group", "temporal"
@@ -150,6 +151,17 @@ class MLProject:
         context = self.orchestrator.prepare()
         self.profile = context.profile
         return context_module.require(context.plan, "plan")
+
+    def recommendations(
+        self,
+    ) -> tuple[recommendations_module.Recommendation, ...]:
+        """Advice about the data and specification, from the profile.
+
+        Returns:
+            Recommendations for the user (never applied automatically).
+        """
+        context = self.orchestrator.prepare()
+        return context.recommendations
 
     def run(
         self, plan: experiments.ExperimentPlan | None = None

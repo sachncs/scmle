@@ -23,6 +23,7 @@ from mml.data.splitting import splitters
 from mml.evaluation import metrics
 from mml.evaluation import selection
 from mml.experimentation import stores as tracking_stores
+from mml.intelligence import recommendations as recommendations_module
 from mml.models import registry as registry_module
 
 T = TypeVar("T")
@@ -80,6 +81,7 @@ class RunContext:
         profile: Dataset profile.
         split: Split result with development data and locked test.
         plan: Experiment plan.
+        recommendations: Advice for the user derived from the profile.
         metric: Primary metric.
         trials: Trial results.
         history: Past runs available for meta-learning.
@@ -128,6 +130,7 @@ class RunContext:
     profile: data_contracts.DatasetProfile | None = None
     split: splitters.SplitResult | None = None
     plan: experiments.ExperimentPlan | None = None
+    recommendations: tuple[recommendations_module.Recommendation, ...] = ()
     metric: metric_contracts.Metric | None = None
     trials: list[experiments.TrialResult] = dataclasses.field(
         default_factory=list
