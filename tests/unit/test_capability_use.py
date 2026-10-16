@@ -6,10 +6,10 @@ import pytest
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
-from mml.data import preprocessing
-from mml.data import strategies
+from mml.data.curation import preprocessing
 from mml.intelligence import planner
 from mml.models import registry as registry_module
+from mml.sampling import strategies
 
 BINARY = tasks.TaskType.BINARY
 

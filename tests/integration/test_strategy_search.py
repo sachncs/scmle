@@ -173,7 +173,7 @@ def test_strategy_run_resumes_without_recomputation(
 ):
     import shutil
 
-    from mml.core import trials as trials_module
+    from mml.experimentation import trials as trials_module
 
     original = run(
         imbalanced_frame,
@@ -245,7 +245,7 @@ def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
 
 
 def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
-    from mml.data import strategies as strategy_module
+    from mml.sampling import strategies as strategy_module
 
     monkeypatch.setattr(
         strategy_module.importlib.util, "find_spec", lambda name: None

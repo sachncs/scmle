@@ -323,7 +323,7 @@ def test_history_survives_save_and_load_and_tampering_is_detected(tmp_path):
 def test_serving_remembers_records_so_the_next_single_record_sees_them(
     tmp_path,
 ):
-    from mml.deployment import serving
+    from mml.inference import serving
 
     result = run_series(series_frame(), tmp_path)
     adapter = serving.BatchServing(result.bundle)

@@ -7,9 +7,9 @@ import pathlib
 import numpy as np
 import support
 
-from mml.artifacts import ledger
 from mml.contracts import tasks
-from mml.data import splitting
+from mml.data.splitting import splitters
+from mml.governance import ledger
 
 
 def read_events(run_dir):
@@ -86,7 +86,7 @@ def test_ledger_detects_violations(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path)
     spec = support.make_project(binary_frame, "y").spec
     task = tasks.TaskType(result.plan.task)
-    split = splitting.SplitManager(spec, task).split(binary_frame)
+    split = splitters.SplitManager(spec, task).split(binary_frame)
     honest = ledger.build_ledger(split, result.trials, 1, False)
     assert all(honest["verified"].values())
     reopened = ledger.build_ledger(split, result.trials, 2, False)
@@ -97,7 +97,7 @@ def test_ledger_checks_what_trials_actually_received(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path)
     spec = support.make_project(binary_frame, "y").spec
     task = tasks.TaskType(result.plan.task)
-    split = splitting.SplitManager(spec, task).split(binary_frame)
+    split = splitters.SplitManager(spec, task).split(binary_frame)
     observed = [t for t in result.trials if t.observed_access]
     assert observed and all(
         len(t.observed_access) == len(split.manifest.folds)

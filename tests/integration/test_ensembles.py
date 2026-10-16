@@ -110,7 +110,7 @@ def test_stack_resumes_without_recomputation(
 ):
     import shutil
 
-    from mml.core import trials as trials_module
+    from mml.experimentation import trials as trials_module
 
     original = run(binary_frame, tmp_path)
     (original.run_dir / "evaluation.json").unlink()

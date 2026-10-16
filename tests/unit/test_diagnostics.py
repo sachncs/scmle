@@ -6,7 +6,7 @@ import pytest
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
-from mml.data import preprocessing
+from mml.data.curation import preprocessing
 from mml.evaluation import diagnostics
 from mml.evaluation import metrics
 from mml.models import registry as registry_module

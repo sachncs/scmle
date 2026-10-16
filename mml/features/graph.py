@@ -25,7 +25,7 @@ from sklearn import base
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import columns
+from mml.data.validation import columns
 
 MAX_ARITY = 64
 Inputs = list[pd.Series]

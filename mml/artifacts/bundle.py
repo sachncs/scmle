@@ -27,9 +27,9 @@ import mml
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import feature_graph
-from mml.data import interchange
-from mml.data import readers
+from mml.data.readers import interchange
+from mml.data.readers import tabular
+from mml.features import graph as feature_graph
 from mml.monitoring import reference as reference_module
 
 BUNDLE_FORMAT = 1
@@ -861,7 +861,7 @@ class ModelBundle:
     ) -> pd.DataFrame:
         """Loads inference input from a path or copies a DataFrame."""
         if isinstance(data, (str, pathlib.Path)):
-            return readers.read_table(data)
+            return tabular.read_table(data)
         return interchange.to_pandas(data)
 
     def validate(

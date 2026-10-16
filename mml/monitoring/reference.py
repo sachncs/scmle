@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from mml.contracts import data as data_contracts
-from mml.data import columns
+from mml.data.validation import columns
 
 DECILES = tuple(np.linspace(0.1, 0.9, 9))
 MAX_CATEGORIES = 50

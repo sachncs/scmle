@@ -7,7 +7,7 @@ candidate. The ensemble is adopted only if it beats its best member.
 
 from mml.contracts import experiments
 from mml.core import context as context_module
-from mml.core import trials
+from mml.experimentation import trials
 from mml.models import ensembles
 
 Status = experiments.TrialStatus

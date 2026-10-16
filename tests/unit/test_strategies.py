@@ -6,11 +6,11 @@ import pytest
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import profiling
-from mml.data import readers
-from mml.data import strategies
+from mml.data.profiling import profiler as profiling
+from mml.data.readers import tabular
 from mml.models import registry as registry_module
-from mml.models import resampling
+from mml.sampling import resampling
+from mml.sampling import strategies
 
 REGISTRY = registry_module.ModelRegistry.with_builtins()
 BINARY = tasks.TaskType.BINARY
@@ -18,7 +18,7 @@ BINARY = tasks.TaskType.BINARY
 
 def profile_of(frame, task=BINARY):
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
-    manifest = readers.build_manifest(frame, "y")
+    manifest = tabular.build_manifest(frame, "y")
     return profiling.DatasetProfiler(spec).profile(frame, manifest, task)
 
 

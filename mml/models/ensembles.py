@@ -16,8 +16,8 @@ from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
-from mml.data import inner_cv
-from mml.data import preprocessing
+from mml.data.curation import preprocessing
+from mml.data.splitting import inner_cv
 
 STACK_FOLDS = 3
 MIN_MEMBERS = 2

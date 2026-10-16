@@ -25,14 +25,14 @@ from mml.contracts import tasks
 from mml.core import checkpoints as checkpoints_module
 from mml.core import compiler
 from mml.core import context as context_module
-from mml.core import execution
 from mml.core import limits
+from mml.core import scheduler
 from mml.core import stages as stages_module
 from mml.core import state
 from mml.evaluation import metrics
 from mml.evaluation import selection
+from mml.experimentation import stores as tracking_stores
 from mml.models import registry as registry_module
-from mml.tracking import stores as tracking_stores
 
 
 def environment_lock() -> str:
@@ -110,7 +110,7 @@ class Orchestrator:
             registry=self.registry,
             catalog=metrics.CATALOG,
             policy=self.policy,
-            backend=execution.create_backend(
+            backend=scheduler.create_backend(
                 limits.ResourceGovernor(self.spec.resources).workers,
                 self.spec.resources.executor,
             ),

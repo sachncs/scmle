@@ -8,7 +8,7 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.models import conformance
 from mml.models import registry as registry_module
-from mml.models import sklearn_adapters
+from mml.models.sklearn import adapters as sklearn_adapters
 
 BINARY = tasks.TaskType.BINARY
 REGRESSION = tasks.TaskType.REGRESSION

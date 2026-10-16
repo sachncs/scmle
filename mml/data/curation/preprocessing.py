@@ -14,8 +14,8 @@ from sklearn import pipeline
 from mml.contracts import data as data_contracts
 from mml.contracts import models
 from mml.contracts import tasks
-from mml.data import columns
-from mml.data import feature_graph
+from mml.data.validation import columns
+from mml.features import graph as feature_graph
 
 SPARSE_THRESHOLD = 0.3
 

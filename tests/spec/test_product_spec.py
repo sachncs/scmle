@@ -26,14 +26,14 @@ from mml.contracts import events
 from mml.contracts import experiments
 from mml.contracts import models as model_contracts
 from mml.contracts import tasks
-from mml.core import execution
+from mml.core import scheduler
 from mml.core import stages
 from mml.core import state
-from mml.data import columns
-from mml.data import strategies as strategies_module
-from mml.deployment import lifecycle
+from mml.data.validation import columns
+from mml.governance import lifecycle
 from mml.models import conformance
 from mml.models import registry as registry_module
+from mml.sampling import strategies as strategies_module
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "mml"
@@ -141,9 +141,9 @@ def test_l23_to_l39_decision_table(run):
         is state.RunState.VALIDATING
     )
     assert {"sequential", "process", "ray"} <= {
-        execution.SequentialBackend.name,
-        execution.ProcessBackend.name,
-        execution.RayBackend.name,
+        scheduler.SequentialBackend.name,
+        scheduler.ProcessBackend.name,
+        scheduler.RayBackend.name,
     }  # local-first, distributed-capable
     assert (
         result.evaluation["split_fingerprint"]
@@ -153,7 +153,7 @@ def test_l23_to_l39_decision_table(run):
     assert "content_id" in {
         f.name
         for f in dataclasses.fields(
-            __import__("mml.deployment.registry", fromlist=["x"]).VersionRecord
+            __import__("mml.governance.registry", fromlist=["x"]).VersionRecord
         )
     }  # content-addressed artifacts
     assert {"tracking", "distributed", "optimization"} <= set(
@@ -221,14 +221,25 @@ def test_l113_l176_package_organization():
         "evaluation",
         "artifacts",
         "monitoring",
-        "deployment",
-        "tracking",
+        "features",
+        "sampling",
+        "experimentation",
+        "governance",
+        "inference",
+        "integrations",
     ):
         assert (PACKAGE / module / "__init__.py").exists(), module
     for rel in (
-        "data/readers.py",
-        "data/profiling.py",
-        "data/splitting.py",
+        "data/readers/tabular.py",
+        "data/profiling/profiler.py",
+        "data/splitting/splitters.py",
+        "data/validation/columns.py",
+        "data/curation/preprocessing.py",
+        "intelligence/fingerprint.py",
+        "features/graph.py",
+        "sampling/resampling.py",
+        "models/sklearn/adapters.py",
+        "models/boosting/adapters.py",
         "models/registry.py",
         "core/orchestrator.py",
         "core/state.py",
@@ -304,14 +315,14 @@ def test_l192_cross_field_validation():
 
     with pytest.raises(errors.ConfigError):
         metrics.CATALOG.resolve("pr_auc", tasks.TaskType.MULTICLASS)
-    from mml.data import splitting
+    from mml.data.splitting import splitters
 
     frame = make_frame(100).assign(t="not a date")
     spec = tasks.ProjectSpec(
         data=tasks.DataSpec(uri="x", target="y", time_column="t")
     )
     with pytest.raises(errors.BlockedError, match="ambiguous"):
-        splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+        splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
 
 
 def test_l198_l206_foundational_and_production_contracts(run):
@@ -322,7 +333,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
     assert dataclasses.fields(
         model_contracts.Capabilities
     )  # capability discovery
-    from mml.core import trials
+    from mml.experimentation import trials
 
     assert {f.name for f in dataclasses.fields(trials.TrialPayload)} >= {
         "job",
@@ -361,22 +372,22 @@ def test_l198_l206_foundational_and_production_contracts(run):
 def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     """L210-L224: key invariant of each module in the I/O matrix."""
     project, result = run
-    from mml.data import profiling
-    from mml.data import readers
-    from mml.data import splitting
+    from mml.data.profiling import profiler as profiling
+    from mml.data.readers import tabular
+    from mml.data.splitting import splitters
 
     frame = make_frame(200)
     before = frame.copy()
-    readers.build_manifest(frame, "y")
+    tabular.build_manifest(frame, "y")
     pd.testing.assert_frame_equal(frame, before)  # ingestion: input immutable
     spec = project.spec
-    manifest = readers.build_manifest(frame, "y")
+    manifest = tabular.build_manifest(frame, "y")
     task = profiling.TaskResolver(spec).resolve(frame["y"])
     profiling.DatasetProfiler(spec).profile(frame, manifest, task)
     pd.testing.assert_frame_equal(
         frame, before
     )  # profiling: no fitted state, no mutation
-    split = splitting.SplitManager(spec, task).split(frame)
+    split = splitters.SplitManager(spec, task).split(frame)
     assert not set(split.manifest.train_ids) & set(
         split.manifest.test_ids
     )  # splitting
@@ -526,7 +537,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
         frame, "y", time_budget=1, output_dir=tmp_path / "b"
     ).run()
     assert budget.state == "COMPLETED"  # budget exhaustion handled
-    assert execution.ProcessBackend(2).map(abs, [-1, -2]) == [
+    assert scheduler.ProcessBackend(2).map(abs, [-1, -2]) == [
         1,
         2,
     ]  # parallel independent work
@@ -686,7 +697,7 @@ def test_l370_optimizer_library_is_not_the_architecture():
 
 def test_l374_l393_balancing_and_augmentation(frame):
     """L374-L393: the technique table and its policies."""
-    from mml.data import strategies
+    from mml.sampling import strategies
 
     for name in (
         "class_weight",
@@ -703,9 +714,9 @@ def test_l374_l393_balancing_and_augmentation(frame):
         and "copula_augment" in strategies.OPT_IN
     )  # research plugins
     from mml.contracts import data as data_contracts
-    from mml.data import profiling
-    from mml.data import readers
-    from mml.models import resampling
+    from mml.data.profiling import profiler as profiling
+    from mml.data.readers import tabular
+    from mml.sampling import resampling
 
     # Sampling happens inside the training fold (inside fit), never on the full dataset.
     assert "fit" in resampling.ResamplingClassifier.__dict__
@@ -713,7 +724,7 @@ def test_l374_l393_balancing_and_augmentation(frame):
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
     reg = pd.DataFrame({"x": np.arange(100.0), "y": np.arange(100.0) * 2})
     profile = profiling.DatasetProfiler(spec).profile(
-        reg, readers.build_manifest(reg, "y"), tasks.TaskType.REGRESSION
+        reg, tabular.build_manifest(reg, "y"), tasks.TaskType.REGRESSION
     )
     adapter = registry_module.ModelRegistry.with_builtins().get("ridge")
     reason = strategies.STRATEGIES["random_oversample"].applicability(
@@ -806,11 +817,11 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
     assert (
         manifest["train_ids"] and manifest["test_ids"]
     )  # 1 immutable row-id manifest
-    from mml.data import splitting
+    from mml.data.splitting import splitters
 
     assert (
-        dataclasses.is_dataclass(splitting.SplitManifest)
-        and splitting.SplitManifest.__dataclass_params__.frozen
+        dataclasses.is_dataclass(splitters.SplitManifest)
+        and splitters.SplitManifest.__dataclass_params__.frozen
     )
     ledger = json.loads(
         (result.run_dir / "diagnostics" / "data_access.json").read_text()
@@ -818,7 +829,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
     assert all(
         ledger["verified"].values()
     )  # 3 record of data accessed per fitted operation
-    split = splitting.SplitManager(project.spec, tasks.TaskType.BINARY).split(
+    split = splitters.SplitManager(project.spec, tasks.TaskType.BINARY).split(
         make_frame(200)
     )
     with pytest.raises(errors.LeakageError):
@@ -839,7 +850,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
 
 def test_l439_deployment_scenario_splits(frame):
     """L439: temporal/entity data must not use a random split."""
-    from mml.data import splitting
+    from mml.data.splitting import splitters
 
     with_time = support.make_project(
         frame.assign(t=range(len(frame))), "y", time_column="t"
@@ -848,11 +859,11 @@ def test_l439_deployment_scenario_splits(frame):
         frame.assign(g=np.arange(len(frame)) % 40), "y", group_column="g"
     ).spec
     assert (
-        splitting.resolve_strategy_name(with_time, tasks.TaskType.BINARY)
+        splitters.resolve_strategy_name(with_time, tasks.TaskType.BINARY)
         == "temporal"
     )
     assert (
-        splitting.resolve_strategy_name(with_group, tasks.TaskType.BINARY)
+        splitters.resolve_strategy_name(with_group, tasks.TaskType.BINARY)
         == "group"
     )
 
@@ -947,7 +958,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     assert caught.value.details["missing"] == ["b"]  # structured errors
     path = tmp_path / "batch.csv"
     features.to_csv(path, index=False)
-    from mml.deployment import serving
+    from mml.inference import serving
 
     assert serving.BatchServing(result.bundle).score_file(
         path, tmp_path / "out.csv"
@@ -1000,9 +1011,9 @@ def test_l548_no_heavy_imports_until_a_model_is_selected():
 
 def test_l554_l606_roadmap_deliverables(frame, tmp_path):
     """L554-L600: M0-M4 deliverables are observable behaviours."""
-    from mml.data import readers
+    from mml.data.readers import tabular
 
-    assert readers.read_table  # M0: CSV/Parquet ingestion + typed config
+    assert tabular.read_table  # M0: CSV/Parquet ingestion + typed config
     result = support.make_project(
         frame, "y", output_dir=tmp_path
     ).run()  # M1: MLProject(...).run()
@@ -1024,13 +1035,13 @@ def test_l554_l606_roadmap_deliverables(frame, tmp_path):
 def test_l610_l629_backlog_priorities(run):
     """L610-L629: each backlog row has a working implementation."""
     from mml.contracts import models as model_contracts
-    from mml.deployment import registry
-    from mml.deployment import serving
     from mml.evaluation import diagnostics
+    from mml.governance import registry
+    from mml.inference import serving
     from mml.intelligence import knowledge
     from mml.models import ensembles
-    from mml.models import synthesis
     from mml.monitoring import monitor
+    from mml.sampling import synthesis
 
     result = run[1]
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
@@ -1110,7 +1121,7 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
         ).run()
         assert result.state == "COMPLETED"
     assert issubclass(
-        execution.RayBackend, execution.ExecutionBackend
+        scheduler.RayBackend, scheduler.ExecutionBackend
     )  # distributed: optional
 
 
@@ -1120,19 +1131,19 @@ def test_l739_l747_first_sprint_outcomes(run):
     assert (ROOT / "pyproject.toml").exists() and list(
         (ROOT / "tests").rglob("test_*.py")
     )  # 2 package skeleton + tests
-    from mml.data import profiling
-    from mml.data import readers
-    from mml.data import splitting
+    from mml.data.profiling import profiler as profiling
+    from mml.data.readers import tabular
+    from mml.data.splitting import splitters
 
     frame = make_frame()
-    manifest = readers.build_manifest(frame, "y", "<memory>")
+    manifest = tabular.build_manifest(frame, "y", "<memory>")
     assert manifest.row_count == len(frame)  # 3 ingestion
     profile = profiling.DatasetProfiler(
         tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
     ).profile(frame, manifest, tasks.TaskType.BINARY)
     assert set(profile.feature_plan.features) == {"a", "b", "c"}  # profiling
     assert {"stratified", "random", "group", "temporal"} == set(
-        splitting.STRATEGIES
+        splitters.STRATEGIES
     )  # 4 split manager
     result = run[1]
     assert (
@@ -1178,14 +1189,14 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     import pickle
 
     from mml.core import checkpoints as policy
-    from mml.core import trials
-    from mml.data import feature_graph
-    from mml.data import splitting
+    from mml.data.splitting import splitters
+    from mml.experimentation import trials
+    from mml.features import graph as feature_graph
     from mml.intelligence import knowledge
     from mml.models import registry as models_registry
-    from mml.models import resampling
-    from mml.models import synthesis
     from mml.monitoring import events as monitor_events
+    from mml.sampling import resampling
+    from mml.sampling import synthesis
 
     registry = models_registry.ModelRegistry.with_builtins()
     neural = registry.get("neural_network")  # deep learning: a plugin family
@@ -1209,7 +1220,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
             strategy="temporal", folds=3, embargo_rows=5
         ),
     )
-    split = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(series)
+    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(series)
     gaps = [min(held) - max(fit) for fit, held in split.manifest.folds]
     assert all(gap > 5 for gap in gaps)  # time-series: embargo is honoured
     profile = mml.MLProject(
@@ -1257,16 +1268,16 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
 
     job = trials.TrialJob("trial_001", "dummy", {"strategy": "x"})
     assert pickle.loads(pickle.dumps(job)) == job  # scheduler-independent
-    for backend in (execution.SequentialBackend(), execution.ProcessBackend(2)):
+    for backend in (scheduler.SequentialBackend(), scheduler.ProcessBackend(2)):
         assert backend.map(abs, [-1, -2, -3]) == [1, 2, 3]
 
 
 def mml_profile(frame):
     """Profile of `frame` for fingerprint checks."""
-    from mml.data import profiling
-    from mml.data import readers
+    from mml.data.profiling import profiler as profiling
+    from mml.data.readers import tabular
 
-    manifest = readers.build_manifest(frame, "y", "<memory>")
+    manifest = tabular.build_manifest(frame, "y", "<memory>")
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
     return profiling.DatasetProfiler(spec).profile(
         frame, manifest, tasks.TaskType.BINARY
@@ -1277,7 +1288,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     frame,
 ):
     """L786-L801: a candidate is a complete, independently evaluable pipeline."""
-    from mml.data import strategies
+    from mml.sampling import strategies
 
     registry = registry_module.ModelRegistry.with_builtins()
     plan = mml.MLProject(frame, "y").plan()
@@ -1309,7 +1320,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
 def test_l805_l829_five_abstractions_and_the_core_path(run):
     """L805-L829: Dataset, Plan, Experiment, Model Bundle, Lifecycle; Dataset->Plan->Experiment->Bundle."""
     from mml.contracts import data as data_contracts
-    from mml.deployment import registry
+    from mml.governance import registry
 
     result = run[1]
     assert isinstance(

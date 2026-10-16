@@ -3,7 +3,7 @@
 import numpy as np
 from sklearn import base
 
-from mml.data import transformers
+from mml.data.curation import transformers
 
 
 def make_features():

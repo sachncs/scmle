@@ -4,7 +4,7 @@ import pytest
 
 from mml.contracts import events
 from mml.contracts import experiments
-from mml.tracking import stores
+from mml.experimentation import stores
 
 
 def make_trial(

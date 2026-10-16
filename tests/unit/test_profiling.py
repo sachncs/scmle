@@ -6,8 +6,8 @@ import pytest
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import profiling
-from mml.data import readers
+from mml.data.profiling import profiler as profiling
+from mml.data.readers import tabular
 
 
 def make_spec(task="auto", **data_overrides):
@@ -18,7 +18,7 @@ def make_spec(task="auto", **data_overrides):
 def profile(frame, task="auto", **data_overrides):
     spec = make_spec(task, **data_overrides)
     resolved = profiling.TaskResolver(spec).resolve(frame["y"])
-    manifest = readers.build_manifest(frame, "y")
+    manifest = tabular.build_manifest(frame, "y")
     result = profiling.DatasetProfiler(spec).profile(frame, manifest, resolved)
     return resolved, result
 

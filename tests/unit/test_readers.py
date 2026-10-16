@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from mml.contracts import errors
-from mml.data import readers
+from mml.data.readers import tabular
 
 
 @pytest.fixture
@@ -15,68 +15,68 @@ def frame():
 def test_csv_and_parquet_roundtrip(tmp_path, frame):
     frame.to_csv(tmp_path / "d.csv", index=False)
     frame.to_parquet(tmp_path / "d.parquet")
-    assert readers.read_table(tmp_path / "d.csv").shape == (3, 3)
-    assert readers.read_table(tmp_path / "d.parquet").shape == (3, 3)
+    assert tabular.read_table(tmp_path / "d.csv").shape == (3, 3)
+    assert tabular.read_table(tmp_path / "d.parquet").shape == (3, 3)
 
 
 def test_missing_file(tmp_path):
     with pytest.raises(errors.DataError, match="not found"):
-        readers.read_table(tmp_path / "nope.csv")
+        tabular.read_table(tmp_path / "nope.csv")
 
 
 def test_unsupported_suffix(tmp_path):
     (tmp_path / "d.xlsx").write_text("x")
     with pytest.raises(errors.DataError, match="unsupported"):
-        readers.read_table(tmp_path / "d.xlsx")
+        tabular.read_table(tmp_path / "d.xlsx")
 
 
 def test_empty_file(tmp_path):
     (tmp_path / "e.csv").write_text("a,b\n")
     with pytest.raises(errors.DataError, match="no rows"):
-        readers.read_table(tmp_path / "e.csv")
+        tabular.read_table(tmp_path / "e.csv")
 
 
 def test_duplicate_columns(tmp_path):
-    class DuplicatingReader(readers.TableReader):
+    class DuplicatingReader(tabular.TableReader):
         suffixes = (".csv",)
 
         def load(self, path):
             return pd.DataFrame([[1, 2]], columns=["a", "a"])
 
     (tmp_path / "d.csv").write_text("a\n1\n")
-    loader = readers.DatasetLoader((DuplicatingReader(),))
+    loader = tabular.DatasetLoader((DuplicatingReader(),))
     with pytest.raises(errors.DataError, match="duplicate"):
         loader.load(tmp_path / "d.csv")
 
 
 def test_custom_reader_is_dispatched_by_suffix(tmp_path):
-    class TsvReader(readers.TableReader):
+    class TsvReader(tabular.TableReader):
         suffixes = (".tsv",)
 
         def load(self, path):
             return pd.read_csv(path, sep="\t")
 
     (tmp_path / "d.tsv").write_text("a\tb\n1\t2\n")
-    loader = readers.DatasetLoader((TsvReader(),))
+    loader = tabular.DatasetLoader((TsvReader(),))
     assert loader.load(tmp_path / "d.tsv").shape == (1, 2)
     assert loader.supported_suffixes() == [".tsv"]
 
 
 def test_manifest_deterministic_and_input_immutable(frame):
     before = frame.copy()
-    first = readers.build_manifest(frame, "y")
-    second = readers.build_manifest(frame.copy(), "y")
+    first = tabular.build_manifest(frame, "y")
+    second = tabular.build_manifest(frame.copy(), "y")
     assert first == second
     pd.testing.assert_frame_equal(frame, before)
     changed = frame.assign(a=[9, 2, 3])
-    changed_manifest = readers.build_manifest(changed, "y")
+    changed_manifest = tabular.build_manifest(changed, "y")
     assert changed_manifest.data_hash != first.data_hash
     assert changed_manifest.schema_hash == first.schema_hash
 
 
 def test_manifest_requires_target(frame):
     with pytest.raises(errors.DataError, match="target"):
-        readers.build_manifest(frame, "nope")
+        tabular.build_manifest(frame, "nope")
 
 
 def test_replace_infinities_reports_counts_and_leaves_input_untouched():
@@ -88,7 +88,7 @@ def test_replace_infinities_reports_counts_and_leaves_input_untouched():
         }
     )
     before = frame.copy()
-    cleaned, counts = readers.replace_infinities(frame)
+    cleaned, counts = tabular.replace_infinities(frame)
     assert counts == {"a": 1, "b": 2}
     assert cleaned["a"].isna().sum() == 1 and cleaned["b"].isna().sum() == 2
     pd.testing.assert_frame_equal(frame, before)
@@ -96,5 +96,5 @@ def test_replace_infinities_reports_counts_and_leaves_input_untouched():
 
 def test_replace_infinities_returns_same_frame_when_clean():
     frame = pd.DataFrame({"a": [1.0, 2.0], "s": ["x", "y"]})
-    cleaned, counts = readers.replace_infinities(frame)
+    cleaned, counts = tabular.replace_infinities(frame)
     assert counts == {} and cleaned is frame

@@ -22,10 +22,10 @@ from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
-from mml.data import inner_cv
-from mml.data import preprocessing
-from mml.models import resampling
-from mml.models import synthesis
+from mml.data.curation import preprocessing
+from mml.data.splitting import inner_cv
+from mml.sampling import resampling
+from mml.sampling import synthesis
 
 MIN_IMBALANCE_RATIO = 3.0
 TARGET_SKEW_THRESHOLD = 1.0

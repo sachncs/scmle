@@ -15,11 +15,11 @@ from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
-from mml.data import splitting
-from mml.data import strategies
+from mml.data.splitting import splitters
 from mml.evaluation import metrics
 from mml.intelligence import knowledge
 from mml.models import registry as registry_module
+from mml.sampling import strategies
 
 FAST_BUDGET_SECONDS = tasks.FAST_BUDGET_SECONDS
 FAST_EXCEPTION = "hist_gradient_boosting"
@@ -527,7 +527,7 @@ class Planner:
             for a in candidates
         ]
         names = tuple(a.name for a in candidates)
-        strategy = splitting.resolve_strategy_name(spec, task)
+        strategy = splitters.resolve_strategy_name(spec, task)
         resolved = tasks.ProjectSpec.model_validate(
             spec.model_dump()
             | {

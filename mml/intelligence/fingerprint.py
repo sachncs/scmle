@@ -19,8 +19,8 @@ from sklearn import pipeline
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
-from mml.data import columns
-from mml.data import preprocessing
+from mml.data.curation import preprocessing
+from mml.data.validation import columns
 from mml.monitoring import reference
 
 BYTES_PER_MB = 1024 * 1024

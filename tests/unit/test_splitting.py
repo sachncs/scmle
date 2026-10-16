@@ -6,7 +6,7 @@ import pytest
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import splitting
+from mml.data.splitting import splitters
 
 BINARY = tasks.TaskType.BINARY
 
@@ -19,7 +19,7 @@ def make_spec(strategy="auto", **data_overrides):
 
 
 def split(frame, spec=None, task=BINARY):
-    return splitting.SplitManager(spec or make_spec(), task).split(frame)
+    return splitters.SplitManager(spec or make_spec(), task).split(frame)
 
 
 @pytest.fixture
@@ -118,17 +118,17 @@ def test_regression_defaults_to_random_and_rejects_stratified(frame):
     result = split(regression, task=tasks.TaskType.REGRESSION)
     assert result.manifest.strategy == "random"
     with pytest.raises(errors.BlockedError):
-        splitting.StratifiedSplit(make_spec(), tasks.TaskType.REGRESSION)
+        splitters.StratifiedSplit(make_spec(), tasks.TaskType.REGRESSION)
 
 
 def test_strategy_registry_is_polymorphic():
-    assert set(splitting.STRATEGIES) == {
+    assert set(splitters.STRATEGIES) == {
         "random",
         "stratified",
         "group",
         "temporal",
     }
-    assert issubclass(splitting.StratifiedSplit, splitting.RandomSplit)
+    assert issubclass(splitters.StratifiedSplit, splitters.RandomSplit)
 
 
 def test_locked_test_set_opens_once(frame):
@@ -151,7 +151,7 @@ def temporal_spec(embargo):
 
 def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
     manifest = (
-        splitting.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
+        splitters.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
     )
     dev_times = frame.t.iloc[list(manifest.train_ids)].to_numpy()
     for fit, validate in manifest.folds:
@@ -162,10 +162,10 @@ def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
 
 def test_embargo_rows_before_the_test_set_belong_to_neither_partition(frame):
     plain = (
-        splitting.SplitManager(temporal_spec(0), BINARY).split(frame).manifest
+        splitters.SplitManager(temporal_spec(0), BINARY).split(frame).manifest
     )
     embargoed = (
-        splitting.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
+        splitters.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
     )
     assert embargoed.test_ids == plain.test_ids
     assert len(embargoed.train_ids) == len(plain.train_ids) - 10
@@ -194,7 +194,7 @@ def test_embargo_requires_a_time_column_and_enough_rows(frame):
             validation=tasks.ValidationSpec(embargo_rows=5),
         )
     with pytest.raises(errors.BlockedError, match="too few"):
-        splitting.SplitManager(temporal_spec(400), BINARY).split(frame)
+        splitters.SplitManager(temporal_spec(400), BINARY).split(frame)
 
 
 def group_classification_frame(groups=30, per_group=10, seed=0):
@@ -215,7 +215,7 @@ def test_group_folds_keep_groups_apart_and_every_class_in_every_fold():
         data=tasks.DataSpec(uri="x", target="y", group_column="unit"),
         validation=tasks.ValidationSpec(strategy="group"),
     )
-    part = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    part = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
     dev_groups = frame.unit.to_numpy()[list(part.manifest.train_ids)]
     labels = frame.y.to_numpy()[list(part.manifest.train_ids)]
     for fit, held in part.manifest.folds:
@@ -232,7 +232,7 @@ def test_group_validation_blocks_when_classes_hide_in_one_group():
         validation=tasks.ValidationSpec(strategy="group", folds=3),
     )
     with pytest.raises(errors.BlockedError):
-        splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+        splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
 
 
 def test_temporal_folds_are_listed_latest_window_first():
@@ -248,7 +248,7 @@ def test_temporal_folds_are_listed_latest_window_first():
         data=tasks.DataSpec(uri="x", target="y", time_column="t"),
         validation=tasks.ValidationSpec(strategy="temporal", folds=4),
     )
-    part = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    part = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
     sizes = [len(fit) for fit, held in part.manifest.folds]
     assert sizes == sorted(sizes, reverse=True)  # largest training first
     assert any("latest window first" in n for n in part.manifest.notes)

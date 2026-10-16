@@ -8,8 +8,8 @@ same model's default pipeline; every verdict is written to the decision log.
 
 from mml.contracts import experiments
 from mml.core import context as context_module
-from mml.core import trials
-from mml.data import strategies
+from mml.experimentation import trials
+from mml.sampling import strategies
 
 Status = experiments.TrialStatus
 Action = experiments.DecisionAction

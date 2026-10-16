@@ -14,7 +14,7 @@ from mml.contracts import tasks
 from mml.core import checkpoints as checkpoints_module
 from mml.core import context as context_module
 from mml.core import orchestrator as orchestrator_module
-from mml.data import interchange
+from mml.data.readers import interchange
 
 ValidationStrategy = Literal[
     "auto", "stratified", "random", "group", "temporal"

@@ -5,17 +5,17 @@ import pandas as pd
 import pytest
 
 from mml.contracts import tasks
-from mml.data import columns
-from mml.data import fingerprint
-from mml.data import profiling
-from mml.data import readers
+from mml.data.profiling import profiler as profiling
+from mml.data.readers import tabular
+from mml.data.validation import columns
+from mml.intelligence import fingerprint
 
 
 def profile_of(frame, task=tasks.TaskType.BINARY, **data_overrides):
     spec = tasks.ProjectSpec(
         data=tasks.DataSpec(uri="m", target="y", **data_overrides)
     )
-    manifest = readers.build_manifest(frame, "y")
+    manifest = tabular.build_manifest(frame, "y")
     return profiling.DatasetProfiler(spec).profile(frame, manifest, task, 0.25)
 
 

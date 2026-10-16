@@ -9,7 +9,7 @@ from sklearn import base
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import feature_graph
+from mml.features import graph as feature_graph
 
 
 def node(name, op, inputs, **params):

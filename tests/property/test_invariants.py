@@ -10,14 +10,14 @@ import pytest
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import preprocessing
-from mml.data import profiling
-from mml.data import readers
-from mml.data import splitting
+from mml.data.curation import preprocessing
+from mml.data.profiling import profiler as profiling
+from mml.data.readers import tabular
+from mml.data.splitting import splitters
 from mml.models import registry as registry_module
-from mml.models import resampling
 from mml.models import thresholds
 from mml.monitoring import reference
+from mml.sampling import resampling
 
 SETTINGS = settings(
     max_examples=40,
@@ -62,7 +62,7 @@ def spec_for(**kwargs):
 @given(frame=frames())
 def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
     spec = spec_for()
-    manifest = readers.build_manifest(frame, "y")
+    manifest = tabular.build_manifest(frame, "y")
     try:
         task = profiling.TaskResolver(spec).resolve(frame["y"])
         profile = profiling.DatasetProfiler(spec).profile(frame, manifest, task)
@@ -83,7 +83,7 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
 @given(frame=frames(min_rows=60), seed=st.integers(0, 100))
 def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
     spec = spec_for()
-    manifest = readers.build_manifest(frame, "y")
+    manifest = tabular.build_manifest(frame, "y")
     try:
         task = profiling.TaskResolver(spec).resolve(frame["y"])
         plan = (
@@ -133,7 +133,7 @@ def test_stratified_splits_partition_rows_without_overlap(
         ),
     )
     try:
-        result = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(
+        result = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(
             frame
         )
     except errors.BlockedError:
@@ -167,7 +167,7 @@ def test_group_splits_never_share_a_group(groups, rows, seed):
     )
     spec = spec_for(group_column="g")
     try:
-        result = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(
+        result = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(
             frame
         )
     except errors.BlockedError:
@@ -195,7 +195,7 @@ def test_temporal_splits_never_train_on_the_future(rows, seed):
     )
     spec = spec_for(time_column="t")
     try:
-        result = splitting.SplitManager(spec, tasks.TaskType.BINARY).split(
+        result = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(
             frame
         )
     except errors.BlockedError:

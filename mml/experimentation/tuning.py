@@ -10,7 +10,7 @@ import math
 
 from mml.contracts import experiments
 from mml.core import context as context_module
-from mml.core import trials
+from mml.experimentation import trials
 from mml.optimization import optimizers
 
 MIN_BATCH = 2

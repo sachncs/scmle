@@ -6,8 +6,8 @@ import pytest
 
 from mml.contracts import experiments
 from mml.contracts import tasks
-from mml.data import profiling
-from mml.data import readers
+from mml.data.profiling import profiler as profiling
+from mml.data.readers import tabular
 from mml.intelligence import knowledge
 
 BINARY = tasks.TaskType.BINARY
@@ -15,7 +15,7 @@ BINARY = tasks.TaskType.BINARY
 
 def profile_of(frame):
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
-    manifest = readers.build_manifest(frame, "y")
+    manifest = tabular.build_manifest(frame, "y")
     return profiling.DatasetProfiler(spec).profile(frame, manifest, BINARY)
 
 

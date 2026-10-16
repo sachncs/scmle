@@ -10,8 +10,8 @@ import pandas as pd
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import columns
-from mml.data import fingerprint
+from mml.data.validation import columns
+from mml.intelligence import fingerprint
 
 LEAK_ASSOCIATION = 0.98
 MISSINGNESS_LEAK = 0.9

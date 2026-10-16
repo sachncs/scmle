@@ -10,25 +10,25 @@ import pytest
 
 from mml.contracts import models as model_contracts
 from mml.core import checkpoints
-from mml.core import execution
+from mml.core import scheduler
 from mml.core import stages
-from mml.data import columns
-from mml.data import feature_graph
-from mml.data import readers
-from mml.data import splitting
-from mml.data import strategies
-from mml.deployment import serving
+from mml.data.readers import tabular
+from mml.data.splitting import splitters
+from mml.data.validation import columns
 from mml.evaluation import diagnostics
 from mml.evaluation import selection
+from mml.experimentation import stores
+from mml.features import graph as feature_graph
+from mml.inference import serving
 from mml.intelligence import planner
-from mml.models import boosting_adapters
-from mml.models import resampling
-from mml.models import sklearn_adapters
-from mml.models import synthesis
 from mml.models import thresholds
+from mml.models.boosting import adapters as boosting_adapters
+from mml.models.sklearn import adapters as sklearn_adapters
 from mml.monitoring import monitor
 from mml.optimization import optimizers
-from mml.tracking import stores
+from mml.sampling import resampling
+from mml.sampling import strategies
+from mml.sampling import synthesis
 
 
 def concrete_subclasses(base, *modules):
@@ -49,9 +49,9 @@ def concrete_subclasses(base, *modules):
 @pytest.mark.parametrize(
     ("base", "modules"),
     [
-        (readers.TableReader, [readers]),
+        (tabular.TableReader, [tabular]),
         (columns.ColumnKind, [columns]),
-        (splitting.SplitStrategy, [splitting]),
+        (splitters.SplitStrategy, [splitters]),
         (strategies.DataStrategy, [strategies]),
         (diagnostics.Diagnostic, [diagnostics]),
         (planner.PlanningRule, [planner]),
@@ -63,7 +63,7 @@ def concrete_subclasses(base, *modules):
         (synthesis.SyntheticGenerator, [synthesis]),
         (thresholds.ThresholdObjective, [thresholds]),
         (monitor.AdvisoryRule, [monitor]),
-        (execution.ExecutionBackend, [execution]),
+        (scheduler.ExecutionBackend, [scheduler]),
         (optimizers.Optimizer, [optimizers]),
         (stores.ExperimentStore, [stores]),
         (serving.ServingAdapter, [serving]),
@@ -113,9 +113,9 @@ def test_one_stage_per_lifecycle_state_in_order():
 
 def test_abstract_bases_cannot_be_instantiated():
     for base in (
-        readers.TableReader,
+        tabular.TableReader,
         columns.ColumnKind,
-        splitting.SplitStrategy,
+        splitters.SplitStrategy,
         strategies.DataStrategy,
         model_contracts.ModelAdapter,
         stores.ExperimentStore,

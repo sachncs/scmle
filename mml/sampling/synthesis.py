@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 from scipy import special
 
-from mml.models import resampling
+from mml.sampling import resampling
 
 MIN_FIT_ROWS = 5
 RIDGE = 1e-6

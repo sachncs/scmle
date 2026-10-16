@@ -7,9 +7,9 @@ import pytest
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
-from mml.data import strategies
 from mml.models import registry as registry_module
-from mml.models import resampling
+from mml.sampling import resampling
+from mml.sampling import strategies
 
 REGRESSION = tasks.TaskType.REGRESSION
 

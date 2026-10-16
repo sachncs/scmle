@@ -7,8 +7,8 @@ import pytest
 import support
 
 from mml.contracts import errors
-from mml.data import interchange
-from mml.data import readers
+from mml.data.readers import interchange
+from mml.data.readers import tabular
 
 
 def run(data, tmp_path, **kwargs):
@@ -51,7 +51,7 @@ def test_results_export_to_arrow(binary_frame, tmp_path):
 def test_feather_files_are_read_and_scored(binary_frame, tmp_path):
     path = tmp_path / "d.feather"
     binary_frame.to_feather(path)
-    assert readers.read_table(path).shape == binary_frame.shape
+    assert tabular.read_table(path).shape == binary_frame.shape
     result = run(binary_frame, tmp_path / "r")
     new = tmp_path / "new.arrow"
     binary_frame.drop(columns="y").to_feather(new)

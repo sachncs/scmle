@@ -11,7 +11,7 @@ from typing import Any
 
 from mml.contracts import errors
 from mml.contracts import experiments
-from mml.tracking import stores
+from mml.experimentation import stores
 
 RUN_TAG = "mml.run_id"
 LINEAGE_ARTIFACTS = frozenset({"config_json", "artifacts"})

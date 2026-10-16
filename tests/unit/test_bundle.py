@@ -12,7 +12,7 @@ from mml.artifacts import store as store_module
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.data import preprocessing
+from mml.data.curation import preprocessing
 from mml.models import registry as registry_module
 
 PLAN = data_contracts.FeaturePlan(("num",), ("cat",))

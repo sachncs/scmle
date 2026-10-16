@@ -7,7 +7,7 @@ from sklearn import base
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
-from mml.data import preprocessing
+from mml.data.curation import preprocessing
 from mml.models import registry as registry_module
 
 PLAN = data_contracts.FeaturePlan(("num", "flag"), ("cat",))

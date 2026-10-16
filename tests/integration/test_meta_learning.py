@@ -5,7 +5,7 @@ import pandas as pd
 import support
 
 import mml
-from mml.tracking import stores
+from mml.experimentation import stores
 
 
 def make_frame(rows, seed):

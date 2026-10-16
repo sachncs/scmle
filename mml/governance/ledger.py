@@ -9,7 +9,7 @@ import hashlib
 from typing import Any
 
 from mml.contracts import experiments
-from mml.data import splitting
+from mml.data.splitting import splitters
 
 
 def digest_of(row_ids: list[Any]) -> dict[str, Any]:
@@ -20,7 +20,7 @@ def digest_of(row_ids: list[Any]) -> dict[str, Any]:
 
 
 def observed_access(
-    split: splitting.SplitResult, trials: list[experiments.TrialResult]
+    split: splitters.SplitResult, trials: list[experiments.TrialResult]
 ) -> dict[str, Any]:
     """Checks what trials actually received against the split manifest.
 
@@ -60,7 +60,7 @@ def observed_access(
 
 
 def build_ledger(
-    split: splitting.SplitResult,
+    split: splitters.SplitResult,
     trials: list[experiments.TrialResult],
     test_opens: int,
     threshold_used: bool,

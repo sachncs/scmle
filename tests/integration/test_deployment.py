@@ -12,9 +12,9 @@ import pytest
 import support
 
 from mml.contracts import errors
-from mml.deployment import lifecycle
-from mml.deployment import registry as registry_module
-from mml.deployment import serving
+from mml.governance import lifecycle
+from mml.governance import registry as registry_module
+from mml.inference import serving
 
 
 def make_frame(rows, seed, relabel=False):

@@ -16,13 +16,13 @@ from mml.contracts import errors
 from mml.contracts import events
 from mml.contracts import experiments
 from mml.contracts import tasks
-from mml.core import execution
 from mml.core import limits
-from mml.data import splitting
+from mml.core import scheduler
+from mml.data.splitting import splitters
 from mml.evaluation import metrics
 from mml.evaluation import selection
+from mml.experimentation import stores as tracking_stores
 from mml.models import registry as registry_module
-from mml.tracking import stores as tracking_stores
 
 T = TypeVar("T")
 
@@ -110,8 +110,8 @@ class RunContext:
     checkpoints: dict[str, experiments.TrialResult] = dataclasses.field(
         default_factory=dict
     )
-    backend: execution.ExecutionBackend = dataclasses.field(
-        default_factory=execution.SequentialBackend
+    backend: scheduler.ExecutionBackend = dataclasses.field(
+        default_factory=scheduler.SequentialBackend
     )
     governor: limits.ResourceGovernor | None = None
     cancel_event: threading.Event = dataclasses.field(
@@ -125,7 +125,7 @@ class RunContext:
     manifest: data_contracts.DatasetManifest | None = None
     task: tasks.TaskType | None = None
     profile: data_contracts.DatasetProfile | None = None
-    split: splitting.SplitResult | None = None
+    split: splitters.SplitResult | None = None
     plan: experiments.ExperimentPlan | None = None
     metric: metrics.Metric | None = None
     trials: list[experiments.TrialResult] = dataclasses.field(

@@ -7,13 +7,13 @@ import support
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.core import execution
 from mml.core import orchestrator as orchestrator_module
+from mml.core import scheduler
 
 
 def test_mlflow_store_records_runs_trials_and_lineage(binary_frame, tmp_path):
     pytest.importorskip("mlflow")
-    from mml.tracking import mlflow_store
+    from mml.integrations import mlflow as mlflow_store
 
     store = mlflow_store.MlflowExperimentStore(
         f"sqlite:///{tmp_path / 'mlflow.db'}", "magicml-test"
@@ -43,7 +43,7 @@ def test_mlflow_store_records_runs_trials_and_lineage(binary_frame, tmp_path):
 
 def test_mlflow_store_reuses_the_parent_run_on_resume(binary_frame, tmp_path):
     pytest.importorskip("mlflow")
-    from mml.tracking import mlflow_store
+    from mml.integrations import mlflow as mlflow_store
 
     store = mlflow_store.MlflowExperimentStore(
         f"sqlite:///{tmp_path / 'mlflow.db'}", "magicml-resume"
@@ -67,7 +67,7 @@ def test_mlflow_without_the_library_is_a_config_error(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", blocked)
-    from mml.tracking import mlflow_store
+    from mml.integrations import mlflow as mlflow_store
 
     with pytest.raises(errors.ConfigError, match="tracking"):
         mlflow_store.MlflowExperimentStore()
@@ -75,7 +75,7 @@ def test_mlflow_without_the_library_is_a_config_error(monkeypatch):
 
 def test_ray_backend_maps_in_order():
     pytest.importorskip("ray")
-    backend = execution.create_backend(2, "ray")
+    backend = scheduler.create_backend(2, "ray")
     try:
         pairs = [[1, 3], [2, 4], [10, 20]]
         assert backend.map(statistics.fmean, pairs) == [2.0, 3.0, 15.0]
@@ -117,12 +117,12 @@ def test_ray_run_matches_sequential(binary_frame, tmp_path):
 
 def test_unknown_executor_is_rejected():
     with pytest.raises(errors.ConfigError, match="unknown executor"):
-        execution.create_backend(2, "spark")
+        scheduler.create_backend(2, "spark")
 
 
 def test_mlflow_artifacts_stay_beside_the_sqlite_store(tmp_path, monkeypatch):
     pytest.importorskip("mlflow")
-    from mml.tracking import mlflow_store
+    from mml.integrations import mlflow as mlflow_store
 
     monkeypatch.chdir(tmp_path)
     location = mlflow_store.MlflowExperimentStore.artifact_location(

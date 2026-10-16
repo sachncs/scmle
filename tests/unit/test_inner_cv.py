@@ -7,9 +7,9 @@ import pandas as pd
 
 from mml.contracts import data as data_contracts
 from mml.contracts import tasks
-from mml.data import inner_cv
-from mml.data import strategies
+from mml.data.splitting import inner_cv
 from mml.models import registry as registry_module
+from mml.sampling import strategies
 
 BINARY = tasks.TaskType.BINARY
 
@@ -87,7 +87,7 @@ def test_calibration_strategy_uses_the_structured_splitter():
 def test_stack_members_are_full_pipelines_cross_fitted_by_group():
     registry = registry_module.ModelRegistry.with_builtins()
     params = {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]}
-    from mml.data import preprocessing
+    from mml.data.curation import preprocessing
 
     stack = preprocessing.build_pipeline(
         plan(group_column="unit"), registry.get("stacking"), BINARY, 0, params

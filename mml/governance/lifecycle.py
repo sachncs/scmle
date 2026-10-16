@@ -9,7 +9,7 @@ import pandas as pd
 import mml
 from mml.api import results
 from mml.contracts import errors
-from mml.deployment import registry as registry_module
+from mml.governance import registry as registry_module
 from mml.monitoring import champion
 from mml.monitoring import monitor as monitor_module
 

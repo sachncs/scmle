@@ -14,9 +14,9 @@ from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.core import orchestrator as orchestrator_module
-from mml.core import trials as trials_module
+from mml.experimentation import stores
+from mml.experimentation import trials as trials_module
 from mml.models import registry as registry_module
-from mml.tracking import stores
 
 BINARY = frozenset({tasks.TaskType.BINARY})
 

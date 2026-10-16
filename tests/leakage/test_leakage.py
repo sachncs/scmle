@@ -125,9 +125,9 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
 ):
     base = support.make_project(binary_frame, "y", output_dir=tmp_path / "a")
     base.plan()
-    from mml.data import splitting
+    from mml.data.splitting import splitters
 
-    split = splitting.SplitManager(base.spec, tasks.TaskType.BINARY).split(
+    split = splitters.SplitManager(base.spec, tasks.TaskType.BINARY).split(
         binary_frame
     )
     test_positions = list(split.manifest.test_ids)
@@ -154,10 +154,10 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
 def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
     binary_frame, tmp_path
 ):
-    from mml.data import splitting
+    from mml.data.splitting import splitters
 
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
-    split = splitting.SplitManager(project.spec, tasks.TaskType.BINARY).split(
+    split = splitters.SplitManager(project.spec, tasks.TaskType.BINARY).split(
         binary_frame
     )
     test_positions = list(split.manifest.test_ids)

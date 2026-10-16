@@ -4,9 +4,9 @@ import pytest
 
 from mml.contracts import errors
 from mml.contracts import tasks
-from mml.models import boosting_adapters
 from mml.models import conformance
 from mml.models import registry as registry_module
+from mml.models.boosting import adapters as boosting_adapters
 
 
 @pytest.mark.parametrize("library", ["lightgbm", "xgboost"])

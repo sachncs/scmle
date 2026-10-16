@@ -12,7 +12,7 @@ import pyarrow as pa
 from mml.artifacts import bundle as bundle_module
 from mml.contracts import data as data_contracts
 from mml.contracts import experiments
-from mml.data import interchange
+from mml.data.readers import interchange
 
 LEADERBOARD_DETAILS = (
     "fold_scores",

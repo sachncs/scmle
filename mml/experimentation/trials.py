@@ -25,8 +25,8 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.core import context as context_module
 from mml.core import limits
-from mml.data import strategies
 from mml.evaluation import metrics
+from mml.sampling import strategies
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

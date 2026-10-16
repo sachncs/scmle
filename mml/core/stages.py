@@ -18,7 +18,6 @@ import pandas as pd
 
 from mml.api import results
 from mml.artifacts import bundle as bundle_module
-from mml.artifacts import ledger
 from mml.artifacts import report
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
@@ -26,23 +25,24 @@ from mml.contracts import experiments
 from mml.contracts import tasks
 from mml.core import compiler
 from mml.core import context as context_module
-from mml.core import ensemble_search
 from mml.core import state as run_state
-from mml.core import strategy_search
-from mml.core import trials
-from mml.core import tuning
-from mml.data import feature_graph
-from mml.data import profiling
-from mml.data import readers
-from mml.data import splitting
-from mml.data import strategies
+from mml.data.profiling import profiler as profiling
+from mml.data.readers import tabular
+from mml.data.splitting import splitters
 from mml.evaluation import confidence
 from mml.evaluation import diagnostics
 from mml.evaluation import resources
+from mml.experimentation import ensemble_search
+from mml.experimentation import strategy_search
+from mml.experimentation import trials
+from mml.experimentation import tuning
+from mml.features import graph as feature_graph
+from mml.governance import ledger
 from mml.intelligence import knowledge
 from mml.intelligence import planner as planner_module
 from mml.models import thresholds
 from mml.monitoring import reference as reference_module
+from mml.sampling import strategies
 
 LEAKAGE_MARKER = "leakage"
 BASELINE = "dummy"
@@ -89,10 +89,10 @@ class IngestStage(Stage):
         if context.input_frame is not None:
             frame = context.input_frame.copy()
         else:
-            frame = readers.read_table(data.uri)
+            frame = tabular.read_table(data.uri)
         context.read_seconds = time.monotonic() - started
-        context.manifest = readers.build_manifest(frame, data.target, data.uri)
-        frame, infinite = readers.replace_infinities(frame)
+        context.manifest = tabular.build_manifest(frame, data.target, data.uri)
+        frame, infinite = tabular.replace_infinities(frame)
         context.cleaning_notes = [
             f"column '{name}': {count} infinite value(s) treated as missing"
             for name, count in infinite.items()
@@ -229,9 +229,9 @@ class ProfileStage(Stage):
         context: context_module.RunContext,
         task: tasks.TaskType,
         frame: pd.DataFrame,
-    ) -> splitting.SplitResult:
+    ) -> splitters.SplitResult:
         """Splits the dataset and records the manifest."""
-        split = splitting.SplitManager(context.spec, task).split(frame)
+        split = splitters.SplitManager(context.spec, task).split(frame)
         context.split = split
         context.write_json("validation_manifest.json", split.manifest.to_dict())
         context.track(split_fingerprint=split.manifest.fingerprint)
