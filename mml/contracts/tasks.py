@@ -14,6 +14,7 @@ FAST_BUDGET_SECONDS = 300
 FAST_SEARCH_MODELS = 1
 FAST_SEARCH_CONFIGS = 3
 GRAPH_VERSION = 1
+DELAYED_SUFFIX = "__available"
 
 
 class TaskType(enum.StrEnum):
@@ -115,7 +116,22 @@ class FeatureGraphSpec(FrozenModel):
 
 
 class DataSpec(FrozenModel):
-    """Where the data lives and what its columns mean."""
+    """Where the data lives and what its columns mean.
+
+    Attributes:
+        uri: Where the data lives.
+        target: Target column.
+        id_columns: Identifier columns (never features).
+        group_column: Entity column for grouped and series data.
+        time_column: Column ordering the rows in time.
+        excluded_columns: Columns never used.
+        unavailable_at_prediction: Columns only known after the outcome.
+        feature_delays: For columns whose value becomes known only some
+            rows after the row it describes (for example a monthly report
+            published a quarter later), the number of rows of delay. The
+            model then sees the value from that many rows earlier; the raw
+            column is excluded. Needs `time_column`.
+    """
 
     uri: str
     target: str
@@ -124,18 +140,35 @@ class DataSpec(FrozenModel):
     time_column: str | None = None
     excluded_columns: list[str] = pydantic.Field(default_factory=list)
     unavailable_at_prediction: list[str] = pydantic.Field(default_factory=list)
+    feature_delays: dict[str, int] = pydantic.Field(default_factory=dict)
 
 
 class ValidationSpec(FrozenModel):
-    """How data is partitioned for model selection and final testing."""
+    """How data is partitioned for model selection and final testing.
 
-    strategy: Literal["auto", "stratified", "random", "group", "temporal"] = (
-        "auto"
-    )
+    Attributes:
+        strategy: Validation protocol. `temporal` uses expanding training
+            windows; `rolling` slides a fixed-size training window forward
+            (see `window_rows` and `horizon_rows`).
+        test_fraction: Share of rows locked away for the final test.
+        folds: Number of validation folds.
+        seed: Random seed.
+        embargo_rows: Rows dropped between training and validation windows
+            so serial dependence cannot leak across the boundary.
+        horizon_rows: Rolling only: rows in each validation window.
+        window_rows: Rolling only: rows in each training window (None keeps
+            every earlier row, an expanding window).
+    """
+
+    strategy: Literal[
+        "auto", "stratified", "random", "group", "temporal", "rolling"
+    ] = "auto"
     test_fraction: float = pydantic.Field(default=0.20, gt=0, lt=1)
     folds: int = pydantic.Field(default=5, ge=2)
     seed: int = 42
     embargo_rows: int = pydantic.Field(default=0, ge=0)
+    horizon_rows: int | None = pydantic.Field(default=None, ge=1)
+    window_rows: int | None = pydantic.Field(default=None, ge=1)
 
 
 class ResourceSpec(FrozenModel):
@@ -271,6 +304,52 @@ class ProjectSpec(FrozenModel):
     decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def expand_feature_delays(cls, values: Any) -> Any:
+        """Turns `data.feature_delays` into lagged nodes and exclusions.
+
+        The expansion is idempotent, so a saved configuration (which already
+        contains the nodes) loads unchanged.
+        """
+        if not isinstance(values, dict):
+            return values
+        data = values.get("data")
+        data_record = (
+            data.model_dump()
+            if isinstance(data, DataSpec)
+            else dict(data or {})
+        )
+        delays = data_record.get("feature_delays") or {}
+        if not delays:
+            return values
+        graph = values.get("feature_graph")
+        graph_record = (
+            graph.model_dump()
+            if isinstance(graph, FeatureGraphSpec)
+            else dict(graph or {})
+        )
+        nodes = list(graph_record.get("nodes", []))
+        present = {node["name"] for node in nodes}
+        for column, delay in delays.items():
+            name = f"{column}{DELAYED_SUFFIX}"
+            if name not in present:
+                nodes.append(
+                    {
+                        "name": name,
+                        "op": "lag",
+                        "inputs": [column],
+                        "params": {"k": delay},
+                    }
+                )
+        excluded = list(data_record.get("excluded_columns", []))
+        excluded += [c for c in delays if c not in excluded]
+        return {
+            **values,
+            "data": {**data_record, "excluded_columns": excluded},
+            "feature_graph": {**graph_record, "nodes": nodes},
+        }
+
     @pydantic.model_validator(mode="after")
     def check_cross_field_rules(self) -> Self:
         """Validates constraints that span several fields.
@@ -284,8 +363,33 @@ class ProjectSpec(FrozenModel):
         data, validation = self.data, self.validation
         if validation.strategy == "group" and not data.group_column:
             raise ValueError("strategy 'group' requires data.group_column")
-        if validation.strategy == "temporal" and not data.time_column:
-            raise ValueError("strategy 'temporal' requires data.time_column")
+        if validation.strategy in ("temporal", "rolling") and (
+            not data.time_column
+        ):
+            raise ValueError(
+                f"strategy '{validation.strategy}' requires data.time_column"
+            )
+        if (
+            validation.horizon_rows or validation.window_rows
+        ) and validation.strategy not in ("rolling", "auto"):
+            raise ValueError(
+                "horizon_rows and window_rows apply to the rolling strategy"
+            )
+        if data.feature_delays and not data.time_column:
+            raise ValueError("data.feature_delays requires data.time_column")
+        if any(delay < 1 for delay in data.feature_delays.values()):
+            raise ValueError("feature delays must be at least 1 row")
+        stale = [
+            node.name
+            for node in self.feature_graph.nodes
+            if set(node.inputs) & set(data.feature_delays)
+            and not node.name.endswith(DELAYED_SUFFIX)
+        ]
+        if stale:
+            raise ValueError(
+                f"feature nodes {stale} read a delayed column directly; "
+                f"read '<column>{DELAYED_SUFFIX}' instead"
+            )
         if validation.strategy == "stratified" and self.task == "regression":
             raise ValueError(
                 "stratified validation is undefined for regression"

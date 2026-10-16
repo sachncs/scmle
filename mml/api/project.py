@@ -18,7 +18,7 @@ from mml.data.readers import interchange
 from mml.intelligence import recommendations as recommendations_module
 
 ValidationStrategy = Literal[
-    "auto", "stratified", "random", "group", "temporal"
+    "auto", "stratified", "random", "group", "temporal", "rolling"
 ]
 LeakagePolicy = Literal["warn", "block"]
 
@@ -41,7 +41,10 @@ class MLProject:
         time_column: str | None = None,
         excluded_columns: list[str] | None = None,
         unavailable_at_prediction: list[str] | None = None,
+        feature_delays: dict[str, int] | None = None,
         embargo_rows: int = 0,
+        horizon_rows: int | None = None,
+        window_rows: int | None = None,
         validation: ValidationStrategy = "auto",
         folds: int = 5,
         test_fraction: float = 0.2,
@@ -78,8 +81,14 @@ class MLProject:
             excluded_columns: Other columns to ignore.
             unavailable_at_prediction: Columns known only after the outcome
                 (excluded; the feature-availability contract).
+            feature_delays: Columns whose value is known only that many rows
+                after the row it describes; the model sees the value from
+                that many rows earlier (needs `time_column`).
             embargo_rows: Rows dropped between training and validation
                 windows in temporal validation.
+            horizon_rows: Rolling validation: rows in each validation window.
+            window_rows: Rolling validation: rows in each training window
+                (all earlier rows when omitted).
             validation: Split strategy or `auto`.
             folds: Cross-validation folds.
             test_fraction: Share of rows locked away for the final test.
@@ -118,12 +127,15 @@ class MLProject:
                 time_column=time_column,
                 excluded_columns=excluded_columns or [],
                 unavailable_at_prediction=unavailable_at_prediction or [],
+                feature_delays=feature_delays or {},
             ),
             task=task,
             metric=metric,
             validation=tasks.ValidationSpec(
                 strategy=validation,
                 embargo_rows=embargo_rows,
+                horizon_rows=horizon_rows,
+                window_rows=window_rows,
                 folds=folds,
                 test_fraction=test_fraction,
                 seed=seed,

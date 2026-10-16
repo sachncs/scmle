@@ -407,3 +407,63 @@ def test_classification_bundles_return_prediction_sets_that_survive_saving(
     assert sets == result.bundle.predict_set(rows, coverage=0.9)
     with pytest.raises(errors.ArtifactError, match="regression"):
         reloaded.predict_interval(rows)
+
+
+def series_frame(rows=600, seed=8):
+    rng = np.random.default_rng(seed)
+    frame = pd.DataFrame(
+        {
+            "when": pd.date_range("2024-01-01", periods=rows, freq="h"),
+            "demand": rng.normal(size=rows).cumsum(),
+        }
+    )
+    # `report` describes the previous 3 rows' outcome and becomes known
+    # only 3 rows later; using it undelayed would leak the future.
+    frame["y"] = (frame["demand"].diff().shift(-1) > 0).astype(int)
+    frame["report"] = frame["y"]
+    return frame.dropna().reset_index(drop=True)
+
+
+def test_rolling_validation_runs_end_to_end_with_a_time_aware_report(tmp_path):
+    frame = series_frame()
+    result = support.make_project(
+        frame,
+        "y",
+        time_budget=300,
+        output_dir=tmp_path,
+        time_column="when",
+        validation="rolling",
+        folds=3,
+        horizon_rows=60,
+        window_rows=200,
+        excluded_columns=["report"],
+    ).run()
+
+    manifest = json.loads(
+        (result.run_dir / "validation_manifest.json").read_text()
+    )
+    assert manifest["strategy"] == "rolling" and len(manifest["folds"]) == 3
+    assert result.evaluation["cv_confidence"]["note"]
+
+
+def test_a_delayed_column_is_used_only_through_its_lagged_copy(tmp_path):
+    frame = series_frame()
+    project = support.make_project(
+        frame,
+        "y",
+        time_budget=300,
+        output_dir=tmp_path,
+        time_column="when",
+        feature_delays={"report": 3},
+    )
+    result = project.run()
+
+    features = result.profile.feature_plan
+    assert "report" not in features.numeric
+    assert "report" in project.spec.data.excluded_columns
+    assert any(
+        n.name == "report__available" for n in project.spec.feature_graph.nodes
+    )
+    assert "report__available" in result.bundle.features or (
+        "report__available" in result.bundle.schema.series_columns
+    )

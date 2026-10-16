@@ -127,6 +127,7 @@ def test_strategy_registry_is_polymorphic():
         "stratified",
         "group",
         "temporal",
+        "rolling",
     }
     assert issubclass(splitters.StratifiedSplit, splitters.RandomSplit)
 
@@ -252,3 +253,100 @@ def test_temporal_folds_are_listed_latest_window_first():
     sizes = [len(fit) for fit, held in part.manifest.folds]
     assert sizes == sorted(sizes, reverse=True)  # largest training first
     assert any("latest window first" in n for n in part.manifest.notes)
+
+
+def rolling_spec(**validation):
+    return tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="m", target="y", time_column="t"),
+        validation=tasks.ValidationSpec(strategy="rolling", **validation),
+    )
+
+
+def test_rolling_windows_slide_forward_and_always_validate_on_the_future(frame):
+    result = split(
+        frame,
+        rolling_spec(folds=4, horizon_rows=30, window_rows=100),
+    )
+    manifest = result.manifest
+    times = pd.to_datetime(frame["t"]).iloc[list(manifest.train_ids)].to_numpy()
+    order = np.argsort(times, kind="stable")
+
+    assert manifest.strategy == "rolling" and len(manifest.folds) == 4
+    for train, held in manifest.folds:
+        assert max(order.tolist().index(i) for i in train) < min(
+            order.tolist().index(i) for i in held
+        )
+        assert len(held) == 30 and len(train) <= 100
+
+
+def test_rolling_embargo_leaves_a_gap_before_each_validation_window(frame):
+    result = split(
+        frame, rolling_spec(folds=3, horizon_rows=20, embargo_rows=5)
+    )
+
+    positions = {
+        row: rank for rank, row in enumerate(sorted(result.manifest.train_ids))
+    }
+    ordered = frame["t"].iloc[sorted(result.manifest.train_ids)]
+    assert ordered.is_monotonic_increasing
+    for train, held in result.manifest.folds:
+        ranks_train = sorted(positions[i] for i in train)
+        ranks_held = sorted(positions[i] for i in held)
+        assert ranks_held[0] - ranks_train[-1] > 5
+
+
+def test_rolling_blocks_when_no_window_fits(frame):
+    with pytest.raises(errors.BlockedError, match="rolling window"):
+        split(frame, rolling_spec(folds=4, horizon_rows=200))
+
+
+def test_the_rolling_strategy_needs_a_time_column_and_its_options_need_rolling():
+    with pytest.raises(ValueError, match=r"requires data\.time_column"):
+        tasks.ProjectSpec(
+            data=tasks.DataSpec(uri="m", target="y"),
+            validation=tasks.ValidationSpec(strategy="rolling"),
+        )
+    with pytest.raises(ValueError, match="rolling strategy"):
+        tasks.ProjectSpec(
+            data=tasks.DataSpec(uri="m", target="y", time_column="t"),
+            validation=tasks.ValidationSpec(
+                strategy="stratified", horizon_rows=10
+            ),
+        )
+
+
+def test_feature_delays_become_lagged_nodes_and_exclusions_idempotently():
+    data = tasks.DataSpec(
+        uri="m", target="y", time_column="t", feature_delays={"report": 3}
+    )
+    spec = tasks.ProjectSpec(data=data)
+
+    node = spec.feature_graph.nodes[0]
+    assert (node.name, node.op, node.params) == (
+        "report__available",
+        "lag",
+        {"k": 3},
+    )
+    assert "report" in spec.data.excluded_columns
+    again = tasks.ProjectSpec.model_validate_json(spec.canonical_json())
+    assert again == spec and len(again.feature_graph.nodes) == 1
+
+
+def test_feature_delays_need_a_time_column_and_forbid_reading_the_raw_column():
+    with pytest.raises(ValueError, match=r"requires data\.time_column"):
+        tasks.ProjectSpec(
+            data=tasks.DataSpec(
+                uri="m", target="y", feature_delays={"report": 2}
+            )
+        )
+    with pytest.raises(ValueError, match="read a delayed column"):
+        tasks.ProjectSpec(
+            data=tasks.DataSpec(
+                uri="m", target="y", time_column="t", feature_delays={"r": 2}
+            ),
+            feature_graph=tasks.FeatureGraphSpec(
+                nodes=[
+                    tasks.FeatureNode(name="doubled", op="log1p", inputs=["r"])
+                ]
+            ),
+        )

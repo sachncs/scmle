@@ -86,11 +86,35 @@ class ProjectCommand(Command):
         parser.add_argument("--output-dir", default="runs")
         parser.add_argument(
             "--validation",
-            choices=["auto", "stratified", "random", "group", "temporal"],
+            choices=[
+                "auto",
+                "stratified",
+                "random",
+                "group",
+                "temporal",
+                "rolling",
+            ],
             default="auto",
         )
         parser.add_argument("--folds", type=int, default=5)
         parser.add_argument("--test-fraction", type=float, default=0.2)
+        parser.add_argument(
+            "--horizon-rows",
+            type=int,
+            help="rolling validation: rows in each validation window",
+        )
+        parser.add_argument(
+            "--window-rows",
+            type=int,
+            help="rolling validation: rows in each training window",
+        )
+        parser.add_argument(
+            "--feature-delay",
+            nargs="*",
+            default=[],
+            metavar="COLUMN=ROWS",
+            help="columns known only ROWS rows after the row they describe",
+        )
         parser.add_argument(
             "--embargo-rows",
             type=int,
@@ -172,6 +196,12 @@ class ProjectCommand(Command):
             folds=args.folds,
             test_fraction=args.test_fraction,
             embargo_rows=args.embargo_rows,
+            horizon_rows=args.horizon_rows,
+            window_rows=args.window_rows,
+            feature_delays={
+                pair.split("=", 1)[0]: int(pair.split("=", 1)[1])
+                for pair in args.feature_delay
+            },
             unavailable_at_prediction=args.unavailable_at_prediction,
             enforcement=args.enforcement,
             leakage_policy=args.leakage_policy,
