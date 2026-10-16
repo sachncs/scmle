@@ -264,16 +264,30 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
     ) -> Any:
         """Weighted mean loss over the given row indices."""
         outputs = network(tensors["x"][rows])
-        losses = self.row_losses(torch, outputs, tensors["y"][rows])
+        if outputs.dim() == 2:
+            outputs = outputs.unsqueeze(1)
+        batch, members = outputs.shape[0], outputs.shape[1]
+        losses = self.row_losses(
+            torch,
+            outputs.reshape(batch * members, -1),
+            tensors["y"][rows].repeat_interleave(members),
+        )
+        losses = losses.reshape(batch, members).mean(dim=1)
         weights = tensors["w"][rows]
         return (losses * weights).sum() / weights.sum()
 
     def raw_outputs(self, features: Any) -> np.ndarray:
-        """Network outputs for new rows (evaluation mode, CPU)."""
+        """Member outputs for new rows, shape (rows, members, outputs).
+
+        Single networks have one member. Evaluation mode, on the CPU.
+        """
         torch = importlib.import_module("torch")
         with torch.no_grad():
             tensor = torch.from_numpy(self.dense(features))
-            return self.network_(tensor).numpy()
+            outputs = self.network_(tensor)
+            if outputs.dim() == 2:
+                outputs = outputs.unsqueeze(1)
+            return outputs.numpy()
 
 
 class ClassifierEngine(base.ClassifierMixin, TabularEngine):
@@ -345,9 +359,10 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
     def predict_proba(self, features: Any) -> np.ndarray:
         """Class probabilities, columns ordered like `classes_`."""
         scores = self.raw_outputs(features)
-        scores = scores - scores.max(axis=1, keepdims=True)
+        scores = scores - scores.max(axis=2, keepdims=True)
         exp = np.exp(scores)
-        return exp / exp.sum(axis=1, keepdims=True)
+        probabilities = exp / exp.sum(axis=2, keepdims=True)
+        return probabilities.mean(axis=1)
 
     def predict(self, features: Any) -> np.ndarray:
         """Most probable class."""
@@ -380,5 +395,5 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
 
     def predict(self, features: Any) -> np.ndarray:
         """Predicted values in the original units."""
-        scaled = self.raw_outputs(features).reshape(-1)
+        scaled = self.raw_outputs(features)[:, :, 0].mean(axis=1)
         return scaled * self.target_scale_ + self.target_mean_

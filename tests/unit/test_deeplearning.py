@@ -271,3 +271,60 @@ def test_auto_batch_size_and_both_schedules_train():
             batch_size="auto", schedule=schedule, **FAST
         ).fit(features, labels)
         assert (model.predict(features) == labels).mean() > 0.85
+
+
+@pytest.mark.parametrize(
+    ("architecture", "sizes"),
+    [
+        ("tabm", (64,)),
+        ("ft_transformer", (32,)),
+        ("robust_mlp", (64,)),
+    ],
+)
+def test_modern_architectures_learn_classification(architecture, sizes):
+    features, labels = separable()
+    model = estimators.TorchClassifier(
+        architecture=architecture, hidden_sizes=sizes, **FAST
+    ).fit(features, labels)
+
+    assert (model.predict(features) == labels).mean() > 0.9
+    probabilities = model.predict_proba(features)
+    np.testing.assert_allclose(probabilities.sum(axis=1), 1.0, rtol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "architecture", ["tabm", "ft_transformer", "robust_mlp"]
+)
+def test_modern_architectures_learn_regression(architecture):
+    rng = np.random.default_rng(3)
+    features = rng.normal(size=(400, 4)).astype(np.float32)
+    target = 20 + 5 * features[:, 0] - 3 * features[:, 2]
+
+    model = estimators.TorchRegressor(
+        architecture=architecture,
+        hidden_sizes=(32,) if architecture == "ft_transformer" else (64,),
+        **FAST,
+    ).fit(features, target)
+
+    residual = target - model.predict(features)
+    assert 1 - residual.var() / target.var() > 0.85
+
+
+def test_the_ensemble_architecture_averages_several_members():
+    features, labels = separable()
+    model = estimators.TorchClassifier(architecture="tabm", **FAST).fit(
+        features, labels
+    )
+
+    raw = worker.client().request(
+        "call",
+        (
+            model.engine_path,
+            model.state_id_,
+            model.state_,
+            "raw_outputs",
+            model.dense(features),
+        ),
+    )
+
+    assert raw.shape == (len(features), 8, 2)

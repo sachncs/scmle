@@ -1,6 +1,7 @@
 """PyTorch model-family adapters (`deeplearning` extra)."""
 
 from collections.abc import Mapping
+import dataclasses
 from typing import Any
 from typing import ClassVar
 
@@ -104,7 +105,56 @@ class TorchResidualAdapter(TorchAdapter):
     )
 
 
+class TorchEnsembleAdapter(TorchAdapter):
+    """BatchEnsemble MLP (TabM-style): many cheap members, averaged."""
+
+    name = "torch_tabm"
+    architecture = "tabm"
+    search_space = search.SearchSpace(
+        (
+            search.ChoiceParameter(
+                "hidden_sizes", ((64,), (128, 64), (256, 128))
+            ),
+            *COMMON_SPACE,
+        )
+    )
+
+
+class TorchTransformerAdapter(TorchAdapter):
+    """FT-Transformer: attention over feature tokens."""
+
+    name = "torch_ft_transformer"
+    architecture = "ft_transformer"
+    capabilities = dataclasses.replace(
+        TorchAdapter.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
+    )
+    search_space = search.SearchSpace(
+        (
+            search.ChoiceParameter("hidden_sizes", ((32,), (64,), (64, 64))),
+            *COMMON_SPACE,
+        )
+    )
+
+
+class TorchRobustMlpAdapter(TorchAdapter):
+    """MLP with learned scaling, smooth clipping and PReLU (RealMLP-style)."""
+
+    name = "torch_realmlp"
+    architecture = "robust_mlp"
+    search_space = search.SearchSpace(
+        (
+            search.ChoiceParameter(
+                "hidden_sizes", ((128,), (256, 128), (256, 256))
+            ),
+            *COMMON_SPACE,
+        )
+    )
+
+
 DEEP_LEARNING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     TorchMlpAdapter,
     TorchResidualAdapter,
+    TorchEnsembleAdapter,
+    TorchTransformerAdapter,
+    TorchRobustMlpAdapter,
 )
