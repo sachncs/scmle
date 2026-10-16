@@ -7,6 +7,7 @@ from mml.contracts import tasks
 from mml.models import conformance
 from mml.models import registry as registry_module
 from mml.models.boosting import adapters as boosting_adapters
+from mml.models.boosting import early_stopping
 
 
 @pytest.mark.parametrize("library", ["lightgbm", "xgboost"])
@@ -40,8 +41,10 @@ def test_params_override_fixed_params_and_seed_is_applied():
         tasks.TaskType.REGRESSION, 5, {"num_leaves": 9}
     )
     params = estimator.get_params()
-    assert params["num_leaves"] == 9 and params["random_state"] == 5
-    assert params["verbose"] == -1
+    assert params["estimator__num_leaves"] == 9
+    assert params["estimator__random_state"] == 5
+    assert params["estimator__verbose"] == -1
+    assert params["rounds"] == early_stopping.DEFAULT_ROUNDS
 
 
 def test_end_to_end_with_string_labels(multiclass_frame, tmp_path):

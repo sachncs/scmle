@@ -16,6 +16,7 @@ from mml.contracts import models
 from mml.contracts import search
 from mml.contracts import tasks
 from mml.models import wrappers
+from mml.models.boosting import early_stopping
 
 ALL_TASKS = frozenset(tasks.TaskType)
 NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
@@ -42,6 +43,7 @@ class LazyLibraryAdapter(models.ModelAdapter):
     regressor_name: ClassVar[str]
     fixed_params: ClassVar[types.MappingProxyType] = NO_PARAMS
     fit_param_names: ClassVar[tuple[str, ...]] = ()
+    stopping_rounds: ClassVar[int | None] = early_stopping.DEFAULT_ROUNDS
 
     def build(
         self,
@@ -84,6 +86,10 @@ class LazyLibraryAdapter(models.ModelAdapter):
             **given,
         }
         estimator = getattr(module, class_name)(**kwargs)
+        if self.stopping_rounds:
+            estimator = early_stopping.HoldoutEarlyStopping(
+                estimator, self.stopping_rounds, random_state=seed
+            )
         if fit_params:
             wrapper = (
                 wrappers.FitParamsClassifier

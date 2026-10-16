@@ -15,6 +15,7 @@ from mml.models import ensembles
 from mml.models.boosting import adapters as boosting_adapters
 from mml.models.deeplearning import adapters as deep_adapters
 from mml.models.sklearn import adapters as sklearn_adapters
+from mml.models.sklearn import bagging
 
 ENTRY_POINT_GROUP = "mml.models"
 
@@ -46,6 +47,7 @@ class ModelRegistry:
             *sklearn_adapters.BUILTIN_ADAPTERS,
             *boosting_adapters.BOOSTING_ADAPTERS,
             *deep_adapters.DEEP_LEARNING_ADAPTERS,
+            *bagging.BAGGING_ADAPTERS,
         )
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))
