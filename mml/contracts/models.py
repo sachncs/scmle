@@ -145,6 +145,14 @@ class ModelAdapter(abc.ABC):
         """
         return {}
 
+    def gpu_usable(self) -> bool:
+        """Whether this adapter can use a GPU on this machine right now.
+
+        The default trusts the declared capability; adapters whose GPU
+        support depends on the installed hardware override it.
+        """
+        return self.capabilities.gpu
+
     def is_available(self) -> bool:
         """Whether every required module is importable (checked lazily)."""
         return all(

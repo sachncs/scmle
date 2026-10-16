@@ -96,6 +96,7 @@ def test_ray_run_matches_sequential(binary_frame, tmp_path):
             search=tasks.SearchSpec(top_models=0),
             strategies=support.NO_STRATEGIES,
             ensemble=support.NO_ENSEMBLE,
+            models=support.FAST_MODELS,
         )
 
     sequential = orchestrator_module.Orchestrator(

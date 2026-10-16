@@ -57,6 +57,8 @@ def handle(
     Returns:
         The reply value.
     """
+    if operation == "probe":
+        return bool(importlib.import_module("torch").cuda.is_available())
     if operation == "fit":
         path, params, features, target, weights = payload
         engine = resolve(path)(**params)

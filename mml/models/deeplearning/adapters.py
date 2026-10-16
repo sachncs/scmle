@@ -10,6 +10,7 @@ from mml.contracts import models
 from mml.contracts import search
 from mml.contracts import tasks
 from mml.models.deeplearning import estimators
+from mml.models.deeplearning import worker
 
 ALL_TASKS = frozenset(tasks.TaskType)
 COMMON_SPACE = (
@@ -41,6 +42,12 @@ class TorchAdapter(models.ModelAdapter):
         cost=4,
         memory_factor=4.0,
     )
+
+    def gpu_usable(self) -> bool:
+        """Whether PyTorch can see a CUDA device (asked of the worker)."""
+        return self.is_available() and bool(
+            worker.client().request("probe", ())
+        )
 
     def build(
         self,

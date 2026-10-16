@@ -122,7 +122,7 @@ class GpuRule(PlanningRule):
         """
         if context.spec.resources.gpu != "required":
             return candidates
-        capable = [a for a in candidates if a.capabilities.gpu]
+        capable = [a for a in candidates if a.gpu_usable()]
         if not capable:
             raise errors.BlockedError(
                 "resources.gpu='required' but no compatible model can use a "

@@ -155,6 +155,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
         time_budget=600,
         output_dir=tmp_path,
         enforcement="hard",
+        models=tasks.ModelSpec(),
     )
     plan = project.plan()
     only_torch = dataclasses.replace(
@@ -182,6 +183,7 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
         time_budget=600,
         output_dir=tmp_path,
         enforcement="hard",
+        models=tasks.ModelSpec(),
         selection=tasks.SelectionSpec(max_model_mb=50.0),
     )
     only_torch = dataclasses.replace(
