@@ -32,6 +32,7 @@ from mml.data.splitting import splitters
 from mml.data.validation import target as target_module
 from mml.evaluation import confidence
 from mml.evaluation import diagnostics
+from mml.evaluation import fit_health
 from mml.evaluation import resources
 from mml.experimentation import ensemble_search
 from mml.experimentation import strategy_search
@@ -583,6 +584,19 @@ class FinalEvaluationStage(Stage):
         selected = require(context.selected, "selected")
         return f"final one-time test evaluation of {selected.model_name}"
 
+    def selected_health(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+    ) -> dict[str, Any] | None:
+        """Fit-health record of the selected trial, if it can be judged."""
+        health = fit_health.assess_trial(
+            selected,
+            context.trials,
+            require(context.metric, "metric").greater_is_better,
+        )
+        return None if health is None else health.to_dict()
+
     def execute(self, context: context_module.RunContext) -> None:
         """Refits on all development data and evaluates on the test set."""
         context.check_cancelled()
@@ -668,6 +682,7 @@ class FinalEvaluationStage(Stage):
             "selected_strategy": selected.strategy,
             "selected_cv_score": selected.score_mean,
             "selected_cv_std": selected.score_std,
+            "fit_health": self.selected_health(context, selected),
             "cv_confidence": confidence.cv_interval(
                 selected.fold_scores,
                 float(np.mean([len(fold[0]) for fold in split.manifest.folds])),

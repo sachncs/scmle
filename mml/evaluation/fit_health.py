@@ -17,6 +17,8 @@ OVERFIT_LOSS_SHARE = 0.25
 UNDERFIT_RELATIVE_GAIN = 0.05
 UNSTABLE_NOISE_SHARE = 0.5
 TINY = 1e-12
+BASELINE_MODEL = "dummy"
+DEFAULT_STRATEGY = "default"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -95,3 +97,37 @@ def assess(
     else:
         verdict, note = "healthy", "training gain carries over to validation"
     return FitHealth(verdict, train, held_out, retained, noise, note)
+
+
+def assess_trial(
+    trial: Any, trials: Sequence[Any], greater_is_better: bool
+) -> FitHealth | None:
+    """Judges a trial against the constant baseline trained in the same run.
+
+    Args:
+        trial: A successful trial with training and validation fold scores.
+        trials: All trials of the run (the baseline is found among them).
+        greater_is_better: The metric's orientation.
+
+    Returns:
+        The assessment, or None when the trial has no training scores or the
+        run has no baseline trial to compare with.
+    """
+    baseline = next(
+        (
+            t
+            for t in trials
+            if t.model_name == BASELINE_MODEL
+            and t.strategy == DEFAULT_STRATEGY
+            and t.fold_scores
+        ),
+        None,
+    )
+    if baseline is None or not trial.train_scores or not trial.fold_scores:
+        return None
+    sign = 1.0 if greater_is_better else -1.0
+    return assess(
+        [sign * s for s in trial.train_scores],
+        [sign * s for s in trial.fold_scores],
+        sign * baseline.score_mean,
+    )

@@ -189,11 +189,12 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
                         network.parameters(), self.max_grad_norm or math.inf
                     )
                 )
-                alive = monitor.step(float(loss), norm, self.max_grad_norm)
+                value = float(loss.detach())
+                alive = monitor.step(value, norm, self.max_grad_norm)
                 if not alive:
                     break
                 optimizer.step()
-                epoch_loss += float(loss)
+                epoch_loss += value
                 step += 1
             if not alive:
                 break

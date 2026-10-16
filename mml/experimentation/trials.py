@@ -87,6 +87,9 @@ class TrialPayload:
     memory_gb: float | None = None
 
 
+TRAIN_SCORE_ROWS = 2000
+
+
 def access_record(row_ids: pd.Index) -> dict[str, Any]:
     """Row count and digest of the rows a fit or scoring call received."""
     ordered = sorted(map(str, row_ids))
@@ -142,6 +145,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
         )
         scorer = metric.scorer(payload.positive_label)
         raw_scores = []
+        raw_train_scores = []
         with threadpoolctl.threadpool_limits(limits=payload.thread_limit):
             for fit_list, evaluate_list in folds:
                 fit = np.asarray(fit_list)
@@ -157,6 +161,14 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
                         payload.target.iloc[evaluate],
                     )
                 )
+                sample = fit[:TRAIN_SCORE_ROWS]
+                raw_train_scores.append(
+                    scorer(
+                        candidate,
+                        payload.features.iloc[sample],
+                        payload.target.iloc[sample],
+                    )
+                )
                 result.observed_access.append(
                     {
                         "fit": access_record(payload.features.index.take(fit)),
@@ -167,6 +179,9 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
                 )
         scores = [metric.to_natural(float(s)) for s in raw_scores]
         result.fold_scores = scores
+        result.train_scores = [
+            metric.to_natural(float(s)) for s in raw_train_scores
+        ]
         result.score_mean = float(np.mean(scores))
         result.score_std = float(np.std(scores))
         result.status = experiments.TrialStatus.OK
@@ -345,6 +360,7 @@ class TrialRunner:
                 "folds": wanted,
             },
             runtime=dict(checkpoint.runtime),
+            train_scores=list(checkpoint.train_scores[:wanted]),
         )
 
     def skip(

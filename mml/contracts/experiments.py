@@ -142,6 +142,8 @@ class TrialResult:
             seed), so a trial is reproducible from its own record.
         runtime: Runtime requirements of the candidate (Python version and
             the libraries its model needs).
+        train_scores: Per-fold scores on the rows each model was fitted on,
+            for the fit-health check (a bounded sample of those rows).
     """
 
     trial_id: str
@@ -160,6 +162,7 @@ class TrialResult:
     )
     evaluation_config: dict[str, Any] = dataclasses.field(default_factory=dict)
     runtime: dict[str, Any] = dataclasses.field(default_factory=dict)
+    train_scores: list[float] = dataclasses.field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""

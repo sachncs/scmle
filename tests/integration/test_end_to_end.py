@@ -327,3 +327,25 @@ def test_planning_writes_recommendations_the_project_can_return(
         (result.run_dir / "diagnostics" / "recommendations.json").read_text()
     )
     assert [item["topic"] for item in written] == [i.topic for i in advice]
+
+
+def test_fit_health_is_recorded_for_the_selected_model_and_each_trial(
+    binary_frame, tmp_path
+):
+    result = support.make_project(
+        binary_frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    health = result.evaluation["fit_health"]
+    board = result.leaderboard()
+
+    assert health["verdict"] in {"healthy", "overfit", "underfit", "unstable"}
+    assert set(board["fit_health"]) <= {
+        "",
+        "healthy",
+        "overfit",
+        "underfit",
+        "unstable",
+    }
+    assert "train_scores" not in board.columns
+    assert all(len(t.train_scores) == len(t.fold_scores) for t in result.trials)

@@ -1,5 +1,6 @@
 """Tests for the fit-health verdict."""
 
+from mml.contracts import experiments
 from mml.evaluation import fit_health
 
 
@@ -44,3 +45,42 @@ def test_an_oriented_error_metric_works_the_same_way():
 
     assert result.verdict == "overfit"
     assert result.to_dict()["verdict"] == "overfit"
+
+
+def make_trial(name, scores, train, strategy="default"):
+    return experiments.TrialResult(
+        "t",
+        name,
+        experiments.TrialStatus.OK,
+        "m",
+        fold_scores=scores,
+        train_scores=train,
+        strategy=strategy,
+    )
+
+
+def test_a_trial_is_judged_against_the_baseline_trial_of_its_run():
+    baseline = make_trial("dummy", [0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    memoriser = make_trial("tree", [0.7, 0.7, 0.7], [1.0, 1.0, 1.0])
+
+    health = fit_health.assess_trial(memoriser, [baseline, memoriser], True)
+
+    assert health is not None and health.verdict == "overfit"
+
+
+def test_error_metrics_are_oriented_before_judging():
+    baseline = make_trial("dummy", [100.0, 100.0, 100.0], [100.0] * 3)
+    overfit = make_trial("tree", [60.0, 62.0, 58.0], [5.0, 6.0, 5.0])
+
+    health = fit_health.assess_trial(overfit, [baseline, overfit], False)
+
+    assert health is not None and health.verdict == "overfit"
+
+
+def test_without_a_baseline_or_training_scores_there_is_no_verdict():
+    alone = make_trial("tree", [0.7, 0.7, 0.7], [1.0, 1.0, 1.0])
+    no_train = make_trial("tree", [0.7, 0.7, 0.7], [])
+    baseline = make_trial("dummy", [0.5] * 3, [0.5] * 3)
+
+    assert fit_health.assess_trial(alone, [alone], True) is None
+    assert fit_health.assess_trial(no_train, [baseline, no_train], True) is None

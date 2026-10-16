@@ -13,12 +13,14 @@ from mml.artifacts import bundle as bundle_module
 from mml.contracts import data as data_contracts
 from mml.contracts import experiments
 from mml.data.readers import interchange
+from mml.evaluation import fit_health
 
 LEADERBOARD_DETAILS = (
     "fold_scores",
     "observed_access",
     "evaluation_config",
     "runtime",
+    "train_scores",
 )
 
 
@@ -57,9 +59,21 @@ class RunResult:
         report = self.diagnostics.get("permutation_importance", {})
         return pd.DataFrame(report.get("features", []))
 
+    def health_label(self, trial: experiments.TrialResult) -> str:
+        """Fit-health verdict of a trial, or an empty string if unknown."""
+        if trial.status is not experiments.TrialStatus.OK:
+            return ""
+        health = fit_health.assess_trial(
+            trial, self.trials, self.evaluation["metric_greater_is_better"]
+        )
+        return "" if health is None else health.verdict
+
     def leaderboard(self) -> pd.DataFrame:
         """Returns trials ranked best-first, failed/skipped trials last."""
         board = pd.DataFrame([t.to_dict() for t in self.trials])
+        board["fit_health"] = [
+            self.health_label(trial) for trial in self.trials
+        ]
         board = board.drop(columns=list(LEADERBOARD_DETAILS))
         board["params"] = board["params"].map(json.dumps)
         board["selected"] = (
