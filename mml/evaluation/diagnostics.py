@@ -48,6 +48,8 @@ class DiagnosticInput:
             repeated entities (resampling then draws whole groups).
         temporal: Whether rows are chronologically ordered and serially
             dependent (resampling then draws contiguous blocks).
+        reference_features: Development rows the model was trained on, for
+            diagnostics that compare them with the evaluation rows.
     """
 
     estimator: Any
@@ -59,6 +61,7 @@ class DiagnosticInput:
     seed: int
     groups: pd.Series | None = None
     temporal: bool = False
+    reference_features: pd.DataFrame | None = None
 
     @property
     def positive_label(self) -> Any:

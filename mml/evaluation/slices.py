@@ -66,7 +66,7 @@ class SliceReport(diagnostics.Diagnostic):
                         "gap": float(gap),
                     }
                 )
-        scored.sort(key=lambda item: -item["gap"])
+        scored.sort(key=lambda item: -float(item["gap"]))
         return {
             "metric": metric.name,
             "overall": float(overall),
