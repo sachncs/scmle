@@ -193,6 +193,36 @@ now closed.
 Deliberate deviation: section 3 recommends a `src` layout; the module tree is
 followed under a flat `mml/` package (no `src/`), as the project owner instructed.
 
+## Beyond the first slice
+
+Capabilities added after the first vertical slice, each with its tests.
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| Deep learning registered as model-family plugins: PyTorch MLP, residual network, TabM-style ensemble, FT-Transformer and a RealMLP-style network, all computed in a worker process so the framework never imports torch | Implemented | `mml/models/deeplearning/networks.py`, `mml/models/deeplearning/worker.py::WorkerClient`, `tests/unit/test_deeplearning.py::test_the_framework_process_never_imports_torch`, `tests/unit/test_deeplearning.py::test_torch_shares_a_process_with_xgboost_and_lightgbm` |
+| Training health: warm-up and cosine learning-rate schedule, automatic batch size, gradient clipping, divergence and vanishing / exploding detection | Implemented | `mml/models/deeplearning/training.py::TrainingMonitor`, `tests/unit/test_training.py::test_non_finite_values_mean_divergence_and_stop_the_run` |
+| Bagging for unstable learners | Implemented | `mml/models/sklearn/bagging.py::BaggedAdapter`, `tests/unit/test_bagging.py::test_the_bagger_wraps_the_base_model_and_applies_both_parameter_sets` |
+| Early stopping of boosting on an internal holdout | Implemented | `mml/models/boosting/early_stopping.py::HoldoutEarlyStopping`, `tests/unit/test_early_stopping.py::test_lightgbm_stops_well_before_the_round_limit` |
+| Under- and over-training: a fit-health verdict per trial and for the selected model | Implemented | `mml/evaluation/fit_health.py::assess`, `tests/unit/test_fit_health.py::test_a_model_that_memorises_is_overfit` |
+| Paired Bayesian comparison drives tie handling in selection | Implemented | `mml/evaluation/comparison.py::compare_paired`, `mml/evaluation/selection.py::BestMeanPolicy`, `tests/unit/test_evaluation.py::test_bayesian_selection_prefers_the_simpler_model_when_gain_is_noise` |
+| Stress tests: score under missing values, noise and unseen categories | Implemented | `mml/evaluation/robustness.py::RobustnessReport`, `tests/unit/test_robustness.py::test_every_scenario_is_scored_and_noise_hurts_a_signal_model` |
+| Subgroup performance with the worst slices surfaced | Implemented | `mml/evaluation/slices.py::SliceReport`, `tests/unit/test_slices.py::test_the_worst_slice_is_the_region_the_model_cannot_learn` |
+| Adversarial validation between development and test rows | Implemented | `mml/evaluation/shift.py::AdversarialValidation`, `tests/unit/test_shift.py::test_a_moved_feature_is_detected_and_named` |
+| Conformal prediction intervals and sets with a stated coverage, stored in the bundle | Implemented | `mml/evaluation/conformal.py::ConformalCalibrator`, `tests/unit/test_conformal.py::test_regression_intervals_cover_at_the_requested_rate`, `tests/integration/test_end_to_end.py::test_regression_bundles_return_calibrated_intervals` |
+| Explanations: permutation importance, partial dependence, per-prediction attribution | Implemented | `mml/explainability/local.py::OcclusionExplainer`, `tests/unit/test_explainability.py::test_partial_dependence_follows_the_driving_feature` |
+| Automatic feature construction (differences, ratios) and L1 feature selection, tested as strategies | Implemented | `mml/data/curation/selection.py::SparseSelector`, `tests/unit/test_selection.py::test_the_sparse_selector_drops_noise_and_keeps_signal`, `tests/unit/test_strategies.py::test_constructed_ratios_let_a_linear_model_learn_a_ratio_target` |
+| Profile-driven recommendations for the user | Implemented | `mml/intelligence/recommendations.py::recommend`, `tests/unit/test_recommendations.py::test_severe_imbalance_suggests_metric_and_threshold` |
+| Locked test rows held by a separate vault process under hard enforcement | Implemented | `mml/governance/vault.py::SealedTestSet`, `tests/unit/test_vault.py::test_the_rows_are_released_once_to_the_token_holder`, `tests/leakage/test_leakage.py::test_hard_enforcement_moves_the_test_rows_out_of_reach` |
+| Run audit against lifecycle and locked-test invariants | Implemented | `mml/governance/audit.py::RunAuditor`, `tests/integration/test_audit.py::test_a_clean_run_passes_and_lists_its_decisions` |
+| Rolling-origin validation and a feature-availability contract for series data | Implemented | `mml/data/splitting/splitters.py::RollingSplit`, `mml/contracts/tasks.py::ProjectSpec`, `tests/unit/test_splitting.py::test_rolling_windows_slide_forward_and_always_validate_on_the_future` |
+| Model and family exclusion | Implemented | `mml/intelligence/planner.py::ExcludedModelsRule`, `tests/unit/test_planner.py::test_excluded_models_and_families_are_not_planned_and_are_explained` |
+| Predict from a saved bundle without the training project | Implemented | `mml/api/predict.py::predict`, `tests/integration/test_predict_api.py::test_a_saved_bundle_predicts_without_the_project` |
+
+Known limits of the isolation: the vault protects the locked rows from code
+in trial processes and plugins that run in them. It cannot stop a process
+from reading the original data file if the caller passed a path, and a
+caller's own in-memory DataFrame still contains every row.
+
 ## 21. Risks
 
 | Risk | Mitigation shipped | Evidence |

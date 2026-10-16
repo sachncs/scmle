@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+* Package layout follows the section 3 module tree under a flat `mml/`;
+  modules carry their real names, with no compatibility aliases.
+* Logging replaces `print` in the library, CLI, benchmarks and examples.
+* PyTorch model families (MLP, residual, TabM-style ensemble,
+  FT-Transformer, RealMLP-style) computed in a dedicated worker process;
+  warm-up and cosine schedule, automatic batch size, gradient clipping and a
+  training-health report; `deeplearning` extra.
+* Bagging adapters; early stopping for LightGBM, XGBoost and CatBoost.
+* Fit-health verdicts (healthy, overfit, underfit, unstable) per trial.
+* Paired Bayesian tie handling in selection (`uncertainty="bayesian"`).
+* Diagnostics: slices, robustness stress tests, adversarial validation,
+  partial dependence, per-prediction attribution; reliability section in the
+  report.
+* Conformal prediction intervals and sets stored in the bundle.
+* Automatic feature construction and L1 selection as tested strategies.
+* Profile-driven recommendations; run audit; `mml.predict` / `mml.load_model`.
+* Under hard enforcement the locked test rows live in a separate vault
+  process.
+* Rolling-origin validation and `data.feature_delays`.
+* `models.exclude_models` / `models.exclude_families`.
+
 ## 0.1.0b1
 
 First public beta.
