@@ -61,7 +61,7 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
                 rho = stats.spearmanr(values, outcome, nan_policy="omit")[0]
                 scored.append((abs(float(np.nan_to_num(rho))), column))
             scored.sort(key=lambda item: (-item[0], item[1]))
-            chosen = [column for __, column in scored[: self.top]]
+            chosen = [entry[1] for entry in scored[: self.top]]
             self.pairs_ = list(combinations(sorted(chosen), 2))
         self.feature_names_in_ = np.asarray(features.columns, dtype=object)
         return self

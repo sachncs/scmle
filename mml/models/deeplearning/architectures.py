@@ -93,7 +93,7 @@ class ResidualArchitecture(Architecture):
                 hidden = self.linear(torch.relu(self.norm(features)))
                 return features + self.drop(hidden)
 
-        blocks = [Block() for __ in hidden_sizes]
+        blocks = [Block() for size in hidden_sizes if size]
         return torch.nn.Sequential(
             torch.nn.Linear(inputs, width),
             *blocks,

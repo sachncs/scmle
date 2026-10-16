@@ -217,6 +217,19 @@ class SelectionSpec(FrozenModel):
     uncertainty: Literal["none", "one_standard_error"] = "none"
 
 
+class ModelSpec(FrozenModel):
+    """Which model families may be considered.
+
+    Attributes:
+        exclude_models: Model names that must not run.
+        exclude_families: Model families that must not run (for example
+            `deep_learning`, `boosting`).
+    """
+
+    exclude_models: list[str] = pydantic.Field(default_factory=list)
+    exclude_families: list[str] = pydantic.Field(default_factory=list)
+
+
 class DecisionSpec(FrozenModel):
     """How binary probabilities become decisions (threshold optimization)."""
 
@@ -238,6 +251,7 @@ class ProjectSpec(FrozenModel):
     resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
     search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
     strategies: StrategySpec = pydantic.Field(default_factory=StrategySpec)
+    models: ModelSpec = pydantic.Field(default_factory=ModelSpec)
     feature_graph: FeatureGraphSpec = pydantic.Field(
         default_factory=FeatureGraphSpec
     )

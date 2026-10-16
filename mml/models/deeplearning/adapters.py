@@ -28,7 +28,7 @@ class TorchAdapter(models.ModelAdapter):
         architecture: Name in `architectures.ARCHITECTURES`.
     """
 
-    family = "neural"
+    family = "deep_learning"
     requires = ("torch",)
     architecture: ClassVar[str]
     capabilities = models.Capabilities(

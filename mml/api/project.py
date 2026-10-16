@@ -48,6 +48,7 @@ class MLProject:
         seed: int = 42,
         search: tasks.SearchSpec | None = None,
         strategies: tasks.StrategySpec | None = None,
+        models: tasks.ModelSpec | None = None,
         ensemble: tasks.EnsembleSpec | None = None,
         feature_graph: tasks.FeatureGraphSpec | None = None,
         selection: tasks.SelectionSpec | None = None,
@@ -88,6 +89,7 @@ class MLProject:
                 disable tuning.
             strategies: Which data strategies to evaluate; defaults to all.
                 Use `StrategySpec(top_models=0)` to disable.
+            models: Model names and families to exclude.
             ensemble: Stacking settings; `EnsembleSpec(size=0)` disables.
             feature_graph: Declarative derived features (row-wise, fitted and
                 time-series operations), versioned with the configuration.
@@ -133,6 +135,7 @@ class MLProject:
             ),
             search=search or tasks.SearchSpec(),
             strategies=strategies or tasks.StrategySpec(),
+            models=models or tasks.ModelSpec(),
             ensemble=ensemble or tasks.EnsembleSpec(),
             feature_graph=feature_graph or tasks.FeatureGraphSpec(),
             selection=selection or tasks.SelectionSpec(),

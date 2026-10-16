@@ -112,6 +112,18 @@ class ProjectCommand(Command):
             "--enforcement", choices=["hard", "cooperative"], default="hard"
         )
         parser.add_argument(
+            "--exclude-models",
+            nargs="*",
+            default=[],
+            help="model names to skip",
+        )
+        parser.add_argument(
+            "--exclude-families",
+            nargs="*",
+            default=[],
+            help="model families to skip (for example deep_learning)",
+        )
+        parser.add_argument(
             "--leakage-policy", choices=["warn", "block"], default="warn"
         )
         parser.add_argument(
@@ -132,6 +144,14 @@ class ProjectCommand(Command):
                 optimizer=args.optimizer,
             ),
         )
+        if args.exclude_models or args.exclude_families:
+            sections.setdefault(
+                "models",
+                tasks.ModelSpec(
+                    exclude_models=args.exclude_models,
+                    exclude_families=args.exclude_families,
+                ),
+            )
         if args.strategies is not None:
             sections.setdefault(
                 "strategies", tasks.StrategySpec(names=args.strategies)

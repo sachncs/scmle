@@ -266,6 +266,32 @@ class HighCardinalityRule(PlanningRule):
         return baselines + native + rest
 
 
+class ExcludedModelsRule(PlanningRule):
+    """Removes the models and families the specification excludes."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Drops excluded models, recording why."""
+        spec = context.spec.models
+        kept = []
+        for adapter in candidates:
+            if adapter.name in spec.exclude_models:
+                reason = "excluded by models.exclude_models"
+            elif adapter.family in spec.exclude_families:
+                reason = f"family '{adapter.family}' is excluded"
+            else:
+                kept.append(adapter)
+                continue
+            decisions.append(
+                experiments.Decision(adapter.name, Action.REJECT, reason)
+            )
+        return kept
+
+
 class ApprovedModelsRule(PlanningRule):
     """Restricts candidates to a human-approved subset."""
 
@@ -459,6 +485,7 @@ class EnsembleRule(PlanningRule):
 def default_rules() -> tuple[PlanningRule, ...]:
     """Returns the standard rule chain."""
     return (
+        ExcludedModelsRule(),
         GpuRule(),
         MemoryRule(),
         SerializableRule(),

@@ -10,6 +10,7 @@ from mml.contracts import tasks
 SECTIONS = {
     "search": tasks.SearchSpec,
     "strategies": tasks.StrategySpec,
+    "models": tasks.ModelSpec,
     "ensemble": tasks.EnsembleSpec,
     "feature_graph": tasks.FeatureGraphSpec,
     "selection": tasks.SelectionSpec,

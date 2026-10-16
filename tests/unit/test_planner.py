@@ -183,3 +183,22 @@ def test_every_adapter_declares_a_positive_memory_factor():
         adapter
     ) in registry_module.ModelRegistry.with_builtins().adapters.values():
         assert adapter.capabilities.memory_factor >= 1.0, adapter.name
+
+
+def test_excluded_models_and_families_are_not_planned_and_are_explained(
+    planner, frame
+):
+    plan = make_plan(
+        planner,
+        frame,
+        models=tasks.ModelSpec(
+            exclude_models=["random_forest"],
+            exclude_families=["deep_learning"],
+        ),
+    )
+
+    assert "random_forest" not in plan.candidate_models
+    assert not any(m.startswith("torch_") for m in plan.candidate_models)
+    reasons = {d.technique: d.reason for d in plan.decisions}
+    assert reasons["random_forest"] == "excluded by models.exclude_models"
+    assert "family 'deep_learning' is excluded" in reasons["torch_mlp"]
