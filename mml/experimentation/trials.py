@@ -21,6 +21,7 @@ import threadpoolctl
 
 from mml.contracts import data as data_contracts
 from mml.contracts import experiments
+from mml.contracts import metrics as metric_contracts
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.core import context as context_module
@@ -76,7 +77,7 @@ class TrialPayload:
     feature_plan: data_contracts.FeaturePlan
     task: tasks.TaskType
     seed: int
-    metric: metrics.Metric
+    metric: metric_contracts.Metric
     positive_label: Any
     features: pd.DataFrame
     target: pd.Series

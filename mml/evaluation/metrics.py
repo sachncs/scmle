@@ -4,14 +4,13 @@ Scores are always reported in natural units (log loss is positive);
 `greater_is_better` tells rankers which direction wins.
 """
 
-from collections.abc import Callable
-import dataclasses
 from typing import Any
 
 import pandas as pd
 from sklearn import metrics as sk_metrics
 
 from mml.contracts import errors
+from mml.contracts import metrics as metric_contracts
 from mml.contracts import models
 from mml.contracts import tasks
 
@@ -36,77 +35,12 @@ def positive_label(target: pd.Series, task: tasks.TaskType) -> Any:
     return sorted(target.dropna().unique())[1]
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class Metric:
-    """A scoring rule.
-
-    Attributes:
-        name: Public metric name.
-        scorer_name: scikit-learn scorer (sign-adjusted so larger is better).
-        greater_is_better: Whether larger natural values are better.
-        tasks: Tasks the metric is defined for.
-    """
-
-    name: str
-    scorer_name: str
-    greater_is_better: bool
-    tasks: frozenset[tasks.TaskType]
-
-    def to_natural(self, scorer_value: float) -> float:
-        """Converts a sign-adjusted scorer value to natural units."""
-        return scorer_value if self.greater_is_better else -scorer_value
-
-    def scorer(self, positive: Any = None) -> Any:
-        """Returns the scikit-learn scorer.
-
-        Args:
-            positive: Positive class label (used by subclasses that need it).
-        """
-        return sk_metrics.get_scorer(self.scorer_name)
-
-    def score(
-        self,
-        estimator: models.Estimator,
-        features: pd.DataFrame,
-        target: pd.Series,
-        positive: Any = None,
-    ) -> float:
-        """Scores a fitted estimator in natural units."""
-        scorer = self.scorer(positive)
-        return self.to_natural(float(scorer(estimator, features, target)))
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class PositiveLabelMetric(Metric):
-    """A binary metric defined relative to a positive class.
-
-    scikit-learn's stock scorers hard-code `pos_label=1`, which breaks on
-    string or other non-{0, 1} labels; this builds the scorer with the real
-    positive class instead.
-
-    Attributes:
-        score_function: Function `(y_true, y_pred_or_score, pos_label=...)`.
-        response_methods: Estimator methods supplying the prediction.
-    """
-
-    score_function: Callable[..., float] = sk_metrics.f1_score
-    response_methods: tuple[str, ...] = ("predict",)
-
-    def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer bound to `positive` (stock scorer if unknown)."""
-        if positive is None:
-            return super().scorer(None)
-        return sk_metrics.make_scorer(
-            self.score_function,
-            response_method=self.response_methods,
-            pos_label=positive,
-        )
-
-
 DEFAULT_METRICS = (
-    Metric("roc_auc", "roc_auc", True, frozenset({BINARY})),
-    Metric("roc_auc_ovr", "roc_auc_ovr", True, frozenset({MULTICLASS})),
-    PositiveLabelMetric(
+    metric_contracts.Metric("roc_auc", "roc_auc", True, frozenset({BINARY})),
+    metric_contracts.Metric(
+        "roc_auc_ovr", "roc_auc_ovr", True, frozenset({MULTICLASS})
+    ),
+    metric_contracts.PositiveLabelMetric(
         "pr_auc",
         "average_precision",
         True,
@@ -114,8 +48,8 @@ DEFAULT_METRICS = (
         sk_metrics.average_precision_score,
         ("decision_function", "predict_proba"),
     ),
-    Metric("log_loss", "neg_log_loss", False, CLASSIFICATION),
-    PositiveLabelMetric(
+    metric_contracts.Metric("log_loss", "neg_log_loss", False, CLASSIFICATION),
+    metric_contracts.PositiveLabelMetric(
         "f1",
         "f1",
         True,
@@ -123,14 +57,18 @@ DEFAULT_METRICS = (
         sk_metrics.f1_score,
         ("predict",),
     ),
-    Metric("f1_macro", "f1_macro", True, CLASSIFICATION),
-    Metric("balanced_accuracy", "balanced_accuracy", True, CLASSIFICATION),
-    Metric("accuracy", "accuracy", True, CLASSIFICATION),
-    Metric("mae", "neg_mean_absolute_error", False, frozenset({REGRESSION})),
-    Metric(
+    metric_contracts.Metric("f1_macro", "f1_macro", True, CLASSIFICATION),
+    metric_contracts.Metric(
+        "balanced_accuracy", "balanced_accuracy", True, CLASSIFICATION
+    ),
+    metric_contracts.Metric("accuracy", "accuracy", True, CLASSIFICATION),
+    metric_contracts.Metric(
+        "mae", "neg_mean_absolute_error", False, frozenset({REGRESSION})
+    ),
+    metric_contracts.Metric(
         "rmse", "neg_root_mean_squared_error", False, frozenset({REGRESSION})
     ),
-    Metric("r2", "r2", True, frozenset({REGRESSION})),
+    metric_contracts.Metric("r2", "r2", True, frozenset({REGRESSION})),
 )
 
 
@@ -155,7 +93,9 @@ class MetricCatalog:
         REGRESSION: ("mae", "rmse", "r2"),
     }
 
-    def __init__(self, metrics: tuple[Metric, ...] = DEFAULT_METRICS) -> None:
+    def __init__(
+        self, metrics: tuple[metric_contracts.Metric, ...] = DEFAULT_METRICS
+    ) -> None:
         """Initializes the catalog.
 
         Args:
@@ -163,7 +103,9 @@ class MetricCatalog:
         """
         self.metrics = {metric.name: metric for metric in metrics}
 
-    def resolve(self, name: str | None, task: tasks.TaskType) -> Metric:
+    def resolve(
+        self, name: str | None, task: tasks.TaskType
+    ) -> metric_contracts.Metric:
         """Finds the metric to optimize.
 
         Args:

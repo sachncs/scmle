@@ -5,8 +5,8 @@ import math
 
 from mml.contracts import errors
 from mml.contracts import experiments
+from mml.contracts import metrics as metric_contracts
 from mml.contracts import tasks
-from mml.evaluation import metrics
 from mml.models import registry as registry_module
 
 SCORE_PRECISION = 12
@@ -26,7 +26,7 @@ class SelectionPolicy(abc.ABC):
     def rank(
         self,
         trials: list[experiments.TrialResult],
-        metric: metrics.Metric,
+        metric: metric_contracts.Metric,
         registry: registry_module.ModelRegistry,
     ) -> list[experiments.TrialResult]:
         """Orders the eligible trials best first.
@@ -46,7 +46,7 @@ class SelectionPolicy(abc.ABC):
     def select(
         self,
         trials: list[experiments.TrialResult],
-        metric: metrics.Metric,
+        metric: metric_contracts.Metric,
         registry: registry_module.ModelRegistry,
     ) -> experiments.TrialResult:
         """Returns the best-ranked trial."""
@@ -92,7 +92,7 @@ class BestMeanPolicy(SelectionPolicy):
     def rank(
         self,
         trials: list[experiments.TrialResult],
-        metric: metrics.Metric,
+        metric: metric_contracts.Metric,
         registry: registry_module.ModelRegistry,
     ) -> list[experiments.TrialResult]:
         """Sorts by score, resolving ties with the configured tie-breaker."""

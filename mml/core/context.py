@@ -15,6 +15,7 @@ from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import events
 from mml.contracts import experiments
+from mml.contracts import metrics as metric_contracts
 from mml.contracts import tasks
 from mml.core import limits
 from mml.core import scheduler
@@ -127,7 +128,7 @@ class RunContext:
     profile: data_contracts.DatasetProfile | None = None
     split: splitters.SplitResult | None = None
     plan: experiments.ExperimentPlan | None = None
-    metric: metrics.Metric | None = None
+    metric: metric_contracts.Metric | None = None
     trials: list[experiments.TrialResult] = dataclasses.field(
         default_factory=list
     )

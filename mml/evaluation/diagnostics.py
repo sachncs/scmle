@@ -18,8 +18,8 @@ from sklearn import metrics as sk_metrics
 
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
+from mml.contracts import metrics as metric_contracts
 from mml.contracts import tasks
-from mml.evaluation import metrics as metric_module
 
 CALIBRATION_BINS = 10
 MAX_SEGMENT_LEVELS = 12
@@ -54,7 +54,7 @@ class DiagnosticInput:
     features: pd.DataFrame
     target: pd.Series
     task: tasks.TaskType
-    metric: metric_module.Metric
+    metric: metric_contracts.Metric
     feature_plan: data_contracts.FeaturePlan
     seed: int
     groups: pd.Series | None = None
