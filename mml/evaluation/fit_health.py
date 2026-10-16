@@ -129,5 +129,5 @@ def assess_trial(
     return assess(
         [sign * s for s in trial.train_scores],
         [sign * s for s in trial.fold_scores],
-        sign * baseline.score_mean,
+        sign * float(np.mean(baseline.fold_scores)),
     )
