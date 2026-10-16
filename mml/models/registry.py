@@ -13,6 +13,7 @@ from mml.contracts import tasks
 from mml.models import conformance
 from mml.models import ensembles
 from mml.models.boosting import adapters as boosting_adapters
+from mml.models.deeplearning import adapters as deep_adapters
 from mml.models.sklearn import adapters as sklearn_adapters
 
 ENTRY_POINT_GROUP = "mml.models"
@@ -34,14 +35,17 @@ class ModelRegistry:
 
     @classmethod
     def with_builtins(cls) -> Self:
-        """Creates a registry with the scikit-learn and boosting adapters.
+        """Creates a registry with the built-in adapters.
 
-        Boosting adapters register unconditionally; they are rejected at
+        These are scikit-learn, boosting and PyTorch families.
+
+        Optional adapters register unconditionally; they are rejected at
         planning time when their library is not installed.
         """
         classes = (
             *sklearn_adapters.BUILTIN_ADAPTERS,
             *boosting_adapters.BOOSTING_ADAPTERS,
+            *deep_adapters.DEEP_LEARNING_ADAPTERS,
         )
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))
