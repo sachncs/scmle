@@ -16,6 +16,8 @@ Supervision applies when `ResourceSpec.enforcement` is `hard` (the default);
 """
 
 from collections.abc import Callable
+from collections.abc import Iterator
+import contextlib
 import dataclasses
 import multiprocessing
 from multiprocessing import connection
@@ -37,10 +39,37 @@ MIN_CEILING_SECONDS = 1.0
 POLL_SECONDS = 0.1
 PS_FIELDS = 3
 PRELOAD_MODULES = ["numpy", "pandas", "sklearn"]
+ACCELERATE_THREADS = "VECLIB_MAXIMUM_THREADS"
 
 
 class TrialLimitError(errors.MagicMLError):
     """Raised when a supervised trial was stopped or lost."""
+
+
+@contextlib.contextmanager
+def forkserver_environment() -> Iterator[None]:
+    """Starts the forkserver with a fork-safe BLAS configuration.
+
+    On macOS the Accelerate library parallelises large matrix products with
+    Grand Central Dispatch, whose thread pool does not survive `fork()`: a
+    trial process forked from the warmed-up server crashes on its first big
+    product. Accelerate reads `VECLIB_MAXIMUM_THREADS` when it loads, so the
+    server (which loads numpy) is started with it set to 1. Trials are
+    already single-threaded; parallelism comes from running several. The
+    variable is restored afterwards so this process is unaffected.
+    """
+    if sys.platform != "darwin":
+        yield
+        return
+    previous = os.environ.get(ACCELERATE_THREADS)
+    os.environ[ACCELERATE_THREADS] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop(ACCELERATE_THREADS, None)
+        else:
+            os.environ[ACCELERATE_THREADS] = previous
 
 
 def peak_memory_gb() -> float:
@@ -154,7 +183,8 @@ class TrialSupervisor:
             target=child_main, args=(sender, function, argument)
         )
         started = time.monotonic()
-        process.start()
+        with forkserver_environment():
+            process.start()
         sender.close()
         try:
             while not receiver.poll(POLL_SECONDS):

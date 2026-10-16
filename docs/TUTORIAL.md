@@ -184,18 +184,23 @@ selection = tasks.SelectionSpec(uncertainty="bayesian", rope=0.005)
 
 # Series data: rolling-origin validation and delayed columns.
 project = mml.MLProject(
-    data, "demand", time_column="week", validation="rolling",
-    horizon_rows=52, window_rows=520, feature_delays={"survey": 4},
+    data,
+    "demand",
+    time_column="week",
+    validation="rolling",
+    horizon_rows=52,
+    window_rows=520,
+    feature_delays={"survey": 4},
 )
 
 # After a run: reliability checks, explanations and calibrated uncertainty.
-result.evaluation["fit_health"]            # healthy / overfit / underfit
-result.diagnostics["robustness"]           # score under degraded input
-result.diagnostics["slice_performance"]    # weakest subgroups
+result.evaluation["fit_health"]  # healthy / overfit / underfit
+result.diagnostics["robustness"]  # score under degraded input
+result.diagnostics["slice_performance"]  # weakest subgroups
 result.diagnostics["adversarial_validation"]  # development vs test shift
-result.explain(rows, background)           # per-prediction attribution
-result.bundle.predict_interval(rows, coverage=0.9)   # regression
-result.bundle.predict_set(rows, coverage=0.9)        # classification
+result.explain(rows, background)  # per-prediction attribution
+result.bundle.predict_interval(rows, coverage=0.9)  # regression
+result.bundle.predict_set(rows, coverage=0.9)  # classification
 ```
 
 ## 10. Extending

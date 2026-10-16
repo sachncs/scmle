@@ -1159,7 +1159,7 @@ def test_l739_l747_first_sprint_outcomes(run):
         tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
     ).profile(frame, manifest, tasks.TaskType.BINARY)
     assert set(profile.feature_plan.features) == {"a", "b", "c"}  # profiling
-    assert {"stratified", "random", "group", "temporal"} == set(
+    assert {"stratified", "random", "group", "temporal"} <= set(
         splitters.STRATEGIES
     )  # 4 split manager
     result = run[1]

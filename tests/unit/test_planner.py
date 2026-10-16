@@ -192,13 +192,12 @@ def test_excluded_models_and_families_are_not_planned_and_are_explained(
         planner,
         frame,
         models=tasks.ModelSpec(
-            exclude_models=["random_forest"],
-            exclude_families=["deep_learning"],
+            exclude_models=["random_forest"], exclude_families=["linear"]
         ),
     )
 
     assert "random_forest" not in plan.candidate_models
-    assert not any(m.startswith("torch_") for m in plan.candidate_models)
+    assert "logistic_regression" not in plan.candidate_models
     reasons = {d.technique: d.reason for d in plan.decisions}
     assert reasons["random_forest"] == "excluded by models.exclude_models"
-    assert "family 'deep_learning' is excluded" in reasons["torch_mlp"]
+    assert "family 'linear' is excluded" in reasons["logistic_regression"]

@@ -1,5 +1,7 @@
 """Tests for hard time and memory limits enforced by process supervision."""
 
+import os
+import sys
 import time
 
 import numpy as np
@@ -64,3 +66,31 @@ def test_governor_modes_describe_their_enforcement():
     )
     assert not soft.hard
     assert "cooperative" in soft.report()["memory"]["enforcement"]
+
+
+def read_thread_setting(value):
+    return os.environ.get(limits.ACCELERATE_THREADS)
+
+
+def large_products(value):
+    import numpy as np
+
+    matrix = np.random.default_rng(0).normal(size=(3000, 3000))
+    vector = np.ones(3000)
+    return float(sum((matrix @ vector).sum() for __ in range(3)))
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="Accelerate is macOS only")
+def test_trial_processes_run_with_single_threaded_accelerate_and_survive():
+    supervisor = limits.TrialSupervisor(120.0, None)
+
+    assert supervisor.run(read_thread_setting, 1) == "1"
+    assert isinstance(supervisor.run(large_products, 1), float)
+
+
+def test_the_environment_is_restored_after_starting_a_trial():
+    before = os.environ.get(limits.ACCELERATE_THREADS)
+
+    limits.TrialSupervisor(30.0, None).run(double, 2)
+
+    assert os.environ.get(limits.ACCELERATE_THREADS) == before
