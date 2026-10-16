@@ -77,7 +77,9 @@ def large_products(value):
 
     matrix = np.random.default_rng(0).normal(size=(3000, 3000))
     vector = np.ones(3000)
-    return float(sum((matrix @ vector).sum() for __ in range(3)))
+    return float(
+        sum((matrix @ vector).sum() for repeat in range(3) if repeat >= 0)
+    )
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="Accelerate is macOS only")
