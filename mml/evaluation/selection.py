@@ -7,6 +7,7 @@ from mml.contracts import errors
 from mml.contracts import experiments
 from mml.contracts import metrics as metric_contracts
 from mml.contracts import tasks
+from mml.evaluation import comparison
 from mml.models import registry as registry_module
 
 SCORE_PRECISION = 12
@@ -79,15 +80,44 @@ class BestMeanPolicy(SelectionPolicy):
     def describe(rule: tasks.SelectionSpec) -> str:
         """Human-readable rule recorded in the evaluation report."""
         tie = f"{rule.tie_tolerance:g}" if rule.tie_tolerance else "exact"
-        noise = (
-            "; scores within one standard error of the best are ties"
-            if rule.uncertainty == "one_standard_error"
-            else ""
-        )
+        noise = {
+            "one_standard_error": (
+                "; scores within one standard error of the best are ties"
+            ),
+            "bayesian": (
+                "; candidates are ties unless the best is better with "
+                f"probability >= {rule.bayesian_confidence:g}"
+            ),
+        }.get(rule.uncertainty, "")
         return (
             f"best mean CV score; {tie} ties -> {rule.tie_breaker}{noise}; "
             "dummy baseline excluded when other models ran"
         )
+
+    def probably_equivalent(
+        self,
+        best: experiments.TrialResult,
+        other: experiments.TrialResult,
+        sign: int,
+    ) -> bool:
+        """Whether the best candidate is not credibly better than `other`.
+
+        Only used with `uncertainty="bayesian"` and when both candidates were
+        scored on the same number of folds (at least three).
+        """
+        if self.rule.uncertainty != "bayesian":
+            return False
+        if (
+            len(best.fold_scores) != len(other.fold_scores)
+            or len(best.fold_scores) < comparison.MIN_FOLDS
+        ):
+            return False
+        verdict = comparison.compare_paired(
+            [sign * s for s in best.fold_scores],
+            [sign * s for s in other.fold_scores],
+            rope=self.rule.rope,
+        )
+        return verdict.probability_first_better < self.rule.bayesian_confidence
 
     def rank(
         self,
@@ -134,6 +164,7 @@ class BestMeanPolicy(SelectionPolicy):
             t
             for t in ordered
             if sign * (best.score_mean - t.score_mean) <= tolerance + 1e-12
+            or self.probably_equivalent(best, t, sign)
         ]
         rest = [t for t in ordered if t not in tied]
         return sorted(tied, key=tie_key) + rest

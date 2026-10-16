@@ -238,3 +238,63 @@ def test_latency_safety_factor_scales_the_measured_latency():
         max_p95_latency_ms=15.0, latency_safety_factor=2.0
     )
     assert "safety factor 2" in slower.violations(usage)[0]
+
+
+def folds_trial(name, scores):
+    return TrialResult(
+        f"t_{name}",
+        name,
+        Status.OK,
+        "m",
+        score_mean=float(np.mean(scores)),
+        score_std=float(np.std(scores)),
+        fold_scores=scores,
+    )
+
+
+def test_bayesian_selection_prefers_the_simpler_model_when_gain_is_noise(
+    registry,
+):
+    policy = selection.BestMeanPolicy(
+        tasks.SelectionSpec(uncertainty="bayesian")
+    )
+    noisy_winner = folds_trial("random_forest", [0.80, 0.86, 0.78, 0.85, 0.79])
+    simpler = folds_trial("decision_tree", [0.83, 0.82, 0.82, 0.82, 0.83])
+
+    winner = policy.select(
+        [noisy_winner, simpler], CATALOG.metrics["roc_auc"], registry
+    )
+
+    assert noisy_winner.score_mean > simpler.score_mean - 0.01
+    assert winner.model_name == "decision_tree"
+
+
+def test_bayesian_selection_keeps_a_credibly_better_model(registry):
+    policy = selection.BestMeanPolicy(
+        tasks.SelectionSpec(uncertainty="bayesian")
+    )
+    clear_winner = folds_trial("random_forest", [0.90, 0.91, 0.90, 0.92, 0.91])
+    simpler = folds_trial("decision_tree", [0.80, 0.81, 0.80, 0.82, 0.81])
+
+    winner = policy.select(
+        [clear_winner, simpler], CATALOG.metrics["roc_auc"], registry
+    )
+
+    assert winner.model_name == "random_forest"
+    assert "probability" in policy.description
+
+
+def test_a_rope_makes_negligible_gains_ties(registry):
+    policy = selection.BestMeanPolicy(
+        tasks.SelectionSpec(uncertainty="bayesian", rope=0.02)
+    )
+    slightly_better = folds_trial(
+        "random_forest", [0.851, 0.852, 0.851, 0.852, 0.851]
+    )
+    simpler = folds_trial("decision_tree", [0.84, 0.84, 0.84, 0.84, 0.84])
+
+    winner = policy.select(
+        [slightly_better, simpler], CATALOG.metrics["roc_auc"], registry
+    )
+
+    assert winner.model_name == "decision_tree"

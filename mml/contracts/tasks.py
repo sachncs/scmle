@@ -204,7 +204,14 @@ class SelectionSpec(FrozenModel):
         tie_tolerance: Absolute score difference regarded as a tie.
         uncertainty: `one_standard_error` also treats every candidate within
             one standard error of the best mean score as tied, so noise is
-            not mistaken for a real difference.
+            not mistaken for a real difference. `bayesian` compares paired
+            fold scores and treats a candidate as tied with the best unless
+            the best is better with at least `bayesian_confidence`
+            probability (beyond a region of practical equivalence `rope`).
+        bayesian_confidence: Probability the best candidate must reach to be
+            declared better than another.
+        rope: Half-width, in metric units, of the region in which two
+            candidates count as equivalent.
     """
 
     maximize: str | None = None
@@ -214,7 +221,9 @@ class SelectionSpec(FrozenModel):
     max_candidates_checked: int = pydantic.Field(default=10, ge=1)
     tie_breaker: Literal["simpler_model", "lower_variance"] = "simpler_model"
     tie_tolerance: float = pydantic.Field(default=0.0, ge=0.0)
-    uncertainty: Literal["none", "one_standard_error"] = "none"
+    uncertainty: Literal["none", "one_standard_error", "bayesian"] = "none"
+    bayesian_confidence: float = pydantic.Field(default=0.95, gt=0.5, lt=1.0)
+    rope: float = pydantic.Field(default=0.0, ge=0.0)
 
 
 class ModelSpec(FrozenModel):
