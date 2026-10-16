@@ -1,8 +1,9 @@
-"""Post-selection diagnostics and explainability.
+"""Post-selection diagnostics.
 
 Each `Diagnostic` subclass computes one JSON-serializable report from the
 frozen, fitted candidate and the (already opened, single-use) test partition.
-Diagnostics never influence selection; they explain it.
+Diagnostics never influence selection; they explain it. Model explanations
+build on the same base class in `mml.explainability`.
 """
 
 import abc
@@ -13,7 +14,6 @@ from typing import ClassVar
 import numpy as np
 import pandas as pd
 from sklearn import base
-from sklearn import inspection
 from sklearn import metrics as sk_metrics
 
 from mml.contracts import data as data_contracts
@@ -22,7 +22,6 @@ from mml.contracts import tasks
 from mml.evaluation import metrics as metric_module
 
 CALIBRATION_BINS = 10
-IMPORTANCE_REPEATS = 5
 MAX_SEGMENT_LEVELS = 12
 MAX_SEGMENT_FEATURES = 3
 SEGMENT_BANDS = 4
@@ -243,37 +242,6 @@ class ResidualReport(Diagnostic):
         return report
 
 
-class PermutationImportance(Diagnostic):
-    """Model-agnostic feature importance on the evaluation data."""
-
-    name = "permutation_importance"
-
-    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Measures the metric drop when each feature is shuffled."""
-        columns = list(inputs.feature_plan.input_columns)
-        scorer = inputs.metric.scorer(inputs.positive_label)
-        result = inspection.permutation_importance(
-            inputs.estimator,
-            inputs.features[columns],
-            inputs.target,
-            scoring=scorer,
-            n_repeats=IMPORTANCE_REPEATS,
-            random_state=inputs.seed,
-        )
-        ranked = np.argsort(-result.importances_mean)
-        return {
-            "metric": inputs.metric.name,
-            "features": [
-                {
-                    "feature": columns[i],
-                    "importance": float(result.importances_mean[i]),
-                    "std": float(result.importances_std[i]),
-                }
-                for i in ranked
-            ],
-        }
-
-
 class CachedPredictions(base.BaseEstimator):
     """Replays a fitted model's predictions by row label.
 
@@ -438,7 +406,6 @@ def default_suite() -> tuple[Diagnostic, ...]:
         CalibrationReport(),
         ThresholdReport(),
         ResidualReport(),
-        PermutationImportance(),
         MetricUncertainty(),
     )
 

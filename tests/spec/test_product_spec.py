@@ -1038,6 +1038,7 @@ def test_l610_l629_backlog_priorities(run):
     """L610-L629: each backlog row has a working implementation."""
     from mml.contracts import models as model_contracts
     from mml.evaluation import diagnostics
+    from mml.explainability import importance
     from mml.governance import registry
     from mml.inference import serving
     from mml.intelligence import knowledge
@@ -1056,7 +1057,7 @@ def test_l610_l629_backlog_priorities(run):
     )
     assert report.recommendation.action  # P2 monitoring
     assert issubclass(
-        diagnostics.PermutationImportance, diagnostics.Diagnostic
+        importance.PermutationImportance, diagnostics.Diagnostic
     )  # P1 explainability
     assert "permutation_importance" in result.diagnostics
     assert issubclass(ensembles.StackingAdapter, model_contracts.ModelAdapter)

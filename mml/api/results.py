@@ -104,6 +104,15 @@ class RunResult:
         """Predicts class probabilities with the best model."""
         return self.bundle.predict_proba(data)
 
+    def explain(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        background: str | pathlib.Path | pd.DataFrame,
+        class_label: Any = None,
+    ) -> pd.DataFrame:
+        """Explains predictions of the best model against a background."""
+        return self.bundle.explain(data, background, class_label=class_label)
+
     def summary(self) -> str:
         """Returns a one-line human-readable result."""
         evaluation = self.evaluation

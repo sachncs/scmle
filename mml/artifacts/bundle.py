@@ -30,6 +30,7 @@ from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data.readers import interchange
 from mml.data.readers import tabular
+from mml.explainability import local
 from mml.features import graph as feature_graph
 from mml.inference import mapping as mapping_module
 from mml.inference import validation
@@ -46,6 +47,7 @@ SIGNATURE_FILE = "signature.json"
 SIGNING_KEY_ENV = "MAGICML_SIGNING_KEY"
 SIGNATURE_ALGORITHM = "hmac-sha256"
 MANIFEST_FILE = "model_manifest.json"
+BINARY_CLASSES = 2
 MAX_KNOWN_CATEGORIES = 200
 
 
@@ -778,3 +780,49 @@ class ModelBundle:
         if self.calibrator is not None:
             return self.calibrator.predict_proba(frame)
         return self.pipeline.predict_proba(frame)
+
+    def explain(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        background: str | pathlib.Path | pd.DataFrame,
+        mapping: mapping_module.ColumnMapping | None = None,
+        class_label: Any = None,
+    ) -> pd.DataFrame:
+        """Explains individual predictions against a background sample.
+
+        Args:
+            data: Rows to explain (DataFrame or path).
+            background: Rows describing typical input, for example a sample
+                of the training data.
+            mapping: Explicit column-name policy; exact names if omitted.
+            class_label: Class whose probability is explained; the positive
+                class when omitted for binary models.
+
+        Returns:
+            A `prediction` column (probability of the class, or the
+            regression value) and one contribution column per feature.
+
+        Raises:
+            ArtifactError: For a multiclass model without `class_label`.
+        """
+        rows = self.prepare_frame(data, mapping)
+        reference = self.prepare_frame(background, mapping)
+        if self.schema.task == "regression":
+            score = self.pipeline.predict
+        else:
+            classes = list(self.classes or ())
+            if class_label is None:
+                if len(classes) != BINARY_CLASSES:
+                    raise errors.ArtifactError(
+                        "a multiclass model needs class_label to explain"
+                    )
+                class_label = classes[1]
+            column = classes.index(class_label)
+            estimator = self.calibrator or self.pipeline
+
+            def score(frame: pd.DataFrame) -> np.ndarray:
+                return np.asarray(estimator.predict_proba(frame))[:, column]
+
+        return local.OcclusionExplainer(score, self.schema.features).explain(
+            rows, reference
+        )

@@ -9,6 +9,8 @@ from mml.contracts import tasks
 from mml.data.curation import preprocessing
 from mml.evaluation import diagnostics
 from mml.evaluation import metrics
+from mml.explainability import importance
+from mml.explainability import suite as suite_module
 from mml.models import registry as registry_module
 
 REGISTRY = registry_module.ModelRegistry.with_builtins()
@@ -46,7 +48,7 @@ def make_inputs(task, seed=0, rows=600):
 
 
 def test_importance_ranks_the_signal_feature_first():
-    report = diagnostics.PermutationImportance().compute(
+    report = importance.PermutationImportance().compute(
         make_inputs(tasks.TaskType.BINARY)
     )
     ranked = [row["feature"] for row in report["features"]]
@@ -100,18 +102,23 @@ def test_residual_report_segments_and_bias():
 
 
 def test_suite_selects_by_task_and_isolates_failures():
-    binary = diagnostics.run_suite(make_inputs(tasks.TaskType.BINARY))
+    suite = diagnostics.default_suite() + suite_module.default_suite()
+    binary = diagnostics.run_suite(make_inputs(tasks.TaskType.BINARY), suite)
     assert set(binary) == {
         "classification_report",
         "calibration",
         "threshold_analysis",
         "permutation_importance",
+        "partial_dependence",
         "metric_uncertainty",
     }
-    regression = diagnostics.run_suite(make_inputs(tasks.TaskType.REGRESSION))
+    regression = diagnostics.run_suite(
+        make_inputs(tasks.TaskType.REGRESSION), suite
+    )
     assert set(regression) == {
         "residuals",
         "permutation_importance",
+        "partial_dependence",
         "metric_uncertainty",
     }
 
