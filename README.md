@@ -80,19 +80,21 @@ installed):
 
 | dataset | rows | task | metric | selected | cv | test | reference |
 | --- | ---: | --- | --- | --- | ---: | ---: | ---: |
-| breast_cancer | 569 | binary | roc_auc | svm / log_skewed | 0.9950 | 0.9957 | 0.9901 |
-| wine | 178 | multiclass | log_loss | lightgbm | 0.0561 | 0.0126 | 0.0099 |
-| digits | 1797 | multiclass | log_loss | lightgbm | 0.0806 | 0.0919 | 0.1394 |
-| diabetes | 442 | regression | rmse | ridge | 55.76 | 53.59 | 57.01 |
-| credit-g (OpenML) | 1000 | binary | roc_auc | catboost / calibrated | 0.8047 | 0.7842 | 0.7479 |
-| titanic (OpenML) | 1309 | binary | roc_auc | catboost / target_encoding | 0.9946 | 0.9940 | 0.9910 |
-| kc1 defects (OpenML) | 2109 | binary, 15% positive | pr_auc | catboost | 0.4828 | 0.5422 | 0.5249 |
-| adult income (OpenML, 12k) | 12000 | binary | roc_auc | logistic_regression / target_encoding | 0.9094 | 0.9146 | 0.9066 |
-| california housing (OpenML, 10k) | 10000 | regression | rmse | stacking | 47921 | 47090 | 49378 |
+| breast_cancer | 569 | binary | roc_auc | torch_realmlp | 0.9955 | 0.9940 | 0.9901 |
+| wine | 178 | multiclass | log_loss | stacking | 0.0647 | 0.1049 | 0.0099 |
+| digits | 1797 | multiclass | log_loss | catboost | 0.0840 | 0.0759 | 0.1394 |
+| diabetes | 442 | regression | rmse | torch_tabm | 55.42 | 50.43 | 57.01 |
+| credit-g (OpenML) | 1000 | binary | roc_auc | stacking | 0.8047 | 0.7823 | 0.7479 |
+| titanic (OpenML) | 1309 | binary | roc_auc | lightgbm | 0.9944 | 0.9920 | 0.9910 |
+| kc1 defects (OpenML) | 2109 | binary, 15% positive | pr_auc | stacking | 0.4773 | 0.4991 | 0.5249 |
+| adult income (OpenML, 12k) | 12000 | binary | roc_auc | torch_tabm / calibrated | 0.9112 | 0.9138 | 0.9066 |
+| california housing (OpenML, 10k) | 10000 | regression | rmse | stacking | 48795 | 47321 | 49378 |
 
-Honest reading: ahead of the reference on 8 of 9. The exception is wine,
-whose locked test set has only 36 rows, where one confident mistake dominates
-log loss. Titanic's near-perfect score comes from leaked columns (`boat`,
+Honest reading: ahead of the reference on 7 of 9. The two exceptions are
+wine, whose locked test set has only 36 rows so one confident mistake
+dominates log loss, and kc1, where the selected stack trails the reference on
+the locked test rows by about 0.026 PR-AUC (a 15%-positive set with few
+positives in the test rows, so the score is noisy). Titanic's near-perfect score comes from leaked columns (`boat`,
 `body`): the profiler flags both, and `leakage_policy="block"` refuses to
 proceed. Choosing the best of many trials carries a mild optimism bias, which
 is why the locked-test score is the number to trust.
