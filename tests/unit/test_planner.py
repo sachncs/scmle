@@ -183,25 +183,3 @@ def test_every_adapter_declares_a_positive_memory_factor():
         adapter
     ) in registry_module.ModelRegistry.with_builtins().adapters.values():
         assert adapter.capabilities.memory_factor >= 1.0, adapter.name
-
-
-def test_models_needing_their_own_process_are_planned_only_when_hard(
-    planner, frame
-):
-    hard = make_plan(planner, frame)
-    cooperative = make_plan(
-        planner,
-        frame,
-        resources=tasks.ResourceSpec(
-            time_budget_seconds=1800, enforcement="cooperative"
-        ),
-    )
-
-    assert "torch_mlp" in hard.candidate_models
-    assert "torch_mlp" not in cooperative.candidate_models
-    rejected = {
-        d.technique: d.reason
-        for d in cooperative.decisions
-        if d.action is experiments.DecisionAction.REJECT
-    }
-    assert "enforcement='hard'" in rejected["torch_mlp"]

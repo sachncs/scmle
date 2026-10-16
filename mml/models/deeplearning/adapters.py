@@ -35,7 +35,6 @@ class TorchAdapter(models.ModelAdapter):
         early_stopping=True,
         needs_scaling=True,
         gpu=True,
-        isolated_process=True,
         max_rows=500_000,
         cost=4,
         memory_factor=4.0,

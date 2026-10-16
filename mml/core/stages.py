@@ -25,7 +25,6 @@ from mml.contracts import experiments
 from mml.contracts import tasks
 from mml.core import compiler
 from mml.core import context as context_module
-from mml.core import limits as limits_module
 from mml.core import state as run_state
 from mml.data.profiling import profiler as profiling
 from mml.data.readers import tabular
@@ -443,43 +442,6 @@ class SelectStage(Stage):
             spec.latency_safety_factor,
         )
 
-    def fit_and_measure(
-        self,
-        context: context_module.RunContext,
-        candidate: Any,
-        limits: resources.ResourceLimits,
-        isolated: bool,
-    ) -> tuple[Any, resources.ResourceUsage]:
-        """Refits a candidate on the development data and measures it.
-
-        Under hard enforcement the work happens in a supervised worker
-        process, so candidates of different native runtimes never meet in
-        this process; only a candidate within the limits comes back.
-
-        Args:
-            context: Run context.
-            candidate: Unfitted candidate pipeline.
-            limits: Serving limits.
-            isolated: Whether the model needs a fresh interpreter.
-
-        Returns:
-            The fitted candidate and its measured usage. When the candidate
-            breaks a limit under hard enforcement the first element is the
-            unfitted input, which callers discard.
-        """
-        split = require(context.split, "split")
-        job = (candidate, split.dev_features, split.dev_target, limits)
-        if not context.resource_governor.hard:
-            fitted, usage = resources.fit_and_measure(job)
-            return candidate if fitted is None else fitted, usage
-        supervisor = limits_module.TrialSupervisor(
-            context.resource_governor.trial_ceiling_seconds(),
-            context.spec.resources.memory_limit_gb,
-            isolated,
-        )
-        fitted, usage = supervisor.run(resources.fit_and_measure, job)
-        return candidate if fitted is None else fitted, usage
-
     def execute(self, context: context_module.RunContext) -> None:
         """Chooses the best trial that satisfies the serving constraints.
 
@@ -497,6 +459,7 @@ class SelectStage(Stage):
             context.selected = ranked[0]
             self.announce(context)
             return
+        split = require(context.split, "split")
         task = require(context.task, "task")
         plan = require(context.profile, "profile").feature_plan
         checked = ranked[: context.spec.selection.max_candidates_checked]
@@ -508,14 +471,8 @@ class SelectStage(Stage):
                 context.spec.validation.seed,
                 trial.params,
             )
-            candidate, usage = self.fit_and_measure(
-                context,
-                candidate,
-                limits,
-                context.registry.get(
-                    trial.model_name
-                ).capabilities.isolated_process,
-            )
+            candidate.fit(split.dev_features, split.dev_target)
+            usage = resources.measure(candidate, split.dev_features)
             broken = limits.violations(usage)
             label = f"{trial.model_name}/{trial.strategy}"
             if broken:

@@ -1,7 +1,11 @@
 """Tests for the PyTorch model families."""
 
 import dataclasses
+import importlib.util
 import io
+import subprocess
+import sys
+import textwrap
 
 import joblib
 import numpy as np
@@ -10,13 +14,15 @@ from scipy import sparse
 import support
 
 import mml
-from mml.contracts import errors
 from mml.contracts import tasks
 from mml.models import conformance
 from mml.models import registry as registry_module
 from mml.models.deeplearning import estimators
+from mml.models.deeplearning import worker
 
-torch = pytest.importorskip("torch")
+pytestmark = pytest.mark.skipif(
+    importlib.util.find_spec("torch") is None, reason="torch is not installed"
+)
 
 REGISTRY = registry_module.ModelRegistry.with_builtins()
 FAST = {"epochs": 60, "patience": 6}
@@ -124,7 +130,7 @@ def test_sparse_input_and_sample_weights_are_accepted():
 
 def test_unknown_architecture_is_a_configuration_error():
     features, labels = separable()
-    with pytest.raises(errors.ConfigError, match="unknown architecture"):
+    with pytest.raises(worker.WorkerError, match="unknown architecture"):
         estimators.TorchClassifier(architecture="transformer").fit(
             features, labels
         )
@@ -143,7 +149,6 @@ def test_adapters_pass_conformance_and_support_every_task(name):
 def test_a_pytorch_model_family_trains_packages_and_predicts(
     binary_frame, tmp_path
 ):
-    pytest.importorskip("torch")
     project = support.make_project(
         binary_frame,
         "y",
@@ -188,3 +193,47 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
     assert result.selected_model == "torch_mlp"
     log = (result.run_dir / "diagnostics" / "decision_log.json").read_text()
     assert "within serving limits" in log
+
+
+def test_the_framework_process_never_imports_torch():
+    program = textwrap.dedent(
+        """
+        import sys
+        import numpy as np
+        from mml.models.deeplearning import estimators
+        features = np.random.rand(120, 3).astype("float32")
+        target = (features[:, 0] > 0.5).astype(int)
+        model = estimators.TorchClassifier(epochs=5).fit(features, target)
+        model.predict_proba(features)
+        assert "torch" not in sys.modules
+        """
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program], capture_output=True, text=True
+    )
+
+    assert completed.returncode == 0, completed.stderr[-800:]
+
+
+def test_torch_shares_a_process_with_xgboost_and_lightgbm():
+    xgboost = pytest.importorskip("xgboost")
+    lightgbm = pytest.importorskip("lightgbm")
+    features, labels = separable()
+    numeric = (labels == "yes").astype(int)
+
+    network = estimators.TorchClassifier(**FAST).fit(features, labels)
+    xgboost.XGBClassifier(n_estimators=10).fit(features, numeric)
+    lightgbm.LGBMClassifier(n_estimators=10, verbose=-1).fit(features, numeric)
+
+    assert (network.predict(features) == labels).mean() > 0.9
+
+
+def test_a_killed_worker_is_restarted_on_the_next_request():
+    features, labels = separable()
+    model = estimators.TorchClassifier(**FAST).fit(features, labels)
+    before = model.predict_proba(features)
+
+    worker.client().process.kill()
+    worker.client().process.wait()
+
+    np.testing.assert_allclose(model.predict_proba(features), before)

@@ -68,9 +68,6 @@ packages = ["mml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# PyTorch must not share a process with the other model libraries; its
-# tests run in a fresh interpreter through tests/unit/test_deeplearning_isolated.py.
-norecursedirs = ["deeplearning"]
 filterwarnings = ["ignore::UserWarning", "ignore::FutureWarning"]
 
 [tool.ruff]

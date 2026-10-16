@@ -110,24 +110,3 @@ def measure(
         machine=f"{platform.machine()} {platform.system()} "
         f"python {platform.python_version()}",
     )
-
-
-def fit_and_measure(
-    job: tuple[Any, pd.DataFrame, pd.Series, ResourceLimits],
-) -> tuple[Any | None, ResourceUsage]:
-    """Refits a candidate and measures it; keeps it only if within limits.
-
-    Runs in a worker process under hard enforcement, so a rejected candidate
-    is never sent back (and its native libraries never load in the caller).
-
-    Args:
-        job: The unfitted candidate, development features and target, and
-            the serving limits.
-
-    Returns:
-        The fitted candidate (None when it breaks a limit) and its usage.
-    """
-    candidate, features, target, limits = job
-    candidate.fit(features, target)
-    usage = measure(candidate, features)
-    return (None if limits.violations(usage) else candidate), usage

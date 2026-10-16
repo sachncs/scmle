@@ -64,8 +64,3 @@ def test_governor_modes_describe_their_enforcement():
     )
     assert not soft.hard
     assert "cooperative" in soft.report()["memory"]["enforcement"]
-
-
-def test_a_fresh_interpreter_child_runs_the_function():
-    supervisor = limits.TrialSupervisor(60.0, None, fresh_interpreter=True)
-    assert supervisor.run(double, 21) == 42

@@ -52,9 +52,6 @@ class EnsembleSearch:
             and t.strategy == experiments.DEFAULT_STRATEGY
             and t.model_name != STACK
             and self.context.registry.get(t.model_name).family != "baseline"
-            and not self.context.registry.get(
-                t.model_name
-            ).capabilities.isolated_process
         ]
         best: dict[str, experiments.TrialResult] = {}
         for trial in sorted(eligible, key=lambda t: -sign * t.score_mean):

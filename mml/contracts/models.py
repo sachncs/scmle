@@ -50,9 +50,6 @@ class Capabilities:
         needs_scaling: Benefits from standardized inputs.
         serializable: Can be persisted in a bundle.
         gpu: Can train on a GPU.
-        isolated_process: Its native runtime cannot share a process with
-            other model libraries (two OpenMP runtimes crash together), so
-            it is only planned when each trial runs in its own process.
         standalone: Can be a screening candidate on its own (False for
             meta-models assembled from other candidates).
         max_rows: Largest dataset it is practical on, if any.
@@ -71,7 +68,6 @@ class Capabilities:
     needs_scaling: bool = False
     serializable: bool = True
     gpu: bool = False
-    isolated_process: bool = False
     standalone: bool = True
     max_rows: int | None = None
     cost: int = 1

@@ -132,14 +132,10 @@ class TrialSupervisor:
     Attributes:
         ceiling_seconds: Wall-clock limit (None = unlimited).
         memory_gb: Resident-memory limit in gigabytes (None = unlimited).
-        fresh_interpreter: Start the child as a new interpreter instead of
-            forking a warmed-up server. Needed by models whose native runtime
-            must not be loaded next to the libraries the server preloads.
     """
 
     ceiling_seconds: float | None = None
     memory_gb: float | None = None
-    fresh_interpreter: bool = False
 
     def run(self, function: Callable[[Any], Any], argument: Any) -> Any:
         """Calls `function(argument)` in a child process and returns its value.
@@ -151,12 +147,8 @@ class TrialSupervisor:
         Raises:
             TrialLimitError: If the child exceeded a limit, died, or raised.
         """
-        context: multiprocessing.context.BaseContext
-        if self.fresh_interpreter:
-            context = multiprocessing.get_context("spawn")
-        else:
-            context = multiprocessing.get_context("forkserver")
-            context.set_forkserver_preload(PRELOAD_MODULES)
+        context = multiprocessing.get_context("forkserver")
+        context.set_forkserver_preload(PRELOAD_MODULES)
         receiver, sender = context.Pipe(duplex=False)
         process = context.Process(
             target=child_main, args=(sender, function, argument)

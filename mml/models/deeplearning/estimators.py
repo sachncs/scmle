@@ -1,25 +1,25 @@
-"""Scikit-learn compatible estimators that train PyTorch networks."""
+"""Scikit-learn estimators whose computation runs in the PyTorch worker.
 
-import abc
-import copy
-import importlib
+These classes never import torch. `fit` ships the (dense, float32) training
+matrix to the worker and keeps the returned weights as plain numpy arrays;
+`predict` ships rows plus a state id, and the worker loads the weights once
+and caches them. Pickling therefore stores only numpy data.
+"""
+
 from typing import Any
+import uuid
 
 import numpy as np
 from scipy import sparse
 from sklearn import base
 
-from mml.contracts import errors
-from mml.models.deeplearning import architectures
+from mml.models.deeplearning import worker
 
-MIN_ROWS_FOR_VALIDATION = 30
+NEED_STATE = worker.NEED_STATE
 
 
-class TabularNetwork(base.BaseEstimator, abc.ABC):
-    """Trains a network with Adam, early stopping and weighted losses.
-
-    The matrix is expected to be numeric, complete and scaled (the standard
-    pipeline provides that); sparse input is densified.
+class NetworkEstimator(base.BaseEstimator):
+    """Common behaviour of the worker-backed estimators.
 
     Attributes:
         architecture: Name in `architectures.ARCHITECTURES`.
@@ -34,6 +34,8 @@ class TabularNetwork(base.BaseEstimator, abc.ABC):
         device: `auto` (CUDA when available), `cpu` or `cuda`.
         random_state: Seed for initialization, shuffling and the split.
     """
+
+    engine_path = ""
 
     def __init__(
         self,
@@ -62,28 +64,6 @@ class TabularNetwork(base.BaseEstimator, abc.ABC):
         self.device = device
         self.random_state = random_state
 
-    @abc.abstractmethod
-    def encode_target(self, target: Any) -> np.ndarray:
-        """Converts the target to the array the loss consumes."""
-
-    @abc.abstractmethod
-    def output_units(self) -> int:
-        """Number of network outputs."""
-
-    @abc.abstractmethod
-    def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Per-row loss (no reduction)."""
-
-    @abc.abstractmethod
-    def row_weights(self, targets: np.ndarray) -> np.ndarray:
-        """Per-row weight implied by the estimator's own settings."""
-
-    def resolve_device(self, torch: Any) -> str:
-        """Chooses where to train."""
-        if self.device == "auto":
-            return "cuda" if torch.cuda.is_available() else "cpu"
-        return self.device
-
     @staticmethod
     def dense(features: Any) -> np.ndarray:
         """Returns a float32 matrix, densifying sparse input."""
@@ -93,8 +73,8 @@ class TabularNetwork(base.BaseEstimator, abc.ABC):
 
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
-    ) -> "TabularNetwork":
-        """Trains the network.
+    ) -> "NetworkEstimator":
+        """Trains the network in the worker.
 
         Args:
             features: Numeric matrix.
@@ -103,135 +83,49 @@ class TabularNetwork(base.BaseEstimator, abc.ABC):
 
         Returns:
             The fitted estimator.
-
-        Raises:
-            ConfigError: For an unknown architecture.
         """
-        if self.architecture not in architectures.ARCHITECTURES:
-            raise errors.ConfigError(
-                f"unknown architecture '{self.architecture}'"
-            )
-        torch = importlib.import_module("torch")
-        matrix = self.dense(features)
-        encoded = self.encode_target(target)
-        weights = self.row_weights(encoded)
-        if sample_weight is not None:
-            weights = weights * np.asarray(sample_weight, dtype=np.float32)
-        order = np.random.default_rng(self.random_state).permutation(
-            len(matrix)
+        weights = (
+            None
+            if sample_weight is None
+            else np.asarray(sample_weight, dtype=np.float32)
         )
-        held = (
-            int(len(matrix) * self.validation_fraction)
-            if len(matrix) >= MIN_ROWS_FOR_VALIDATION
-            else 0
+        state = worker.client().request(
+            "fit",
+            (
+                self.engine_path,
+                self.get_params(),
+                self.dense(features),
+                np.asarray(target),
+                weights,
+            ),
         )
-        validation, training = order[:held], order[held:]
-        torch.manual_seed(self.random_state)
-        device = self.resolve_device(torch)
-        self.input_width_ = matrix.shape[1]
-        network = self.new_network(torch).to(device)
-        tensors = {
-            "x": torch.from_numpy(matrix).to(device),
-            "y": torch.from_numpy(encoded).to(device),
-            "w": torch.from_numpy(weights.astype(np.float32)).to(device),
-        }
-        optimizer = torch.optim.Adam(
-            network.parameters(),
-            lr=self.learning_rate,
-            weight_decay=self.weight_decay,
-        )
-        generator = np.random.default_rng(self.random_state + 1)
-        best, best_state, stale = np.inf, None, 0
-        for epoch in range(self.epochs):
-            network.train()
-            shuffled = generator.permutation(training)
-            for start in range(0, len(shuffled), self.batch_size):
-                batch = torch.from_numpy(
-                    shuffled[start : start + self.batch_size]
-                ).to(device)
-                optimizer.zero_grad()
-                loss = self.weighted_loss(torch, network, tensors, batch)
-                loss.backward()
-                optimizer.step()
-            self.n_iter_ = epoch + 1
-            if not held:
-                continue
-            network.eval()
-            with torch.no_grad():
-                score = float(
-                    self.weighted_loss(
-                        torch,
-                        network,
-                        tensors,
-                        torch.from_numpy(validation).to(device),
-                    )
-                )
-            if score < best:
-                best, stale = score, 0
-                best_state = copy.deepcopy(network.state_dict())
-            else:
-                stale += 1
-                if stale >= self.patience:
-                    break
-        if best_state is not None:
-            network.load_state_dict(best_state)
-        network.eval()
-        self.network_ = network.cpu()
+        self.state_ = state
+        self.state_id_ = uuid.uuid4().hex
+        self.n_iter_ = state["n_iter_"]
+        self.remember(state)
         return self
 
-    def new_network(self, torch: Any) -> Any:
-        """Creates an untrained network of the configured architecture."""
-        return architectures.ARCHITECTURES[self.architecture].build(
-            torch,
-            self.input_width_,
-            self.output_units(),
-            tuple(self.hidden_sizes),
-            self.dropout,
-        )
+    def remember(self, state: dict[str, Any]) -> None:
+        """Copies the attributes scikit-learn expects from the fitted state."""
 
-    def __getstate__(self) -> dict[str, Any]:
-        """Pickles the weights as plain arrays, not the module objects."""
-        state = dict(super().__getstate__())
-        network = state.pop("network_", None)
-        if network is not None:
-            state["weights_"] = {
-                name: tensor.numpy()
-                for name, tensor in network.state_dict().items()
-            }
-        return state
-
-    def __setstate__(self, state: dict[str, Any]) -> None:
-        """Rebuilds the network from the pickled weights."""
-        state = dict(state)
-        weights = state.pop("weights_", None)
-        super().__setstate__(state)
-        if weights is not None:
-            torch = importlib.import_module("torch")
-            network = self.new_network(torch)
-            network.load_state_dict(
-                {name: torch.from_numpy(w) for name, w in weights.items()}
+    def call(self, method: str, features: Any) -> np.ndarray:
+        """Runs an engine method in the worker on new rows."""
+        matrix = self.dense(features)
+        client = worker.client()
+        for state in (None, self.state_):
+            reply = client.request(
+                "call",
+                (self.engine_path, self.state_id_, state, method, matrix),
             )
-            self.network_ = network.eval()
-
-    def weighted_loss(
-        self, torch: Any, network: Any, tensors: dict[str, Any], rows: Any
-    ) -> Any:
-        """Weighted mean loss over the given row indices."""
-        outputs = network(tensors["x"][rows])
-        losses = self.row_losses(torch, outputs, tensors["y"][rows])
-        weights = tensors["w"][rows]
-        return (losses * weights).sum() / weights.sum()
-
-    def raw_outputs(self, features: Any) -> np.ndarray:
-        """Network outputs for new rows (evaluation mode, CPU)."""
-        torch = importlib.import_module("torch")
-        with torch.no_grad():
-            tensor = torch.from_numpy(self.dense(features))
-            return self.network_(tensor).numpy()
+            if not (isinstance(reply, str) and reply == NEED_STATE):
+                return np.asarray(reply)
+        raise worker.WorkerError("the worker could not load the model state")
 
 
-class TorchClassifier(base.ClassifierMixin, TabularNetwork):
+class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
     """Classifier: softmax over class scores, optional class balancing."""
+
+    engine_path = "mml.models.deeplearning.engines.ClassifierEngine"
 
     def __init__(
         self,
@@ -264,69 +158,24 @@ class TorchClassifier(base.ClassifierMixin, TabularNetwork):
         )
         self.class_weight = class_weight
 
-    def encode_target(self, target: Any) -> np.ndarray:
-        """Maps labels to 0..K-1 and remembers the classes."""
-        self.classes_, codes = np.unique(
-            np.asarray(target), return_inverse=True
-        )
-        return codes.astype(np.int64)
-
-    def output_units(self) -> int:
-        """One unit per class."""
-        return len(self.classes_)
-
-    def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Cross entropy per row."""
-        return torch.nn.functional.cross_entropy(
-            outputs, targets, reduction="none"
-        )
-
-    def row_weights(self, targets: np.ndarray) -> np.ndarray:
-        """Inverse class frequency when `class_weight` is `balanced`."""
-        weights = np.ones(len(targets), dtype=np.float32)
-        if self.class_weight == "balanced":
-            counts = np.bincount(targets, minlength=len(self.classes_))
-            per_class = len(targets) / (len(counts) * np.maximum(counts, 1))
-            weights = per_class[targets].astype(np.float32)
-        return weights
+    def remember(self, state: dict[str, Any]) -> None:
+        """Exposes `classes_` after fitting."""
+        self.classes_ = state["classes_"]
 
     def predict_proba(self, features: Any) -> np.ndarray:
         """Class probabilities, columns ordered like `classes_`."""
-        scores = self.raw_outputs(features)
-        scores = scores - scores.max(axis=1, keepdims=True)
-        exp = np.exp(scores)
-        return exp / exp.sum(axis=1, keepdims=True)
+        return self.call("predict_proba", features)
 
     def predict(self, features: Any) -> np.ndarray:
         """Most probable class."""
-        return self.classes_[self.predict_proba(features).argmax(axis=1)]
+        return self.call("predict", features)
 
 
-class TorchRegressor(base.RegressorMixin, TabularNetwork):
+class TorchRegressor(base.RegressorMixin, NetworkEstimator):
     """Regressor trained on the standardized target with squared error."""
 
-    def encode_target(self, target: Any) -> np.ndarray:
-        """Standardizes the target and remembers its scale."""
-        values = np.asarray(target, dtype=np.float64)
-        self.target_mean_ = float(values.mean())
-        self.target_scale_ = float(values.std()) or 1.0
-        return ((values - self.target_mean_) / self.target_scale_).astype(
-            np.float32
-        )
-
-    def output_units(self) -> int:
-        """A single value."""
-        return 1
-
-    def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Squared error per row."""
-        return (outputs.squeeze(-1) - targets) ** 2
-
-    def row_weights(self, targets: np.ndarray) -> np.ndarray:
-        """Unit weights."""
-        return np.ones(len(targets), dtype=np.float32)
+    engine_path = "mml.models.deeplearning.engines.RegressorEngine"
 
     def predict(self, features: Any) -> np.ndarray:
         """Predicted values in the original units."""
-        scaled = self.raw_outputs(features).reshape(-1)
-        return scaled * self.target_scale_ + self.target_mean_
+        return self.call("predict", features)

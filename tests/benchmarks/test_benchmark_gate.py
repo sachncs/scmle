@@ -44,7 +44,7 @@ def test_missing_failed_and_changed_metric_are_violations():
     assert "metric changed" in check_regression.violations(swapped, BASELINE)[0]
 
 
-def test_command_line_exit_codes(tmp_path, capsys):
+def test_command_line_exit_codes(tmp_path, caplog):
     baseline = tmp_path / "baseline.json"
     baseline.write_text(json.dumps(BASELINE))
     good = tmp_path / "good.json"
@@ -66,4 +66,4 @@ def test_command_line_exit_codes(tmp_path, capsys):
     )
     assert check_regression.main([str(good), "--baseline", str(baseline)]) == 0
     assert check_regression.main([str(bad), "--baseline", str(baseline)]) == 1
-    assert "REGRESSION a" in capsys.readouterr().err
+    assert "REGRESSION a" in caplog.text

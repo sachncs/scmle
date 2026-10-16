@@ -183,9 +183,7 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.TrialResult:
     `FAILED` result so the run continues.
     """
     supervisor = limits.TrialSupervisor(
-        payload.ceiling_seconds,
-        payload.memory_gb,
-        payload.adapter.capabilities.isolated_process,
+        payload.ceiling_seconds, payload.memory_gb
     )
     try:
         return supervisor.run(evaluate_payload, payload)

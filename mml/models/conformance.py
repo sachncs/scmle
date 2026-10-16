@@ -1,10 +1,7 @@
 """Shared contract checks every model adapter must pass."""
 
 import io
-import pickle  # nosec B403 - our own adapter bytes, never external
 import random
-import subprocess  # nosec B404
-import sys
 from typing import Any
 
 import joblib
@@ -117,57 +114,6 @@ def check_declared_capabilities(
 
 def check_conformance(adapter: models.ModelAdapter) -> None:
     """Verifies an adapter honours its declared capabilities.
-
-    Adapters declaring `isolated_process` are checked in a fresh interpreter,
-    because their native runtime must not share a process with other models.
-
-    Args:
-        adapter: Adapter under test.
-
-    Raises:
-        ConfigError: On the first violated expectation.
-    """
-    if adapter.capabilities.isolated_process:
-        check_in_fresh_process(adapter)
-    else:
-        check_here(adapter)
-
-
-FRESH_PROCESS_PROGRAM = (
-    "import pickle, sys\n"
-    "from mml.models import conformance\n"
-    "conformance.check_here(pickle.loads(sys.stdin.buffer.read()))\n"  # nosec B301
-)
-FRESH_PROCESS_TIMEOUT_SECONDS = 300
-
-
-def check_in_fresh_process(adapter: models.ModelAdapter) -> None:
-    """Runs the conformance checks in a new interpreter.
-
-    Args:
-        adapter: Picklable adapter under test.
-
-    Raises:
-        ConfigError: If the checks fail or the process crashes.
-    """
-    completed = subprocess.run(  # nosec B603
-        [sys.executable, "-c", FRESH_PROCESS_PROGRAM],
-        input=pickle.dumps(adapter),
-        capture_output=True,
-        timeout=FRESH_PROCESS_TIMEOUT_SECONDS,
-        check=False,
-    )
-    if completed.returncode != 0:
-        tail = completed.stderr.decode(errors="replace").strip().splitlines()
-        raise errors.ConfigError(
-            f"{adapter.name}: conformance failed in a fresh process "
-            f"(exit {completed.returncode}): "
-            f"{tail[-1] if tail else 'no output'}"
-        )
-
-
-def check_here(adapter: models.ModelAdapter) -> None:
-    """Runs the conformance checks in this process.
 
     Args:
         adapter: Adapter under test.
