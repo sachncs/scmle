@@ -32,6 +32,7 @@ from mml.core import state
 from mml.data.validation import columns
 from mml.governance import lifecycle
 from mml.inference import mapping as mapping_module
+from mml.integrations import ray as ray_integration
 from mml.models import conformance
 from mml.models import registry as registry_module
 from mml.sampling import strategies as strategies_module
@@ -144,7 +145,7 @@ def test_l23_to_l39_decision_table(run):
     assert {"sequential", "process", "ray"} <= {
         scheduler.SequentialBackend.name,
         scheduler.ProcessBackend.name,
-        scheduler.RayBackend.name,
+        ray_integration.RayBackend.name,
     }  # local-first, distributed-capable
     assert (
         result.evaluation["split_fingerprint"]
@@ -1122,7 +1123,7 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
         ).run()
         assert result.state == "COMPLETED"
     assert issubclass(
-        scheduler.RayBackend, scheduler.ExecutionBackend
+        ray_integration.RayBackend, scheduler.ExecutionBackend
     )  # distributed: optional
 
 
