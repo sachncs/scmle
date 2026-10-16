@@ -43,6 +43,7 @@ from mml.experimentation import trials
 from mml.experimentation import tuning
 from mml.features import feature_graph
 from mml.governance import ledger
+from mml.governance import vault
 from mml.intelligence import knowledge
 from mml.intelligence import planner as planner_module
 from mml.intelligence import recommendations
@@ -230,6 +231,23 @@ class ProfileStage(Stage):
                     "unresolved leakage risk: " + "; ".join(leaks)
                 )
 
+    @staticmethod
+    def seal(locked: splitters.LockedTestSet) -> splitters.LockedTestSet:
+        """Moves the test rows into a vault process.
+
+        Args:
+            locked: The resident test set just produced by the split.
+
+        Returns:
+            The sealed set; this process keeps only the row ids. The
+            resident object is emptied so no reference to the rows remains.
+        """
+        assert isinstance(locked, splitters.ResidentTestSet)  # nosec B101
+        sealed = vault.SealedTestSet(locked.features, locked.target, locked.ids)
+        locked.features = locked.features.iloc[0:0]
+        locked.target = locked.target.iloc[0:0]
+        return sealed
+
     def make_split(
         self,
         context: context_module.RunContext,
@@ -238,6 +256,13 @@ class ProfileStage(Stage):
     ) -> splitters.SplitResult:
         """Splits the dataset and records the manifest."""
         split = splitters.SplitManager(context.spec, task).split(frame)
+        isolation = "in-process protocol"
+        if context.resource_governor.hard:
+            split.locked_test = self.seal(split.locked_test)
+            context.frame = split.dev_features.assign(
+                **{context.spec.data.target: split.dev_target}
+            )
+            isolation = "separate vault process"
         context.split = split
         context.write_json("validation_manifest.json", split.manifest.to_dict())
         context.track(split_fingerprint=split.manifest.fingerprint)
@@ -250,6 +275,7 @@ class ProfileStage(Stage):
                 "strategy": split.manifest.strategy,
                 "development_rows": len(split.manifest.train_ids),
                 "test_rows": len(split.manifest.test_ids),
+                "test_set_isolation": isolation,
                 "notes": list(split.manifest.notes),
             },
         )

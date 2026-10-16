@@ -402,3 +402,6 @@ class Orchestrator:
                     "recoverable_trials": self.recoverable(store),
                 },
             ) from error
+        finally:
+            if context.split is not None:
+                context.split.locked_test.close()

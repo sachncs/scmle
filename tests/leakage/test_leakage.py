@@ -168,3 +168,64 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
     probe = support.make_project(leaky, "y", output_dir=tmp_path / "p")
     probe.plan()
     assert not any("'late'" in r for r in probe.profile.risk_findings)
+
+
+def test_hard_enforcement_moves_the_test_rows_out_of_reach(
+    tmp_path, monkeypatch
+):
+    from mml.core import limits
+
+    rng = np.random.default_rng(21)
+    frame = pd.DataFrame(
+        {
+            "sentinel": np.arange(400, dtype=float),
+            "x": rng.normal(size=400),
+        }
+    )
+    frame["y"] = (frame.x + rng.normal(0, 0.5, 400) > 0).astype(int)
+    seen = []
+    original = limits.TrialSupervisor.run
+
+    def record(self, function, argument):
+        seen.append(set(argument.features["sentinel"]))
+        return original(self, function, argument)
+
+    monkeypatch.setattr(limits.TrialSupervisor, "run", record)
+    result = support.make_project(
+        frame,
+        "y",
+        time_budget=300,
+        output_dir=tmp_path,
+        enforcement="hard",
+    ).run()
+
+    manifest = json.loads(
+        (result.run_dir / "validation_manifest.json").read_text()
+    )
+    test_ids = set(manifest["test_ids"])
+    test_values = {float(frame.loc[i, "sentinel"]) for i in test_ids}
+    events = [
+        json.loads(line)
+        for line in (result.run_dir / "events.jsonl").read_text().splitlines()
+    ]
+    created = next(e for e in events if e["kind"] == "split.created")
+
+    assert created["data"]["test_set_isolation"] == "separate vault process"
+    assert seen and all(values.isdisjoint(test_values) for values in seen)
+    assert result.evaluation["n_test"] == len(test_ids)
+    assert result.evaluation["test_set_opened"] is True
+
+
+def test_cooperative_mode_says_it_relies_on_the_in_process_protocol(
+    binary_frame, tmp_path
+):
+    result = support.make_project(
+        binary_frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    events = [
+        json.loads(line)
+        for line in (result.run_dir / "events.jsonl").read_text().splitlines()
+    ]
+    created = next(e for e in events if e["kind"] == "split.created")
+    assert created["data"]["test_set_isolation"] == "in-process protocol"

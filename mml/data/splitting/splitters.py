@@ -92,13 +92,52 @@ class Partition:
     notes: list[str] = dataclasses.field(default_factory=list)
 
 
+class LockedTestSet(abc.ABC):
+    """The test partition: unavailable to search, released once.
+
+    Attributes:
+        ids: Row ids of the test rows.
+        opened: Whether the rows were released.
+    """
+
+    ids: tuple[int, ...]
+    opened: bool
+
+    @abc.abstractmethod
+    def issue_token(self) -> str:
+        """Returns the release token; call only once selection is frozen."""
+
+    @abc.abstractmethod
+    def open(self, token: str) -> tuple[pd.DataFrame, pd.Series]:
+        """Releases the test data a single time.
+
+        Args:
+            token: The token from `issue_token`.
+
+        Returns:
+            Test features and labels.
+
+        Raises:
+            LeakageError: On a wrong token or a repeated release.
+        """
+
+    @abc.abstractmethod
+    def close(self) -> None:
+        """Releases any resource held for the lock."""
+
+    def __len__(self) -> int:
+        """Number of test rows."""
+        return len(self.ids)
+
+
 @dataclasses.dataclass(slots=True)
-class LockedTestSet:
-    """Holds the test partition; unavailable to search, openable once.
+class ResidentTestSet(LockedTestSet):
+    """Test rows kept in this process, behind a one-time token.
 
     Python cannot hide attributes, so the lock is a protocol: trial code only
     receives development data, and `open` enforces a one-time, token-gated
-    release that is recorded.
+    release that is recorded. The sealed variant moves the rows to a separate
+    process (see `mml.governance.vault`).
 
     Attributes:
         features: Test features.
@@ -121,17 +160,7 @@ class LockedTestSet:
         return self.token
 
     def open(self, token: str) -> tuple[pd.DataFrame, pd.Series]:
-        """Releases the test data a single time.
-
-        Args:
-            token: The token from `issue_token`.
-
-        Returns:
-            Test features and labels.
-
-        Raises:
-            LeakageError: On a wrong token or a repeated release.
-        """
+        """Releases the test data a single time."""
         if token != self.token:
             raise errors.LeakageError("test set is locked: invalid token")
         if self.opened:
@@ -141,9 +170,8 @@ class LockedTestSet:
         self.opened = True
         return self.features, self.target
 
-    def __len__(self) -> int:
-        """Number of test rows."""
-        return len(self.ids)
+    def close(self) -> None:
+        """Nothing to release: the rows live in this process."""
 
 
 @dataclasses.dataclass(slots=True)
@@ -482,7 +510,7 @@ class SplitManager:
         target_name = self.spec.data.target
         features = frame.drop(columns=[target_name])
         target = frame[target_name]
-        locked = LockedTestSet(
+        locked = ResidentTestSet(
             features.iloc[part.test_ids].reset_index(drop=True),
             target.iloc[part.test_ids].reset_index(drop=True),
             manifest.test_ids,
