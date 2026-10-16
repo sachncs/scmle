@@ -35,7 +35,7 @@ def test_opening_the_test_set_twice_is_a_finding(binary_frame, tmp_path):
     rewrite(
         events,
         lambda lines: (
-            lines + [next(r for r in lines if r["kind"] == "test.opened")]
+            [*lines, next(r for r in lines if r["kind"] == "test.opened")]
         ),
     )
 
