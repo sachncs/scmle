@@ -9,7 +9,7 @@ import textwrap
 import pytest
 
 from mml.contracts import models as model_contracts
-from mml.core import checkpoints
+from mml.core import policies
 from mml.core import scheduler
 from mml.core import stages
 from mml.data.readers import tabular
@@ -57,7 +57,7 @@ def concrete_subclasses(base, *modules):
         (planner.PlanningRule, [planner]),
         (selection.SelectionPolicy, [selection]),
         (stages.Stage, [stages]),
-        (checkpoints.PolicyCheckpoint, [checkpoints]),
+        (policies.PolicyCheckpoint, [policies]),
         (resampling.Resampler, [resampling]),
         (feature_graph.FeatureOp, [feature_graph]),
         (synthesis.SyntheticGenerator, [synthesis]),

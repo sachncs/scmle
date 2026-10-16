@@ -22,10 +22,10 @@ from mml.contracts import errors
 from mml.contracts import events
 from mml.contracts import experiments
 from mml.contracts import tasks
-from mml.core import checkpoints as checkpoints_module
 from mml.core import compiler
 from mml.core import context as context_module
 from mml.core import limits
+from mml.core import policies as checkpoints_module
 from mml.core import scheduler
 from mml.core import stages as stages_module
 from mml.core import state

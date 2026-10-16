@@ -8,7 +8,7 @@ import support
 
 import mml
 from mml.contracts import errors
-from mml.core import checkpoints
+from mml.core import policies
 from mml.core import state
 
 
@@ -28,7 +28,7 @@ def kinds(run_dir):
 
 
 def test_auto_approval_runs_and_audits_both_gates(binary_frame, tmp_path):
-    result = project(binary_frame, tmp_path, checkpoints.AutoApprove()).run()
+    result = project(binary_frame, tmp_path, policies.AutoApprove()).run()
     events = kinds(result.run_dir)
     approvals = [e for e in events if e["kind"] == "policy.approved"]
     assert [a["data"]["gate"] for a in approvals] == ["PLANNING", "SELECTING"]
@@ -42,9 +42,7 @@ def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
         seen.append(review)
         return True
 
-    project(
-        binary_frame, tmp_path, checkpoints.CallbackCheckpoint(decide)
-    ).run()
+    project(binary_frame, tmp_path, policies.CallbackCheckpoint(decide)).run()
     plan_review, selection_review = seen
     assert plan_review.gate is state.RunState.PLANNING
     assert "Candidates:" in plan_review.summary
@@ -55,9 +53,9 @@ def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
 
 
 def test_rejecting_the_plan_stops_before_any_training(binary_frame, tmp_path):
-    reject = checkpoints.CallbackCheckpoint(
-        lambda review: checkpoints.Approval(False, "alice", "too many models"),
-        gates=frozenset({checkpoints.PLAN_GATE}),
+    reject = policies.CallbackCheckpoint(
+        lambda review: policies.Approval(False, "alice", "too many models"),
+        gates=frozenset({policies.PLAN_GATE}),
     )
     with pytest.raises(
         errors.BlockedError, match="alice: too many models"
@@ -76,8 +74,8 @@ def test_rejecting_the_plan_stops_before_any_training(binary_frame, tmp_path):
 def test_rejecting_the_selection_keeps_the_test_set_locked(
     binary_frame, tmp_path
 ):
-    reject = checkpoints.CallbackCheckpoint(
-        lambda review: review.gate is not checkpoints.SELECTION_GATE
+    reject = policies.CallbackCheckpoint(
+        lambda review: review.gate is not policies.SELECTION_GATE
     )
     with pytest.raises(
         errors.BlockedError, match="SELECTING not approved"
@@ -91,10 +89,10 @@ def test_rejecting_the_selection_keeps_the_test_set_locked(
 
 
 def test_every_checkpoint_must_approve(binary_frame, tmp_path):
-    yes = checkpoints.CallbackCheckpoint(lambda review: True)
-    no = checkpoints.CallbackCheckpoint(
-        lambda review: checkpoints.Approval(False, "bob", "veto"),
-        gates=frozenset({checkpoints.SELECTION_GATE}),
+    yes = policies.CallbackCheckpoint(lambda review: True)
+    no = policies.CallbackCheckpoint(
+        lambda review: policies.Approval(False, "bob", "veto"),
+        gates=frozenset({policies.SELECTION_GATE}),
     )
     with pytest.raises(errors.BlockedError, match="bob"):
         project(binary_frame, tmp_path, yes, no).run()
@@ -102,7 +100,7 @@ def test_every_checkpoint_must_approve(binary_frame, tmp_path):
 
 def test_a_blocked_run_can_be_resumed_once_approved(binary_frame, tmp_path):
     gate = {"open": False}
-    reviewer = checkpoints.CallbackCheckpoint(lambda review: gate["open"])
+    reviewer = policies.CallbackCheckpoint(lambda review: gate["open"])
     first = project(binary_frame, tmp_path, reviewer)
     with pytest.raises(errors.BlockedError) as caught:
         first.run()
@@ -115,9 +113,7 @@ def test_a_blocked_run_can_be_resumed_once_approved(binary_frame, tmp_path):
 
 def test_checkpoints_do_not_change_results(binary_frame, tmp_path):
     plain = project(binary_frame, tmp_path / "a").run()
-    gated = project(
-        binary_frame, tmp_path / "b", checkpoints.AutoApprove()
-    ).run()
+    gated = project(binary_frame, tmp_path / "b", policies.AutoApprove()).run()
     assert gated.selected_model == plain.selected_model
     assert gated.evaluation["selected_cv_score"] == pytest.approx(
         plain.evaluation["selected_cv_score"]

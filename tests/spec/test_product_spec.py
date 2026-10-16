@@ -1192,7 +1192,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     """L765-L778: each architectural commitment works, not merely exists."""
     import pickle
 
-    from mml.core import checkpoints as policy
+    from mml.core import policies as policy
     from mml.data.splitting import splitters
     from mml.experimentation import trials
     from mml.features import graph as feature_graph

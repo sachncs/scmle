@@ -93,7 +93,7 @@ validation gaps.
 ## 5. Approval gates, audit trail and replay
 
 ```python
-from mml.core import checkpoints
+from mml.core import policies
 
 
 def reviewer(review):  # review.gate is PLANNING or SELECTING
@@ -102,7 +102,7 @@ def reviewer(review):  # review.gate is PLANNING or SELECTING
 
 
 project = mml.MLProject(
-    data, "churn", checkpoints=(checkpoints.CallbackCheckpoint(reviewer),)
+    data, "churn", checkpoints=(policies.CallbackCheckpoint(reviewer),)
 )
 ```
 

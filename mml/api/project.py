@@ -11,9 +11,9 @@ from mml.artifacts import reproducibility
 from mml.contracts import data as data_contracts
 from mml.contracts import experiments
 from mml.contracts import tasks
-from mml.core import checkpoints as checkpoints_module
 from mml.core import context as context_module
 from mml.core import orchestrator as orchestrator_module
+from mml.core import policies as checkpoints_module
 from mml.data.readers import interchange
 
 ValidationStrategy = Literal[
