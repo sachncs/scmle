@@ -28,7 +28,10 @@ class NetworkEstimator(base.BaseEstimator):
         learning_rate: Adam step size.
         weight_decay: L2 penalty.
         epochs: Maximum epochs.
-        batch_size: Rows per step.
+        batch_size: Rows per step, or `auto` to size it from the data.
+        schedule: Learning-rate schedule, `cosine` or `constant`.
+        warmup_epochs: Epochs of linear learning-rate warm-up.
+        max_grad_norm: Gradient clipping threshold (None disables it).
         patience: Epochs without validation improvement before stopping.
         validation_fraction: Share of rows held out for early stopping.
         device: `auto` (CUDA when available), `cpu` or `cuda`.
@@ -45,7 +48,10 @@ class NetworkEstimator(base.BaseEstimator):
         learning_rate: float = 1e-3,
         weight_decay: float = 1e-5,
         epochs: int = 100,
-        batch_size: int = 128,
+        batch_size: int | str = 128,
+        schedule: str = "cosine",
+        warmup_epochs: int = 1,
+        max_grad_norm: float | None = 5.0,
         patience: int = 10,
         validation_fraction: float = 0.1,
         device: str = "auto",
@@ -59,6 +65,9 @@ class NetworkEstimator(base.BaseEstimator):
         self.weight_decay = weight_decay
         self.epochs = epochs
         self.batch_size = batch_size
+        self.schedule = schedule
+        self.warmup_epochs = warmup_epochs
+        self.max_grad_norm = max_grad_norm
         self.patience = patience
         self.validation_fraction = validation_fraction
         self.device = device
@@ -102,6 +111,7 @@ class NetworkEstimator(base.BaseEstimator):
         self.state_ = state
         self.state_id_ = uuid.uuid4().hex
         self.n_iter_ = state["n_iter_"]
+        self.training_report_ = state["training_report_"]
         self.remember(state)
         return self
 
@@ -135,7 +145,10 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
         learning_rate: float = 1e-3,
         weight_decay: float = 1e-5,
         epochs: int = 100,
-        batch_size: int = 128,
+        batch_size: int | str = 128,
+        schedule: str = "cosine",
+        warmup_epochs: int = 1,
+        max_grad_norm: float | None = 5.0,
         patience: int = 10,
         validation_fraction: float = 0.1,
         device: str = "auto",
@@ -151,6 +164,9 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
             weight_decay,
             epochs,
             batch_size,
+            schedule,
+            warmup_epochs,
+            max_grad_norm,
             patience,
             validation_fraction,
             device,

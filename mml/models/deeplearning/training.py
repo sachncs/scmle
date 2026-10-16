@@ -125,7 +125,7 @@ class TrainingMonitor:
         """
         norms = np.asarray(self.norms)
         median = float(np.median(norms)) if norms.size else 0.0
-        peak = float(norms.max()) if norms.size else 0.0
+        peak = float(np.max(norms)) if norms.size else 0.0
         improvement = 0.0
         if len(self.losses) > 1 and abs(self.losses[0]) > 0:
             improvement = (self.losses[0] - self.losses[-1]) / abs(

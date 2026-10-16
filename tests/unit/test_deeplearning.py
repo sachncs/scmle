@@ -237,3 +237,37 @@ def test_a_killed_worker_is_restarted_on_the_next_request():
     worker.client().process.wait()
 
     np.testing.assert_allclose(model.predict_proba(features), before)
+
+
+def test_training_reports_its_health_and_clips_gradients():
+    features, labels = separable()
+
+    model = estimators.TorchClassifier(**FAST).fit(features, labels)
+
+    report = model.training_report_
+    assert report["verdict"] in {"ok", "stalled"} and report["steps"] > 0
+    assert report["peak_gradient_norm"] >= report["median_gradient_norm"]
+
+
+def test_a_huge_learning_rate_is_caught_instead_of_silently_accepted():
+    features, labels = separable()
+    unstable = estimators.TorchClassifier(
+        learning_rate=1e6, max_grad_norm=None, epochs=20, hidden_sizes=(256,)
+    ).fit(features * 1e3, labels)
+
+    assert unstable.training_report_["verdict"] in {
+        "diverged",
+        "exploding",
+        "stalled",
+    }
+    assert unstable.training_report_["verdict"] != "ok"
+
+
+def test_auto_batch_size_and_both_schedules_train():
+    features, labels = separable()
+
+    for schedule in ("cosine", "constant"):
+        model = estimators.TorchClassifier(
+            batch_size="auto", schedule=schedule, **FAST
+        ).fit(features, labels)
+        assert (model.predict(features) == labels).mean() > 0.85

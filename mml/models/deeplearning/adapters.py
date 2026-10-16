@@ -15,7 +15,8 @@ COMMON_SPACE = (
     search.FloatParameter("dropout", 0.0, 0.4),
     search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
     search.FloatParameter("weight_decay", 1e-6, 1e-2, log=True),
-    search.ChoiceParameter("batch_size", (64, 128, 256)),
+    search.ChoiceParameter("batch_size", ("auto", 64, 128, 256)),
+    search.ChoiceParameter("schedule", ("cosine", "constant")),
 )
 
 

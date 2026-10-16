@@ -7,6 +7,7 @@ the estimators users see are the proxies in `estimators`.
 import abc
 import copy
 import importlib
+import math
 from typing import Any
 
 import numpy as np
@@ -15,6 +16,7 @@ from sklearn import base
 
 from mml.contracts import errors
 from mml.models.deeplearning import architectures
+from mml.models.deeplearning import training as training_helpers
 
 MIN_ROWS_FOR_VALIDATION = 30
 
@@ -32,7 +34,10 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         learning_rate: Adam step size.
         weight_decay: L2 penalty.
         epochs: Maximum epochs.
-        batch_size: Rows per step.
+        batch_size: Rows per step, or `auto` to size it from the data.
+        schedule: Learning-rate schedule, `cosine` or `constant`.
+        warmup_epochs: Epochs of linear learning-rate warm-up.
+        max_grad_norm: Gradient clipping threshold (None disables it).
         patience: Epochs without validation improvement before stopping.
         validation_fraction: Share of rows held out for early stopping.
         device: `auto` (CUDA when available), `cpu` or `cuda`.
@@ -47,7 +52,10 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         learning_rate: float = 1e-3,
         weight_decay: float = 1e-5,
         epochs: int = 100,
-        batch_size: int = 128,
+        batch_size: int | str = 128,
+        schedule: str = "cosine",
+        warmup_epochs: int = 1,
+        max_grad_norm: float | None = 5.0,
         patience: int = 10,
         validation_fraction: float = 0.1,
         device: str = "auto",
@@ -61,6 +69,9 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         self.weight_decay = weight_decay
         self.epochs = epochs
         self.batch_size = batch_size
+        self.schedule = schedule
+        self.warmup_epochs = warmup_epochs
+        self.max_grad_norm = max_grad_norm
         self.patience = patience
         self.validation_fraction = validation_fraction
         self.device = device
@@ -144,19 +155,49 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
         )
+        batch_rows = training_helpers.resolve_batch_size(
+            self.batch_size, len(training)
+        )
+        steps_per_epoch = max(math.ceil(len(training) / batch_rows), 1)
+        total_steps = steps_per_epoch * self.epochs
+        warmup_steps = steps_per_epoch * self.warmup_epochs
+        monitor = training_helpers.TrainingMonitor()
         generator = np.random.default_rng(self.random_state + 1)
-        best, best_state, stale = np.inf, None, 0
+        best, best_state, stale, step = np.inf, None, 0, 0
+        self.n_iter_ = 0
         for epoch in range(self.epochs):
             network.train()
             shuffled = generator.permutation(training)
-            for start in range(0, len(shuffled), self.batch_size):
+            epoch_loss, alive = 0.0, True
+            for start in range(0, len(shuffled), batch_rows):
                 batch = torch.from_numpy(
-                    shuffled[start : start + self.batch_size]
+                    shuffled[start : start + batch_rows]
                 ).to(device)
+                for group in optimizer.param_groups:
+                    group["lr"] = training_helpers.learning_rate_at(
+                        step,
+                        total_steps,
+                        self.learning_rate,
+                        warmup_steps,
+                        self.schedule,
+                    )
                 optimizer.zero_grad()
                 loss = self.weighted_loss(torch, network, tensors, batch)
                 loss.backward()
+                norm = float(
+                    torch.nn.utils.clip_grad_norm_(
+                        network.parameters(), self.max_grad_norm or math.inf
+                    )
+                )
+                alive = monitor.step(float(loss), norm, self.max_grad_norm)
+                if not alive:
+                    break
                 optimizer.step()
+                epoch_loss += float(loss)
+                step += 1
+            if not alive:
+                break
+            monitor.epoch(epoch_loss / steps_per_epoch)
             self.n_iter_ = epoch + 1
             if not held:
                 continue
@@ -177,6 +218,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
                 stale += 1
                 if stale >= self.patience:
                     break
+        self.training_report_ = monitor.report()
         if best_state is not None:
             network.load_state_dict(best_state)
         network.eval()
@@ -245,7 +287,10 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         learning_rate: float = 1e-3,
         weight_decay: float = 1e-5,
         epochs: int = 100,
-        batch_size: int = 128,
+        batch_size: int | str = 128,
+        schedule: str = "cosine",
+        warmup_epochs: int = 1,
+        max_grad_norm: float | None = 5.0,
         patience: int = 10,
         validation_fraction: float = 0.1,
         device: str = "auto",
@@ -261,6 +306,9 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
             weight_decay,
             epochs,
             batch_size,
+            schedule,
+            warmup_epochs,
+            max_grad_norm,
             patience,
             validation_fraction,
             device,
