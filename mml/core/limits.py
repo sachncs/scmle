@@ -5,8 +5,8 @@
   killed and recorded as failed, whatever code it is executing.
 * Memory: no new trial starts above the limit, and a trial whose resident
   memory exceeds the limit is killed and recorded as failed. Resident memory
-  is sampled while the trial runs, so a very fast allocation spike can
-  overshoot by one sampling interval.
+  (the trial and every process it started) is sampled while it runs, so a
+  very fast allocation spike can overshoot by one sampling interval.
 * CPU: the worker count is capped at `cpu_limit` and each worker's math
   libraries are limited to its share of the CPUs.
 * GPU: no built-in model uses a GPU; `gpu="required"` blocks the run.
@@ -21,6 +21,7 @@ import multiprocessing
 from multiprocessing import connection
 import os
 import resource
+import signal
 import subprocess  # nosec B404
 import sys
 import time
@@ -34,6 +35,7 @@ KILOBYTES = 1024
 GRACE_SHARE = 0.1
 MIN_CEILING_SECONDS = 1.0
 POLL_SECONDS = 0.1
+PS_FIELDS = 3
 PRELOAD_MODULES = ["numpy", "pandas", "sklearn"]
 
 
@@ -49,20 +51,39 @@ def peak_memory_gb() -> float:
     return max(own, children) / BYTES_PER_GB
 
 
-def resident_bytes(pid: int) -> int:
-    """Current resident memory of a process, 0 if it is gone."""
-    statm = f"/proc/{pid}/statm"
-    if os.path.exists(statm):
-        with open(statm, encoding="ascii") as handle:
-            return int(handle.read().split()[1]) * resource.getpagesize()
+def process_table() -> dict[int, tuple[int, int]]:
+    """Maps every live pid to its (parent pid, resident bytes)."""
     completed = subprocess.run(  # nosec B603 B607
-        ["ps", "-o", "rss=", "-p", str(pid)],
+        ["ps", "-A", "-o", "pid=,ppid=,rss="],
         capture_output=True,
         text=True,
         check=False,
     )
-    text = completed.stdout.strip()
-    return int(text) * KILOBYTES if text.isdigit() else 0
+    table: dict[int, tuple[int, int]] = {}
+    for line in completed.stdout.splitlines():
+        fields = line.split()
+        if len(fields) == PS_FIELDS and all(f.isdigit() for f in fields):
+            table[int(fields[0])] = (int(fields[1]), int(fields[2]) * KILOBYTES)
+    return table
+
+
+def process_tree(root: int) -> dict[int, int]:
+    """Resident bytes of a process and all its descendants, by pid."""
+    table = process_table()
+    members = {root}
+    grew = True
+    while grew:
+        grew = False
+        for pid, entry in table.items():
+            if entry[0] in members and pid not in members:
+                members.add(pid)
+                grew = True
+    return {pid: table[pid][1] for pid in members if pid in table}
+
+
+def resident_bytes(pid: int) -> int:
+    """Resident memory of a process and its descendants, 0 if it is gone."""
+    return sum(process_tree(pid).values())
 
 
 def child_main(
@@ -124,12 +145,24 @@ class TrialSupervisor:
             raise TrialLimitError("trial process died unexpectedly") from error
         finally:
             if process.is_alive():
+                if process.pid is not None:
+                    self.kill_descendants(process.pid)
                 process.kill()
             process.join()
             receiver.close()
         if not succeeded:
             raise TrialLimitError(value)
         return value
+
+    @staticmethod
+    def kill_descendants(root: int) -> None:
+        """Kills processes the trial started, so none outlive it."""
+        for pid in process_tree(root):
+            if pid != root:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    continue
 
     def violation(
         self, process: multiprocessing.process.BaseProcess, elapsed: float

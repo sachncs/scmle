@@ -1,6 +1,9 @@
 """Resource limits in real runs."""
 
 import dataclasses
+import os
+import subprocess
+import sys
 import time
 
 import pytest
@@ -123,3 +126,44 @@ def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     assert sleepy and sleepy[0].status == "failed"
     assert "hard time ceiling" in sleepy[0].error
     assert result.selected_model != "sleepy"
+
+
+def spawn_memory_hungry_subprocess(marker):
+    child = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import time; data = bytearray(700 * 1024**2); "
+            "data[::4096] = b'x' * len(data[::4096]); time.sleep(120)",
+        ]
+    )
+    marker.write_text(str(child.pid))
+    time.sleep(120)
+
+
+def test_memory_of_subprocesses_a_trial_starts_counts_and_is_cleaned_up(
+    tmp_path,
+):
+    marker = tmp_path / "child.pid"
+    supervisor = limits.TrialSupervisor(ceiling_seconds=60, memory_gb=0.4)
+
+    with pytest.raises(limits.TrialLimitError, match="memory limit"):
+        supervisor.run(spawn_memory_hungry_subprocess, marker)
+
+    child = int(marker.read_text())
+    deadline = time.monotonic() + 5
+    while child in limits.process_table() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert child not in limits.process_table()
+
+
+def test_process_tree_includes_descendants():
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"]
+    )
+    try:
+        tree = limits.process_tree(os.getpid())
+        assert child.pid in tree and os.getpid() in tree
+    finally:
+        child.kill()
+        child.wait()

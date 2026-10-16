@@ -142,8 +142,8 @@ installed into a clean environment.
 ## Known limits
 
 * Memory is sampled while a trial runs (every 0.1 s), so a very fast spike
-  can overshoot once before the trial is killed; child processes spawned by
-  a trial are not counted. `resources.enforcement: cooperative` turns
+  can overshoot once before the trial is killed. The trial's memory includes
+  every process it started, and those are killed with it. `resources.enforcement: cooperative` turns
   supervision off.
 * Series features (lag / rolling) at prediction time use the recent rows
   the model stored at training time (`series_history.parquet`, checksummed in
