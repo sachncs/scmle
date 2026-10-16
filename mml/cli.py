@@ -7,10 +7,8 @@ executes itself, so adding a command never touches the dispatcher.
 import abc
 import argparse
 from collections.abc import Sequence
-import json
 import pathlib
 import sys
-from typing import Any
 from typing import ClassVar
 
 import pandas as pd
@@ -19,6 +17,7 @@ from mml.api import project
 from mml.artifacts import bundle as bundle_module
 from mml.contracts import errors
 from mml.contracts import tasks
+from mml.core import config
 from mml.inference import mapping as mapping_module
 from mml.optimization import optimizers
 
@@ -120,35 +119,9 @@ class ProjectCommand(Command):
             "(same fields as the specification classes)",
         )
 
-    @staticmethod
-    def load_sections(path: str | None) -> dict[str, Any]:
-        """Reads the optional JSON file of nested specification sections.
-
-        Raises:
-            ConfigError: For unknown sections.
-        """
-        if path is None:
-            return {}
-        record = json.loads(pathlib.Path(path).read_text())
-        classes = {
-            "search": tasks.SearchSpec,
-            "strategies": tasks.StrategySpec,
-            "ensemble": tasks.EnsembleSpec,
-            "feature_graph": tasks.FeatureGraphSpec,
-            "selection": tasks.SelectionSpec,
-            "decision": tasks.DecisionSpec,
-        }
-        unknown = set(record) - set(classes)
-        if unknown:
-            raise errors.ConfigError(
-                f"unknown config sections {sorted(unknown)}; allowed: "
-                f"{sorted(classes)}"
-            )
-        return {name: classes[name](**body) for name, body in record.items()}
-
     def build_project(self, args: argparse.Namespace) -> project.MLProject:
         """Creates the project described by the arguments."""
-        sections = self.load_sections(args.config)
+        sections = config.load_sections(args.config)
         sections.setdefault(
             "search",
             tasks.SearchSpec(
