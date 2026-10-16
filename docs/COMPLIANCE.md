@@ -141,7 +141,7 @@ spec lines it covers (`test_l<from>_l<to>_...`); it runs in the normal suite.
 | Backlog P1 (registry, tuning, tracking, automated decisions, imbalance, explainability) | Implemented | `tests/integration/test_strategy_search.py`, `tests/integration/test_resume.py`, `tests/unit/test_diagnostics.py` |
 | Backlog P2 (ensembles, advanced augmentation, meta-learning, deployment, monitoring) | Implemented | `tests/integration/test_ensembles.py`, `tests/integration/test_meta_learning.py`, `tests/integration/test_monitoring.py`, `tests/integration/test_deployment.py` |
 | Contract, statistical, leakage, property, artifact, recovery, benchmark tests | Implemented | `tests/unit/test_component_contracts.py`, `tests/property/test_invariants.py`, `tests/leakage/test_leakage.py`, `benchmarks/check_regression.py` |
-| Quality gates (fold-local state, manifests and decision logs, round-trip, limits, terminal-state reporting, plugin conformance, benchmark suite) | Implemented | `tests/integration/test_resource_limits.py`, `tests/integration/test_recovery.py`, `tests/unit/test_benchmark_gate.py` |
+| Quality gates (fold-local state, manifests and decision logs, round-trip, limits, terminal-state reporting, plugin conformance, benchmark suite) | Implemented | `tests/integration/test_resource_limits.py`, `tests/integration/test_recovery.py`, `tests/benchmarks/test_benchmark_gate.py` |
 | Security review, dependency policy, packaging | Implemented | `docs/SECURITY.md`, `docs/DEPENDENCIES.md`, `.github/workflows/release.yml` |
 
 ## 18-20. First slice, API, future commitments
@@ -190,8 +190,8 @@ now closed.
 | Resource limits are enforced: every trial supervised in its own process, killed past the time ceiling or memory limit | Implemented | `mml/core/limits.py::TrialSupervisor`, `tests/unit/test_trial_supervision.py`, `tests/integration/test_resource_limits.py::test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues` |
 | CLI exposes validation, embargo, strategies, enforcement and nested specifications | Implemented | `mml/cli.py`, `tests/integration/test_cli.py::test_config_file_and_flags_reach_the_full_specification` |
 
-Deliberate deviation: the package layout in section 3 is a recommendation; the
-code uses a flat `mml/` package (no `src/`), as the project owner instructed.
+Deliberate deviation: section 3 recommends a `src` layout; the module tree is
+followed under a flat `mml/` package (no `src/`), as the project owner instructed.
 
 ## 21. Risks
 

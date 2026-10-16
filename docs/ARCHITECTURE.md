@@ -6,7 +6,7 @@ magicml is a modular monolith with three planes that stay separate:
 | --- | --- | --- |
 | Control | what to do, when and why | `mml.core` (orchestrator, stages, state machine), `mml.intelligence` (planner, meta-learning) |
 | Execution | transformations, training, tuning, evaluation | `mml.data`, `mml.models`, `mml.optimization`, `mml.experimentation.trials`, `mml.core.scheduler` |
-| Evidence | artifacts, measurements, decisions, provenance | `mml.artifacts`, `mml.tracking`, `mml.monitoring`, `mml.deployment` |
+| Evidence | artifacts, measurements, decisions, provenance | `mml.artifacts`, `mml.experimentation.stores`, `mml.monitoring`, `mml.governance`, `mml.inference` |
 
 Modules interact only through the typed contracts in `mml.contracts`.
 

@@ -98,18 +98,23 @@ is why the locked-test score is the number to trust.
 
 | Package | Responsibility |
 | --- | --- |
-| `mml.contracts` | Typed contracts (pydantic config, frozen dataclasses, ABCs) |
-| `mml.data` | Readers, column kinds, profiling and fingerprint, split strategies, pipelines, data strategies |
-| `mml.models` | `ModelAdapter` hierarchy, registry, conformance, resampling, thresholds, stacking |
+| `mml.contracts` | Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, ABCs |
+| `mml.data` | `readers` (CSV, Parquet, Arrow / Polars interchange), `profiling`, `validation` (column kinds, target and task), `curation` (fold-local preprocessing), `splitting` (leakage-safe and structure-aware strategies) |
+| `mml.features` | Versioned, fitted feature graph (row-wise and series nodes) |
+| `mml.sampling` | Resamplers, synthesis, and the data strategies evaluated inside folds |
+| `mml.models` | `ModelAdapter` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
 | `mml.optimization` | Ask/tell optimizers (random, Optuna) |
-| `mml.intelligence` | `Planner`, `PlanningRule`s, meta-learning from run history |
+| `mml.experimentation` | Trials, tuning, strategy and ensemble search, experiment stores (SQLite) |
+| `mml.intelligence` | Dataset fingerprint, `Planner` and `PlanningRule`s, recommendations, meta-learning from run history |
 | `mml.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
-| `mml.core` | State machine, `Stage` hierarchy, trials, tuner, strategy and ensemble search, checkpoints, limits, execution backends, orchestrator |
-| `mml.tracking` | Experiment stores (SQLite, MLflow) |
-| `mml.artifacts` | Signed model bundle, run store, ledger, report, replay verification |
+| `mml.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
+| `mml.core` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
+| `mml.artifacts` | Signed model bundle, run store, report, replay verification |
+| `mml.inference` | Column mapping, input validation, batch / HTTP serving |
 | `mml.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
-| `mml.deployment` | Content-addressed model registry, batch / HTTP serving, lifecycle manager |
-| `mml.api` | `MLProject`, `RunResult` |
+| `mml.governance` | Access ledger, content-addressed model registry, lifecycle manager, run audit |
+| `mml.integrations` | Optional MLflow and Ray adapters |
+| `mml.api` | `MLProject`, `RunResult`, `load_model` / `predict` |
 
 Extension points are polymorphic: add a `TableReader`, `ColumnKind`,
 `SplitStrategy`, `DataStrategy`, `ModelAdapter`, `Optimizer`, `PlanningRule`,

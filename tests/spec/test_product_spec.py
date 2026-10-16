@@ -212,53 +212,66 @@ def test_l101_l105_three_planes_are_separate_packages():
 
 
 def test_l113_l176_package_organization():
-    """L113-L176: the spec's module tree exists (with our naming where merged)."""
-    for module in (
+    """L113-L176: every module of the spec's tree exists (flat `mml/`)."""
+    packages = (
         "api",
         "contracts",
         "core",
         "intelligence",
         "data",
-        "models",
-        "optimization",
-        "evaluation",
-        "artifacts",
-        "monitoring",
+        "data/readers",
+        "data/profiling",
+        "data/validation",
+        "data/curation",
+        "data/splitting",
         "features",
         "sampling",
+        "models",
+        "models/sklearn",
+        "models/boosting",
+        "optimization",
         "experimentation",
-        "governance",
+        "evaluation",
+        "explainability",
+        "artifacts",
         "inference",
+        "monitoring",
+        "governance",
         "integrations",
-    ):
-        assert (PACKAGE / module / "__init__.py").exists(), module
-    for rel in (
-        "data/readers/tabular.py",
-        "data/profiling/profiler.py",
-        "data/splitting/splitters.py",
-        "data/validation/columns.py",
-        "data/curation/preprocessing.py",
-        "intelligence/fingerprint.py",
-        "features/graph.py",
-        "sampling/resampling.py",
-        "models/sklearn/adapters.py",
-        "models/boosting/adapters.py",
-        "models/registry.py",
-        "core/orchestrator.py",
-        "core/state.py",
-        "intelligence/planner.py",
-        "intelligence/knowledge.py",
-        "contracts/events.py",
+    )
+    for package in packages:
+        assert (PACKAGE / package / "__init__.py").exists(), package
+    modules = (
         "api/project.py",
         "api/results.py",
-    ):
+        "api/predict.py",
+        "contracts/data.py",
+        "contracts/tasks.py",
+        "contracts/models.py",
+        "contracts/metrics.py",
+        "contracts/artifacts.py",
+        "contracts/events.py",
+        "core/config.py",
+        "core/orchestrator.py",
+        "core/compiler.py",
+        "core/scheduler.py",
+        "core/state.py",
+        "core/policies.py",
+        "intelligence/fingerprint.py",
+        "intelligence/planner.py",
+        "intelligence/recommendations.py",
+        "intelligence/knowledge.py",
+        "models/registry.py",
+    )
+    for rel in modules:
         assert (PACKAGE / rel).exists(), rel
-    for folder in ("unit", "integration", "leakage", "property"):
+    for folder in ("unit", "integration", "leakage", "property", "benchmarks"):
         assert (ROOT / "tests" / folder).is_dir()
     assert (
         (ROOT / "benchmarks").is_dir()
         and (ROOT / "examples").is_dir()
         and (ROOT / "docs").is_dir()
+        and (ROOT / "LICENSE").is_file()
     )
 
 

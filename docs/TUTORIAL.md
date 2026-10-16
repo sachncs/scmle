@@ -124,7 +124,8 @@ mml.MLProject.resume("runs/run_20261015_001")  # finished trials are reused
 ## 7. Serve and monitor
 
 ```python
-from mml.deployment import lifecycle, registry, serving
+from mml.governance import lifecycle, registry
+from mml.inference import serving
 from mml.monitoring import monitor
 
 bundle = mml.ModelBundle.load("artifacts/churn", signing_key="...")
