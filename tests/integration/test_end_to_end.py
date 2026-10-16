@@ -293,3 +293,20 @@ def test_a_plan_for_another_task_or_an_impossible_strategy_is_refused(
         support.make_project(binary_frame, "y", output_dir=tmp_path / "x").run(
             impossible
         )
+
+
+def test_a_run_explains_individual_predictions_against_a_background(
+    binary_frame, tmp_path
+):
+    result = support.make_project(
+        binary_frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+    rows = binary_frame.drop(columns="y").head(3)
+    background = binary_frame.drop(columns="y").iloc[100:160]
+
+    table = result.explain(rows, background)
+
+    assert list(table.columns) == ["prediction", "a", "b", "c"]
+    assert len(table) == 3 and table["prediction"].between(0, 1).all()
+    assert table[["a", "b", "c"]].abs().to_numpy().sum() > 0
+    assert "partial_dependence" in result.diagnostics
