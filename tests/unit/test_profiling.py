@@ -8,6 +8,7 @@ from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data.profiling import profiler as profiling
 from mml.data.readers import tabular
+from mml.data.validation import target as target_module
 
 
 def make_spec(task="auto", **data_overrides):
@@ -17,7 +18,7 @@ def make_spec(task="auto", **data_overrides):
 
 def profile(frame, task="auto", **data_overrides):
     spec = make_spec(task, **data_overrides)
-    resolved = profiling.TaskResolver(spec).resolve(frame["y"])
+    resolved = target_module.TaskResolver(spec).resolve(frame["y"])
     manifest = tabular.build_manifest(frame, "y")
     result = profiling.DatasetProfiler(spec).profile(frame, manifest, resolved)
     return resolved, result
@@ -39,7 +40,7 @@ def classification_frame():
 
 
 def resolve(frame, task="auto"):
-    return profiling.TaskResolver(make_spec(task)).resolve(frame["y"])
+    return target_module.TaskResolver(make_spec(task)).resolve(frame["y"])
 
 
 def test_task_resolution(classification_frame):

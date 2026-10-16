@@ -14,6 +14,7 @@ from mml.data.curation import preprocessing
 from mml.data.profiling import profiler as profiling
 from mml.data.readers import tabular
 from mml.data.splitting import splitters
+from mml.data.validation import target as target_module
 from mml.models import registry as registry_module
 from mml.models import thresholds
 from mml.monitoring import reference
@@ -64,7 +65,7 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
     spec = spec_for()
     manifest = tabular.build_manifest(frame, "y")
     try:
-        task = profiling.TaskResolver(spec).resolve(frame["y"])
+        task = target_module.TaskResolver(spec).resolve(frame["y"])
         profile = profiling.DatasetProfiler(spec).profile(frame, manifest, task)
     except errors.MagicMLError:
         return
@@ -85,7 +86,7 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
     spec = spec_for()
     manifest = tabular.build_manifest(frame, "y")
     try:
-        task = profiling.TaskResolver(spec).resolve(frame["y"])
+        task = target_module.TaskResolver(spec).resolve(frame["y"])
         plan = (
             profiling.DatasetProfiler(spec)
             .profile(frame, manifest, task)

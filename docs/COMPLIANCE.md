@@ -170,7 +170,7 @@ now closed.
 | --- | --- | --- |
 | Resume reuses checkpoints only for the same data | Implemented | `mml/core/stages.py::refuse_stale_resume`, `tests/integration/test_resume.py::test_resume_refuses_checkpoints_computed_on_different_data` |
 | Profiling, feature selection and leakage decisions use the development partition only | Implemented | `mml/core/stages.py::make_split`, `tests/leakage/test_leakage.py::test_profile_and_feature_plan_never_see_the_locked_test_rows` |
-| Ambiguous / degenerate targets BLOCK the run | Implemented | `mml/data/profiling/profiler.py::resolve_auto`, `tests/integration/test_edge_cases.py::test_degenerate_targets_block_the_run_with_a_clear_reason` |
+| Ambiguous / degenerate targets BLOCK the run | Implemented | `mml/data/validation/target.py::resolve_auto`, `tests/integration/test_edge_cases.py::test_degenerate_targets_block_the_run_with_a_clear_reason` |
 | Installed plugins are discovered and must pass the conformance suite | Implemented | `mml/models/registry.py::load_plugins`, `tests/unit/test_registry.py::test_a_default_orchestrator_discovers_conforming_plugins_only` |
 | Adapter capabilities drive preprocessing and planning (missing values, sparse input, native categoricals, serializability) and are verified by the conformance suite | Implemented | `mml/data/curation/preprocessing.py::default_options`, `mml/models/conformance.py::check_declared_capabilities`, `tests/unit/test_capability_use.py` |
 | High-cardinality categories: native-categorical models first, regularized target encoding evaluated | Implemented | `mml/intelligence/planner.py::HighCardinalityRule`, `mml/sampling/strategies.py::TargetEncodingStrategy`, `tests/unit/test_capability_use.py` |

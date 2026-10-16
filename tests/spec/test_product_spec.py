@@ -30,6 +30,7 @@ from mml.core import scheduler
 from mml.core import stages
 from mml.core import state
 from mml.data.validation import columns
+from mml.data.validation import target as target_module
 from mml.governance import lifecycle
 from mml.inference import mapping as mapping_module
 from mml.integrations import ray as ray_integration
@@ -384,7 +385,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     pd.testing.assert_frame_equal(frame, before)  # ingestion: input immutable
     spec = project.spec
     manifest = tabular.build_manifest(frame, "y")
-    task = profiling.TaskResolver(spec).resolve(frame["y"])
+    task = target_module.TaskResolver(spec).resolve(frame["y"])
     profiling.DatasetProfiler(spec).profile(frame, manifest, task)
     pd.testing.assert_frame_equal(
         frame, before

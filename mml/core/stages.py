@@ -29,6 +29,7 @@ from mml.core import state as run_state
 from mml.data.profiling import profiler as profiling
 from mml.data.readers import tabular
 from mml.data.splitting import splitters
+from mml.data.validation import target as target_module
 from mml.evaluation import confidence
 from mml.evaluation import diagnostics
 from mml.evaluation import resources
@@ -176,7 +177,7 @@ class ProfileStage(Stage):
                 f"target '{target.name}' has {int(target.isna().sum())} "
                 "missing values"
             )
-        task = profiling.TaskResolver(spec).resolve(target)
+        task = target_module.TaskResolver(spec).resolve(target)
         approved = context.approved_plan
         if approved is not None and approved.task != task.value:
             raise errors.ConfigError(
