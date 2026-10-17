@@ -16,6 +16,8 @@ import pandas as pd
 from sklearn import base
 
 FRACTIONS = (0.2, 0.4, 0.6, 0.8, 1.0)
+MIN_POINTS = 3
+MAX_CLASSES = 20
 MIN_TRAIN_ROWS = 100
 CLIMBING_SHARE = 0.25
 FLAT_TOLERANCE = 0.002
@@ -97,10 +99,14 @@ def compute(
         return None
     held = np.asarray(evaluate_positions)
     sizes, scores = [], []
+    distinct = target.iloc[fit].nunique()
+    needed = distinct if distinct <= MAX_CLASSES else 2
     for fraction in FRACTIONS:
         if should_stop():
             return None
         used = fit[: max(int(len(fit) * fraction), 2)]
+        if target.iloc[used].nunique() < needed:
+            continue  # An ordered prefix can miss classes.
         fitted = base.clone(candidate).fit(
             features.iloc[used], target.iloc[used]
         )
@@ -108,6 +114,8 @@ def compute(
             float(scorer(fitted, features.iloc[held], target.iloc[held]))
         )
         sizes.append(len(used))
+    if len(scores) < MIN_POINTS:
+        return None
     verdict, last, total = judge(scores)
     sign = 1.0 if greater_is_better else -1.0
     return LearningCurve(

@@ -113,3 +113,23 @@ def test_error_metrics_are_reported_in_natural_orientation():
     )
 
     assert all(score > 0 for score in curve.scores)
+
+
+def test_slices_holding_a_single_class_are_skipped_not_fatal():
+    rows = 300
+    features = pd.DataFrame(
+        np.random.default_rng(0).normal(size=(rows, 3)), columns=list("abc")
+    )
+    target = pd.Series([0] * 120 + [1] * 120 + [2] * 60)
+    curve = learning_curve.compute(
+        linear_model.LogisticRegression(),
+        features,
+        target,
+        range(240),
+        range(240, rows),
+        metrics.get_scorer("accuracy"),
+        True,
+    )
+
+    assert curve is not None
+    assert min(curve.sizes) > 48  # the first, single-class slice was skipped

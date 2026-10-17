@@ -90,10 +90,11 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     ).resume(run_dir)
     assert resumed.state == "COMPLETED"
     # 5 CV fits were reused. The new fits are the final refit of the selected
-    # model (ties go to the alphabetically first equal-cost model) and the 5
-    # out-of-fold fits that calibrate the conformal intervals.
+    # model (ties go to the alphabetically first equal-cost model), the 5
+    # out-of-fold fits that calibrate the conformal intervals and the 5 fits
+    # of the learning curve.
     assert resumed.selected_model == "canceller"
-    assert canceller.fits == 5 + 1 + 5, "the cancelled trial must be reused"
+    assert canceller.fits == 5 + 1 + 5 + 5, "the cancelled trial must be reused"
     assert counting.fits >= 5, "the unfinished trial must be computed"
     assert [t.model_name for t in resumed.trials] == [
         "dummy",

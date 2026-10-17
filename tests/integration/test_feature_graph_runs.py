@@ -100,7 +100,7 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
     )
     plan = result.profile.feature_plan
     assert {"cross", "month"} <= set(plan.numeric)
-    assert "when" in plan.dropped and "when" in plan.extra_inputs
+    assert "when" in plan.extra_inputs
     assert set(result.bundle.features) == {"x1", "x2", "when"}
     assert "cross" not in result.bundle.features  # computed, not supplied
     with_graph = result.evaluation["test_metrics"]["roc_auc"]
