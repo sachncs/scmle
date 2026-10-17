@@ -52,6 +52,8 @@ from mml.models import thresholds
 from mml.monitoring import reference as reference_module
 from mml.sampling import strategies
 
+DIAGNOSTIC_BUDGET_SHARE = 0.25
+DIAGNOSTIC_MIN_SECONDS = 30.0
 LEAKAGE_MARKER = "leakage"
 BASELINE = "dummy"
 require = context_module.require
@@ -617,6 +619,16 @@ class FinalEvaluationStage(Stage):
         selected = require(context.selected, "selected")
         return f"final one-time test evaluation of {selected.model_name}"
 
+    @staticmethod
+    def diagnostic_seconds(context: context_module.RunContext) -> float:
+        """Time the post-selection diagnostics may use in total.
+
+        A share of the time budget, never less than a minimum, so wide
+        datasets cannot turn explanation into the slowest step of the run.
+        """
+        budget = context.spec.resources.time_budget_seconds
+        return max(DIAGNOSTIC_MIN_SECONDS, DIAGNOSTIC_BUDGET_SHARE * budget)
+
     def selected_health(
         self,
         context: context_module.RunContext,
@@ -702,6 +714,7 @@ class FinalEvaluationStage(Stage):
                 sensitive_columns=tuple(context.spec.data.sensitive_columns),
             ),
             suite.full_suite(),
+            self.diagnostic_seconds(context),
         )
         for name, report_body in context.diagnostics.items():
             context.write_json(f"diagnostics/{name}.json", report_body)
@@ -784,6 +797,8 @@ class PackageStage(Stage):
         held_scores: list[Any] = []
         classes = list(bundle.classes or ())
         for fit_positions, evaluate_positions in split.manifest.folds:
+            if context.resource_governor.skip_reason(first=False):
+                return None
             fit = np.asarray(fit_positions)
             evaluate = np.asarray(evaluate_positions)
             candidate = base.clone(template).fit(

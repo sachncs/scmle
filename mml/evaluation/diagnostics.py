@@ -8,6 +8,7 @@ build on the same base class in `mml.explainability`.
 
 import abc
 import dataclasses
+import time
 from typing import Any
 from typing import ClassVar
 
@@ -51,6 +52,8 @@ class DiagnosticInput:
         reference_features: Development rows the model was trained on, for
             diagnostics that compare them with the evaluation rows.
         sensitive_columns: Columns whose groups outcomes are compared across.
+        deadline: Monotonic time by which a diagnostic should finish; slow
+            diagnostics stop early and say so (None = no limit).
     """
 
     estimator: Any
@@ -64,6 +67,11 @@ class DiagnosticInput:
     temporal: bool = False
     reference_features: pd.DataFrame | None = None
     sensitive_columns: tuple[str, ...] = ()
+    deadline: float | None = None
+
+    def out_of_time(self) -> bool:
+        """Whether the diagnostic's time allowance has run out."""
+        return self.deadline is not None and time.monotonic() > self.deadline
 
     @property
     def positive_label(self) -> Any:
@@ -416,23 +424,37 @@ def default_suite() -> tuple[Diagnostic, ...]:
 
 
 def run_suite(
-    inputs: DiagnosticInput, suite: tuple[Diagnostic, ...] | None = None
+    inputs: DiagnosticInput,
+    suite: tuple[Diagnostic, ...] | None = None,
+    total_seconds: float | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Runs every applicable diagnostic; one failure never hides the others.
 
     Args:
         inputs: Fitted candidate and evaluation data.
         suite: Diagnostics to run; defaults to `default_suite()`.
+        total_seconds: Time allowance for the whole suite, shared evenly by
+            the diagnostics still to run (None = unlimited).
 
     Returns:
         Report per diagnostic name; failures appear as `{"error": ...}`.
     """
     reports: dict[str, dict[str, Any]] = {}
-    for diagnostic in suite if suite is not None else default_suite():
-        if inputs.task not in diagnostic.applies_to:
-            continue
+    chosen = [
+        d
+        for d in (suite if suite is not None else default_suite())
+        if inputs.task in d.applies_to
+    ]
+    finish = None if total_seconds is None else time.monotonic() + total_seconds
+    for position, diagnostic in enumerate(chosen):
+        limited = inputs
+        if finish is not None:
+            share = (finish - time.monotonic()) / (len(chosen) - position)
+            limited = dataclasses.replace(
+                inputs, deadline=time.monotonic() + max(share, 0.0)
+            )
         try:
-            reports[diagnostic.name] = diagnostic.compute(inputs)
+            reports[diagnostic.name] = diagnostic.compute(limited)
         except Exception as error:  # Isolation: diagnostics are advisory.
             reports[diagnostic.name] = {
                 "error": f"{type(error).__name__}: {error}"

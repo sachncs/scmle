@@ -3,11 +3,11 @@
 from typing import Any
 
 import numpy as np
-from sklearn import inspection
 
 from mml.evaluation import diagnostics
 
 IMPORTANCE_REPEATS = 5
+IMPORTANCE_ROWS = 1000
 
 
 class PermutationImportance(diagnostics.Diagnostic):
@@ -16,26 +16,47 @@ class PermutationImportance(diagnostics.Diagnostic):
     name = "permutation_importance"
 
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
-        """Measures the metric drop when each feature is shuffled."""
+        """Measures the metric drop when each feature is shuffled.
+
+        The cost grows with the number of features, so rows are capped, the
+        features are visited in a random order and the loop stops when the
+        diagnostic's time allowance is spent. The report then covers a random
+        subset of the features and says so.
+        """
         columns = list(inputs.feature_plan.input_columns)
+        rng = np.random.default_rng(inputs.seed)
+        rows = rng.permutation(len(inputs.features))[:IMPORTANCE_ROWS]
+        features = inputs.features[columns].iloc[rows].reset_index(drop=True)
+        target = inputs.target.iloc[rows].reset_index(drop=True)
         scorer = inputs.metric.scorer(inputs.positive_label)
-        result = inspection.permutation_importance(
-            inputs.estimator,
-            inputs.features[columns],
-            inputs.target,
-            scoring=scorer,
-            n_repeats=IMPORTANCE_REPEATS,
-            random_state=inputs.seed,
-        )
-        ranked = np.argsort(-result.importances_mean)
+        baseline = scorer(inputs.estimator, features, target)
+        measured = []
+        for index in rng.permutation(len(columns)):
+            if inputs.out_of_time():
+                break
+            drops = []
+            for repeat in range(IMPORTANCE_REPEATS):
+                shuffler = np.random.default_rng([inputs.seed, index, repeat])
+                shuffled = features.copy()
+                shuffled[columns[index]] = shuffler.permutation(
+                    features[columns[index]].to_numpy()
+                )
+                drops.append(
+                    baseline - scorer(inputs.estimator, shuffled, target)
+                )
+            measured.append((columns[index], drops))
+        ranked = sorted(measured, key=lambda item: -float(np.mean(item[1])))
         return {
             "metric": inputs.metric.name,
+            "truncated": len(measured) < len(columns),
+            "features_measured": len(measured),
+            "features_total": len(columns),
             "features": [
                 {
-                    "feature": columns[i],
-                    "importance": float(result.importances_mean[i]),
-                    "std": float(result.importances_std[i]),
+                    "feature": name,
+                    "importance": float(np.mean(drops)),
+                    "std": float(np.std(drops)),
                 }
-                for i in ranked
+                for name, drops in ranked
             ],
         }
