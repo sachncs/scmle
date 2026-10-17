@@ -180,7 +180,9 @@ def open_ml(
     task: tasks.TaskRequest,
     metric: str,
     version: int = 1,
-    **options: object,
+    max_rows: int | None = None,
+    drop: tuple[str, ...] = (),
+    time_column: str | None = None,
 ) -> OpenMlDataset:
     """Describes an OpenML dataset (shorthand for the extended suite)."""
     return OpenMlDataset(
@@ -188,9 +190,11 @@ def open_ml(
         target,
         task,
         metric,
+        max_rows=max_rows,
+        drop=drop,
+        time_column=time_column,
         openml_name=openml_name,
         version=version,
-        **options,  # type: ignore[arg-type]
     )
 
 
@@ -309,14 +313,18 @@ EXTENDED = (
 )
 
 
+HUB_REPO = "inria-soda/tabular-benchmark"
+
+
 def hugging_face(
     name: str,
     filename: str,
     target: str,
     task: tasks.TaskRequest,
     metric: str,
-    repo: str = "inria-soda/tabular-benchmark",
-    **options: object,
+    repo: str = HUB_REPO,
+    max_rows: int | None = None,
+    drop: tuple[str, ...] = (),
 ) -> HuggingFaceDataset:
     """Describes a Hugging Face table (shorthand for the suite below)."""
     return HuggingFaceDataset(
@@ -324,26 +332,44 @@ def hugging_face(
         target,
         task,
         metric,
+        max_rows=max_rows,
+        drop=drop,
         repo=repo,
         filename=filename,
-        **options,  # type: ignore[arg-type]
     )
 
 
 def classification(
-    name: str, filename: str, target: str, **options: object
+    name: str,
+    filename: str,
+    target: str,
+    repo: str = HUB_REPO,
+    max_rows: int | None = None,
 ) -> HuggingFaceDataset:
     """A binary classification table of the curated benchmark."""
     return hugging_face(
-        name, filename, target, "classification", "roc_auc", **options
+        name,
+        filename,
+        target,
+        "classification",
+        "roc_auc",
+        repo,
+        max_rows,
     )
 
 
 def regression(
-    name: str, filename: str, target: str, **options: object
+    name: str,
+    filename: str,
+    target: str,
+    repo: str = HUB_REPO,
+    max_rows: int | None = None,
+    drop: tuple[str, ...] = (),
 ) -> HuggingFaceDataset:
     """A regression table of the curated benchmark."""
-    return hugging_face(name, filename, target, "regression", "rmse", **options)
+    return hugging_face(
+        name, filename, target, "regression", "rmse", repo, max_rows, drop
+    )
 
 
 # The curated tabular benchmark of Grinsztajn et al. plus scikit-learn's
