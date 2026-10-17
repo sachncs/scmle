@@ -22,6 +22,18 @@
   process.
 * Rolling-origin validation and `data.feature_delays`.
 * `models.exclude_models` / `models.exclude_families`.
+* Datetime columns become calendar and trend features; free-text columns are
+  encoded as fold-local TF-IDF terms.
+* Missing-value indicator and iterative-imputation strategies; arcsinh target
+  transform for long-tailed regression targets.
+* `mml.register_metric` for user-defined metrics.
+* Greedy weighted blending searched alongside stacking.
+* Fairness report (`data.sensitive_columns`), out-of-distribution flags in
+  the bundle, a learning curve, monotonic constraints
+  (`data.monotonic_constraints`).
+* Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
+* Benchmarks: Hugging Face source and suites (`--suite`).
+* Post-selection diagnostics are bounded by a share of the time budget.
 
 ## 0.1.0b1
 
