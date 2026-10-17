@@ -125,11 +125,13 @@ def test_strategy_registry_is_polymorphic():
     assert set(splitters.STRATEGIES) == {
         "random",
         "stratified",
+        "stratified_events",
         "group",
         "temporal",
         "rolling",
     }
     assert issubclass(splitters.StratifiedSplit, splitters.RandomSplit)
+    assert issubclass(splitters.EventStratifiedSplit, splitters.RandomSplit)
 
 
 def test_locked_test_set_opens_once(frame):
