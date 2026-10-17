@@ -142,7 +142,7 @@ def test_adapters_pass_conformance_and_support_every_task(name):
 
     conformance.check_conformance(adapter)
 
-    assert adapter.capabilities.tasks == frozenset(tasks.TaskType)
+    assert adapter.capabilities.tasks == tasks.STANDARD_TASKS
     assert adapter.rejection_reason(tasks.TaskType.BINARY) is None
 
 

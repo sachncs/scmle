@@ -31,6 +31,11 @@ class TaskType(enum.StrEnum):
         return self in (TaskType.BINARY, TaskType.MULTICLASS)
 
 
+STANDARD_TASKS = frozenset(
+    {TaskType.BINARY, TaskType.MULTICLASS, TaskType.REGRESSION}
+)
+"""Tasks scikit-learn style estimators handle; survival needs its own models."""
+
 TaskRequest = Literal[
     "auto",
     "classification",

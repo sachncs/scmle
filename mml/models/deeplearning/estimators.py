@@ -279,3 +279,70 @@ class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):
     def predict(self, features: Any) -> np.ndarray:
         """Predicted values."""
         return self.call("predict", features)
+
+
+class KerasEstimator(NetworkEstimator):
+    """Worker-backed Keras network with the scikit-learn estimator interface.
+
+    Attributes:
+        hidden_sizes: Layer widths.
+        dropout: Dropout probability.
+        learning_rate: Adam step size.
+        l2: L2 penalty on the kernels.
+        epochs: Maximum epochs.
+        batch_size: Rows per step.
+        patience: Epochs without validation improvement before stopping.
+        validation_fraction: Share of rows held out for early stopping.
+        random_state: Seed.
+    """
+
+    def __init__(
+        self,
+        hidden_sizes: tuple[int, ...] = (64,),
+        dropout: float = 0.1,
+        learning_rate: float = 1e-3,
+        l2: float = 1e-5,
+        epochs: int = 100,
+        batch_size: int = 128,
+        patience: int = 10,
+        validation_fraction: float = 0.1,
+        random_state: int = 0,
+    ) -> None:
+        """Stores the hyperparameters (scikit-learn convention)."""
+        self.hidden_sizes = hidden_sizes
+        self.dropout = dropout
+        self.learning_rate = learning_rate
+        self.l2 = l2
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.patience = patience
+        self.validation_fraction = validation_fraction
+        self.random_state = random_state
+
+
+class KerasClassifier(base.ClassifierMixin, KerasEstimator):
+    """Keras classifier."""
+
+    engine_path = "mml.models.deeplearning.keras_engine.ClassifierEngine"
+
+    def remember(self, state: dict[str, Any]) -> None:
+        """Exposes `classes_` after fitting."""
+        self.classes_ = state["classes_"]
+
+    def predict_proba(self, features: Any) -> np.ndarray:
+        """Class probabilities."""
+        return self.call("predict_proba", features)
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Most probable class."""
+        return self.call("predict", features)
+
+
+class KerasRegressor(base.RegressorMixin, KerasEstimator):
+    """Keras regressor."""
+
+    engine_path = "mml.models.deeplearning.keras_engine.RegressorEngine"
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Predicted values."""
+        return self.call("predict", features)

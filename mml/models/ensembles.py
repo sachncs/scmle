@@ -152,7 +152,7 @@ class StackingAdapter(models.ModelAdapter):
     name = "stacking"
     family = "ensemble"
     capabilities = models.Capabilities(
-        frozenset(tasks.TaskType),
+        tasks.STANDARD_TASKS,
         needs_scaling=True,
         standalone=False,
         cost=5,

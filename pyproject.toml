@@ -38,7 +38,8 @@ dependencies = [
 [project.optional-dependencies]
 boosting = ["lightgbm>=4.6", "xgboost>=3.0"]
 catboost = ["catboost>=1.2.8"]  # no free-threaded (3.14t) wheel yet
-deeplearning = ["torch>=2.8"]
+# Keras 3 runs on the PyTorch backend inside the same worker process.
+deeplearning = ["torch>=2.8", "keras>=3.5"]
 # TabPFN needs an accepted Prior Labs license and TABPFN_TOKEN for its weights,
 # so it is not part of the `all` extra.
 tabpfn = ["tabpfn>=2.0"]

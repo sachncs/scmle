@@ -214,7 +214,7 @@ def register_metric(
     name: str,
     score_function: Callable[..., float],
     greater_is_better: bool,
-    task_types: tuple[tasks.TaskType, ...] = tuple(tasks.TaskType),
+    task_types: tuple[tasks.TaskType, ...] = tuple(tasks.STANDARD_TASKS),
     response_method: str = "predict",
     replace: bool = False,
 ) -> metric_contracts.FunctionMetric:

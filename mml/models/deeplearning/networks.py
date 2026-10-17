@@ -13,7 +13,7 @@ from mml.models.deeplearning import estimators
 from mml.models.deeplearning import foundation
 from mml.models.deeplearning import worker
 
-ALL_TASKS = frozenset(tasks.TaskType)
+ALL_TASKS = tasks.STANDARD_TASKS
 COMMON_SPACE = (
     search.FloatParameter("dropout", 0.0, 0.4),
     search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
@@ -31,7 +31,7 @@ class TorchAdapter(models.ModelAdapter):
     """
 
     family = "deep_learning"
-    requires = ("torch",)
+    requires: ClassVar[tuple[str, ...]] = ("torch",)
     architecture: ClassVar[str]
     capabilities = models.Capabilities(
         ALL_TASKS,
@@ -159,6 +159,44 @@ class TorchRobustMlpAdapter(TorchAdapter):
     )
 
 
+class KerasMlpAdapter(TorchAdapter):
+    """Keras dense network, run on the PyTorch backend in the same worker."""
+
+    name = "keras_mlp"
+    requires = ("torch", "keras")
+    search_space = search.SearchSpace(
+        (
+            search.ChoiceParameter(
+                "hidden_sizes", ((64,), (128,), (128, 64), (256, 128))
+            ),
+            search.FloatParameter("dropout", 0.0, 0.4),
+            search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
+            search.FloatParameter("l2", 1e-6, 1e-2, log=True),
+            search.ChoiceParameter("batch_size", (64, 128, 256)),
+        )
+    )
+
+    def build(
+        self,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Creates an unfitted Keras estimator.
+
+        Raises:
+            ConfigError: If PyTorch or Keras is not installed.
+        """
+        if not self.is_available():
+            raise errors.ConfigError(
+                f"{self.name}: install the 'deeplearning' extra (torch, keras)"
+            )
+        settings = {"random_state": seed, **(params or {})}
+        if task.is_classification:
+            return estimators.KerasClassifier(**settings)
+        return estimators.KerasRegressor(**settings)
+
+
 class TabPfnAdapter(models.ModelAdapter):
     """Pretrained tabular foundation model (`tabpfn` extra, license required).
 
@@ -213,4 +251,5 @@ DEEP_LEARNING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     TorchEnsembleAdapter,
     TorchTransformerAdapter,
     TorchRobustMlpAdapter,
+    KerasMlpAdapter,
 )

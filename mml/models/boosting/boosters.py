@@ -18,7 +18,7 @@ from mml.contracts import tasks
 from mml.models import wrappers
 from mml.models.boosting import early_stopping
 
-ALL_TASKS = frozenset(tasks.TaskType)
+ALL_TASKS = tasks.STANDARD_TASKS
 NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
 
 
