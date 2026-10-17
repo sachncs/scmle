@@ -100,7 +100,7 @@ proceed. Choosing the best of many trials carries a mild optimism bias, which
 is why the locked-test score is the number to trust.
 
 More datasets: on 20 Hugging Face Hub tables the framework is ahead of the same reference on 16 of 20, and on 21 further OpenML tables on 13 of 21
-(including extreme class imbalance, chronological, text-free mixed and
+(including extreme class imbalance, chronological, mixed-type and
 wide data). The full tables, and where it is behind, are in
 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
