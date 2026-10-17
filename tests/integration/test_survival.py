@@ -131,3 +131,36 @@ def test_survival_works_with_a_weight_column(tmp_path):
 
     assert result.evaluation["test_metrics"]["c_index"] > 0.65
     assert "w" not in result.bundle.features
+
+
+def test_time_dependent_metrics_are_reported_on_the_locked_rows(result):
+    metrics = result.evaluation["test_metrics"]
+
+    assert {"c_index", "ibs", "td_auc"} <= set(metrics)
+    assert metrics["td_auc"] > 0.65
+    assert 0.0 < metrics["ibs"] < 0.25
+
+
+def test_the_selected_model_has_a_lower_brier_score_than_kaplan_meier(result):
+    from mml.evaluation import survival as survival_metrics
+    from mml.models.survival import estimators
+
+    train = censored_frame(1200, seed=0)
+    fresh = censored_frame(1500, seed=5)
+    baseline = estimators.MarginalSurvival().fit(
+        train[["x1"]], train.time, train.event
+    )
+    times = survival_metrics.time_grid(
+        fresh.time.to_numpy(), fresh.event.to_numpy()
+    )
+    features = fresh[["x1", "x2", "noise"]]
+
+    model_curves = result.bundle.predict_survival(features, times)
+    base_curves = baseline.predict_survival(features, times)
+
+    def score(curves):
+        return survival_metrics.integrated_brier(
+            fresh.time.to_numpy(), fresh.event.to_numpy(), curves, times
+        )
+
+    assert score(model_curves) < score(base_curves)

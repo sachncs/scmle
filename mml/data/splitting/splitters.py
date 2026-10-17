@@ -324,6 +324,45 @@ class StratifiedSplit(RandomSplit):
         return list(splitter.split(np.arange(len(dev_ids)), labels))
 
 
+class EventStratifiedSplit(RandomSplit):
+    """Keeps the share of observed events equal across splits (survival)."""
+
+    name = "stratified_events"
+    supported_tasks = frozenset({tasks.TaskType.SURVIVAL})
+
+    def events(self, frame: pd.DataFrame) -> pd.Series:
+        """The 0/1 event column."""
+        return frame[self.data.event_column]
+
+    def stratify_labels(self, frame: pd.DataFrame) -> pd.Series:
+        """Stratifies the holdout on the event indicator."""
+        events = self.events(frame)
+        if (events.value_counts() < 2).any():
+            raise errors.BlockedError(
+                "events or censored rows number fewer than 2: cannot stratify"
+            )
+        return events
+
+    def cross_validation_folds(
+        self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
+    ) -> list[Fold]:
+        """Stratified K-fold on events, so every fold has events to rank."""
+        events = self.events(frame).iloc[dev_ids]
+        rarest = int(events.value_counts().min())
+        if rarest < 2:
+            raise errors.BlockedError(
+                "too few events (or censored rows) after the test split"
+            )
+        folds = self.validation.folds
+        if rarest < folds:
+            notes.append(f"folds reduced {folds}->{rarest} (rarest outcome)")
+            folds = rarest
+        splitter = model_selection.StratifiedKFold(
+            n_splits=folds, shuffle=True, random_state=self.validation.seed
+        )
+        return list(splitter.split(np.arange(len(dev_ids)), events))
+
+
 class GroupSplit(SplitStrategy):
     """Keeps every group wholly inside one partition."""
 
@@ -523,6 +562,7 @@ STRATEGIES: dict[str, type[SplitStrategy]] = {
     for strategy in (
         RandomSplit,
         StratifiedSplit,
+        EventStratifiedSplit,
         GroupSplit,
         TemporalSplit,
         RollingSplit,
@@ -548,6 +588,8 @@ def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
         return "temporal"
     if spec.data.group_column:
         return "group"
+    if task is tasks.TaskType.SURVIVAL:
+        return "stratified_events"
     return "stratified" if task.is_classification else "random"
 
 

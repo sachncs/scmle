@@ -16,6 +16,7 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.evaluation import concordance
 from mml.evaluation import ordinal
+from mml.evaluation import survival
 
 BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
@@ -94,6 +95,10 @@ DEFAULT_METRICS = (
         "accuracy_levels", "accuracy", True, frozenset({ORDINAL})
     ),
     concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
+    survival.SurvivalMetric("ibs", "", False, frozenset({SURVIVAL}), "ibs"),
+    survival.SurvivalMetric(
+        "td_auc", "", True, frozenset({SURVIVAL}), "td_auc"
+    ),
 )
 
 
@@ -118,7 +123,7 @@ class MetricCatalog:
         ),
         MULTICLASS: ("log_loss", "f1_macro", "balanced_accuracy", "accuracy"),
         REGRESSION: ("mae", "rmse", "r2"),
-        SURVIVAL: ("c_index",),
+        SURVIVAL: ("c_index", "ibs", "td_auc"),
         ORDINAL: ("qwk", "mace", "accuracy_levels"),
     }
 

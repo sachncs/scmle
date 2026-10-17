@@ -62,6 +62,9 @@
 * Ordinal targets: `task="ordinal"` with `ordinal_order`; thresholded
   regressors give ordered labels and probabilities, scored by quadratic
   weighted kappa and mean absolute class error.
+* Survival: event-stratified splits and censoring-weighted integrated Brier
+  score and dynamic AUC beside the concordance index. Competing risks and
+  time-varying covariates are not built.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

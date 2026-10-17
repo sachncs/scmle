@@ -100,6 +100,7 @@ class ProjectCommand(Command):
             choices=[
                 "auto",
                 "stratified",
+                "stratified_events",
                 "random",
                 "group",
                 "temporal",

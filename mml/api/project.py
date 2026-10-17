@@ -18,7 +18,13 @@ from mml.data.readers import interchange
 from mml.intelligence import recommendations as recommendations_module
 
 ValidationStrategy = Literal[
-    "auto", "stratified", "random", "group", "temporal", "rolling"
+    "auto",
+    "stratified",
+    "stratified_events",
+    "random",
+    "group",
+    "temporal",
+    "rolling",
 ]
 LeakagePolicy = Literal["warn", "block"]
 

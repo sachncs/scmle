@@ -206,7 +206,13 @@ class ValidationSpec(FrozenModel):
     """
 
     strategy: Literal[
-        "auto", "stratified", "random", "group", "temporal", "rolling"
+        "auto",
+        "stratified",
+        "stratified_events",
+        "random",
+        "group",
+        "temporal",
+        "rolling",
     ] = "auto"
     test_fraction: float = pydantic.Field(default=0.20, gt=0, lt=1)
     folds: int = pydantic.Field(default=5, ge=2)
