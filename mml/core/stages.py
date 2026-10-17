@@ -35,6 +35,7 @@ from mml.data.readers import tabular
 from mml.data.splitting import splitters
 from mml.data.validation import target as target_module
 from mml.evaluation import backtest
+from mml.evaluation import bias_variance
 from mml.evaluation import confidence
 from mml.evaluation import conformal
 from mml.evaluation import criteria
@@ -1394,6 +1395,40 @@ class PackageStage(Stage):
             quantile.QuantileBand.calibrate(observed, lows, highs),
         )
 
+    def bias_variance(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+    ) -> dict[str, Any] | None:
+        """Splits the selected model's error into bias and variance."""
+        replicates = context.spec.selection.bias_variance_replicates
+        task = require(context.task, "task")
+        if not replicates:
+            return None
+        if task not in (
+            tasks.TaskType.BINARY,
+            tasks.TaskType.MULTICLASS,
+            tasks.TaskType.REGRESSION,
+        ):
+            return {"skipped": f"not defined for {task.value}"}
+        split = require(context.split, "split")
+        adapter = context.registry.get(selected.model_name)
+        strategy = strategies.get_strategy(selected.strategy)
+        plan = require(context.profile, "profile").feature_plan
+        seed = context.spec.validation.seed
+        found = bias_variance.decompose(
+            lambda: strategy.build(plan, adapter, task, seed, selected.params),
+            split.dev_features,
+            split.dev_target,
+            task.is_classification,
+            replicates,
+            seed,
+            lambda: bool(context.resource_governor.skip_reason(first=False)),
+        )
+        if found is None:
+            return {"skipped": "time budget spent or too few predictions"}
+        return found.to_dict()
+
     def nested_validation(
         self,
         context: context_module.RunContext,
@@ -1536,6 +1571,7 @@ class PackageStage(Stage):
         )
         evaluation["learning_curve"] = self.learning_curve(context, selected)
         evaluation["nested_cv"] = self.nested_validation(context, selected)
+        evaluation["bias_variance"] = self.bias_variance(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.quantile = self.quantile_intervals(context)
         if require(context.task, "task") is tasks.TaskType.FORECAST:

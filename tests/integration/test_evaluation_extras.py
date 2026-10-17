@@ -51,3 +51,35 @@ def test_perfectly_equal_classes_get_a_down_sampling_warning(tmp_path):
         "exactly 160 rows" in finding
         for finding in result.profile.quality_findings
     )
+
+
+def test_the_bias_variance_report_names_the_dominant_error(tmp_path):
+    rng = np.random.default_rng(2)
+    data = pd.DataFrame({"x": rng.uniform(-3, 3, 800)})
+    data["y"] = np.sin(2 * data.x) + rng.normal(0, 0.3, 800)
+
+    result = support.make_project(
+        data,
+        "y",
+        task="regression",
+        time_budget=300,
+        output_dir=tmp_path,
+        selection=tasks.SelectionSpec(bias_variance_replicates=15),
+    ).run()
+
+    report = result.evaluation["bias_variance"]
+    assert report["kind"] == "squared_error" and report["replicates"] == 15
+    assert report["verdict"] in {
+        "bias-dominated",
+        "variance-dominated",
+        "balanced",
+    }
+    assert report["advice"]
+
+
+def test_the_bias_variance_report_is_off_by_default(tmp_path):
+    result = support.make_project(
+        frame(), "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    assert result.evaluation["bias_variance"] is None

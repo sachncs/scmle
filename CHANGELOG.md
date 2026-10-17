@@ -120,6 +120,10 @@
   nested cross-validation (`selection.nested_cv`) reporting the optimism of
   the winning score, a warning for exactly equal classes, and a note that
   validation and test keep the natural class mix.
+* Bias–variance report (`selection.bias_variance_replicates`): bootstrap
+  decomposition of the selected model's error with a nearest-neighbour noise
+  estimate, a verdict and advice. It reproduces resampling variance only; the
+  limitation is stated in the module and the report.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

@@ -118,8 +118,7 @@ def nested_score(
         candidates: list[dict[str, Any]] = [{}]
         if space is not None:
             candidates += [
-                space.sample(rng)
-                for draw in range(max(configurations - 1, 0))
+                space.sample(rng) for draw in range(max(configurations - 1, 0))
             ]
         scored = [
             (

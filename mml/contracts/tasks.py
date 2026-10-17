@@ -401,6 +401,9 @@ class SelectionSpec(FrozenModel):
             declared better than another.
         rope: Half-width, in metric units, of the region in which two
             candidates count as equivalent.
+        bias_variance_replicates: Bootstrap refits of the selected model used
+            to split its error into bias and variance (0 turns it off;
+            regression and classification only).
         nested_cv: Also estimate how optimistic the winning score is by
             repeating the configuration search inside each outer fold (random
             and stratified validation only; costs several extra fits).
@@ -421,6 +424,7 @@ class SelectionSpec(FrozenModel):
     rope: float = pydantic.Field(default=0.0, ge=0.0)
     weighted: bool = True
     nested_cv: bool = False
+    bias_variance_replicates: int = pydantic.Field(default=0, ge=0)
 
 
 class ModelSpec(FrozenModel):
