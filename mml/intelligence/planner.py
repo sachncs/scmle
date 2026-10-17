@@ -497,7 +497,13 @@ class StrategyRule(PlanningRule):
                     "strategy search disabled (strategies.top_models=0)"
                     if applicable
                     else next(
-                        (r for r in reasons.values() if r),
+                        (
+                            reasons[a.name]
+                            for a in sorted(
+                                candidates, key=lambda a: a.family == "baseline"
+                            )
+                            if reasons[a.name]
+                        ),
                         "no candidate models",
                     )
                 )
