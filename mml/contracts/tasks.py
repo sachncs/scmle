@@ -289,6 +289,9 @@ class SelectionSpec(FrozenModel):
             declared better than another.
         rope: Half-width, in metric units, of the region in which two
             candidates count as equivalent.
+        weighted: With a `data.weight_column`, score validation folds with
+            the weights so selection agrees with the weighted test metrics
+            (metrics that cannot take weights stay unweighted).
     """
 
     maximize: str | None = None
@@ -301,6 +304,7 @@ class SelectionSpec(FrozenModel):
     uncertainty: Literal["none", "one_standard_error", "bayesian"] = "none"
     bayesian_confidence: float = pydantic.Field(default=0.95, gt=0.5, lt=1.0)
     rope: float = pydantic.Field(default=0.0, ge=0.0)
+    weighted: bool = True
 
 
 class ModelSpec(FrozenModel):

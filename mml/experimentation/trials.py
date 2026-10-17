@@ -69,6 +69,7 @@ class TrialPayload:
         thread_limit: Threads each worker may use (None = library default).
         ceiling_seconds: Hard time ceiling for the trial (None = none).
         memory_gb: Hard memory cap for the trial (None = none).
+        weighted: Score folds with the plan's weight column.
     """
 
     job: TrialJob
@@ -85,6 +86,7 @@ class TrialPayload:
     thread_limit: int | None
     ceiling_seconds: float | None = None
     memory_gb: float | None = None
+    weighted: bool = False
 
 
 TRAIN_SCORE_ROWS = 2000
@@ -106,6 +108,17 @@ def runtime_requirements(adapter: models.ModelAdapter) -> dict[str, Any]:
         except importlib.metadata.PackageNotFoundError:
             needed[module] = "unknown"
     return {"python": platform.python_version(), "libraries": needed}
+
+
+def fold_weights(
+    payload: TrialPayload, positions: np.ndarray
+) -> dict[str, np.ndarray]:
+    """Scorer keyword arguments carrying the rows' weights, when weighted."""
+    if not payload.weighted:
+        return {}
+    column = payload.feature_plan.weight_column
+    values = payload.features[column].iloc[positions].to_numpy(dtype=float)
+    return {"sample_weight": values}
 
 
 def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
@@ -132,6 +145,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
             "metric": metric.name,
             "folds": len(folds),
             "seed": payload.seed,
+            "weighted": payload.weighted,
         },
         runtime=runtime_requirements(payload.adapter),
     )
@@ -154,19 +168,21 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
                 candidate.fit(
                     payload.features.iloc[fit], payload.target.iloc[fit]
                 )
+                sample = fit[:TRAIN_SCORE_ROWS]
                 raw_scores.append(
                     scorer(
                         candidate,
                         payload.features.iloc[evaluate],
                         payload.target.iloc[evaluate],
+                        **fold_weights(payload, evaluate),
                     )
                 )
-                sample = fit[:TRAIN_SCORE_ROWS]
                 raw_train_scores.append(
                     scorer(
                         candidate,
                         payload.features.iloc[sample],
                         payload.target.iloc[sample],
+                        **fold_weights(payload, sample),
                     )
                 )
                 result.observed_access.append(
@@ -261,6 +277,11 @@ class TrialRunner:
             thread_limit=governor.thread_limit,
             ceiling_seconds=governor.trial_ceiling_seconds(),
             memory_gb=context.spec.resources.memory_limit_gb,
+            weighted=bool(
+                context.spec.selection.weighted
+                and self.feature_plan.weight_column
+                and self.metric.accepts_weights()
+            ),
         )
 
     def run(

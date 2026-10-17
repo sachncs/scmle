@@ -65,3 +65,62 @@ def test_weighted_test_metrics_are_reported_beside_the_plain_ones(tmp_path):
         weighted.evaluation["test_metrics"]
     )
     assert plain.evaluation["weighted_test_metrics"] is None
+
+
+def weights_frame(rows=700, seed=3):
+    rng = np.random.default_rng(seed)
+    frame = pd.DataFrame(
+        {"x": rng.normal(size=rows), "other": rng.normal(size=rows)}
+    )
+    frame["y"] = (frame.x + rng.normal(0, 1.0, rows) > 0).astype(int)
+    frame["w"] = rng.uniform(0.1, 5.0, rows)
+    return frame
+
+
+def test_validation_scores_are_weighted_and_say_so(tmp_path):
+    result = run(weights_frame(), tmp_path, weight_column="w")
+
+    configs = [
+        t.evaluation_config for t in result.trials if t.evaluation_config
+    ]
+    assert configs and all(c["weighted"] for c in configs)
+
+
+def test_unit_weights_give_exactly_the_unweighted_scores(tmp_path):
+    frame = weights_frame()
+    frame["w"] = 1.0
+
+    weighted = run(frame, tmp_path / "w", weight_column="w")
+    plain = run(frame.drop(columns=["w"]), tmp_path / "p")
+
+    def scores(result):
+        return {
+            (t.model_name, t.strategy): t.fold_scores
+            for t in result.trials
+            if t.fold_scores
+        }
+
+    left, right = scores(weighted), scores(plain)
+    # Only models whose `fit` takes weights see unit weights as no weights.
+    exact = {
+        key
+        for key in left.keys() & right.keys()
+        if key[0] in {"dummy", "logistic_regression"}
+    }
+    assert exact
+    for key in exact:
+        assert left[key] == pytest.approx(right[key])
+
+
+def test_selection_can_opt_out_of_weighted_scores(tmp_path):
+    result = run(
+        weights_frame(),
+        tmp_path,
+        weight_column="w",
+        selection=tasks.SelectionSpec(weighted=False),
+    )
+
+    configs = [
+        t.evaluation_config for t in result.trials if t.evaluation_config
+    ]
+    assert configs and not any(c["weighted"] for c in configs)

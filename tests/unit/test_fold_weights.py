@@ -1,0 +1,69 @@
+"""Validation folds are scored with the rows' own weights."""
+
+import numpy as np
+import pandas as pd
+import pytest
+from sklearn import metrics as sk_metrics
+
+from mml.contracts import data as data_contracts
+from mml.contracts import metrics as metric_contracts
+from mml.contracts import tasks
+from mml.experimentation import trials
+
+
+def payload(weighted):
+    features = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "w": [1, 2, 3, 4.0]})
+    return trials.TrialPayload(
+        job=trials.TrialJob("t", "dummy"),
+        adapter=None,
+        strategy=None,
+        feature_plan=data_contracts.FeaturePlan(("x",), (), weight_column="w"),
+        task=tasks.TaskType.REGRESSION,
+        seed=0,
+        metric=None,
+        positive_label=None,
+        features=features,
+        target=pd.Series([1.0, 2.0, 3.0, 4.0]),
+        folds=[],
+        thread_limit=None,
+        weighted=weighted,
+    )
+
+
+def test_the_weights_of_the_scored_rows_are_passed_to_the_scorer():
+    found = trials.fold_weights(payload(True), np.array([1, 3]))
+
+    assert list(found["sample_weight"]) == [2.0, 4.0]
+
+
+def test_unweighted_selection_passes_nothing():
+    assert trials.fold_weights(payload(False), np.array([1, 3])) == {}
+
+
+def test_a_weighted_score_equals_the_hand_computed_one():
+    truth = np.array([1.0, 2.0, 3.0])
+    guess = np.array([1.0, 2.0, 5.0])
+    weights = np.array([1.0, 1.0, 2.0])
+
+    value = sk_metrics.mean_absolute_error(truth, guess, sample_weight=weights)
+
+    assert value == pytest.approx((0 + 0 + 2 * 2) / 4)
+
+
+def plain_error(truth, guess):
+    return float(np.abs(truth - guess).mean())
+
+
+def weighted_error(truth, guess, sample_weight=None):
+    return float(np.average(np.abs(truth - guess), weights=sample_weight))
+
+
+def test_metrics_report_whether_their_function_takes_weights():
+    every = frozenset(tasks.STANDARD_TASKS)
+    plain = metric_contracts.FunctionMetric("a", "", False, every, plain_error)
+    weighted = metric_contracts.FunctionMetric(
+        "b", "", False, every, weighted_error
+    )
+
+    assert not plain.accepts_weights()
+    assert weighted.accepts_weights()

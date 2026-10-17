@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 import dataclasses
+import inspect
 from typing import Any
 
 import pandas as pd
@@ -30,6 +31,10 @@ class Metric:
     def to_natural(self, scorer_value: float) -> float:
         """Converts a sign-adjusted scorer value to natural units."""
         return scorer_value if self.greater_is_better else -scorer_value
+
+    def accepts_weights(self) -> bool:
+        """Whether the scorer takes per-row `sample_weight`."""
+        return True
 
     def scorer(self, positive: Any = None) -> Any:
         """Returns the scikit-learn scorer.
@@ -107,6 +112,12 @@ class FunctionMetric(Metric):
 
     score_function: Callable[..., float] = sk_metrics.accuracy_score
     response_method: str = "predict"
+
+    def accepts_weights(self) -> bool:
+        """Whether the user function takes `sample_weight`."""
+        return (
+            "sample_weight" in inspect.signature(self.score_function).parameters
+        )
 
     def scorer(self, positive: Any = None) -> Any:
         """Builds a scorer that applies the user function."""

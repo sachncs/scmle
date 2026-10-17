@@ -56,6 +56,10 @@ class ConcordanceMetric(metric_contracts.Metric):
     given (`estimator.event_column`), so it needs no extra plumbing.
     """
 
+    def accepts_weights(self) -> bool:
+        """The concordance index here is unweighted."""
+        return False
+
     def scorer(self, positive: Any = None) -> Any:
         """Builds a scorer `(estimator, features, durations)`."""
 

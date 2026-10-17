@@ -45,6 +45,8 @@
   discrete-time boosted models, concordance index, `predict_survival`.
 * Keras network (`keras_mlp`; Keras 3 on the PyTorch backend, in the same
   worker, with the `deeplearning` extra).
+* Validation folds are scored with the weight column (`selection.weighted`),
+  so selection agrees with the weighted test metrics.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.
