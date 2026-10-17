@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Sensitivity analysis (`mml.evaluation.sensitivity`): training (seed,
+  resample), evaluation (split) and performance (input noise) sensitivity.
+* `RollbackPolicy.tolerance` now defaults to 0.01 so routine retraining noise
+  does not undo promotions.
 * `docs/CURRICULUM.md`: the eight modelling stages mapped to modules, tests
   and equations, with one executed example per stage.
 * Data quality: label-noise detection (`find_label_noise`) and

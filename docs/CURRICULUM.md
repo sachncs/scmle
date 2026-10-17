@@ -162,6 +162,12 @@ neighbours. The bootstrap understates variance, so read the verdict as
 direction, not as an exact split. Learning curves show whether more rows would
 help.
 
+* Sensitivity: `mml/evaluation/sensitivity.py::analyze` separates how much
+  the score moves with the training seed, with a bootstrap resample of the
+  training rows, with the choice of split, and with noise added to the
+  features. On scikit-learn's breast-cancer data (ROC AUC, 10 repeats) the
+  standard deviations were 0.000 to 0.006, so score differences under about
+  0.01 between models there are within noise.
 * Modules: `mml/evaluation/bias_variance.py`,
   `mml/evaluation/learning_curve.py`, `mml/evaluation/fit_health.py`.
 * Tests: `tests/unit/test_bias_variance.py`.

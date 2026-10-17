@@ -43,11 +43,14 @@ class RollbackPolicy:
         tolerance: Score the new champion may lose to the previous one, in
             the metric's units, before the loss counts. The rollback
             happens only when the whole 95% interval of its advantage lies
-            below minus this tolerance.
+            below minus this tolerance. The default 0.01 keeps routine
+            retraining noise (a model refit on a new sample nearly always
+            differs by a little) from undoing promotions; set it to the
+            smallest loss you would actually act on.
     """
 
     min_rows: int = 100
-    tolerance: float = 0.0
+    tolerance: float = 0.01
 
 
 @dataclasses.dataclass(frozen=True)
