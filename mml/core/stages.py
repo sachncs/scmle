@@ -27,6 +27,7 @@ from mml.contracts import tasks
 from mml.core import compiler
 from mml.core import context as context_module
 from mml.core import state as run_state
+from mml.data.curation import preprocessing
 from mml.data.profiling import profiler
 from mml.data.readers import tabular
 from mml.data.splitting import splitters
@@ -37,6 +38,7 @@ from mml.evaluation import diagnostics
 from mml.evaluation import fit_health
 from mml.evaluation import learning_curve
 from mml.evaluation import metrics as metric_catalog
+from mml.evaluation import quantile
 from mml.evaluation import resources
 from mml.evaluation import suite
 from mml.experimentation import ensemble_search
@@ -882,6 +884,69 @@ class PackageStage(Stage):
             held_labels, np.asarray(held_scores), classes
         )
 
+    def quantile_intervals(
+        self, context: context_module.RunContext
+    ) -> quantile.QuantileIntervals | None:
+        """Fits and calibrates the low and high quantile models (regression).
+
+        Both models are boosted trees on the standard preprocessing. Each
+        cross-validation fold fits them on its training rows and records how
+        far its held-out rows fall outside the band; the final pair is fit on
+        all development rows.
+
+        Returns:
+            The intervals, or None for classification, when the time budget
+            is spent or too few held-out rows exist.
+        """
+        task = require(context.task, "task")
+        if task is not tasks.TaskType.REGRESSION:
+            return None
+        if context.resource_governor.skip_reason(first=False):
+            return None
+        split = require(context.split, "split")
+        plan = require(context.profile, "profile").feature_plan
+        adapter = context.registry.get("hist_gradient_boosting")
+        seed = context.spec.validation.seed
+
+        def build(level: float) -> Any:
+            return preprocessing.build_pipeline(
+                plan,
+                adapter,
+                task,
+                seed,
+                {"loss": "quantile", "quantile": level},
+            )
+
+        observed: list[float] = []
+        lows: list[float] = []
+        highs: list[float] = []
+        for fit_positions, evaluate_positions in split.manifest.folds:
+            if context.resource_governor.skip_reason(first=False):
+                return None
+            fit = np.asarray(fit_positions)
+            evaluate = np.asarray(evaluate_positions)
+            train_x = split.dev_features.iloc[fit]
+            train_y = split.dev_target.iloc[fit]
+            low, high = quantile.predicted_band(
+                build(quantile.LOWER_LEVEL).fit(train_x, train_y),
+                build(quantile.UPPER_LEVEL).fit(train_x, train_y),
+                split.dev_features.iloc[evaluate],
+            )
+            observed.extend(split.dev_target.iloc[evaluate])
+            lows.extend(low)
+            highs.extend(high)
+        if len(observed) < conformal.MIN_CALIBRATION_ROWS:
+            return None
+        return quantile.QuantileIntervals(
+            build(quantile.LOWER_LEVEL).fit(
+                split.dev_features, split.dev_target
+            ),
+            build(quantile.UPPER_LEVEL).fit(
+                split.dev_features, split.dev_target
+            ),
+            quantile.QuantileBand.calibrate(observed, lows, highs),
+        )
+
     def execute(self, context: context_module.RunContext) -> None:
         """Packages artifacts and assembles the `RunResult`."""
         store = context.run_store
@@ -916,6 +981,7 @@ class PackageStage(Stage):
         )
         evaluation["learning_curve"] = self.learning_curve(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
+        bundle.quantile = self.quantile_intervals(context)
         bundle.novelty = novelty.NoveltyDetector.fit(
             split.dev_features,
             bundle.schema.numeric,

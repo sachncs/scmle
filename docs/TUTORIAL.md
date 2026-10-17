@@ -213,6 +213,7 @@ result.diagnostics["slice_performance"]  # weakest subgroups
 result.diagnostics["adversarial_validation"]  # development vs test shift
 result.explain(rows, background)  # per-prediction attribution
 result.bundle.predict_interval(rows, coverage=0.9)  # regression
+result.bundle.predict_interval(rows, 0.9, method="quantile")  # adaptive width
 result.bundle.predict_set(rows, coverage=0.9)  # classification
 ```
 

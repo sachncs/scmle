@@ -35,6 +35,9 @@
   directly by models that accept `sample_weight`, otherwise by a weighted
   draw of training rows. Test metrics are also reported weighted
   (`weighted_test_metrics`).
+* Conformalized quantile intervals (`predict_interval(method="quantile")`):
+  widths follow the row's noise; the default residual method is unchanged.
+* `data.time_as_feature` offers the time column to the model (opt-in).
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

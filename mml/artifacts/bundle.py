@@ -31,6 +31,7 @@ from mml.contracts import tasks
 from mml.data.readers import interchange
 from mml.data.readers import tabular
 from mml.evaluation import conformal as conformal_module
+from mml.evaluation import quantile as quantile_module
 from mml.explainability import local
 from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
@@ -44,6 +45,7 @@ SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
 CALIBRATOR_FILE = "calibrator.joblib"
 CONFORMAL_FILE = "conformal.json"
+QUANTILE_FILE = "quantile.joblib"
 NOVELTY_FILE = "novelty.joblib"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
@@ -226,6 +228,7 @@ class ModelBundle:
         calibrator: Any = None,
         conformal: conformal_module.ConformalCalibrator | None = None,
         novelty: novelty_module.NoveltyDetector | None = None,
+        quantile: quantile_module.QuantileIntervals | None = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -241,6 +244,8 @@ class ModelBundle:
             conformal: Out-of-fold nonconformity scores that turn
                 predictions into intervals or sets with a coverage level.
             novelty: Detector that flags rows unlike the training data.
+            quantile: Low and high quantile models with calibration, for
+                intervals whose width follows the row (regression).
         """
         self.pipeline = pipeline
         self.schema = schema
@@ -250,6 +255,7 @@ class ModelBundle:
         self.calibrator = calibrator
         self.conformal = conformal
         self.novelty = novelty
+        self.quantile = quantile
 
     @classmethod
     def create(
@@ -593,6 +599,10 @@ class ModelBundle:
             novelty_path = root / NOVELTY_FILE
             joblib.dump(self.novelty, novelty_path)
             files[NOVELTY_FILE] = file_sha256(novelty_path)
+        if self.quantile is not None:
+            quantile_path = root / QUANTILE_FILE
+            joblib.dump(self.quantile, quantile_path)
+            files[QUANTILE_FILE] = file_sha256(quantile_path)
         if self.history is not None:
             history_path = root / HISTORY_FILE
             self.history.to_parquet(history_path, index=False)
@@ -742,6 +752,17 @@ class ModelBundle:
                     "checksum mismatch: novelty detector was modified"
                 )
             detector = joblib.load(novelty_path)
+        intervals = None
+        if QUANTILE_FILE in info.files:
+            quantile_path = root / QUANTILE_FILE
+            if (
+                not quantile_path.exists()
+                or file_sha256(quantile_path) != info.files[QUANTILE_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: quantile models were modified"
+                )
+            intervals = joblib.load(quantile_path)
         return cls(
             joblib.load(model_path),
             schema,
@@ -751,6 +772,7 @@ class ModelBundle:
             calibrator,
             calibrated,
             detector,
+            intervals,
         )
 
     @property
@@ -903,6 +925,7 @@ class ModelBundle:
         data: str | pathlib.Path | pd.DataFrame,
         coverage: float = conformal_module.DEFAULT_COVERAGE,
         mapping: mapping_module.ColumnMapping | None = None,
+        method: str = "residual",
     ) -> pd.DataFrame:
         """Prediction intervals with a stated coverage (regression).
 
@@ -910,14 +933,37 @@ class ModelBundle:
             data: DataFrame or path to CSV/Parquet.
             coverage: Share of new rows the interval should contain.
             mapping: Explicit column-name policy; exact names if omitted.
+            method: `residual` for a margin of the same width everywhere, or
+                `quantile` for conformalized quantile regression, whose
+                width follows how noisy each row's neighbourhood is.
 
         Returns:
             Columns `prediction`, `lower` and `upper`.
 
         Raises:
-            ArtifactError: For classification models or bundles saved
-                without conformal scores.
+            ArtifactError: For classification models, unknown methods, or
+                bundles saved without the needed calibration.
         """
+        if method == "quantile":
+            if self.quantile is None:
+                raise errors.ArtifactError(
+                    "this bundle has no quantile calibration"
+                )
+            frame = self.prepare_frame(data, mapping)
+            lower, upper = self.quantile.interval(frame, coverage)
+            predictions = np.asarray(self.pipeline.predict(frame), dtype=float)
+            return pd.DataFrame(
+                {
+                    "prediction": predictions,
+                    "lower": np.minimum(lower, predictions),
+                    "upper": np.maximum(upper, predictions),
+                }
+            )
+        if method != "residual":
+            raise errors.ArtifactError(
+                f"unknown interval method '{method}'; use 'residual' or "
+                "'quantile'"
+            )
         calibrator = self.require_conformal("regression")
         predictions = np.asarray(self.predict(data, mapping), dtype=float)
         lower, upper = calibrator.interval(predictions, coverage)
