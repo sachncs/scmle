@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Data quality: label-noise detection (`find_label_noise`) and
+  representativeness against a reference sample (`compare_to_reference`).
 * Lifecycle: shadow evaluation (`ShadowEvaluator`), A/B analysis with an
   independent bootstrap (`compare_arms`), and rollback criteria
   (`LifecycleManager.check_rollback`, `previous` registry alias).
