@@ -190,7 +190,20 @@ class IncrementalRule(PlanningRule):
     ) -> list[models.ModelAdapter]:
         """Drops non-incremental models when training on a stream."""
         if context.spec.data.training != "stream":
-            return candidates
+            kept = []
+            for adapter in candidates:
+                if adapter.capabilities.stream_only:
+                    decisions.append(
+                        experiments.Decision(
+                            adapter.name,
+                            Action.REJECT,
+                            "built for data larger than memory; set "
+                            "memory_budget_gb with training='stream'",
+                        )
+                    )
+                else:
+                    kept.append(adapter)
+            return kept
         kept = []
         for adapter in candidates:
             if adapter.capabilities.incremental or adapter.name == "dummy":

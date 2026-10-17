@@ -120,3 +120,19 @@ def test_a_small_file_is_read_normally_even_with_a_budget(tmp_path):
 
     assert result.evaluation["streamed_locked"] is None
     assert result.evaluation["split_strategy"] != "preset"
+
+
+def test_streaming_models_are_not_candidates_for_ordinary_runs(tmp_path):
+    frame = pd.DataFrame(
+        {"a": np.random.default_rng(3).normal(size=400)}
+    ).assign(y=lambda f: (f.a > 0).astype(int))
+
+    plan = support.make_project(
+        frame, "y", time_budget=300, output_dir=tmp_path
+    ).plan()
+
+    assert "sgd_logistic" not in plan.candidate_models
+    reasons = [
+        d.reason for d in plan.decisions if d.technique == "sgd_logistic"
+    ]
+    assert reasons and "data larger than memory" in reasons[0]

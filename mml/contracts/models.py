@@ -51,6 +51,8 @@ class Capabilities:
         serializable: Can be persisted in a bundle.
         incremental: Can keep learning from batches (`partial_fit`), so it
             can train on data larger than memory.
+        stream_only: Built for streamed training; planned only when
+            `data.training` is `stream`.
         gpu: Can train on a GPU.
         standalone: Can be a screening candidate on its own (False for
             meta-models assembled from other candidates).
@@ -70,6 +72,7 @@ class Capabilities:
     needs_scaling: bool = False
     serializable: bool = True
     incremental: bool = False
+    stream_only: bool = False
     gpu: bool = False
     standalone: bool = True
     max_rows: int | None = None

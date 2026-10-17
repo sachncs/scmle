@@ -184,6 +184,7 @@ class SgdLogisticAdapter(SklearnAdapter):
         sparse_input=True,
         needs_scaling=True,
         incremental=True,
+        stream_only=True,
         memory_factor=1.5,
     )
     classifier = linear_model.SGDClassifier
@@ -205,6 +206,7 @@ class SgdRegressionAdapter(SklearnAdapter):
         sparse_input=True,
         needs_scaling=True,
         incremental=True,
+        stream_only=True,
         memory_factor=1.5,
     )
     regressor = linear_model.SGDRegressor
