@@ -1163,6 +1163,7 @@ class FinalEvaluationStage(Stage):
             "weighted_test_metrics": weighted_test_metrics,
             "semi_supervised": context.semi_supervised,
             "fairness_mitigation": context.fairness_mitigation,
+            "execution_backend": context.backend.name,
             "streamed_locked": self.streamed_locked_metrics(context, pipeline),
             "uplift": self.uplift_report(
                 context, pipeline, test_features, test_target

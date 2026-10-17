@@ -44,6 +44,9 @@ class MLProject:
         *,
         workers: int = 1,
         enforcement: Literal["hard", "cooperative"] = "hard",
+        executor: Literal["process", "ray"] = "process",
+        cluster_address: str | None = None,
+        memory_limit_gb: float = 8.0,
         id_columns: list[str] | None = None,
         group_column: str | None = None,
         time_column: str | None = None,
@@ -100,6 +103,9 @@ class MLProject:
                 binary/multiclass task.
             metric: Primary metric; defaults per task.
             time_budget: Wall-clock budget in seconds.
+            executor: `process` (default) or `ray`.
+            cluster_address: Ray cluster to join (a local runtime if None).
+            memory_limit_gb: Hard memory cap per trial.
             workers: Concurrent trial processes (1 = sequential).
             enforcement: `hard` supervises every trial in its own process and
                 kills it past the time or memory limit; `cooperative` only
@@ -232,6 +238,9 @@ class MLProject:
                 time_budget_seconds=time_budget,
                 workers=workers,
                 enforcement=enforcement,
+                executor=executor,
+                cluster_address=cluster_address,
+                memory_limit_gb=memory_limit_gb,
             ),
             search=search or tasks.SearchSpec(),
             strategies=strategies or tasks.StrategySpec(),

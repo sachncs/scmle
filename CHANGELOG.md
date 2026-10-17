@@ -110,6 +110,9 @@
   file. `training="stream"` keeps incremental models (`sgd_logistic`,
   `sgd_regression`) and updates the final one over the whole development
   partition; other models are rejected with a stated reason.
+* Multi-node Ray: `executor="ray"` with `cluster_address`; trial results
+  match a single-node run, hard limits hold on workers, and a lost worker is
+  retried once and then recorded as a failed trial instead of ending the run.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

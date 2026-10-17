@@ -207,6 +207,22 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
     return result
 
 
+def lost_trial(
+    payload: TrialPayload, error: Exception
+) -> experiments.TrialResult:
+    """A failed result for a trial whose worker was lost."""
+    job = payload.job
+    return experiments.TrialResult(
+        job.trial_id,
+        job.model_name,
+        experiments.TrialStatus.FAILED,
+        payload.metric.name,
+        params=dict(job.params),
+        strategy=job.strategy,
+        error=f"WorkerLost: {type(error).__name__}: {error}",
+    )
+
+
 def guarded_evaluate(payload: TrialPayload) -> experiments.TrialResult:
     """Evaluates a job in a supervised process under hard limits.
 
@@ -331,7 +347,7 @@ class TrialRunner:
                 payloads.append(self.payload(job))
         governor = self.context.resource_governor
         function = guarded_evaluate if governor.hard else evaluate_payload
-        outputs = self.context.backend.map(function, payloads)
+        outputs = self.context.backend.map(function, payloads, lost_trial)
         for index, output in zip(slots, outputs, strict=True):
             results[index] = output
         return [r for r in results if r is not None]

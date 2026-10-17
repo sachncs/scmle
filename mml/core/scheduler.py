@@ -28,13 +28,19 @@ class ExecutionBackend(abc.ABC):
 
     @abc.abstractmethod
     def map(
-        self, function: Callable[[Any], Any], items: Sequence[Any]
+        self,
+        function: Callable[[Any], Any],
+        items: Sequence[Any],
+        on_failure: Callable[[Any, Exception], Any] | None = None,
     ) -> list[Any]:
         """Applies `function` to every item.
 
         Args:
             function: Picklable function of one argument.
             items: Independent work items.
+            on_failure: Turns an item whose worker was lost into a result,
+                so one lost worker never ends the run (backends that can
+                lose a worker use it; the others ignore it).
 
         Returns:
             Results in the order of `items`.
@@ -51,7 +57,10 @@ class SequentialBackend(ExecutionBackend):
         self.workers = 1
 
     def map(
-        self, function: Callable[[Any], Any], items: Sequence[Any]
+        self,
+        function: Callable[[Any], Any],
+        items: Sequence[Any],
+        on_failure: Callable[[Any, Exception], Any] | None = None,
     ) -> list[Any]:
         """Applies `function` in order, in this process."""
         return [function(item) for item in items]
@@ -76,7 +85,10 @@ class ProcessBackend(ExecutionBackend):
         self.workers = workers
 
     def map(
-        self, function: Callable[[Any], Any], items: Sequence[Any]
+        self,
+        function: Callable[[Any], Any],
+        items: Sequence[Any],
+        on_failure: Callable[[Any, Exception], Any] | None = None,
     ) -> list[Any]:
         """Applies `function` across worker processes, preserving order."""
         if len(items) <= 1:
@@ -87,12 +99,15 @@ class ProcessBackend(ExecutionBackend):
         return list(parallel(joblib.delayed(function)(item) for item in items))
 
 
-def create_backend(workers: int, executor: str = "process") -> ExecutionBackend:
+def create_backend(
+    workers: int, executor: str = "process", address: str | None = None
+) -> ExecutionBackend:
     """Chooses the backend for a worker count and executor.
 
     Args:
         workers: Requested concurrency.
         executor: `process` (loky pool) or `ray`.
+        address: With `ray`, the cluster to join (local runtime if None).
 
     Returns:
         Sequential for one worker with the process executor, otherwise a
@@ -104,7 +119,7 @@ def create_backend(workers: int, executor: str = "process") -> ExecutionBackend:
     if executor == "ray":
         from mml.integrations import ray_backend
 
-        return ray_backend.RayBackend(workers)
+        return ray_backend.RayBackend(workers, address)
     if executor != "process":
         raise errors.ConfigError(f"unknown executor '{executor}'")
     return SequentialBackend() if workers <= 1 else ProcessBackend(workers)

@@ -329,6 +329,7 @@ class ResourceSpec(FrozenModel):
     cpu_limit: int | None = pydantic.Field(default=None, ge=1)
     workers: int = pydantic.Field(default=1, ge=1)
     executor: Literal["process", "ray"] = "process"
+    cluster_address: str | None = None
     gpu: Literal["auto", "disabled", "required"] = "auto"
     enforcement: Literal["hard", "cooperative"] = "hard"
 

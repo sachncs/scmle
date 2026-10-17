@@ -113,6 +113,7 @@ class Orchestrator:
             backend=scheduler.create_backend(
                 limits.ResourceGovernor(self.spec.resources).workers,
                 self.spec.resources.executor,
+                self.spec.resources.cluster_address,
             ),
             cancel_event=self.cancel_event,
             input_frame=self.frame,
