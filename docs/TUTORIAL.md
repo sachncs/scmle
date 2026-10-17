@@ -193,6 +193,18 @@ project = mml.MLProject(
     feature_delays={"survey": 4},
 )
 
+# Your own metric (a module-level function, so trial processes can import it).
+mml.register_metric("business_cost", my_module.cost, greater_is_better=False)
+project = mml.MLProject(data, "churn", metric="business_cost")
+
+# Domain rules and responsibility.
+project = mml.MLProject(
+    data,
+    "default",
+    sensitive_columns=["sex"],
+    monotonic_constraints={"missed_payments": 1},
+)
+
 # After a run: reliability checks, explanations and calibrated uncertainty.
 result.evaluation["fit_health"]  # healthy / overfit / underfit
 result.diagnostics["robustness"]  # score under degraded input
