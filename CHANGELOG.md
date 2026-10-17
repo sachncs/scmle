@@ -65,6 +65,8 @@
 * Survival: event-stratified splits and censoring-weighted integrated Brier
   score and dynamic AUC beside the concordance index. Competing risks and
   time-varying covariates are not built.
+* Duplicate rows (equal features) are kept on one side of the holdout and of
+  every fold; the manifest notes how many groups were kept together.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

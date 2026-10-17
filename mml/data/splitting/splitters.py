@@ -18,9 +18,11 @@ from sklearn import model_selection
 
 from mml.contracts import errors
 from mml.contracts import tasks
+from mml.data.splitting import duplicates
 
 Fold = tuple[np.ndarray, np.ndarray]
 MIN_ROLLING_TRAIN = 10
+DUPLICATE_AWARE = frozenset({"random", "stratified", "stratified_events"})
 MIN_ROLLING_FOLDS = 2
 
 
@@ -607,6 +609,39 @@ class SplitManager:
         self.task = task
         self.strategy_name = resolve_strategy_name(spec, task)
 
+    def feature_columns(self, frame: pd.DataFrame) -> list[str]:
+        """Columns that describe a record (everything but the roles)."""
+        data = self.spec.data
+        roles = {
+            data.target,
+            data.group_column,
+            data.time_column,
+            data.weight_column,
+            data.event_column,
+            *data.id_columns,
+            *data.excluded_columns,
+            *data.unavailable_at_prediction,
+        }
+        return [c for c in frame.columns if c not in roles]
+
+    def keep_duplicates_together(
+        self, frame: pd.DataFrame, part: Partition
+    ) -> Partition:
+        """Moves copies of one record to the same side of every split."""
+        groups = duplicates.duplicate_groups(frame, self.feature_columns(frame))
+        if (groups == duplicates.NOT_DUPLICATED).all():
+            return part
+        dev, test, folds, count = duplicates.keep_together(
+            part.dev_ids, part.test_ids, part.folds, groups
+        )
+        covered = int((groups != duplicates.NOT_DUPLICATED).sum())
+        notes = [
+            *part.notes,
+            f"{count} groups of duplicate rows ({covered} rows) kept on one "
+            "side of every split",
+        ]
+        return Partition(dev, test, folds, notes)
+
     def split(self, frame: pd.DataFrame) -> SplitResult:
         """Splits the dataset.
 
@@ -618,6 +653,8 @@ class SplitManager:
         """
         strategy = STRATEGIES[self.strategy_name](self.spec, self.task)
         part = strategy.partition(frame)
+        if self.strategy_name in DUPLICATE_AWARE:
+            part = self.keep_duplicates_together(frame, part)
         manifest = SplitManifest(
             strategy=self.strategy_name,
             seed=self.spec.validation.seed,
