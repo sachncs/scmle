@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Lifecycle: shadow evaluation (`ShadowEvaluator`), A/B analysis with an
+  independent bootstrap (`compare_arms`), and rollback criteria
+  (`LifecycleManager.check_rollback`, `previous` registry alias).
 * Package layout follows the section 3 module tree under a flat `mml/`;
   modules carry their real names, with no compatibility aliases.
 * Logging replaces `print` in the library, CLI, benchmarks and examples.

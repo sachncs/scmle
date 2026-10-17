@@ -20,6 +20,7 @@ from mml.contracts import events
 INDEX_FILE = "registry.json"
 AUDIT_FILE = "audit.jsonl"
 CHAMPION = "champion"
+PREVIOUS = "previous"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -192,6 +193,8 @@ class ModelRegistryStore:
             raise errors.ArtifactError(f"{model} v{version} is not registered")
         previous = entry["aliases"].get(alias)
         entry["aliases"][alias] = version
+        if alias == CHAMPION and previous is not None and previous != version:
+            entry["aliases"][PREVIOUS] = previous
         self.write_index(index)
         self.audit(
             "promote",

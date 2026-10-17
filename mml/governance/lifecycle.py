@@ -34,6 +34,39 @@ class RetrainPolicy:
     cooldown_rows: int = 500
 
 
+@dataclasses.dataclass(frozen=True)
+class RollbackPolicy:
+    """When a promoted model must be taken back.
+
+    Attributes:
+        min_rows: Labeled rows needed to judge a promotion.
+        tolerance: Score the new champion may lose to the previous one, in
+            the metric's units, before the loss counts. The rollback
+            happens only when the whole 95% interval of its advantage lies
+            below minus this tolerance.
+    """
+
+    min_rows: int = 100
+    tolerance: float = 0.0
+
+
+@dataclasses.dataclass(frozen=True)
+class RollbackOutcome:
+    """What a rollback check concluded and did.
+
+    Attributes:
+        rolled_back: Whether the previous version is champion again.
+        comparison: New champion (as challenger) against the previous one.
+        restored_version: The version now serving, if rolled back.
+        reason: Human-readable explanation.
+    """
+
+    rolled_back: bool
+    comparison: champion.Comparison | None
+    restored_version: int | None
+    reason: str
+
+
 def fingerprint(frame: pd.DataFrame) -> str:
     """Short digest of the rows, to recognise data already acted on."""
     hashes = pd.util.hash_pandas_object(frame, index=False).to_numpy()
@@ -235,6 +268,62 @@ class LifecycleManager:
         )
         notes.append(f"promoted challenger as v{record.version}")
         return LifecycleOutcome(report, True, comparison, record.version, notes)
+
+    def check_rollback(
+        self,
+        fresh: pd.DataFrame,
+        target: str,
+        policy: RollbackPolicy | None = None,
+    ) -> RollbackOutcome:
+        """Takes the previous champion back if the new one is clearly worse.
+
+        Both versions score the same fresh labeled rows. The previous version
+        returns only when the new champion's advantage over it is negative
+        with its whole interval below the policy's tolerance; anything less
+        clear leaves the new champion in place. Either way the evidence goes
+        to the audit trail.
+
+        Args:
+            fresh: Recent served rows including the true target.
+            target: Name of the target column.
+            policy: Evidence required; defaults to `RollbackPolicy()`.
+        """
+        rule = policy or RollbackPolicy()
+        aliases = self.registry.aliases(self.model)
+        previous = aliases.get(registry_module.PREVIOUS)
+        if previous is None:
+            return RollbackOutcome(False, None, None, "no previous version")
+        if len(fresh) < rule.min_rows:
+            return RollbackOutcome(
+                False, None, None, f"fewer than {rule.min_rows} labeled rows"
+            )
+        current = self.registry.load(self.model)
+        old = self.registry.load(self.model, previous)
+        comparison = champion.ChampionChallenger(old, current).compare(
+            fresh.drop(columns=[target]), fresh[target]
+        )
+        worse = comparison.interval[1] < -rule.tolerance
+        self.registry.audit(
+            "lifecycle.rollback_check",
+            model=self.model,
+            current=aliases[registry_module.CHAMPION],
+            previous=previous,
+            rolled_back=worse,
+            **dataclasses.asdict(comparison),
+        )
+        if not worse:
+            return RollbackOutcome(
+                False, comparison, None, "the new champion holds up"
+            )
+        self.registry.promote(self.model, previous)
+        return RollbackOutcome(
+            True,
+            comparison,
+            previous,
+            f"restored v{previous}: the new champion trails it by "
+            f"{-comparison.advantage:.4f} (interval "
+            f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}])",
+        )
 
     def note_rows(self, state: dict[str, Any], fresh: pd.DataFrame) -> None:
         """Counts fresh rows toward the cooldown after an attempt."""
