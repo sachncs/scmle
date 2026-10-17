@@ -10,6 +10,7 @@ from collections.abc import Sequence
 import logging
 import pathlib
 import sys
+import threading
 from typing import ClassVar
 
 import pandas as pd
@@ -20,6 +21,7 @@ from mml.contracts import errors
 from mml.contracts import tasks
 from mml.core import config
 from mml.inference import mapping as mapping_module
+from mml.inference import serving
 from mml.optimization import optimizers
 
 LOGGER = logging.getLogger(__name__)
@@ -330,11 +332,73 @@ class PredictCommand(Command):
         return EXIT_OK
 
 
+class ServeCommand(Command):
+    """Serves a saved bundle over HTTP."""
+
+    name = "serve"
+    help = "serve a saved model bundle over HTTP (trusted bundles only)"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds bundle and binding options."""
+        parser.add_argument("bundle", help="bundle directory")
+        parser.add_argument("--host", default="127.0.0.1")
+        parser.add_argument("--port", type=int, default=8000)
+        parser.add_argument(
+            "--trusted",
+            action="store_true",
+            help="load an unsigned bundle you vouch for (pickle executes code)",
+        )
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Loads the bundle and serves until interrupted."""
+        model = bundle_module.ModelBundle.load(
+            args.bundle, trusted=args.trusted
+        )
+        adapter = serving.HttpServing(model, args.host, args.port)
+        adapter.start()
+        LOGGER.info("serving %s on %s", model.info.model_name, adapter.address)
+        try:
+            threading.Event().wait()
+        except KeyboardInterrupt:
+            LOGGER.info("stopping")
+        finally:
+            adapter.stop()
+        return EXIT_OK
+
+
+class ExportOnnxCommand(Command):
+    """Exports a saved bundle's pipeline as an ONNX graph."""
+
+    name = "export-onnx"
+    help = "export a saved model bundle as ONNX (needs the onnx extra)"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds bundle, output and parity-check options."""
+        parser.add_argument("bundle", help="bundle directory")
+        parser.add_argument("--output", default="model.onnx")
+        parser.add_argument(
+            "--check", help="CSV or Parquet rows to compare graph and pipeline"
+        )
+        parser.add_argument("--trusted", action="store_true")
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Writes the graph, optionally verifying it on sample rows."""
+        model = bundle_module.ModelBundle.load(
+            args.bundle, trusted=args.trusted
+        )
+        check = None if args.check is None else model.read_frame(args.check)
+        written = model.export_onnx(args.output, check=check)
+        LOGGER.info("wrote %s", written)
+        return EXIT_OK
+
+
 COMMANDS: tuple[Command, ...] = (
     PlanCommand(),
     RunCommand(),
     ResumeCommand(),
     PredictCommand(),
+    ServeCommand(),
+    ExportOnnxCommand(),
 )
 
 

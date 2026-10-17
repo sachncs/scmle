@@ -216,6 +216,10 @@ project = mml.MLProject(
 )
 # result.bundle.predict_survival(rows, times=[3, 6, 12]) -> P(no event yet)
 
+# Deployment: ONNX graph (onnx extra) and an HTTP server.
+result.bundle.export_onnx("model.onnx", check=sample_rows)
+# magicml serve runs/<id>/model --trusted --port 8000
+
 # After a run: reliability checks, explanations and calibrated uncertainty.
 result.evaluation["fit_health"]  # healthy / overfit / underfit
 result.diagnostics["robustness"]  # score under degraded input

@@ -43,6 +43,8 @@ deeplearning = ["torch>=2.8", "keras>=3.5"]
 # TabPFN needs an accepted Prior Labs license and TABPFN_TOKEN for its weights,
 # so it is not part of the `all` extra.
 tabpfn = ["tabpfn>=2.0"]
+# ONNX export; onnxruntime has no free-threaded (3.14t) wheel yet.
+onnx = ["skl2onnx>=1.17", "onnxruntime>=1.20"]
 optimization = ["optuna>=4.0"]
 sampling = ["imbalanced-learn>=0.14.1"]
 polars = ["polars>=1.0"]

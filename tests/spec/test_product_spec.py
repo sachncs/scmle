@@ -90,11 +90,11 @@ def test_l5_to_l11_python_package_tabular_scope():
     meta = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     assert meta["requires-python"].startswith(">=3.11")
     assert meta["license"] == "Apache-2.0"
-    assert tasks.STANDARD_TASKS == {
+    assert {
         tasks.TaskType.BINARY,
         tasks.TaskType.MULTICLASS,
         tasks.TaskType.REGRESSION,
-    }
+    } == tasks.STANDARD_TASKS
     # Survival is an addition beyond the specified scope, never a replacement.
     assert set(tasks.TaskType) - tasks.STANDARD_TASKS == {
         tasks.TaskType.SURVIVAL

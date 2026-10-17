@@ -123,7 +123,10 @@ def test_http_serving_predict_health_schema_and_errors(trained):
     try:
         base = adapter.address
         with urllib.request.urlopen(f"{base}/health") as response:
-            assert json.loads(response.read()) == {"status": "ok"}
+            health = json.loads(response.read())
+            assert health["status"] == "ok"
+            assert health["task"] == "binary_classification"
+            assert health["model_version"] == trained.bundle.info.model_version
         with urllib.request.urlopen(f"{base}/schema") as response:
             assert json.loads(response.read())["schema"]["target"] == "y"
         records = make_frame(5, 2).drop(columns="y").to_dict("records")
@@ -137,7 +140,7 @@ def test_http_serving_predict_health_schema_and_errors(trained):
         )
         status, body = post(f"{base}/predict", {"records": [{"a": 1.0}]})
         assert (
-            status == 400
+            status == 422
             and body["category"] == "schema"
             and "missing" in body["details"]
         )

@@ -1,0 +1,192 @@
+"""The serve and export-onnx commands, and the server's refusals."""
+
+import importlib.util
+import json
+import threading
+import types
+import urllib.error
+import urllib.request
+
+import numpy as np
+import pandas as pd
+import pytest
+import support
+
+from mml import cli
+from mml.artifacts import bundle as bundle_module
+from mml.contracts import data as data_contracts
+from mml.contracts import errors
+from mml.contracts import tasks
+from mml.data.curation import preprocessing
+from mml.inference import serving
+from mml.models import registry as registry_module
+
+
+@pytest.fixture(scope="module")
+def saved(tmp_path_factory):
+    rng = np.random.default_rng(0)
+    frame = pd.DataFrame({"a": rng.normal(size=400), "b": rng.normal(size=400)})
+    frame["y"] = (frame.a + frame.b > 0).astype(int)
+    root = tmp_path_factory.mktemp("served")
+    result = support.make_project(
+        frame, "y", time_budget=300, output_dir=root / "runs"
+    ).run()
+    result.bundle.save(root / "bundle")
+    frame.drop(columns="y").to_csv(root / "rows.csv", index=False)
+    return root, result
+
+
+def post(url, body):
+    request = urllib.request.Request(
+        url, json.dumps(body).encode(), {"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(request) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
+
+
+def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
+    root, __ = saved
+    model = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
+    adapter = serving.HttpServing(model)
+    adapter.start()
+    try:
+        status, body = post(
+            f"{adapter.address}/predict", {"records": [{"a": 1.0}]}
+        )
+    finally:
+        adapter.stop()
+
+    assert status == 422 and "missing" in body["details"]
+
+
+def test_health_reports_the_model_version_and_checksum(saved):
+    root, __ = saved
+    model = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
+    adapter = serving.HttpServing(model)
+    adapter.start()
+    try:
+        with urllib.request.urlopen(f"{adapter.address}/health") as response:
+            health = json.loads(response.read())
+    finally:
+        adapter.stop()
+
+    assert health["model_version"] == model.info.model_version
+    assert health["model_sha256"] == model.info.files[bundle_module.MODEL_FILE]
+    assert len(health["model_sha256"]) == 64
+
+
+def test_an_unsigned_bundle_is_not_served_unless_trusted(saved):
+    root, __ = saved
+
+    with pytest.raises(errors.ArtifactError, match="unauthenticated"):
+        cli.ServeCommand().execute(
+            cli.build_parser().parse_args(["serve", str(root / "bundle")])
+        )
+
+
+def test_the_serve_command_starts_a_server_for_a_trusted_bundle(
+    saved, monkeypatch
+):
+    root, __ = saved
+    started = threading.Event()
+    seen = {}
+
+    class Recorder:
+        def wait(self):
+            seen["address"] = adapters[-1].address
+            started.set()
+            raise KeyboardInterrupt
+
+    adapters = []
+    real = serving.HttpServing
+
+    def build(*args, **kwargs):
+        adapters.append(real(*args, **kwargs))
+        return adapters[-1]
+
+    monkeypatch.setattr(cli.serving, "HttpServing", build)
+    monkeypatch.setattr(cli, "threading", types.SimpleNamespace(Event=Recorder))
+
+    code = cli.main(["serve", str(root / "bundle"), "--trusted", "--port", "0"])
+
+    assert code == 0 and started.is_set()
+    assert seen["address"].startswith("http://127.0.0.1:")
+
+
+@pytest.fixture(scope="module")
+def exportable(tmp_path_factory):
+    """A saved bundle of a model family the ONNX converter supports."""
+    rng = np.random.default_rng(1)
+    frame = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
+    target = (frame.a + frame.b > 0).astype(int)
+    plan = data_contracts.FeaturePlan(("a", "b"), ())
+    fitted = preprocessing.build_pipeline(
+        plan,
+        registry_module.ModelRegistry.with_builtins().get(
+            "logistic_regression"
+        ),
+        tasks.TaskType.BINARY,
+        0,
+    ).fit(frame, target)
+    bundle = bundle_module.ModelBundle.create(
+        fitted, plan, frame, "y", "binary_classification", "roc_auc", "lr"
+    )
+    root = tmp_path_factory.mktemp("exportable")
+    bundle.save(root / "bundle")
+    frame.to_csv(root / "rows.csv", index=False)
+    return root
+
+
+needs_onnx = pytest.mark.skipif(
+    importlib.util.find_spec("skl2onnx") is None
+    or importlib.util.find_spec("onnxruntime") is None,
+    reason="the onnx extra is not installed",
+)
+
+
+@needs_onnx
+def test_export_onnx_command_writes_a_graph_that_matches_the_pipeline(
+    exportable, tmp_path
+):
+    output = tmp_path / "m.onnx"
+
+    code = cli.main(
+        [
+            "export-onnx",
+            str(exportable / "bundle"),
+            "--trusted",
+            "--output",
+            str(output),
+            "--check",
+            str(exportable / "rows.csv"),
+        ]
+    )
+
+    assert code == cli.EXIT_OK and output.stat().st_size > 0
+
+
+@needs_onnx
+def test_export_onnx_command_fails_cleanly_for_an_unsupported_model(
+    saved, tmp_path, caplog
+):
+    root = saved[0]
+    unsupported = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
+    unsupported.pipeline = object()
+    unsupported.save(tmp_path / "bundle")
+
+    code = cli.main(
+        [
+            "export-onnx",
+            str(tmp_path / "bundle"),
+            "--trusted",
+            "--output",
+            str(tmp_path / "m.onnx"),
+        ]
+    )
+
+    assert code == cli.EXIT_FAILED
+    assert "not supported" in caplog.text
+    assert not (tmp_path / "m.onnx").exists()

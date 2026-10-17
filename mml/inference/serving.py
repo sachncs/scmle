@@ -97,8 +97,10 @@ class BatchServing(ServingAdapter):
 class HttpServing(ServingAdapter):
     """JSON-over-HTTP serving on a background thread.
 
-    Endpoints: `GET /health`, `GET /schema`, `POST /predict` with
-    `{"records": [{...}, ...]}`.
+    Endpoints: `GET /health` (status, model version and checksum),
+    `GET /schema`, and `POST /predict` with `{"records": [{...}, ...]}`.
+    Records that violate the schema get a 422 with the reason; malformed
+    requests get a 400.
     """
 
     def __init__(
@@ -142,7 +144,18 @@ class HttpServing(ServingAdapter):
 
             def do_GET(self) -> None:
                 if self.path == "/health":
-                    self.send_json(200, {"status": "ok"})
+                    info = adapter.bundle.info
+                    self.send_json(
+                        200,
+                        {
+                            "status": "ok",
+                            "model_version": info.model_version,
+                            "model_sha256": info.files.get(
+                                bundle_module.MODEL_FILE, ""
+                            ),
+                            "task": adapter.bundle.schema.task,
+                        },
+                    )
                 elif self.path == "/schema":
                     self.send_json(
                         200,
@@ -163,8 +176,10 @@ class HttpServing(ServingAdapter):
                     records = json.loads(self.rfile.read(length))["records"]
                     self.send_json(200, adapter.respond(records))
                 except errors.MagicMLError as error:
+                    # Rows that break the schema are well-formed requests the
+                    # server cannot process: 422. Anything else is a 400.
                     self.send_json(
-                        400,
+                        422 if isinstance(error, errors.DataError) else 400,
                         {
                             "error": str(error),
                             "category": error.category,

@@ -37,6 +37,7 @@ from mml.explainability import local
 from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
 from mml.inference import novelty as novelty_module
+from mml.inference import onnx_export
 from mml.inference import validation
 from mml.monitoring import reference as reference_module
 
@@ -977,6 +978,32 @@ class ModelBundle:
         return pd.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
+
+    def export_onnx(
+        self,
+        path: str | pathlib.Path,
+        check: pd.DataFrame | None = None,
+        tolerance: float = onnx_export.DEFAULT_TOLERANCE,
+    ) -> pathlib.Path:
+        """Writes the pipeline as an ONNX graph (`onnx` extra).
+
+        Args:
+            path: Destination file.
+            check: Rows to score with both the graph and the pipeline; the
+                export fails if they disagree beyond `tolerance`.
+            tolerance: Largest allowed probability / scaled value difference.
+
+        Returns:
+            The path written.
+
+        Raises:
+            ArtifactError: For models that cannot be exported faithfully, when
+                a probability calibrator is attached, or on a failed check.
+        """
+        written = onnx_export.export(self, path)
+        if check is not None:
+            onnx_export.verify(self, written, check, tolerance)
+        return written
 
     def predict_survival(
         self,

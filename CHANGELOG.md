@@ -53,6 +53,10 @@
 * Multiclass reliability report (top-label calibration error), calibration
   error before/after in `bundle.calibrate`, and a quantile-interval coverage
   curve on the locked rows (`evaluation["quantile_coverage"]`).
+* ONNX export (`bundle.export_onnx`, `magicml export-onnx`, `onnx` extra)
+  with a parity check; unsupported models are refused by name. `magicml
+  serve` runs the HTTP server; schema violations return 422 and `/health`
+  reports the model version and checksum.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.
