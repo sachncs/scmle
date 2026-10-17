@@ -231,6 +231,13 @@ result.bundle.predict_interval(rows, 0.9, method="quantile")  # adaptive width
 result.bundle.predict_set(rows, coverage=0.9)  # classification
 ```
 
+Register any scikit-learn-compatible estimator in one call; the class must be
+defined at module level so trial processes can import it:
+
+```python
+mml.register_estimator("gaussian_nb", classifier=GaussianNB)
+```
+
 ## 10. Extending
 
 Subclass `ModelAdapter` and pass `check_conformance`, or register it through

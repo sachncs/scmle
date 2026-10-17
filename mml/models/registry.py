@@ -19,6 +19,18 @@ from mml.models.sklearn import classical
 from mml.models.survival import adapters as survival_adapters
 
 ENTRY_POINT_GROUP = "mml.models"
+USER_ADAPTERS: dict[str, models.ModelAdapter] = {}
+"""Adapters added with `register_estimator`, shared by later projects."""
+
+
+def builtin_names() -> frozenset[str]:
+    """Names of the built-in model families."""
+    saved = dict(USER_ADAPTERS)
+    USER_ADAPTERS.clear()
+    try:
+        return frozenset(ModelRegistry.with_builtins().adapters)
+    finally:
+        USER_ADAPTERS.update(saved)
 
 
 class ModelRegistry:
@@ -54,6 +66,8 @@ class ModelRegistry:
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))
         registry.register(ensembles.BlendingAdapter(registry))
+        for adapter in USER_ADAPTERS.values():
+            registry.register(adapter, overwrite=True)
         return registry
 
     def register(

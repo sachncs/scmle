@@ -57,6 +57,8 @@
   with a parity check; unsupported models are refused by name. `magicml
   serve` runs the HTTP server; schema violations return 422 and `/health`
   reports the model version and checksum.
+* `mml.register_estimator` registers any scikit-learn-compatible estimator
+  class as a model (conformance-checked, picklable for trial processes).
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.
