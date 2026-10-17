@@ -59,6 +59,9 @@
   reports the model version and checksum.
 * `mml.register_estimator` registers any scikit-learn-compatible estimator
   class as a model (conformance-checked, picklable for trial processes).
+* Ordinal targets: `task="ordinal"` with `ordinal_order`; thresholded
+  regressors give ordered labels and probabilities, scored by quadratic
+  weighted kappa and mean absolute class error.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

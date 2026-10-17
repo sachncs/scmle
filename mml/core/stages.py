@@ -237,6 +237,12 @@ class ProfileStage(Stage):
             )
         if task is tasks.TaskType.SURVIVAL:
             target_module.check_events(frame, spec.data.event_column)
+        if task is tasks.TaskType.ORDINAL:
+            frame = target_module.encode_ordinal(
+                frame, spec.data.target, spec.data.ordinal_order
+            )
+            context.frame = frame
+            context.ordinal_labels = tuple(spec.data.ordinal_order)
         context.task = task
         context.metric = context.catalog.resolve(spec.primary_metric, task)
         split = self.make_split(context, task, frame)
@@ -944,8 +950,8 @@ class PackageStage(Stage):
             held-out rows exist.
         """
         task = require(context.task, "task")
-        if task is tasks.TaskType.SURVIVAL:
-            return None  # Conformal margins are defined on point predictions.
+        if task in (tasks.TaskType.SURVIVAL, tasks.TaskType.ORDINAL):
+            return None  # Conformal margins need point predictions or labels.
         if context.resource_governor.skip_reason(first=False):
             return None
         split = require(context.split, "split")
@@ -1078,6 +1084,7 @@ class PackageStage(Stage):
             group_column=context.spec.data.group_column,
             time_column=context.spec.data.time_column,
             history_source=context.frame,
+            class_labels=context.ordinal_labels,
             reference=reference_module.ReferenceProfile.build(
                 split.dev_features,
                 profile.feature_plan,

@@ -220,6 +220,11 @@ project = mml.MLProject(
 result.bundle.export_onnx("model.onnx", check=sample_rows)
 # magicml serve runs/<id>/model --trusted --port 8000
 
+# Ordered labels: predictions come back as your labels, in order.
+project = mml.MLProject(
+    data, "rating", task="ordinal", ordinal_order=["low", "medium", "high"]
+)
+
 # After a run: reliability checks, explanations and calibrated uncertainty.
 result.evaluation["fit_health"]  # healthy / overfit / underfit
 result.diagnostics["robustness"]  # score under degraded input

@@ -97,7 +97,8 @@ def test_l5_to_l11_python_package_tabular_scope():
     } == tasks.STANDARD_TASKS
     # Survival is an addition beyond the specified scope, never a replacement.
     assert set(tasks.TaskType) - tasks.STANDARD_TASKS == {
-        tasks.TaskType.SURVIVAL
+        tasks.TaskType.SURVIVAL,
+        tasks.TaskType.ORDINAL,
     }
 
 

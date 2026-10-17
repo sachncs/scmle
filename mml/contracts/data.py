@@ -57,6 +57,7 @@ class FeaturePlan:
             order.
         weight_column: Column of per-row training weights, if any.
         event_column: Survival event indicator column, if any.
+        ordinal_levels: Number of ordered levels of an ordinal target.
     """
 
     numeric: tuple[str, ...]
@@ -72,6 +73,7 @@ class FeaturePlan:
     time_column: str | None = None
     weight_column: str | None = None
     event_column: str | None = None
+    ordinal_levels: int | None = None
 
     @property
     def features(self) -> tuple[str, ...]:

@@ -23,6 +23,7 @@ from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import search
 from mml.contracts import tasks
+from mml.models.ordinal import estimators as ordinal_estimators
 from mml.models.survival import estimators as survival_estimators
 
 BINARY = tasks.TaskType.BINARY
@@ -86,7 +87,8 @@ class DummyAdapter(models.ModelAdapter):
     name = "dummy"
     family = "baseline"
     capabilities = models.Capabilities(
-        ALL_TASKS | frozenset({tasks.TaskType.SURVIVAL}),
+        ALL_TASKS
+        | frozenset({tasks.TaskType.SURVIVAL, tasks.TaskType.ORDINAL}),
         sparse_input=True,
         handles_missing=True,
     )
@@ -100,6 +102,12 @@ class DummyAdapter(models.ModelAdapter):
         """Returns a prior classifier, a mean regressor or a marginal curve."""
         if task is tasks.TaskType.SURVIVAL:
             return survival_estimators.MarginalSurvival()
+        if task is tasks.TaskType.ORDINAL:
+            return ordinal_estimators.CumulativeThresholdRegressor(
+                dummy.DummyRegressor(strategy="median"),
+                (params or {}).get("levels"),
+                seed,
+            )
         if task.is_classification:
             return dummy.DummyClassifier(strategy="prior")
         return dummy.DummyRegressor(strategy="mean")

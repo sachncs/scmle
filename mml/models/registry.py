@@ -14,6 +14,7 @@ from mml.models import conformance
 from mml.models import ensembles
 from mml.models.boosting import boosters
 from mml.models.deeplearning import networks
+from mml.models.ordinal import adapters as ordinal_adapters
 from mml.models.sklearn import bagging
 from mml.models.sklearn import classical
 from mml.models.survival import adapters as survival_adapters
@@ -62,6 +63,7 @@ class ModelRegistry:
             *networks.DEEP_LEARNING_ADAPTERS,
             *bagging.BAGGING_ADAPTERS,
             *survival_adapters.SURVIVAL_ADAPTERS,
+            *ordinal_adapters.ORDINAL_ADAPTERS,
         )
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))

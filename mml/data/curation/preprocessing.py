@@ -163,6 +163,8 @@ def build_pipeline(
     Returns:
         An unfitted pipeline of preprocessing followed by the estimator.
     """
+    if plan.ordinal_levels:
+        params = {**(params or {}), "levels": plan.ordinal_levels}
     assembled = adapter.assemble(plan, task, seed, params)
     if assembled is not None:
         if plan.weight_column:

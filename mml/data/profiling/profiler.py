@@ -330,6 +330,7 @@ class DatasetProfiler:
             time_column=self.spec.data.time_column,
             weight_column=self.spec.data.weight_column,
             event_column=self.spec.data.event_column,
+            ordinal_levels=len(self.spec.data.ordinal_order) or None,
             high_cardinality=tuple(
                 c
                 for c in features["categorical"]

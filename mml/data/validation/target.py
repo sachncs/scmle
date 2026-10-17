@@ -44,6 +44,16 @@ def check_events(frame: pd.DataFrame, column: str | None) -> None:
         )
 
 
+def encode_ordinal(
+    frame: pd.DataFrame, column: str, order: list[str | int]
+) -> pd.DataFrame:
+    """Copy of `frame` whose ordinal labels are replaced by integer ranks."""
+    ranks = {label: rank for rank, label in enumerate(order)}
+    encoded = frame.copy()
+    encoded[column] = frame[column].map(ranks).astype(int)
+    return encoded
+
+
 class TaskResolver:
     """Resolves the requested task against the actual target values."""
 
@@ -54,6 +64,7 @@ class TaskResolver:
             spec: Project specification carrying the task request.
         """
         self.request = spec.task
+        self.order = list(spec.data.ordinal_order)
 
     def resolve(self, target: pd.Series) -> tasks.TaskType:
         """Returns the concrete task type.
@@ -74,6 +85,8 @@ class TaskResolver:
             )
         if self.request == "survival":
             return self.resolve_survival(target)
+        if self.request == "ordinal":
+            return self.resolve_ordinal(target)
         if self.request == "regression":
             return self.resolve_regression(target)
         if self.request == "auto":
@@ -87,6 +100,22 @@ class TaskResolver:
                 "survival needs a numeric duration target greater than zero"
             )
         return tasks.TaskType.SURVIVAL
+
+    def resolve_ordinal(self, target: pd.Series) -> tasks.TaskType:
+        """Requires the listed order to match the labels in the data."""
+        present = set(target.dropna().unique())
+        listed = set(self.order)
+        if present - listed:
+            raise errors.BlockedError(
+                "ordinal_order omits label(s) present in the data: "
+                f"{sorted(map(str, present - listed))}"
+            )
+        if listed - present:
+            raise errors.BlockedError(
+                "ordinal_order lists label(s) with no rows: "
+                f"{sorted(map(str, listed - present))}"
+            )
+        return tasks.TaskType.ORDINAL
 
     def resolve_regression(self, target: pd.Series) -> tasks.TaskType:
         """Validates an explicit regression request."""

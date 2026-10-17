@@ -27,6 +27,10 @@ def toy_problem(
     )
     if task is tasks.TaskType.SURVIVAL:
         target = pd.Series(rng.exponential(1.0, ROWS) + 0.01)
+    elif task is tasks.TaskType.ORDINAL:
+        target = pd.Series(
+            np.clip(np.round(features["a"] + rng.normal(size=ROWS)), -1, 1) + 1
+        ).astype(float)
     elif task is tasks.TaskType.REGRESSION:
         target = features["a"] * 2 + rng.normal(scale=0.1, size=ROWS)
     else:

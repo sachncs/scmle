@@ -15,11 +15,13 @@ from mml.contracts import metrics as metric_contracts
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.evaluation import concordance
+from mml.evaluation import ordinal
 
 BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
 REGRESSION = tasks.TaskType.REGRESSION
 SURVIVAL = tasks.TaskType.SURVIVAL
+ORDINAL = tasks.TaskType.ORDINAL
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 
 
@@ -72,6 +74,25 @@ DEFAULT_METRICS = (
         "rmse", "neg_root_mean_squared_error", False, frozenset({REGRESSION})
     ),
     metric_contracts.Metric("r2", "r2", True, frozenset({REGRESSION})),
+    metric_contracts.FunctionMetric(
+        "qwk",
+        "",
+        True,
+        frozenset({ORDINAL}),
+        ordinal.quadratic_weighted_kappa,
+        "predict",
+    ),
+    metric_contracts.FunctionMetric(
+        "mace",
+        "",
+        False,
+        frozenset({ORDINAL}),
+        ordinal.mean_absolute_class_error,
+        "predict",
+    ),
+    metric_contracts.Metric(
+        "accuracy_levels", "accuracy", True, frozenset({ORDINAL})
+    ),
     concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
 )
 
@@ -84,6 +105,7 @@ class MetricCatalog:
         MULTICLASS: "log_loss",
         REGRESSION: "rmse",
         SURVIVAL: "c_index",
+        ORDINAL: "qwk",
     }
     report_names = {
         BINARY: (
@@ -97,6 +119,7 @@ class MetricCatalog:
         MULTICLASS: ("log_loss", "f1_macro", "balanced_accuracy", "accuracy"),
         REGRESSION: ("mae", "rmse", "r2"),
         SURVIVAL: ("c_index",),
+        ORDINAL: ("qwk", "mace", "accuracy_levels"),
     }
 
     def __init__(

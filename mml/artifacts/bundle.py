@@ -278,6 +278,7 @@ class ModelBundle:
         group_column: str | None = None,
         time_column: str | None = None,
         history_source: pd.DataFrame | None = None,
+        class_labels: tuple[Any, ...] | None = None,
     ) -> Self:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -299,6 +300,8 @@ class ModelBundle:
             time_column: Ordering column for series features.
             history_source: All rows known at training time; the recent ones
                 per entity are stored as the model's series history.
+            class_labels: Labels of the classes in probability-column order
+                when the pipeline works on codes (ordinal tasks).
 
         Returns:
             The bundle.
@@ -331,7 +334,9 @@ class ModelBundle:
                 c: str(dev_features[c].dtype) for c in (*numeric, *categorical)
             },
             known_categories=known,
-            classes=None
+            classes=class_labels
+            if class_labels is not None
+            else None
             if classes is None
             else tuple(np.asarray(classes).tolist()),
             extra_inputs=extra,
@@ -503,7 +508,10 @@ class ModelBundle:
             ArtifactError: For regression models.
             ConfigError: For an unknown method.
         """
-        if self.schema.classes is None:
+        if (
+            self.schema.classes is None
+            or self.schema.task == tasks.TaskType.ORDINAL.value
+        ):
             raise errors.ArtifactError("only classifiers can be calibrated")
         if method not in ("sigmoid", "isotonic"):
             raise errors.ConfigError(
@@ -854,7 +862,11 @@ class ModelBundle:
             data: DataFrame or path to CSV/Parquet.
             mapping: Explicit column-name policy; exact names if omitted.
         """
-        return self.pipeline.predict(self.prepare_frame(data, mapping))
+        predictions = self.pipeline.predict(self.prepare_frame(data, mapping))
+        if self.schema.task == tasks.TaskType.ORDINAL.value:
+            labels = np.asarray(self.schema.classes, dtype=object)
+            return labels[np.asarray(predictions).astype(int)]
+        return predictions
 
     def predict_proba(
         self,
