@@ -15,6 +15,8 @@ import logging
 import pathlib
 import sys
 
+from benchmarks import intervals
+
 BASELINE = pathlib.Path(__file__).with_name("baseline.json")
 LOWER_IS_BETTER = {"log_loss", "rmse", "mae"}
 
@@ -44,6 +46,12 @@ def violations(results: list[dict], baseline: dict[str, dict]) -> list[str]:
             problems.append(f"{name}: metric changed {was} -> {now}")
             continue
         score, bound = record["test_score"], expected["bound"]
+        if record.get("seeds", 1) > 1:
+            # Repeated runs: a breach needs the whole interval beyond the
+            # bound, so noise alone cannot fail the gate.
+            scores = record["test_scores"]
+            low, high = intervals.mean_interval(scores)[1:]
+            score = low if expected["metric"] in LOWER_IS_BETTER else high
         worse = (
             score > bound
             if expected["metric"] in LOWER_IS_BETTER

@@ -17,6 +17,7 @@ import traceback
 from typing import Any
 
 from benchmarks import datasets
+from benchmarks import intervals
 from benchmarks import reference
 import mml
 
@@ -44,6 +45,11 @@ class BenchmarkRecord:
         seconds: Wall-clock time.
         findings: Quality and leakage findings raised by profiling.
         error: Error text when failed.
+        seeds: Repetitions with different seeds (split and models).
+        test_scores: Locked-test score of each repetition.
+        reference_scores: Reference score of each repetition.
+        advantage: Mean, 95% interval and verdict of how much better the
+            selected model is than the reference (positive = better).
     """
 
     name: str
@@ -60,6 +66,10 @@ class BenchmarkRecord:
     seconds: float = 0.0
     findings: list[str] = dataclasses.field(default_factory=list)
     error: str = ""
+    seeds: int = 1
+    test_scores: list[float] = dataclasses.field(default_factory=list)
+    reference_scores: list[float] = dataclasses.field(default_factory=list)
+    advantage: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 def run_one(
@@ -67,56 +77,81 @@ def run_one(
     budget: int,
     workers: int,
     root: pathlib.Path,
+    seeds: int = 1,
 ) -> BenchmarkRecord:
-    """Runs the full workflow on one dataset.
+    """Runs the full workflow on one dataset, once per seed.
 
     Args:
         dataset: Benchmark dataset.
-        budget: Time budget in seconds.
+        budget: Time budget in seconds, per seed.
         workers: Concurrent trial processes.
         root: Directory for run artifacts.
+        seeds: Repetitions; each seed changes the split and the models.
 
     Returns:
-        The record; failures are captured, not raised.
+        The record, averaged over seeds; failures are captured, not raised.
     """
-    record = BenchmarkRecord(dataset.name)
+    record = BenchmarkRecord(dataset.name, seeds=seeds)
     started = time.monotonic()
     try:
         frame = dataset.load()
-        project = mml.MLProject(
-            frame,
-            dataset.target,
-            task=dataset.task,
-            metric=dataset.metric,
-            time_budget=budget,
-            workers=workers,
-            time_column=dataset.time_column,
-            time_as_feature=dataset.time_as_feature,
-            output_dir=root / dataset.name,
-        )
-        result = project.run()
-        evaluation = result.evaluation
-        record.rows = len(frame)
-        record.task = evaluation["task"]
-        record.metric = evaluation["metric"]
-        record.selected = (
-            f"{result.selected_model}/{evaluation['selected_strategy']}"
-        )
-        record.cv_score = evaluation["selected_cv_score"]
-        record.baseline_cv = evaluation["baseline_cv_score"]
-        record.test_score = evaluation["test_metrics"][record.metric]
-        record.trials = len(result.trials)
-        record.findings = list(
-            result.profile.quality_findings + result.profile.risk_findings
-        )
-        record.reference_test = reference.reference_score(
-            frame,
-            dataset.target,
-            result.run_dir,
-            record.task,
-            record.metric,
-            record.task != "regression",
-        )
+        cv_scores: list[float] = []
+        for seed in range(seeds):
+            project = mml.MLProject(
+                frame,
+                dataset.target,
+                task=dataset.task,
+                metric=dataset.metric,
+                time_budget=budget,
+                workers=workers,
+                time_column=dataset.time_column,
+                time_as_feature=dataset.time_as_feature,
+                seed=seed,
+                output_dir=root / f"{dataset.name}-{seed}",
+            )
+            result = project.run()
+            evaluation = result.evaluation
+            if seed == 0:
+                record.rows = len(frame)
+                record.task = evaluation["task"]
+                record.metric = evaluation["metric"]
+                record.selected = (
+                    f"{result.selected_model}/{evaluation['selected_strategy']}"
+                )
+                record.baseline_cv = evaluation["baseline_cv_score"]
+                record.findings = list(
+                    result.profile.quality_findings
+                    + result.profile.risk_findings
+                )
+            record.trials += len(result.trials)
+            cv_scores.append(evaluation["selected_cv_score"])
+            record.test_scores.append(evaluation["test_metrics"][record.metric])
+            record.reference_scores.append(
+                reference.reference_score(
+                    frame,
+                    dataset.target,
+                    result.run_dir,
+                    record.task,
+                    record.metric,
+                    record.task != "regression",
+                )
+            )
+        record.cv_score = sum(cv_scores) / seeds
+        record.test_score = sum(record.test_scores) / seeds
+        record.reference_test = sum(record.reference_scores) / seeds
+        gains = [
+            intervals.advantage(record.metric, score, base_score)
+            for score, base_score in zip(
+                record.test_scores, record.reference_scores, strict=True
+            )
+        ]
+        mean, low, high = intervals.mean_interval(gains)
+        record.advantage = {
+            "mean": mean,
+            "low": low,
+            "high": high,
+            "verdict": intervals.verdict(low, high, seeds),
+        }
     except Exception:  # Report every dataset, even when one fails.
         record.status = "error"
         record.error = traceback.format_exc(limit=4)
@@ -134,6 +169,8 @@ COLUMNS = (
     "cv",
     "test",
     "reference test",
+    "advantage (95% CI)",
+    "verdict",
     "trials",
     "seconds",
 )
@@ -144,6 +181,14 @@ def format_number(value: float | None) -> str:
     return "" if value is None else f"{value:.4f}"
 
 
+def describe_advantage(record: BenchmarkRecord) -> str:
+    """The advantage over the reference with its interval, if there is one."""
+    found = record.advantage
+    if record.seeds < 2:
+        return f"{found['mean']:+.4f}"
+    return f"{found['mean']:+.4f} [{found['low']:+.4f}, {found['high']:+.4f}]"
+
+
 def to_markdown(records: list[BenchmarkRecord]) -> str:
     """Renders records as a Markdown table."""
     lines = [
@@ -152,7 +197,7 @@ def to_markdown(records: list[BenchmarkRecord]) -> str:
     ]
     for record in records:
         if record.status != "ok":
-            cells = [record.name, "", "ERROR"] + [""] * 7
+            cells = [record.name, "", "ERROR"] + [""] * 9
             cells.append(f"{record.seconds:.0f}")
         else:
             cells = [
@@ -165,6 +210,8 @@ def to_markdown(records: list[BenchmarkRecord]) -> str:
                 format_number(record.cv_score),
                 format_number(record.test_score),
                 format_number(record.reference_test),
+                describe_advantage(record),
+                record.advantage["verdict"],
                 str(record.trials),
                 f"{record.seconds:.0f}",
             ]
@@ -184,6 +231,12 @@ def main(argv: list[str] | None = None) -> int:
         "Hugging Face tables, or everything",
     )
     parser.add_argument("--only", nargs="*", default=[])
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        default=1,
+        help="repeat each dataset with this many seeds and report intervals",
+    )
     parser.add_argument("--budget", type=int, default=300)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--output", default="benchmarks/results.json")
@@ -205,7 +258,11 @@ def main(argv: list[str] | None = None) -> int:
             LOGGER.info("running %s ...", dataset.name)
             records.append(
                 run_one(
-                    dataset, args.budget, args.workers, pathlib.Path(scratch)
+                    dataset,
+                    args.budget,
+                    args.workers,
+                    pathlib.Path(scratch),
+                    args.seeds,
                 )
             )
     LOGGER.info("%s", to_markdown(records))
