@@ -389,6 +389,18 @@ class ProfileStage(Stage):
     ) -> splitters.SplitResult:
         """Splits the dataset and records the manifest."""
         split = splitters.SplitManager(context.spec, task).split(frame)
+        data = context.spec.data
+        if task is tasks.TaskType.FORECAST and data.seasonal_period:
+            # Computed now: under hard isolation the frame held afterwards has
+            # no locked rows, but the seasonal baseline needs their history.
+            context.seasonal_baseline = backtest.seasonal_naive(
+                frame,
+                np.asarray(split.manifest.test_ids),
+                data.value_column or "",
+                data.group_column,
+                len(data.targets),
+                data.seasonal_period,
+            )
         isolation = "in-process protocol"
         if context.resource_governor.hard:
             split.locked_test = self.seal(split.locked_test)
@@ -1517,18 +1529,11 @@ class PackageStage(Stage):
         headline = None
         if context.test_rows is not None:
             features, target = context.test_rows
-            seasonal = None
-            if data.seasonal_period and data.value_column:
-                seasonal = backtest.seasonal_naive(
-                    require(context.frame, "frame"),
-                    np.asarray(split.manifest.test_ids),
-                    data.value_column,
-                    data.group_column,
-                    len(data.targets),
-                    data.seasonal_period,
-                )
             headline = backtest.report(
-                context.final_pipeline, features, target, seasonal
+                context.final_pipeline,
+                features,
+                target,
+                context.seasonal_baseline,
             )
         return {
             "steps": headline,

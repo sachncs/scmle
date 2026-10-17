@@ -22,7 +22,16 @@ from mml.models import registry as registry_module
 from mml.sampling import strategies
 
 FAST_BUDGET_SECONDS = tasks.FAST_BUDGET_SECONDS
-FAST_EXCEPTION = "hist_gradient_boosting"
+FAST_EXCEPTIONS = frozenset(
+    {
+        "hist_gradient_boosting",
+        "multi_hist_gradient_boosting",
+        "ordinal_hist_gradient_boosting",
+        "pointwise_ranker",
+        "uplift_t_learner",
+    }
+)
+"""Boosted learners cheap enough to keep on a tight budget, one per task."""
 
 Action = experiments.DecisionAction
 
@@ -165,7 +174,7 @@ class FastBudgetRule(PlanningRule):
         kept = []
         for adapter in candidates:
             expensive = adapter.capabilities.cost >= 3
-            if expensive and adapter.name != FAST_EXCEPTION:
+            if expensive and adapter.name not in FAST_EXCEPTIONS:
                 decisions.append(
                     experiments.Decision(
                         adapter.name,

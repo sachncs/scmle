@@ -140,3 +140,13 @@ def test_many_series_are_forecast_together(tmp_path):
 
     assert set(forecast["shop"]) == {"a", "b"}
     assert len(forecast) == 2 * 3
+
+
+def test_the_backtest_works_under_hard_isolation_where_locked_rows_are_sealed(
+    tmp_path,
+):
+    result = run(tmp_path, series(300), enforcement="hard")
+
+    steps = result.evaluation["forecast_backtest"]["steps"]
+    assert len(steps) == HORIZON
+    assert all(s["seasonal_naive_mae"] is not None for s in steps)

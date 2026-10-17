@@ -36,6 +36,13 @@ class NetworkEstimator(base.BaseEstimator):
         validation_fraction: Share of rows held out for early stopping.
         device: `auto` (CUDA when available), `cpu` or `cuda`.
         random_state: Seed for initialization, shuffling and the split.
+        optimizer: `adam`, `adamw`, `sgd`, `rmsprop` or `lbfgs`.
+        momentum: Momentum of `sgd`.
+        loss: `default`, or `focal` (classifier) / `huber` (regressor).
+        label_smoothing: Share of probability moved off the true class.
+        focal_gamma: Focusing strength of the focal loss.
+        huber_delta: Width of the Huber loss's squared region.
+        accumulation_steps: Mini-batches summed per parameter update.
     """
 
     engine_path = ""
@@ -56,8 +63,22 @@ class NetworkEstimator(base.BaseEstimator):
         validation_fraction: float = 0.1,
         device: str = "auto",
         random_state: int = 0,
+        optimizer: str = "adam",
+        momentum: float = 0.9,
+        loss: str = "default",
+        label_smoothing: float = 0.0,
+        focal_gamma: float = 2.0,
+        huber_delta: float = 1.0,
+        accumulation_steps: int = 1,
     ) -> None:
         """Stores the hyperparameters (scikit-learn convention)."""
+        self.optimizer = optimizer
+        self.momentum = momentum
+        self.loss = loss
+        self.label_smoothing = label_smoothing
+        self.focal_gamma = focal_gamma
+        self.huber_delta = huber_delta
+        self.accumulation_steps = accumulation_steps
         self.architecture = architecture
         self.hidden_sizes = hidden_sizes
         self.dropout = dropout
@@ -153,6 +174,13 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
         validation_fraction: float = 0.1,
         device: str = "auto",
         random_state: int = 0,
+        optimizer: str = "adam",
+        momentum: float = 0.9,
+        loss: str = "default",
+        label_smoothing: float = 0.0,
+        focal_gamma: float = 2.0,
+        huber_delta: float = 1.0,
+        accumulation_steps: int = 1,
         class_weight: str | None = None,
     ) -> None:
         """Stores the hyperparameters, plus `class_weight` (`balanced`)."""
@@ -171,6 +199,13 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
             validation_fraction,
             device,
             random_state,
+            optimizer,
+            momentum,
+            loss,
+            label_smoothing,
+            focal_gamma,
+            huber_delta,
+            accumulation_steps,
         )
         self.class_weight = class_weight
 

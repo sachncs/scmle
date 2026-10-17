@@ -124,6 +124,12 @@
   decomposition of the selected model's error with a nearest-neighbour noise
   estimate, a verdict and advice. It reproduces resampling variance only; the
   limitation is stated in the module and the report.
+* PyTorch networks: optimizer choice (`adam`, `adamw`, `sgd` with momentum,
+  `rmsprop`, full-batch `lbfgs`), Huber and focal losses, label smoothing and
+  gradient accumulation.
+* Fixes found on real data: the forecasting backtest crashed under hard
+  isolation (the seasonal baseline now comes from split time), and the
+  tight-budget rule rejected the boosted learners of the newer tasks.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

@@ -42,6 +42,16 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         validation_fraction: Share of rows held out for early stopping.
         device: `auto` (CUDA when available), `cpu` or `cuda`.
         random_state: Seed for initialization, shuffling and the split.
+        optimizer: `adam`, `adamw`, `sgd` (with `momentum`), `rmsprop` or
+            `lbfgs` (full-batch second-order steps).
+        momentum: Momentum of `sgd`.
+        loss: `default`, or `focal` (classifier) / `huber` (regressor).
+        label_smoothing: Share of probability moved off the true class.
+        focal_gamma: Focusing strength of the focal loss.
+        huber_delta: Where the Huber loss turns from squared to linear (in
+            standardized target units).
+        accumulation_steps: Mini-batches whose gradients are summed before
+            one parameter update (a larger effective batch).
     """
 
     def __init__(
@@ -60,8 +70,22 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         validation_fraction: float = 0.1,
         device: str = "auto",
         random_state: int = 0,
+        optimizer: str = "adam",
+        momentum: float = 0.9,
+        loss: str = "default",
+        label_smoothing: float = 0.0,
+        focal_gamma: float = 2.0,
+        huber_delta: float = 1.0,
+        accumulation_steps: int = 1,
     ) -> None:
         """Stores the hyperparameters (scikit-learn convention)."""
+        self.optimizer = optimizer
+        self.momentum = momentum
+        self.loss = loss
+        self.label_smoothing = label_smoothing
+        self.focal_gamma = focal_gamma
+        self.huber_delta = huber_delta
+        self.accumulation_steps = accumulation_steps
         self.architecture = architecture
         self.hidden_sizes = hidden_sizes
         self.dropout = dropout
@@ -126,6 +150,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
             raise errors.ConfigError(
                 f"unknown architecture '{self.architecture}'"
             )
+        self.check_options()
         torch = importlib.import_module("torch")
         matrix = self.dense(features)
         encoded = self.encode_target(target)
@@ -150,17 +175,20 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
             "y": torch.from_numpy(encoded).to(device),
             "w": torch.from_numpy(weights.astype(np.float32)).to(device),
         }
-        optimizer = torch.optim.Adam(
-            network.parameters(),
-            lr=self.learning_rate,
-            weight_decay=self.weight_decay,
+        optimizer = self.new_optimizer(torch, network)
+        second_order = self.optimizer == "lbfgs"
+        batch_rows = (
+            len(training)
+            if second_order
+            else training_helpers.resolve_batch_size(
+                self.batch_size, len(training)
+            )
         )
-        batch_rows = training_helpers.resolve_batch_size(
-            self.batch_size, len(training)
-        )
-        steps_per_epoch = max(math.ceil(len(training) / batch_rows), 1)
-        total_steps = steps_per_epoch * self.epochs
-        warmup_steps = steps_per_epoch * self.warmup_epochs
+        accumulate = 1 if second_order else self.accumulation_steps
+        batches_per_epoch = max(math.ceil(len(training) / batch_rows), 1)
+        updates_per_epoch = max(math.ceil(batches_per_epoch / accumulate), 1)
+        total_steps = updates_per_epoch * self.epochs
+        warmup_steps = updates_per_epoch * self.warmup_epochs
         monitor = training_helpers.TrainingMonitor()
         generator = np.random.default_rng(self.random_state + 1)
         best, best_state, stale, step = np.inf, None, 0, 0
@@ -169,36 +197,54 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
             network.train()
             shuffled = generator.permutation(training)
             epoch_loss, alive = 0.0, True
+            pending, running = 0, 0.0
             for start in range(0, len(shuffled), batch_rows):
                 batch = torch.from_numpy(
                     shuffled[start : start + batch_rows]
                 ).to(device)
-                for group in optimizer.param_groups:
-                    group["lr"] = training_helpers.learning_rate_at(
-                        step,
-                        total_steps,
-                        self.learning_rate,
-                        warmup_steps,
-                        self.schedule,
+                if second_order:
+                    value, norm = self.lbfgs_step(
+                        torch, network, optimizer, tensors, batch
                     )
-                optimizer.zero_grad()
+                    alive = monitor.step(value, norm, None)
+                    if not alive:
+                        break
+                    epoch_loss += value
+                    step += 1
+                    continue
+                if pending == 0:
+                    for group in optimizer.param_groups:
+                        group["lr"] = training_helpers.learning_rate_at(
+                            step,
+                            total_steps,
+                            self.learning_rate,
+                            warmup_steps,
+                            self.schedule,
+                        )
+                    optimizer.zero_grad()
                 loss = self.weighted_loss(torch, network, tensors, batch)
-                loss.backward()
+                (loss / accumulate).backward()
+                running += float(loss.detach())
+                pending += 1
+                last = start + batch_rows >= len(shuffled)
+                if pending < accumulate and not last:
+                    continue
                 norm = float(
                     torch.nn.utils.clip_grad_norm_(
                         network.parameters(), self.max_grad_norm or math.inf
                     )
                 )
-                value = float(loss.detach())
+                value = running / pending
                 alive = monitor.step(value, norm, self.max_grad_norm)
                 if not alive:
                     break
                 optimizer.step()
                 epoch_loss += value
                 step += 1
+                pending, running = 0, 0.0
             if not alive:
                 break
-            monitor.epoch(epoch_loss / steps_per_epoch)
+            monitor.epoch(epoch_loss / updates_per_epoch)
             self.n_iter_ = epoch + 1
             if not held:
                 continue
@@ -225,6 +271,75 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         network.eval()
         self.network_ = network.cpu()
         return self
+
+    OPTIMIZERS = ("adam", "adamw", "sgd", "rmsprop", "lbfgs")
+    CLASSIFIER_LOSSES = ("default", "focal")
+    REGRESSOR_LOSSES = ("default", "huber")
+    losses: tuple[str, ...] = ("default",)
+
+    def check_options(self) -> None:
+        """Rejects unknown optimizers and losses before any work is done.
+
+        Raises:
+            ConfigError: For an unknown optimizer, a loss the task does not
+                have, or a non-positive accumulation count.
+        """
+        if self.optimizer not in self.OPTIMIZERS:
+            raise errors.ConfigError(
+                f"unknown optimizer '{self.optimizer}'; use one of "
+                f"{list(self.OPTIMIZERS)}"
+            )
+        if self.loss not in self.losses:
+            raise errors.ConfigError(
+                f"unknown loss '{self.loss}' for this task; use one of "
+                f"{list(self.losses)}"
+            )
+        if self.accumulation_steps < 1:
+            raise errors.ConfigError("accumulation_steps must be at least 1")
+
+    def new_optimizer(self, torch: Any, network: Any) -> Any:
+        """Creates the configured optimizer for the network's parameters."""
+        parameters = network.parameters()
+        rate, decay = self.learning_rate, self.weight_decay
+        if self.optimizer == "adamw":
+            return torch.optim.AdamW(parameters, lr=rate, weight_decay=decay)
+        if self.optimizer == "sgd":
+            return torch.optim.SGD(
+                parameters,
+                lr=rate,
+                momentum=self.momentum,
+                nesterov=self.momentum > 0,
+                weight_decay=decay,
+            )
+        if self.optimizer == "rmsprop":
+            return torch.optim.RMSprop(parameters, lr=rate, weight_decay=decay)
+        if self.optimizer == "lbfgs":
+            return torch.optim.LBFGS(
+                parameters, lr=1.0, max_iter=20, line_search_fn="strong_wolfe"
+            )
+        return torch.optim.Adam(parameters, lr=rate, weight_decay=decay)
+
+    def lbfgs_step(
+        self,
+        torch: Any,
+        network: Any,
+        optimizer: Any,
+        tensors: dict[str, Any],
+        batch: Any,
+    ) -> tuple[float, float]:
+        """One full-batch L-BFGS step; returns the loss and gradient norm."""
+
+        def closure() -> Any:
+            optimizer.zero_grad()
+            loss = self.weighted_loss(torch, network, tensors, batch)
+            loss.backward()
+            return loss
+
+        loss = optimizer.step(closure)
+        norm = float(
+            torch.nn.utils.clip_grad_norm_(network.parameters(), math.inf)
+        )
+        return float(loss.detach()), norm
 
     def new_network(self, torch: Any) -> Any:
         """Creates an untrained network of the configured architecture."""
@@ -294,6 +409,8 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
 class ClassifierEngine(base.ClassifierMixin, TabularEngine):
     """Classifier: softmax over class scores, optional class balancing."""
 
+    losses = ("default", "focal")
+
     def __init__(
         self,
         architecture: str = "mlp",
@@ -310,6 +427,13 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         validation_fraction: float = 0.1,
         device: str = "auto",
         random_state: int = 0,
+        optimizer: str = "adam",
+        momentum: float = 0.9,
+        loss: str = "default",
+        label_smoothing: float = 0.0,
+        focal_gamma: float = 2.0,
+        huber_delta: float = 1.0,
+        accumulation_steps: int = 1,
         class_weight: str | None = None,
     ) -> None:
         """Stores the hyperparameters, plus `class_weight` (`balanced`)."""
@@ -328,6 +452,13 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
             validation_fraction,
             device,
             random_state,
+            optimizer,
+            momentum,
+            loss,
+            label_smoothing,
+            focal_gamma,
+            huber_delta,
+            accumulation_steps,
         )
         self.class_weight = class_weight
 
@@ -343,10 +474,17 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         return len(self.classes_)
 
     def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Cross entropy per row."""
-        return torch.nn.functional.cross_entropy(
-            outputs, targets, reduction="none"
+        """Cross entropy per row, optionally smoothed or focal."""
+        entropy = torch.nn.functional.cross_entropy(
+            outputs,
+            targets,
+            reduction="none",
+            label_smoothing=self.label_smoothing,
         )
+        if self.loss == "focal":
+            confidence = torch.exp(-entropy)
+            return (1.0 - confidence) ** self.focal_gamma * entropy
+        return entropy
 
     def row_weights(self, targets: np.ndarray) -> np.ndarray:
         """Inverse class frequency when `class_weight` is `balanced`."""
@@ -371,7 +509,9 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
 
 
 class RegressorEngine(base.RegressorMixin, TabularEngine):
-    """Regressor trained on the standardized target with squared error."""
+    """Regressor trained on the standardized target (squared or Huber)."""
+
+    losses = ("default", "huber")
 
     def encode_target(self, target: Any) -> np.ndarray:
         """Standardizes the target and remembers its scale."""
@@ -387,7 +527,14 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
         return 1
 
     def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Squared error per row."""
+        """Squared error per row, or Huber when configured."""
+        if self.loss == "huber":
+            return torch.nn.functional.huber_loss(
+                outputs.squeeze(-1),
+                targets,
+                reduction="none",
+                delta=self.huber_delta,
+            )
         return (outputs.squeeze(-1) - targets) ** 2
 
     def row_weights(self, targets: np.ndarray) -> np.ndarray:

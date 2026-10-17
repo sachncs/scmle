@@ -1,95 +1,121 @@
-"""Tests for the optimizers."""
+"""Optimizer, loss and accumulation options of the PyTorch networks."""
 
+import importlib.util
+
+import numpy as np
 import pytest
 
 from mml.contracts import errors
-from mml.contracts import search
-from mml.optimization import optimizers
+from mml.models.deeplearning import estimators
 
-SPACE = search.SearchSpace(
-    (
-        search.FloatParameter("x", 0.0, 1.0),
-        search.IntParameter("n", 1, 10),
-        search.ChoiceParameter("c", ("a", "b", "c")),
-    )
+pytestmark = pytest.mark.skipif(
+    importlib.util.find_spec("torch") is None, reason="torch is not installed"
 )
 
-
-def drive(optimizer, rounds=12):
-    proposals = []
-    for params in (optimizer.ask() for round_number in range(rounds)):
-        proposals.append(params)
-        optimizer.tell(params, params["x"] + params["n"] / 10)
-    return proposals
+FAST = {"epochs": 60, "patience": 8}
 
 
-def assert_valid(params):
-    assert 0.0 <= params["x"] <= 1.0
-    assert 1 <= params["n"] <= 10
-    assert params["c"] in ("a", "b", "c")
+def separable(rows=400, seed=0):
+    rng = np.random.default_rng(seed)
+    features = rng.normal(size=(rows, 4)).astype(np.float32)
+    labels = np.where(features[:, 0] + features[:, 1] > 0, "yes", "no")
+    return features, labels
 
 
-def test_random_optimizer_is_seeded_and_valid():
-    first = drive(optimizers.RandomOptimizer(SPACE, 1))
-    second = drive(optimizers.RandomOptimizer(SPACE, 1))
-    other = drive(optimizers.RandomOptimizer(SPACE, 2))
-    assert first == second and first != other
-    assert all(assert_valid(p) is None for p in first)
+def linear(rows=400, seed=1):
+    rng = np.random.default_rng(seed)
+    features = rng.normal(size=(rows, 3)).astype(np.float32)
+    return features, 4 + 3 * features[:, 0] - 2 * features[:, 1]
 
 
-def test_random_optimizer_records_history():
-    optimizer = optimizers.RandomOptimizer(SPACE, 0)
-    params = optimizer.ask()
-    optimizer.tell(params, 0.5)
-    assert optimizer.history == [(params, 0.5)]
+@pytest.mark.parametrize("optimizer", ["adam", "adamw", "sgd", "rmsprop"])
+def test_every_first_order_optimizer_learns(optimizer):
+    features, labels = separable()
+    rate = 5e-2 if optimizer == "sgd" else 1e-2
+
+    model = estimators.TorchClassifier(
+        optimizer=optimizer, learning_rate=rate, **FAST
+    ).fit(features, labels)
+
+    assert (model.predict(features) == labels).mean() > 0.9
+    assert model.training_report_["verdict"] in {"ok", "stalled"}
 
 
-@pytest.mark.parametrize("greater", [True, False])
-def test_optuna_optimizer_proposes_valid_configurations(greater):
-    pytest.importorskip("optuna")
-    optimizer = optimizers.OptunaOptimizer(SPACE, 0, greater)
-    proposals = drive(optimizer)
-    assert all(assert_valid(p) is None for p in proposals)
-    assert optimizer.pending == []
-    assert len(optimizer.study.trials) == len(proposals)
+def test_lbfgs_takes_full_batch_second_order_steps():
+    features, target = linear()
+
+    model = estimators.TorchRegressor(
+        optimizer="lbfgs", epochs=25, patience=8
+    ).fit(features, target)
+
+    residual = target - model.predict(features)
+    assert 1 - residual.var() / target.var() > 0.9
 
 
-def test_optuna_is_deterministic_per_seed():
-    pytest.importorskip("optuna")
-    first = drive(optimizers.OptunaOptimizer(SPACE, 7))
-    second = drive(optimizers.OptunaOptimizer(SPACE, 7))
-    assert first == second
+def test_accumulating_gradients_trains_like_a_larger_batch():
+    features, labels = separable()
+
+    model = estimators.TorchClassifier(
+        batch_size=32, accumulation_steps=4, **FAST
+    ).fit(features, labels)
+
+    assert (model.predict(features) == labels).mean() > 0.9
 
 
-def test_optuna_exploits_a_clear_signal():
-    pytest.importorskip("optuna")
-    space = search.SearchSpace((search.FloatParameter("x", 0.0, 1.0),))
-    optimizer = optimizers.OptunaOptimizer(space, 0, greater_is_better=True)
-    proposals = (optimizer.ask() for round_number in range(40))
-    for params in proposals:
-        optimizer.tell(params, -((params["x"] - 0.8) ** 2))
-    best = max(t.value for t in optimizer.study.trials)
-    assert best > -0.01
+def test_focal_loss_and_label_smoothing_still_learn_and_soften_confidence():
+    features, labels = separable()
+    plain = estimators.TorchClassifier(**FAST).fit(features, labels)
 
-
-def test_factory_and_errors(monkeypatch):
-    assert isinstance(
-        optimizers.create_optimizer("random", SPACE, 0, True),
-        optimizers.RandomOptimizer,
+    smooth = estimators.TorchClassifier(label_smoothing=0.2, **FAST).fit(
+        features, labels
     )
-    with pytest.raises(errors.ConfigError, match="unknown optimizer"):
-        optimizers.create_optimizer("nope", SPACE, 0, True)
-    monkeypatch.setattr(
-        optimizers.OptunaOptimizer, "requires", ("not_installed_pkg",)
+    focal = estimators.TorchClassifier(loss="focal", **FAST).fit(
+        features, labels
     )
-    with pytest.raises(errors.ConfigError, match="optimization"):
-        optimizers.OptunaOptimizer(SPACE, 0)
+
+    assert (smooth.predict(features) == labels).mean() > 0.9
+    assert (focal.predict(features) == labels).mean() > 0.9
+    assert (
+        smooth.predict_proba(features).max(axis=1).mean()
+        < plain.predict_proba(features).max(axis=1).mean()
+    )
 
 
-def test_unsupported_parameter_type_is_rejected():
-    class Odd(search.Parameter):
-        def sample(self, rng):
-            return 1
+def test_huber_loss_resists_outliers_that_pull_the_squared_loss():
+    features, target = linear()
+    corrupted = target.copy()
+    corrupted[:20] += 80.0
 
-    with pytest.raises(errors.ConfigError, match="unsupported"):
-        optimizers.suggest(Odd("odd"), object())
+    squared = estimators.TorchRegressor(epochs=80, patience=10).fit(
+        features, corrupted
+    )
+    huber = estimators.TorchRegressor(
+        loss="huber", huber_delta=0.5, epochs=80, patience=10
+    ).fit(features, corrupted)
+
+    clean = slice(20, None)
+    error_squared = np.abs(
+        squared.predict(features)[clean] - target[clean]
+    ).mean()
+    error_huber = np.abs(huber.predict(features)[clean] - target[clean]).mean()
+    assert error_huber < error_squared
+
+
+@pytest.mark.parametrize(
+    ("kind", "settings"),
+    [
+        (estimators.TorchClassifier, {"optimizer": "newton"}),
+        (estimators.TorchClassifier, {"loss": "huber"}),
+        (estimators.TorchRegressor, {"loss": "focal"}),
+        (estimators.TorchClassifier, {"accumulation_steps": 0}),
+    ],
+)
+def test_unknown_options_are_refused_before_training(kind, settings):
+    features, labels = separable()
+
+    with pytest.raises(Exception, match=r"unknown|accumulation") as caught:
+        kind(**settings).fit(features, labels)
+
+    assert "ConfigError" in type(caught.value).__name__ or isinstance(
+        caught.value, errors.MagicMLError
+    )

@@ -128,3 +128,16 @@ def test_bad_target_sets_are_refused(tmp_path):
         support.make_project(
             frame, LABELS, task="binary_classification", output_dir=tmp_path
         )
+
+
+def test_the_boosted_multi_target_model_survives_a_tight_budget(tmp_path):
+    plan = support.make_project(
+        quantities(),
+        ["first", "second"],
+        task="multioutput",
+        time_budget=60,
+        output_dir=tmp_path,
+    ).plan()
+
+    assert "multi_hist_gradient_boosting" in plan.candidate_models
+    assert "multi_random_forest" not in plan.candidate_models

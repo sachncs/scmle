@@ -99,6 +99,8 @@ class RunContext:
         test_rows: The released locked rows and labels, kept for reports
             written after the test was opened.
         stream: The chunked source and totals when the file was streamed.
+        seasonal_baseline: Seasonal-naive forecasts for the locked rows,
+            computed at split time (forecasting).
         propensity: How well the covariates predict treatment (uplift).
         fairness_mitigation: Evidence for group thresholds, applied or not.
         ordinal_labels: For ordinal tasks, the labels from lowest to highest
@@ -159,6 +161,7 @@ class RunContext:
     final_pipeline: Any = None
     test_rows: tuple[pd.DataFrame, pd.Series] | None = None
     stream: tuple[streaming.ChunkSource, streaming.Totals] | None = None
+    seasonal_baseline: Any = None
     propensity: dict[str, Any] | None = None
     fairness_mitigation: dict[str, Any] | None = None
     ordinal_labels: tuple[Any, ...] | None = None
