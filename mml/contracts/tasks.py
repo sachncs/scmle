@@ -339,8 +339,10 @@ class SearchSpec(FrozenModel):
 
     top_models: int = pydantic.Field(default=2, ge=0)
     configs_per_model: int = pydantic.Field(default=6, ge=1)
-    optimizer: Literal["random", "optuna"] = "random"
+    optimizer: Literal["random", "grid", "optuna"] = "random"
     prune_fraction: float = pydantic.Field(default=0.5, ge=0, lt=1)
+    pruning: Literal["halving", "hyperband"] = "halving"
+    eta: int = pydantic.Field(default=3, ge=2)
 
 
 class StrategySpec(FrozenModel):
@@ -404,6 +406,11 @@ class SelectionSpec(FrozenModel):
         bias_variance_replicates: Bootstrap refits of the selected model used
             to split its error into bias and variance (0 turns it off;
             regression and classification only).
+        pareto: Measure the top candidates' size and latency, report the
+            score / latency / size Pareto front, and pick, among candidates
+            within `pareto_tolerance` of the best score, the fastest.
+        pareto_tolerance: Score gap (in the metric's units) that is accepted
+            for a faster or smaller model.
         nested_cv: Also estimate how optimistic the winning score is by
             repeating the configuration search inside each outer fold (random
             and stratified validation only; costs several extra fits).
@@ -425,6 +432,8 @@ class SelectionSpec(FrozenModel):
     weighted: bool = True
     nested_cv: bool = False
     bias_variance_replicates: int = pydantic.Field(default=0, ge=0)
+    pareto: bool = False
+    pareto_tolerance: float = pydantic.Field(default=0.0, ge=0.0)
 
 
 class ModelSpec(FrozenModel):

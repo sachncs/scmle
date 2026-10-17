@@ -8,6 +8,8 @@ Optuna never becomes the framework's architecture.
 import abc
 import functools
 import importlib.util
+import itertools
+import math
 import random
 from typing import Any
 from typing import ClassVar
@@ -118,6 +120,65 @@ def suggest_choice(parameter: search.ChoiceParameter, trial: Any) -> Any:
     return trial.suggest_categorical(parameter.name, list(parameter.choices))
 
 
+class GridOptimizer(Optimizer):
+    """Walks a coarse grid: low, middle and high of each numeric parameter.
+
+    Choices contribute every option (up to four). The grid is shuffled with
+    the seed, so even a short run touches distant corners rather than one
+    neighbourhood, and random draws take over once the grid is exhausted.
+    """
+
+    name = "grid"
+    LEVELS = 3
+    MAX_CHOICES = 4
+
+    def __init__(
+        self,
+        space: search.SearchSpace,
+        seed: int,
+        greater_is_better: bool = True,
+    ) -> None:
+        """Builds and shuffles the grid."""
+        super().__init__(space, seed, greater_is_better)
+        axes = [self.levels(p) for p in space.parameters]
+        points = [
+            dict(zip(space.names(), combo, strict=True))
+            for combo in itertools.product(*axes)
+        ]
+        self.rng = random.Random(seed)  # nosec B311 - seeded, not security
+        self.rng.shuffle(points)
+        self.points = points
+        self.position = 0
+
+    @classmethod
+    def levels(cls, parameter: search.Parameter) -> list[Any]:
+        """The grid values of one parameter."""
+        if isinstance(parameter, search.ChoiceParameter):
+            return list(parameter.choices)[: cls.MAX_CHOICES]
+        if isinstance(parameter, search.IntParameter):
+            whole_low, whole_high = parameter.low, parameter.high
+            if parameter.log:
+                whole_mid = round(math.sqrt(whole_low * whole_high))
+            else:
+                whole_mid = (whole_low + whole_high) // 2
+            return sorted({whole_low, whole_mid, whole_high})
+        assert isinstance(parameter, search.FloatParameter)  # nosec B101
+        low, high = parameter.low, parameter.high
+        middle = math.sqrt(low * high) if parameter.log else (low + high) / 2
+        return [low, middle, high]
+
+    def ask(self) -> dict[str, Any]:
+        """The next grid point, then random draws."""
+        if self.position < len(self.points):
+            point = self.points[self.position]
+            self.position += 1
+            return dict(point)
+        return self.space.sample(self.rng)
+
+    def tell(self, params: dict[str, Any], score: float) -> None:
+        """A grid keeps no state beyond its position."""
+
+
 class OptunaOptimizer(Optimizer):
     """TPE search through Optuna (optional `optimization` extra)."""
 
@@ -167,7 +228,7 @@ class OptunaOptimizer(Optimizer):
 
 OPTIMIZERS: dict[str, type[Optimizer]] = {
     optimizer.name: optimizer
-    for optimizer in (RandomOptimizer, OptunaOptimizer)
+    for optimizer in (RandomOptimizer, GridOptimizer, OptunaOptimizer)
 }
 
 
@@ -180,7 +241,7 @@ def create_optimizer(
     """Instantiates an optimizer by name.
 
     Args:
-        name: `random` or `optuna`.
+        name: `random`, `grid` or `optuna`.
         space: Parameters to tune.
         seed: Random seed.
         greater_is_better: Orientation of the told scores.

@@ -84,6 +84,9 @@ class Tuner:
             context.spec.validation.seed + index,
             self.metric.greater_is_better,
         )
+        if search.pruning == "hyperband":
+            self.hyperband(name, strategy, optimizer)
+            return
         batch_size = max(MIN_BATCH, math.ceil(search.configs_per_model / 3))
         remaining = search.configs_per_model
         while (
@@ -94,6 +97,103 @@ class Tuner:
             size = min(batch_size, remaining)
             remaining -= size
             self.run_batch(name, strategy, optimizer, size)
+
+    def rung_schedule(self) -> list[list[int | None]]:
+        """Fold budgets of each Hyperband bracket, cheapest start first.
+
+        With `F` folds and reduction factor `eta`, rungs are the geometric
+        fold counts `F / eta^k` (at least one fold) ending at the full
+        evaluation (`None`). Bracket `s` starts at rung `s`: early brackets
+        try many configurations cheaply, the last one a few at full cost.
+        """
+        folds = len(self.runner.folds)
+        if folds < 2:
+            return [[None]]
+        eta = self.search.eta
+        counts = sorted(
+            {max(int(folds / eta**power), 1) for power in range(0, 4)}
+        )
+        rungs: list[int | None] = [c for c in counts if c < folds]
+        rungs.append(None)
+        return [rungs[start:] for start in range(len(rungs))]
+
+    def hyperband(
+        self,
+        name: str,
+        strategy: str,
+        optimizer: optimizers.Optimizer,
+    ) -> None:
+        """Hyperband: successive-halving brackets with different start costs.
+
+        The configuration budget is shared between brackets, weighted toward
+        the cheap ones (many tries need cheap screening); each bracket keeps
+        the best `1/eta` at every rung and finishes the survivors on every
+        fold.
+        """
+        brackets = self.rung_schedule()
+        weights = [len(brackets) - index for index in range(len(brackets))]
+        total = sum(weights)
+        remaining = self.search.configs_per_model
+        for index, rungs in enumerate(brackets):
+            if remaining <= 0 or (
+                self.context.resource_governor.skip_reason(first=False)
+            ):
+                return
+            self.context.check_cancelled()
+            share = max(
+                MIN_BATCH,
+                round(self.search.configs_per_model * weights[index] / total),
+            )
+            size = min(share, remaining)
+            remaining -= size
+            self.run_bracket(name, strategy, optimizer, size, rungs)
+
+    def run_bracket(
+        self,
+        name: str,
+        strategy: str,
+        optimizer: optimizers.Optimizer,
+        size: int,
+        rungs: list[int | None],
+    ) -> None:
+        """Evaluates `size` configurations through the rungs of one bracket."""
+        proposals = [optimizer.ask() for count in range(size)]
+        ids = self.context.allocate_trial_ids(len(proposals))
+        current = self.runner.run_many(
+            [
+                trials.TrialJob(trial_id, name, params, rungs[0], strategy)
+                for trial_id, params in zip(ids, proposals, strict=True)
+            ]
+        )
+        sign = 1 if self.metric.greater_is_better else -1
+        for rung in rungs[1:]:
+            alive = [t for t in current if t.status is Status.OK]
+            keep = max(1, math.ceil(len(alive) / self.search.eta))
+            winners = sorted(alive, key=lambda t: -sign * t.score_mean)[:keep]
+            finished = {
+                t.trial_id: t
+                for t in self.runner.run_many(
+                    [
+                        trials.TrialJob(
+                            t.trial_id, t.model_name, t.params, rung, t.strategy
+                        )
+                        for t in winners
+                    ]
+                )
+            }
+            for trial in current:
+                if trial.status is Status.OK and trial.trial_id not in finished:
+                    trial.status = Status.PRUNED
+                    trial.error = f"pruned before the {rung or 'full'} rung"
+                    self.complete(trial, optimizer)
+            current = [
+                finished[t.trial_id] for t in winners if t.trial_id in finished
+            ]
+        for trial in current:
+            if trial.status is Status.OK:
+                self.complete(trial, optimizer)
+            else:
+                self.context.record_trial(trial)
 
     def run_batch(
         self,

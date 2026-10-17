@@ -99,6 +99,7 @@ class RunContext:
         test_rows: The released locked rows and labels, kept for reports
             written after the test was opened.
         stream: The chunked source and totals when the file was streamed.
+        pareto_front: Score / latency / size of measured candidates.
         seasonal_baseline: Seasonal-naive forecasts for the locked rows,
             computed at split time (forecasting).
         propensity: How well the covariates predict treatment (uplift).
@@ -161,6 +162,7 @@ class RunContext:
     final_pipeline: Any = None
     test_rows: tuple[pd.DataFrame, pd.Series] | None = None
     stream: tuple[streaming.ChunkSource, streaming.Totals] | None = None
+    pareto_front: list[dict[str, Any]] | None = None
     seasonal_baseline: Any = None
     propensity: dict[str, Any] | None = None
     fairness_mitigation: dict[str, Any] | None = None

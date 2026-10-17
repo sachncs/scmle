@@ -130,6 +130,10 @@
 * Fixes found on real data: the forecasting backtest crashed under hard
   isolation (the seasonal baseline now comes from split time), and the
   tight-budget rule rejected the boosted learners of the newer tasks.
+* Tuning breadth: a grid optimizer, Hyperband brackets (`search.pruning`,
+  `search.eta`) and Pareto selection (`selection.pareto`) that reports the
+  score / latency / size front and picks the fastest model within a score
+  tolerance.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

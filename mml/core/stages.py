@@ -620,6 +620,69 @@ class SelectStage(Stage):
             spec.latency_safety_factor,
         )
 
+    def select_on_front(
+        self,
+        context: context_module.RunContext,
+        checked: list[experiments.TrialResult],
+        limits: resources.ResourceLimits,
+    ) -> None:
+        """Measures every checked candidate and picks from the Pareto front.
+
+        Among candidates that meet the limits and score within
+        `pareto_tolerance` of the best, the fastest wins (smaller size breaks
+        ties). The whole front is reported so the trade-off is visible.
+
+        Raises:
+            BlockedError: If no checked candidate satisfies the limits.
+        """
+        split = require(context.split, "split")
+        task = require(context.task, "task")
+        plan = require(context.profile, "profile").feature_plan
+        metric = require(context.metric, "metric")
+        sign = 1.0 if metric.greater_is_better else -1.0
+        rows = []
+        for trial in checked:
+            candidate = strategies.get_strategy(trial.strategy).build(
+                plan,
+                context.registry.get(trial.model_name),
+                task,
+                context.spec.validation.seed,
+                trial.params,
+            )
+            candidate.fit(split.dev_features, split.dev_target)
+            usage = resources.measure(candidate, split.dev_features)
+            rows.append(
+                Measured(trial, candidate, usage, limits.violations(usage))
+            )
+        feasible = [r for r in rows if not r.broken]
+        if not feasible:
+            raise errors.BlockedError(
+                f"none of the top {len(checked)} candidates satisfies the "
+                "serving constraints; relax the limits or allow more candidates"
+            )
+        best = max(sign * r.trial.score_mean for r in feasible)
+        near = [
+            r
+            for r in feasible
+            if best - sign * r.trial.score_mean
+            <= context.spec.selection.pareto_tolerance
+        ]
+        chosen = min(
+            near,
+            key=lambda r: (r.usage.p95_latency_ms, r.usage.model_mb),
+        )
+        context.pareto_front = pareto_report(rows, chosen, sign)
+        trial = chosen.trial
+        context.add_outcome(
+            f"{trial.model_name}/{trial.strategy}",
+            experiments.DecisionAction.INCLUDE,
+            f"fastest within {context.spec.selection.pareto_tolerance} of the "
+            f"best score ({chosen.usage.p95_latency_ms:.1f} ms p95)",
+        )
+        context.refits[trial.trial_id] = chosen.candidate
+        context.selected = trial
+        self.announce(context)
+
     def execute(self, context: context_module.RunContext) -> None:
         """Chooses the best trial that satisfies the serving constraints.
 
@@ -633,7 +696,8 @@ class SelectStage(Stage):
             context.trials, require(context.metric, "metric"), context.registry
         )
         limits = self.limits(context)
-        if not limits.active:
+        spec = context.spec.selection
+        if not limits.active and not spec.pareto:
             context.selected = ranked[0]
             self.announce(context)
             return
@@ -641,6 +705,9 @@ class SelectStage(Stage):
         task = require(context.task, "task")
         plan = require(context.profile, "profile").feature_plan
         checked = ranked[: context.spec.selection.max_candidates_checked]
+        if spec.pareto:
+            self.select_on_front(context, checked, limits)
+            return
         for trial in checked:
             candidate = strategies.get_strategy(trial.strategy).build(
                 plan,
@@ -672,6 +739,62 @@ class SelectStage(Stage):
             f"none of the top {len(checked)} candidates satisfies the "
             "serving constraints; relax the limits or allow more candidates"
         )
+
+
+@dataclasses.dataclass
+class Measured:
+    """A candidate refit on the development rows and measured for serving.
+
+    Attributes:
+        trial: The trial it came from.
+        candidate: The fitted pipeline.
+        usage: Its measured size and latency.
+        broken: Serving limits it violates.
+    """
+
+    trial: experiments.TrialResult
+    candidate: Any
+    usage: resources.ResourceUsage
+    broken: list[str]
+
+
+def pareto_report(
+    rows: list[Measured], chosen: Measured, sign: float
+) -> list[dict[str, Any]]:
+    """Score / latency / size of each measured candidate, with dominance."""
+    points = [
+        (
+            sign * r.trial.score_mean,
+            r.usage.p95_latency_ms,
+            r.usage.model_mb,
+        )
+        for r in rows
+    ]
+
+    def dominated(index: int) -> bool:
+        a = points[index]
+        return any(
+            b[0] >= a[0]
+            and b[1] <= a[1]
+            and b[2] <= a[2]
+            and (b[0] > a[0] or b[1] < a[1] or b[2] < a[2])
+            for other, b in enumerate(points)
+            if other != index
+        )
+
+    return [
+        {
+            "model": r.trial.model_name,
+            "strategy": r.trial.strategy,
+            "score": r.trial.score_mean,
+            "p95_latency_ms": r.usage.p95_latency_ms,
+            "model_mb": r.usage.model_mb,
+            "violations": list(r.broken),
+            "dominated": dominated(index),
+            "chosen": r is chosen,
+        }
+        for index, r in enumerate(rows)
+    ]
 
 
 def reference_scores(
@@ -1188,6 +1311,7 @@ class FinalEvaluationStage(Stage):
             "semi_supervised": context.semi_supervised,
             "fairness_mitigation": context.fairness_mitigation,
             "execution_backend": context.backend.name,
+            "pareto_front": context.pareto_front,
             "evaluation_prevalence": {
                 "natural": True,
                 "note": "resampling strategies change only training folds; "
