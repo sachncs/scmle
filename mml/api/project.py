@@ -90,8 +90,8 @@ class MLProject:
             sensitive_columns: Columns describing groups of people; the
                 fairness report compares outcomes across them.
             weight_column: Numeric column of per-row training weights (never
-                a feature; not needed at prediction time; metrics stay
-                unweighted).
+                a feature; not needed at prediction time; test metrics
+                are also reported weighted).
             monotonic_constraints: Numeric feature to +1 / -1: predictions
                 must never fall / rise as the feature grows (binary
                 classification and regression).

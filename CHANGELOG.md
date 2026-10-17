@@ -33,7 +33,8 @@
   (`data.monotonic_constraints`).
 * Per-row training weights (`data.weight_column`, `--weight-column`): used
   directly by models that accept `sample_weight`, otherwise by a weighted
-  draw of training rows. Metrics stay unweighted.
+  draw of training rows. Test metrics are also reported weighted
+  (`weighted_test_metrics`).
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

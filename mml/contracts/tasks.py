@@ -138,7 +138,7 @@ class DataSpec(FrozenModel):
         weight_column: Numeric column of non-negative per-row weights (for
             example survey weights or recency). Rows count in training by
             their weight; the column is never a feature and is not needed
-            at prediction time. Metrics stay unweighted.
+            at prediction time. Test metrics are also reported weighted.
         sensitive_columns: Columns describing groups of people (for example
             sex or age band). They are not hidden from the model unless also
             excluded; the fairness report compares outcomes across them.
