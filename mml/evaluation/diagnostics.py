@@ -50,6 +50,7 @@ class DiagnosticInput:
             dependent (resampling then draws contiguous blocks).
         reference_features: Development rows the model was trained on, for
             diagnostics that compare them with the evaluation rows.
+        sensitive_columns: Columns whose groups outcomes are compared across.
     """
 
     estimator: Any
@@ -62,6 +63,7 @@ class DiagnosticInput:
     groups: pd.Series | None = None
     temporal: bool = False
     reference_features: pd.DataFrame | None = None
+    sensitive_columns: tuple[str, ...] = ()
 
     @property
     def positive_label(self) -> Any:

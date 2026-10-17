@@ -109,6 +109,12 @@ class ProjectCommand(Command):
             help="rolling validation: rows in each training window",
         )
         parser.add_argument(
+            "--sensitive-columns",
+            nargs="*",
+            default=[],
+            help="columns whose groups the fairness report compares",
+        )
+        parser.add_argument(
             "--feature-delay",
             nargs="*",
             default=[],
@@ -196,6 +202,7 @@ class ProjectCommand(Command):
             folds=args.folds,
             test_fraction=args.test_fraction,
             embargo_rows=args.embargo_rows,
+            sensitive_columns=args.sensitive_columns,
             horizon_rows=args.horizon_rows,
             window_rows=args.window_rows,
             feature_delays={

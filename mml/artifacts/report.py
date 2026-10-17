@@ -98,6 +98,10 @@ class HtmlReport:
                 f"{escape(top['slice'])} ({top['rows']} rows, "
                 f"{top['gap']:+.3f} versus overall)"
             )
+        fair = result.diagnostics.get("fairness", {})
+        for column in fair.get("flagged", []):
+            flags = "; ".join(fair["columns"][column]["flags"])
+            lines.append(f"Fairness ({escape(column)}): {escape(flags)}")
         return (
             "".join(f"<p>{line}</p>" for line in lines)
             or "<p>no checks were available</p>"

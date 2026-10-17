@@ -112,6 +112,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         "partial_dependence",
         "metric_uncertainty",
         "slice_performance",
+        "fairness",
         "robustness",
         "adversarial_validation",
     }
@@ -124,6 +125,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         "partial_dependence",
         "metric_uncertainty",
         "slice_performance",
+        "fairness",
         "robustness",
         "adversarial_validation",
     }

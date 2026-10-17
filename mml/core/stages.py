@@ -698,6 +698,7 @@ class FinalEvaluationStage(Stage):
                 ),
                 temporal=split.manifest.strategy == "temporal",
                 reference_features=split.dev_features,
+                sensitive_columns=tuple(context.spec.data.sensitive_columns),
             ),
             suite.full_suite(),
         )

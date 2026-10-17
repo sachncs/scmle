@@ -1,6 +1,7 @@
 """The complete post-selection diagnostic suite."""
 
 from mml.evaluation import diagnostics
+from mml.evaluation import fairness
 from mml.evaluation import robustness
 from mml.evaluation import shift
 from mml.evaluation import slices
@@ -16,6 +17,7 @@ def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
     return (
         *diagnostics.default_suite(),
         slices.SliceReport(),
+        fairness.FairnessReport(),
         robustness.RobustnessReport(),
         shift.AdversarialValidation(),
         *explanation_suite.default_suite(),

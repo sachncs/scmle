@@ -535,3 +535,21 @@ def test_free_text_is_encoded_and_scored_from_raw_strings(tmp_path):
         }
     )
     assert list(result.predict(fresh)) == [1, 0]
+
+
+def test_the_fairness_report_names_the_sensitive_columns_and_reaches_the_report(
+    binary_frame, tmp_path
+):
+    result = support.make_project(
+        binary_frame,
+        "y",
+        time_budget=300,
+        output_dir=tmp_path,
+        sensitive_columns=["c"],
+    ).run()
+
+    report = result.diagnostics["fairness"]
+    assert report["available"] is True and "c" in report["columns"]
+    groups = set(report["columns"]["c"]["groups"])
+    assert groups and groups <= {"x", "y", "z"}
+    assert (result.run_dir / "diagnostics" / "fairness.json").exists()

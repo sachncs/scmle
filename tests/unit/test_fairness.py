@@ -1,0 +1,132 @@
+"""Tests for the fairness report."""
+
+import dataclasses
+
+import numpy as np
+import pandas as pd
+from sklearn import base
+
+from mml.contracts import data as data_contracts
+from mml.contracts import tasks
+from mml.evaluation import diagnostics
+from mml.evaluation import fairness
+from mml.evaluation import metrics
+
+PLAN = data_contracts.FeaturePlan(("score",), ("group",))
+
+
+class Rule(base.ClassifierMixin, base.BaseEstimator):
+    """Approves everyone in group a, only high scorers elsewhere."""
+
+    classes_ = np.array([0, 1])
+
+    def fit(self, features, target):
+        return self
+
+    def predict(self, features):
+        favoured = features["group"].to_numpy() == "a"
+        return np.where(favoured | (features["score"].to_numpy() > 1.0), 1, 0)
+
+
+def make_inputs(biased=True, rows=1200):
+    rng = np.random.default_rng(0)
+    frame = pd.DataFrame(
+        {
+            "score": rng.normal(size=rows),
+            "group": rng.choice(["a", "b"], rows),
+        }
+    )
+    target = pd.Series(
+        (frame.score + rng.normal(0, 0.5, rows) > 0.5).astype(int)
+    )
+    estimator = Rule()
+    if not biased:
+        estimator.predict = lambda f: (f["score"].to_numpy() > 0.5).astype(int)
+    return diagnostics.DiagnosticInput(
+        estimator,
+        frame,
+        target,
+        tasks.TaskType.BINARY,
+        metrics.CATALOG.resolve("roc_auc", tasks.TaskType.BINARY),
+        PLAN,
+        0,
+        sensitive_columns=("group",),
+    )
+
+
+def test_a_rule_that_favours_one_group_is_flagged_with_its_disparities():
+    report = fairness.FairnessReport().compute(make_inputs())
+
+    body = report["columns"]["group"]
+    assert report["flagged"] == ["group"]
+    assert body["demographic_parity_difference"] > 0.4
+    assert body["disparate_impact_ratio"] < 0.8
+    assert body["groups"]["a"]["selection_rate"] == 1.0
+    assert any("selection rates differ" in f for f in body["flags"])
+
+
+def test_group_blind_decisions_are_not_flagged():
+    report = fairness.FairnessReport().compute(make_inputs(biased=False))
+
+    assert report["flagged"] == []
+    assert report["columns"]["group"]["demographic_parity_difference"] < 0.1
+
+
+def test_without_sensitive_columns_the_report_says_so():
+    inputs = dataclasses.replace(make_inputs(), sensitive_columns=())
+
+    assert fairness.FairnessReport().compute(inputs) == {
+        "available": False,
+        "reason": "no sensitive columns",
+    }
+
+
+def test_numeric_sensitive_columns_are_banded_and_small_groups_skipped():
+    inputs = make_inputs()
+    inputs = dataclasses.replace(inputs, sensitive_columns=("score",))
+
+    report = fairness.FairnessReport().compute(inputs)
+
+    assert len(report["columns"]["score"]["groups"]) == 4
+    tiny = dataclasses.replace(
+        make_inputs(rows=40), sensitive_columns=("group",)
+    )
+    body = fairness.FairnessReport().compute(tiny)["columns"]["group"]
+    assert all(
+        g["rows"] >= fairness.MIN_GROUP_ROWS for g in body["groups"].values()
+    )
+
+
+def test_regression_reports_bias_per_group():
+    rng = np.random.default_rng(3)
+    rows = 800
+    frame = pd.DataFrame(
+        {"x": rng.normal(size=rows), "group": rng.choice(["a", "b"], rows)}
+    )
+    truth = pd.Series(frame.x * 2 + (frame.group == "b") * 3)
+
+    class Ignorant(base.RegressorMixin, base.BaseEstimator):
+        def fit(self, features, target):
+            return self
+
+        def predict(self, features):
+            return features["x"].to_numpy() * 2
+
+    inputs = diagnostics.DiagnosticInput(
+        Ignorant(),
+        frame,
+        truth,
+        tasks.TaskType.REGRESSION,
+        metrics.CATALOG.resolve("rmse", tasks.TaskType.REGRESSION),
+        data_contracts.FeaturePlan(("x",), ("group",)),
+        0,
+        sensitive_columns=("group",),
+    )
+
+    body = fairness.FairnessReport().compute(inputs)["columns"]["group"]
+
+    assert (
+        body["groups"]["b"]["bias"] < -2.5
+        and abs(body["groups"]["a"]["bias"]) < 0.3
+    )
+    assert body["flags"] and body["bias_gap"] > 0.5

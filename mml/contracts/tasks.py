@@ -131,6 +131,9 @@ class DataSpec(FrozenModel):
             published a quarter later), the number of rows of delay. The
             model then sees the value from that many rows earlier; the raw
             column is excluded. Needs `time_column`.
+        sensitive_columns: Columns describing groups of people (for example
+            sex or age band). They are not hidden from the model unless also
+            excluded; the fairness report compares outcomes across them.
     """
 
     uri: str
@@ -141,6 +144,7 @@ class DataSpec(FrozenModel):
     excluded_columns: list[str] = pydantic.Field(default_factory=list)
     unavailable_at_prediction: list[str] = pydantic.Field(default_factory=list)
     feature_delays: dict[str, int] = pydantic.Field(default_factory=dict)
+    sensitive_columns: list[str] = pydantic.Field(default_factory=list)
 
 
 class ValidationSpec(FrozenModel):
@@ -404,6 +408,8 @@ class ProjectSpec(FrozenModel):
             raise ValueError("the target cannot be an id column")
         if data.target in data.excluded_columns:
             raise ValueError("the target cannot be excluded")
+        if data.target in data.sensitive_columns:
+            raise ValueError("the target cannot be a sensitive column")
         if data.target in data.unavailable_at_prediction:
             raise ValueError("the target cannot be unavailable at prediction")
         wanted = self.selection.maximize
