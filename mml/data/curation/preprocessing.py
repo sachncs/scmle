@@ -6,6 +6,7 @@ the identical fitted graph.
 """
 
 from collections.abc import Mapping
+import dataclasses
 from typing import Any
 
 from sklearn import compose
@@ -46,7 +47,17 @@ def build_preprocessor(
         parts.append(("high_cardinality", encoder, list(special)))
     for kind in columns.KINDS:
         selected = [c for c in plan.columns_for(kind.name) if c not in special]
-        transformer = kind.transformer(options)
+        if not selected:
+            continue
+        kind_options = options
+        if kind.name == "numeric" and options.missing == "indicator":
+            flagged, selected = split_flagged(plan, selected)
+            if flagged:
+                parts.append(
+                    ("numeric_flagged", kind.transformer(options), flagged)
+                )
+            kind_options = dataclasses.replace(options, missing="median")
+        transformer = kind.transformer(kind_options)
         if selected and transformer is not None:
             parts.append((kind.name, transformer, selected))
     if options.construct:
@@ -63,6 +74,19 @@ def build_preprocessor(
         verbose_feature_names_out=False,
         sparse_threshold=SPARSE_THRESHOLD if options.sparse else 0.0,
     )
+
+
+def split_flagged(
+    plan: data_contracts.FeaturePlan, selected: list[str]
+) -> tuple[list[str], list[str]]:
+    """Numeric columns whose gaps are informative, and the rest.
+
+    Without a missingness report every column gets indicators, as before.
+    """
+    if plan.informative_missing is None:
+        return list(selected), []
+    flagged = [c for c in selected if c in plan.informative_missing]
+    return flagged, [c for c in selected if c not in flagged]
 
 
 def monotonic_signs(

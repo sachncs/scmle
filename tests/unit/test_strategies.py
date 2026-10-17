@@ -393,8 +393,18 @@ def gappy_problem(rows=900, seed=7):
     return frame, holes
 
 
-def test_missing_indicators_append_a_flag_for_features_with_gaps():
-    frame = gappy_problem()[0]
+def informative_gap_problem(rows=900, seed=7):
+    """Like `gappy_problem`, but the gaps in `b` follow the outcome."""
+    frame = gappy_problem(rows, seed)[0]
+    restored = gappy_problem(rows, seed)[0]
+    rng = np.random.default_rng(seed + 1)
+    frame["b"] = restored["b"].fillna(0.0) + restored["a"] * 2
+    frame.loc[(frame.y == 1) & (rng.random(rows) < 0.5), "b"] = np.nan
+    return frame
+
+
+def test_missing_indicators_append_a_flag_for_features_with_informative_gaps():
+    frame = informative_gap_problem()
     profile = profile_of(frame)
     pipeline = strategies.get_strategy("missing_indicators").build(
         profile.feature_plan, REGISTRY.get("logistic_regression"), BINARY, 0
@@ -435,12 +445,16 @@ def test_iterative_imputation_recovers_values_better_than_the_median():
 
 
 def test_feature_strategies_for_gaps_are_not_offered_when_the_model_copes():
-    frame = gappy_problem()[0]
+    frame = informative_gap_problem()
     profile = profile_of(frame)
     complete = profile_of(frame.drop(columns="y").fillna(0).assign(y=frame.y))
+    random_gaps = profile_of(gappy_problem()[0])
 
     assert "natively" in reason("missing_indicators", profile, "lightgbm")
     assert reason("missing_indicators", profile, "logistic_regression") is None
+    assert "associated with the target" in reason(
+        "missing_indicators", random_gaps, "logistic_regression"
+    )
     assert "no numeric feature is missing" in reason(
         "iterative_imputation", complete, "logistic_regression"
     )

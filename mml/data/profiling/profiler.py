@@ -13,6 +13,7 @@ import pandas as pd
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
+from mml.data.profiling import missingness
 from mml.data.validation import columns
 from mml.intelligence import fingerprint
 
@@ -318,6 +319,14 @@ class DatasetProfiler:
         stamps = tuple(features["datetime"])
         derived = tuple(self.datetime_nodes(frame, stamps))
         quality += self.duplicate_findings(frame, usable, task)
+        gaps = missingness.assess(frame, usable, target, task.is_classification)
+        informative = tuple(f.column for f in gaps if f.informative)
+        quality += [
+            f"missingness of '{f.column}' is associated with the target "
+            f"({f.test}, effect {f.effect:.2f}, p={f.p_value:.1e})"
+            for f in gaps
+            if f.informative
+        ]
         risks = self.leakage_findings(frame, statistics, usable, task)
         target_summary, target_risks = summarize_target(target, task)
         base_plan = data_contracts.FeaturePlan(
@@ -354,6 +363,7 @@ class DatasetProfiler:
             numeric=base_plan.numeric + tuple(n.name for n in derived),
             derived=derived,
             extra_inputs=tuple(c for c in stamps if derived) + base_plan.text,
+            informative_missing=informative,
         )
         return data_contracts.DatasetProfile(
             manifest=manifest,
@@ -363,4 +373,5 @@ class DatasetProfiler:
             target_summary=target_summary,
             feature_plan=feature_plan,
             dataset_statistics=dataset_statistics,
+            missingness=tuple(f.to_dict() for f in gaps),
         )

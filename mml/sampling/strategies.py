@@ -622,8 +622,29 @@ class MissingIndicatorStrategy(MissingValueStrategy):
     """Fills with the median and flags which values were missing."""
 
     name = "missing_indicators"
-    description = "median imputation plus a missing-value flag per feature"
+    description = (
+        "median imputation plus a missing-value flag for features whose "
+        "gaps relate to the target"
+    )
     missing = "indicator"
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs numeric gaps that the missingness report calls informative."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        plan = profile.feature_plan
+        if plan.informative_missing is None:
+            return None  # Not assessed: keep the earlier behaviour.
+        flagged = [c for c in plan.informative_missing if c in plan.numeric]
+        if not flagged:
+            return "no numeric feature's gaps are associated with the target"
+        return None
 
 
 class IterativeImputationStrategy(MissingValueStrategy):

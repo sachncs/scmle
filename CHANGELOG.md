@@ -67,6 +67,9 @@
   time-varying covariates are not built.
 * Duplicate rows (equal features) are kept on one side of the holdout and of
   every fold; the manifest notes how many groups were kept together.
+* Missingness report: per-column tests of whether gaps relate to the target
+  (development rows, Bonferroni-corrected); missing-value flags are planned
+  and built only for the flagged columns.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

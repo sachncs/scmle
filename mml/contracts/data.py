@@ -58,6 +58,8 @@ class FeaturePlan:
         weight_column: Column of per-row training weights, if any.
         event_column: Survival event indicator column, if any.
         ordinal_levels: Number of ordered levels of an ordinal target.
+        informative_missing: Features whose gaps are associated with the
+            target; `None` when missingness was not assessed.
     """
 
     numeric: tuple[str, ...]
@@ -74,6 +76,7 @@ class FeaturePlan:
     weight_column: str | None = None
     event_column: str | None = None
     ordinal_levels: int | None = None
+    informative_missing: tuple[str, ...] | None = None
 
     @property
     def features(self) -> tuple[str, ...]:
@@ -136,6 +139,7 @@ class DatasetProfile:
         dataset_statistics: Dataset-level fingerprint grouped by dimension
             (shape, types, missingness, target, features, relationships,
             structure, quality, operational, risk).
+        missingness: Per-column tests of whether gaps relate to the target.
     """
 
     manifest: DatasetManifest
@@ -147,6 +151,7 @@ class DatasetProfile:
     dataset_statistics: Mapping[str, Any] = dataclasses.field(
         default_factory=dict
     )
+    missingness: tuple[Mapping[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -158,6 +163,7 @@ class DatasetProfile:
             "target": dict(self.target_summary),
             "feature_plan": self.feature_plan.to_dict(),
             "dataset": dict(self.dataset_statistics),
+            "missingness": [dict(item) for item in self.missingness],
         }
 
 
