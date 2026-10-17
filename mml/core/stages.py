@@ -304,7 +304,7 @@ def attach_feature_graph(
         return profile
     ordered, rowwise = feature_graph.split_nodes(graph)
     plan = profile.feature_plan
-    computed = {n.name for n in graph.nodes}
+    computed = {n.name for n in graph.nodes} | plan.derived_names
     needed = feature_graph.required_raw_inputs(graph.nodes, computed)
     if ordered:
         needed += [
@@ -313,11 +313,15 @@ def attach_feature_graph(
             if c and c not in needed
         ]
     used = set(plan.features) | {n.name for n in rowwise}
-    extra = tuple(c for c in needed if c not in used)
+    extra = tuple(
+        dict.fromkeys(
+            [*plan.extra_inputs, *(c for c in needed if c not in used)]
+        )
+    )
     new_plan = dataclasses.replace(
         plan,
         numeric=plan.numeric + tuple(n.name for n in rowwise),
-        derived=tuple(rowwise),
+        derived=plan.derived + tuple(rowwise),
         series=tuple(ordered),
         extra_inputs=extra,
     )

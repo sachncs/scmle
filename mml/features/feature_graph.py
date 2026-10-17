@@ -32,6 +32,9 @@ Inputs = list[pd.Series]
 Params = Mapping[str, Any]
 
 
+EPOCH = pd.Timestamp("1970-01-01")
+
+
 class FeatureOp(abc.ABC):
     """One operation of the graph.
 
@@ -266,6 +269,7 @@ class DatePart(FeatureOp):
             "dayofyear",
             "hour",
             "minute",
+            "timestamp",
         }
     )
 
@@ -282,6 +286,8 @@ class DatePart(FeatureOp):
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
         """Extracts the part; unparseable dates give NaN."""
         stamps = pd.to_datetime(inputs[0], errors="coerce")
+        if params["part"] == "timestamp":
+            return (stamps - EPOCH) / pd.Timedelta(days=1)
         return getattr(stamps.dt, params["part"]).astype(float)
 
 

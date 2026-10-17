@@ -179,3 +179,36 @@ def test_features_unavailable_at_prediction_time_are_excluded_with_a_reason(
 def test_target_cannot_be_declared_unavailable():
     with pytest.raises(Exception, match="unavailable"):
         make_spec(unavailable_at_prediction=["y"])
+
+
+def test_datetime_columns_become_calendar_and_trend_features():
+    rng = np.random.default_rng(0)
+    frame = pd.DataFrame(
+        {
+            "signed_up": pd.date_range("2022-01-01", periods=400, freq="40h"),
+            "constant_day": pd.Timestamp("2024-03-04"),
+            "x": rng.normal(size=400),
+            "y": rng.integers(0, 2, 400),
+        }
+    )
+    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
+    manifest = tabular.build_manifest(frame, "y")
+
+    profile = profiler.DatasetProfiler(spec).profile(
+        frame, manifest, tasks.TaskType.BINARY
+    )
+
+    plan = profile.feature_plan
+    names = {n.name for n in plan.derived}
+    assert {
+        "signed_up__year",
+        "signed_up__month",
+        "signed_up__dayofweek",
+        "signed_up__hour",
+        "signed_up__timestamp",
+    } <= names
+    assert not any(
+        n.startswith("constant_day__") and "year" in n for n in names
+    )
+    assert "signed_up" in plan.extra_inputs and "signed_up" not in plan.features
+    assert set(names) <= set(plan.numeric)

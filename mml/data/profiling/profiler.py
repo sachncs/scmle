@@ -5,6 +5,8 @@ a feature strongly associated with the target may be a good predictor or a
 leak, and statistics alone cannot tell which.
 """
 
+import dataclasses
+
 import pandas as pd
 
 from mml.contracts import data as data_contracts
@@ -18,6 +20,14 @@ MISSINGNESS_LEAK = 0.9
 HIGH_MISSING_DROP = 0.95
 HIGH_MISSING_WARN = 0.30
 SEVERE_IMBALANCE = 10.0
+DATETIME_PARTS = (
+    "year",
+    "month",
+    "dayofweek",
+    "hour",
+    "dayofyear",
+    "timestamp",
+)
 
 
 def column_exclusion_reason(
@@ -103,7 +113,11 @@ class DatasetProfiler:
         """
         statistics: dict[str, dict] = {}
         dropped = dict(roles)
-        features: dict[str, list[str]] = {"numeric": [], "categorical": []}
+        features: dict[str, list[str]] = {
+            "numeric": [],
+            "categorical": [],
+            "datetime": [],
+        }
         quality: list[str] = []
         for name in frame.columns:
             if name == self.spec.data.target:
@@ -125,6 +139,34 @@ class DatasetProfiler:
                     f"column '{name}' is {stats['missing_rate']:.0%} missing"
                 )
         return statistics, dropped, features, quality
+
+    @staticmethod
+    def datetime_nodes(
+        frame: pd.DataFrame, stamps: tuple[str, ...]
+    ) -> list[tasks.FeatureNode]:
+        """Calendar and trend features for each datetime column.
+
+        Only parts that vary in the data are produced: a column holding one
+        year yields no year feature. The elapsed-days part carries the trend.
+        """
+        nodes = []
+        for column in stamps:
+            values = pd.to_datetime(frame[column], errors="coerce")
+            for part in DATETIME_PARTS:
+                if part == "timestamp":
+                    varies = values.nunique() > 1
+                else:
+                    varies = getattr(values.dt, part).nunique() > 1
+                if varies:
+                    nodes.append(
+                        tasks.FeatureNode(
+                            name=f"{column}__{part}",
+                            op="datepart",
+                            inputs=[column],
+                            params={"part": part},
+                        )
+                    )
+        return nodes
 
     def duplicate_count(self, frame: pd.DataFrame) -> int:
         """Counts rows duplicated apart from their identifier columns."""
@@ -226,14 +268,16 @@ class DatasetProfiler:
             frame, roles
         )
         usable = features["numeric"] + features["categorical"]
-        if not usable:
+        if not usable and not features["datetime"]:
             raise errors.BlockedError(
                 "no usable feature columns remain after exclusions"
             )
+        stamps = tuple(features["datetime"])
+        derived = tuple(self.datetime_nodes(frame, stamps))
         quality += self.duplicate_findings(frame, usable, task)
         risks = self.leakage_findings(frame, statistics, usable, task)
         target_summary, target_risks = summarize_target(target, task)
-        feature_plan = data_contracts.FeaturePlan(
+        base_plan = data_contracts.FeaturePlan(
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
             dropped=dropped,
@@ -250,12 +294,18 @@ class DatasetProfiler:
             frame,
             self.spec,
             task,
-            feature_plan,
+            base_plan,
             statistics,
             self.duplicate_count(frame),
             read_seconds,
             len(risks),
             total_rows,
+        )
+        feature_plan = dataclasses.replace(
+            base_plan,
+            numeric=base_plan.numeric + tuple(n.name for n in derived),
+            derived=derived,
+            extra_inputs=tuple(c for c in stamps if derived),
         )
         return data_contracts.DatasetProfile(
             manifest=manifest,

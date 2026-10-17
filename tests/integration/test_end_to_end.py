@@ -467,3 +467,32 @@ def test_a_delayed_column_is_used_only_through_its_lagged_copy(tmp_path):
     assert "report__available" in result.bundle.features or (
         "report__available" in result.bundle.schema.series_columns
     )
+
+
+def test_datetime_features_train_and_predict_from_raw_timestamps(tmp_path):
+    rng = np.random.default_rng(14)
+    rows = 700
+    frame = pd.DataFrame(
+        {
+            "seen": pd.date_range("2023-01-01", periods=rows, freq="7h"),
+            "x": rng.normal(size=rows),
+        }
+    )
+    frame["y"] = (
+        frame["seen"].dt.dayofweek.isin([5, 6]).astype(int)
+        + (rng.random(rows) < 0.05)
+    ).clip(0, 1)
+    result = support.make_project(
+        frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    assert result.evaluation["test_metrics"]["roc_auc"] > 0.9
+    as_text = (
+        frame.drop(columns="y")
+        .head(12)
+        .assign(seen=lambda d: d["seen"].astype(str))
+    )
+    np.testing.assert_array_equal(
+        result.predict(as_text),
+        result.predict(frame.drop(columns="y").head(12)),
+    )

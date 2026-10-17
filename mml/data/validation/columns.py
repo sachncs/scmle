@@ -287,7 +287,7 @@ class NumericKind(ColumnKind):
 
 
 class DatetimeKind(ColumnKind):
-    """Datetime columns: usable for splitting only in v0.1."""
+    """Datetime columns: expanded into calendar and trend features."""
 
     name = "datetime"
 
@@ -296,11 +296,8 @@ class DatetimeKind(ColumnKind):
         return pd.api.types.is_datetime64_any_dtype(series)
 
     def exclusion_reason(self, series: pd.Series) -> str | None:
-        """Datetimes are not yet engineered into features."""
-        return (
-            "datetime (unsupported in v0.1; set as time_column or "
-            "engineer features)"
-        )
+        """Datetimes are kept: the profiler expands them into features."""
+        return None
 
 
 class CategoricalKind(ColumnKind):
