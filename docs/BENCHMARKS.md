@@ -84,3 +84,41 @@ With three seeds only one result is distinguishable from noise (diabetes
 progression, ahead). The single-seed "behind" label on wine earlier in this
 document is not supported once the spread across seeds is counted: its
 interval spans zero by a wide margin because one seed scored badly.
+
+## New task types on real datasets
+
+`benchmarks/real_tasks.py` runs every task type added after the first release
+on public data (OpenML, R datasets, the Criteo uplift sample, MSLR-WEB10k,
+covertype) with a 300 s budget per case, one seed, against a simple strong
+baseline scored on the same locked rows. Results: `benchmarks/results_real_tasks.json`.
+
+| dataset | task | metric | framework | baseline | verdict | selected |
+| --- | --- | --- | --- | --- | --- | --- |
+| AirPassengers (monthly, 144) | forecast | mean MAE over steps | 31.46 | 40.26 (seasonal naive) | ahead | multioutput_ridge |
+| nottem (monthly temperature, 240) | forecast | mean MAE over steps | 1.828 | 2.446 (seasonal naive) | ahead | multi_random_forest |
+| UKgas (quarterly, 108) | forecast | mean MAE over steps | 43.84 | 40.1 (seasonal naive) | behind | multioutput_ridge |
+| rotterdam breast cancer (2982) | survival | c_index | 0.6929 | 0.6825 (untuned ridge Cox) | ahead | cox_ph |
+| PBC liver (418) | survival | c_index | 0.844 | 0.8218 (untuned ridge Cox) | ahead | cox_ph |
+| wine quality, red (1599) | ordinal | qwk | 0.5723 | 0.5671 (multiclass boosted classifier) | ahead | ordinal_random_forest |
+| yeast (2417, 14 labels) | multilabel | macro F1 | 0.4175 | 0.4195 (one boosted classifier per label) | behind | multi_hist_gradient_boosting |
+| energy efficiency (768, 2 loads) | multioutput | mean R2 | 0.978 | 0.9869 (one boosted regressor per target) | behind | multi_random_forest |
+| NSW job training (randomized, 445) | uplift | qini | 0.02255 | -1.896e-05 (random ranking (mean of 50)) | ahead | uplift_s_learner |
+| Lalonde NSW vs PSID (observational, 614) | uplift | qini | -4.107e-05 | -0.0002036 (random ranking (mean of 50)) | ahead | uplift_s_learner |
+| Criteo uplift (randomized, sampled 420k) | uplift | qini | 0.003091 | -3.769e-05 (random ranking (mean of 50)) | ahead | uplift_s_learner |
+| mslr-web10k (700 queries) | ranking | ndcg@10 | 0.5575 | 0.5583 (pointwise boosting) | behind | pointwise_ranker |
+| sms-spam | text | roc_auc | 0.9889 | 0.9864 (TF-IDF terms) | ahead | logistic_regression |
+| wine quality, white (4898) | ordinal | qwk | 0.5574 | 0.5231 (multiclass boosted classifier) | ahead | ordinal_hist_gradient_boosting |
+| scene (2407, 6 labels) | multilabel | macro F1 | 0.8127 | 0.7949 (one boosted classifier per label) | ahead | multi_hist_gradient_boosting |
+| covertype (581k rows, 50 MB budget) | streamed | accuracy on all locked rows | 0.8555 | 0.7794 (boosting on every development row) | ahead | catboost |
+
+Reading it honestly: these are single-seed point estimates, not intervals, so
+small gaps are ties (wine-red 0.572 vs 0.567; yeast 0.4175 vs 0.4195; mslr
+0.5575 vs 0.5583). Clear wins: AirPassengers, nottem, wine-white, scene,
+PBC, the randomized uplift sets and covertype under a 50 MB memory budget.
+Clear losses: UKgas (the seasonal-naive forecast is better than the framework's
+direct ridge on 108 points) and energy-efficiency (a per-target boosted
+regressor is slightly better). On the observational Lalonde data the uplift
+estimate rests on the no-unmeasured-confounding assumption and its Qini is
+close to zero, so it should not be read as a causal result. Covertype's
+baseline is a default boosted model on all development rows, which is weak, so
+its margin overstates the framework's advantage.

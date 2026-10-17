@@ -264,8 +264,8 @@ def multilabel_case(
     """Several labels against one boosted classifier per label."""
     frame = frame.copy()
     for label in labels:
-        frame[label] = (frame[label].astype(str).str.upper() == "TRUE").astype(
-            int
+        frame[label] = (
+            frame[label].astype(str).str.upper().isin(["TRUE", "1"]).astype(int)
         )
     result = project(frame, labels, root, task="multilabel").run()
     train, test = split_ids(result)
@@ -421,6 +421,7 @@ def streaming_case(root: pathlib.Path) -> Row:
     result = mml.MLProject(
         str(path),
         "Cover_Type",
+        task="classification",
         time_budget=BUDGET,
         workers=2,
         output_dir=root,
@@ -562,7 +563,7 @@ def build_cases(root: pathlib.Path) -> dict[str, Callable[[], Row]]:
         ),
         "wine-white": lambda: ordinal_case(
             "wine quality, white (4898)",
-            openml("wine-quality-white").rename(columns={"class": "quality"}),
+            openml("wine-quality-white").rename(columns={"Class": "quality"}),
             "quality",
             r("winewhite"),
         ),
