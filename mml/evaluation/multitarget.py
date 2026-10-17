@@ -75,6 +75,7 @@ class MultiTargetMetric(metric_contracts.Metric):
     def scorer(self, positive: Any = None) -> Any:
         """Builds a scorer `(estimator, features, primary_target)`."""
         function = FUNCTIONS[self.kind]
+        sign = 1.0 if self.greater_is_better else -1.0
 
         def score(
             estimator: Any,
@@ -88,6 +89,7 @@ class MultiTargetMetric(metric_contracts.Metric):
                     features[list(estimator.target_columns[1:])].to_numpy(),
                 ]
             )
-            return function(truth, np.asarray(estimator.predict(features)))
+            guess = np.asarray(estimator.predict(features))
+            return sign * function(truth, guess)
 
         return score

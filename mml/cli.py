@@ -72,6 +72,8 @@ class ProjectCommand(Command):
         parser.add_argument("--weight-column")
         parser.add_argument("--event-column")
         parser.add_argument("--query-column")
+        parser.add_argument("--horizon", type=int)
+        parser.add_argument("--seasonal-period", type=int)
         parser.add_argument("--ordinal-order", nargs="+")
         parser.add_argument(
             "--unlabeled",
@@ -219,6 +221,8 @@ class ProjectCommand(Command):
             weight_column=args.weight_column,
             event_column=args.event_column,
             query_column=args.query_column,
+            horizon=args.horizon,
+            seasonal_period=args.seasonal_period,
             ordinal_order=args.ordinal_order,
             unlabeled=args.unlabeled,
             time_column=args.time_column,

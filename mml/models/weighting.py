@@ -50,6 +50,11 @@ class WeightedEstimator(base.BaseEstimator):
         return self.estimator.event_column
 
     @property
+    def value_column(self) -> str:
+        """The wrapped forecasting pipeline's value column."""
+        return self.estimator.value_column
+
+    @property
     def target_columns(self) -> tuple[str, ...]:
         """The wrapped multi-target pipeline's target columns."""
         return self.estimator.target_columns

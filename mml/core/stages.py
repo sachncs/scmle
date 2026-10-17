@@ -27,11 +27,13 @@ from mml.contracts import tasks
 from mml.core import compiler
 from mml.core import context as context_module
 from mml.core import state as run_state
+from mml.data.curation import forecasting
 from mml.data.curation import preprocessing
 from mml.data.profiling import profiler
 from mml.data.readers import tabular
 from mml.data.splitting import splitters
 from mml.data.validation import target as target_module
+from mml.evaluation import backtest
 from mml.evaluation import confidence
 from mml.evaluation import conformal
 from mml.evaluation import diagnostics
@@ -107,6 +109,8 @@ class IngestStage(Stage):
             frame = context.input_frame.copy()
         else:
             frame = tabular.read_table(data.uri)
+        if data.horizon:
+            frame = forecasting.add_targets(frame, data)
         context.read_seconds = time.monotonic() - started
         context.manifest = tabular.build_manifest(frame, data.target, data.uri)
         frame, infinite = tabular.replace_infinities(frame)
@@ -238,7 +242,11 @@ class ProfileStage(Stage):
             )
         if task is tasks.TaskType.SURVIVAL:
             target_module.check_events(frame, spec.data.event_column)
-        if task in (tasks.TaskType.MULTILABEL, tasks.TaskType.MULTIOUTPUT):
+        if task in (
+            tasks.TaskType.MULTILABEL,
+            tasks.TaskType.MULTIOUTPUT,
+            tasks.TaskType.FORECAST,
+        ):
             target_module.check_targets(frame, spec.data.targets, task)
         if task is tasks.TaskType.ORDINAL:
             frame = target_module.encode_ordinal(
@@ -1074,6 +1082,7 @@ class PackageStage(Stage):
             tasks.TaskType.RANKING,
             tasks.TaskType.MULTILABEL,
             tasks.TaskType.MULTIOUTPUT,
+            tasks.TaskType.FORECAST,
         ):
             return None  # Conformal margins need point predictions or labels.
         if context.resource_governor.skip_reason(first=False):
@@ -1184,6 +1193,69 @@ class PackageStage(Stage):
             quantile.QuantileBand.calibrate(observed, lows, highs),
         )
 
+    def forecast_backtest(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+    ) -> dict[str, Any] | None:
+        """Per-step errors against baselines, and one row per rolling origin.
+
+        The locked rows give the headline comparison. Each cross-validation
+        fold (an origin) refits the selected candidate on its past and scores
+        the future that followed.
+
+        Returns:
+            The report, or None when the time budget is spent.
+        """
+        if context.resource_governor.skip_reason(first=False):
+            return None
+        split = require(context.split, "split")
+        data = context.spec.data
+        template = strategies.get_strategy(selected.strategy).build(
+            require(context.profile, "profile").feature_plan,
+            context.registry.get(selected.model_name),
+            require(context.task, "task"),
+            context.spec.validation.seed,
+            selected.params,
+        )
+        fitted = []
+        for fit_positions, evaluate_positions in split.manifest.folds:
+            if context.resource_governor.skip_reason(first=False):
+                return None
+            fit = np.asarray(fit_positions)
+            held = np.asarray(evaluate_positions)
+            model = base.clone(template).fit(
+                split.dev_features.iloc[fit], split.dev_target.iloc[fit]
+            )
+            fitted.append(
+                (
+                    model,
+                    split.dev_features.iloc[held],
+                    split.dev_target.iloc[held],
+                )
+            )
+        headline = None
+        if context.test_rows is not None:
+            features, target = context.test_rows
+            seasonal = None
+            if data.seasonal_period and data.value_column:
+                seasonal = backtest.seasonal_naive(
+                    require(context.frame, "frame"),
+                    np.asarray(split.manifest.test_ids),
+                    data.value_column,
+                    data.group_column,
+                    len(data.targets),
+                    data.seasonal_period,
+                )
+            headline = backtest.report(
+                context.final_pipeline, features, target, seasonal
+            )
+        return {
+            "steps": headline,
+            "origins": backtest.origins(fitted),
+            "seasonal_period": data.seasonal_period,
+        }
+
     def execute(self, context: context_module.RunContext) -> None:
         """Packages artifacts and assembles the `RunResult`."""
         store = context.run_store
@@ -1220,6 +1292,14 @@ class PackageStage(Stage):
         evaluation["learning_curve"] = self.learning_curve(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.quantile = self.quantile_intervals(context)
+        if require(context.task, "task") is tasks.TaskType.FORECAST:
+            evaluation["forecast_backtest"] = self.forecast_backtest(
+                context, selected
+            )
+            context.write_json(
+                "diagnostics/forecast_backtest.json",
+                evaluation["forecast_backtest"],
+            )
         if bundle.quantile is not None and context.test_rows is not None:
             evaluation["quantile_coverage"] = bundle.quantile.coverage_curve(
                 *context.test_rows, COVERAGE_LEVELS

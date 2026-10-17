@@ -510,6 +510,24 @@ class TemporalSplit(SplitStrategy):
 
     name = "temporal"
 
+    def embargo(self, frame: pd.DataFrame) -> int:
+        """Rows dropped between training and later windows.
+
+        A forecast row's target looks `horizon` steps ahead, so the rows just
+        before a window would otherwise train on the window's own values; the
+        embargo covers `horizon` time steps of every series.
+        """
+        configured = self.validation.embargo_rows
+        horizon = self.data.horizon
+        if horizon is None:
+            return configured
+        series = (
+            frame[self.data.group_column].nunique()
+            if self.data.group_column
+            else 1
+        )
+        return max(configured, horizon * series)
+
     def chronological_holdout(
         self, frame: pd.DataFrame
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -532,13 +550,13 @@ class TemporalSplit(SplitStrategy):
         order = np.argsort(times.to_numpy(), kind="stable")
         rows = len(frame)
         test_rows = max(1, round(rows * self.validation.test_fraction))
-        embargo = self.validation.embargo_rows
+        embargo = self.embargo(frame)
         return order[: rows - test_rows - embargo], order[rows - test_rows :]
 
     def partition(self, frame: pd.DataFrame) -> Partition:
         """Chronological holdout and expanding-window folds."""
         dev_ids, test_ids = self.chronological_holdout(frame)
-        embargo = self.validation.embargo_rows
+        embargo = self.embargo(frame)
         folds = self.validation.folds
         if len(dev_ids) < folds + 1 + embargo:
             raise errors.BlockedError(

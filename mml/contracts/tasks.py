@@ -15,6 +15,9 @@ FAST_SEARCH_MODELS = 1
 FAST_SEARCH_CONFIGS = 3
 GRAPH_VERSION = 1
 DELAYED_SUFFIX = "__available"
+HORIZON_SEPARATOR = "__h"
+DEFAULT_LAGS = (1, 2, 3, 7)
+DEFAULT_WINDOWS = (3, 7)
 
 
 class TaskType(enum.StrEnum):
@@ -28,6 +31,7 @@ class TaskType(enum.StrEnum):
     RANKING = "ranking"
     MULTILABEL = "multilabel"
     MULTIOUTPUT = "multioutput"
+    FORECAST = "forecast"
 
     @property
     def is_classification(self) -> bool:
@@ -49,10 +53,47 @@ TaskRequest = Literal[
     "ranking",
     "multilabel",
     "multioutput",
+    "forecast",
     "binary_classification",
     "multiclass_classification",
 ]
 """Public task requests; `classification` is resolved from the target."""
+
+
+def horizon_names(value: str, horizon: int) -> list[str]:
+    """Names of the future-value targets `<value>__h1 .. <value>__h<H>`."""
+    return [f"{value}{HORIZON_SEPARATOR}{k}" for k in range(1, horizon + 1)]
+
+
+def series_node(
+    name: str, op: str, source: str, **params: Any
+) -> dict[str, Any]:
+    """A feature-node record over one source column."""
+    return {"name": name, "op": op, "inputs": [source], "params": params}
+
+
+def forecast_nodes(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
+    """Lag, rolling and calendar nodes for a forecasting data record."""
+    period = record.get("seasonal_period")
+    lags = list(record.get("forecast_lags") or DEFAULT_LAGS)
+    if period and period not in lags:
+        lags.append(int(period))
+    windows = list(record.get("forecast_windows") or DEFAULT_WINDOWS)
+    nodes = [series_node(f"{value}__lag{k}", "lag", value, k=k) for k in lags]
+    for w in windows:
+        nodes.append(
+            series_node(f"{value}__mean{w}", "rolling_mean", value, window=w)
+        )
+        nodes.append(
+            series_node(f"{value}__std{w}", "rolling_std", value, window=w)
+        )
+    clock = record.get("time_column")
+    if clock:
+        nodes += [
+            series_node(f"{clock}__{part}", "datepart", clock, part=part)
+            for part in record.get("forecast_calendar") or []
+        ]
+    return nodes
 
 
 class FrozenModel(pydantic.BaseModel):
@@ -157,6 +198,19 @@ class DataSpec(FrozenModel):
         ordinal_order: For ordinal tasks, the target's labels from lowest to
             highest (for example `["low", "medium", "high"]`). Every label in
             the data must be listed and every listed label must occur.
+        horizon: For forecasting, how many steps ahead to predict. The
+            target column is then the series' value, and the framework adds
+            one target per step ahead (`<value>__h1 .. <value>__h<horizon>`)
+            and lag / rolling features of the value.
+        value_column: The series' value column (set from `target`).
+        seasonal_period: Rows per season (for example 7 for daily data with
+            a weekly cycle); adds a seasonal lag and a seasonal baseline.
+        forecast_lags: Lags (in rows) of the value to use as features;
+            defaults to 1, 2, 3 and 7.
+        forecast_windows: Rolling-window sizes for mean and spread features;
+            defaults to 3 and 7.
+        forecast_calendar: Date parts of the time column to add as features
+            (for example `["dayofweek", "month"]`; needs a datetime column).
         targets: For multi-label and multi-output tasks, every target
             column (the first must equal `target`). Binary 0/1 columns for
             `multilabel`, numeric ones for `multioutput`.
@@ -199,6 +253,12 @@ class DataSpec(FrozenModel):
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
     event_column: str | None = None
+    horizon: int | None = pydantic.Field(default=None, ge=1)
+    value_column: str | None = None
+    seasonal_period: int | None = pydantic.Field(default=None, ge=2)
+    forecast_lags: list[int] = pydantic.Field(default_factory=list)
+    forecast_windows: list[int] = pydantic.Field(default_factory=list)
+    forecast_calendar: list[str] = pydantic.Field(default_factory=list)
     targets: list[str] = pydantic.Field(default_factory=list)
     text_encoding: Literal["tfidf", "embedding"] = "tfidf"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -457,6 +517,52 @@ class ProjectSpec(FrozenModel):
             "feature_graph": {**graph_record, "nodes": nodes},
         }
 
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def expand_forecast(cls, values: Any) -> Any:
+        """Turns a forecasting request into targets and series features.
+
+        `data.target` is the series value; the expansion points the target at
+        the first future-value column, lists them all as targets and adds the
+        lag / rolling feature nodes. It is idempotent, so a saved
+        configuration loads unchanged.
+        """
+        if not isinstance(values, dict) or values.get("task") != "forecast":
+            return values
+        data = values.get("data")
+        record = (
+            data.model_dump()
+            if isinstance(data, DataSpec)
+            else dict(data or {})
+        )
+        if record.get("value_column") or not record.get("horizon"):
+            return values
+        value, horizon = record["target"], int(record["horizon"])
+        names = horizon_names(value, horizon)
+        graph = values.get("feature_graph")
+        graph_record = (
+            graph.model_dump()
+            if isinstance(graph, FeatureGraphSpec)
+            else dict(graph or {})
+        )
+        known = list(graph_record.get("nodes", []))
+        present = {node["name"] for node in known}
+        added = [
+            node
+            for node in forecast_nodes(record, value)
+            if node["name"] not in present
+        ]
+        return {
+            **values,
+            "data": {
+                **record,
+                "value_column": value,
+                "target": names[0],
+                "targets": names,
+            },
+            "feature_graph": {**graph_record, "nodes": known + added},
+        }
+
     @pydantic.model_validator(mode="after")
     def check_cross_field_rules(self) -> Self:
         """Validates constraints that span several fields.
@@ -509,6 +615,7 @@ class ProjectSpec(FrozenModel):
             "ranking",
             "multilabel",
             "multioutput",
+            "forecast",
         ):
             raise ValueError(
                 f"stratified validation is undefined for {self.task}"
@@ -536,7 +643,14 @@ class ProjectSpec(FrozenModel):
                     "fairness mitigation needs a column listed in "
                     "data.sensitive_columns"
                 )
-        multi = self.task in ("multilabel", "multioutput")
+        if self.task == "forecast":
+            if not (data.horizon and data.time_column):
+                raise ValueError(
+                    "forecast tasks need data.horizon and data.time_column"
+                )
+        elif data.horizon is not None:
+            raise ValueError("data.horizon applies to forecast tasks only")
+        multi = self.task in ("multilabel", "multioutput", "forecast")
         if multi != bool(data.targets):
             raise ValueError(
                 "multilabel and multioutput tasks need data.targets, and "

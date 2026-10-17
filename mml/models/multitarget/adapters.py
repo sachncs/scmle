@@ -11,7 +11,16 @@ from mml.contracts import search
 from mml.contracts import tasks
 from mml.models.multitarget import estimators
 
-MULTI = frozenset({tasks.TaskType.MULTILABEL, tasks.TaskType.MULTIOUTPUT})
+MULTI = frozenset(
+    {
+        tasks.TaskType.MULTILABEL,
+        tasks.TaskType.MULTIOUTPUT,
+        tasks.TaskType.FORECAST,
+    }
+)
+REGRESSION_LIKE = frozenset(
+    {tasks.TaskType.MULTIOUTPUT, tasks.TaskType.FORECAST}
+)
 
 
 class MultiTargetAdapter(models.ModelAdapter):
@@ -76,7 +85,7 @@ class MultioutputRidgeAdapter(MultiTargetAdapter):
     name = "multioutput_ridge"
     family = "linear"
     capabilities = models.Capabilities(
-        frozenset({tasks.TaskType.MULTIOUTPUT}), needs_scaling=True, cost=1
+        REGRESSION_LIKE, needs_scaling=True, cost=1
     )
     search_space = search.SearchSpace(
         (search.FloatParameter("alpha", 1e-3, 100.0, log=True),)

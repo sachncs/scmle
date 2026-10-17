@@ -1217,6 +1217,86 @@ class ModelBundle:
             )
         )
 
+    def forecast(
+        self,
+        history: str | pathlib.Path | pd.DataFrame,
+        steps: int | None = None,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> pd.DataFrame:
+        """Forecasts the next values of every series in `history`.
+
+        The history supplies each series' recent values (the lag and rolling
+        features are computed from it), so the series need not have been
+        seen in training.
+
+        Args:
+            history: Past rows with the value, time and (if used) entity
+                columns.
+            steps: How many steps ahead, at most the trained horizon.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            One row per series and step: the entity column (if any), `step`,
+            the forecast time and `forecast`.
+
+        Raises:
+            ArtifactError: For models that are not forecasters or a request
+                beyond the trained horizon.
+        """
+        if self.schema.task != tasks.TaskType.FORECAST.value:
+            raise errors.ArtifactError("this bundle is not a forecaster")
+        horizon = len(self.schema.targets)
+        wanted = horizon if steps is None else steps
+        if not 1 <= wanted <= horizon:
+            raise errors.ArtifactError(
+                f"this model forecasts 1 to {horizon} steps ahead"
+            )
+        frame = self.read_frame(history)
+        if mapping is not None:
+            frame = mapping.apply(frame, self.features)
+        clock, entity = self.schema.time_column, self.schema.group_column
+        time_name = clock or "time"
+        prepared = self.prepare_frame(frame)
+        stamps = pd.to_datetime(frame[clock], errors="coerce")
+        numeric_clock = stamps.isna().any()
+        order = frame[clock].to_numpy() if numeric_clock else stamps.to_numpy()
+        positions = np.arange(len(frame))
+        by_entity = (
+            frame[entity].astype(str).to_numpy()
+            if entity
+            else np.zeros(len(frame), dtype=int)
+        )
+        latest = {}
+        for position in positions[np.argsort(order, kind="stable")]:
+            latest[by_entity[position]] = position
+        chosen = np.array(sorted(latest.values()))
+        predicted = np.asarray(self.pipeline.predict(prepared.iloc[chosen]))[
+            :, :wanted
+        ]
+        distinct = np.unique(order)
+        gaps = np.sort(np.diff(distinct))
+        step_size = gaps[len(gaps) // 2] if len(gaps) else None
+        rows = []
+        for row, position in enumerate(chosen):
+            for step in range(wanted):
+                stamp = order[position]
+                if step_size is not None:
+                    stamp = stamp + step_size * (step + 1)
+                record: dict[str, Any] = (
+                    {}
+                    if entity is None
+                    else {entity: frame[entity].iloc[position]}
+                )
+                rows.append(
+                    {
+                        **record,
+                        "step": step + 1,
+                        time_name: stamp,
+                        "forecast": float(predicted[row, step]),
+                    }
+                )
+        return pd.DataFrame(rows)
+
     def rank(
         self,
         data: str | pathlib.Path | pd.DataFrame,

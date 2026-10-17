@@ -94,6 +94,12 @@
 * Multi-label and multi-output targets: pass a list of target columns with
   `task="multilabel"` or `"multioutput"`; iterative stratification keeps rare
   labels in every fold; `bundle.predict_frame` returns one column per target.
+* Forecasting: `task="forecast"` with `horizon`, `time_column` and optional
+  `group_column` and `seasonal_period`; lag and rolling features are added
+  automatically, the split embargoes the horizon, MASE against no-change is
+  the default metric, and `bundle.forecast(history)` forecasts any series.
+  The backtest report gives per-step errors against last-value and
+  seasonal-naive baselines and per-origin scores.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

@@ -28,7 +28,11 @@ def toy_problem(
     target: pd.Series | pd.DataFrame
     if task is tasks.TaskType.SURVIVAL:
         target = pd.Series(rng.exponential(1.0, ROWS) + 0.01)
-    elif task in (tasks.TaskType.MULTILABEL, tasks.TaskType.MULTIOUTPUT):
+    elif task in (
+        tasks.TaskType.MULTILABEL,
+        tasks.TaskType.MULTIOUTPUT,
+        tasks.TaskType.FORECAST,
+    ):
         target = pd.DataFrame(
             {
                 "first": rng.integers(0, 2, ROWS),

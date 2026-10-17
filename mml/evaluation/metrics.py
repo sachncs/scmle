@@ -15,6 +15,7 @@ from mml.contracts import metrics as metric_contracts
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.evaluation import concordance
+from mml.evaluation import forecast
 from mml.evaluation import multitarget
 from mml.evaluation import ordinal
 from mml.evaluation import ranking
@@ -28,6 +29,7 @@ ORDINAL = tasks.TaskType.ORDINAL
 RANKING = tasks.TaskType.RANKING
 MULTILABEL = tasks.TaskType.MULTILABEL
 MULTIOUTPUT = tasks.TaskType.MULTIOUTPUT
+FORECAST = tasks.TaskType.FORECAST
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 
 
@@ -117,6 +119,13 @@ DEFAULT_METRICS = (
     multitarget.MultiTargetMetric(
         "mae_scaled", "", False, frozenset({MULTIOUTPUT}), "mae_scaled"
     ),
+    forecast.ForecastMetric("mase", "", False, frozenset({FORECAST}), "mase"),
+    forecast.ForecastMetric(
+        "forecast_mae", "", False, frozenset({FORECAST}), "mae"
+    ),
+    forecast.ForecastMetric(
+        "forecast_smape", "", False, frozenset({FORECAST}), "smape"
+    ),
     ranking.RankingMetric("ndcg", "", True, frozenset({RANKING}), "ndcg"),
     ranking.RankingMetric("map", "", True, frozenset({RANKING}), "map"),
     concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
@@ -139,6 +148,7 @@ class MetricCatalog:
         RANKING: "ndcg",
         MULTILABEL: "f1_macro_labels",
         MULTIOUTPUT: "r2_mean",
+        FORECAST: "mase",
     }
     report_names = {
         BINARY: (
@@ -161,6 +171,7 @@ class MetricCatalog:
             "subset_accuracy",
         ),
         MULTIOUTPUT: ("r2_mean", "mae_scaled"),
+        FORECAST: ("mase", "forecast_mae", "forecast_smape"),
     }
 
     def __init__(

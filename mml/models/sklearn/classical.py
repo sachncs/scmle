@@ -97,6 +97,7 @@ class DummyAdapter(models.ModelAdapter):
                 tasks.TaskType.RANKING,
                 tasks.TaskType.MULTILABEL,
                 tasks.TaskType.MULTIOUTPUT,
+                tasks.TaskType.FORECAST,
             }
         ),
         sparse_input=True,
@@ -112,7 +113,11 @@ class DummyAdapter(models.ModelAdapter):
         """Returns a prior classifier, a mean regressor or a marginal curve."""
         if task is tasks.TaskType.SURVIVAL:
             return survival_estimators.MarginalSurvival()
-        if task in (tasks.TaskType.MULTILABEL, tasks.TaskType.MULTIOUTPUT):
+        if task in (
+            tasks.TaskType.MULTILABEL,
+            tasks.TaskType.MULTIOUTPUT,
+            tasks.TaskType.FORECAST,
+        ):
             classify = task is tasks.TaskType.MULTILABEL
             return multitarget_estimators.PerTarget(
                 dummy.DummyClassifier(strategy="prior")

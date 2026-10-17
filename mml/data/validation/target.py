@@ -117,7 +117,7 @@ class TaskResolver:
             return self.resolve_ordinal(target)
         if self.request == "ranking":
             return self.resolve_ranking(target)
-        if self.request in ("multilabel", "multioutput"):
+        if self.request in ("multilabel", "multioutput", "forecast"):
             return tasks.TaskType(self.request)
         if self.request == "regression":
             return self.resolve_regression(target)

@@ -54,6 +54,11 @@ class MLProject:
         weight_column: str | None = None,
         event_column: str | None = None,
         query_column: str | None = None,
+        horizon: int | None = None,
+        seasonal_period: int | None = None,
+        forecast_lags: list[int] | None = None,
+        forecast_windows: list[int] | None = None,
+        forecast_calendar: list[str] | None = None,
         text_encoding: Literal["tfidf", "embedding"] = "tfidf",
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
         ordinal_order: list[str | int] | None = None,
@@ -115,6 +120,13 @@ class MLProject:
                 columns (needs the `embeddings` extra; falls back to TF-IDF
                 with a warning when unavailable).
             embedding_model: Sentence-embedding model for `embedding`.
+            horizon: For `task="forecast"`, how many steps ahead to predict
+                (needs `time_column`; `target` is the series value).
+            seasonal_period: Rows per season of a forecast series.
+            forecast_lags: Lags of the value used as features (default
+                1, 2, 3 and 7).
+            forecast_windows: Rolling-window sizes (default 3 and 7).
+            forecast_calendar: Date parts of the time column to add.
             query_column: For `task="ranking"`, the column identifying each
                 row's query; the target is the relevance grade.
             ordinal_order: For `task="ordinal"`, the target's labels from
@@ -181,6 +193,11 @@ class MLProject:
                 weight_column=weight_column,
                 event_column=event_column,
                 query_column=query_column,
+                horizon=horizon,
+                seasonal_period=seasonal_period,
+                forecast_lags=forecast_lags or [],
+                forecast_windows=forecast_windows or [],
+                forecast_calendar=forecast_calendar or [],
                 text_encoding=text_encoding,
                 embedding_model=embedding_model,
                 ordinal_order=ordinal_order or [],

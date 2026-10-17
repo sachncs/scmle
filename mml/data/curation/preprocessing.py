@@ -20,6 +20,7 @@ from mml.data.validation import columns
 from mml.features import feature_graph
 from mml.models import weighting
 from mml.models import wrappers
+from mml.models.forecasting import estimators as forecast_estimators
 from mml.models.multitarget import wrapper as multitarget_wrapper
 from mml.models.ranking import wrapper as ranking_wrapper
 from mml.models.survival import wrapper as survival_wrapper
@@ -193,7 +194,13 @@ def build_pipeline(
     """
     if plan.ordinal_levels:
         params = {**(params or {}), "levels": plan.ordinal_levels}
-    assembled = adapter.assemble(plan, task, seed, params)
+    assembled: Any
+    if task is tasks.TaskType.FORECAST and adapter.name == "dummy":
+        assembled = forecast_estimators.LastValueForecaster(
+            None, plan.target_columns, plan.value_column or ""
+        )
+    else:
+        assembled = adapter.assemble(plan, task, seed, params)
     if assembled is not None:
         if plan.weight_column:
             return weighting.weighted(assembled, plan.weight_column, seed)
@@ -234,7 +241,11 @@ def build_pipeline(
     built: Any = pipeline.Pipeline(steps)
     if plan.event_column:
         built = survival_wrapper.EventAwareEstimator(built, plan.event_column)
-    if plan.target_columns:
+    if task is tasks.TaskType.FORECAST:
+        built = forecast_estimators.ForecastEstimator(
+            built, plan.target_columns, plan.value_column or ""
+        )
+    elif plan.target_columns:
         kind = (
             multitarget_wrapper.MultiLabelEstimator
             if task is tasks.TaskType.MULTILABEL
