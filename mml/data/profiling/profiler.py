@@ -90,7 +90,7 @@ class DatasetProfiler:
         )
         if data.group_column:
             roles[data.group_column] = "group column (used for splitting only)"
-        if data.time_column:
+        if data.time_column and not data.time_as_feature:
             roles[data.time_column] = "time column (used for splitting only)"
         if data.weight_column:
             roles[data.weight_column] = "sample weight (used for training only)"

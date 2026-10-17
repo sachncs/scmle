@@ -124,6 +124,10 @@ class DataSpec(FrozenModel):
         id_columns: Identifier columns (never features).
         group_column: Entity column for grouped and series data.
         time_column: Column ordering the rows in time.
+        time_as_feature: Also give the time column to the model as a
+            feature (a numeric stamp stays numeric; a date becomes date
+            parts). Off by default because a model that keys on absolute
+            time must extrapolate into the future.
         excluded_columns: Columns never used.
         unavailable_at_prediction: Columns only known after the outcome.
         feature_delays: For columns whose value becomes known only some
@@ -149,6 +153,7 @@ class DataSpec(FrozenModel):
     id_columns: list[str] = pydantic.Field(default_factory=list)
     group_column: str | None = None
     time_column: str | None = None
+    time_as_feature: bool = False
     excluded_columns: list[str] = pydantic.Field(default_factory=list)
     unavailable_at_prediction: list[str] = pydantic.Field(default_factory=list)
     feature_delays: dict[str, int] = pydantic.Field(default_factory=dict)

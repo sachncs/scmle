@@ -29,6 +29,7 @@ class BenchmarkDataset(abc.ABC):
         numeric_target: The target is stored as text (an OpenML category) but
             is a number.
         time_column: Column ordering the rows, for chronological validation.
+        time_as_feature: Whether the model may also use that column.
         online: Whether loading needs the network.
     """
 
@@ -40,6 +41,7 @@ class BenchmarkDataset(abc.ABC):
     drop: tuple[str, ...] = ()
     numeric_target: bool = False
     time_column: str | None = None
+    time_as_feature: bool = False
     online: ClassVar[bool] = False
 
     @abc.abstractmethod
@@ -188,6 +190,7 @@ def open_ml(
     max_rows: int | None = None,
     drop: tuple[str, ...] = (),
     time_column: str | None = None,
+    time_as_feature: bool = False,
     numeric_target: bool = False,
 ) -> OpenMlDataset:
     """Describes an OpenML dataset (shorthand for the extended suite)."""
@@ -200,6 +203,7 @@ def open_ml(
         drop=drop,
         numeric_target=numeric_target,
         time_column=time_column,
+        time_as_feature=time_as_feature,
         openml_name=openml_name,
         version=version,
     )
@@ -244,6 +248,7 @@ EXTENDED = (
         "roc_auc",
         max_rows=12000,
         time_column="date",
+        time_as_feature=True,
     ),
     open_ml(
         "credit_approval",

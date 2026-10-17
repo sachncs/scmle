@@ -69,6 +69,7 @@ class ProjectCommand(Command):
         parser.add_argument("--group-column")
         parser.add_argument("--weight-column")
         parser.add_argument("--time-column")
+        parser.add_argument("--time-as-feature", action="store_true")
         parser.add_argument("--id-columns", nargs="*", default=[])
         parser.add_argument("--exclude", nargs="*", default=[])
         parser.add_argument("--seed", type=int, default=42)
@@ -205,6 +206,7 @@ class ProjectCommand(Command):
             group_column=args.group_column,
             weight_column=args.weight_column,
             time_column=args.time_column,
+            time_as_feature=args.time_as_feature,
             excluded_columns=args.exclude,
             seed=args.seed,
             validation=args.validation,

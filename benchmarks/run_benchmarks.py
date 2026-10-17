@@ -91,6 +91,7 @@ def run_one(
             time_budget=budget,
             workers=workers,
             time_column=dataset.time_column,
+            time_as_feature=dataset.time_as_feature,
             output_dir=root / dataset.name,
         )
         result = project.run()

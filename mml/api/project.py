@@ -39,6 +39,7 @@ class MLProject:
         id_columns: list[str] | None = None,
         group_column: str | None = None,
         time_column: str | None = None,
+        time_as_feature: bool = False,
         excluded_columns: list[str] | None = None,
         unavailable_at_prediction: list[str] | None = None,
         feature_delays: dict[str, int] | None = None,
@@ -81,6 +82,8 @@ class MLProject:
             id_columns: Identifier columns excluded from features.
             group_column: Entity column that must not straddle splits.
             time_column: Column ordering rows in time.
+            time_as_feature: Also let the model use the time column as a
+                feature (off by default; models must extrapolate in time).
             excluded_columns: Other columns to ignore.
             unavailable_at_prediction: Columns known only after the outcome
                 (excluded; the feature-availability contract).
@@ -136,6 +139,7 @@ class MLProject:
                 id_columns=id_columns or [],
                 group_column=group_column,
                 time_column=time_column,
+                time_as_feature=time_as_feature,
                 excluded_columns=excluded_columns or [],
                 unavailable_at_prediction=unavailable_at_prediction or [],
                 feature_delays=feature_delays or {},
