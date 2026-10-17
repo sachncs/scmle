@@ -43,9 +43,10 @@ optimization = ["optuna>=4.0"]
 sampling = ["imbalanced-learn>=0.14.1"]
 polars = ["polars>=1.0"]
 tracking = ["mlflow>=3.0"]
+benchmarks = ["huggingface_hub>=0.25"]
 distributed = ["ray>=2.40"]
 all = [
-    "magicml[boosting,catboost,deeplearning,optimization,sampling,polars,tracking,distributed]",
+    "magicml[boosting,catboost,deeplearning,optimization,sampling,polars,tracking,distributed,benchmarks]",
 ]
 
 [project.scripts]

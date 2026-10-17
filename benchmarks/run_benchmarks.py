@@ -90,6 +90,7 @@ def run_one(
             metric=dataset.metric,
             time_budget=budget,
             workers=workers,
+            time_column=dataset.time_column,
             output_dir=root / dataset.name,
         )
         result = project.run()
@@ -174,6 +175,13 @@ def main(argv: list[str] | None = None) -> int:
     """Runs the selected benchmarks and writes the results."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true", help="skip downloads")
+    parser.add_argument(
+        "--suite",
+        choices=sorted(datasets.SUITES),
+        default="core",
+        help="which datasets: the core nine, the extra OpenML tables, the "
+        "Hugging Face tables, or everything",
+    )
     parser.add_argument("--only", nargs="*", default=[])
     parser.add_argument("--budget", type=int, default=300)
     parser.add_argument("--workers", type=int, default=1)
@@ -186,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
 
     chosen = [
         d
-        for d in datasets.ALL
+        for d in datasets.SUITES[args.suite]
         if (not args.offline or not d.online)
         and (not args.only or d.name in args.only)
     ]
