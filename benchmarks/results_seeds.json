@@ -1,0 +1,141 @@
+{
+  "results": [
+    {
+      "name": "breast_cancer",
+      "status": "ok",
+      "rows": 569,
+      "task": "binary_classification",
+      "metric": "roc_auc",
+      "selected": "logistic_regression/select_features",
+      "cv_score": 0.996078431372549,
+      "baseline_cv": 0.5,
+      "test_score": 0.9961419753086419,
+      "reference_test": 0.9916225749559082,
+      "trials": 48,
+      "seconds": 64.39573245798238,
+      "findings": [],
+      "error": "",
+      "seeds": 3,
+      "test_scores": [
+        0.9933862433862434,
+        0.9986772486772486,
+        0.9963624338624338
+      ],
+      "reference_scores": [
+        0.9867724867724867,
+        0.992063492063492,
+        0.996031746031746
+      ],
+      "advantage": {
+        "mean": 0.004519400352733682,
+        "low": -0.004491887330824569,
+        "high": 0.013530688036291934,
+        "verdict": "tie"
+      }
+    },
+    {
+      "name": "wine",
+      "status": "ok",
+      "rows": 178,
+      "task": "multiclass_classification",
+      "metric": "log_loss",
+      "selected": "logistic_regression/log_skewed",
+      "cv_score": 0.04080316483103235,
+      "baseline_cv": 1.085734832655819,
+      "test_score": 0.36769591132098484,
+      "reference_test": 0.028858459402087963,
+      "trials": 49,
+      "seconds": 34.43199412501417,
+      "findings": [],
+      "error": "",
+      "seeds": 3,
+      "test_scores": [
+        0.005812647839275267,
+        0.09606249175039179,
+        1.0012125943732875
+      ],
+      "reference_scores": [
+        0.061835952056583196,
+        0.0068665537639728,
+        0.017872872385707898
+      ],
+      "advantage": {
+        "mean": -0.33883745191889686,
+        "low": -1.73705514305179,
+        "high": 1.0593802392139964,
+        "verdict": "tie"
+      }
+    },
+    {
+      "name": "digits",
+      "status": "ok",
+      "rows": 1797,
+      "task": "multiclass_classification",
+      "metric": "log_loss",
+      "selected": "blending/default",
+      "cv_score": 0.08046107059345757,
+      "baseline_cv": 2.302523542660848,
+      "test_score": 0.08110933272188482,
+      "reference_test": 0.09018475917107667,
+      "trials": 48,
+      "seconds": 511.0193220000947,
+      "findings": [
+        "column 'pixel_0_0' dropped: constant",
+        "column 'pixel_3_0' dropped: constant",
+        "column 'pixel_4_0' dropped: constant",
+        "column 'pixel_4_7' dropped: constant"
+      ],
+      "error": "",
+      "seeds": 3,
+      "test_scores": [
+        0.08210183209223697,
+        0.08205297225325525,
+        0.07917319382016223
+      ],
+      "reference_scores": [
+        0.08040043751097145,
+        0.09060956084670146,
+        0.09954427915555711
+      ],
+      "advantage": {
+        "mean": 0.009075426449191857,
+        "low": -0.018362826152695702,
+        "high": 0.03651367905107941,
+        "verdict": "tie"
+      }
+    },
+    {
+      "name": "diabetes_progression",
+      "status": "ok",
+      "rows": 442,
+      "task": "regression",
+      "metric": "rmse",
+      "selected": "ridge/default",
+      "cv_score": 53.93184893202201,
+      "baseline_cv": 78.41183421607737,
+      "test_score": 56.37922156150262,
+      "reference_test": 63.51626224181544,
+      "trials": 48,
+      "seconds": 54.84045379201416,
+      "findings": [],
+      "error": "",
+      "seeds": 3,
+      "test_scores": [
+        58.5671133186925,
+        55.02969934731182,
+        55.54085201850355
+      ],
+      "reference_scores": [
+        65.69395606975053,
+        61.50425476336608,
+        63.35057589232972
+      ],
+      "advantage": {
+        "mean": 7.137040680312819,
+        "low": 5.478524408722564,
+        "high": 8.795556951903073,
+        "verdict": "ahead"
+      }
+    }
+  ]
+}

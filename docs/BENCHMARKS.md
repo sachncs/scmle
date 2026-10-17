@@ -64,3 +64,23 @@ Ahead of the reference on **13 of 21**.
 * The clearest weaknesses are covertype and letter (large multiclass sets where the 240 s budget leaves little room to tune), and house_sales, where the long-tail target transform won cross-validation but lost on the locked rows.
 * Wide tables (bioresponse, 419 features) exposed that the post-selection diagnostics were not bounded by the time budget; they now share a fraction of it.
 * Scores come from one split and one seed per dataset, so differences in the fourth digit are within noise.
+
+## Repeated seeds with intervals
+
+`--seeds N` repeats each dataset with N seeds (each seed changes the split and
+the models) and reports the advantage over the plain HistGradientBoosting
+reference with a 95% Student-t interval. A win needs the interval to exclude
+zero; otherwise the verdict is `tie`. Three seeds, 150 s budget, the four
+bundled datasets (`benchmarks/results_seeds.json`):
+
+| dataset | metric | test (mean) | reference (mean) | advantage (95% CI) | verdict |
+| --- | --- | --- | --- | --- | --- |
+| breast_cancer | roc_auc | 0.9961 | 0.9916 | +0.0045 [-0.0045, +0.0135] | tie |
+| wine | log_loss | 0.3677 | 0.0289 | -0.3388 [-1.7371, +1.0594] | tie |
+| digits | log_loss | 0.0811 | 0.0902 | +0.0091 [-0.0184, +0.0365] | tie |
+| diabetes_progression | rmse | 56.3792 | 63.5163 | +7.1370 [+5.4785, +8.7956] | ahead |
+
+With three seeds only one result is distinguishable from noise (diabetes
+progression, ahead). The single-seed "behind" label on wine earlier in this
+document is not supported once the spread across seeds is counted: its
+interval spans zero by a wide margin because one seed scored badly.
