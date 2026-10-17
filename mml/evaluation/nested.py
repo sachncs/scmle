@@ -120,7 +120,6 @@ def nested_score(
             candidates += [
                 space.sample(rng)
                 for draw in range(max(configurations - 1, 0))
-                if draw >= 0
             ]
         scored = [
             (
