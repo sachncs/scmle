@@ -72,6 +72,9 @@
   and built only for the flagged columns.
 * `bundle.environment_lock()` writes the build environment as pinned
   requirements; a dependency mismatch at load carries it in the error.
+* `bundle.counterfactual`: the smallest change to actionable columns that
+  gives a wanted class or value range; unneeded changes are pruned and other
+  columns never change.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

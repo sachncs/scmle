@@ -225,6 +225,11 @@ project = mml.MLProject(
     data, "rating", task="ordinal", ordinal_order=["low", "medium", "high"]
 )
 
+# What would change this decision? Only the listed columns may change.
+found = result.bundle.counterfactual(
+    row, "approved", actionable=["income", "city"], background=features
+)
+
 # After a run: reliability checks, explanations and calibrated uncertainty.
 result.evaluation["fit_health"]  # healthy / overfit / underfit
 result.diagnostics["robustness"]  # score under degraded input

@@ -34,6 +34,7 @@ from mml.data.readers import tabular
 from mml.evaluation import conformal as conformal_module
 from mml.evaluation import quantile as quantile_module
 from mml.evaluation import reliability
+from mml.explainability import counterfactual as counterfactual_module
 from mml.explainability import local
 from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
@@ -1024,6 +1025,82 @@ class ModelBundle:
         return pd.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
+
+    def counterfactual(
+        self,
+        row: pd.DataFrame | dict[str, Any],
+        desired: Any,
+        actionable: list[str],
+        background: str | pathlib.Path | pd.DataFrame,
+        max_changes: int = 3,
+    ) -> counterfactual_module.Counterfactual:
+        """The smallest change to `row` that gives the wanted prediction.
+
+        Only the columns in `actionable` are ever changed, and only to values
+        seen in `background`.
+
+        Args:
+            row: One row (a dict or a one-row frame).
+            desired: The wanted class label for classifiers, or a
+                `(low, high)` range for regression.
+            actionable: Columns the search may change.
+            background: Typical rows, the source of candidate values.
+            max_changes: Most columns it may change.
+
+        Returns:
+            The search result; `found` says whether the outcome was reached.
+
+        Raises:
+            ArtifactError: For unknown or non-feature actionable columns, an
+                outcome this model cannot produce, or a model without
+                probabilities when classifying.
+        """
+        features = [*self.schema.numeric, *self.schema.categorical]
+        unknown = [c for c in actionable if c not in features]
+        if unknown:
+            raise errors.ArtifactError(
+                f"not model features, so they cannot be changed: {unknown}"
+            )
+        frame = pd.DataFrame([row] if isinstance(row, dict) else row)
+        if len(frame) != 1:
+            raise errors.ArtifactError("give exactly one row")
+        reference = self.read_frame(background)
+        fixed = {c: frame.iloc[0][c] for c in frame.columns}
+        if self.schema.classes is not None:
+            if desired not in self.schema.classes:
+                raise errors.ArtifactError(
+                    f"{desired!r} is not one of {list(self.schema.classes)}"
+                )
+            column = list(self.schema.classes).index(desired)
+
+            def progress(rows: pd.DataFrame) -> np.ndarray:
+                return np.asarray(self.predict_proba(rows))[:, column]
+
+            def reached(rows: pd.DataFrame) -> np.ndarray:
+                return np.asarray(self.predict(rows)) == desired
+
+        else:
+            low, high = desired
+
+            def progress(rows: pd.DataFrame) -> np.ndarray:
+                values = np.asarray(self.predict(rows), dtype=float)
+                return -(
+                    np.maximum(low - values, 0) + np.maximum(values - high, 0)
+                )
+
+            def reached(rows: pd.DataFrame) -> np.ndarray:
+                values = np.asarray(self.predict(rows), dtype=float)
+                return (values >= low) & (values <= high)
+
+        search = counterfactual_module.CounterfactualSearch(
+            progress,
+            reached,
+            self.predict,
+            reference,
+            actionable,
+            max_changes,
+        )
+        return search.search(fixed)
 
     def environment_lock(self, path: str | pathlib.Path | None = None) -> str:
         """The environment this model was built in, as pinned requirements.
