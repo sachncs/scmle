@@ -26,6 +26,8 @@ class BenchmarkDataset(abc.ABC):
         metric: Primary metric.
         max_rows: Stratification-free row cap for slow downloads (None = all).
         drop: Columns that are identifiers or free text, never features.
+        numeric_target: The target is stored as text (an OpenML category) but
+            is a number.
         time_column: Column ordering the rows, for chronological validation.
         online: Whether loading needs the network.
     """
@@ -36,6 +38,7 @@ class BenchmarkDataset(abc.ABC):
     metric: str
     max_rows: int | None = None
     drop: tuple[str, ...] = ()
+    numeric_target: bool = False
     time_column: str | None = None
     online: ClassVar[bool] = False
 
@@ -46,6 +49,8 @@ class BenchmarkDataset(abc.ABC):
     def load(self) -> pd.DataFrame:
         """Loads the table, subsampling deterministically if capped."""
         frame = self.fetch().drop(columns=list(self.drop))
+        if self.numeric_target:
+            frame[self.target] = pd.to_numeric(frame[self.target])
         if self.max_rows is not None and len(frame) > self.max_rows:
             frame = frame.sample(self.max_rows, random_state=0)
         return frame.reset_index(drop=True)
@@ -183,6 +188,7 @@ def open_ml(
     max_rows: int | None = None,
     drop: tuple[str, ...] = (),
     time_column: str | None = None,
+    numeric_target: bool = False,
 ) -> OpenMlDataset:
     """Describes an OpenML dataset (shorthand for the extended suite)."""
     return OpenMlDataset(
@@ -192,6 +198,7 @@ def open_ml(
         metric,
         max_rows=max_rows,
         drop=drop,
+        numeric_target=numeric_target,
         time_column=time_column,
         openml_name=openml_name,
         version=version,
@@ -282,7 +289,6 @@ EXTENDED = (
         "rmse",
         version=3,
         max_rows=12000,
-        drop=("id", "date"),
     ),
     open_ml(
         "bike_sharing",
@@ -298,6 +304,7 @@ EXTENDED = (
         "Class_number_of_rings",
         "regression",
         "rmse",
+        numeric_target=True,
     ),
     open_ml(
         "diamonds",

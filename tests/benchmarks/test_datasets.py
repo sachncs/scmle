@@ -71,3 +71,17 @@ def test_dropped_columns_are_removed_when_loading(monkeypatch):
     loaded = Fake("f", "y", "classification", "roc_auc", drop=("id",)).load()
 
     assert list(loaded.columns) == ["x", "y"]
+
+
+def test_numeric_targets_stored_as_text_are_converted(monkeypatch):
+    import pandas as pd
+
+    class Fake(datasets.BenchmarkDataset):
+        def fetch(self):
+            return pd.DataFrame({"x": [1.0, 2.0], "y": ["7", "9"]})
+
+    loaded = Fake(
+        "f", "y", "regression", "rmse", numeric_target=True
+    ).load()
+
+    assert loaded["y"].tolist() == [7, 9]
