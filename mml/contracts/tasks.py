@@ -238,6 +238,9 @@ class DataSpec(FrozenModel):
         event_column: For survival tasks, the 0/1 column saying whether the
             event was observed (1) or the row was censored (0); the target
             is then the time to the event or to censoring. Never a feature.
+        reference_uri: A file with a recent sample of the population the model
+            will serve (same feature columns). The development rows are
+            compared with it and a gap is reported as a data-quality finding.
         unlabeled: What to do with rows whose target is missing: `block`
             (refuse, the default), `ignore` (set them aside and report how
             many), or `pseudo_label` (classification only: label the rows the
@@ -281,6 +284,7 @@ class DataSpec(FrozenModel):
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     query_column: str | None = None
     ordinal_order: list[str | int] = pydantic.Field(default_factory=list)
+    reference_uri: str | None = None
     unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"
     pseudo_label_confidence: float = pydantic.Field(default=0.9, gt=0.5, lt=1.0)
 

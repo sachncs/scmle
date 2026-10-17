@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+* Clustering (`mml.unsupervised.clustering.find_clusters`): k-means, Gaussian
+  mixture and agglomerative at several counts, scored by silhouette,
+  Davies-Bouldin, Calinski-Harabasz and bootstrap stability.
+* Competing risks (`CauseSpecificCox`, Aalen-Johansen `cumulative_incidence`)
+  and time-varying covariates (`TimeVaryingCox`, counting-process rows).
+* The profile stage now reports label noise and, given `reference=`, a gap
+  between the development rows and a reference sample.
 * Fairness reweighing (`reweighing_weights`): training weights that remove
   the association of a sensitive group and the label, used through
   `weight_column`.

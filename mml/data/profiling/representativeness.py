@@ -19,6 +19,7 @@ from sklearn import model_selection
 
 MIN_ROWS = 50
 UNREPRESENTATIVE_AUC = 0.65
+MAX_ROWS = 20000
 
 
 @dataclasses.dataclass(frozen=True)
@@ -108,4 +109,29 @@ def compare_to_reference(
     )
     return RepresentativenessReport(
         auc=auc, representative=auc < UNREPRESENTATIVE_AUC, gaps=tuple(gaps)
+    )
+
+
+def representativeness_note(
+    sample: pd.DataFrame, reference: pd.DataFrame, seed: int = 0
+) -> str | None:
+    """A data-quality finding when the sample differs from the reference."""
+    shared = [name for name in sample.columns if name in reference.columns]
+    if not shared:
+        return "representativeness: the reference shares no feature columns"
+    try:
+        report = compare_to_reference(
+            sample[shared].head(MAX_ROWS),
+            reference[shared].head(MAX_ROWS),
+            seed,
+        )
+    except ValueError:
+        return None
+    if report.representative:
+        return None
+    worst = report.gaps[0]
+    return (
+        f"representativeness: development rows are distinguishable from the "
+        f"reference sample (AUC {report.auc:.2f}); the largest gap is in "
+        f"'{worst.column}'"
     )

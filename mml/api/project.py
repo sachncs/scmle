@@ -70,6 +70,7 @@ class MLProject:
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
         ordinal_order: list[str | int] | None = None,
         unlabeled: Literal["block", "ignore", "pseudo_label"] = "block",
+        reference: str | None = None,
         pseudo_label_confidence: float = 0.9,
         monotonic_constraints: dict[str, int] | None = None,
         embargo_rows: int = 0,
@@ -147,6 +148,8 @@ class MLProject:
                 row's query; the target is the relevance grade.
             ordinal_order: For `task="ordinal"`, the target's labels from
                 lowest to highest.
+            reference: Path of a recent sample of the population the model will
+                serve; the development rows are compared with it.
             unlabeled: What to do with rows whose target is missing: `block`
                 (default), `ignore`, or `pseudo_label` (classification; used
                 only if it wins in cross-validation).
@@ -224,6 +227,7 @@ class MLProject:
                 embedding_model=embedding_model,
                 ordinal_order=ordinal_order or [],
                 unlabeled=unlabeled,
+                reference_uri=reference,
                 pseudo_label_confidence=pseudo_label_confidence,
                 monotonic_constraints=monotonic_constraints or {},
             ),

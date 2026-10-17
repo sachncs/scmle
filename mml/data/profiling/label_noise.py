@@ -95,3 +95,31 @@ def find_label_noise(
         confidence=tuple(float(probabilities[i, best[i]]) for i in order),
         rate=float(flagged.mean()),
     )
+
+
+NOTE_RATE = 0.05
+MAX_ROWS = 5000
+
+
+def noise_note(
+    features: pd.DataFrame, labels: pd.Series, seed: int = 0
+) -> str | None:
+    """A data-quality finding when many labels look wrong, else None.
+
+    Large frames are subsampled to bound the cost. Frames too small or with
+    one class give no finding.
+    """
+    if len(features) > MAX_ROWS:
+        rows = features.sample(MAX_ROWS, random_state=seed).index
+        features, labels = features.loc[rows], labels.loc[rows]
+    try:
+        report = find_label_noise(features, labels, seed)
+    except ValueError:
+        return None
+    if report.rate < NOTE_RATE:
+        return None
+    return (
+        f"label noise: {report.rate:.0%} of {len(features)} checked rows "
+        "have a label that a model trained without them contradicts "
+        "confidently; review before trusting scores"
+    )

@@ -29,7 +29,9 @@ from mml.core import context as context_module
 from mml.core import state as run_state
 from mml.data.curation import forecasting
 from mml.data.curation import preprocessing
+from mml.data.profiling import label_noise
 from mml.data.profiling import profiler
+from mml.data.profiling import representativeness
 from mml.data.readers import streaming
 from mml.data.readers import tabular
 from mml.data.splitting import splitters
@@ -328,6 +330,7 @@ class ProfileStage(Stage):
                 quality_findings=profile.quality_findings
                 + tuple(context.cleaning_notes),
             )
+        profile = self.add_quality_notes(spec, task, development, profile)
         if task is tasks.TaskType.UPLIFT:
             propensity = uplift.check_propensity(
                 split.dev_features.drop(
@@ -363,6 +366,42 @@ class ProfileStage(Stage):
                 raise errors.BlockedError(
                     "unresolved leakage risk: " + "; ".join(leaks)
                 )
+
+    @staticmethod
+    def add_quality_notes(
+        spec: tasks.ProjectSpec,
+        task: tasks.TaskType,
+        development: pd.DataFrame,
+        profile: data_contracts.DatasetProfile,
+    ) -> data_contracts.DatasetProfile:
+        """Appends label-noise and representativeness findings."""
+        columns = list(profile.feature_plan.numeric)
+        notes = []
+        if columns and task in (
+            tasks.TaskType.BINARY,
+            tasks.TaskType.MULTICLASS,
+        ):
+            note = label_noise.noise_note(
+                development[columns],
+                development[spec.data.target],
+                spec.validation.seed,
+            )
+            if note:
+                notes.append(note)
+        if spec.data.reference_uri:
+            reference = tabular.read_table(spec.data.reference_uri)
+            note = representativeness.representativeness_note(
+                development[columns + list(profile.feature_plan.categorical)],
+                reference,
+                spec.validation.seed,
+            )
+            if note:
+                notes.append(note)
+        if not notes:
+            return profile
+        return dataclasses.replace(
+            profile, quality_findings=(*profile.quality_findings, *notes)
+        )
 
     @staticmethod
     def seal(locked: splitters.LockedTestSet) -> splitters.LockedTestSet:
