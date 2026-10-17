@@ -243,6 +243,7 @@ def test_every_trial_records_its_evaluation_config_and_runtime(
             "metric": "roc_auc",
             "folds": 4,
             "seed": 7,
+            "weighted": False,
         }
         assert trial.runtime["python"].count(".") == 2
     record = json.loads(

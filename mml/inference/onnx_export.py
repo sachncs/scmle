@@ -42,7 +42,10 @@ def load_converter() -> tuple[Any, Any]:
         convert = importlib.import_module("skl2onnx")
         runtime = importlib.import_module("onnxruntime")
     except ImportError as error:
-        raise errors.ArtifactError(f"ONNX export: {INSTALL_HINT}") from error
+        raise errors.ArtifactError(
+            f"ONNX export: {INSTALL_HINT}; bundle.export_service(directory) "
+            "packages any model as a ready-to-run service without it"
+        ) from error
     return convert, runtime
 
 
