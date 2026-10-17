@@ -121,3 +121,13 @@ def test_other_tasks_refuse_survival_curves(tmp_path):
 
     with pytest.raises(errors.ArtifactError, match="not a survival"):
         classified.bundle.predict_survival(frame[["x1", "x2", "noise"]], [1.0])
+
+
+def test_survival_works_with_a_weight_column(tmp_path):
+    frame = censored_frame(800)
+    frame["w"] = np.random.default_rng(2).uniform(0.5, 2.0, len(frame))
+
+    result = run(tmp_path, frame, weight_column="w")
+
+    assert result.evaluation["test_metrics"]["c_index"] > 0.65
+    assert "w" not in result.bundle.features
