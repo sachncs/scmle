@@ -574,3 +574,14 @@ def test_bundles_flag_rows_unlike_the_training_data_and_keep_the_detector(
     assert reloaded.novelty_of(rows)["out_of_distribution"].tolist() == (
         flags.tolist()
     )
+
+
+def test_the_run_reports_whether_more_data_would_help(binary_frame, tmp_path):
+    result = support.make_project(
+        binary_frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    curve = result.evaluation["learning_curve"]
+    assert curve["verdict"] in {"more data likely helps", "plateau", "unclear"}
+    assert len(curve["sizes"]) == 5 and curve["sizes"] == sorted(curve["sizes"])
+    assert "Learning curve" in (result.run_dir / "report.html").read_text()

@@ -77,6 +77,13 @@ class HtmlReport:
                 f"Fit health: <b>{escape(health['verdict'])}</b> "
                 f"({escape(health['note'])})"
             )
+        curve = result.evaluation.get("learning_curve")
+        if curve:
+            lines.append(
+                f"Learning curve: <b>{escape(curve['verdict'])}</b> "
+                f"(last step {curve['last_gain']:+.4f}, whole curve "
+                f"{curve['total_gain']:+.4f})"
+            )
         shift = result.diagnostics.get("adversarial_validation", {})
         if shift.get("available"):
             lines.append(

@@ -35,6 +35,8 @@ from mml.evaluation import confidence
 from mml.evaluation import conformal
 from mml.evaluation import diagnostics
 from mml.evaluation import fit_health
+from mml.evaluation import learning_curve
+from mml.evaluation import metrics as metric_catalog
 from mml.evaluation import resources
 from mml.evaluation import suite
 from mml.experimentation import ensemble_search
@@ -766,6 +768,45 @@ class PackageStage(Stage):
         """Names the stage."""
         return "write bundle and reports"
 
+    def learning_curve(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+    ) -> dict[str, Any] | None:
+        """Learning curve of the selected candidate on its first fold.
+
+        Returns:
+            The curve as a record, or None when the budget is spent or the
+            folds are too small.
+        """
+        if context.resource_governor.skip_reason(first=False):
+            return None
+        split = require(context.split, "split")
+        template = strategies.get_strategy(selected.strategy).build(
+            require(context.profile, "profile").feature_plan,
+            context.registry.get(selected.model_name),
+            require(context.task, "task"),
+            context.spec.validation.seed,
+            selected.params,
+        )
+        metric = require(context.metric, "metric")
+        fit_positions, evaluate_positions = split.manifest.folds[0]
+        curve = learning_curve.compute(
+            template,
+            split.dev_features,
+            split.dev_target,
+            fit_positions,
+            evaluate_positions,
+            metric.scorer(
+                metric_catalog.positive_label(
+                    split.dev_target, require(context.task, "task")
+                )
+            ),
+            metric.greater_is_better,
+            lambda: bool(context.resource_governor.skip_reason(first=False)),
+        )
+        return None if curve is None else curve.to_dict()
+
     def conformal_calibration(
         self,
         context: context_module.RunContext,
@@ -860,6 +901,7 @@ class PackageStage(Stage):
                 evaluation["test_metrics"],
             ),
         )
+        evaluation["learning_curve"] = self.learning_curve(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.novelty = novelty.NoveltyDetector.fit(
             split.dev_features,
