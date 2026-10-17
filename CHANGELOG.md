@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* `docs/CURRICULUM.md`: the eight modelling stages mapped to modules, tests
+  and equations, with one executed example per stage.
 * Data quality: label-noise detection (`find_label_noise`) and
   representativeness against a reference sample (`compare_to_reference`).
 * Lifecycle: shadow evaluation (`ShadowEvaluator`), A/B analysis with an
