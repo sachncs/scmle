@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import platform
 
 import numpy as np
 import pandas as pd
@@ -376,3 +377,43 @@ def test_score_returns_the_structured_inference_result(trained):
     assert np.allclose(np.sum(result["probabilities"], axis=1), 1.0)
     with pytest.raises(errors.SchemaError):
         bundle.score(features.drop(columns="num"))
+
+
+def test_the_environment_lock_pins_the_build_environment(trained, tmp_path):
+    bundle = trained[0]
+    path = tmp_path / "lock.txt"
+
+    text = bundle.environment_lock(path)
+
+    assert path.read_text() == text
+    assert text.startswith("# magicml environment lock")
+    assert f"# python {platform.python_version()}" in text
+    assert f"numpy=={np.__version__}" in text
+    assert "# platform " in text and "unknown" not in text.splitlines()[2]
+    names = [line.split("==")[0] for line in text.splitlines() if "==" in line]
+    assert names == sorted(names)
+
+
+def test_the_lock_survives_saving_and_loading(trained, tmp_path):
+    bundle = trained[0]
+    bundle.save(tmp_path / "m")
+
+    loaded = bundle_module.ModelBundle.load(tmp_path / "m", trusted=True)
+
+    assert loaded.environment_lock() == bundle.environment_lock()
+
+
+def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
+    bundle = trained[0]
+    bundle.save(tmp_path / "m")
+    manifest = tmp_path / "m" / bundle_module.MANIFEST_FILE
+    recorded = json.loads(manifest.read_text())
+    recorded["sklearn"] = "0.1.0"
+    manifest.write_text(json.dumps(recorded))
+
+    with pytest.raises(errors.ArtifactError, match="scikit-learn") as caught:
+        bundle_module.ModelBundle.load(tmp_path / "m", trusted=True)
+
+    lock = caught.value.details["environment_lock"]
+    assert lock == bundle.environment_lock()
+    assert f"numpy=={np.__version__}" in lock

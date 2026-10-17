@@ -9,6 +9,7 @@ import dataclasses
 import hashlib
 import hmac
 import importlib
+import importlib.metadata
 import json
 import os
 import pathlib
@@ -68,6 +69,16 @@ TRACKED_LIBRARIES = (
     "catboost",
     "imblearn",
 )
+
+
+def installed_distributions() -> dict[str, str]:
+    """Every installed distribution and its version (for the lock)."""
+    found = {}
+    for distribution in importlib.metadata.distributions():
+        name = distribution.metadata["Name"]
+        if name:
+            found[name.lower().replace("_", "-")] = distribution.version
+    return dict(sorted(found.items()))
 
 
 def installed_versions() -> dict[str, str]:
@@ -172,6 +183,9 @@ class BundleInfo:
             (numpy, scipy, joblib and any installed model library).
         calibration: Description of the probability calibration applied at
             inference, empty if none.
+        environment: Every distribution installed when the bundle was built,
+            by name, so the environment can be rebuilt.
+        platform: Operating system and architecture that built it.
     """
 
     model_name: str
@@ -190,6 +204,21 @@ class BundleInfo:
         default_factory=lambda: installed_versions()
     )
     calibration: str = ""
+    environment: dict[str, str] = dataclasses.field(default_factory=dict)
+    platform: str = ""
+
+    def environment_lock(self) -> str:
+        """The build environment as a pinned requirements listing."""
+        header = [
+            "# magicml environment lock",
+            f"# python {self.python}",
+            f"# platform {self.platform or 'unknown'}",
+            f"# magicml {self.magicml_version}",
+        ]
+        pins = [
+            f"{name}=={version}" for name, version in self.environment.items()
+        ]
+        return "\n".join([*header, *pins]) + "\n"
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -353,6 +382,8 @@ class ModelBundle:
             model_params=model_params or {},
             strategy=strategy,
             decision_threshold=decision_threshold,
+            environment=installed_distributions(),
+            platform=platform.platform(),
         )
         bundle = cls(pipeline, schema, info, reference)
         if schema.series and history_source is not None:
@@ -707,7 +738,10 @@ class ModelBundle:
             raise errors.ArtifactError(
                 "bundle was built with different dependencies: "
                 + "; ".join(problems),
-                {"mismatches": problems},
+                {
+                    "mismatches": problems,
+                    "environment_lock": info.environment_lock(),
+                },
             )
         reference = None
         reference_path = root / REFERENCE_FILE
@@ -990,6 +1024,21 @@ class ModelBundle:
         return pd.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
+
+    def environment_lock(self, path: str | pathlib.Path | None = None) -> str:
+        """The environment this model was built in, as pinned requirements.
+
+        Args:
+            path: Where to write it; omit to only return the text.
+
+        Returns:
+            Python version, platform and every installed distribution with
+            its exact version, ready for `pip install -r`.
+        """
+        text = self.info.environment_lock()
+        if path is not None:
+            pathlib.Path(path).write_text(text)
+        return text
 
     def export_onnx(
         self,
