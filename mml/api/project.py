@@ -87,6 +87,7 @@ class MLProject:
         selection: tasks.SelectionSpec | None = None,
         decision: tasks.DecisionSpec | None = None,
         fairness: tasks.FairnessSpec | None = None,
+        problem: tasks.ProblemSpec | None = None,
         leakage_policy: LeakagePolicy = "warn",
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
@@ -175,6 +176,9 @@ class MLProject:
             feature_graph: Declarative derived features (row-wise, fitted and
                 time-series operations), versioned with the configuration.
             selection: Serving constraints (max model size, p95 latency).
+            problem: The decision, the population and the scores the model
+                must reach on the locked rows (checked after the one test
+                release).
             fairness: Optional group-threshold mitigation of outcome gaps
                 across a sensitive column (binary tasks).
             decision: Threshold optimization for binary tasks (objective
@@ -250,6 +254,7 @@ class MLProject:
             selection=selection or tasks.SelectionSpec(),
             decision=decision or tasks.DecisionSpec(),
             fairness=fairness or tasks.FairnessSpec(),
+            problem=problem or tasks.ProblemSpec(),
             leakage_policy=leakage_policy,
         )
         self.output_dir = pathlib.Path(output_dir)

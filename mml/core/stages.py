@@ -37,6 +37,7 @@ from mml.data.validation import target as target_module
 from mml.evaluation import backtest
 from mml.evaluation import confidence
 from mml.evaluation import conformal
+from mml.evaluation import criteria
 from mml.evaluation import diagnostics
 from mml.evaluation import fit_health
 from mml.evaluation import learning_curve
@@ -298,6 +299,15 @@ class ProfileStage(Stage):
             context.ordinal_labels = tuple(spec.data.ordinal_order)
         context.task = task
         context.metric = context.catalog.resolve(spec.primary_metric, task)
+        unknown = sorted(
+            set(spec.problem.success_criteria)
+            - set(context.catalog.report_names[task])
+        )
+        if unknown:
+            raise errors.ConfigError(
+                f"success criteria name unreported metrics {unknown}; "
+                f"available: {sorted(context.catalog.report_names[task])}"
+            )
         split = self.make_split(context, task, frame)
         development = split.dev_features.assign(
             **{spec.data.target: split.dev_target}
@@ -1164,6 +1174,14 @@ class FinalEvaluationStage(Stage):
             "semi_supervised": context.semi_supervised,
             "fairness_mitigation": context.fairness_mitigation,
             "execution_backend": context.backend.name,
+            "success_criteria": [
+                r.to_dict()
+                for r in criteria.check(
+                    context.spec.problem.success_criteria,
+                    test_metrics,
+                    context.catalog,
+                )
+            ],
             "streamed_locked": self.streamed_locked_metrics(context, pipeline),
             "uplift": self.uplift_report(
                 context, pipeline, test_features, test_target

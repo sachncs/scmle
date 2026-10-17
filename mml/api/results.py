@@ -127,6 +127,11 @@ class RunResult:
         """Explains predictions of the best model against a background."""
         return self.bundle.explain(data, background, class_label=class_label)
 
+    @property
+    def meets_criteria(self) -> bool:
+        """Whether every stated success criterion was met (True if none)."""
+        return all(c["met"] for c in self.evaluation["success_criteria"])
+
     def summary(self) -> str:
         """Returns a one-line human-readable result."""
         evaluation = self.evaluation
@@ -134,8 +139,20 @@ class RunResult:
             f"{name}={value:.4f}"
             for name, value in evaluation["test_metrics"].items()
         )
-        return (
+        text = (
             f"{self.run_id}: selected {self.selected_model} "
             f"(cv {evaluation['metric']}="
             f"{evaluation['selected_cv_score']:.4f}); test: {test}"
         )
+        missed = [
+            f"{c['metric']} {c['achieved']:.4f} vs required {c['required']}"
+            for c in evaluation["success_criteria"]
+            if not c["met"]
+        ]
+        if evaluation["success_criteria"]:
+            text += (
+                "; success criteria met"
+                if not missed
+                else "; success criteria NOT met: " + ", ".join(missed)
+            )
+        return text

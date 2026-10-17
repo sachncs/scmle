@@ -113,6 +113,9 @@
 * Multi-node Ray: `executor="ray"` with `cluster_address`; trial results
   match a single-node run, hard limits hold on workers, and a lost worker is
   retried once and then recorded as a failed trial instead of ending the run.
+* `ProblemSpec`: state the decision, population and success criteria;
+  the criteria are checked on the locked rows and shown in the summary
+  (`result.meets_criteria`).
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

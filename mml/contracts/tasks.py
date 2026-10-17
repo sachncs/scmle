@@ -469,6 +469,22 @@ class FairnessSpec(FrozenModel):
     max_accuracy_cost: float = pydantic.Field(default=0.03, ge=0.0, lt=1.0)
 
 
+class ProblemSpec(FrozenModel):
+    """What the model is for, so the result can be judged against it.
+
+    Attributes:
+        decision: The decision the predictions will inform.
+        population: Who or what the predictions are about.
+        success_criteria: Metric name to the score that must be reached on
+            the locked rows (a floor for higher-is-better metrics, a
+            ceiling for lower-is-better ones).
+    """
+
+    decision: str = ""
+    population: str = ""
+    success_criteria: dict[str, float] = pydantic.Field(default_factory=dict)
+
+
 class ProjectSpec(FrozenModel):
     """The explicit, versioned specification of an ML project."""
 
@@ -488,6 +504,7 @@ class ProjectSpec(FrozenModel):
     selection: SelectionSpec = pydantic.Field(default_factory=SelectionSpec)
     decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
     fairness: FairnessSpec = pydantic.Field(default_factory=FairnessSpec)
+    problem: ProblemSpec = pydantic.Field(default_factory=ProblemSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
     @pydantic.model_validator(mode="before")
