@@ -15,6 +15,7 @@ from mml.contracts import metrics as metric_contracts
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.evaluation import concordance
+from mml.evaluation import multitarget
 from mml.evaluation import ordinal
 from mml.evaluation import ranking
 from mml.evaluation import survival
@@ -25,6 +26,8 @@ REGRESSION = tasks.TaskType.REGRESSION
 SURVIVAL = tasks.TaskType.SURVIVAL
 ORDINAL = tasks.TaskType.ORDINAL
 RANKING = tasks.TaskType.RANKING
+MULTILABEL = tasks.TaskType.MULTILABEL
+MULTIOUTPUT = tasks.TaskType.MULTIOUTPUT
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 
 
@@ -96,6 +99,24 @@ DEFAULT_METRICS = (
     metric_contracts.Metric(
         "accuracy_levels", "accuracy", True, frozenset({ORDINAL})
     ),
+    multitarget.MultiTargetMetric(
+        "f1_macro_labels", "", True, frozenset({MULTILABEL}), "f1_macro_labels"
+    ),
+    multitarget.MultiTargetMetric(
+        "f1_micro_labels", "", True, frozenset({MULTILABEL}), "f1_micro_labels"
+    ),
+    multitarget.MultiTargetMetric(
+        "hamming", "", False, frozenset({MULTILABEL}), "hamming"
+    ),
+    multitarget.MultiTargetMetric(
+        "subset_accuracy", "", True, frozenset({MULTILABEL}), "subset_accuracy"
+    ),
+    multitarget.MultiTargetMetric(
+        "r2_mean", "", True, frozenset({MULTIOUTPUT}), "r2_mean"
+    ),
+    multitarget.MultiTargetMetric(
+        "mae_scaled", "", False, frozenset({MULTIOUTPUT}), "mae_scaled"
+    ),
     ranking.RankingMetric("ndcg", "", True, frozenset({RANKING}), "ndcg"),
     ranking.RankingMetric("map", "", True, frozenset({RANKING}), "map"),
     concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
@@ -116,6 +137,8 @@ class MetricCatalog:
         SURVIVAL: "c_index",
         ORDINAL: "qwk",
         RANKING: "ndcg",
+        MULTILABEL: "f1_macro_labels",
+        MULTIOUTPUT: "r2_mean",
     }
     report_names = {
         BINARY: (
@@ -131,6 +154,13 @@ class MetricCatalog:
         SURVIVAL: ("c_index", "ibs", "td_auc"),
         ORDINAL: ("qwk", "mace", "accuracy_levels"),
         RANKING: ("ndcg", "map"),
+        MULTILABEL: (
+            "f1_macro_labels",
+            "f1_micro_labels",
+            "hamming",
+            "subset_accuracy",
+        ),
+        MULTIOUTPUT: ("r2_mean", "mae_scaled"),
     }
 
     def __init__(

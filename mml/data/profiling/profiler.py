@@ -93,6 +93,8 @@ class DatasetProfiler:
             roles[data.group_column] = "group column (used for splitting only)"
         if data.time_column and not data.time_as_feature:
             roles[data.time_column] = "time column (used for splitting only)"
+        for extra in data.targets[1:]:
+            roles[extra] = "additional target (multi-target task)"
         if data.query_column:
             roles[data.query_column] = "query identifier (ranking only)"
         if data.event_column:
@@ -342,6 +344,7 @@ class DatasetProfiler:
             weight_column=self.spec.data.weight_column,
             event_column=self.spec.data.event_column,
             query_column=self.spec.data.query_column,
+            target_columns=tuple(self.spec.data.targets),
             text_encoding=self.spec.data.text_encoding,
             embedding_model=self.spec.data.embedding_model,
             ordinal_levels=len(self.spec.data.ordinal_order) or None,

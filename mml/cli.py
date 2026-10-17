@@ -63,7 +63,7 @@ class ProjectCommand(Command):
     def configure(self, parser: argparse.ArgumentParser) -> None:
         """Adds data and project options."""
         parser.add_argument("data", help="CSV or Parquet file")
-        parser.add_argument("--target", required=True)
+        parser.add_argument("--target", required=True, nargs="+")
         parser.add_argument("--task", default="auto")
         parser.add_argument("--metric")
         parser.add_argument("--time-budget", type=int, default=1800)
@@ -102,6 +102,7 @@ class ProjectCommand(Command):
                 "auto",
                 "stratified",
                 "stratified_events",
+                "multilabel_stratified",
                 "random",
                 "group",
                 "temporal",
@@ -208,7 +209,7 @@ class ProjectCommand(Command):
             )
         return project.MLProject(
             args.data,
-            args.target,
+            args.target[0] if len(args.target) == 1 else args.target,
             task=args.task,
             metric=args.metric,
             time_budget=args.time_budget,

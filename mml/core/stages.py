@@ -238,6 +238,8 @@ class ProfileStage(Stage):
             )
         if task is tasks.TaskType.SURVIVAL:
             target_module.check_events(frame, spec.data.event_column)
+        if task in (tasks.TaskType.MULTILABEL, tasks.TaskType.MULTIOUTPUT):
+            target_module.check_targets(frame, spec.data.targets, task)
         if task is tasks.TaskType.ORDINAL:
             frame = target_module.encode_ordinal(
                 frame, spec.data.target, spec.data.ordinal_order
@@ -600,7 +602,10 @@ def reference_scores(
     """
     if task is tasks.TaskType.BINARY:
         return pd.Series(fitted.predict_proba(features)[:, 1], name="score")
-    return pd.Series(fitted.predict(features), name="prediction")
+    predicted = np.asarray(fitted.predict(features))
+    if predicted.ndim == 2:
+        predicted = predicted[:, 0]  # The primary target stands for all.
+    return pd.Series(predicted, name="prediction")
 
 
 def choose_decision_threshold(
@@ -1067,6 +1072,8 @@ class PackageStage(Stage):
             tasks.TaskType.SURVIVAL,
             tasks.TaskType.ORDINAL,
             tasks.TaskType.RANKING,
+            tasks.TaskType.MULTILABEL,
+            tasks.TaskType.MULTIOUTPUT,
         ):
             return None  # Conformal margins need point predictions or labels.
         if context.resource_governor.skip_reason(first=False):

@@ -91,6 +91,9 @@
 * Text embeddings: `text_encoding="embedding"` encodes free text with a
   sentence-embedding model in the PyTorch worker (`embeddings` extra), each
   distinct string embedded once, falling back to TF-IDF with a warning.
+* Multi-label and multi-output targets: pass a list of target columns with
+  `task="multilabel"` or `"multioutput"`; iterative stratification keeps rare
+  labels in every fold; `bundle.predict_frame` returns one column per target.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

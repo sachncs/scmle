@@ -20,6 +20,7 @@ from mml.data.validation import columns
 from mml.features import feature_graph
 from mml.models import weighting
 from mml.models import wrappers
+from mml.models.multitarget import wrapper as multitarget_wrapper
 from mml.models.ranking import wrapper as ranking_wrapper
 from mml.models.survival import wrapper as survival_wrapper
 
@@ -233,6 +234,13 @@ def build_pipeline(
     built: Any = pipeline.Pipeline(steps)
     if plan.event_column:
         built = survival_wrapper.EventAwareEstimator(built, plan.event_column)
+    if plan.target_columns:
+        kind = (
+            multitarget_wrapper.MultiLabelEstimator
+            if task is tasks.TaskType.MULTILABEL
+            else multitarget_wrapper.MultiOutputEstimator
+        )
+        built = kind(built, plan.target_columns)
     if plan.query_column:
         built = ranking_wrapper.QueryAwareEstimator(built, plan.query_column)
     if plan.weight_column:

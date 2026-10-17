@@ -19,6 +19,7 @@ from sklearn import model_selection
 from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data.splitting import duplicates
+from mml.data.splitting import iterative
 
 Fold = tuple[np.ndarray, np.ndarray]
 MIN_ROLLING_TRAIN = 10
@@ -365,6 +366,59 @@ class EventStratifiedSplit(RandomSplit):
         return list(splitter.split(np.arange(len(dev_ids)), events))
 
 
+class MultilabelStratifiedSplit(RandomSplit):
+    """Keeps every label's share steady across splits (multi-label)."""
+
+    name = "multilabel_stratified"
+    supported_tasks = frozenset({tasks.TaskType.MULTILABEL})
+
+    def label_matrix(self, frame: pd.DataFrame) -> np.ndarray:
+        """The 0/1 matrix of all label columns."""
+        return frame[self.data.targets].to_numpy().astype(int)
+
+    def partition(self, frame: pd.DataFrame) -> Partition:
+        """Iteratively stratified holdout, then folds over development."""
+        labels = self.label_matrix(frame)
+        share = self.validation.test_fraction
+        side = iterative.iterative_assignment(
+            labels, [1.0 - share, share], self.validation.seed
+        )
+        dev_ids = np.flatnonzero(side == 0)
+        test_ids = np.flatnonzero(side == 1)
+        notes: list[str] = []
+        folds = self.cross_validation_folds(frame, dev_ids, notes)
+        return Partition(dev_ids, test_ids, folds, notes)
+
+    def cross_validation_folds(
+        self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
+    ) -> list[Fold]:
+        """Iteratively stratified folds over the development rows."""
+        count = self.validation.folds
+        assignment = iterative.iterative_assignment(
+            self.label_matrix(frame)[dev_ids],
+            [1.0 / count] * count,
+            self.validation.seed,
+        )
+        positions = np.arange(len(dev_ids))
+        folds = [
+            (positions[assignment != k], positions[assignment == k])
+            for k in range(count)
+        ]
+        missing = [
+            column
+            for column in self.data.targets
+            if any(
+                frame[column].to_numpy()[dev_ids[fold[1]]].sum() == 0
+                for fold in folds
+            )
+        ]
+        if missing:
+            notes.append(
+                f"labels too rare to appear in every fold: {sorted(missing)}"
+            )
+        return folds
+
+
 class GroupSplit(SplitStrategy):
     """Keeps every group wholly inside one partition."""
 
@@ -566,6 +620,7 @@ STRATEGIES: dict[str, type[SplitStrategy]] = {
         RandomSplit,
         StratifiedSplit,
         EventStratifiedSplit,
+        MultilabelStratifiedSplit,
         GroupSplit,
         TemporalSplit,
         RollingSplit,
@@ -595,6 +650,8 @@ def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
         return "stratified_events"
     if task is tasks.TaskType.RANKING:
         return "group"
+    if task is tasks.TaskType.MULTILABEL:
+        return "multilabel_stratified"
     return "stratified" if task.is_classification else "random"
 
 
@@ -617,6 +674,7 @@ class SplitManager:
         data = self.spec.data
         roles = {
             data.target,
+            *data.targets,
             data.group_column,
             data.time_column,
             data.weight_column,

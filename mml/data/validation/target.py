@@ -54,6 +54,34 @@ def encode_ordinal(
     return encoded
 
 
+def check_targets(
+    frame: pd.DataFrame, columns: list[str], task: tasks.TaskType
+) -> None:
+    """Requires every target column to exist, be complete and fit the task.
+
+    Raises:
+        BlockedError: For a missing column, gaps, labels that are not 0/1
+            (multilabel) or values that are not numeric (multioutput).
+    """
+    for column in columns:
+        if column not in frame.columns:
+            raise errors.BlockedError(f"target column '{column}' not found")
+        values = frame[column]
+        if values.isna().any():
+            raise errors.BlockedError(
+                f"target column '{column}' has missing values"
+            )
+        if task is tasks.TaskType.MULTILABEL:
+            if not values.isin([0, 1]).all():
+                raise errors.BlockedError(
+                    f"label column '{column}' must hold 0 or 1"
+                )
+        elif not is_numeric_target(values):
+            raise errors.BlockedError(
+                f"target column '{column}' must be numeric"
+            )
+
+
 class TaskResolver:
     """Resolves the requested task against the actual target values."""
 
@@ -89,6 +117,8 @@ class TaskResolver:
             return self.resolve_ordinal(target)
         if self.request == "ranking":
             return self.resolve_ranking(target)
+        if self.request in ("multilabel", "multioutput"):
+            return tasks.TaskType(self.request)
         if self.request == "regression":
             return self.resolve_regression(target)
         if self.request == "auto":

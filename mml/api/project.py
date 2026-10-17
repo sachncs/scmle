@@ -21,6 +21,7 @@ ValidationStrategy = Literal[
     "auto",
     "stratified",
     "stratified_events",
+    "multilabel_stratified",
     "random",
     "group",
     "temporal",
@@ -35,7 +36,7 @@ class MLProject:
     def __init__(
         self,
         data: Any,
-        target: str,
+        target: str | list[str],
         task: tasks.TaskRequest = "auto",
         metric: str | None = None,
         time_budget: int = 1800,
@@ -84,7 +85,8 @@ class MLProject:
             data: CSV / Parquet / Feather path, or an in-memory table:
                 pandas DataFrame, pyarrow Table, Polars frame, or anything
                 implementing the Arrow stream protocol.
-            target: Name of the target column.
+            target: Name of the target column, or for `multilabel` and
+                `multioutput` tasks the list of all target columns.
             task: `auto`, `classification`, `regression`, or an explicit
                 binary/multiclass task.
             metric: Primary metric; defaults per task.
@@ -166,7 +168,8 @@ class MLProject:
         self.spec = tasks.ProjectSpec(
             data=tasks.DataSpec(
                 uri="<in-memory>" if frame is not None else str(data),
-                target=target,
+                target=target if isinstance(target, str) else target[0],
+                targets=[] if isinstance(target, str) else list(target),
                 id_columns=id_columns or [],
                 group_column=group_column,
                 time_column=time_column,

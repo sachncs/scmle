@@ -23,6 +23,7 @@ from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import search
 from mml.contracts import tasks
+from mml.models.multitarget import estimators as multitarget_estimators
 from mml.models.ordinal import estimators as ordinal_estimators
 from mml.models.ranking import estimators as ranking_estimators
 from mml.models.survival import estimators as survival_estimators
@@ -94,6 +95,8 @@ class DummyAdapter(models.ModelAdapter):
                 tasks.TaskType.SURVIVAL,
                 tasks.TaskType.ORDINAL,
                 tasks.TaskType.RANKING,
+                tasks.TaskType.MULTILABEL,
+                tasks.TaskType.MULTIOUTPUT,
             }
         ),
         sparse_input=True,
@@ -109,6 +112,14 @@ class DummyAdapter(models.ModelAdapter):
         """Returns a prior classifier, a mean regressor or a marginal curve."""
         if task is tasks.TaskType.SURVIVAL:
             return survival_estimators.MarginalSurvival()
+        if task in (tasks.TaskType.MULTILABEL, tasks.TaskType.MULTIOUTPUT):
+            classify = task is tasks.TaskType.MULTILABEL
+            return multitarget_estimators.PerTarget(
+                dummy.DummyClassifier(strategy="prior")
+                if classify
+                else dummy.DummyRegressor(strategy="mean"),
+                classify,
+            )
         if task is tasks.TaskType.RANKING:
             return ranking_estimators.ConstantRanker()
         if task is tasks.TaskType.ORDINAL:

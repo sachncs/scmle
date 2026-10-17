@@ -126,6 +126,7 @@ def test_strategy_registry_is_polymorphic():
         "random",
         "stratified",
         "stratified_events",
+        "multilabel_stratified",
         "group",
         "temporal",
         "rolling",

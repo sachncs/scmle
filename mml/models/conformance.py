@@ -19,14 +19,22 @@ ABSENT = object()
 
 def toy_problem(
     task: tasks.TaskType, seed: int = 0
-) -> tuple[pd.DataFrame, pd.Series]:
+) -> tuple[pd.DataFrame, pd.Series | pd.DataFrame]:
     """Builds a small learnable problem for `task`."""
     rng = np.random.default_rng(seed)
     features = pd.DataFrame(
         {"a": rng.normal(size=ROWS), "b": rng.normal(size=ROWS)}
     )
+    target: pd.Series | pd.DataFrame
     if task is tasks.TaskType.SURVIVAL:
         target = pd.Series(rng.exponential(1.0, ROWS) + 0.01)
+    elif task in (tasks.TaskType.MULTILABEL, tasks.TaskType.MULTIOUTPUT):
+        target = pd.DataFrame(
+            {
+                "first": rng.integers(0, 2, ROWS),
+                "second": rng.integers(0, 2, ROWS),
+            }
+        ).astype(float)
     elif task is tasks.TaskType.RANKING:
         target = pd.Series(
             np.clip(np.round(features["a"] + rng.normal(size=ROWS)), 0, 2)
@@ -63,7 +71,7 @@ def check_declared_capabilities(
     adapter: models.ModelAdapter,
     task: tasks.TaskType,
     features: pd.DataFrame,
-    target: pd.Series,
+    target: pd.Series | pd.DataFrame,
 ) -> None:
     """Verifies the capabilities the pipeline relies on actually work.
 

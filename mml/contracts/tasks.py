@@ -26,6 +26,8 @@ class TaskType(enum.StrEnum):
     SURVIVAL = "survival"
     ORDINAL = "ordinal"
     RANKING = "ranking"
+    MULTILABEL = "multilabel"
+    MULTIOUTPUT = "multioutput"
 
     @property
     def is_classification(self) -> bool:
@@ -45,6 +47,8 @@ TaskRequest = Literal[
     "survival",
     "ordinal",
     "ranking",
+    "multilabel",
+    "multioutput",
     "binary_classification",
     "multiclass_classification",
 ]
@@ -153,6 +157,9 @@ class DataSpec(FrozenModel):
         ordinal_order: For ordinal tasks, the target's labels from lowest to
             highest (for example `["low", "medium", "high"]`). Every label in
             the data must be listed and every listed label must occur.
+        targets: For multi-label and multi-output tasks, every target
+            column (the first must equal `target`). Binary 0/1 columns for
+            `multilabel`, numeric ones for `multioutput`.
         text_encoding: How free-text columns become features: `tfidf`
             (default) or `embedding` (a pretrained sentence-embedding model
             run in the PyTorch worker; falls back to TF-IDF if unavailable).
@@ -192,6 +199,7 @@ class DataSpec(FrozenModel):
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
     event_column: str | None = None
+    targets: list[str] = pydantic.Field(default_factory=list)
     text_encoding: Literal["tfidf", "embedding"] = "tfidf"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     query_column: str | None = None
@@ -221,6 +229,7 @@ class ValidationSpec(FrozenModel):
         "auto",
         "stratified",
         "stratified_events",
+        "multilabel_stratified",
         "random",
         "group",
         "temporal",
@@ -498,6 +507,8 @@ class ProjectSpec(FrozenModel):
             "survival",
             "ordinal",
             "ranking",
+            "multilabel",
+            "multioutput",
         ):
             raise ValueError(
                 f"stratified validation is undefined for {self.task}"
@@ -525,6 +536,21 @@ class ProjectSpec(FrozenModel):
                     "fairness mitigation needs a column listed in "
                     "data.sensitive_columns"
                 )
+        multi = self.task in ("multilabel", "multioutput")
+        if multi != bool(data.targets):
+            raise ValueError(
+                "multilabel and multioutput tasks need data.targets, and "
+                "only they may set it"
+            )
+        if multi:
+            if len(set(data.targets)) != len(data.targets) or (
+                len(data.targets) < 2
+            ):
+                raise ValueError(
+                    "data.targets needs at least two distinct columns"
+                )
+            if data.targets[0] != data.target:
+                raise ValueError("data.targets must start with data.target")
         if (self.task == "ranking") != (data.query_column is not None):
             raise ValueError(
                 "ranking tasks need data.query_column, and only ranking "

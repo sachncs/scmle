@@ -377,6 +377,7 @@ class ModelBundle:
             graph_fingerprint=graph_fingerprint,
             group_column=group_column,
             time_column=time_column,
+            targets=tuple(getattr(pipeline, "target_columns", ())),
             optional_inputs=(
                 (pipeline.column,)
                 if isinstance(pipeline, thresholds.GroupThresholdClassifier)
@@ -477,10 +478,7 @@ class ModelBundle:
         report = self.validate(frame)
         predictions = self.predict(frame)
         result: dict[str, Any] = {
-            "predictions": [
-                item.item() if hasattr(item, "item") else item
-                for item in predictions
-            ],
+            "predictions": np.asarray(predictions).tolist(),
             "model_version": self.info.model_version,
             "schema_valid": report.valid,
             "diagnostics": {
@@ -913,10 +911,28 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
         """
         predictions = self.pipeline.predict(self.prepare_frame(data, mapping))
+        if self.schema.targets:
+            return np.asarray(predictions)
         if self.schema.task == tasks.TaskType.ORDINAL.value:
             labels = np.asarray(self.schema.classes, dtype=object)
             return labels[np.asarray(predictions).astype(int)]
         return predictions
+
+    def predict_frame(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> pd.DataFrame:
+        """Predictions of a multi-target model, one named column per target.
+
+        Raises:
+            ArtifactError: For single-target models.
+        """
+        if not self.schema.targets:
+            raise errors.ArtifactError("this bundle has a single target")
+        return pd.DataFrame(
+            self.predict(data, mapping), columns=list(self.schema.targets)
+        )
 
     def predict_proba(
         self,
@@ -933,9 +949,10 @@ class ModelBundle:
             ArtifactError: For regression models or estimators without
                 probabilities.
         """
-        if self.schema.task == "regression" or not hasattr(
-            self.pipeline, "predict_proba"
-        ):
+        if self.schema.task in (
+            "regression",
+            tasks.TaskType.MULTIOUTPUT.value,
+        ) or not hasattr(self.pipeline, "predict_proba"):
             raise errors.ArtifactError(
                 "this model does not provide probabilities"
             )

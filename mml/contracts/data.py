@@ -59,6 +59,7 @@ class FeaturePlan:
         event_column: Survival event indicator column, if any.
         ordinal_levels: Number of ordered levels of an ordinal target.
         query_column: Ranking query identifier column, if any.
+        target_columns: Every target column of a multi-target task.
         text_encoding: `tfidf` or `embedding` for free-text columns.
         embedding_model: Sentence-embedding model for `embedding`.
         informative_missing: Features whose gaps are associated with the
@@ -80,6 +81,7 @@ class FeaturePlan:
     event_column: str | None = None
     ordinal_levels: int | None = None
     query_column: str | None = None
+    target_columns: tuple[str, ...] = ()
     text_encoding: str = "tfidf"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     informative_missing: tuple[str, ...] | None = None

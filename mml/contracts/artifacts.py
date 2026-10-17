@@ -25,6 +25,7 @@ class BundleSchema:
         graph_fingerprint: Hash of the feature graph, empty without one.
         group_column: Entity column the series nodes group by, if any.
         time_column: Column ordering the rows for series nodes, if any.
+        targets: Output columns of a multi-target model, in order.
         optional_inputs: Columns used when supplied but not required (the
             sensitive column behind group-specific thresholds).
     """
@@ -43,6 +44,7 @@ class BundleSchema:
     group_column: str | None = None
     time_column: str | None = None
     optional_inputs: tuple[str, ...] = ()
+    targets: tuple[str, ...] = ()
 
     @property
     def features(self) -> list[str]:
@@ -86,6 +88,7 @@ class BundleSchema:
             group_column=record.get("group_column"),
             time_column=record.get("time_column"),
             optional_inputs=tuple(record.get("optional_inputs", ())),
+            targets=tuple(record.get("targets", ())),
         )
 
 

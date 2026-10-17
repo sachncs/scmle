@@ -100,6 +100,8 @@ def test_l5_to_l11_python_package_tabular_scope():
         tasks.TaskType.SURVIVAL,
         tasks.TaskType.ORDINAL,
         tasks.TaskType.RANKING,
+        tasks.TaskType.MULTILABEL,
+        tasks.TaskType.MULTIOUTPUT,
     }
 
 
