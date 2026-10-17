@@ -11,10 +11,12 @@ import pandas as pd
 import pytest
 import support
 
+import mml
 from mml.contracts import errors
 from mml.governance import lifecycle
 from mml.governance import registry as registry_module
 from mml.inference import serving
+from mml.monitoring import champion as champion_module
 
 
 def make_frame(rows, seed, relabel=False):
@@ -265,3 +267,116 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
     assert len(loaded.predict(features)) == 10
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
         store.load("m")  # a signed bundle needs its key at load time
+
+
+def count_trainings(monkeypatch):
+    runs = []
+    original = mml.MLProject.run
+
+    def counted(self, *args, **kwargs):
+        runs.append(1)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(mml.MLProject, "run", counted)
+    return runs
+
+
+FAST_OPTIONS = {
+    "time_budget": 300,
+    "search": support.NO_TUNING,
+    "strategies": support.NO_STRATEGIES,
+    "ensemble": support.NO_ENSEMBLE,
+}
+
+
+def audit_actions(store):
+    lines = (store.root / registry_module.AUDIT_FILE).read_text().splitlines()
+    return [json.loads(line)["action"] for line in lines]
+
+
+def test_repeated_checks_of_the_same_drift_retrain_exactly_once(
+    trained, tmp_path, monkeypatch
+):
+    runs = count_trainings(monkeypatch)
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
+    manager.register_run(trained)
+    runs.clear()
+    drifted = make_frame(2400, 5, relabel=True)
+
+    first = manager.review(drifted, "y", project_options=FAST_OPTIONS)
+    second = manager.review(drifted, "y", project_options=FAST_OPTIONS)
+    third = manager.review(drifted, "y", project_options=FAST_OPTIONS)
+
+    assert len(runs) == 1
+    assert first.promoted_version == 2
+    assert second.skipped in {None, "already_handled"}
+    assert not second.retrained and not third.retrained
+
+
+def test_a_rejected_challenger_is_recorded_and_not_retried_at_once(
+    trained, tmp_path, monkeypatch
+):
+    runs = count_trainings(monkeypatch)
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    manager = lifecycle.LifecycleManager(
+        store,
+        "churn",
+        str(tmp_path / "work"),
+        lifecycle.RetrainPolicy(min_rows=200, cooldown_rows=1500),
+    )
+    manager.register_run(trained)
+    runs.clear()
+    monkeypatch.setattr(
+        champion_module.ChampionChallenger,
+        "compare",
+        lambda self, data, outcomes, metric_name=None: (
+            champion_module.Comparison(
+                "roc_auc", len(data), 0.9, 0.9, 0.0, (-0.01, 0.01), 0.5, "keep"
+            )
+        ),
+    )
+
+    first = manager.review(
+        make_frame(1200, 5, relabel=True), "y", project_options=FAST_OPTIONS
+    )
+    soon = manager.review(
+        make_frame(400, 8, relabel=True), "y", project_options=FAST_OPTIONS
+    )
+    later = manager.review(
+        make_frame(1400, 9, relabel=True), "y", project_options=FAST_OPTIONS
+    )
+
+    assert first.retrained and first.promoted_version is None
+    assert store.resolve("churn").version == 1
+    assert soon.skipped == "cooldown" and not soon.retrained
+    assert later.retrained and len(runs) == 2
+    actions = audit_actions(store)
+    assert actions.count("lifecycle.challenger_rejected") == 2
+    assert "lifecycle.retrain_skipped" in actions
+    lines = (store.root / registry_module.AUDIT_FILE).read_text().splitlines()
+    rejected = next(
+        json.loads(line) for line in lines if "challenger_rejected" in line
+    )
+    assert rejected["decision"] == "keep" and "interval" in rejected
+
+
+def test_too_few_labeled_rows_do_not_trigger_training(
+    trained, tmp_path, monkeypatch
+):
+    runs = count_trainings(monkeypatch)
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    manager = lifecycle.LifecycleManager(
+        store,
+        "churn",
+        str(tmp_path / "work"),
+        lifecycle.RetrainPolicy(min_rows=5000),
+    )
+    manager.register_run(trained)
+    runs.clear()
+
+    outcome = manager.review(
+        make_frame(2400, 5, relabel=True), "y", project_options=FAST_OPTIONS
+    )
+
+    assert outcome.skipped == "too_few_rows" and not runs

@@ -75,6 +75,9 @@
 * `bundle.counterfactual`: the smallest change to actionable columns that
   gives a wanted class or value range; unneeded changes are pruned and other
   columns never change.
+* Lifecycle retraining policy: one retrain per drift event (data digest),
+  a row cooldown, a minimum of labeled rows, and an audit record for every
+  review, skip, rejection and promotion with its evidence.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.
