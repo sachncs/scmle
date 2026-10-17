@@ -44,6 +44,7 @@ from mml.experimentation import tuning
 from mml.features import feature_graph
 from mml.governance import ledger
 from mml.governance import vault
+from mml.inference import novelty
 from mml.intelligence import knowledge
 from mml.intelligence import planner as planner_module
 from mml.intelligence import recommendations
@@ -845,6 +846,12 @@ class PackageStage(Stage):
             ),
         )
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
+        bundle.novelty = novelty.NoveltyDetector.fit(
+            split.dev_features,
+            bundle.schema.numeric,
+            bundle.schema.categorical,
+            context.spec.validation.seed,
+        )
         bundle.save(store.path("model"))
         evaluation["artifact_verification"] = bundle.verify_round_trip(
             store.path("model"), split.dev_features.head(PARITY_ROWS)

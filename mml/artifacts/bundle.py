@@ -34,6 +34,7 @@ from mml.evaluation import conformal as conformal_module
 from mml.explainability import local
 from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
+from mml.inference import novelty as novelty_module
 from mml.inference import validation
 from mml.monitoring import reference as reference_module
 
@@ -43,6 +44,7 @@ SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
 CALIBRATOR_FILE = "calibrator.joblib"
 CONFORMAL_FILE = "conformal.json"
+NOVELTY_FILE = "novelty.joblib"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
 SIGNATURE_FILE = "signature.json"
@@ -223,6 +225,7 @@ class ModelBundle:
         history: pd.DataFrame | None = None,
         calibrator: Any = None,
         conformal: conformal_module.ConformalCalibrator | None = None,
+        novelty: novelty_module.NoveltyDetector | None = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -237,6 +240,7 @@ class ModelBundle:
                 training (see `calibrate`), applied by `predict_proba`.
             conformal: Out-of-fold nonconformity scores that turn
                 predictions into intervals or sets with a coverage level.
+            novelty: Detector that flags rows unlike the training data.
         """
         self.pipeline = pipeline
         self.schema = schema
@@ -245,6 +249,7 @@ class ModelBundle:
         self.history = history
         self.calibrator = calibrator
         self.conformal = conformal
+        self.novelty = novelty
 
     @classmethod
     def create(
@@ -435,7 +440,33 @@ class ModelBundle:
         if self.schema.classes is not None:
             result["classes"] = list(self.schema.classes)
             result["probabilities"] = self.predict_proba(frame).tolist()
+        if self.novelty is not None:
+            result["out_of_distribution"] = self.novelty_of(frame)[
+                "out_of_distribution"
+            ].tolist()
         return result
+
+    def novelty_of(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> pd.DataFrame:
+        """Flags rows that look unlike the training data.
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            `novelty_score` and `out_of_distribution` per row.
+
+        Raises:
+            ArtifactError: If the bundle has no novelty detector.
+        """
+        if self.novelty is None:
+            raise errors.ArtifactError("this bundle has no novelty detector")
+        frame = self.prepare_frame(data, mapping)
+        return self.novelty.score(frame)
 
     def calibrate(
         self,
@@ -558,6 +589,10 @@ class ModelBundle:
             conformal_path = root / CONFORMAL_FILE
             conformal_path.write_text(json.dumps(self.conformal.to_dict()))
             files[CONFORMAL_FILE] = file_sha256(conformal_path)
+        if self.novelty is not None:
+            novelty_path = root / NOVELTY_FILE
+            joblib.dump(self.novelty, novelty_path)
+            files[NOVELTY_FILE] = file_sha256(novelty_path)
         if self.history is not None:
             history_path = root / HISTORY_FILE
             self.history.to_parquet(history_path, index=False)
@@ -696,6 +731,17 @@ class ModelBundle:
             calibrated = conformal_module.ConformalCalibrator.from_dict(
                 json.loads(conformal_path.read_text())
             )
+        detector = None
+        if NOVELTY_FILE in info.files:
+            novelty_path = root / NOVELTY_FILE
+            if (
+                not novelty_path.exists()
+                or file_sha256(novelty_path) != info.files[NOVELTY_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: novelty detector was modified"
+                )
+            detector = joblib.load(novelty_path)
         return cls(
             joblib.load(model_path),
             schema,
@@ -704,6 +750,7 @@ class ModelBundle:
             history,
             calibrator,
             calibrated,
+            detector,
         )
 
     @property

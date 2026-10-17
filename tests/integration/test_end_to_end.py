@@ -553,3 +553,24 @@ def test_the_fairness_report_names_the_sensitive_columns_and_reaches_the_report(
     groups = set(report["columns"]["c"]["groups"])
     assert groups and groups <= {"x", "y", "z"}
     assert (result.run_dir / "diagnostics" / "fairness.json").exists()
+
+
+def test_bundles_flag_rows_unlike_the_training_data_and_keep_the_detector(
+    binary_frame, tmp_path
+):
+    result = support.make_project(
+        binary_frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+    rows = binary_frame.drop(columns="y").head(5).copy()
+    rows.loc[rows.index[0], "b"] = 500.0
+
+    flags = result.bundle.novelty_of(rows)["out_of_distribution"]
+    scored = result.bundle.score(rows)
+    result.save(tmp_path / "net")
+    reloaded = mml.load_model(tmp_path / "net", trusted=True)
+
+    assert bool(flags.iloc[0]) is True
+    assert scored["out_of_distribution"][0] is True
+    assert reloaded.novelty_of(rows)["out_of_distribution"].tolist() == (
+        flags.tolist()
+    )
