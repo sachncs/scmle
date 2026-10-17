@@ -49,7 +49,8 @@ def test_exclusion_rules():
         columns.CategoricalKind().exclusion_reason(pd.Series(list("ab" * 25)))
         is None
     )
-    assert "datetime" in columns.DatetimeKind().exclusion_reason(pd.Series([1]))
+    # Datetimes are kept: the profiler expands them into features.
+    assert columns.DatetimeKind().exclusion_reason(pd.Series([1])) is None
     assert columns.NumericKind().exclusion_reason(pd.Series([1])) is None
 
 
