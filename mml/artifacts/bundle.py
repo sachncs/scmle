@@ -42,6 +42,7 @@ from mml.inference import novelty as novelty_module
 from mml.inference import onnx_export
 from mml.inference import packaging
 from mml.inference import validation
+from mml.models import thresholds
 from mml.monitoring import reference as reference_module
 
 BUNDLE_FORMAT = 1
@@ -376,6 +377,11 @@ class ModelBundle:
             graph_fingerprint=graph_fingerprint,
             group_column=group_column,
             time_column=time_column,
+            optional_inputs=(
+                (pipeline.column,)
+                if isinstance(pipeline, thresholds.GroupThresholdClassifier)
+                else ()
+            ),
         )
         info = BundleInfo(
             model_name,
@@ -885,7 +891,15 @@ class ModelBundle:
         validation.InputValidator(self.schema).check(frame)
         if self.schema.series:
             frame = self.series_builder().apply(frame)
-        return frame[self.schema.pipeline_columns]
+        wanted = [
+            *self.schema.pipeline_columns,
+            *(
+                c
+                for c in self.schema.optional_inputs
+                if c in frame.columns and c not in self.schema.pipeline_columns
+            ),
+        ]
+        return frame[wanted]
 
     def predict(
         self,

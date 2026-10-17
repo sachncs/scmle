@@ -82,6 +82,9 @@
   write a service folder (bundle, pinned requirements, build environment,
   server script, Dockerfile). ONNX also covers LightGBM and XGBoost with
   `onnxmltools`; refusals point to the service package.
+* Fairness mitigation (`fairness=FairnessSpec(mitigation="group_thresholds")`):
+  per-group thresholds judged on validation, reported on the locked rows,
+  logged in the decision log. Reweighing and constrained fitting are not built.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

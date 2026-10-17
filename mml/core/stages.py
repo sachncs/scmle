@@ -38,6 +38,7 @@ from mml.evaluation import diagnostics
 from mml.evaluation import fit_health
 from mml.evaluation import learning_curve
 from mml.evaluation import metrics as metric_catalog
+from mml.evaluation import mitigation
 from mml.evaluation import quantile
 from mml.evaluation import resources
 from mml.evaluation import suite
@@ -693,6 +694,112 @@ class FinalEvaluationStage(Stage):
         )
         return None if health is None else health.to_dict()
 
+    def mitigate_fairness(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+        pipeline: Any,
+        decision: dict[str, Any] | None,
+    ) -> Any:
+        """Gives each group its own threshold when that is judged worthwhile.
+
+        The judgement uses out-of-fold development predictions only. The
+        outcome (applied or not) is always written to the decision log.
+
+        Returns:
+            A group-threshold classifier when applied, else `pipeline`.
+        """
+        fairness = context.spec.fairness
+        task = require(context.task, "task")
+        if fairness.mitigation == "none":
+            return pipeline
+        column = fairness.column or context.spec.data.sensitive_columns[0]
+        label = f"fairness:{column}"
+        if task is not tasks.TaskType.BINARY:
+            context.add_outcome(
+                label,
+                experiments.DecisionAction.REJECT,
+                "group thresholds apply to binary classification only",
+            )
+            return pipeline
+        split = require(context.split, "split")
+        strategy = strategies.get_strategy(selected.strategy)
+        adapter = context.registry.get(selected.model_name)
+        plan = require(context.profile, "profile").feature_plan
+        seed = context.spec.validation.seed
+        probabilities, positions = thresholds.out_of_fold_probabilities(
+            lambda: strategy.build(plan, adapter, task, seed, selected.params),
+            split.dev_features,
+            split.dev_target,
+            split.manifest.folds,
+        )
+        actual = (
+            split.dev_target.iloc[positions] == pipeline.classes_[1]
+        ).to_numpy()
+        assigner = thresholds.GroupAssigner.fit(split.dev_features[column])
+        groups = assigner.assign(
+            split.dev_features[column].iloc[positions]
+        ).reset_index(drop=True)
+        base_cut = decision["threshold"] if decision else 0.5
+        result = mitigation.judge(
+            probabilities,
+            groups,
+            actual,
+            column,
+            fairness.criterion,
+            base_cut,
+            fairness.trigger_gap,
+            fairness.min_reduction,
+            fairness.max_accuracy_cost,
+        )
+        context.add_outcome(
+            label,
+            experiments.DecisionAction.INCLUDE
+            if result.applied
+            else experiments.DecisionAction.REJECT,
+            result.reason,
+        )
+        context.fairness_mitigation = result.to_dict()
+        if not result.applied:
+            return pipeline
+        return thresholds.GroupThresholdClassifier(
+            pipeline, column, assigner, result.thresholds, base_cut
+        )
+
+    def mitigation_on_locked_rows(
+        self,
+        context: context_module.RunContext,
+        before: Any,
+        after: Any,
+        features: pd.DataFrame,
+        target: pd.Series,
+    ) -> None:
+        """Adds the gap and accuracy on the released rows to the evidence."""
+        record = context.fairness_mitigation
+        if record is None or not record["applied"]:
+            return
+        column = record["column"]
+        assigner = after.assigner
+        groups = assigner.assign(features[column]).reset_index(drop=True)
+        positive = after.classes_[1]
+        actual = (target == positive).to_numpy()
+        flags = {
+            name: np.asarray(model.predict(features)) == positive
+            for name, model in (("before", before), ("after", after))
+        }
+        criterion = record["criterion"]
+        record["locked_rows"] = {
+            "gap_before": mitigation.gap(
+                groups, flags["before"], actual, criterion
+            ),
+            "gap_after": mitigation.gap(
+                groups, flags["after"], actual, criterion
+            ),
+            "accuracy_before": float((flags["before"] == actual).mean()),
+            "accuracy_after": float((flags["after"] == actual).mean()),
+            "rows": len(features),
+        }
+
     def self_train(
         self,
         context: context_module.RunContext,
@@ -773,9 +880,14 @@ class FinalEvaluationStage(Stage):
             pipeline.fit(split.dev_features, split.dev_target)
         pipeline = self.self_train(context, selected, pipeline)
         pipeline, decision = choose_decision_threshold(context, pipeline)
+        unmitigated = pipeline
+        pipeline = self.mitigate_fairness(context, selected, pipeline, decision)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
         context.test_rows = (test_features, test_target)
+        self.mitigation_on_locked_rows(
+            context, unmitigated, pipeline, test_features, test_target
+        )
         context.emit(
             "test.opened",
             "locked test set released once, after selection was frozen",
@@ -867,6 +979,7 @@ class FinalEvaluationStage(Stage):
             "test_metrics": test_metrics,
             "weighted_test_metrics": weighted_test_metrics,
             "semi_supervised": context.semi_supervised,
+            "fairness_mitigation": context.fairness_mitigation,
             "n_dev": len(split.dev_features),
             "n_test": len(test_features),
             "split_fingerprint": split.manifest.fingerprint,
