@@ -15,6 +15,7 @@ from typing import Any
 from typing import ClassVar
 
 from sklearn import calibration
+from sklearn import compose
 from sklearn.utils import validation
 
 from mml.contracts import data as data_contracts
@@ -23,6 +24,7 @@ from mml.contracts import experiments
 from mml.contracts import models
 from mml.contracts import tasks
 from mml.data.curation import preprocessing
+from mml.data.curation import transformers
 from mml.data.splitting import inner_cv
 from mml.sampling import resampling
 from mml.sampling import synthesis
@@ -33,6 +35,8 @@ SKEW_THRESHOLD = 1.0
 MIN_INTERACTION_FEATURES = 2
 MAX_INTERACTION_FEATURES = 12
 MIN_SELECTION_FEATURES = 6
+MIN_MISSING_RATE = 0.01
+MAX_ITERATIVE_FEATURES = 50
 DEFAULT = experiments.DEFAULT_STRATEGY
 CALIBRATION_FOLDS = 3
 
@@ -361,12 +365,14 @@ class FeatureStrategy(DataStrategy):
         interactions: Add pairwise numeric interactions.
         construct: Append differences and ratios of the best numeric pairs.
         select: Keep only columns an L1-penalised linear model uses.
+        missing: Missing-value strategy for numeric features.
     """
 
     log_skewed: ClassVar[bool] = False
     interactions: ClassVar[bool] = False
     construct: ClassVar[bool] = False
     select: ClassVar[bool] = False
+    missing: ClassVar[str] = "median"
 
     def build(
         self,
@@ -383,6 +389,7 @@ class FeatureStrategy(DataStrategy):
             interactions=self.interactions,
             construct=self.construct,
             select=self.select,
+            missing=self.missing,
         )
         if self.select:
             options = dataclasses.replace(options, scale=True)
@@ -583,6 +590,108 @@ class SelectFeaturesStrategy(FeatureStrategy):
         return None
 
 
+class MissingValueStrategy(FeatureStrategy):
+    """Base for strategies that change how missing numbers are filled."""
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs numeric gaps and a model that does not handle them itself."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        if adapter.capabilities.handles_missing:
+            return "the model handles missing values natively"
+        stats = profile.column_statistics
+        gaps = [
+            name
+            for name in profile.feature_plan.numeric
+            if stats.get(name, {}).get("missing_rate", 0.0) >= MIN_MISSING_RATE
+        ]
+        if not gaps:
+            return f"no numeric feature is missing in >= {MIN_MISSING_RATE:.0%}"
+        return None
+
+
+class MissingIndicatorStrategy(MissingValueStrategy):
+    """Fills with the median and flags which values were missing."""
+
+    name = "missing_indicators"
+    description = "median imputation plus a missing-value flag per feature"
+    missing = "indicator"
+
+
+class IterativeImputationStrategy(MissingValueStrategy):
+    """Predicts each missing value from the other features."""
+
+    name = "iterative_imputation"
+    description = "model-based imputation from the other numeric features"
+    missing = "iterative"
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Also bounded in width, because it fits a model per feature."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        width = len(profile.feature_plan.numeric)
+        if width > MAX_ITERATIVE_FEATURES:
+            return f"{width} numeric features is too many to impute iteratively"
+        return None
+
+
+class TargetTransformStrategy(DataStrategy):
+    """Regression on a compressed target, predicted in original units.
+
+    A long-tailed target makes squared error chase the extremes; modelling a
+    more symmetric version often helps. Adopted only if the original-unit
+    score on the validation folds improves.
+    """
+
+    name = "target_transform"
+    description = "arcsinh transform of a skewed regression target"
+
+    def applicability(
+        self,
+        profile: data_contracts.DatasetProfile,
+        task: tasks.TaskType,
+        adapter: models.ModelAdapter,
+    ) -> str | None:
+        """Needs a skewed continuous target."""
+        reason = super().applicability(profile, task, adapter)
+        if reason is not None:
+            return reason
+        if task is not tasks.TaskType.REGRESSION:
+            return "target transforms are a regression technique"
+        skew = abs(profile.target_summary.get("skew", 0.0))
+        if skew < TARGET_SKEW_THRESHOLD:
+            return f"target is not long-tailed (|skew| {skew:.2f})"
+        return None
+
+    def build(
+        self,
+        plan: data_contracts.FeaturePlan,
+        adapter: models.ModelAdapter,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Wraps the standard pipeline so the target is transformed."""
+        return compose.TransformedTargetRegressor(
+            regressor=preprocessing.build_pipeline(
+                plan, adapter, task, seed, params
+            ),
+            transformer=transformers.AsinhTarget(),
+        )
+
+
 STRATEGIES: dict[str, DataStrategy] = {
     strategy.name: strategy
     for strategy in (
@@ -600,6 +709,9 @@ STRATEGIES: dict[str, DataStrategy] = {
         InteractionStrategy(),
         ConstructFeaturesStrategy(),
         SelectFeaturesStrategy(),
+        MissingIndicatorStrategy(),
+        IterativeImputationStrategy(),
+        TargetTransformStrategy(),
         TargetEncodingStrategy(),
         RareTargetStrategy(),
     )

@@ -132,8 +132,8 @@ def test_builds_produce_fittable_candidates(skewed_imbalanced):
     for name in strategies.STRATEGIES:
         if name in {"smote", "borderline_smote", "adasyn"} and not has_sampling:
             continue
-        if name == "rare_target_weighting":
-            continue  # regression only; covered in test_rare_target
+        if name in {"rare_target_weighting", "target_transform"}:
+            continue  # regression only; covered by their own tests
         adapter = REGISTRY.get("logistic_regression")
         candidate = strategies.get_strategy(name).build(
             plan, adapter, BINARY, 0
@@ -175,6 +175,9 @@ def test_registry_and_unknown_strategy():
         "interactions",
         "construct_features",
         "select_features",
+        "missing_indicators",
+        "iterative_imputation",
+        "target_transform",
         "target_encoding",
         "rare_target_weighting",
     )
@@ -371,4 +374,111 @@ def test_applicability_of_the_feature_strategies_is_explained():
     )
     assert "baseline" in reason(
         "construct_features", profile_of(ratio_problem()), "dummy"
+    )
+
+
+def gappy_problem(rows=900, seed=7):
+    rng = np.random.default_rng(seed)
+    base = rng.normal(size=rows)
+    frame = pd.DataFrame(
+        {
+            "a": base,
+            "b": base * 2 + rng.normal(0, 0.1, rows),
+            "c": rng.normal(size=rows),
+        }
+    )
+    frame["y"] = (frame.b + rng.normal(0, 0.3, rows) > 0).astype(int)
+    holes = rng.random(rows) < 0.3
+    frame.loc[holes, "b"] = np.nan
+    return frame, holes
+
+
+def test_missing_indicators_append_a_flag_for_features_with_gaps():
+    frame, __ = gappy_problem()
+    profile = profile_of(frame)
+    pipeline = strategies.get_strategy("missing_indicators").build(
+        profile.feature_plan, REGISTRY.get("logistic_regression"), BINARY, 0
+    )
+
+    pipeline.fit(frame.drop(columns="y"), frame["y"])
+    width = (
+        pipeline.named_steps["prep"].transform(frame.drop(columns="y")).shape[1]
+    )
+
+    assert width == 4
+
+
+def test_iterative_imputation_recovers_values_better_than_the_median():
+    frame, holes = gappy_problem()
+    truth = frame.copy()
+    rng = np.random.default_rng(7)
+    base = rng.normal(size=len(frame))
+    truth["b"] = base * 2 + rng.normal(0, 0.1, len(frame))
+    profile = profile_of(frame)
+
+    def error(strategy):
+        pipeline = strategies.get_strategy(strategy).build(
+            profile.feature_plan, REGISTRY.get("logistic_regression"), BINARY, 0
+        )
+        pipeline.fit(frame.drop(columns="y"), frame["y"])
+        names = list(pipeline.named_steps["prep"].get_feature_names_out())
+        matrix = pipeline.named_steps["prep"].transform(frame.drop(columns="y"))
+        return matrix, names
+
+    matrix, names = error("iterative_imputation")
+    filled = matrix[:, names.index("b")][holes]
+    partner = matrix[:, names.index("a")][holes]
+    assert abs(np.corrcoef(filled, partner)[0, 1]) > 0.9
+    default_matrix, default_names = error("default")
+    flat = default_matrix[:, default_names.index("b")][holes]
+    assert np.std(flat) < 0.01
+
+
+def test_feature_strategies_for_gaps_are_not_offered_when_the_model_copes():
+    frame, __ = gappy_problem()
+    profile = profile_of(frame)
+    complete = profile_of(frame.drop(columns="y").fillna(0).assign(y=frame.y))
+
+    assert "natively" in reason("missing_indicators", profile, "lightgbm")
+    assert reason("missing_indicators", profile, "logistic_regression") is None
+    assert "no numeric feature is missing" in reason(
+        "iterative_imputation", complete, "logistic_regression"
+    )
+
+
+def test_target_transform_helps_a_linear_model_on_a_long_tailed_target():
+    from sklearn import model_selection
+
+    rng = np.random.default_rng(9)
+    frame = pd.DataFrame({"x": rng.normal(size=1000)})
+    frame["y"] = np.exp(1.2 * frame.x + rng.normal(0, 0.2, 1000))
+    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
+    profile = profiler.DatasetProfiler(spec).profile(
+        frame,
+        tabular.build_manifest(frame, "y"),
+        tasks.TaskType.REGRESSION,
+    )
+
+    def mae(name):
+        estimator = strategies.get_strategy(name).build(
+            profile.feature_plan,
+            REGISTRY.get("ridge"),
+            tasks.TaskType.REGRESSION,
+            0,
+        )
+        return -model_selection.cross_val_score(
+            estimator,
+            frame.drop(columns="y"),
+            frame["y"],
+            cv=4,
+            scoring="neg_median_absolute_error",
+        ).mean()
+
+    assert mae("target_transform") < mae("default")
+    assert (
+        reason("target_transform", profile, "ridge", tasks.TaskType.REGRESSION)
+        is None
+    )
+    assert "regression technique" in reason(
+        "target_transform", profile, "ridge", BINARY
     )

@@ -18,6 +18,7 @@ from sklearn import preprocessing
 from sklearn import tree as sk_tree
 
 from mml.contracts import data as data_contracts
+from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data.curation import transformers
 
@@ -68,7 +69,19 @@ def to_finite(series: pd.Series) -> pd.Series:
 def to_float(values: Any) -> np.ndarray:
     """Coerces a 2-D block to float; unparseable and infinite become NaN."""
     frame = pd.DataFrame(values).apply(to_finite)
-    return frame.to_numpy()
+    return np.array(frame.to_numpy(), dtype=float, copy=True)
+
+
+def experimental_impute() -> Any:
+    """Builds the iterative imputer (scikit-learn gates it behind an import)."""
+    from sklearn.experimental import enable_iterative_imputer  # noqa: F401
+
+    return impute.IterativeImputer(
+        max_iter=5,
+        keep_empty_features=True,
+        random_state=0,
+        sample_posterior=False,
+    )
 
 
 def to_text(values: Any) -> np.ndarray:
@@ -243,6 +256,25 @@ class NumericKind(ColumnKind):
             stats["outlier_rate"] = outlier_rate(finite)
         return stats
 
+    @staticmethod
+    def imputer(strategy: str) -> Any:
+        """The imputer for a missing-value strategy.
+
+        Raises:
+            ConfigError: For an unknown strategy.
+        """
+        if strategy == "median":
+            return impute.SimpleImputer(
+                strategy="median", keep_empty_features=True
+            )
+        if strategy == "indicator":
+            return impute.SimpleImputer(
+                strategy="median", keep_empty_features=True, add_indicator=True
+            )
+        if strategy == "iterative":
+            return experimental_impute()
+        raise errors.ConfigError(f"unknown missing-value strategy '{strategy}'")
+
     def transformer(
         self, options: data_contracts.PreprocessingOptions
     ) -> pipeline.Pipeline:
@@ -256,14 +288,7 @@ class NumericKind(ColumnKind):
             ),
         ]
         if options.impute:
-            steps.append(
-                (
-                    "impute",
-                    impute.SimpleImputer(
-                        strategy="median", keep_empty_features=True
-                    ),
-                )
-            )
+            steps.append(("impute", self.imputer(options.missing)))
         if options.log_skewed:
             steps.append(("log", transformers.SkewedLogTransformer()))
         if options.scale:

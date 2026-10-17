@@ -89,3 +89,35 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
     def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
         """Terms of the vocabulary."""
         return self.vectorizer_.get_feature_names_out()
+
+
+class AsinhTarget(base.TransformerMixin, base.BaseEstimator):
+    """Inverse hyperbolic sine of the target, scaled by its spread.
+
+    Behaves like a log for large values and like the identity near zero, is
+    defined for negative values, and inverts exactly everywhere (unlike a
+    power transform, whose inverse can leave its domain for extreme
+    predictions).
+
+    Attributes:
+        scale_: Spread of the training target, set by fit.
+    """
+
+    LIMIT = 50.0
+
+    def fit(self, target: Any, unused: Any = None) -> Self:
+        """Learns the scale from the training target."""
+        spread = float(np.std(np.asarray(target, dtype=float)))
+        self.scale_ = spread if spread > 0 else 1.0
+        return self
+
+    def transform(self, target: Any) -> np.ndarray:
+        """Compresses the tails."""
+        return np.arcsinh(np.asarray(target, dtype=float) / self.scale_)
+
+    def inverse_transform(self, target: Any) -> np.ndarray:
+        """Maps predictions back to the original units."""
+        clipped = np.clip(
+            np.asarray(target, dtype=float), -self.LIMIT, self.LIMIT
+        )
+        return np.sinh(clipped) * self.scale_

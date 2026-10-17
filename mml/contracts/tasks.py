@@ -208,6 +208,9 @@ class StrategySpec(FrozenModel):
             "interactions",
             "construct_features",
             "select_features",
+            "missing_indicators",
+            "iterative_imputation",
+            "target_transform",
             "target_encoding",
             "rare_target_weighting",
         ]

@@ -54,3 +54,15 @@ def test_feature_names_pass_through():
     names = np.array(["a", "b"], dtype=object)
     model = transformers.SkewedLogTransformer().fit(np.ones((20, 2)))
     assert list(model.get_feature_names_out(names)) == ["a", "b"]
+
+
+def test_asinh_target_round_trips_and_tames_tails():
+    target = np.array([-5.0, 0.0, 1.0, 10.0, 1000.0, 1e6])
+    transform = transformers.AsinhTarget().fit(target)
+
+    squeezed = transform.transform(target)
+
+    np.testing.assert_allclose(transform.inverse_transform(squeezed), target)
+    assert squeezed.max() < 20 and squeezed.min() < 0
+    huge = transform.inverse_transform(np.array([1e9, -1e9]))
+    assert np.isfinite(huge).all()

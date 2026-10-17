@@ -171,6 +171,10 @@ class PreprocessingOptions:
         construct: Append differences and ratios of the numeric features
             most associated with the target.
         select: Keep only the columns an L1-penalised linear model uses.
+        missing: How missing numeric values are filled: `median`,
+            `indicator` (median plus a flag column per feature that has
+            missing values) or `iterative` (each feature predicted from the
+            others).
     """
 
     scale: bool = False
@@ -181,3 +185,4 @@ class PreprocessingOptions:
     sparse: bool = False
     construct: bool = False
     select: bool = False
+    missing: str = "median"
