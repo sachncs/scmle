@@ -55,6 +55,7 @@ class FeaturePlan:
             together.
         time_column: Ordering column, so inner cross-validation keeps time
             order.
+        weight_column: Column of per-row training weights, if any.
     """
 
     numeric: tuple[str, ...]
@@ -68,6 +69,7 @@ class FeaturePlan:
     high_cardinality: tuple[str, ...] = ()
     group_column: str | None = None
     time_column: str | None = None
+    weight_column: str | None = None
 
     @property
     def features(self) -> tuple[str, ...]:

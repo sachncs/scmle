@@ -135,6 +135,10 @@ class DataSpec(FrozenModel):
             must never fall (+1) or never rise (-1) as the feature grows,
             other features held fixed. Only models that can enforce this
             are planned (binary classification and regression).
+        weight_column: Numeric column of non-negative per-row weights (for
+            example survey weights or recency). Rows count in training by
+            their weight; the column is never a feature and is not needed
+            at prediction time. Metrics stay unweighted.
         sensitive_columns: Columns describing groups of people (for example
             sex or age band). They are not hidden from the model unless also
             excluded; the fairness report compares outcomes across them.
@@ -150,6 +154,7 @@ class DataSpec(FrozenModel):
     feature_delays: dict[str, int] = pydantic.Field(default_factory=dict)
     sensitive_columns: list[str] = pydantic.Field(default_factory=list)
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
+    weight_column: str | None = None
 
 
 class ValidationSpec(FrozenModel):

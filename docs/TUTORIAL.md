@@ -203,6 +203,7 @@ project = mml.MLProject(
     "default",
     sensitive_columns=["sex"],
     monotonic_constraints={"missed_payments": 1},
+    weight_column="survey_weight",  # rows count by weight when training
 )
 
 # After a run: reliability checks, explanations and calibrated uncertainty.

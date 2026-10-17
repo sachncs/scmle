@@ -67,6 +67,7 @@ class ProjectCommand(Command):
         parser.add_argument("--time-budget", type=int, default=1800)
         parser.add_argument("--workers", type=int, default=1)
         parser.add_argument("--group-column")
+        parser.add_argument("--weight-column")
         parser.add_argument("--time-column")
         parser.add_argument("--id-columns", nargs="*", default=[])
         parser.add_argument("--exclude", nargs="*", default=[])
@@ -202,6 +203,7 @@ class ProjectCommand(Command):
             workers=args.workers,
             id_columns=args.id_columns,
             group_column=args.group_column,
+            weight_column=args.weight_column,
             time_column=args.time_column,
             excluded_columns=args.exclude,
             seed=args.seed,

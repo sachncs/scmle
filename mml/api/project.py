@@ -43,6 +43,7 @@ class MLProject:
         unavailable_at_prediction: list[str] | None = None,
         feature_delays: dict[str, int] | None = None,
         sensitive_columns: list[str] | None = None,
+        weight_column: str | None = None,
         monotonic_constraints: dict[str, int] | None = None,
         embargo_rows: int = 0,
         horizon_rows: int | None = None,
@@ -88,6 +89,9 @@ class MLProject:
                 that many rows earlier (needs `time_column`).
             sensitive_columns: Columns describing groups of people; the
                 fairness report compares outcomes across them.
+            weight_column: Numeric column of per-row training weights (never
+                a feature; not needed at prediction time; metrics stay
+                unweighted).
             monotonic_constraints: Numeric feature to +1 / -1: predictions
                 must never fall / rise as the feature grows (binary
                 classification and regression).
@@ -136,6 +140,7 @@ class MLProject:
                 unavailable_at_prediction=unavailable_at_prediction or [],
                 feature_delays=feature_delays or {},
                 sensitive_columns=sensitive_columns or [],
+                weight_column=weight_column,
                 monotonic_constraints=monotonic_constraints or {},
             ),
             task=task,

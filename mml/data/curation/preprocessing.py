@@ -17,6 +17,7 @@ from mml.contracts import tasks
 from mml.data.curation import selection
 from mml.data.validation import columns
 from mml.features import feature_graph
+from mml.models import weighting
 from mml.models import wrappers
 
 SPARSE_THRESHOLD = 0.3
@@ -163,6 +164,8 @@ def build_pipeline(
     """
     assembled = adapter.assemble(plan, task, seed, params)
     if assembled is not None:
+        if plan.weight_column:
+            return weighting.weighted(assembled, plan.weight_column, seed)
         return assembled
     params = dict(params or {})
     if options is None:
@@ -197,4 +200,7 @@ def build_pipeline(
             monotonic_signs(plan, len(special)),
         )
     steps.append(("model", estimator))
-    return pipeline.Pipeline(steps)
+    built = pipeline.Pipeline(steps)
+    if plan.weight_column:
+        return weighting.weighted(built, plan.weight_column, seed)
+    return built

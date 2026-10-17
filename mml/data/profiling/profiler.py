@@ -7,6 +7,7 @@ leak, and statistics alone cannot tell which.
 
 import dataclasses
 
+import numpy as np
 import pandas as pd
 
 from mml.contracts import data as data_contracts
@@ -91,12 +92,34 @@ class DatasetProfiler:
             roles[data.group_column] = "group column (used for splitting only)"
         if data.time_column:
             roles[data.time_column] = "time column (used for splitting only)"
+        if data.weight_column:
+            roles[data.weight_column] = "sample weight (used for training only)"
         for column in roles:
             if column not in frame.columns:
                 raise errors.DataError(
                     f"configured column '{column}' not found in dataset"
                 )
+        if data.weight_column:
+            self.check_weights(frame[data.weight_column])
         return roles
+
+    def check_weights(self, weights: pd.Series) -> None:
+        """Requires finite, non-negative weights with a positive total.
+
+        Raises:
+            DataError: If the weight column cannot weight training rows.
+        """
+        numeric = pd.to_numeric(weights, errors="coerce").to_numpy(float)
+        name = self.spec.data.weight_column
+        if not np.isfinite(numeric).all():
+            raise errors.DataError(
+                f"weight column '{name}' has missing or non-numeric values"
+            )
+        if (numeric < 0).any() or numeric.sum() <= 0:
+            raise errors.DataError(
+                f"weight column '{name}' must be non-negative with a "
+                "positive total"
+            )
 
     def inspect_columns(
         self, frame: pd.DataFrame, roles: dict[str, str]
@@ -301,6 +324,7 @@ class DatasetProfiler:
             dropped=dropped,
             group_column=self.spec.data.group_column,
             time_column=self.spec.data.time_column,
+            weight_column=self.spec.data.weight_column,
             high_cardinality=tuple(
                 c
                 for c in features["categorical"]
