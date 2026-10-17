@@ -38,6 +38,9 @@
 * Conformalized quantile intervals (`predict_interval(method="quantile")`):
   widths follow the row's noise; the default residual method is unchanged.
 * `data.time_as_feature` offers the time column to the model (opt-in).
+* Unlabeled rows: `data.unlabeled` (`block`, `ignore`, `pseudo_label`);
+  self-training is judged in cross-validation and used only if it wins;
+  `bundle.rank_for_labeling` picks the rows to label next.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

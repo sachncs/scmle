@@ -68,6 +68,11 @@ class ProjectCommand(Command):
         parser.add_argument("--workers", type=int, default=1)
         parser.add_argument("--group-column")
         parser.add_argument("--weight-column")
+        parser.add_argument(
+            "--unlabeled",
+            choices=["block", "ignore", "pseudo_label"],
+            default="block",
+        )
         parser.add_argument("--time-column")
         parser.add_argument("--time-as-feature", action="store_true")
         parser.add_argument("--id-columns", nargs="*", default=[])
@@ -205,6 +210,7 @@ class ProjectCommand(Command):
             id_columns=args.id_columns,
             group_column=args.group_column,
             weight_column=args.weight_column,
+            unlabeled=args.unlabeled,
             time_column=args.time_column,
             time_as_feature=args.time_as_feature,
             excluded_columns=args.exclude,

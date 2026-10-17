@@ -45,6 +45,8 @@ class MLProject:
         feature_delays: dict[str, int] | None = None,
         sensitive_columns: list[str] | None = None,
         weight_column: str | None = None,
+        unlabeled: Literal["block", "ignore", "pseudo_label"] = "block",
+        pseudo_label_confidence: float = 0.9,
         monotonic_constraints: dict[str, int] | None = None,
         embargo_rows: int = 0,
         horizon_rows: int | None = None,
@@ -92,6 +94,10 @@ class MLProject:
                 that many rows earlier (needs `time_column`).
             sensitive_columns: Columns describing groups of people; the
                 fairness report compares outcomes across them.
+            unlabeled: What to do with rows whose target is missing: `block`
+                (default), `ignore`, or `pseudo_label` (classification; used
+                only if it wins in cross-validation).
+            pseudo_label_confidence: Smallest probability trusted as a label.
             weight_column: Numeric column of per-row training weights (never
                 a feature; not needed at prediction time; test metrics
                 are also reported weighted).
@@ -145,6 +151,8 @@ class MLProject:
                 feature_delays=feature_delays or {},
                 sensitive_columns=sensitive_columns or [],
                 weight_column=weight_column,
+                unlabeled=unlabeled,
+                pseudo_label_confidence=pseudo_label_confidence,
                 monotonic_constraints=monotonic_constraints or {},
             ),
             task=task,

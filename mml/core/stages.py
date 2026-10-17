@@ -54,6 +54,7 @@ from mml.intelligence import planner as planner_module
 from mml.intelligence import recommendations
 from mml.models import thresholds
 from mml.monitoring import reference as reference_module
+from mml.sampling import pseudo_labeling
 from mml.sampling import strategies
 
 DIAGNOSTIC_BUDGET_SHARE = 0.25
@@ -174,6 +175,37 @@ class ProfileStage(Stage):
         """Names the stage."""
         return "profile dataset"
 
+    def set_aside_unlabeled(
+        self, context: context_module.RunContext, frame: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Applies the `unlabeled` policy to rows with a missing target.
+
+        Returns:
+            The labeled rows. The others wait in `context.unlabeled` (their
+            weight, if the data has one, defaults to 1).
+
+        Raises:
+            BlockedError: Under the default `block` policy.
+        """
+        data = context.spec.data
+        missing = frame[data.target].isna()
+        if data.unlabeled == "block":
+            raise errors.BlockedError(
+                f"target '{data.target}' has {int(missing.sum())} missing "
+                "values; set data.unlabeled to 'ignore' or 'pseudo_label' to "
+                "use the unlabeled rows"
+            )
+        rows = frame[missing].drop(columns=[data.target]).reset_index(drop=True)
+        if data.weight_column and data.weight_column in rows:
+            rows[data.weight_column] = rows[data.weight_column].fillna(1.0)
+        context.unlabeled = rows
+        context.cleaning_notes.append(
+            f"{len(rows)} row(s) without a target were set aside "
+            f"(policy '{data.unlabeled}')"
+        )
+        context.frame = frame[~missing].reset_index(drop=True)
+        return context.frame
+
     def execute(self, context: context_module.RunContext) -> None:
         """Resolves task/metric, profiles, and enforces the leakage policy.
 
@@ -185,11 +217,17 @@ class ProfileStage(Stage):
         frame = require(context.frame, "frame")
         target = frame[spec.data.target]
         if target.isna().any():
-            raise errors.BlockedError(
-                f"target '{target.name}' has {int(target.isna().sum())} "
-                "missing values"
-            )
+            frame = self.set_aside_unlabeled(context, frame)
+            target = frame[spec.data.target]
         task = target_module.TaskResolver(spec).resolve(target)
+        if (
+            context.unlabeled is not None
+            and spec.data.unlabeled == "pseudo_label"
+            and not task.is_classification
+        ):
+            raise errors.ConfigError(
+                "unlabeled='pseudo_label' supports classification only"
+            )
         approved = context.approved_plan
         if approved is not None and approved.task != task.value:
             raise errors.ConfigError(
@@ -646,6 +684,67 @@ class FinalEvaluationStage(Stage):
         )
         return None if health is None else health.to_dict()
 
+    def self_train(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+        pipeline: Any,
+    ) -> Any:
+        """Adds confident pseudo-labels to the final fit when they help.
+
+        The judgement uses only development folds. The unlabeled rows never
+        touch the locked test rows.
+
+        Returns:
+            The pipeline to carry forward: the self-trained refit when
+            cross-validation accepted it, otherwise `pipeline` unchanged.
+        """
+        data = context.spec.data
+        unlabeled = context.unlabeled
+        if data.unlabeled != "pseudo_label" or unlabeled is None:
+            return pipeline
+        split = require(context.split, "split")
+        task = require(context.task, "task")
+        metric = require(context.metric, "metric")
+        template = strategies.get_strategy(selected.strategy).build(
+            require(context.profile, "profile").feature_plan,
+            context.registry.get(selected.model_name),
+            task,
+            context.spec.validation.seed,
+            selected.params,
+        )
+        outcome = pseudo_labeling.judge(
+            template,
+            split.dev_features,
+            split.dev_target,
+            split.manifest.folds,
+            unlabeled,
+            metric.scorer(
+                metric_catalog.positive_label(split.dev_target, task)
+            ),
+            data.pseudo_label_confidence,
+            lambda: bool(context.resource_governor.skip_reason(first=False)),
+        )
+        record: dict[str, Any] = {
+            "unlabeled_rows": len(unlabeled),
+            "confidence": data.pseudo_label_confidence,
+            "outcome": None if outcome is None else outcome.to_dict(),
+            "used": False,
+        }
+        context.semi_supervised = record
+        if outcome is None or not outcome.accepted:
+            return pipeline
+        augmented, count = pseudo_labeling.augmented_fit(
+            pipeline,
+            split.dev_features,
+            split.dev_target,
+            unlabeled,
+            data.pseudo_label_confidence,
+        )
+        record["used"] = count > 0
+        record["pseudo_rows"] = count
+        return augmented
+
     def execute(self, context: context_module.RunContext) -> None:
         """Refits on all development data and evaluates on the test set."""
         context.check_cancelled()
@@ -663,6 +762,7 @@ class FinalEvaluationStage(Stage):
                 selected.params,
             )
             pipeline.fit(split.dev_features, split.dev_target)
+        pipeline = self.self_train(context, selected, pipeline)
         pipeline, decision = choose_decision_threshold(context, pipeline)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
@@ -756,6 +856,7 @@ class FinalEvaluationStage(Stage):
             "baseline_cv_score": baseline.score_mean if baseline else None,
             "test_metrics": test_metrics,
             "weighted_test_metrics": weighted_test_metrics,
+            "semi_supervised": context.semi_supervised,
             "n_dev": len(split.dev_features),
             "n_test": len(test_features),
             "split_fingerprint": split.manifest.fingerprint,

@@ -971,6 +971,51 @@ class ModelBundle:
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
 
+    def rank_for_labeling(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        count: int = 10,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> pd.DataFrame:
+        """Picks the unlabeled rows a person should label next.
+
+        Classification ranks by the smallest gap between the two most likely
+        classes (the model cannot tell them apart). Regression ranks by the
+        width of the quantile band (the model is least sure there).
+
+        Args:
+            data: Unlabeled rows (DataFrame or path to CSV/Parquet).
+            count: How many rows to return.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            The `count` most informative rows: `position` in `data` and an
+            `uncertainty` score in [0, 1] for classification (a width in
+            target units for regression), most uncertain first.
+
+        Raises:
+            ArtifactError: For a regression bundle without quantile models.
+        """
+        frame = self.prepare_frame(data, mapping)
+        if self.classes is not None:
+            ordered = np.sort(
+                np.asarray(self.pipeline.predict_proba(frame)), axis=1
+            )
+            top = ordered[:, -1]
+            runner_up = ordered[:, -2] if ordered.shape[1] > 1 else 0.0
+            uncertainty = 1.0 - (top - runner_up)
+        else:
+            if self.quantile is None:
+                raise errors.ArtifactError(
+                    "this bundle has no quantile models to rank by"
+                )
+            lower, upper = self.quantile.raw_band(frame)
+            uncertainty = upper - lower
+        order = np.argsort(-uncertainty, kind="stable")[:count]
+        return pd.DataFrame(
+            {"position": order, "uncertainty": uncertainty[order]}
+        )
+
     def predict_set(
         self,
         data: str | pathlib.Path | pd.DataFrame,

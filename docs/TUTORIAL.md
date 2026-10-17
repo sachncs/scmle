@@ -206,6 +206,10 @@ project = mml.MLProject(
     weight_column="survey_weight",  # rows count by weight when training
 )
 
+# Rows without a label: set aside, or self-train when it measurably helps.
+project = mml.MLProject(data, "churn", unlabeled="pseudo_label")
+# result.bundle.rank_for_labeling(pool, count=20) -> rows to label next
+
 # After a run: reliability checks, explanations and calibrated uncertainty.
 result.evaluation["fit_health"]  # healthy / overfit / underfit
 result.diagnostics["robustness"]  # score under degraded input

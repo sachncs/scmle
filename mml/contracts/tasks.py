@@ -139,6 +139,13 @@ class DataSpec(FrozenModel):
             must never fall (+1) or never rise (-1) as the feature grows,
             other features held fixed. Only models that can enforce this
             are planned (binary classification and regression).
+        unlabeled: What to do with rows whose target is missing: `block`
+            (refuse, the default), `ignore` (set them aside and report how
+            many), or `pseudo_label` (classification only: label the rows the
+            model is confident about and train on them, but only if that
+            wins in cross-validation).
+        pseudo_label_confidence: Smallest top-class probability trusted
+            when pseudo-labeling.
         weight_column: Numeric column of non-negative per-row weights (for
             example survey weights or recency). Rows count in training by
             their weight; the column is never a feature and is not needed
@@ -160,6 +167,8 @@ class DataSpec(FrozenModel):
     sensitive_columns: list[str] = pydantic.Field(default_factory=list)
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
+    unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"
+    pseudo_label_confidence: float = pydantic.Field(default=0.9, gt=0.5, lt=1.0)
 
 
 class ValidationSpec(FrozenModel):

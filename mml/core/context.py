@@ -95,6 +95,8 @@ class RunContext:
         refits: Candidates already refit on development data during
             constraint checks, by trial id (reused by the final evaluation).
         final_pipeline: Selected pipeline refit on development data.
+        unlabeled: Rows without a target, set aside by the `unlabeled` policy.
+        semi_supervised: Record of the self-training judgement, if any.
         evaluation: Final evaluation record.
         bundle: Packaged model.
         result: Final run result.
@@ -147,6 +149,8 @@ class RunContext:
     reference_scores: pd.Series | None = None
     refits: dict[str, Any] = dataclasses.field(default_factory=dict)
     final_pipeline: Any = None
+    unlabeled: pd.DataFrame | None = None
+    semi_supervised: dict[str, Any] | None = None
     evaluation: dict[str, Any] | None = None
     bundle: bundle_module.ModelBundle | None = None
     result: results.RunResult | None = None
