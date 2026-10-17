@@ -10,6 +10,7 @@ from mml.contracts import models
 from mml.contracts import search
 from mml.contracts import tasks
 from mml.models.deeplearning import estimators
+from mml.models.deeplearning import foundation
 from mml.models.deeplearning import worker
 
 ALL_TASKS = frozenset(tasks.TaskType)
@@ -158,7 +159,55 @@ class TorchRobustMlpAdapter(TorchAdapter):
     )
 
 
+class TabPfnAdapter(models.ModelAdapter):
+    """Pretrained tabular foundation model (`tabpfn` extra, license required).
+
+    Needs the `tabpfn` package and an accepted Prior Labs license for the
+    weights (`TABPFN_TOKEN`). Without them its trials fail with the library's
+    own message and the rest of the run continues.
+    """
+
+    name = "tabpfn"
+    family = "foundation"
+    requires = ("tabpfn",)
+    capabilities = models.Capabilities(
+        ALL_TASKS,
+        probabilities=True,
+        gpu=True,
+        max_rows=foundation.MAX_ROWS,
+        cost=5,
+        memory_factor=6.0,
+    )
+
+    def gpu_usable(self) -> bool:
+        """Whether PyTorch can see a CUDA device (asked of the worker)."""
+        return self.is_available() and bool(
+            worker.client().request("probe", ())
+        )
+
+    def build(
+        self,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> models.Estimator:
+        """Creates an unfitted TabPFN estimator.
+
+        Raises:
+            ConfigError: If the `tabpfn` package is not installed.
+        """
+        if not self.is_available():
+            raise errors.ConfigError(
+                f"{self.name}: install the 'tabpfn' extra (tabpfn)"
+            )
+        settings = {"random_state": seed, **(params or {})}
+        if task.is_classification:
+            return estimators.TabPfnClassifier(**settings)
+        return estimators.TabPfnRegressor(**settings)
+
+
 DEEP_LEARNING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
+    TabPfnAdapter,
     TorchMlpAdapter,
     TorchResidualAdapter,
     TorchEnsembleAdapter,

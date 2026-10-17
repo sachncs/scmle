@@ -394,7 +394,7 @@ def gappy_problem(rows=900, seed=7):
 
 
 def test_missing_indicators_append_a_flag_for_features_with_gaps():
-    frame, __ = gappy_problem()
+    frame = gappy_problem()[0]
     profile = profile_of(frame)
     pipeline = strategies.get_strategy("missing_indicators").build(
         profile.feature_plan, REGISTRY.get("logistic_regression"), BINARY, 0
@@ -435,7 +435,7 @@ def test_iterative_imputation_recovers_values_better_than_the_median():
 
 
 def test_feature_strategies_for_gaps_are_not_offered_when_the_model_copes():
-    frame, __ = gappy_problem()
+    frame = gappy_problem()[0]
     profile = profile_of(frame)
     complete = profile_of(frame.drop(columns="y").fillna(0).assign(y=frame.y))
 

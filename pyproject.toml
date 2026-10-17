@@ -39,6 +39,9 @@ dependencies = [
 boosting = ["lightgbm>=4.6", "xgboost>=3.0"]
 catboost = ["catboost>=1.2.8"]  # no free-threaded (3.14t) wheel yet
 deeplearning = ["torch>=2.8"]
+# TabPFN needs an accepted Prior Labs license and TABPFN_TOKEN for its weights,
+# so it is not part of the `all` extra.
+tabpfn = ["tabpfn>=2.0"]
 optimization = ["optuna>=4.0"]
 sampling = ["imbalanced-learn>=0.14.1"]
 polars = ["polars>=1.0"]

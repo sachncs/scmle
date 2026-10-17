@@ -6,7 +6,7 @@ from mml.contracts import tasks
 NO_TUNING = tasks.SearchSpec(top_models=0)
 NO_STRATEGIES = tasks.StrategySpec(top_models=0)
 NO_ENSEMBLE = tasks.EnsembleSpec(size=0)
-FAST_MODELS = tasks.ModelSpec(exclude_families=["deep_learning"])
+FAST_MODELS = tasks.ModelSpec(exclude_families=["deep_learning", "foundation"])
 
 
 def make_project(data, target, **kwargs):

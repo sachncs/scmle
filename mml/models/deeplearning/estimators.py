@@ -195,3 +195,87 @@ class TorchRegressor(base.RegressorMixin, NetworkEstimator):
     def predict(self, features: Any) -> np.ndarray:
         """Predicted values in the original units."""
         return self.call("predict", features)
+
+
+class TabPfnEstimator(base.BaseEstimator):
+    """Worker-backed TabPFN with the scikit-learn estimator interface.
+
+    Attributes:
+        device: `auto`, `cpu` or `cuda`.
+        random_state: Seed of TabPFN's internal ensemble.
+        n_estimators: Members of TabPFN's internal ensemble.
+    """
+
+    engine_path = ""
+
+    def __init__(
+        self,
+        device: str = "auto",
+        random_state: int = 0,
+        n_estimators: int = 8,
+    ) -> None:
+        """Stores the settings (scikit-learn convention)."""
+        self.device = device
+        self.random_state = random_state
+        self.n_estimators = n_estimators
+
+    def fit(self, features: Any, target: Any) -> "TabPfnEstimator":
+        """Stores the rows in the worker's TabPFN model."""
+        matrix = NetworkEstimator.dense(features)
+        self.state_ = worker.client().request(
+            "fit",
+            (
+                self.engine_path,
+                self.get_params(),
+                matrix,
+                np.asarray(target),
+                None,
+            ),
+        )
+        self.state_id_ = uuid.uuid4().hex
+        self.remember(self.state_)
+        return self
+
+    def remember(self, state: dict[str, Any]) -> None:
+        """Copies attributes scikit-learn expects from the fitted state."""
+
+    def call(self, method: str, features: Any) -> np.ndarray:
+        """Runs an engine method in the worker on new rows."""
+        matrix = NetworkEstimator.dense(features)
+        client = worker.client()
+        for state in (None, self.state_):
+            reply = client.request(
+                "call",
+                (self.engine_path, self.state_id_, state, method, matrix),
+            )
+            if not (isinstance(reply, str) and reply == NEED_STATE):
+                return np.asarray(reply)
+        raise worker.WorkerError("the worker could not load the model state")
+
+
+class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
+    """TabPFN classifier."""
+
+    engine_path = "mml.models.deeplearning.foundation.ClassifierEngine"
+
+    def remember(self, state: dict[str, Any]) -> None:
+        """Exposes `classes_` after fitting."""
+        self.classes_ = state["classes_"]
+
+    def predict_proba(self, features: Any) -> np.ndarray:
+        """Class probabilities."""
+        return self.call("predict_proba", features)
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Most probable class."""
+        return self.call("predict", features)
+
+
+class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):
+    """TabPFN regressor."""
+
+    engine_path = "mml.models.deeplearning.foundation.RegressorEngine"
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Predicted values."""
+        return self.call("predict", features)
