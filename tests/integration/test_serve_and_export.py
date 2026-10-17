@@ -48,7 +48,7 @@ def post(url, body):
 
 
 def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
-    root, __ = saved
+    root = saved[0]
     model = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
     adapter = serving.HttpServing(model)
     adapter.start()
@@ -63,7 +63,7 @@ def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
 
 
 def test_health_reports_the_model_version_and_checksum(saved):
-    root, __ = saved
+    root = saved[0]
     model = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
     adapter = serving.HttpServing(model)
     adapter.start()
@@ -79,7 +79,7 @@ def test_health_reports_the_model_version_and_checksum(saved):
 
 
 def test_an_unsigned_bundle_is_not_served_unless_trusted(saved):
-    root, __ = saved
+    root = saved[0]
 
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
         cli.ServeCommand().execute(
@@ -90,7 +90,7 @@ def test_an_unsigned_bundle_is_not_served_unless_trusted(saved):
 def test_the_serve_command_starts_a_server_for_a_trusted_bundle(
     saved, monkeypatch
 ):
-    root, __ = saved
+    root = saved[0]
     started = threading.Event()
     seen = {}
 

@@ -27,7 +27,7 @@ def test_overconfidence_is_measured_as_the_gap_to_accuracy():
     probabilities = np.tile([0.9, 0.1], (10, 1))
     labels = [0] * 5 + [1] * 5  # right half the time at 0.9 confidence
 
-    error, __ = reliability.top_label_curve(probabilities, labels, [0, 1])
+    error = reliability.top_label_curve(probabilities, labels, [0, 1])[0]
 
     assert error == pytest.approx(0.4)
 

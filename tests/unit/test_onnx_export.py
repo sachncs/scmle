@@ -111,7 +111,7 @@ def test_the_scorer_returns_probabilities_in_class_order(tmp_path):
 
 
 def test_models_the_converter_cannot_express_are_refused_by_name(tmp_path):
-    bundle, __ = make_bundle("random_forest", tasks.TaskType.BINARY)
+    bundle = make_bundle("random_forest", tasks.TaskType.BINARY)[0]
     bundle.pipeline = tasks  # Not an estimator at all.
 
     with pytest.raises(errors.ArtifactError, match="not supported"):
@@ -127,7 +127,7 @@ def test_an_attached_calibrator_blocks_the_export(tmp_path):
 
 
 def test_survival_models_are_refused(tmp_path):
-    bundle, __ = make_bundle("random_forest", tasks.TaskType.BINARY)
+    bundle = make_bundle("random_forest", tasks.TaskType.BINARY)[0]
     bundle.schema = dataclasses.replace(bundle.schema, task="survival")
 
     with pytest.raises(errors.ArtifactError, match="survival"):

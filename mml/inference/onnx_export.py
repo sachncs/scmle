@@ -127,7 +127,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
             an inference-time calibrator is attached (the graph would not
             reproduce `predict_proba`), or when the extra is not installed.
     """
-    converter, __ = load_converter()
+    converter = load_converter()[0]
     types = importlib.import_module("skl2onnx.common.data_types")
     task = bundle.schema.task
     if task not in {
@@ -203,7 +203,7 @@ def verify(
     Raises:
         ArtifactError: If the difference exceeds `tolerance`.
     """
-    __, runtime = load_converter()
+    runtime = load_converter()[1]
     session = runtime.InferenceSession(str(path))
     outputs = session.run(None, feed(bundle, frame))
     prepared = bundle.prepare_frame(frame)
@@ -241,7 +241,7 @@ class OnnxScorer:
             bundle: The bundle the graph was exported from (for its schema).
             path: ONNX file.
         """
-        __, runtime = load_converter()
+        runtime = load_converter()[1]
         self.bundle = bundle
         self.session = runtime.InferenceSession(str(path))
 
