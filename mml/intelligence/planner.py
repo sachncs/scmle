@@ -478,7 +478,9 @@ class EnsembleRule(PlanningRule):
                 "only if it beats its best member in cross-validation"
             )
             action = Action.INCLUDE
+        reason_blend = reason.replace("stack the best", "blend the best")
         decisions.append(experiments.Decision("stacking", action, reason))
+        decisions.append(experiments.Decision("blending", action, reason_blend))
         return candidates
 
 

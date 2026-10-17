@@ -51,6 +51,7 @@ class ModelRegistry:
         )
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))
+        registry.register(ensembles.BlendingAdapter(registry))
         return registry
 
     def register(

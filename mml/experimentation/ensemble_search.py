@@ -1,8 +1,9 @@
-"""Stacking-ensemble search.
+"""Ensemble search: stacking and greedy blending.
 
 After screening, strategy search and tuning, the best configuration of each
-distinct model is combined into a stack and cross-validated like any other
-candidate. The ensemble is adopted only if it beats its best member.
+distinct model is combined (stacked, and blended with greedy weights) and
+cross-validated like any other candidate. An ensemble is adopted only if it
+beats its best member.
 """
 
 from mml.contracts import experiments
@@ -13,6 +14,8 @@ from mml.models import ensembles
 Status = experiments.TrialStatus
 Action = experiments.DecisionAction
 STACK = ensembles.StackingAdapter.name
+BLEND = ensembles.BlendingAdapter.name
+COMBINERS = (STACK, BLEND)
 
 
 class EnsembleSearch:
@@ -50,7 +53,7 @@ class EnsembleSearch:
             for t in evaluated
             if t.status is Status.OK
             and t.strategy == experiments.DEFAULT_STRATEGY
-            and t.model_name != STACK
+            and t.model_name not in COMBINERS
             and self.context.registry.get(t.model_name).family != "baseline"
         ]
         best: dict[str, experiments.TrialResult] = {}
@@ -72,40 +75,54 @@ class EnsembleSearch:
             return
         members = self.members(evaluated, size)
         if len(members) < ensembles.MIN_MEMBERS:
-            self.context.add_outcome(
-                STACK, Action.REJECT, "fewer than two eligible distinct models"
-            )
+            for combiner in COMBINERS:
+                self.context.add_outcome(
+                    combiner,
+                    Action.REJECT,
+                    "fewer than two eligible distinct models",
+                )
             return
-        self.context.check_cancelled()
         params = {
             "members": [
                 {"model": t.model_name, "params": dict(t.params)}
                 for t in members
             ]
         }
-        trial_id = self.context.allocate_trial_ids(1)[0]
-        outcome = self.runner.run(trial_id, STACK, params)
-        self.context.record_trial(outcome)
-        self.judge(members[0], outcome, [t.model_name for t in members])
+        for combiner in COMBINERS:
+            if self.context.resource_governor.skip_reason(first=False):
+                return
+            self.context.check_cancelled()
+            trial_id = self.context.allocate_trial_ids(1)[0]
+            outcome = self.runner.run(trial_id, combiner, params)
+            self.context.record_trial(outcome)
+            self.judge(
+                combiner,
+                members[0],
+                outcome,
+                [t.model_name for t in members],
+            )
 
     def judge(
         self,
+        combiner: str,
         leader: experiments.TrialResult,
         outcome: experiments.TrialResult,
         names: list[str],
     ) -> None:
-        """Compares the stack with its best member."""
+        """Compares an ensemble with its best member."""
         if outcome.status is not Status.OK:
             self.context.add_outcome(
-                STACK, Action.REJECT, f"trial {outcome.status}: {outcome.error}"
+                combiner,
+                Action.REJECT,
+                f"trial {outcome.status}: {outcome.error}",
             )
             return
         sign = 1 if self.metric.greater_is_better else -1
         gain = sign * (outcome.score_mean - leader.score_mean)
         self.context.add_outcome(
-            STACK,
+            combiner,
             Action.INCLUDE if gain > 0 else Action.REJECT,
-            f"stack of {', '.join(names)}: cv {self.metric.name} "
+            f"{combiner} of {', '.join(names)}: cv {self.metric.name} "
             f"{outcome.score_mean:.4f} vs best member {leader.score_mean:.4f} "
             f"({gain:+.4f} in the metric's favour)",
         )

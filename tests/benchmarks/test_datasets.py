@@ -80,8 +80,6 @@ def test_numeric_targets_stored_as_text_are_converted(monkeypatch):
         def fetch(self):
             return pd.DataFrame({"x": [1.0, 2.0], "y": ["7", "9"]})
 
-    loaded = Fake(
-        "f", "y", "regression", "rmse", numeric_target=True
-    ).load()
+    loaded = Fake("f", "y", "regression", "rmse", numeric_target=True).load()
 
     assert loaded["y"].tolist() == [7, 9]

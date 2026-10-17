@@ -33,7 +33,11 @@ def test_stack_is_evaluated_against_its_members(binary_frame, tmp_path):
     assert len({m["model"] for m in members}) == len(members)
     assert "dummy" not in {m["model"] for m in members}
     log = (result.run_dir / "diagnostics" / "decision_log.json").read_text()
-    assert "stack of" in log and "best member" in log
+    assert "stacking of" in log and "blending of" in log
+    assert "best member" in log
+    blends = [t for t in result.trials if t.model_name == "blending"]
+    assert len(blends) == 1 and blends[0].status == "ok"
+    assert blends[0].params["members"] == members
 
 
 def test_stack_is_cross_fitted_inside_each_training_fold(binary_frame):
