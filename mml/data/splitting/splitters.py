@@ -18,6 +18,7 @@ from sklearn import model_selection
 
 from mml.contracts import errors
 from mml.contracts import tasks
+from mml.data.readers import streaming
 from mml.data.splitting import duplicates
 from mml.data.splitting import iterative
 
@@ -461,6 +462,36 @@ class TreatmentStratifiedSplit(RandomSplit):
         return list(splitter.split(np.arange(len(dev_ids)), cells))
 
 
+class PresetSplit(RandomSplit):
+    """Uses a split that was decided while streaming the file.
+
+    The `split_side` column says which rows are locked (1) and which are
+    development (0); development rows are then cross-validated at random
+    (stratified for classification).
+    """
+
+    name = "preset"
+
+    def partition(self, frame: pd.DataFrame) -> Partition:
+        """Reads the sides from the column; folds over the development rows."""
+        side = frame[streaming.SPLIT_COLUMN].to_numpy()
+        dev_ids = np.flatnonzero(side == streaming.DEVELOPMENT)
+        test_ids = np.flatnonzero(side == streaming.LOCKED)
+        notes = ["split decided by hashing row positions while streaming"]
+        if self.task.is_classification:
+            labels = frame[self.data.target].iloc[dev_ids]
+            folds = min(self.validation.folds, int(labels.value_counts().min()))
+            splitter = model_selection.StratifiedKFold(
+                n_splits=max(folds, 2),
+                shuffle=True,
+                random_state=self.validation.seed,
+            )
+            parts = list(splitter.split(np.arange(len(dev_ids)), labels))
+        else:
+            parts = self.cross_validation_folds(frame, dev_ids, notes)
+        return Partition(dev_ids, test_ids, parts, notes)
+
+
 class GroupSplit(SplitStrategy):
     """Keeps every group wholly inside one partition."""
 
@@ -682,6 +713,7 @@ STRATEGIES: dict[str, type[SplitStrategy]] = {
         EventStratifiedSplit,
         MultilabelStratifiedSplit,
         TreatmentStratifiedSplit,
+        PresetSplit,
         GroupSplit,
         TemporalSplit,
         RollingSplit,
@@ -776,12 +808,17 @@ class SplitManager:
         Returns:
             Manifest, development data and the sealed test set.
         """
-        strategy = STRATEGIES[self.strategy_name](self.spec, self.task)
+        name = (
+            PresetSplit.name
+            if streaming.SPLIT_COLUMN in frame.columns
+            else self.strategy_name
+        )
+        strategy = STRATEGIES[name](self.spec, self.task)
         part = strategy.partition(frame)
-        if self.strategy_name in DUPLICATE_AWARE:
+        if name in DUPLICATE_AWARE:
             part = self.keep_duplicates_together(frame, part)
         manifest = SplitManifest(
-            strategy=self.strategy_name,
+            strategy=name,
             seed=self.spec.validation.seed,
             train_ids=to_ids(part.dev_ids),
             test_ids=to_ids(part.test_ids),

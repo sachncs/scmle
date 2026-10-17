@@ -179,6 +179,34 @@ class FastBudgetRule(PlanningRule):
         return kept
 
 
+class IncrementalRule(PlanningRule):
+    """Keeps only models that can learn from batches when streaming."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Drops non-incremental models when training on a stream."""
+        if context.spec.data.training != "stream":
+            return candidates
+        kept = []
+        for adapter in candidates:
+            if adapter.capabilities.incremental or adapter.name == "dummy":
+                kept.append(adapter)
+            else:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name,
+                        Action.REJECT,
+                        "cannot learn incrementally, so it cannot train on "
+                        "a stream larger than memory",
+                    )
+                )
+        return kept
+
+
 class SerializableRule(PlanningRule):
     """Rejects models that cannot be persisted in a bundle."""
 
@@ -534,6 +562,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
         GpuRule(),
         MemoryRule(),
         SerializableRule(),
+        IncrementalRule(),
         FastBudgetRule(),
         ApprovedModelsRule(),
         HighCardinalityRule(),

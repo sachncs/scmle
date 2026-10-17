@@ -203,6 +203,15 @@ class DataSpec(FrozenModel):
         treatment_column: For uplift tasks, the 0/1 column saying whether a
             row received the treatment; the target is the outcome. Never a
             feature; not needed at prediction time.
+        memory_budget_gb: Largest in-memory size of the dataset. A file
+            bigger than this is read in batches: the locked rows are chosen
+            by hashing row positions, development uses a bounded random
+            sample, and the locked rows are scored by streaming them all.
+            Needs a Parquet or CSV file and random or stratified
+            validation.
+        training: With a streamed file, `sample` trains on the development
+            sample; `stream` also passes the whole development partition
+            through the final model in batches (incremental models only).
         horizon: For forecasting, how many steps ahead to predict. The
             target column is then the series' value, and the framework adds
             one target per step ahead (`<value>__h1 .. <value>__h<horizon>`)
@@ -258,6 +267,8 @@ class DataSpec(FrozenModel):
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
     event_column: str | None = None
+    memory_budget_gb: float | None = pydantic.Field(default=None, gt=0)
+    training: Literal["sample", "stream"] = "sample"
     treatment_column: str | None = None
     horizon: int | None = pydantic.Field(default=None, ge=1)
     value_column: str | None = None
@@ -642,6 +653,22 @@ class ProjectSpec(FrozenModel):
             raise ValueError("data.ordinal_order must not repeat a label")
         if self.task == "ordinal" and len(data.ordinal_order) < 3:
             raise ValueError("ordinal tasks need at least three levels")
+        if data.memory_budget_gb is not None and (
+            data.time_column
+            or data.group_column
+            or data.query_column
+            or data.horizon
+            or data.feature_delays
+            or self.feature_graph.nodes
+            or data.unlabeled != "block"
+        ):
+            raise ValueError(
+                "streaming a file larger than memory supports random or "
+                "stratified validation only (no time, group, query, "
+                "feature graph, forecast or unlabeled-row options)"
+            )
+        if data.training == "stream" and data.memory_budget_gb is None:
+            raise ValueError("training='stream' needs data.memory_budget_gb")
         if self.fairness.mitigation != "none":
             chosen = self.fairness.column or next(
                 iter(data.sensitive_columns), None

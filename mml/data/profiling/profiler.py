@@ -14,6 +14,7 @@ from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
 from mml.data.profiling import missingness
+from mml.data.readers import streaming
 from mml.data.validation import columns
 from mml.intelligence import fingerprint
 
@@ -95,6 +96,8 @@ class DatasetProfiler:
             roles[data.time_column] = "time column (used for splitting only)"
         for extra in data.targets[1:]:
             roles[extra] = "additional target (multi-target task)"
+        if streaming.SPLIT_COLUMN in frame.columns:
+            roles[streaming.SPLIT_COLUMN] = "split side chosen while streaming"
         if data.treatment_column:
             roles[data.treatment_column] = (
                 "treatment indicator (used by uplift models only)"

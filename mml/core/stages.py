@@ -30,6 +30,7 @@ from mml.core import state as run_state
 from mml.data.curation import forecasting
 from mml.data.curation import preprocessing
 from mml.data.profiling import profiler
+from mml.data.readers import streaming
 from mml.data.readers import tabular
 from mml.data.splitting import splitters
 from mml.data.validation import target as target_module
@@ -42,6 +43,7 @@ from mml.evaluation import learning_curve
 from mml.evaluation import metrics as metric_catalog
 from mml.evaluation import mitigation
 from mml.evaluation import quantile
+from mml.evaluation import replay
 from mml.evaluation import resources
 from mml.evaluation import suite
 from mml.evaluation import uplift
@@ -102,12 +104,43 @@ class IngestStage(Stage):
         """Names the stage."""
         return "ingest dataset"
 
+    @staticmethod
+    def must_stream(data: tasks.DataSpec) -> bool:
+        """Whether the file is bigger than the memory budget."""
+        if data.memory_budget_gb is None:
+            return False
+        size = streaming.source_for(data.uri).estimated_bytes()
+        return size > data.memory_budget_gb * 1e9
+
+    def read_stream(
+        self, context: context_module.RunContext, data: tasks.DataSpec
+    ) -> pd.DataFrame:
+        """One pass over the file: locked rows by hash, a development sample."""
+        source = streaming.source_for(data.uri)
+        columns = source.shape()[1]
+        development, locked = streaming.sample_caps(
+            columns,
+            data.memory_budget_gb or 1.0,
+            context.spec.validation.test_fraction,
+        )
+        frame, totals = streaming.sample_pass(
+            source,
+            development,
+            locked,
+            context.spec.validation.test_fraction,
+            context.spec.validation.seed,
+        )
+        context.stream = (source, totals)
+        return frame
+
     def execute(self, context: context_module.RunContext) -> None:
         """Loads data (copying in-memory input) and builds the manifest."""
         data = context.spec.data
         started = time.monotonic()
         if context.input_frame is not None:
             frame = context.input_frame.copy()
+        elif self.must_stream(data):
+            frame = self.read_stream(context, data)
         else:
             frame = tabular.read_table(data.uri)
         if data.horizon:
@@ -119,6 +152,12 @@ class IngestStage(Stage):
             f"column '{name}': {count} infinite value(s) treated as missing"
             for name, count in infinite.items()
         ]
+        if context.stream is not None:
+            totals = context.stream[1]
+            context.cleaning_notes.append(
+                f"streamed {totals.rows} rows; {totals.development_sample} "
+                f"development rows kept in memory, {totals.locked} rows locked"
+            )
         graph = context.spec.feature_graph
         if graph.nodes:
             feature_graph.validate_graph(graph, set(frame.columns), data)
@@ -796,6 +835,92 @@ class FinalEvaluationStage(Stage):
             pipeline, column, assigner, result.thresholds, base_cut
         )
 
+    def stream_refit(
+        self,
+        context: context_module.RunContext,
+        pipeline: Any,
+    ) -> Any:
+        """Passes the whole development partition through an incremental model.
+
+        The preprocessing stays as fitted on the development sample; the
+        final model keeps learning from every development row, batch by
+        batch, in one pass over the file.
+        """
+        if context.stream is None or context.spec.data.training != "stream":
+            return pipeline
+        source = context.stream[0]
+        data, seed = context.spec.data, context.spec.validation.seed
+        fraction = context.spec.validation.test_fraction
+        preprocessing_steps, model = pipeline[:-1], pipeline.steps[-1][1]
+        classes = getattr(pipeline, "classes_", None)
+        offset, rows_seen = 0, 0
+        for batch in source.batches():
+            positions = np.arange(offset, offset + len(batch))
+            offset += len(batch)
+            side = streaming.side_of(positions, fraction, seed)
+            part = batch[side == streaming.DEVELOPMENT]
+            if part.empty:
+                continue
+            features = part.drop(columns=[data.target])
+            matrix = preprocessing_steps.transform(features)
+            if classes is None:
+                model.partial_fit(matrix, part[data.target])
+            else:
+                model.partial_fit(matrix, part[data.target], classes=classes)
+            rows_seen += len(part)
+        context.emit(
+            "training.streamed",
+            f"final model updated on {rows_seen} streamed development rows",
+            data={"rows": rows_seen},
+        )
+        return pipeline
+
+    def streamed_locked_metrics(
+        self,
+        context: context_module.RunContext,
+        pipeline: Any,
+    ) -> dict[str, Any] | None:
+        """Scores every locked row of a streamed file, batch by batch."""
+        if context.stream is None:
+            return None
+        source, totals = context.stream
+        data, seed = context.spec.data, context.spec.validation.seed
+        fraction = context.spec.validation.test_fraction
+        task = require(context.task, "task")
+        labels, guesses, scores = [], [], []
+        offset = 0
+        for batch in source.batches():
+            positions = np.arange(offset, offset + len(batch))
+            offset += len(batch)
+            side = streaming.side_of(positions, fraction, seed)
+            part = batch[side == streaming.LOCKED]
+            if part.empty:
+                continue
+            features = part.drop(columns=[data.target])
+            labels.append(part[data.target].to_numpy())
+            guesses.append(np.asarray(pipeline.predict(features)))
+            if task.is_classification:
+                scores.append(np.asarray(pipeline.predict_proba(features)))
+        truth = pd.Series(np.concatenate(labels))
+        replay_class = (
+            replay.ClassifierPredictions
+            if task.is_classification
+            else replay.RegressorPredictions
+        )
+        stand_in = replay_class(
+            np.concatenate(guesses),
+            np.vstack(scores) if scores else None,
+            getattr(pipeline, "classes_", None),
+        )
+        metrics = context.catalog.evaluate(
+            stand_in, pd.DataFrame(index=truth.index), truth, task
+        )
+        return {
+            "rows": len(truth),
+            "of_total": totals.rows,
+            "metrics": metrics,
+        }
+
     def uplift_report(
         self,
         context: context_module.RunContext,
@@ -936,6 +1061,7 @@ class FinalEvaluationStage(Stage):
             )
             pipeline.fit(split.dev_features, split.dev_target)
         pipeline = self.self_train(context, selected, pipeline)
+        pipeline = self.stream_refit(context, pipeline)
         pipeline, decision = choose_decision_threshold(context, pipeline)
         unmitigated = pipeline
         pipeline = self.mitigate_fairness(context, selected, pipeline, decision)
@@ -1037,6 +1163,7 @@ class FinalEvaluationStage(Stage):
             "weighted_test_metrics": weighted_test_metrics,
             "semi_supervised": context.semi_supervised,
             "fairness_mitigation": context.fairness_mitigation,
+            "streamed_locked": self.streamed_locked_metrics(context, pipeline),
             "uplift": self.uplift_report(
                 context, pipeline, test_features, test_target
             ),

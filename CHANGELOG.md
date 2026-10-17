@@ -104,6 +104,12 @@
   X-learners, Qini coefficient and uplift@30%, treatment/outcome-stratified
   splits, a propensity check that flags non-randomized assignment, and the
   no-unmeasured-confounding assumption stated in the report.
+* Files larger than memory: `memory_budget_gb` streams a Parquet or CSV file
+  in batches. Locked rows are chosen by hashing row positions, development
+  uses a bounded sample, and every locked row is scored by streaming the
+  file. `training="stream"` keeps incremental models (`sgd_logistic`,
+  `sgd_regression`) and updates the final one over the whole development
+  partition; other models are rejected with a stated reason.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

@@ -174,6 +174,46 @@ class RidgeAdapter(SklearnAdapter):
     )
 
 
+class SgdLogisticAdapter(SklearnAdapter):
+    """Logistic regression trained by stochastic gradient descent."""
+
+    name = "sgd_logistic"
+    family = "linear"
+    capabilities = models.Capabilities(
+        CLASSIFICATION,
+        sparse_input=True,
+        needs_scaling=True,
+        incremental=True,
+        memory_factor=1.5,
+    )
+    classifier = linear_model.SGDClassifier
+    fixed_params = types.MappingProxyType(
+        {"loss": "log_loss", "max_iter": 50, "tol": 1e-4}
+    )
+    search_space = search.SearchSpace(
+        (search.FloatParameter("alpha", 1e-7, 1e-1, log=True),)
+    )
+
+
+class SgdRegressionAdapter(SklearnAdapter):
+    """Linear regression trained by stochastic gradient descent."""
+
+    name = "sgd_regression"
+    family = "linear"
+    capabilities = models.Capabilities(
+        REGRESSION_ONLY,
+        sparse_input=True,
+        needs_scaling=True,
+        incremental=True,
+        memory_factor=1.5,
+    )
+    regressor = linear_model.SGDRegressor
+    fixed_params = types.MappingProxyType({"max_iter": 50, "tol": 1e-4})
+    search_space = search.SearchSpace(
+        (search.FloatParameter("alpha", 1e-7, 1e-1, log=True),)
+    )
+
+
 class ElasticNetAdapter(SklearnAdapter):
     """Elastic-net regression."""
 
@@ -387,6 +427,8 @@ BUILTIN_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     DummyAdapter,
     LogisticRegressionAdapter,
     RidgeAdapter,
+    SgdLogisticAdapter,
+    SgdRegressionAdapter,
     ElasticNetAdapter,
     DecisionTreeAdapter,
     RandomForestAdapter,

@@ -49,6 +49,8 @@ class Capabilities:
         early_stopping: Supports early stopping.
         needs_scaling: Benefits from standardized inputs.
         serializable: Can be persisted in a bundle.
+        incremental: Can keep learning from batches (`partial_fit`), so it
+            can train on data larger than memory.
         gpu: Can train on a GPU.
         standalone: Can be a screening candidate on its own (False for
             meta-models assembled from other candidates).
@@ -67,6 +69,7 @@ class Capabilities:
     early_stopping: bool = False
     needs_scaling: bool = False
     serializable: bool = True
+    incremental: bool = False
     gpu: bool = False
     standalone: bool = True
     max_rows: int | None = None

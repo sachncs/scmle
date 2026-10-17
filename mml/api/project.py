@@ -55,6 +55,8 @@ class MLProject:
         weight_column: str | None = None,
         event_column: str | None = None,
         query_column: str | None = None,
+        memory_budget_gb: float | None = None,
+        training: Literal["sample", "stream"] = "sample",
         treatment_column: str | None = None,
         horizon: int | None = None,
         seasonal_period: int | None = None,
@@ -122,6 +124,9 @@ class MLProject:
                 columns (needs the `embeddings` extra; falls back to TF-IDF
                 with a warning when unavailable).
             embedding_model: Sentence-embedding model for `embedding`.
+            memory_budget_gb: Largest in-memory size of the dataset; a bigger
+                Parquet / CSV file is streamed (see `DataSpec`).
+            training: `sample` or `stream` for a streamed file.
             treatment_column: For `task="uplift"`, the 0/1 column saying
                 whether a row was treated; the target is the outcome.
             horizon: For `task="forecast"`, how many steps ahead to predict
@@ -197,6 +202,8 @@ class MLProject:
                 weight_column=weight_column,
                 event_column=event_column,
                 query_column=query_column,
+                memory_budget_gb=memory_budget_gb,
+                training=training,
                 treatment_column=treatment_column,
                 horizon=horizon,
                 seasonal_period=seasonal_period,
