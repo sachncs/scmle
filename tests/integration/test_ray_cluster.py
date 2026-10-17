@@ -3,6 +3,7 @@
 import dataclasses
 import importlib.util
 import os
+import signal
 import sys
 
 import pytest
@@ -28,7 +29,7 @@ def square(value):
 
 def die_on_three(value):
     if value == 3:
-        os._exit(1)  # The worker process vanishes without a word.
+        os.kill(os.getpid(), signal.SIGKILL)  # The worker vanishes.
     return value * 10
 
 
