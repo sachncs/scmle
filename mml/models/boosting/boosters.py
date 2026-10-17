@@ -113,6 +113,7 @@ class LightGbmAdapter(LazyLibraryAdapter):
     requires = ("lightgbm",)
     classifier_name = "LGBMClassifier"
     regressor_name = "LGBMRegressor"
+    monotonic_param = "monotone_constraints"
     fit_param_names = ("categorical_feature",)
     capabilities = models.Capabilities(
         ALL_TASKS,
@@ -153,6 +154,7 @@ class XgboostAdapter(LazyLibraryAdapter):
     needs_integer_labels = True
     classifier_name = "XGBClassifier"
     regressor_name = "XGBRegressor"
+    monotonic_param = "monotone_constraints"
     capabilities = models.Capabilities(
         ALL_TASKS,
         sparse_input=True,

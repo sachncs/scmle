@@ -223,6 +223,7 @@ class HistGradientBoostingAdapter(SklearnAdapter):
     )
     classifier = ensemble.HistGradientBoostingClassifier
     regressor = ensemble.HistGradientBoostingRegressor
+    monotonic_param = "monotonic_cst"
 
     def categorical_params(self, indices: list[int]) -> dict[str, Any]:
         """Marks the integer-coded columns as categorical."""

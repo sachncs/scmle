@@ -87,6 +87,9 @@ class ModelAdapter(abc.ABC):
         search_space: Tunable hyperparameters, or None if not tunable.
         conformance_params: Build parameters the conformance suite should use
             for adapters that cannot build without them (meta-models).
+        monotonic_param: Name of the estimator parameter that takes one
+            monotonic sign per input column, or None when the model cannot
+            enforce monotonic constraints.
     """
 
     name: ClassVar[str]
@@ -95,6 +98,7 @@ class ModelAdapter(abc.ABC):
     requires: ClassVar[tuple[str, ...]] = ()
     search_space: ClassVar[search.SearchSpace | None] = None
     conformance_params: ClassVar[Mapping[str, Any] | None] = None
+    monotonic_param: ClassVar[str | None] = None
 
     @abc.abstractmethod
     def build(

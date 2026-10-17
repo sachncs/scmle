@@ -17,6 +17,7 @@ from mml.contracts import tasks
 from mml.data.curation import selection
 from mml.data.validation import columns
 from mml.features import feature_graph
+from mml.models import wrappers
 
 SPARSE_THRESHOLD = 0.3
 
@@ -59,6 +60,20 @@ def build_preprocessor(
         remainder="drop",
         verbose_feature_names_out=False,
         sparse_threshold=SPARSE_THRESHOLD if options.sparse else 0.0,
+    )
+
+
+def monotonic_signs(
+    plan: data_contracts.FeaturePlan, offset: int
+) -> tuple[int, ...]:
+    """Monotonic signs for the leading columns of the encoded matrix.
+
+    The encoded matrix starts with the specially encoded high-cardinality
+    columns (`offset` of them, one column each), then the numeric features
+    in plan order; later columns are unconstrained.
+    """
+    return (0,) * offset + tuple(
+        plan.monotonic.get(column, 0) for column in plan.numeric
     )
 
 
@@ -174,5 +189,12 @@ def build_pipeline(
                 ),
             )
         )
-    steps.append(("model", adapter.build(task, seed, params)))
+    estimator = adapter.build(task, seed, params)
+    if plan.monotonic:
+        estimator = wrappers.monotone(
+            estimator,
+            adapter.monotonic_param or "",
+            monotonic_signs(plan, len(special)),
+        )
+    steps.append(("model", estimator))
     return pipeline.Pipeline(steps)

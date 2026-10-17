@@ -292,6 +292,48 @@ class ExcludedModelsRule(PlanningRule):
         return kept
 
 
+class MonotonicRule(PlanningRule):
+    """Keeps only models that can enforce the requested monotonic signs."""
+
+    def apply(
+        self,
+        context: PlanningContext,
+        candidates: list[models.ModelAdapter],
+        decisions: list[experiments.Decision],
+    ) -> list[models.ModelAdapter]:
+        """Drops models that cannot enforce monotonic constraints.
+
+        Raises:
+            BlockedError: For multiclass tasks (not enforceable) or when no
+                model that can enforce the constraints is available.
+        """
+        if not context.spec.data.monotonic_constraints:
+            return candidates
+        if context.task is tasks.TaskType.MULTICLASS:
+            raise errors.BlockedError(
+                "monotonic constraints are supported for binary "
+                "classification and regression, not multiclass"
+            )
+        kept = []
+        for adapter in candidates:
+            if adapter.monotonic_param or adapter.family == "baseline":
+                kept.append(adapter)
+            else:
+                decisions.append(
+                    experiments.Decision(
+                        adapter.name,
+                        Action.REJECT,
+                        "cannot enforce monotonic constraints",
+                    )
+                )
+        if not any(a.monotonic_param for a in kept):
+            raise errors.BlockedError(
+                "no available model can enforce the monotonic constraints; "
+                "install the 'boosting' extra or relax the constraints"
+            )
+        return kept
+
+
 class ApprovedModelsRule(PlanningRule):
     """Restricts candidates to a human-approved subset."""
 
@@ -488,6 +530,7 @@ def default_rules() -> tuple[PlanningRule, ...]:
     """Returns the standard rule chain."""
     return (
         ExcludedModelsRule(),
+        MonotonicRule(),
         GpuRule(),
         MemoryRule(),
         SerializableRule(),

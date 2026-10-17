@@ -585,6 +585,8 @@ class SelectFeaturesStrategy(FeatureStrategy):
         if reason is not None:
             return reason
         plan = profile.feature_plan
+        if plan.monotonic:
+            return "feature selection would shift the monotonic constraints"
         if len(plan.numeric) + len(plan.categorical) < MIN_SELECTION_FEATURES:
             return f"fewer than {MIN_SELECTION_FEATURES} features"
         return None

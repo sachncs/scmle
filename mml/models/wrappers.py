@@ -158,3 +158,78 @@ class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):
     def predict(self, features: Any) -> np.ndarray:
         """Predicts values."""
         return np.asarray(self.estimator_.predict(features))
+
+
+class MonotoneEstimator(base.BaseEstimator):
+    """Sets per-column monotonic signs once the input width is known.
+
+    The preprocessing decides how many columns the model receives (one-hot
+    encoding changes it), so the constraint vector can only be completed at
+    fit time: the given signs cover the leading columns and every remaining
+    column is unconstrained.
+
+    Attributes:
+        estimator: Unfitted model whose `parameter` takes the sign vector.
+        parameter: Name of that parameter (set on the innermost estimator,
+            beneath any wrappers).
+        signs: Signs (+1, -1, 0) for the leading columns.
+        estimator_: Fitted clone.
+    """
+
+    def __init__(
+        self,
+        estimator: base.BaseEstimator,
+        parameter: str,
+        signs: tuple[int, ...],
+    ) -> None:
+        """Stores the model, the parameter name and the leading signs."""
+        self.estimator = estimator
+        self.parameter = parameter
+        self.signs = signs
+
+    def fit(self, features: Any, target: Any) -> Self:
+        """Completes the sign vector for this input width and fits."""
+        width = features.shape[1]
+        vector = list(self.signs)[:width]
+        vector += [0] * (width - len(vector))
+        model = base.clone(self.estimator)
+        path, node = [], model
+        while getattr(node, "estimator", None) is not None:
+            path.append("estimator")
+            node = node.estimator
+        model.set_params(**{"__".join([*path, self.parameter]): vector})
+        self.estimator_ = model.fit(features, target)
+        return self
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Predictions of the constrained model."""
+        return np.asarray(self.estimator_.predict(features))
+
+
+class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):
+    """Monotonically constrained classifier."""
+
+    @property
+    def classes_(self) -> np.ndarray:
+        """Class labels of the fitted model."""
+        return np.asarray(self.estimator_.classes_)
+
+    def predict_proba(self, features: Any) -> np.ndarray:
+        """Class probabilities of the constrained model."""
+        return np.asarray(self.estimator_.predict_proba(features))
+
+
+class MonotoneRegressor(base.RegressorMixin, MonotoneEstimator):
+    """Monotonically constrained regressor."""
+
+
+def monotone(
+    estimator: base.BaseEstimator, parameter: str, signs: tuple[int, ...]
+) -> MonotoneEstimator:
+    """Wraps an estimator so its monotonic parameter is set at fit time."""
+    kind = (
+        MonotoneClassifier
+        if base.is_classifier(estimator)
+        else MonotoneRegressor
+    )
+    return kind(estimator, parameter, signs)

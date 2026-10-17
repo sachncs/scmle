@@ -43,6 +43,7 @@ class MLProject:
         unavailable_at_prediction: list[str] | None = None,
         feature_delays: dict[str, int] | None = None,
         sensitive_columns: list[str] | None = None,
+        monotonic_constraints: dict[str, int] | None = None,
         embargo_rows: int = 0,
         horizon_rows: int | None = None,
         window_rows: int | None = None,
@@ -87,6 +88,9 @@ class MLProject:
                 that many rows earlier (needs `time_column`).
             sensitive_columns: Columns describing groups of people; the
                 fairness report compares outcomes across them.
+            monotonic_constraints: Numeric feature to +1 / -1: predictions
+                must never fall / rise as the feature grows (binary
+                classification and regression).
             embargo_rows: Rows dropped between training and validation
                 windows in temporal validation.
             horizon_rows: Rolling validation: rows in each validation window.
@@ -132,6 +136,7 @@ class MLProject:
                 unavailable_at_prediction=unavailable_at_prediction or [],
                 feature_delays=feature_delays or {},
                 sensitive_columns=sensitive_columns or [],
+                monotonic_constraints=monotonic_constraints or {},
             ),
             task=task,
             metric=metric,

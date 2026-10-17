@@ -141,6 +141,21 @@ class DatasetProfiler:
                 )
         return statistics, dropped, features, quality
 
+    def monotonic_features(self, numeric: list[str]) -> dict[str, int]:
+        """Validates the monotonic constraints against the numeric features.
+
+        Raises:
+            BlockedError: If a constrained column is not a numeric feature.
+        """
+        wanted = self.spec.data.monotonic_constraints
+        unusable = sorted(set(wanted) - set(numeric))
+        if unusable:
+            raise errors.BlockedError(
+                f"monotonic constraints need numeric feature columns: "
+                f"{unusable} are missing, excluded or not numeric"
+            )
+        return dict(wanted)
+
     @staticmethod
     def datetime_nodes(
         frame: pd.DataFrame, stamps: tuple[str, ...]
@@ -282,6 +297,7 @@ class DatasetProfiler:
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
             text=tuple(features["text"]),
+            monotonic=self.monotonic_features(features["numeric"]),
             dropped=dropped,
             group_column=self.spec.data.group_column,
             time_column=self.spec.data.time_column,

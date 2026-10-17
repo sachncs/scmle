@@ -109,6 +109,13 @@ class ProjectCommand(Command):
             help="rolling validation: rows in each training window",
         )
         parser.add_argument(
+            "--monotonic",
+            nargs="*",
+            default=[],
+            metavar="COLUMN=SIGN",
+            help="predictions must not fall (+1) or rise (-1) as COLUMN grows",
+        )
+        parser.add_argument(
             "--sensitive-columns",
             nargs="*",
             default=[],
@@ -203,6 +210,10 @@ class ProjectCommand(Command):
             test_fraction=args.test_fraction,
             embargo_rows=args.embargo_rows,
             sensitive_columns=args.sensitive_columns,
+            monotonic_constraints={
+                pair.split("=", 1)[0]: int(pair.split("=", 1)[1])
+                for pair in args.monotonic
+            },
             horizon_rows=args.horizon_rows,
             window_rows=args.window_rows,
             feature_delays={

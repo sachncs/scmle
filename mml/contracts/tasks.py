@@ -131,6 +131,10 @@ class DataSpec(FrozenModel):
             published a quarter later), the number of rows of delay. The
             model then sees the value from that many rows earlier; the raw
             column is excluded. Needs `time_column`.
+        monotonic_constraints: Numeric feature to +1 or -1: the prediction
+            must never fall (+1) or never rise (-1) as the feature grows,
+            other features held fixed. Only models that can enforce this
+            are planned (binary classification and regression).
         sensitive_columns: Columns describing groups of people (for example
             sex or age band). They are not hidden from the model unless also
             excluded; the fairness report compares outcomes across them.
@@ -145,6 +149,7 @@ class DataSpec(FrozenModel):
     unavailable_at_prediction: list[str] = pydantic.Field(default_factory=list)
     feature_delays: dict[str, int] = pydantic.Field(default_factory=dict)
     sensitive_columns: list[str] = pydantic.Field(default_factory=list)
+    monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
 
 
 class ValidationSpec(FrozenModel):
@@ -408,6 +413,12 @@ class ProjectSpec(FrozenModel):
             raise ValueError("the target cannot be an id column")
         if data.target in data.excluded_columns:
             raise ValueError("the target cannot be excluded")
+        if any(
+            sign not in (-1, 1) for sign in data.monotonic_constraints.values()
+        ):
+            raise ValueError("monotonic constraints must be +1 or -1")
+        if data.target in data.monotonic_constraints:
+            raise ValueError("the target cannot have a monotonic constraint")
         if data.target in data.sensitive_columns:
             raise ValueError("the target cannot be a sensitive column")
         if data.target in data.unavailable_at_prediction:

@@ -47,6 +47,7 @@ class FeaturePlan:
         derived: Row-wise feature-graph nodes computed inside the pipeline.
         series: Ordered (time-series) feature-graph nodes.
         extra_inputs: Raw columns only the feature graph reads.
+        monotonic: Numeric feature to +1 / -1 monotonic constraint.
         high_cardinality: Categorical features with many distinct levels
             (`HIGH_CARDINALITY_LEVELS` or more), which one-hot encoding
             handles poorly.
@@ -60,6 +61,7 @@ class FeaturePlan:
     categorical: tuple[str, ...]
     dropped: Mapping[str, str] = dataclasses.field(default_factory=dict)
     text: tuple[str, ...] = ()
+    monotonic: Mapping[str, int] = dataclasses.field(default_factory=dict)
     derived: tuple[Any, ...] = ()
     series: tuple[Any, ...] = ()
     extra_inputs: tuple[str, ...] = ()
