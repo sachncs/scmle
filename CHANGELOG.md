@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Fairness reweighing (`reweighing_weights`): training weights that remove
+  the association of a sensitive group and the label, used through
+  `weight_column`.
 * Dirichlet calibration (`bundle.calibrate(..., method="dirichlet")`) for
   multiclass models.
 * Sensitivity analysis (`mml.evaluation.sensitivity`): training (seed,
