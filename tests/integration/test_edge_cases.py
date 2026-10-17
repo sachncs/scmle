@@ -118,12 +118,16 @@ def test_wide_dataset_with_few_rows(tmp_path):
     check_inference(result, frame)
 
 
-def test_datetime_feature_is_excluded_not_fatal(tmp_path):
+def test_datetime_feature_becomes_date_parts_and_inference_needs_the_raw_column(
+    tmp_path,
+):
     frame = base().assign(
         when=pd.date_range("2024-01-01", periods=200, freq="D")
     )
     result = run(frame, tmp_path)
-    assert "datetime" in result.profile.feature_plan.dropped["when"]
+    plan = result.profile.feature_plan
+    assert "when" in plan.extra_inputs
+    assert {"when__month", "when__dayofweek"} <= set(plan.numeric)
     check_inference(result, frame)
 
 

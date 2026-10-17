@@ -96,7 +96,11 @@ class NoveltyDetector:
         """Tukey far-out fences of each numeric feature."""
         fences = {}
         for column in numeric:
-            values = pd.to_numeric(features[column], errors="coerce").dropna()
+            values = (
+                pd.to_numeric(features[column], errors="coerce")
+                .astype(float)
+                .dropna()
+            )
             if values.empty:
                 continue
             low, high = values.quantile([0.25, 0.75])
