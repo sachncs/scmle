@@ -19,6 +19,7 @@ def is_numeric_target(target: pd.Series) -> bool:
 
 
 MIN_EVENTS = 10
+MIN_ARM_ROWS = 20
 
 
 def check_events(frame: pd.DataFrame, column: str | None) -> None:
@@ -52,6 +53,27 @@ def encode_ordinal(
     encoded = frame.copy()
     encoded[column] = frame[column].map(ranks).astype(int)
     return encoded
+
+
+def check_treatment(frame: pd.DataFrame, column: str | None) -> None:
+    """Requires a complete 0/1 treatment column with both arms present.
+
+    Raises:
+        BlockedError: If the column is missing, not 0/1, has gaps, or one
+            arm is empty or smaller than 20 rows.
+    """
+    if column is None or column not in frame.columns:
+        raise errors.BlockedError(f"treatment column '{column}' not found")
+    values = pd.to_numeric(frame[column], errors="coerce")
+    if values.isna().any() or not values.isin([0, 1]).all():
+        raise errors.BlockedError(
+            f"treatment column '{column}' must hold 0 (control) or 1 "
+            "(treated) in every row"
+        )
+    if min(int(values.sum()), int((1 - values).sum())) < MIN_ARM_ROWS:
+        raise errors.BlockedError(
+            f"each arm needs at least {MIN_ARM_ROWS} rows"
+        )
 
 
 def check_targets(
@@ -117,6 +139,8 @@ class TaskResolver:
             return self.resolve_ordinal(target)
         if self.request == "ranking":
             return self.resolve_ranking(target)
+        if self.request == "uplift":
+            return self.resolve_uplift(target)
         if self.request in ("multilabel", "multioutput", "forecast"):
             return tasks.TaskType(self.request)
         if self.request == "regression":
@@ -132,6 +156,12 @@ class TaskResolver:
                 "survival needs a numeric duration target greater than zero"
             )
         return tasks.TaskType.SURVIVAL
+
+    def resolve_uplift(self, target: pd.Series) -> tasks.TaskType:
+        """The outcome must be numeric (0/1 labels or a quantity)."""
+        if not is_numeric_target(target):
+            raise errors.BlockedError("uplift needs a numeric outcome")
+        return tasks.TaskType.UPLIFT
 
     def resolve_ranking(self, target: pd.Series) -> tasks.TaskType:
         """Relevance grades must be non-negative whole numbers."""

@@ -39,6 +39,8 @@ def toy_problem(
                 "second": rng.integers(0, 2, ROWS),
             }
         ).astype(float)
+    elif task is tasks.TaskType.UPLIFT:
+        target = pd.Series(rng.integers(0, 2, ROWS))
     elif task is tasks.TaskType.RANKING:
         target = pd.Series(
             np.clip(np.round(features["a"] + rng.normal(size=ROWS)), 0, 2)

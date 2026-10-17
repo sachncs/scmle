@@ -44,6 +44,7 @@ from mml.evaluation import mitigation
 from mml.evaluation import quantile
 from mml.evaluation import resources
 from mml.evaluation import suite
+from mml.evaluation import uplift
 from mml.experimentation import ensemble_search
 from mml.experimentation import strategy_search
 from mml.experimentation import trials
@@ -242,6 +243,8 @@ class ProfileStage(Stage):
             )
         if task is tasks.TaskType.SURVIVAL:
             target_module.check_events(frame, spec.data.event_column)
+        if task is tasks.TaskType.UPLIFT:
+            target_module.check_treatment(frame, spec.data.treatment_column)
         if task in (
             tasks.TaskType.MULTILABEL,
             tasks.TaskType.MULTIOUTPUT,
@@ -273,6 +276,20 @@ class ProfileStage(Stage):
                 profile,
                 quality_findings=profile.quality_findings
                 + tuple(context.cleaning_notes),
+            )
+        if task is tasks.TaskType.UPLIFT:
+            propensity = uplift.check_propensity(
+                split.dev_features.drop(
+                    columns=[spec.data.treatment_column], errors="ignore"
+                ),
+                split.dev_features[spec.data.treatment_column].to_numpy(),
+                spec.validation.seed,
+            )
+            context.propensity = propensity.to_dict()
+            finding = f"treatment assignment: {propensity.note}"
+            profile = dataclasses.replace(
+                profile,
+                quality_findings=(*profile.quality_findings, finding),
             )
         context.profile = profile
         context.write_json("dataset_profile.json", profile.to_dict())
@@ -779,6 +796,33 @@ class FinalEvaluationStage(Stage):
             pipeline, column, assigner, result.thresholds, base_cut
         )
 
+    def uplift_report(
+        self,
+        context: context_module.RunContext,
+        fitted: Any,
+        features: pd.DataFrame,
+        outcome: pd.Series,
+    ) -> dict[str, Any] | None:
+        """Treatment-effect evidence on the released rows, with its caveat."""
+        if require(context.task, "task") is not tasks.TaskType.UPLIFT:
+            return None
+        arm = features[context.spec.data.treatment_column].to_numpy(dtype=int)
+        predicted = np.asarray(fitted.predict(features), dtype=float)
+        rows, curve = uplift.qini_curve(outcome.to_numpy(float), arm, predicted)
+        keep = np.unique(np.linspace(0, len(rows) - 1, 50).astype(int))
+        return {
+            "assumption": uplift.ASSUMPTION,
+            "propensity": context.propensity,
+            "average_effect": uplift.average_effect(
+                outcome.to_numpy(float), arm
+            ),
+            "mean_predicted_effect": float(predicted.mean()),
+            "qini_curve": {
+                "rows": rows[keep].tolist(),
+                "incremental": curve[keep].tolist(),
+            },
+        }
+
     def mitigation_on_locked_rows(
         self,
         context: context_module.RunContext,
@@ -993,6 +1037,9 @@ class FinalEvaluationStage(Stage):
             "weighted_test_metrics": weighted_test_metrics,
             "semi_supervised": context.semi_supervised,
             "fairness_mitigation": context.fairness_mitigation,
+            "uplift": self.uplift_report(
+                context, pipeline, test_features, test_target
+            ),
             "n_dev": len(split.dev_features),
             "n_test": len(test_features),
             "split_fingerprint": split.manifest.fingerprint,
@@ -1083,6 +1130,7 @@ class PackageStage(Stage):
             tasks.TaskType.MULTILABEL,
             tasks.TaskType.MULTIOUTPUT,
             tasks.TaskType.FORECAST,
+            tasks.TaskType.UPLIFT,
         ):
             return None  # Conformal margins need point predictions or labels.
         if context.resource_governor.skip_reason(first=False):

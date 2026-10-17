@@ -95,6 +95,10 @@ class DatasetProfiler:
             roles[data.time_column] = "time column (used for splitting only)"
         for extra in data.targets[1:]:
             roles[extra] = "additional target (multi-target task)"
+        if data.treatment_column:
+            roles[data.treatment_column] = (
+                "treatment indicator (used by uplift models only)"
+            )
         if data.query_column:
             roles[data.query_column] = "query identifier (ranking only)"
         if data.event_column:
@@ -346,6 +350,8 @@ class DatasetProfiler:
             query_column=self.spec.data.query_column,
             target_columns=tuple(self.spec.data.targets),
             value_column=self.spec.data.value_column,
+            treatment_column=self.spec.data.treatment_column,
+            binary_outcome=bool(set(pd.unique(target.dropna())) <= {0, 1}),
             text_encoding=self.spec.data.text_encoding,
             embedding_model=self.spec.data.embedding_model,
             ordinal_levels=len(self.spec.data.ordinal_order) or None,

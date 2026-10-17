@@ -24,6 +24,7 @@ from mml.models.forecasting import estimators as forecast_estimators
 from mml.models.multitarget import wrapper as multitarget_wrapper
 from mml.models.ranking import wrapper as ranking_wrapper
 from mml.models.survival import wrapper as survival_wrapper
+from mml.models.uplift import wrapper as uplift_wrapper
 
 SPARSE_THRESHOLD = 0.3
 
@@ -194,6 +195,8 @@ def build_pipeline(
     """
     if plan.ordinal_levels:
         params = {**(params or {}), "levels": plan.ordinal_levels}
+    if plan.treatment_column:
+        params = {**(params or {}), "classify": plan.binary_outcome}
     assembled: Any
     if task is tasks.TaskType.FORECAST and adapter.name == "dummy":
         assembled = forecast_estimators.LastValueForecaster(
@@ -252,6 +255,10 @@ def build_pipeline(
             else multitarget_wrapper.MultiOutputEstimator
         )
         built = kind(built, plan.target_columns)
+    if plan.treatment_column:
+        built = uplift_wrapper.TreatmentAwareEstimator(
+            built, plan.treatment_column
+        )
     if plan.query_column:
         built = ranking_wrapper.QueryAwareEstimator(built, plan.query_column)
     if plan.weight_column:

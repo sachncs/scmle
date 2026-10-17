@@ -100,6 +100,10 @@
   the default metric, and `bundle.forecast(history)` forecasts any series.
   The backtest report gives per-step errors against last-value and
   seasonal-naive baselines and per-origin scores.
+* Uplift modelling: `task="uplift"` with `treatment_column`; T-, S- and
+  X-learners, Qini coefficient and uplift@30%, treatment/outcome-stratified
+  splits, a propensity check that flags non-randomized assignment, and the
+  no-unmeasured-confounding assumption stated in the report.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

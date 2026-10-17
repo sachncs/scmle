@@ -72,6 +72,7 @@ class ProjectCommand(Command):
         parser.add_argument("--weight-column")
         parser.add_argument("--event-column")
         parser.add_argument("--query-column")
+        parser.add_argument("--treatment-column")
         parser.add_argument("--horizon", type=int)
         parser.add_argument("--seasonal-period", type=int)
         parser.add_argument("--ordinal-order", nargs="+")
@@ -105,6 +106,7 @@ class ProjectCommand(Command):
                 "stratified",
                 "stratified_events",
                 "multilabel_stratified",
+                "treatment_stratified",
                 "random",
                 "group",
                 "temporal",
@@ -221,6 +223,7 @@ class ProjectCommand(Command):
             weight_column=args.weight_column,
             event_column=args.event_column,
             query_column=args.query_column,
+            treatment_column=args.treatment_column,
             horizon=args.horizon,
             seasonal_period=args.seasonal_period,
             ordinal_order=args.ordinal_order,

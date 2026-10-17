@@ -419,6 +419,48 @@ class MultilabelStratifiedSplit(RandomSplit):
         return folds
 
 
+class TreatmentStratifiedSplit(RandomSplit):
+    """Keeps treatment and outcome shares equal across splits (uplift)."""
+
+    name = "treatment_stratified"
+    supported_tasks = frozenset({tasks.TaskType.UPLIFT})
+
+    def cells(self, frame: pd.DataFrame) -> pd.Series:
+        """Treatment arm combined with a binary outcome (arm alone else)."""
+        arm = frame[self.data.treatment_column].astype(int)
+        outcome = frame[self.data.target]
+        if set(pd.unique(outcome.dropna())) <= {0, 1}:
+            return arm * 2 + outcome.astype(int)
+        return arm
+
+    def stratify_labels(self, frame: pd.DataFrame) -> pd.Series:
+        """Stratifies the holdout on the arm / outcome cell."""
+        cells = self.cells(frame)
+        if (cells.value_counts() < 2).any():
+            raise errors.BlockedError(
+                "a treatment / outcome combination has fewer than 2 rows"
+            )
+        return cells
+
+    def cross_validation_folds(
+        self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
+    ) -> list[Fold]:
+        """Stratified K-fold on the cells, shrinking K for rare ones."""
+        cells = self.cells(frame).iloc[dev_ids]
+        rarest = int(cells.value_counts().min())
+        folds = min(self.validation.folds, rarest)
+        if folds < 2:
+            raise errors.BlockedError(
+                "too few rows in a treatment / outcome combination"
+            )
+        if folds < self.validation.folds:
+            notes.append(f"folds reduced {self.validation.folds}->{folds}")
+        splitter = model_selection.StratifiedKFold(
+            n_splits=folds, shuffle=True, random_state=self.validation.seed
+        )
+        return list(splitter.split(np.arange(len(dev_ids)), cells))
+
+
 class GroupSplit(SplitStrategy):
     """Keeps every group wholly inside one partition."""
 
@@ -639,6 +681,7 @@ STRATEGIES: dict[str, type[SplitStrategy]] = {
         StratifiedSplit,
         EventStratifiedSplit,
         MultilabelStratifiedSplit,
+        TreatmentStratifiedSplit,
         GroupSplit,
         TemporalSplit,
         RollingSplit,
@@ -670,6 +713,8 @@ def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
         return "group"
     if task is tasks.TaskType.MULTILABEL:
         return "multilabel_stratified"
+    if task is tasks.TaskType.UPLIFT:
+        return "treatment_stratified"
     return "stratified" if task.is_classification else "random"
 
 
@@ -692,6 +737,7 @@ class SplitManager:
         data = self.spec.data
         roles = {
             data.target,
+            data.treatment_column,
             *data.targets,
             data.group_column,
             data.time_column,

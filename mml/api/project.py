@@ -22,6 +22,7 @@ ValidationStrategy = Literal[
     "stratified",
     "stratified_events",
     "multilabel_stratified",
+    "treatment_stratified",
     "random",
     "group",
     "temporal",
@@ -54,6 +55,7 @@ class MLProject:
         weight_column: str | None = None,
         event_column: str | None = None,
         query_column: str | None = None,
+        treatment_column: str | None = None,
         horizon: int | None = None,
         seasonal_period: int | None = None,
         forecast_lags: list[int] | None = None,
@@ -120,6 +122,8 @@ class MLProject:
                 columns (needs the `embeddings` extra; falls back to TF-IDF
                 with a warning when unavailable).
             embedding_model: Sentence-embedding model for `embedding`.
+            treatment_column: For `task="uplift"`, the 0/1 column saying
+                whether a row was treated; the target is the outcome.
             horizon: For `task="forecast"`, how many steps ahead to predict
                 (needs `time_column`; `target` is the series value).
             seasonal_period: Rows per season of a forecast series.
@@ -193,6 +197,7 @@ class MLProject:
                 weight_column=weight_column,
                 event_column=event_column,
                 query_column=query_column,
+                treatment_column=treatment_column,
                 horizon=horizon,
                 seasonal_period=seasonal_period,
                 forecast_lags=forecast_lags or [],

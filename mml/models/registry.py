@@ -20,6 +20,7 @@ from mml.models.ranking import adapters as ranking_adapters
 from mml.models.sklearn import bagging
 from mml.models.sklearn import classical
 from mml.models.survival import adapters as survival_adapters
+from mml.models.uplift import adapters as uplift_adapters
 
 ENTRY_POINT_GROUP = "mml.models"
 USER_ADAPTERS: dict[str, models.ModelAdapter] = {}
@@ -68,6 +69,7 @@ class ModelRegistry:
             *ordinal_adapters.ORDINAL_ADAPTERS,
             *ranking_adapters.RANKING_ADAPTERS,
             *multitarget_adapters.MULTITARGET_ADAPTERS,
+            *uplift_adapters.UPLIFT_ADAPTERS,
         )
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))

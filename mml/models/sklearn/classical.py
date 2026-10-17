@@ -27,6 +27,7 @@ from mml.models.multitarget import estimators as multitarget_estimators
 from mml.models.ordinal import estimators as ordinal_estimators
 from mml.models.ranking import estimators as ranking_estimators
 from mml.models.survival import estimators as survival_estimators
+from mml.models.uplift import estimators as uplift_estimators
 
 BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
@@ -98,6 +99,7 @@ class DummyAdapter(models.ModelAdapter):
                 tasks.TaskType.MULTILABEL,
                 tasks.TaskType.MULTIOUTPUT,
                 tasks.TaskType.FORECAST,
+                tasks.TaskType.UPLIFT,
             }
         ),
         sparse_input=True,
@@ -113,6 +115,8 @@ class DummyAdapter(models.ModelAdapter):
         """Returns a prior classifier, a mean regressor or a marginal curve."""
         if task is tasks.TaskType.SURVIVAL:
             return survival_estimators.MarginalSurvival()
+        if task is tasks.TaskType.UPLIFT:
+            return uplift_estimators.ZeroEffect()
         if task in (
             tasks.TaskType.MULTILABEL,
             tasks.TaskType.MULTIOUTPUT,

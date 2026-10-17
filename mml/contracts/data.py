@@ -61,6 +61,8 @@ class FeaturePlan:
         query_column: Ranking query identifier column, if any.
         target_columns: Every target column of a multi-target task.
         value_column: The series value column of a forecasting task.
+        treatment_column: Uplift treatment indicator column, if any.
+        binary_outcome: Whether an uplift outcome is a 0/1 label.
         text_encoding: `tfidf` or `embedding` for free-text columns.
         embedding_model: Sentence-embedding model for `embedding`.
         informative_missing: Features whose gaps are associated with the
@@ -84,6 +86,8 @@ class FeaturePlan:
     query_column: str | None = None
     target_columns: tuple[str, ...] = ()
     value_column: str | None = None
+    treatment_column: str | None = None
+    binary_outcome: bool = True
     text_encoding: str = "tfidf"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     informative_missing: tuple[str, ...] | None = None

@@ -32,6 +32,7 @@ class TaskType(enum.StrEnum):
     MULTILABEL = "multilabel"
     MULTIOUTPUT = "multioutput"
     FORECAST = "forecast"
+    UPLIFT = "uplift"
 
     @property
     def is_classification(self) -> bool:
@@ -54,6 +55,7 @@ TaskRequest = Literal[
     "multilabel",
     "multioutput",
     "forecast",
+    "uplift",
     "binary_classification",
     "multiclass_classification",
 ]
@@ -198,6 +200,9 @@ class DataSpec(FrozenModel):
         ordinal_order: For ordinal tasks, the target's labels from lowest to
             highest (for example `["low", "medium", "high"]`). Every label in
             the data must be listed and every listed label must occur.
+        treatment_column: For uplift tasks, the 0/1 column saying whether a
+            row received the treatment; the target is the outcome. Never a
+            feature; not needed at prediction time.
         horizon: For forecasting, how many steps ahead to predict. The
             target column is then the series' value, and the framework adds
             one target per step ahead (`<value>__h1 .. <value>__h<horizon>`)
@@ -253,6 +258,7 @@ class DataSpec(FrozenModel):
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
     event_column: str | None = None
+    treatment_column: str | None = None
     horizon: int | None = pydantic.Field(default=None, ge=1)
     value_column: str | None = None
     seasonal_period: int | None = pydantic.Field(default=None, ge=2)
@@ -290,6 +296,7 @@ class ValidationSpec(FrozenModel):
         "stratified",
         "stratified_events",
         "multilabel_stratified",
+        "treatment_stratified",
         "random",
         "group",
         "temporal",
@@ -616,6 +623,7 @@ class ProjectSpec(FrozenModel):
             "multilabel",
             "multioutput",
             "forecast",
+            "uplift",
         ):
             raise ValueError(
                 f"stratified validation is undefined for {self.task}"
@@ -665,6 +673,11 @@ class ProjectSpec(FrozenModel):
                 )
             if data.targets[0] != data.target:
                 raise ValueError("data.targets must start with data.target")
+        if (self.task == "uplift") != (data.treatment_column is not None):
+            raise ValueError(
+                "uplift tasks need data.treatment_column, and only uplift "
+                "tasks may set it"
+            )
         if (self.task == "ranking") != (data.query_column is not None):
             raise ValueError(
                 "ranking tasks need data.query_column, and only ranking "

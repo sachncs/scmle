@@ -50,6 +50,11 @@ class WeightedEstimator(base.BaseEstimator):
         return self.estimator.event_column
 
     @property
+    def treatment_column(self) -> str:
+        """The wrapped uplift pipeline's treatment column."""
+        return self.estimator.treatment_column
+
+    @property
     def value_column(self) -> str:
         """The wrapped forecasting pipeline's value column."""
         return self.estimator.value_column

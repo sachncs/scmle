@@ -97,6 +97,7 @@ class RunContext:
         final_pipeline: Selected pipeline refit on development data.
         test_rows: The released locked rows and labels, kept for reports
             written after the test was opened.
+        propensity: How well the covariates predict treatment (uplift).
         fairness_mitigation: Evidence for group thresholds, applied or not.
         ordinal_labels: For ordinal tasks, the labels from lowest to highest
             (the data's target holds their integer ranks).
@@ -155,6 +156,7 @@ class RunContext:
     refits: dict[str, Any] = dataclasses.field(default_factory=dict)
     final_pipeline: Any = None
     test_rows: tuple[pd.DataFrame, pd.Series] | None = None
+    propensity: dict[str, Any] | None = None
     fairness_mitigation: dict[str, Any] | None = None
     ordinal_labels: tuple[Any, ...] | None = None
     unlabeled: pd.DataFrame | None = None

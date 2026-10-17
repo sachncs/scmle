@@ -103,6 +103,7 @@ def test_l5_to_l11_python_package_tabular_scope():
         tasks.TaskType.MULTILABEL,
         tasks.TaskType.MULTIOUTPUT,
         tasks.TaskType.FORECAST,
+        tasks.TaskType.UPLIFT,
     }
 
 

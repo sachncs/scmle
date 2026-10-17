@@ -20,6 +20,7 @@ from mml.evaluation import multitarget
 from mml.evaluation import ordinal
 from mml.evaluation import ranking
 from mml.evaluation import survival
+from mml.evaluation import uplift
 
 BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
@@ -30,6 +31,7 @@ RANKING = tasks.TaskType.RANKING
 MULTILABEL = tasks.TaskType.MULTILABEL
 MULTIOUTPUT = tasks.TaskType.MULTIOUTPUT
 FORECAST = tasks.TaskType.FORECAST
+UPLIFT = tasks.TaskType.UPLIFT
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 
 
@@ -126,6 +128,10 @@ DEFAULT_METRICS = (
     forecast.ForecastMetric(
         "forecast_smape", "", False, frozenset({FORECAST}), "smape"
     ),
+    uplift.UpliftMetric("qini", "", True, frozenset({UPLIFT}), "qini"),
+    uplift.UpliftMetric(
+        "uplift_at_30", "", True, frozenset({UPLIFT}), "uplift_at_30"
+    ),
     ranking.RankingMetric("ndcg", "", True, frozenset({RANKING}), "ndcg"),
     ranking.RankingMetric("map", "", True, frozenset({RANKING}), "map"),
     concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
@@ -149,6 +155,7 @@ class MetricCatalog:
         MULTILABEL: "f1_macro_labels",
         MULTIOUTPUT: "r2_mean",
         FORECAST: "mase",
+        UPLIFT: "qini",
     }
     report_names = {
         BINARY: (
@@ -172,6 +179,7 @@ class MetricCatalog:
         ),
         MULTIOUTPUT: ("r2_mean", "mae_scaled"),
         FORECAST: ("mase", "forecast_mae", "forecast_smape"),
+        UPLIFT: ("qini", "uplift_at_30"),
     }
 
     def __init__(
