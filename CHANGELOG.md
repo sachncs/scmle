@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Dirichlet calibration (`bundle.calibrate(..., method="dirichlet")`) for
+  multiclass models.
 * Sensitivity analysis (`mml.evaluation.sensitivity`): training (seed,
   resample), evaluation (split) and performance (input noise) sensitivity.
 * `RollbackPolicy.tolerance` now defaults to 0.01 so routine retraining noise

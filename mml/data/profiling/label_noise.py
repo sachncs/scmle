@@ -64,7 +64,8 @@ def find_label_noise(
         raise ValueError(
             f"label-noise detection needs {MIN_ROWS}+ rows and two classes"
         )
-    folds = min(FOLDS, int(np.bincount(encoded).min()))
+    counts = list(np.bincount(np.asarray(encoded).ravel()))
+    folds = min(FOLDS, int(min(counts)))
     if folds < 2:
         raise ValueError("every class needs at least two rows")
     probabilities = model_selection.cross_val_predict(

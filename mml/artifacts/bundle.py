@@ -32,6 +32,7 @@ from mml.contracts import tasks
 from mml.data.readers import interchange
 from mml.data.readers import tabular
 from mml.evaluation import conformal as conformal_module
+from mml.evaluation import dirichlet
 from mml.evaluation import quantile as quantile_module
 from mml.evaluation import reliability
 from mml.explainability import counterfactual as counterfactual_module
@@ -534,7 +535,8 @@ class ModelBundle:
         Args:
             data: Labeled rows.
             target: Their true labels.
-            method: `sigmoid` (Platt) or `isotonic`.
+            method: `sigmoid` (Platt), `isotonic`, or `dirichlet` (a full
+                map over all class probabilities; multiclass only).
 
         Returns:
             Brier score and top-label expected calibration error before and
@@ -550,17 +552,26 @@ class ModelBundle:
             or self.schema.task == tasks.TaskType.ORDINAL.value
         ):
             raise errors.ArtifactError("only classifiers can be calibrated")
-        if method not in ("sigmoid", "isotonic"):
+        if method not in ("sigmoid", "isotonic", "dirichlet"):
             raise errors.ConfigError(
-                f"unknown calibration method '{method}'; use sigmoid or "
-                "isotonic"
+                f"unknown calibration method '{method}'; use sigmoid, "
+                "isotonic or dirichlet"
+            )
+        if method == "dirichlet" and len(self.schema.classes) < 3:
+            raise errors.ConfigError(
+                "dirichlet calibration needs three or more classes"
             )
         frame = self.prepare_frame(data)
         labels = np.asarray(target)
         before = self.pipeline.predict_proba(frame)
-        calibrator = calibration.CalibratedClassifierCV(
-            frozen.FrozenEstimator(self.pipeline), method=method
-        ).fit(frame, labels)
+        if method == "dirichlet":
+            calibrator: Any = dirichlet.DirichletCalibrator(self.pipeline).fit(
+                frame, labels
+            )
+        else:
+            calibrator = calibration.CalibratedClassifierCV(
+                frozen.FrozenEstimator(self.pipeline), method=method
+            ).fit(frame, labels)
         after = calibrator.predict_proba(frame)
         self.calibrator = calibrator
         self.info = dataclasses.replace(
