@@ -372,10 +372,11 @@ class GroupSplit(SplitStrategy):
 
     def partition(self, frame: pd.DataFrame) -> Partition:
         """Group-disjoint holdout and group K-fold."""
-        groups = frame[self.data.group_column].to_numpy()
+        column = self.data.group_column or self.data.query_column
+        groups = frame[column].to_numpy()
         if pd.isna(groups).any():
             raise errors.BlockedError(
-                f"group column '{self.data.group_column}' has missing values"
+                f"group column '{column}' has missing values"
             )
         folds = self.validation.folds
         if len(set(groups)) < folds + 2:
@@ -592,6 +593,8 @@ def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
         return "group"
     if task is tasks.TaskType.SURVIVAL:
         return "stratified_events"
+    if task is tasks.TaskType.RANKING:
+        return "group"
     return "stratified" if task.is_classification else "random"
 
 

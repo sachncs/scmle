@@ -85,6 +85,9 @@
 * Fairness mitigation (`fairness=FairnessSpec(mitigation="group_thresholds")`):
   per-group thresholds judged on validation, reported on the locked rows,
   logged in the decision log. Reweighing and constrained fitting are not built.
+* Learning to rank: `task="ranking"` with `query_column`; pointwise,
+  LightGBM and XGBoost rankers, NDCG@10 and MAP@10, query-disjoint splits and
+  `bundle.rank`.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

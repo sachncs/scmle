@@ -25,6 +25,7 @@ class TaskType(enum.StrEnum):
     REGRESSION = "regression"
     SURVIVAL = "survival"
     ORDINAL = "ordinal"
+    RANKING = "ranking"
 
     @property
     def is_classification(self) -> bool:
@@ -43,6 +44,7 @@ TaskRequest = Literal[
     "regression",
     "survival",
     "ordinal",
+    "ranking",
     "binary_classification",
     "multiclass_classification",
 ]
@@ -151,6 +153,9 @@ class DataSpec(FrozenModel):
         ordinal_order: For ordinal tasks, the target's labels from lowest to
             highest (for example `["low", "medium", "high"]`). Every label in
             the data must be listed and every listed label must occur.
+        query_column: For ranking tasks, the column identifying the query
+            (or session) each row belongs to; the target is the relevance
+            grade. Never a feature; not needed at prediction time.
         event_column: For survival tasks, the 0/1 column saying whether the
             event was observed (1) or the row was censored (0); the target
             is then the time to the event or to censoring. Never a feature.
@@ -183,6 +188,7 @@ class DataSpec(FrozenModel):
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
     event_column: str | None = None
+    query_column: str | None = None
     ordinal_order: list[str | int] = pydantic.Field(default_factory=list)
     unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"
     pseudo_label_confidence: float = pydantic.Field(default=0.9, gt=0.5, lt=1.0)
@@ -447,8 +453,13 @@ class ProjectSpec(FrozenModel):
             ValueError: If the combination of fields is inconsistent.
         """
         data, validation = self.data, self.validation
-        if validation.strategy == "group" and not data.group_column:
-            raise ValueError("strategy 'group' requires data.group_column")
+        if validation.strategy == "group" and not (
+            data.group_column or data.query_column
+        ):
+            raise ValueError(
+                "strategy 'group' requires data.group_column (or "
+                "data.query_column for ranking)"
+            )
         if validation.strategy in ("temporal", "rolling") and (
             not data.time_column
         ):
@@ -480,6 +491,7 @@ class ProjectSpec(FrozenModel):
             "regression",
             "survival",
             "ordinal",
+            "ranking",
         ):
             raise ValueError(
                 f"stratified validation is undefined for {self.task}"
@@ -507,6 +519,11 @@ class ProjectSpec(FrozenModel):
                     "fairness mitigation needs a column listed in "
                     "data.sensitive_columns"
                 )
+        if (self.task == "ranking") != (data.query_column is not None):
+            raise ValueError(
+                "ranking tasks need data.query_column, and only ranking "
+                "tasks may set it"
+            )
         if data.event_column == data.target:
             raise ValueError("data.event_column must differ from the target")
         for name in ("group_column", "time_column"):

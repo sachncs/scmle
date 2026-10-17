@@ -71,6 +71,7 @@ class ProjectCommand(Command):
         parser.add_argument("--group-column")
         parser.add_argument("--weight-column")
         parser.add_argument("--event-column")
+        parser.add_argument("--query-column")
         parser.add_argument("--ordinal-order", nargs="+")
         parser.add_argument(
             "--unlabeled",
@@ -216,6 +217,7 @@ class ProjectCommand(Command):
             group_column=args.group_column,
             weight_column=args.weight_column,
             event_column=args.event_column,
+            query_column=args.query_column,
             ordinal_order=args.ordinal_order,
             unlabeled=args.unlabeled,
             time_column=args.time_column,

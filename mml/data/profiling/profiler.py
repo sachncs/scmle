@@ -93,6 +93,8 @@ class DatasetProfiler:
             roles[data.group_column] = "group column (used for splitting only)"
         if data.time_column and not data.time_as_feature:
             roles[data.time_column] = "time column (used for splitting only)"
+        if data.query_column:
+            roles[data.query_column] = "query identifier (ranking only)"
         if data.event_column:
             roles[data.event_column] = (
                 "event indicator (used by survival models only)"
@@ -339,6 +341,7 @@ class DatasetProfiler:
             time_column=self.spec.data.time_column,
             weight_column=self.spec.data.weight_column,
             event_column=self.spec.data.event_column,
+            query_column=self.spec.data.query_column,
             ordinal_levels=len(self.spec.data.ordinal_order) or None,
             high_cardinality=tuple(
                 c

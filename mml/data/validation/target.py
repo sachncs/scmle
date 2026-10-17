@@ -87,6 +87,8 @@ class TaskResolver:
             return self.resolve_survival(target)
         if self.request == "ordinal":
             return self.resolve_ordinal(target)
+        if self.request == "ranking":
+            return self.resolve_ranking(target)
         if self.request == "regression":
             return self.resolve_regression(target)
         if self.request == "auto":
@@ -100,6 +102,16 @@ class TaskResolver:
                 "survival needs a numeric duration target greater than zero"
             )
         return tasks.TaskType.SURVIVAL
+
+    def resolve_ranking(self, target: pd.Series) -> tasks.TaskType:
+        """Relevance grades must be non-negative whole numbers."""
+        values = pd.to_numeric(target, errors="coerce")
+        if values.isna().any() or (values < 0).any() or (values % 1 != 0).any():
+            raise errors.BlockedError(
+                "ranking needs a relevance target of non-negative whole "
+                "numbers (0 = not relevant)"
+            )
+        return tasks.TaskType.RANKING
 
     def resolve_ordinal(self, target: pd.Series) -> tasks.TaskType:
         """Requires the listed order to match the labels in the data."""

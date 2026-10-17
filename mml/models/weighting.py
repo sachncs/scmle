@@ -49,6 +49,11 @@ class WeightedEstimator(base.BaseEstimator):
         """The wrapped survival pipeline's event column, so scorers find it."""
         return self.estimator.event_column
 
+    @property
+    def query_column(self) -> str:
+        """The wrapped ranking pipeline's query column."""
+        return self.estimator.query_column
+
     def accepts_weights(self, candidate: base.BaseEstimator) -> bool:
         """Whether the pipeline's model step takes `sample_weight`."""
         if not isinstance(candidate, pipeline.Pipeline):

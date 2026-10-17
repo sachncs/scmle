@@ -99,6 +99,7 @@ def test_l5_to_l11_python_package_tabular_scope():
     assert set(tasks.TaskType) - tasks.STANDARD_TASKS == {
         tasks.TaskType.SURVIVAL,
         tasks.TaskType.ORDINAL,
+        tasks.TaskType.RANKING,
     }
 
 

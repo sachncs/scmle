@@ -1200,6 +1200,44 @@ class ModelBundle:
             )
         )
 
+    def rank(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        query_column: str,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> pd.DataFrame:
+        """Scores rows and orders them within each query (ranking tasks).
+
+        Args:
+            data: Rows to rank (DataFrame or path to CSV/Parquet).
+            query_column: Column naming each row's query.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            The input rows with `score` and `rank` (1 = best within its
+            query), sorted by query, then rank.
+
+        Raises:
+            ArtifactError: For models that are not ranking models, or when
+                `query_column` is missing from the data.
+        """
+        if self.schema.task != tasks.TaskType.RANKING.value:
+            raise errors.ArtifactError("this bundle is not a ranking model")
+        frame = self.read_frame(data)
+        if query_column not in frame.columns:
+            raise errors.ArtifactError(
+                f"query column '{query_column}' is not in the data"
+            )
+        ranked = frame.assign(score=self.predict(frame, mapping))
+        ranked["rank"] = (
+            ranked.groupby(query_column, sort=False)["score"]
+            .rank(method="first", ascending=False)
+            .astype(int)
+        )
+        return ranked.sort_values(
+            [query_column, "rank"], kind="stable"
+        ).reset_index(drop=True)
+
     def rank_for_labeling(
         self,
         data: str | pathlib.Path | pd.DataFrame,

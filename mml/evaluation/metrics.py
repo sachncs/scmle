@@ -16,6 +16,7 @@ from mml.contracts import models
 from mml.contracts import tasks
 from mml.evaluation import concordance
 from mml.evaluation import ordinal
+from mml.evaluation import ranking
 from mml.evaluation import survival
 
 BINARY = tasks.TaskType.BINARY
@@ -23,6 +24,7 @@ MULTICLASS = tasks.TaskType.MULTICLASS
 REGRESSION = tasks.TaskType.REGRESSION
 SURVIVAL = tasks.TaskType.SURVIVAL
 ORDINAL = tasks.TaskType.ORDINAL
+RANKING = tasks.TaskType.RANKING
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 
 
@@ -94,6 +96,8 @@ DEFAULT_METRICS = (
     metric_contracts.Metric(
         "accuracy_levels", "accuracy", True, frozenset({ORDINAL})
     ),
+    ranking.RankingMetric("ndcg", "", True, frozenset({RANKING}), "ndcg"),
+    ranking.RankingMetric("map", "", True, frozenset({RANKING}), "map"),
     concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
     survival.SurvivalMetric("ibs", "", False, frozenset({SURVIVAL}), "ibs"),
     survival.SurvivalMetric(
@@ -111,6 +115,7 @@ class MetricCatalog:
         REGRESSION: "rmse",
         SURVIVAL: "c_index",
         ORDINAL: "qwk",
+        RANKING: "ndcg",
     }
     report_names = {
         BINARY: (
@@ -125,6 +130,7 @@ class MetricCatalog:
         REGRESSION: ("mae", "rmse", "r2"),
         SURVIVAL: ("c_index", "ibs", "td_auc"),
         ORDINAL: ("qwk", "mace", "accuracy_levels"),
+        RANKING: ("ndcg", "map"),
     }
 
     def __init__(

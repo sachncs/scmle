@@ -52,6 +52,7 @@ class MLProject:
         sensitive_columns: list[str] | None = None,
         weight_column: str | None = None,
         event_column: str | None = None,
+        query_column: str | None = None,
         ordinal_order: list[str | int] | None = None,
         unlabeled: Literal["block", "ignore", "pseudo_label"] = "block",
         pseudo_label_confidence: float = 0.9,
@@ -106,6 +107,8 @@ class MLProject:
             event_column: For `task="survival"`, the 0/1 column saying
                 whether the event was observed (1) or the row was censored
                 (0); the target is the time to the event or to censoring.
+            query_column: For `task="ranking"`, the column identifying each
+                row's query; the target is the relevance grade.
             ordinal_order: For `task="ordinal"`, the target's labels from
                 lowest to highest.
             unlabeled: What to do with rows whose target is missing: `block`
@@ -168,6 +171,7 @@ class MLProject:
                 sensitive_columns=sensitive_columns or [],
                 weight_column=weight_column,
                 event_column=event_column,
+                query_column=query_column,
                 ordinal_order=ordinal_order or [],
                 unlabeled=unlabeled,
                 pseudo_label_confidence=pseudo_label_confidence,

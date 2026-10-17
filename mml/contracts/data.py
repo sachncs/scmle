@@ -58,6 +58,7 @@ class FeaturePlan:
         weight_column: Column of per-row training weights, if any.
         event_column: Survival event indicator column, if any.
         ordinal_levels: Number of ordered levels of an ordinal target.
+        query_column: Ranking query identifier column, if any.
         informative_missing: Features whose gaps are associated with the
             target; `None` when missingness was not assessed.
     """
@@ -76,6 +77,7 @@ class FeaturePlan:
     weight_column: str | None = None
     event_column: str | None = None
     ordinal_levels: int | None = None
+    query_column: str | None = None
     informative_missing: tuple[str, ...] | None = None
 
     @property

@@ -1063,7 +1063,11 @@ class PackageStage(Stage):
             held-out rows exist.
         """
         task = require(context.task, "task")
-        if task in (tasks.TaskType.SURVIVAL, tasks.TaskType.ORDINAL):
+        if task in (
+            tasks.TaskType.SURVIVAL,
+            tasks.TaskType.ORDINAL,
+            tasks.TaskType.RANKING,
+        ):
             return None  # Conformal margins need point predictions or labels.
         if context.resource_governor.skip_reason(first=False):
             return None
