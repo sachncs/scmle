@@ -21,9 +21,12 @@ from sklearn import preprocessing
 from mml.contracts import errors
 from mml.data.validation import columns
 from mml.models import weighting
+from mml.models import wrappers
+from mml.models.boosting import early_stopping
 from mml.sampling import resampling
 
 OPSET = 17
+ML_OPSET = 3
 DEFAULT_TOLERANCE = 1e-4
 INSTALL_HINT = "install the 'onnx' extra (skl2onnx, onnxruntime)"
 WRAPPERS = (
@@ -43,6 +46,80 @@ def load_converter() -> tuple[Any, Any]:
     return convert, runtime
 
 
+MODEL_WRAPPERS = (
+    early_stopping.HoldoutEarlyStopping,
+    wrappers.LabelEncodedClassifier,
+    wrappers.FlatPredictionClassifier,
+    wrappers.FitParamsClassifier,
+    wrappers.FitParamsRegressor,
+    wrappers.MonotoneEstimator,
+)
+CODES_KEY = "label_codes"
+
+
+def inner_model(step: Any) -> tuple[Any, bool]:
+    """The fitted model inside the framework's model wrappers.
+
+    Returns:
+        The innermost estimator and whether it was trained on integer codes
+        for the class labels (so its outputs must be mapped back).
+    """
+    encoded = False
+    while isinstance(step, MODEL_WRAPPERS):
+        encoded = encoded or hasattr(step, "encoder_")
+        step = step.estimator_
+    return step, encoded
+
+
+def register_booster_converters() -> None:
+    """Teaches the converter LightGBM and XGBoost when onnxmltools exists."""
+    try:
+        registry = importlib.import_module("skl2onnx")
+        shapes = importlib.import_module(
+            "skl2onnx.shape_calculators.linear_classifier"
+        )
+        regression_shapes = importlib.import_module(
+            "skl2onnx.shape_calculators.linear_regressor"
+        )
+        lightgbm = importlib.import_module("lightgbm")
+        xgboost = importlib.import_module("xgboost")
+        light = importlib.import_module(
+            "onnxmltools.convert.lightgbm.operator_converters.LightGbm"
+        )
+        xgb = importlib.import_module(
+            "onnxmltools.convert.xgboost.operator_converters.XGBoost"
+        )
+    except ImportError:
+        return
+    options = {"nocl": [True, False], "zipmap": [True, False, "columns"]}
+    registry.update_registered_converter(
+        lightgbm.LGBMClassifier,
+        "LightGbmLGBMClassifier",
+        shapes.calculate_linear_classifier_output_shapes,
+        light.convert_lightgbm,
+        options=options,
+    )
+    registry.update_registered_converter(
+        lightgbm.LGBMRegressor,
+        "LightGbmLGBMRegressor",
+        regression_shapes.calculate_linear_regressor_output_shapes,
+        light.convert_lightgbm,
+    )
+    registry.update_registered_converter(
+        xgboost.XGBClassifier,
+        "XGBoostXGBClassifier",
+        shapes.calculate_linear_classifier_output_shapes,
+        xgb.convert_xgboost,
+        options=options,
+    )
+    registry.update_registered_converter(
+        xgboost.XGBRegressor,
+        "XGBoostXGBRegressor",
+        regression_shapes.calculate_linear_regressor_output_shapes,
+        xgb.convert_xgboost,
+    )
+
+
 def unwrap(fitted: Any) -> pipeline.Pipeline:
     """The fitted scikit-learn pipeline inside the framework's wrappers.
 
@@ -54,7 +131,9 @@ def unwrap(fitted: Any) -> pipeline.Pipeline:
         current = current.estimator_
     if not isinstance(current, pipeline.Pipeline):
         raise errors.ArtifactError(
-            f"ONNX export is not supported for {type(current).__name__}"
+            f"ONNX export is not supported for {type(current).__name__}; "
+            "bundle.export_service(directory) packages any model as a "
+            "ready-to-run service instead"
         )
     return current
 
@@ -143,7 +222,10 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
             "ONNX export would not reproduce the attached probability "
             "calibrator; export before calibrating"
         )
+    register_booster_converters()
     fitted = without_casts(unwrap(bundle.pipeline))
+    model_step, encoded = inner_model(fitted.steps[-1][1])
+    fitted.steps[-1] = (fitted.steps[-1][0], model_step)
     options = (
         {id(fitted.steps[-1][1]): {"zipmap": False}}
         if bundle.classes is not None
@@ -154,16 +236,31 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
             fitted,
             initial_types=input_types(bundle, types),
             options=options,
-            target_opset=OPSET,
+            target_opset={"": OPSET, "ai.onnx.ml": ML_OPSET},
         )
     except Exception as error:  # The converter raises many types.
         raise errors.ArtifactError(
             f"ONNX export is not supported for model "
-            f"'{bundle.info.model_name}': {error}"
+            f"'{bundle.info.model_name}': {error}. "
+            "bundle.export_service(directory) packages any model as a "
+            "ready-to-run service instead"
         ) from error
+    if encoded:
+        entry = model.metadata_props.add()
+        entry.key, entry.value = CODES_KEY, "1"
     destination = pathlib.Path(path)
     destination.write_bytes(model.SerializeToString())
     return destination
+
+
+def decode(bundle: Any, session: Any, labels: np.ndarray) -> np.ndarray:
+    """Maps integer class codes back to labels when the graph was trained so."""
+    meta = session.get_modelmeta().custom_metadata_map
+    if meta.get(CODES_KEY) == "1":
+        return np.asarray(bundle.classes, dtype=object)[
+            np.asarray(labels).astype(int)
+        ]
+    return np.asarray(labels)
 
 
 def feed(bundle: Any, frame: pd.DataFrame) -> dict[str, np.ndarray]:
@@ -212,7 +309,7 @@ def verify(
         difference = float(np.abs(np.asarray(outputs[1]) - expected).max())
         agreement = float(
             np.mean(
-                np.asarray(outputs[0]).astype(str)
+                decode(bundle, session, outputs[0]).astype(str)
                 == np.asarray(bundle.pipeline.predict(prepared)).astype(str)
             )
         )
@@ -248,7 +345,7 @@ class OnnxScorer:
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         """Labels or values."""
         outputs = self.session.run(None, feed(self.bundle, frame))
-        return np.asarray(outputs[0]).ravel()
+        return decode(self.bundle, self.session, outputs[0]).ravel()
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
         """Class probabilities."""

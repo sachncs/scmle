@@ -216,7 +216,10 @@ project = mml.MLProject(
 )
 # result.bundle.predict_survival(rows, times=[3, 6, 12]) -> P(no event yet)
 
-# Deployment: ONNX graph (onnx extra) and an HTTP server.
+# Deployment. Any model: a ready-to-run service folder with a Dockerfile.
+result.bundle.export_service("service")
+# ONNX where the model allows it (forests, linear, SVM, LightGBM, XGBoost;
+# HistGradientBoosting is not expressible and goes through the service).
 result.bundle.export_onnx("model.onnx", check=sample_rows)
 # magicml serve runs/<id>/model --trusted --port 8000
 

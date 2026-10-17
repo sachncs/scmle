@@ -40,6 +40,7 @@ from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
 from mml.inference import novelty as novelty_module
 from mml.inference import onnx_export
+from mml.inference import packaging
 from mml.inference import validation
 from mml.monitoring import reference as reference_module
 
@@ -1116,6 +1117,20 @@ class ModelBundle:
         if path is not None:
             pathlib.Path(path).write_text(text)
         return text
+
+    def export_service(self, destination: str | pathlib.Path) -> pathlib.Path:
+        """Writes a deployable service folder (works for every model).
+
+        The folder holds this bundle, pinned requirements, the full build
+        environment, a server script and a Dockerfile.
+
+        Args:
+            destination: Folder to create.
+
+        Returns:
+            The folder.
+        """
+        return packaging.write_service(self, destination)
 
     def export_onnx(
         self,

@@ -211,3 +211,106 @@ def out_of_fold_probabilities(
         )
         positions.append(np.asarray(validation))
     return np.concatenate(probabilities), np.concatenate(positions)
+
+
+MIN_GROUP_ROWS = 30
+NUMERIC_LEVELS = 12
+NUMERIC_BANDS = 4
+
+
+@dataclasses.dataclass(frozen=True)
+class GroupAssigner:
+    """Maps a sensitive column to group names, fixed at training time.
+
+    Categories keep their own name; numbers with many distinct values are cut
+    into bands at the quantiles seen in training, so the same value lands in
+    the same group at inference.
+
+    Attributes:
+        edges: Interior band edges for a numeric column, else empty.
+    """
+
+    edges: tuple[float, ...] = ()
+
+    @classmethod
+    def fit(cls, values: pd.Series) -> Self:
+        """Learns the grouping from training values."""
+        numeric = pd.api.types.is_numeric_dtype(values) and (
+            values.nunique() > NUMERIC_LEVELS
+        )
+        if not numeric:
+            return cls()
+        cuts = np.quantile(
+            values.dropna(), np.linspace(0, 1, NUMERIC_BANDS + 1)[1:-1]
+        )
+        return cls(tuple(float(c) for c in np.unique(cuts)))
+
+    def assign(self, values: pd.Series) -> pd.Series:
+        """Group name per row; missing values stay missing."""
+        if self.edges:
+            bands = np.searchsorted(self.edges, values.to_numpy(float))
+            named = pd.Series(
+                [f"band_{band}" for band in bands], index=values.index
+            )
+            return named.where(values.notna())
+        return values.astype(object).where(values.notna()).astype(str)
+
+
+class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
+    """Decides with a separate probability threshold for each group.
+
+    The wrapped classifier is untouched; only the cut between the two classes
+    moves by group. Without the sensitive column in the rows (or for a group
+    never seen) the default threshold applies.
+
+    Attributes:
+        estimator: Fitted binary classifier with `predict_proba`.
+        column: Sensitive column the thresholds are keyed by.
+        assigner: How values of that column become group names.
+        thresholds: Group name to threshold.
+        default_threshold: Threshold when the group is unknown.
+        classes_: The two class labels; the second one is positive.
+    """
+
+    def __init__(
+        self,
+        estimator: Any,
+        column: str,
+        assigner: GroupAssigner,
+        thresholds: dict[str, float],
+        default_threshold: float = 0.5,
+    ) -> None:
+        """Wraps an already fitted classifier."""
+        self.estimator = estimator
+        self.column = column
+        self.assigner = assigner
+        self.thresholds = thresholds
+        self.default_threshold = default_threshold
+        self.classes_ = estimator.classes_
+
+    def fit(self, features: Any, target: Any) -> Self:
+        """Thresholds are learned elsewhere; fitting refits the classifier."""
+        self.estimator = base.clone(self.estimator).fit(features, target)
+        self.classes_ = self.estimator.classes_
+        return self
+
+    def predict_proba(self, features: Any) -> np.ndarray:
+        """The wrapped classifier's probabilities."""
+        return self.estimator.predict_proba(features)
+
+    def cuts(self, features: Any) -> np.ndarray:
+        """Threshold per row, from its group when the column is present."""
+        frame = pd.DataFrame(features)
+        if self.column not in frame.columns:
+            return np.full(len(frame), self.default_threshold)
+        groups = self.assigner.assign(frame[self.column])
+        return (
+            groups.map(self.thresholds)
+            .fillna(self.default_threshold)
+            .to_numpy(float)
+        )
+
+    def predict(self, features: Any) -> np.ndarray:
+        """Positive class where probability reaches the row's threshold."""
+        positive = self.predict_proba(features)[:, 1] >= self.cuts(features)
+        return np.where(positive, self.classes_[1], self.classes_[0])

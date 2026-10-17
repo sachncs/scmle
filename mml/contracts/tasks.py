@@ -342,6 +342,33 @@ class DecisionSpec(FrozenModel):
     false_negative_cost: float = pydantic.Field(default=1.0, gt=0)
 
 
+class FairnessSpec(FrozenModel):
+    """Optional reduction of outcome gaps between groups (binary tasks).
+
+    Attributes:
+        mitigation: `none` only reports gaps; `group_thresholds` gives each
+            group of a sensitive column its own probability threshold when
+            that closes the gap without costing too much accuracy. The
+            decision and its evidence are always recorded.
+        criterion: Gap to close: `demographic_parity` (equal selection
+            rates) or `equal_opportunity` (equal true-positive rates).
+        column: Sensitive column to mitigate on; defaults to the first of
+            `data.sensitive_columns`.
+        trigger_gap: Smallest gap worth acting on.
+        min_reduction: Share of the gap the thresholds must remove.
+        max_accuracy_cost: Most accuracy that may be given up.
+    """
+
+    mitigation: Literal["none", "group_thresholds"] = "none"
+    criterion: Literal["demographic_parity", "equal_opportunity"] = (
+        "demographic_parity"
+    )
+    column: str | None = None
+    trigger_gap: float = pydantic.Field(default=0.05, ge=0.0, lt=1.0)
+    min_reduction: float = pydantic.Field(default=0.5, gt=0.0, le=1.0)
+    max_accuracy_cost: float = pydantic.Field(default=0.03, ge=0.0, lt=1.0)
+
+
 class ProjectSpec(FrozenModel):
     """The explicit, versioned specification of an ML project."""
 
@@ -360,6 +387,7 @@ class ProjectSpec(FrozenModel):
     ensemble: EnsembleSpec = pydantic.Field(default_factory=EnsembleSpec)
     selection: SelectionSpec = pydantic.Field(default_factory=SelectionSpec)
     decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
+    fairness: FairnessSpec = pydantic.Field(default_factory=FairnessSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
 
     @pydantic.model_validator(mode="before")
@@ -470,6 +498,15 @@ class ProjectSpec(FrozenModel):
             raise ValueError("data.ordinal_order must not repeat a label")
         if self.task == "ordinal" and len(data.ordinal_order) < 3:
             raise ValueError("ordinal tasks need at least three levels")
+        if self.fairness.mitigation != "none":
+            chosen = self.fairness.column or next(
+                iter(data.sensitive_columns), None
+            )
+            if chosen is None or chosen not in data.sensitive_columns:
+                raise ValueError(
+                    "fairness mitigation needs a column listed in "
+                    "data.sensitive_columns"
+                )
         if data.event_column == data.target:
             raise ValueError("data.event_column must differ from the target")
         for name in ("group_column", "time_column"):

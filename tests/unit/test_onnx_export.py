@@ -140,3 +140,42 @@ def test_a_failed_parity_check_names_the_difference(tmp_path):
 
     with pytest.raises(errors.ArtifactError, match="differs"):
         onnx_export.verify(bundle, path, features, tolerance=0.0)
+
+
+needs_boosters = pytest.mark.skipif(
+    any(
+        importlib.util.find_spec(name) is None
+        for name in ("onnxmltools", "lightgbm", "xgboost")
+    ),
+    reason="onnxmltools, lightgbm and xgboost are not all installed",
+)
+
+
+@needs_boosters
+@pytest.mark.parametrize("name", ["lightgbm", "xgboost"])
+def test_boosted_models_export_and_decode_their_string_labels(name, tmp_path):
+    bundle, features = make_bundle(name, tasks.TaskType.BINARY)
+
+    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+
+    scorer = onnx_export.OnnxScorer(bundle, path)
+    assert set(scorer.predict(features)) <= {"no", "yes"}
+    assert (scorer.predict(features) == bundle.predict(features)).mean() >= 0.99
+
+
+@needs_boosters
+@pytest.mark.parametrize("name", ["lightgbm", "xgboost"])
+def test_boosted_regressors_export(name, tmp_path):
+    bundle, features = make_bundle(name, tasks.TaskType.REGRESSION)
+
+    path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
+
+    assert path.stat().st_size > 0
+
+
+def test_a_refusal_points_to_the_service_package(tmp_path):
+    bundle = make_bundle("random_forest", tasks.TaskType.BINARY)[0]
+    bundle.pipeline = object()
+
+    with pytest.raises(errors.ArtifactError, match="export_service"):
+        bundle.export_onnx(tmp_path / "m.onnx")

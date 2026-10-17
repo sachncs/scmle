@@ -395,6 +395,28 @@ class ExportOnnxCommand(Command):
         return EXIT_OK
 
 
+class PackageCommand(Command):
+    """Writes a deployable service folder for a saved bundle."""
+
+    name = "package"
+    help = "package a saved model bundle as a ready-to-run service folder"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds bundle and destination options."""
+        parser.add_argument("bundle", help="bundle directory")
+        parser.add_argument("--output", default="service")
+        parser.add_argument("--trusted", action="store_true")
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Writes the folder."""
+        model = bundle_module.ModelBundle.load(
+            args.bundle, trusted=args.trusted
+        )
+        folder = model.export_service(args.output)
+        LOGGER.info("wrote service folder %s", folder)
+        return EXIT_OK
+
+
 COMMANDS: tuple[Command, ...] = (
     PlanCommand(),
     RunCommand(),
@@ -402,6 +424,7 @@ COMMANDS: tuple[Command, ...] = (
     PredictCommand(),
     ServeCommand(),
     ExportOnnxCommand(),
+    PackageCommand(),
 )
 
 

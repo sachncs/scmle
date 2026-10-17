@@ -78,6 +78,10 @@
 * Lifecycle retraining policy: one retrain per drift event (data digest),
   a row cooldown, a minimum of labeled rows, and an audit record for every
   review, skip, rejection and promotion with its evidence.
+* Production for any model: `bundle.export_service` / `magicml package`
+  write a service folder (bundle, pinned requirements, build environment,
+  server script, Dockerfile). ONNX also covers LightGBM and XGBoost with
+  `onnxmltools`; refusals point to the service package.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.
