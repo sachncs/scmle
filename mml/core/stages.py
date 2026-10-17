@@ -234,6 +234,8 @@ class ProfileStage(Stage):
                 f"the approved plan is for {approved.task} but the data "
                 f"resolves to {task.value}"
             )
+        if task is tasks.TaskType.SURVIVAL:
+            target_module.check_events(frame, spec.data.event_column)
         context.task = task
         context.metric = context.catalog.resolve(spec.primary_metric, task)
         split = self.make_split(context, task, frame)
@@ -939,10 +941,12 @@ class PackageStage(Stage):
             The calibrator, or None when the time budget is spent or too few
             held-out rows exist.
         """
+        task = require(context.task, "task")
+        if task is tasks.TaskType.SURVIVAL:
+            return None  # Conformal margins are defined on point predictions.
         if context.resource_governor.skip_reason(first=False):
             return None
         split = require(context.split, "split")
-        task = require(context.task, "task")
         template = strategies.get_strategy(selected.strategy).build(
             require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),

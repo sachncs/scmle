@@ -971,6 +971,34 @@ class ModelBundle:
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
 
+    def predict_survival(
+        self,
+        data: str | pathlib.Path | pd.DataFrame,
+        times: Any,
+        mapping: mapping_module.ColumnMapping | None = None,
+    ) -> np.ndarray:
+        """Probability of no event yet at each time (survival tasks).
+
+        Args:
+            data: DataFrame or path to CSV/Parquet.
+            times: Times (in the duration column's unit) to read the curve at.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            Array of shape `(rows, len(times))`; each row never increases.
+
+        Raises:
+            ArtifactError: For models that are not survival models.
+        """
+        if self.schema.task != tasks.TaskType.SURVIVAL.value:
+            raise errors.ArtifactError("this bundle is not a survival model")
+        frame = self.prepare_frame(data, mapping)
+        return np.asarray(
+            self.pipeline.predict_survival(
+                frame, np.asarray(times, dtype=float)
+            )
+        )
+
     def rank_for_labeling(
         self,
         data: str | pathlib.Path | pd.DataFrame,

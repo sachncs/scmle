@@ -74,6 +74,10 @@ class WeightedEstimator(base.BaseEstimator):
         """Predicts with the fitted pipeline."""
         return self.estimator_.predict(features)
 
+    def predict_survival(self, features: Any, times: Any) -> np.ndarray:
+        """Survival curves from the fitted survival pipeline."""
+        return self.estimator_.predict_survival(features, times)
+
 
 class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):
     """Weighted fitting for classifiers."""

@@ -19,6 +19,7 @@ from mml.data.validation import columns
 from mml.features import feature_graph
 from mml.models import weighting
 from mml.models import wrappers
+from mml.models.survival import wrapper as survival_wrapper
 
 SPARSE_THRESHOLD = 0.3
 
@@ -200,7 +201,9 @@ def build_pipeline(
             monotonic_signs(plan, len(special)),
         )
     steps.append(("model", estimator))
-    built = pipeline.Pipeline(steps)
+    built: Any = pipeline.Pipeline(steps)
+    if plan.event_column:
+        built = survival_wrapper.EventAwareEstimator(built, plan.event_column)
     if plan.weight_column:
         return weighting.weighted(built, plan.weight_column, seed)
     return built

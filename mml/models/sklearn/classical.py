@@ -23,6 +23,7 @@ from mml.contracts import errors
 from mml.contracts import models
 from mml.contracts import search
 from mml.contracts import tasks
+from mml.models.survival import estimators as survival_estimators
 
 BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
@@ -85,7 +86,9 @@ class DummyAdapter(models.ModelAdapter):
     name = "dummy"
     family = "baseline"
     capabilities = models.Capabilities(
-        ALL_TASKS, sparse_input=True, handles_missing=True
+        ALL_TASKS | frozenset({tasks.TaskType.SURVIVAL}),
+        sparse_input=True,
+        handles_missing=True,
     )
 
     def build(
@@ -94,7 +97,9 @@ class DummyAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Returns a prior classifier or a mean regressor."""
+        """Returns a prior classifier, a mean regressor or a marginal curve."""
+        if task is tasks.TaskType.SURVIVAL:
+            return survival_estimators.MarginalSurvival()
         if task.is_classification:
             return dummy.DummyClassifier(strategy="prior")
         return dummy.DummyRegressor(strategy="mean")

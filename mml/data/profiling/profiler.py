@@ -92,6 +92,10 @@ class DatasetProfiler:
             roles[data.group_column] = "group column (used for splitting only)"
         if data.time_column and not data.time_as_feature:
             roles[data.time_column] = "time column (used for splitting only)"
+        if data.event_column:
+            roles[data.event_column] = (
+                "event indicator (used by survival models only)"
+            )
         if data.weight_column:
             roles[data.weight_column] = "sample weight (used for training only)"
         for column in roles:
@@ -325,6 +329,7 @@ class DatasetProfiler:
             group_column=self.spec.data.group_column,
             time_column=self.spec.data.time_column,
             weight_column=self.spec.data.weight_column,
+            event_column=self.spec.data.event_column,
             high_cardinality=tuple(
                 c
                 for c in features["categorical"]

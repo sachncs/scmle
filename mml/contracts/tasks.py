@@ -23,17 +23,19 @@ class TaskType(enum.StrEnum):
     BINARY = "binary_classification"
     MULTICLASS = "multiclass_classification"
     REGRESSION = "regression"
+    SURVIVAL = "survival"
 
     @property
     def is_classification(self) -> bool:
         """Whether the task predicts discrete classes."""
-        return self is not TaskType.REGRESSION
+        return self in (TaskType.BINARY, TaskType.MULTICLASS)
 
 
 TaskRequest = Literal[
     "auto",
     "classification",
     "regression",
+    "survival",
     "binary_classification",
     "multiclass_classification",
 ]
@@ -139,6 +141,9 @@ class DataSpec(FrozenModel):
             must never fall (+1) or never rise (-1) as the feature grows,
             other features held fixed. Only models that can enforce this
             are planned (binary classification and regression).
+        event_column: For survival tasks, the 0/1 column saying whether the
+            event was observed (1) or the row was censored (0); the target
+            is then the time to the event or to censoring. Never a feature.
         unlabeled: What to do with rows whose target is missing: `block`
             (refuse, the default), `ignore` (set them aside and report how
             many), or `pseudo_label` (classification only: label the rows the
@@ -167,6 +172,7 @@ class DataSpec(FrozenModel):
     sensitive_columns: list[str] = pydantic.Field(default_factory=list)
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
+    event_column: str | None = None
     unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"
     pseudo_label_confidence: float = pydantic.Field(default=0.9, gt=0.5, lt=1.0)
 
@@ -421,10 +427,20 @@ class ProjectSpec(FrozenModel):
                 f"feature nodes {stale} read a delayed column directly; "
                 f"read '<column>{DELAYED_SUFFIX}' instead"
             )
-        if validation.strategy == "stratified" and self.task == "regression":
+        if validation.strategy == "stratified" and self.task in (
+            "regression",
+            "survival",
+        ):
             raise ValueError(
-                "stratified validation is undefined for regression"
+                f"stratified validation is undefined for {self.task}"
             )
+        if (self.task == "survival") != (data.event_column is not None):
+            raise ValueError(
+                "survival tasks need data.event_column, and only survival "
+                "tasks may set it"
+            )
+        if data.event_column == data.target:
+            raise ValueError("data.event_column must differ from the target")
         for name in ("group_column", "time_column"):
             if getattr(data, name) == data.target:
                 raise ValueError(f"data.{name} must differ from the target")

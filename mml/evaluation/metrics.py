@@ -14,10 +14,12 @@ from mml.contracts import errors
 from mml.contracts import metrics as metric_contracts
 from mml.contracts import models
 from mml.contracts import tasks
+from mml.evaluation import concordance
 
 BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
 REGRESSION = tasks.TaskType.REGRESSION
+SURVIVAL = tasks.TaskType.SURVIVAL
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 
 
@@ -70,6 +72,7 @@ DEFAULT_METRICS = (
         "rmse", "neg_root_mean_squared_error", False, frozenset({REGRESSION})
     ),
     metric_contracts.Metric("r2", "r2", True, frozenset({REGRESSION})),
+    concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
 )
 
 
@@ -80,6 +83,7 @@ class MetricCatalog:
         BINARY: "roc_auc",
         MULTICLASS: "log_loss",
         REGRESSION: "rmse",
+        SURVIVAL: "c_index",
     }
     report_names = {
         BINARY: (
@@ -92,6 +96,7 @@ class MetricCatalog:
         ),
         MULTICLASS: ("log_loss", "f1_macro", "balanced_accuracy", "accuracy"),
         REGRESSION: ("mae", "rmse", "r2"),
+        SURVIVAL: ("c_index",),
     }
 
     def __init__(

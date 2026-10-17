@@ -23,7 +23,7 @@ def blobs(rows, seed):
 def test_only_confident_rows_receive_a_label():
     features, labels = blobs(300, 0)
     fitted = linear_model.LogisticRegression().fit(features, labels)
-    unlabeled, __ = blobs(400, 1)
+    unlabeled = blobs(400, 1)[0]
 
     rows, given = pseudo_labeling.confident_rows(fitted, unlabeled, 0.95)
 
@@ -35,7 +35,7 @@ def test_only_confident_rows_receive_a_label():
 def test_too_few_confident_rows_leave_the_model_unchanged():
     features, labels = blobs(300, 0)
     fitted = linear_model.LogisticRegression().fit(features, labels)
-    unlabeled, __ = blobs(5, 1)
+    unlabeled = blobs(5, 1)[0]
 
     model, added = pseudo_labeling.augmented_fit(
         fitted, features, labels, unlabeled, 0.9
@@ -46,7 +46,7 @@ def test_too_few_confident_rows_leave_the_model_unchanged():
 
 def test_judging_reports_the_gain_over_the_plain_fit():
     features, labels = blobs(120, 0)
-    unlabeled, __ = blobs(800, 1)
+    unlabeled = blobs(800, 1)[0]
     folds = [(list(range(0, 90)), list(range(90, 120)))]
 
     outcome = pseudo_labeling.judge(

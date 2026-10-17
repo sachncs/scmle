@@ -25,7 +25,9 @@ def toy_problem(
     features = pd.DataFrame(
         {"a": rng.normal(size=ROWS), "b": rng.normal(size=ROWS)}
     )
-    if task is tasks.TaskType.REGRESSION:
+    if task is tasks.TaskType.SURVIVAL:
+        target = pd.Series(rng.exponential(1.0, ROWS) + 0.01)
+    elif task is tasks.TaskType.REGRESSION:
         target = features["a"] * 2 + rng.normal(scale=0.1, size=ROWS)
     else:
         classes = 2 if task is tasks.TaskType.BINARY else 3

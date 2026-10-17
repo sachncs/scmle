@@ -18,6 +18,32 @@ def is_numeric_target(target: pd.Series) -> bool:
     ) and not pd.api.types.is_bool_dtype(target)
 
 
+MIN_EVENTS = 10
+
+
+def check_events(frame: pd.DataFrame, column: str | None) -> None:
+    """Requires a complete 0/1 event column with enough observed events.
+
+    Raises:
+        BlockedError: If the column is missing, not 0/1, has gaps, or records
+            fewer than `MIN_EVENTS` events (censoring everything leaves
+            nothing to learn from).
+    """
+    if column is None or column not in frame.columns:
+        raise errors.BlockedError(f"event column '{column}' not found")
+    values = pd.to_numeric(frame[column], errors="coerce")
+    if values.isna().any() or not set(values.unique()) <= {0, 1}:
+        raise errors.BlockedError(
+            f"event column '{column}' must hold 0 (censored) or 1 (event) in "
+            "every row"
+        )
+    if int(values.sum()) < MIN_EVENTS:
+        raise errors.BlockedError(
+            f"only {int(values.sum())} event(s) observed; survival models "
+            f"need at least {MIN_EVENTS}"
+        )
+
+
 class TaskResolver:
     """Resolves the requested task against the actual target values."""
 
@@ -46,11 +72,21 @@ class TaskResolver:
             raise errors.BlockedError(
                 f"target '{target.name}' has no non-missing values"
             )
+        if self.request == "survival":
+            return self.resolve_survival(target)
         if self.request == "regression":
             return self.resolve_regression(target)
         if self.request == "auto":
             return self.resolve_auto(target)
         return self.resolve_classification(target)
+
+    def resolve_survival(self, target: pd.Series) -> tasks.TaskType:
+        """Validates a survival request: durations must be positive numbers."""
+        if not is_numeric_target(target) or (target <= 0).any():
+            raise errors.BlockedError(
+                "survival needs a numeric duration target greater than zero"
+            )
+        return tasks.TaskType.SURVIVAL
 
     def resolve_regression(self, target: pd.Series) -> tasks.TaskType:
         """Validates an explicit regression request."""

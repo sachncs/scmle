@@ -210,6 +210,12 @@ project = mml.MLProject(
 project = mml.MLProject(data, "churn", unlabeled="pseudo_label")
 # result.bundle.rank_for_labeling(pool, count=20) -> rows to label next
 
+# Time to an event with censored rows (target = time, event_column = 0/1).
+project = mml.MLProject(
+    data, "months_to_churn", task="survival", event_column="churned"
+)
+# result.bundle.predict_survival(rows, times=[3, 6, 12]) -> P(no event yet)
+
 # After a run: reliability checks, explanations and calibrated uncertainty.
 result.evaluation["fit_health"]  # healthy / overfit / underfit
 result.diagnostics["robustness"]  # score under degraded input

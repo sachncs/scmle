@@ -56,6 +56,7 @@ class FeaturePlan:
         time_column: Ordering column, so inner cross-validation keeps time
             order.
         weight_column: Column of per-row training weights, if any.
+        event_column: Survival event indicator column, if any.
     """
 
     numeric: tuple[str, ...]
@@ -70,6 +71,7 @@ class FeaturePlan:
     group_column: str | None = None
     time_column: str | None = None
     weight_column: str | None = None
+    event_column: str | None = None
 
     @property
     def features(self) -> tuple[str, ...]:
