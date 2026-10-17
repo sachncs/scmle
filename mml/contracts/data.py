@@ -41,6 +41,8 @@ class FeaturePlan:
     Attributes:
         numeric: Numeric feature columns.
         categorical: Categorical feature columns.
+        text: Free-text columns (encoded as TF-IDF terms; also listed in
+            `extra_inputs` so inference requires them).
         dropped: Mapping of dropped column to the reason.
         derived: Row-wise feature-graph nodes computed inside the pipeline.
         series: Ordered (time-series) feature-graph nodes.
@@ -57,6 +59,7 @@ class FeaturePlan:
     numeric: tuple[str, ...]
     categorical: tuple[str, ...]
     dropped: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    text: tuple[str, ...] = ()
     derived: tuple[Any, ...] = ()
     series: tuple[Any, ...] = ()
     extra_inputs: tuple[str, ...] = ()
@@ -102,6 +105,7 @@ class FeaturePlan:
         return {
             "numeric": list(self.numeric),
             "categorical": list(self.categorical),
+            "text": list(self.text),
             "dropped": dict(self.dropped),
             "derived": [n.model_dump(mode="json") for n in self.derived],
             "series": [n.model_dump(mode="json") for n in self.series],

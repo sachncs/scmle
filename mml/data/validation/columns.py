@@ -23,6 +23,11 @@ from mml.data.curation import transformers
 
 MISSING_TOKEN = "__missing__"  # nosec B105 - category placeholder, not a secret
 ID_UNIQUE_RATIO = 0.95
+MIN_TEXT_WORDS = 4
+MIN_TEXT_ROWS = 30
+TEXT_UNIQUE_RATIO = 0.5
+TEXT_SAMPLE = 2000
+TEXT_TERMS = 200
 MAX_DIRECT_VALUES = 20
 TREE_LEAVES = 20
 MIN_ASSOCIATION_ROWS = 10
@@ -64,6 +69,12 @@ def to_float(values: Any) -> np.ndarray:
     """Coerces a 2-D block to float; unparseable and infinite become NaN."""
     frame = pd.DataFrame(values).apply(to_finite)
     return frame.to_numpy()
+
+
+def to_text(values: Any) -> np.ndarray:
+    """Casts a one-column block to a 1-D array of strings ("" if missing)."""
+    frame = pd.DataFrame(values)
+    return frame.iloc[:, 0].fillna("").astype(str).to_numpy()
 
 
 def to_object(values: Any) -> np.ndarray:
@@ -300,6 +311,52 @@ class DatetimeKind(ColumnKind):
         return None
 
 
+class TextKind(ColumnKind):
+    """Free text: sentences or descriptions, encoded as TF-IDF terms."""
+
+    name = "text"
+
+    def matches(self, series: pd.Series) -> bool:
+        """Strings with several words per value and mostly unique values."""
+        if not (
+            pd.api.types.is_object_dtype(series)
+            or pd.api.types.is_string_dtype(series)
+        ):
+            return False
+        values = series.dropna().astype(str).head(TEXT_SAMPLE)
+        if len(values) < MIN_TEXT_ROWS:
+            return False
+        words = float(np.mean([len(v.split()) for v in values]))
+        unique = values.nunique() / len(values)
+        return bool(words >= MIN_TEXT_WORDS and unique > TEXT_UNIQUE_RATIO)
+
+    def statistics(self, series: pd.Series) -> dict[str, Any]:
+        """Adds the typical number of words per value."""
+        stats = super().statistics(series)
+        counts = [len(v.split()) for v in series.dropna().astype(str)]
+        stats["mean_words"] = float(np.mean(counts)) if counts else 0.0
+        return stats
+
+    def transformer(
+        self, options: data_contracts.PreprocessingOptions
+    ) -> pipeline.Pipeline:
+        """Casts to text, then learns a TF-IDF vocabulary (fold-local)."""
+        return pipeline.Pipeline(
+            [
+                (
+                    "text",
+                    preprocessing.FunctionTransformer(
+                        to_text, feature_names_out="one-to-one"
+                    ),
+                ),
+                (
+                    "tfidf",
+                    transformers.TextVectorizer(max_terms=TEXT_TERMS),
+                ),
+            ]
+        )
+
+
 class CategoricalKind(ColumnKind):
     """Everything else: strings, categories, objects."""
 
@@ -398,6 +455,7 @@ class CategoricalKind(ColumnKind):
 KINDS: tuple[ColumnKind, ...] = (
     NumericKind(),
     DatetimeKind(),
+    TextKind(),
     CategoricalKind(),
 )
 

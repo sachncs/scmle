@@ -496,3 +496,42 @@ def test_datetime_features_train_and_predict_from_raw_timestamps(tmp_path):
         result.predict(as_text),
         result.predict(frame.drop(columns="y").head(12)),
     )
+
+
+def test_free_text_is_encoded_and_scored_from_raw_strings(tmp_path):
+    rng = np.random.default_rng(31)
+    good = [
+        "great product works well",
+        "love it fantastic quality",
+        "excellent value recommend",
+    ]
+    bad = [
+        "terrible broke after day",
+        "awful waste of money",
+        "poor quality disappointed refund",
+    ]
+    rows = 600
+    label = rng.integers(0, 2, rows)
+    frame = pd.DataFrame(
+        {
+            "review": [
+                f"{rng.choice(good if y else bad)} number {i} thanks"
+                for i, y in enumerate(label)
+            ],
+            "price": rng.normal(size=rows),
+            "y": label,
+        }
+    )
+    result = support.make_project(
+        frame, "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    assert "review" in result.profile.feature_plan.text
+    assert result.evaluation["test_metrics"]["roc_auc"] > 0.95
+    fresh = pd.DataFrame(
+        {
+            "review": ["great product recommend", "awful waste refund"],
+            "price": [0.0, 0.0],
+        }
+    )
+    assert list(result.predict(fresh)) == [1, 0]

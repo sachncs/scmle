@@ -6,6 +6,7 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from sklearn import base
+from sklearn.feature_extraction import text as sk_text
 
 DEFAULT_SKEW_THRESHOLD = 1.0
 
@@ -50,3 +51,41 @@ class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):
     def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
         """Returns the unchanged feature names."""
         return np.asarray(input_features, dtype=object)
+
+
+class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
+    """TF-IDF terms of a text column, with the vocabulary learned per fold.
+
+    Attributes:
+        max_terms: Largest vocabulary kept (by corpus frequency).
+        vectorizer_: The fitted scikit-learn vectorizer.
+    """
+
+    def __init__(self, max_terms: int = 200) -> None:
+        """Stores the vocabulary size."""
+        self.max_terms = max_terms
+
+    def fit(self, texts: Any, target: Any = None) -> Self:
+        """Learns the vocabulary and term weights from the training texts."""
+        self.vectorizer_ = sk_text.TfidfVectorizer(
+            max_features=self.max_terms,
+            ngram_range=(1, 2),
+            min_df=2,
+            sublinear_tf=True,
+            strip_accents="unicode",
+        )
+        try:
+            self.vectorizer_.fit(np.asarray(texts, dtype=str))
+        except ValueError:  # Empty vocabulary: no term occurs twice.
+            self.vectorizer_ = sk_text.TfidfVectorizer(
+                max_features=self.max_terms, strip_accents="unicode"
+            ).fit(np.asarray(texts, dtype=str))
+        return self
+
+    def transform(self, texts: Any) -> Any:
+        """Returns the TF-IDF matrix (sparse)."""
+        return self.vectorizer_.transform(np.asarray(texts, dtype=str))
+
+    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+        """Terms of the vocabulary."""
+        return self.vectorizer_.get_feature_names_out()

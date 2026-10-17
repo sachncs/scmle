@@ -117,6 +117,7 @@ class DatasetProfiler:
             "numeric": [],
             "categorical": [],
             "datetime": [],
+            "text": [],
         }
         quality: list[str] = []
         for name in frame.columns:
@@ -268,7 +269,7 @@ class DatasetProfiler:
             frame, roles
         )
         usable = features["numeric"] + features["categorical"]
-        if not usable and not features["datetime"]:
+        if not (usable or features["datetime"] or features["text"]):
             raise errors.BlockedError(
                 "no usable feature columns remain after exclusions"
             )
@@ -280,6 +281,7 @@ class DatasetProfiler:
         base_plan = data_contracts.FeaturePlan(
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
+            text=tuple(features["text"]),
             dropped=dropped,
             group_column=self.spec.data.group_column,
             time_column=self.spec.data.time_column,
@@ -305,7 +307,7 @@ class DatasetProfiler:
             base_plan,
             numeric=base_plan.numeric + tuple(n.name for n in derived),
             derived=derived,
-            extra_inputs=tuple(c for c in stamps if derived),
+            extra_inputs=tuple(c for c in stamps if derived) + base_plan.text,
         )
         return data_contracts.DatasetProfile(
             manifest=manifest,

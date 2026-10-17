@@ -230,3 +230,40 @@ def test_threshold_association_handles_degenerate_labels():
     assert columns.threshold_association(values, pd.Series([1] * 50)) == 0.0
     multi = pd.Series(np.repeat([0, 1, 2], [20, 15, 15]))
     assert columns.threshold_association(values, multi) == pytest.approx(1.0)
+
+
+def sentences(count):
+    return pd.Series(
+        [f"customer number {i} wrote a long review today" for i in range(count)]
+    )
+
+
+def test_free_text_is_its_own_kind_and_short_labels_are_not():
+    assert columns.kind_of(sentences(60)).name == "text"
+    labels = pd.Series(["red", "green", "blue"] * 30)
+    assert columns.kind_of(labels).name == "categorical"
+    cities = pd.Series(["New York City", "Los Angeles CA"] * 40)
+    assert columns.kind_of(cities).name == "categorical"
+    ids = pd.Series([f"u{i}" for i in range(60)])
+    assert columns.kind_of(ids).name == "categorical"
+
+
+def test_the_text_transformer_learns_its_vocabulary_per_fit():
+    kind = columns.TextKind()
+    train = pd.DataFrame(
+        {"t": ["good fast service"] * 20 + ["bad slow service"] * 20}
+    )
+    encoder = kind.transformer(OPTIONS_PLAIN)
+
+    matrix = encoder.fit_transform(train)
+    terms = list(encoder.named_steps["tfidf"].get_feature_names_out())
+
+    assert matrix.shape[0] == 40 and "service" in terms and "good" in terms
+    unseen = encoder.transform(pd.DataFrame({"t": ["totally new words only"]}))
+    assert unseen.shape == (1, len(terms)) and unseen.sum() == 0
+
+
+def test_text_statistics_report_words_per_value():
+    stats = columns.TextKind().statistics(sentences(40))
+
+    assert stats["kind"] == "text" and stats["mean_words"] == 8.0

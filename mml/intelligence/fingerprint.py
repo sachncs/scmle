@@ -121,7 +121,7 @@ def text_like_columns(
 ) -> list[str]:
     """Categorical columns holding free text rather than short labels."""
     found = []
-    for name in (*plan.categorical, *plan.dropped):
+    for name in (*plan.categorical, *plan.text, *plan.dropped):
         if name not in frame.columns or pd.api.types.is_numeric_dtype(
             frame[name]
         ):
