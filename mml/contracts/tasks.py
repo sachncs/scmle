@@ -401,6 +401,9 @@ class SelectionSpec(FrozenModel):
             declared better than another.
         rope: Half-width, in metric units, of the region in which two
             candidates count as equivalent.
+        nested_cv: Also estimate how optimistic the winning score is by
+            repeating the configuration search inside each outer fold (random
+            and stratified validation only; costs several extra fits).
         weighted: With a `data.weight_column`, score validation folds with
             the weights so selection agrees with the weighted test metrics
             (metrics that cannot take weights stay unweighted).
@@ -417,6 +420,7 @@ class SelectionSpec(FrozenModel):
     bayesian_confidence: float = pydantic.Field(default=0.95, gt=0.5, lt=1.0)
     rope: float = pydantic.Field(default=0.0, ge=0.0)
     weighted: bool = True
+    nested_cv: bool = False
 
 
 class ModelSpec(FrozenModel):

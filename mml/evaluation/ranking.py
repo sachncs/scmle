@@ -68,12 +68,77 @@ def mean_average_precision(
     return float(np.mean(values)) if values else float("nan")
 
 
+def ranked_hits(
+    relevance: np.ndarray, scores: np.ndarray, rows: np.ndarray
+) -> np.ndarray:
+    """Relevance (above zero) of one query's documents in score order."""
+    truth = np.asarray(relevance, dtype=float)[rows] > 0
+    order = np.argsort(-np.asarray(scores, dtype=float)[rows], kind="stable")
+    return truth[order]
+
+
+def mean_reciprocal_rank(
+    relevance: np.ndarray, scores: np.ndarray, queries: Any
+) -> float:
+    """Average of one over the rank of the first relevant document."""
+    values = []
+    for rows in query_groups(queries):
+        hits = ranked_hits(relevance, scores, rows)
+        if len(rows) < MIN_DOCUMENTS or not hits.any():
+            continue
+        values.append(1.0 / (int(np.argmax(hits)) + 1))
+    return float(np.mean(values)) if values else float("nan")
+
+
+def precision_at(
+    relevance: np.ndarray,
+    scores: np.ndarray,
+    queries: Any,
+    cutoff: int = CUTOFF,
+) -> float:
+    """Share of the top `cutoff` documents that are relevant, per query."""
+    values = []
+    for rows in query_groups(queries):
+        hits = ranked_hits(relevance, scores, rows)
+        if len(rows) < MIN_DOCUMENTS or not hits.any():
+            continue
+        values.append(float(hits[:cutoff].sum() / min(cutoff, len(hits))))
+    return float(np.mean(values)) if values else float("nan")
+
+
+def recall_at(
+    relevance: np.ndarray,
+    scores: np.ndarray,
+    queries: Any,
+    cutoff: int = CUTOFF,
+) -> float:
+    """Share of a query's relevant documents found in the top `cutoff`."""
+    values = []
+    for rows in query_groups(queries):
+        hits = ranked_hits(relevance, scores, rows)
+        if len(rows) < MIN_DOCUMENTS or not hits.any():
+            continue
+        found = int(hits[:cutoff].sum())
+        values.append(found / int(hits.sum()))
+    return float(np.mean(values)) if values else float("nan")
+
+
+FUNCTIONS = {
+    "ndcg": mean_ndcg,
+    "map": mean_average_precision,
+    "mrr": mean_reciprocal_rank,
+    "precision_at_10": precision_at,
+    "recall_at_10": recall_at,
+}
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class RankingMetric(metric_contracts.Metric):
     """A ranking metric read off a ranking estimator.
 
     Attributes:
-        kind: `ndcg` or `map`.
+        kind: A key of `FUNCTIONS` (`ndcg`, `map`, `mrr`, `precision_at_10`,
+            `recall_at_10`).
     """
 
     kind: str = "ndcg"
@@ -84,7 +149,7 @@ class RankingMetric(metric_contracts.Metric):
 
     def scorer(self, positive: Any = None) -> Any:
         """Builds a scorer `(estimator, features, relevance)`."""
-        function = mean_ndcg if self.kind == "ndcg" else mean_average_precision
+        function = FUNCTIONS[self.kind]
 
         def score(
             estimator: Any,

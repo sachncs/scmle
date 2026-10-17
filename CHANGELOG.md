@@ -116,6 +116,10 @@
 * `ProblemSpec`: state the decision, population and success criteria;
   the criteria are checked on the locked rows and shown in the summary
   (`result.meets_criteria`).
+* Evaluation completeness: MRR and precision/recall@10 for ranking, optional
+  nested cross-validation (`selection.nested_cv`) reporting the optimism of
+  the winning score, a warning for exactly equal classes, and a note that
+  validation and test keep the natural class mix.
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

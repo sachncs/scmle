@@ -114,3 +114,24 @@ def test_library_rankers_learn_the_ordering(library):
         cutoff=3,
     )
     assert value > chance + 0.05
+
+
+def test_reciprocal_rank_is_one_over_the_first_relevant_position():
+    truth = np.array([0, 0, 1, 0, 1, 0, 0, 0])
+    scores = np.array([4.0, 3.0, 2.0, 1.0, 4.0, 3.0, 2.0, 1.0])
+    queries = np.array([0] * 4 + [1] * 4)
+
+    value = ranking.mean_reciprocal_rank(truth, scores, queries)
+
+    assert value == pytest.approx((1 / 3 + 1 / 1) / 2)
+
+
+def test_precision_and_recall_at_k_count_hits_in_the_top():
+    truth = np.array([1, 0, 1, 0, 1])
+    scores = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+    queries = np.zeros(5)
+
+    assert ranking.precision_at(truth, scores, queries, cutoff=2) == 0.5
+    assert ranking.recall_at(truth, scores, queries, cutoff=3) == pytest.approx(
+        2 / 3
+    )

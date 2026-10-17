@@ -134,6 +134,17 @@ DEFAULT_METRICS = (
     ),
     ranking.RankingMetric("ndcg", "", True, frozenset({RANKING}), "ndcg"),
     ranking.RankingMetric("map", "", True, frozenset({RANKING}), "map"),
+    ranking.RankingMetric("mrr", "", True, frozenset({RANKING}), "mrr"),
+    ranking.RankingMetric(
+        "precision_at_10",
+        "",
+        True,
+        frozenset({RANKING}),
+        "precision_at_10",
+    ),
+    ranking.RankingMetric(
+        "recall_at_10", "", True, frozenset({RANKING}), "recall_at_10"
+    ),
     concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
     survival.SurvivalMetric("ibs", "", False, frozenset({SURVIVAL}), "ibs"),
     survival.SurvivalMetric(
@@ -170,7 +181,7 @@ class MetricCatalog:
         REGRESSION: ("mae", "rmse", "r2"),
         SURVIVAL: ("c_index", "ibs", "td_auc"),
         ORDINAL: ("qwk", "mace", "accuracy_levels"),
-        RANKING: ("ndcg", "map"),
+        RANKING: ("ndcg", "map", "mrr", "precision_at_10", "recall_at_10"),
         MULTILABEL: (
             "f1_macro_labels",
             "f1_micro_labels",

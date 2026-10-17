@@ -66,6 +66,10 @@ def summarize_target(
     return summary, risks
 
 
+MIN_BALANCE_ROWS = 100
+MIN_BALANCE_CLASSES = 2
+
+
 class DatasetProfiler:
     """Builds a `DatasetProfile` for a dataset under a project spec."""
 
@@ -229,6 +233,25 @@ class DatasetProfiler:
         deduplicated = frame.drop(columns=list(data.id_columns))
         return int(deduplicated.duplicated().sum())
 
+    @staticmethod
+    def balance_findings(target: pd.Series, task: tasks.TaskType) -> list[str]:
+        """Warns when classes are exactly equal in size.
+
+        Real data are rarely perfectly balanced, so equal counts usually mean
+        the table was down-sampled. Scores on it then describe a world with
+        equal prevalence, not the one the model will serve.
+        """
+        if not task.is_classification or len(target) < MIN_BALANCE_ROWS:
+            return []
+        counts = target.value_counts()
+        if len(counts) >= MIN_BALANCE_CLASSES and counts.nunique() == 1:
+            return [
+                f"every class has exactly {int(counts.iloc[0])} rows: if the "
+                "table was balanced by sampling, test scores reflect equal "
+                "prevalence, not the real-world mix"
+            ]
+        return []
+
     def duplicate_findings(
         self,
         frame: pd.DataFrame,
@@ -330,6 +353,7 @@ class DatasetProfiler:
         stamps = tuple(features["datetime"])
         derived = tuple(self.datetime_nodes(frame, stamps))
         quality += self.duplicate_findings(frame, usable, task)
+        quality += self.balance_findings(target, task)
         gaps = missingness.assess(frame, usable, target, task.is_classification)
         informative = tuple(f.column for f in gaps if f.informative)
         quality += [

@@ -43,6 +43,7 @@ from mml.evaluation import fit_health
 from mml.evaluation import learning_curve
 from mml.evaluation import metrics as metric_catalog
 from mml.evaluation import mitigation
+from mml.evaluation import nested
 from mml.evaluation import quantile
 from mml.evaluation import replay
 from mml.evaluation import resources
@@ -1174,6 +1175,12 @@ class FinalEvaluationStage(Stage):
             "semi_supervised": context.semi_supervised,
             "fairness_mitigation": context.fairness_mitigation,
             "execution_backend": context.backend.name,
+            "evaluation_prevalence": {
+                "natural": True,
+                "note": "resampling strategies change only training folds; "
+                "validation and test rows keep their real class mix",
+                "strategy": selected.strategy,
+            },
             "success_criteria": [
                 r.to_dict()
                 for r in criteria.check(
@@ -1387,6 +1394,50 @@ class PackageStage(Stage):
             quantile.QuantileBand.calibrate(observed, lows, highs),
         )
 
+    def nested_validation(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+    ) -> dict[str, Any] | None:
+        """Estimates the optimism of the winning score by nested validation."""
+        if not context.spec.selection.nested_cv:
+            return None
+        split = require(context.split, "split")
+        if split.manifest.strategy not in {"random", "stratified"}:
+            return {
+                "skipped": f"not defined for {split.manifest.strategy} "
+                "validation"
+            }
+        if context.resource_governor.skip_reason(first=False):
+            return {"skipped": "time budget spent"}
+        task = require(context.task, "task")
+        adapter = context.registry.get(selected.model_name)
+        strategy = strategies.get_strategy(selected.strategy)
+        plan = require(context.profile, "profile").feature_plan
+        seed = context.spec.validation.seed
+        metric = require(context.metric, "metric")
+        positive = metric_catalog.positive_label(split.dev_target, task)
+        result = nested.nested_score(
+            lambda params: strategy.build(plan, adapter, task, seed, params),
+            adapter.search_space,
+            split.dev_features,
+            split.dev_target,
+            [(f[0], f[1]) for f in split.manifest.folds],
+            metric.scorer(positive),
+            task.is_classification,
+            seed,
+            should_stop=lambda: bool(
+                context.resource_governor.skip_reason(first=False)
+            ),
+        )
+        if result is None:
+            return {"skipped": "time budget spent or too few rows"}
+        sign = 1.0 if metric.greater_is_better else -1.0
+        record = result.to_dict()
+        record["mean_natural"] = sign * result.mean
+        record["optimism_natural"] = sign * result.optimism
+        return record
+
     def forecast_backtest(
         self,
         context: context_module.RunContext,
@@ -1484,6 +1535,7 @@ class PackageStage(Stage):
             ),
         )
         evaluation["learning_curve"] = self.learning_curve(context, selected)
+        evaluation["nested_cv"] = self.nested_validation(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.quantile = self.quantile_intervals(context)
         if require(context.task, "task") is tasks.TaskType.FORECAST:
