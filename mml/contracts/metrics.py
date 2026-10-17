@@ -76,3 +76,28 @@ class PositiveLabelMetric(Metric):
             response_method=self.response_methods,
             pos_label=positive,
         )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class FunctionMetric(Metric):
+    """A metric defined by a user function of the true and predicted values.
+
+    The function is pickled by reference into trial processes, so it must be
+    a module-level function that those processes can import.
+
+    Attributes:
+        score_function: Function `(y_true, y_pred) -> float`.
+        response_method: What the estimator supplies to the function:
+            `predict`, `predict_proba` or `decision_function`.
+    """
+
+    score_function: Callable[..., float] = sk_metrics.accuracy_score
+    response_method: str = "predict"
+
+    def scorer(self, positive: Any = None) -> Any:
+        """Builds a scorer that applies the user function."""
+        return sk_metrics.make_scorer(
+            self.score_function,
+            greater_is_better=self.greater_is_better,
+            response_method=self.response_method,
+        )

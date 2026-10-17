@@ -4,6 +4,7 @@ Scores are always reported in natural units (log loss is positive);
 `greater_is_better` tells rankers which direction wins.
 """
 
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -102,6 +103,38 @@ class MetricCatalog:
             metrics: Available metrics.
         """
         self.metrics = {metric.name: metric for metric in metrics}
+        self.report_names = {
+            task: tuple(names)
+            for task, names in type(self).report_names.items()
+        }
+
+    def register(
+        self, metric: metric_contracts.Metric, replace: bool = False
+    ) -> None:
+        """Adds a user-defined metric, reported alongside the standard ones.
+
+        Args:
+            metric: The metric.
+            replace: Allow overriding an existing metric of the same name.
+
+        Raises:
+            ConfigError: If the name is taken and `replace` is False.
+        """
+        if metric.name in self.metrics and not replace:
+            raise errors.ConfigError(f"metric '{metric.name}' already exists")
+        self.metrics[metric.name] = metric
+        for task in metric.tasks:
+            names = self.report_names[task]
+            if metric.name not in names:
+                self.report_names[task] = (*names, metric.name)
+
+    def unregister(self, name: str) -> None:
+        """Removes a user-defined metric (no-op if it is not registered)."""
+        self.metrics.pop(name, None)
+        self.report_names = {
+            task: tuple(n for n in names if n != name)
+            for task, names in self.report_names.items()
+        }
 
     def resolve(
         self, name: str | None, task: tasks.TaskType
@@ -168,3 +201,36 @@ class MetricCatalog:
 
 
 CATALOG = MetricCatalog()
+
+
+def register_metric(
+    name: str,
+    score_function: Callable[..., float],
+    greater_is_better: bool,
+    task_types: tuple[tasks.TaskType, ...] = tuple(tasks.TaskType),
+    response_method: str = "predict",
+    replace: bool = False,
+) -> metric_contracts.FunctionMetric:
+    """Registers a user-defined metric with the default catalog.
+
+    Args:
+        name: Public metric name, usable as `MLProject(metric=name)`.
+        score_function: Module-level function `(y_true, y_pred) -> float`.
+        greater_is_better: Orientation of the score.
+        task_types: Tasks the metric is defined for.
+        response_method: `predict`, `predict_proba` or `decision_function`.
+        replace: Allow overriding an existing metric of the same name.
+
+    Returns:
+        The registered metric.
+    """
+    metric = metric_contracts.FunctionMetric(
+        name,
+        "",
+        greater_is_better,
+        frozenset(task_types),
+        score_function,
+        response_method,
+    )
+    CATALOG.register(metric, replace)
+    return metric
