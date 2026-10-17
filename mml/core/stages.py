@@ -57,6 +57,7 @@ from mml.monitoring import reference as reference_module
 from mml.sampling import pseudo_labeling
 from mml.sampling import strategies
 
+COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
 DIAGNOSTIC_BUDGET_SHARE = 0.25
 DIAGNOSTIC_MIN_SECONDS = 30.0
 LEAKAGE_MARKER = "leakage"
@@ -768,6 +769,7 @@ class FinalEvaluationStage(Stage):
         pipeline, decision = choose_decision_threshold(context, pipeline)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
+        context.test_rows = (test_features, test_target)
         context.emit(
             "test.opened",
             "locked test set released once, after selection was frozen",
@@ -1087,6 +1089,10 @@ class PackageStage(Stage):
         evaluation["learning_curve"] = self.learning_curve(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.quantile = self.quantile_intervals(context)
+        if bundle.quantile is not None and context.test_rows is not None:
+            evaluation["quantile_coverage"] = bundle.quantile.coverage_curve(
+                *context.test_rows, COVERAGE_LEVELS
+            )
         bundle.novelty = novelty.NoveltyDetector.fit(
             split.dev_features,
             bundle.schema.numeric,

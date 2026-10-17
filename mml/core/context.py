@@ -95,6 +95,8 @@ class RunContext:
         refits: Candidates already refit on development data during
             constraint checks, by trial id (reused by the final evaluation).
         final_pipeline: Selected pipeline refit on development data.
+        test_rows: The released locked rows and labels, kept for reports
+            written after the test was opened.
         unlabeled: Rows without a target, set aside by the `unlabeled` policy.
         semi_supervised: Record of the self-training judgement, if any.
         evaluation: Final evaluation record.
@@ -149,6 +151,7 @@ class RunContext:
     reference_scores: pd.Series | None = None
     refits: dict[str, Any] = dataclasses.field(default_factory=dict)
     final_pipeline: Any = None
+    test_rows: tuple[pd.DataFrame, pd.Series] | None = None
     unlabeled: pd.DataFrame | None = None
     semi_supervised: dict[str, Any] | None = None
     evaluation: dict[str, Any] | None = None

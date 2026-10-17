@@ -21,6 +21,7 @@ from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import metrics as metric_contracts
 from mml.contracts import tasks
+from mml.evaluation import reliability
 
 CALIBRATION_BINS = 10
 MAX_SEGMENT_LEVELS = 12
@@ -171,6 +172,32 @@ class CalibrationReport(Diagnostic):
         return {
             "brier_score": float(np.mean((probability - observed) ** 2)),
             "expected_calibration_error": float(error),
+            "curve": curve,
+        }
+
+
+class MulticlassCalibrationReport(Diagnostic):
+    """Top-label reliability curve, Brier score and calibration error."""
+
+    name = "calibration"
+    applies_to = frozenset({tasks.TaskType.MULTICLASS})
+
+    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+        """Compares confidence in the predicted class with its accuracy."""
+        probabilities = np.asarray(
+            inputs.estimator.predict_proba(inputs.features)
+        )
+        classes = list(inputs.estimator.classes_)
+        labels = np.asarray(inputs.target)
+        error, curve = reliability.top_label_curve(
+            probabilities, labels, classes, CALIBRATION_BINS
+        )
+        truth = (labels[:, None] == np.asarray(classes)[None, :]).astype(float)
+        return {
+            "brier_score": float(
+                np.mean(np.sum((probabilities - truth) ** 2, axis=1))
+            ),
+            "expected_calibration_error": error,
             "curve": curve,
         }
 
@@ -417,6 +444,7 @@ def default_suite() -> tuple[Diagnostic, ...]:
     return (
         ClassificationReport(),
         CalibrationReport(),
+        MulticlassCalibrationReport(),
         ThresholdReport(),
         ResidualReport(),
         MetricUncertainty(),

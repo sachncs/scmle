@@ -50,6 +50,9 @@
 * Benchmarks: `--seeds N` repeats each dataset and reports the advantage over
   the reference with a 95% interval; the verdict and the regression gate use
   the interval, so noise alone neither wins nor fails.
+* Multiclass reliability report (top-label calibration error), calibration
+  error before/after in `bundle.calibrate`, and a quantile-interval coverage
+  curve on the locked rows (`evaluation["quantile_coverage"]`).
 * Optional TabPFN adapter (`tabpfn` extra; needs an accepted license).
 * Benchmarks: Hugging Face source and suites (`--suite`).
 * Post-selection diagnostics are bounded by a share of the time budget.

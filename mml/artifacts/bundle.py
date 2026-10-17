@@ -32,6 +32,7 @@ from mml.data.readers import interchange
 from mml.data.readers import tabular
 from mml.evaluation import conformal as conformal_module
 from mml.evaluation import quantile as quantile_module
+from mml.evaluation import reliability
 from mml.explainability import local
 from mml.features import feature_graph
 from mml.inference import mapping as mapping_module
@@ -493,8 +494,9 @@ class ModelBundle:
             method: `sigmoid` (Platt) or `isotonic`.
 
         Returns:
-            Brier score before and after on the calibration rows (a
-            diagnostic; the calibrator is fitted on the same rows).
+            Brier score and top-label expected calibration error before and
+            after, on the calibration rows (a diagnostic; the calibrator is
+            fitted on the same rows).
 
         Raises:
             ArtifactError: For regression models.
@@ -518,9 +520,14 @@ class ModelBundle:
         self.info = dataclasses.replace(
             self.info, calibration=f"{method} on {len(frame)} rows"
         )
+        classes = self.schema.classes
         return {
-            "brier_before": brier(before, labels, self.schema.classes),
-            "brier_after": brier(after, labels, self.schema.classes),
+            "brier_before": brier(before, labels, classes),
+            "brier_after": brier(after, labels, classes),
+            "ece_before": reliability.top_label_curve(before, labels, classes)[
+                0
+            ],
+            "ece_after": reliability.top_label_curve(after, labels, classes)[0],
         }
 
     def series_builder(self) -> feature_graph.SeriesFeatureBuilder:

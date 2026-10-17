@@ -95,6 +95,37 @@ class QuantileIntervals:
         margin = self.band.margin(coverage)
         return low - margin, high + margin
 
+    def coverage_curve(
+        self,
+        features: pd.DataFrame,
+        target: Any,
+        levels: Sequence[float],
+    ) -> list[dict[str, float]]:
+        """Share of held-out rows inside the interval at each nominal level.
+
+        Args:
+            features: Rows the models did not train on.
+            target: Their true values.
+            levels: Nominal coverages in (0, 1).
+
+        Returns:
+            For each level: nominal and empirical coverage, mean width.
+        """
+        values = np.asarray(target, dtype=float)
+        curve = []
+        for level in levels:
+            low, high = self.interval(features, level)
+            curve.append(
+                {
+                    "nominal": float(level),
+                    "empirical": float(
+                        np.mean((values >= low) & (values <= high))
+                    ),
+                    "mean_width": float(np.mean(high - low)),
+                }
+            )
+        return curve
+
     def raw_band(self, features: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
         """The model band before calibration."""
         return predicted_band(self.lower_model, self.upper_model, features)
