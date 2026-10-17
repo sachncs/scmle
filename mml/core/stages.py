@@ -375,7 +375,11 @@ class ProfileStage(Stage):
         profile: data_contracts.DatasetProfile,
     ) -> data_contracts.DatasetProfile:
         """Appends label-noise and representativeness findings."""
-        columns = list(profile.feature_plan.numeric)
+        present = set(development.columns)
+        columns = [c for c in profile.feature_plan.numeric if c in present]
+        categorical = [
+            c for c in profile.feature_plan.categorical if c in present
+        ]
         notes = []
         if columns and task in (
             tasks.TaskType.BINARY,
@@ -391,7 +395,7 @@ class ProfileStage(Stage):
         if spec.data.reference_uri:
             reference = tabular.read_table(spec.data.reference_uri)
             note = representativeness.representativeness_note(
-                development[columns + list(profile.feature_plan.categorical)],
+                development[columns + categorical],
                 reference,
                 spec.validation.seed,
             )
