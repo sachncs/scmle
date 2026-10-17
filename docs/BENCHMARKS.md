@@ -42,7 +42,7 @@ Ahead of the reference on **13 of 21**.
 | bank_marketing | 15000 | roc_auc | hist_gradient_boosting | 0.9241 | 0.9163 | ahead |
 | credit_card_fraud | 40000 | pr_auc | bagged_decision_tree | 0.829 | 0.6428 | ahead |
 | telco_churn | 5000 | roc_auc | stacking | 0.9165 | 0.9297 | behind |
-| electricity | 12000 | roc_auc | stacking | 0.8955 | 0.9411 | behind |
+| electricity | 12000 | roc_auc | hist_gradient_boosting | 0.9401 | 0.9411 | tie |
 | credit_approval | 690 | roc_auc | hist_gradient_boosting | 0.9159 | 0.9074 | ahead |
 | horse_colic | 368 | roc_auc | bagged_decision_tree | 0.8566 | 0.8235 | ahead |
 | vehicle | 846 | log_loss | stacking | 0.3798 | 0.6179 | ahead |
@@ -60,6 +60,7 @@ Ahead of the reference on **13 of 21**.
 ## Reading the results
 
 * Ties at the third significant digit (ailerons, elevators, spambase, cpu_act, pol) are labelled by the unrounded numbers; treat them as ties.
-* The clearest weaknesses are chronological electricity data (the selected stack trails the reference by about 0.05 ROC-AUC under expanding-window validation), covertype and letter (large multiclass sets where the 240 s budget leaves little room to tune), and house_sales, where the long-tail target transform won cross-validation but lost on the locked rows.
+* Chronological electricity data trailed the reference by about 0.05 ROC-AUC while the time column was only used to order rows; the reference, like most practitioners, used it as a feature. With `time_as_feature=True` the gap is 0.001. Models that key on absolute time must extrapolate, so it stays opt-in.
+* The clearest weaknesses are covertype and letter (large multiclass sets where the 240 s budget leaves little room to tune), and house_sales, where the long-tail target transform won cross-validation but lost on the locked rows.
 * Wide tables (bioresponse, 419 features) exposed that the post-selection diagnostics were not bounded by the time budget; they now share a fraction of it.
 * Scores come from one split and one seed per dataset, so differences in the fourth digit are within noise.
