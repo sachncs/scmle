@@ -20,6 +20,7 @@ from sklearn import tree as sk_tree
 from mml.contracts import data as data_contracts
 from mml.contracts import errors
 from mml.contracts import tasks
+from mml.data.curation import embedding
 from mml.data.curation import transformers
 
 MISSING_TOKEN = "__missing__"  # nosec B105 - category placeholder, not a secret
@@ -365,7 +366,12 @@ class TextKind(ColumnKind):
     def transformer(
         self, options: data_contracts.PreprocessingOptions
     ) -> pipeline.Pipeline:
-        """Casts to text, then learns a TF-IDF vocabulary (fold-local)."""
+        """Casts to text, then TF-IDF terms (fold-local) or embeddings."""
+        encoder: Any = (
+            embedding.TextEmbedder(options.embedding_model, TEXT_TERMS)
+            if options.text_encoding == "embedding"
+            else transformers.TextVectorizer(max_terms=TEXT_TERMS)
+        )
         return pipeline.Pipeline(
             [
                 (
@@ -376,7 +382,7 @@ class TextKind(ColumnKind):
                 ),
                 (
                     "tfidf",
-                    transformers.TextVectorizer(max_terms=TEXT_TERMS),
+                    encoder,
                 ),
             ]
         )

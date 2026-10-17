@@ -59,6 +59,8 @@ class FeaturePlan:
         event_column: Survival event indicator column, if any.
         ordinal_levels: Number of ordered levels of an ordinal target.
         query_column: Ranking query identifier column, if any.
+        text_encoding: `tfidf` or `embedding` for free-text columns.
+        embedding_model: Sentence-embedding model for `embedding`.
         informative_missing: Features whose gaps are associated with the
             target; `None` when missingness was not assessed.
     """
@@ -78,6 +80,8 @@ class FeaturePlan:
     event_column: str | None = None
     ordinal_levels: int | None = None
     query_column: str | None = None
+    text_encoding: str = "tfidf"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     informative_missing: tuple[str, ...] | None = None
 
     @property
@@ -191,6 +195,8 @@ class PreprocessingOptions:
             `indicator` (median plus a flag column per feature that has
             missing values) or `iterative` (each feature predicted from the
             others).
+        text_encoding: `tfidf` or `embedding` for free-text columns.
+        embedding_model: Sentence-embedding model for `embedding`.
     """
 
     scale: bool = False
@@ -202,3 +208,5 @@ class PreprocessingOptions:
     construct: bool = False
     select: bool = False
     missing: str = "median"
+    text_encoding: str = "tfidf"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"

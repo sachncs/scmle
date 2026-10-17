@@ -153,6 +153,10 @@ class DataSpec(FrozenModel):
         ordinal_order: For ordinal tasks, the target's labels from lowest to
             highest (for example `["low", "medium", "high"]`). Every label in
             the data must be listed and every listed label must occur.
+        text_encoding: How free-text columns become features: `tfidf`
+            (default) or `embedding` (a pretrained sentence-embedding model
+            run in the PyTorch worker; falls back to TF-IDF if unavailable).
+        embedding_model: Sentence-embedding model for `text_encoding`.
         query_column: For ranking tasks, the column identifying the query
             (or session) each row belongs to; the target is the relevance
             grade. Never a feature; not needed at prediction time.
@@ -188,6 +192,8 @@ class DataSpec(FrozenModel):
     monotonic_constraints: dict[str, int] = pydantic.Field(default_factory=dict)
     weight_column: str | None = None
     event_column: str | None = None
+    text_encoding: Literal["tfidf", "embedding"] = "tfidf"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     query_column: str | None = None
     ordinal_order: list[str | int] = pydantic.Field(default_factory=list)
     unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"

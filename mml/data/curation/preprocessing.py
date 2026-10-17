@@ -164,6 +164,8 @@ def default_options(
         impute=not caps.handles_missing,
         high_cardinality="ordinal" if native else "onehot",
         sparse=caps.sparse_input and bool(plan.high_cardinality),
+        text_encoding=plan.text_encoding,
+        embedding_model=plan.embedding_model,
     )
 
 

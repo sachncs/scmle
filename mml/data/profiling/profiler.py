@@ -342,6 +342,8 @@ class DatasetProfiler:
             weight_column=self.spec.data.weight_column,
             event_column=self.spec.data.event_column,
             query_column=self.spec.data.query_column,
+            text_encoding=self.spec.data.text_encoding,
+            embedding_model=self.spec.data.embedding_model,
             ordinal_levels=len(self.spec.data.ordinal_order) or None,
             high_cardinality=tuple(
                 c

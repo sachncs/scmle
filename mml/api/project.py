@@ -53,6 +53,8 @@ class MLProject:
         weight_column: str | None = None,
         event_column: str | None = None,
         query_column: str | None = None,
+        text_encoding: Literal["tfidf", "embedding"] = "tfidf",
+        embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
         ordinal_order: list[str | int] | None = None,
         unlabeled: Literal["block", "ignore", "pseudo_label"] = "block",
         pseudo_label_confidence: float = 0.9,
@@ -107,6 +109,10 @@ class MLProject:
             event_column: For `task="survival"`, the 0/1 column saying
                 whether the event was observed (1) or the row was censored
                 (0); the target is the time to the event or to censoring.
+            text_encoding: `tfidf` (default) or `embedding` for free-text
+                columns (needs the `embeddings` extra; falls back to TF-IDF
+                with a warning when unavailable).
+            embedding_model: Sentence-embedding model for `embedding`.
             query_column: For `task="ranking"`, the column identifying each
                 row's query; the target is the relevance grade.
             ordinal_order: For `task="ordinal"`, the target's labels from
@@ -172,6 +178,8 @@ class MLProject:
                 weight_column=weight_column,
                 event_column=event_column,
                 query_column=query_column,
+                text_encoding=text_encoding,
+                embedding_model=embedding_model,
                 ordinal_order=ordinal_order or [],
                 unlabeled=unlabeled,
                 pseudo_label_confidence=pseudo_label_confidence,

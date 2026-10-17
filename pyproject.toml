@@ -43,6 +43,9 @@ deeplearning = ["torch>=2.8", "keras>=3.5"]
 # TabPFN needs an accepted Prior Labs license and TABPFN_TOKEN for its weights,
 # so it is not part of the `all` extra.
 tabpfn = ["tabpfn>=2.0"]
+# Pretrained sentence embeddings for text columns (downloads a model on first
+# use); not part of `all` because it pulls the transformers stack.
+embeddings = ["sentence-transformers>=3.0"]
 # ONNX export (onnxmltools adds LightGBM and XGBoost); onnxruntime has no
 # free-threaded (3.14t) wheel yet. Any model can ship with `magicml package`.
 onnx = ["skl2onnx>=1.17", "onnxruntime>=1.20", "onnxmltools>=1.13"]

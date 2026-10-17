@@ -51,7 +51,7 @@ def handle(
 
     Args:
         cache: Fitted engines already held, by state id (least recent first).
-        operation: `fit` or `call`.
+        operation: `fit`, `call`, `probe` or `embed`.
         payload: Operation arguments.
 
     Returns:
@@ -59,6 +59,11 @@ def handle(
     """
     if operation == "probe":
         return bool(importlib.import_module("torch").cuda.is_available())
+    if operation == "embed":
+        name, texts = payload
+        return importlib.import_module(
+            "mml.models.deeplearning.embeddings"
+        ).embed(name, texts)
     if operation == "fit":
         path, params, features, target, weights = payload
         engine = resolve(path)(**params)
