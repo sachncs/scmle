@@ -172,6 +172,7 @@ class MetricCatalog:
         features: pd.DataFrame,
         target: pd.Series,
         task: tasks.TaskType,
+        sample_weight: Any = None,
     ) -> dict[str, float]:
         """Applies every report metric for the task.
 
@@ -180,6 +181,7 @@ class MetricCatalog:
             features: Evaluation features.
             target: Evaluation labels.
             task: Resolved task type.
+            sample_weight: Optional per-row weights applied to every score.
 
         Returns:
             Metric name to natural-unit score; NaN when a metric cannot be
@@ -193,9 +195,9 @@ class MetricCatalog:
         for name in self.report_names[task]:
             try:
                 results[name] = self.metrics[name].score(
-                    estimator, features, target, positive
+                    estimator, features, target, positive, sample_weight
                 )
-            except ValueError:
+            except (ValueError, TypeError):
                 results[name] = float("nan")
         return results
 

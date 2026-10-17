@@ -686,6 +686,18 @@ class FinalEvaluationStage(Stage):
         test_metrics = context.catalog.evaluate(
             pipeline, test_features, test_target, task
         )
+        weight_column = context.spec.data.weight_column
+        weighted_test_metrics = (
+            context.catalog.evaluate(
+                pipeline,
+                test_features,
+                test_target,
+                task,
+                test_features[weight_column].to_numpy(dtype=float),
+            )
+            if weight_column
+            else None
+        )
         context.track(
             selected_strategy=selected.strategy,
             selected_model=selected.model_name,
@@ -741,6 +753,7 @@ class FinalEvaluationStage(Stage):
             ),
             "baseline_cv_score": baseline.score_mean if baseline else None,
             "test_metrics": test_metrics,
+            "weighted_test_metrics": weighted_test_metrics,
             "n_dev": len(split.dev_features),
             "n_test": len(test_features),
             "split_fingerprint": split.manifest.fingerprint,

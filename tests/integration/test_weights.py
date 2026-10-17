@@ -50,3 +50,18 @@ def test_bad_weights_are_refused_with_a_clear_message(tmp_path):
 
     with pytest.raises(errors.DataError, match="non-negative"):
         run(frame, tmp_path, weight_column="w")
+
+
+def test_weighted_test_metrics_are_reported_beside_the_plain_ones(tmp_path):
+    frame = conflicting_frame()
+    frame["w"] = np.where(frame["first"], 1.0, 0.01)
+
+    weighted = run(
+        frame, tmp_path / "w", weight_column="w", excluded_columns=["first"]
+    )
+    plain = run(frame, tmp_path / "p", excluded_columns=["first", "w"])
+
+    assert set(weighted.evaluation["weighted_test_metrics"]) == set(
+        weighted.evaluation["test_metrics"]
+    )
+    assert plain.evaluation["weighted_test_metrics"] is None

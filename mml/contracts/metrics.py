@@ -45,10 +45,24 @@ class Metric:
         features: pd.DataFrame,
         target: pd.Series,
         positive: Any = None,
+        sample_weight: Any = None,
     ) -> float:
-        """Scores a fitted estimator in natural units."""
+        """Scores a fitted estimator in natural units.
+
+        Args:
+            estimator: Fitted estimator.
+            features: Evaluation features.
+            target: Evaluation labels.
+            positive: Positive class label for binary metrics.
+            sample_weight: Optional per-row weights for the score.
+        """
         scorer = self.scorer(positive)
-        return self.to_natural(float(scorer(estimator, features, target)))
+        extra = (
+            {} if sample_weight is None else {"sample_weight": sample_weight}
+        )
+        return self.to_natural(
+            float(scorer(estimator, features, target, **extra))
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
