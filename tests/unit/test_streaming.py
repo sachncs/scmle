@@ -87,10 +87,14 @@ def test_a_file_far_larger_than_the_budget_is_read_in_bounded_memory(tmp_path):
     write_parquet(path, 4_000_000, columns=7, chunk=250_000)
     script = textwrap.dedent(
         f"""
-        import json, resource, sys
+        import json, sys
         import numpy as np, pandas as pd
         from scml.data.readers import streaming
         def peak():
+            if sys.platform == "win32":
+                import psutil
+                return psutil.Process().memory_info().peak_wset / 1e6
+            import resource
             value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
             return value / (1024 * 1024) if sys.platform == "darwin" else value / 1024
         source = streaming.ParquetChunks(__import__("pathlib").Path({str(path)!r}))

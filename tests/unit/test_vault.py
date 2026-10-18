@@ -1,6 +1,7 @@
 """Tests for the test-set vault."""
 
 import os
+import sys
 
 import pandas as pd
 import pytest
@@ -45,6 +46,9 @@ def test_this_process_keeps_only_the_ids(sealed):
     )
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows handles are not file descriptors"
+)
 def test_the_vault_pipe_is_not_inherited_by_child_processes(sealed):
     assert os.get_inheritable(sealed.channel.fileno()) is False
 

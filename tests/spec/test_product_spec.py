@@ -216,7 +216,7 @@ def test_l101_l105_three_planes_are_separate_packages():
     for plane in (
         ("core", "intelligence"),
         ("data", "models"),
-        ("artifacts", "tracking"),
+        ("artifacts", "integrations"),
     ):
         assert all((PACKAGE / name).is_dir() for name in plane)
 

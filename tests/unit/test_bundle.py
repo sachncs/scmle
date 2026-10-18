@@ -206,11 +206,11 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
     good = bundle.save(tmp_path / "good", signing_key="k")
     evil = bundle.save(tmp_path / "evil", signing_key="k")
     (evil / bundle_module.MODEL_FILE).write_bytes(b"malicious pickle")
-    (evil / bundle_module.MANIFEST_FILE).write_text(
-        (good / bundle_module.MANIFEST_FILE).read_text()
+    (evil / bundle_module.MANIFEST_FILE).write_bytes(
+        (good / bundle_module.MANIFEST_FILE).read_bytes()
     )
-    (evil / bundle_module.SIGNATURE_FILE).write_text(
-        (good / bundle_module.SIGNATURE_FILE).read_text()
+    (evil / bundle_module.SIGNATURE_FILE).write_bytes(
+        (good / bundle_module.SIGNATURE_FILE).read_bytes()
     )
     with pytest.raises(errors.ArtifactError, match="checksum"):
         bundle_module.ModelBundle.load(evil, signing_key="k")
