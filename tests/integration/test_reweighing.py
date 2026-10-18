@@ -1,10 +1,13 @@
 """Reweighing removes the group-label association and narrows the model gap."""
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import mml
+from mml.contracts import tasks
 from mml.evaluation import reweighing
 
 
@@ -57,3 +60,46 @@ def test_a_project_trained_on_the_weights_selects_more_evenly():
         return float(rates.max() - rates.min())
 
     assert gap("w") < gap(None)
+
+
+def test_the_fairness_option_reweights_development_rows_automatically():
+    frame = biased()
+
+    def run(mitigation):
+        result = mml.MLProject(
+            frame,
+            "y",
+            metric="roc_auc",
+            time_budget=60,
+            sensitive_columns=["group"],
+            fairness=tasks.FairnessSpec(mitigation=mitigation),
+        ).run()
+        scored = result.predict(frame.drop(columns="y"))
+        rates = pd.Series(scored).groupby(frame.group.to_numpy()).mean()
+        return result, float(rates.max() - rates.min())
+
+    reweighed, narrow = run("reweighing")
+    unchanged, wide = run("none")
+
+    assert narrow < wide
+    log = json.loads(
+        (reweighed.run_dir / "diagnostics/decision_log.json").read_text()
+    )
+    notes = [
+        o["reason"]
+        for o in log["outcomes"]
+        if o["technique"] == "fairness:group"
+    ]
+    assert notes and "reweighted" in notes[0]
+    assert unchanged.bundle.predict(frame.drop(columns="y")).shape[0] == 1600
+
+
+def test_reweighing_cannot_be_combined_with_a_weight_column():
+    with pytest.raises(ValueError, match="weight_column"):
+        mml.MLProject(
+            biased().assign(w=1.0),
+            "y",
+            weight_column="w",
+            sensitive_columns=["group"],
+            fairness=tasks.FairnessSpec(mitigation="reweighing"),
+        )

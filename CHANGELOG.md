@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* `FairnessSpec(mitigation="reweighing")` weights development rows so group and
+  label are independent in training; locked rows are untouched.
 * `selection.sensitivity_repeats` runs the sensitivity analysis on the selected
   model and stores it in `evaluation["sensitivity"]`.
 * Clustering (`mml.unsupervised.clustering.find_clusters`): k-means, Gaussian

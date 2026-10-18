@@ -40,6 +40,9 @@ class TaskType(enum.StrEnum):
         return self in (TaskType.BINARY, TaskType.MULTICLASS)
 
 
+FAIRNESS_WEIGHT = "fairness_weight"
+"""Weight column the reweighing mitigation adds to development rows."""
+
 STANDARD_TASKS = frozenset(
     {TaskType.BINARY, TaskType.MULTICLASS, TaskType.REGRESSION}
 )
@@ -475,7 +478,11 @@ class FairnessSpec(FrozenModel):
         mitigation: `none` only reports gaps; `group_thresholds` gives each
             group of a sensitive column its own probability threshold when
             that closes the gap without costing too much accuracy. The
-            decision and its evidence are always recorded.
+            decision and its evidence are always recorded. `reweighing`
+            instead weights the development rows (never the locked ones) so
+            group and label are independent in training, for binary and
+            multiclass tasks; it cannot be combined with
+            `data.weight_column`.
         criterion: Gap to close: `demographic_parity` (equal selection
             rates) or `equal_opportunity` (equal true-positive rates).
         column: Sensitive column to mitigate on; defaults to the first of
@@ -485,7 +492,7 @@ class FairnessSpec(FrozenModel):
         max_accuracy_cost: Most accuracy that may be given up.
     """
 
-    mitigation: Literal["none", "group_thresholds"] = "none"
+    mitigation: Literal["none", "group_thresholds", "reweighing"] = "none"
     criterion: Literal["demographic_parity", "equal_opportunity"] = (
         "demographic_parity"
     )
@@ -713,6 +720,13 @@ class ProjectSpec(FrozenModel):
             )
         if data.training == "stream" and data.memory_budget_gb is None:
             raise ValueError("training='stream' needs data.memory_budget_gb")
+        if (
+            self.fairness.mitigation == "reweighing"
+            and data.weight_column not in (None, FAIRNESS_WEIGHT)
+        ):
+            raise ValueError(
+                "fairness reweighing cannot be combined with data.weight_column"
+            )
         if self.fairness.mitigation != "none":
             chosen = self.fairness.column or next(
                 iter(data.sensitive_columns), None

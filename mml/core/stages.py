@@ -50,6 +50,7 @@ from mml.evaluation import nested
 from mml.evaluation import quantile
 from mml.evaluation import replay
 from mml.evaluation import resources
+from mml.evaluation import reweighing
 from mml.evaluation import sensitivity
 from mml.evaluation import suite
 from mml.evaluation import uplift
@@ -314,6 +315,7 @@ class ProfileStage(Stage):
                 f"available: {sorted(context.catalog.report_names[task])}"
             )
         split = self.make_split(context, task, frame)
+        spec = context.spec  # reweighing may have set the weight column
         development = split.dev_features.assign(
             **{spec.data.target: split.dev_target}
         )
@@ -425,6 +427,47 @@ class ProfileStage(Stage):
         locked.target = locked.target.iloc[0:0]
         return sealed
 
+    def apply_reweighing(
+        self,
+        context: context_module.RunContext,
+        task: tasks.TaskType,
+        split: splitters.SplitResult,
+    ) -> None:
+        """Weights development rows so group and label are independent.
+
+        The weights come from development rows only; the locked rows are
+        untouched. The weight column then trains the models as any other.
+        """
+        fairness = context.spec.fairness
+        if fairness.mitigation != "reweighing":
+            return
+        column = fairness.column or context.spec.data.sensitive_columns[0]
+        label = f"fairness:{column}"
+        if task not in (tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS):
+            context.add_outcome(
+                label,
+                experiments.DecisionAction.REJECT,
+                "reweighing applies to binary and multiclass tasks only",
+            )
+            return
+        weights = reweighing.reweighing_weights(
+            split.dev_features[column].astype(str), split.dev_target
+        )
+        split.dev_features[tasks.FAIRNESS_WEIGHT] = weights
+        context.spec = context.spec.model_copy(
+            update={
+                "data": context.spec.data.model_copy(
+                    update={"weight_column": tasks.FAIRNESS_WEIGHT}
+                )
+            }
+        )
+        context.add_outcome(
+            label,
+            experiments.DecisionAction.INCLUDE,
+            "development rows reweighted so group and label are independent "
+            f"(weights from {weights.min():.2f} to {weights.max():.2f})",
+        )
+
     def make_split(
         self,
         context: context_module.RunContext,
@@ -445,6 +488,7 @@ class ProfileStage(Stage):
                 len(data.targets),
                 data.seasonal_period,
             )
+        self.apply_reweighing(context, task, split)
         isolation = "in-process protocol"
         if context.resource_governor.hard:
             split.locked_test = self.seal(split.locked_test)
@@ -971,7 +1015,7 @@ class FinalEvaluationStage(Stage):
         """
         fairness = context.spec.fairness
         task = require(context.task, "task")
-        if fairness.mitigation == "none":
+        if fairness.mitigation != "group_thresholds":
             return pipeline
         column = fairness.column or context.spec.data.sensitive_columns[0]
         label = f"fairness:{column}"
@@ -1258,6 +1302,13 @@ class FinalEvaluationStage(Stage):
         pipeline = self.mitigate_fairness(context, selected, pipeline, decision)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
+        if (
+            context.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
+            and tasks.FAIRNESS_WEIGHT not in test_features
+        ):
+            # Reweighing weights development rows only; locked rows carry a
+            # neutral weight so the pipeline finds the column it expects.
+            test_features = test_features.assign(**{tasks.FAIRNESS_WEIGHT: 1.0})
         context.test_rows = (test_features, test_target)
         self.mitigation_on_locked_rows(
             context, unmitigated, pipeline, test_features, test_target
@@ -1293,7 +1344,7 @@ class FinalEvaluationStage(Stage):
                 task,
                 test_features[weight_column].to_numpy(dtype=float),
             )
-            if weight_column
+            if weight_column and weight_column != tasks.FAIRNESS_WEIGHT
             else None
         )
         context.track(
