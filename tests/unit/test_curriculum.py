@@ -15,4 +15,6 @@ def test_every_stage_has_an_example():
 
 @pytest.mark.parametrize("index", range(8))
 def test_the_example_runs(index):
+    if "import torch" in BLOCKS[index]:
+        pytest.importorskip("torch")
     exec(compile(BLOCKS[index], f"curriculum-stage-{index + 1}", "exec"), {})
