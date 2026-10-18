@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* `selection.sensitivity_repeats` runs the sensitivity analysis on the selected
+  model and stores it in `evaluation["sensitivity"]`.
 * Clustering (`mml.unsupervised.clustering.find_clusters`): k-means, Gaussian
   mixture and agglomerative at several counts, scored by silhouette,
   Davies-Bouldin, Calinski-Harabasz and bootstrap stability.

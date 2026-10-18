@@ -410,6 +410,10 @@ class SelectionSpec(FrozenModel):
         bias_variance_replicates: Bootstrap refits of the selected model used
             to split its error into bias and variance (0 turns it off;
             regression and classification only).
+        sensitivity_repeats: Repeats for the sensitivity report on the selected
+            model: spread of the score over training seeds, bootstrap
+            resamples and splits, and its decay under added input noise
+            (0 turns it off; regression and classification only).
         pareto: Measure the top candidates' size and latency, report the
             score / latency / size Pareto front, and pick, among candidates
             within `pareto_tolerance` of the best score, the fastest.
@@ -436,6 +440,7 @@ class SelectionSpec(FrozenModel):
     weighted: bool = True
     nested_cv: bool = False
     bias_variance_replicates: int = pydantic.Field(default=0, ge=0)
+    sensitivity_repeats: int = pydantic.Field(default=0, ge=0)
     pareto: bool = False
     pareto_tolerance: float = pydantic.Field(default=0.0, ge=0.0)
 

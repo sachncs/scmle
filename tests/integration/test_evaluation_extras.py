@@ -83,3 +83,27 @@ def test_the_bias_variance_report_is_off_by_default(tmp_path):
     ).run()
 
     assert result.evaluation["bias_variance"] is None
+
+
+def test_the_sensitivity_report_separates_training_split_and_noise(tmp_path):
+    result = support.make_project(
+        frame(),
+        "y",
+        time_budget=300,
+        output_dir=tmp_path,
+        selection=tasks.SelectionSpec(sensitivity_repeats=4),
+    ).run()
+
+    report = result.evaluation["sensitivity"]
+    assert report["dominant"] in {"seed", "resample", "split"}
+    assert len(report["split"]["scores"]) == 4
+    assert report["noise"]["0.0"] >= report["noise"]["1.0"]
+    assert report["decay"] <= 0.0
+
+
+def test_the_sensitivity_report_is_off_by_default(tmp_path):
+    result = support.make_project(
+        frame(), "y", time_budget=300, output_dir=tmp_path
+    ).run()
+
+    assert result.evaluation["sensitivity"] is None

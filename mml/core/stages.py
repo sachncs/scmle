@@ -50,6 +50,7 @@ from mml.evaluation import nested
 from mml.evaluation import quantile
 from mml.evaluation import replay
 from mml.evaluation import resources
+from mml.evaluation import sensitivity
 from mml.evaluation import suite
 from mml.evaluation import uplift
 from mml.experimentation import ensemble_search
@@ -1608,6 +1609,43 @@ class PackageStage(Stage):
             return {"skipped": "time budget spent or too few predictions"}
         return found.to_dict()
 
+    def sensitivity(
+        self,
+        context: context_module.RunContext,
+        selected: experiments.TrialResult,
+    ) -> dict[str, Any] | None:
+        """Spread of the selected model's score over training, split, noise."""
+        repeats = context.spec.selection.sensitivity_repeats
+        task = require(context.task, "task")
+        if not repeats:
+            return None
+        if task not in (
+            tasks.TaskType.BINARY,
+            tasks.TaskType.MULTICLASS,
+            tasks.TaskType.REGRESSION,
+        ):
+            return {"skipped": f"not defined for {task.value}"}
+        if context.resource_governor.skip_reason(first=False):
+            return {"skipped": "time budget spent"}
+        split = require(context.split, "split")
+        adapter = context.registry.get(selected.model_name)
+        strategy = strategies.get_strategy(selected.strategy)
+        plan = require(context.profile, "profile").feature_plan
+        seed = context.spec.validation.seed
+        metric = require(context.metric, "metric")
+        scorer = metric.scorer(
+            metric_catalog.positive_label(split.dev_target, task)
+        )
+        report = sensitivity.analyze(
+            lambda: strategy.build(plan, adapter, task, seed, selected.params),
+            split.dev_features,
+            split.dev_target,
+            scorer,
+            repeats,
+            seed,
+        )
+        return {**report.to_dict(), "dominant": report.dominant()}
+
     def nested_validation(
         self,
         context: context_module.RunContext,
@@ -1744,6 +1782,7 @@ class PackageStage(Stage):
         evaluation["learning_curve"] = self.learning_curve(context, selected)
         evaluation["nested_cv"] = self.nested_validation(context, selected)
         evaluation["bias_variance"] = self.bias_variance(context, selected)
+        evaluation["sensitivity"] = self.sensitivity(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.quantile = self.quantile_intervals(context)
         if require(context.task, "task") is tasks.TaskType.FORECAST:
