@@ -7,7 +7,7 @@ from sklearn import dummy
 from sklearn import ensemble
 from sklearn import linear_model
 
-from mml.evaluation import resources
+from scml.evaluation import resources
 
 
 def fitted(model, rows=300):

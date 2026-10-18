@@ -1,14 +1,14 @@
 # Architecture
 
-magicml is a modular monolith with three planes that stay separate:
+scml is a modular monolith with three planes that stay separate:
 
 | Plane | Decides / does | Code |
 | --- | --- | --- |
-| Control | what to do, when and why | `mml.core` (orchestrator, stages, state machine), `mml.intelligence` (planner, meta-learning) |
-| Execution | transformations, training, tuning, evaluation | `mml.data`, `mml.models`, `mml.optimization`, `mml.experimentation.trials`, `mml.core.scheduler` |
-| Evidence | artifacts, measurements, decisions, provenance | `mml.artifacts`, `mml.experimentation.stores`, `mml.monitoring`, `mml.governance`, `mml.inference` |
+| Control | what to do, when and why | `scml.core` (orchestrator, stages, state machine), `scml.intelligence` (planner, meta-learning) |
+| Execution | transformations, training, tuning, evaluation | `scml.data`, `scml.models`, `scml.optimization`, `scml.experimentation.trials`, `scml.core.scheduler` |
+| Evidence | artifacts, measurements, decisions, provenance | `scml.artifacts`, `scml.experimentation.stores`, `scml.monitoring`, `scml.governance`, `scml.inference` |
 
-Modules interact only through the typed contracts in `mml.contracts`.
+Modules interact only through the typed contracts in `scml.contracts`.
 
 ## The run
 
@@ -70,7 +70,7 @@ tracking database.
   features leaves every trial, fold score and selection unchanged.
 
 Known, documented limits: profiling statistics (imbalance ratio, skew,
-leakage associations) are computed on the whole dataset, as `product.md`
+leakage associations) are computed on the whole dataset, as the design specification
 orders profiling before splitting; stratified splits legitimately use labels
 to choose the test rows.
 
@@ -85,7 +85,7 @@ Add a subclass; no core edits are needed.
 | a feature operation | `FeatureOp` | `feature_graph.OPS` |
 | a synthetic-data generator | `SyntheticGenerator` | `GeneratorOverSampler.generator_class` |
 | a validation protocol | `SplitStrategy` | `splitting.STRATEGIES` |
-| a model family | `ModelAdapter` | `ModelRegistry.register` or the `mml.models` entry point |
+| a model family | `ModelAdapter` | `ModelRegistry.register` or the `scml.models` entry point |
 | a data strategy | `DataStrategy` | `strategies.STRATEGIES` |
 | a planning policy | `PlanningRule` | `Planner(rules=...)` |
 | a search algorithm | `Optimizer` | `optimizers.OPTIMIZERS` |
@@ -97,7 +97,7 @@ Add a subclass; no core edits are needed.
 | a workflow stage | `Stage` | `Orchestrator(stages=...)` |
 
 Third-party model adapters must pass
-`mml.models.conformance.check_conformance`.
+`scml.models.conformance.check_conformance`.
 
 ## Conventions
 

@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 import support
 
-import mml
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.models import ensembles
-from mml.models import registry as registry_module
+import scml
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.models import ensembles
+from scml.models import registry as registry_module
 
 ENSEMBLE = tasks.EnsembleSpec(size=3)
 
@@ -77,7 +77,7 @@ def test_a_winning_stack_is_selected_refit_and_packaged(
         assert result.selected_model == "stacking"
         assert result.bundle.info.model_params["members"]
         features = regression_frame.drop(columns="y")
-        loaded = mml.ModelBundle.load(
+        loaded = scml.ModelBundle.load(
             result.save(tmp_path / "bundle"), trusted=True
         )
         np.testing.assert_allclose(
@@ -104,7 +104,7 @@ def test_stacking_needs_two_members():
 def test_ensemble_can_be_disabled_and_is_planned(binary_frame, tmp_path):
     off = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
     assert not any(t.model_name == "stacking" for t in off.trials)
-    plan = mml.MLProject(binary_frame, "y").plan()
+    plan = scml.MLProject(binary_frame, "y").plan()
     decision = next(d for d in plan.decisions if d.technique == "stacking")
     assert decision.action == "include"
 
@@ -114,7 +114,7 @@ def test_stack_resumes_without_recomputation(
 ):
     import shutil
 
-    from mml.experimentation import trials as trials_module
+    from scml.experimentation import trials as trials_module
 
     original = run(binary_frame, tmp_path)
     (original.run_dir / "evaluation.json").unlink()
@@ -126,5 +126,5 @@ def test_stack_resumes_without_recomputation(
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
-    resumed = mml.MLProject.resume(original.run_dir, data=binary_frame)
+    resumed = scml.MLProject.resume(original.run_dir, data=binary_frame)
     assert calls == [] and resumed.state == "COMPLETED"

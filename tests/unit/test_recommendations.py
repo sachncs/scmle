@@ -3,11 +3,11 @@
 import numpy as np
 import pandas as pd
 
-from mml.contracts import data as data_contracts
-from mml.contracts import tasks
-from mml.data.profiling import profiler
-from mml.data.validation import target as target_module
-from mml.intelligence import recommendations
+from scml.contracts import data as data_contracts
+from scml.contracts import tasks
+from scml.data.profiling import profiler
+from scml.data.validation import target as target_module
+from scml.intelligence import recommendations
 
 
 def profile_of(frame, **spec_fields):

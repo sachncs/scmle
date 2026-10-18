@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from mml.evaluation import conformal
+from scml.evaluation import conformal
 
 
 def noisy_regression(rows, rng):

@@ -3,12 +3,12 @@
 import pytest
 from sklearn import dummy
 
-from mml.contracts import errors
-from mml.contracts import models
-from mml.contracts import tasks
-from mml.models import conformance
-from mml.models import registry as registry_module
-from mml.models.sklearn import classical
+from scml.contracts import errors
+from scml.contracts import models
+from scml.contracts import tasks
+from scml.models import conformance
+from scml.models import registry as registry_module
+from scml.models.sklearn import classical
 
 BINARY = tasks.TaskType.BINARY
 REGRESSION = tasks.TaskType.REGRESSION
@@ -202,7 +202,7 @@ def test_a_third_party_deep_learning_adapter_needs_no_core_edit(registry):
 def test_a_default_orchestrator_discovers_conforming_plugins_only(
     monkeypatch, binary_frame
 ):
-    from mml.core import orchestrator as orchestrator_module
+    from scml.core import orchestrator as orchestrator_module
 
     class NoProba:
         def fit(self, features, target):

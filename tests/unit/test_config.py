@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.core import config
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.core import config
 
 
 def make_spec():

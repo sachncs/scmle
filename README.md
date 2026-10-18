@@ -1,17 +1,32 @@
-# magicml
+# super-charge-ml
 
-Autonomous, leakage-safe ML lifecycle framework for tabular data. Python 3.11
-or newer (tested on 3.11 to 3.14, including the free-threaded 3.14 build).
-The architecture is specified in [`product.md`](product.md); the importable
-package is `mml`.
+[![CI](https://github.com/sachncs/magicml/actions/workflows/ci.yml/badge.svg)](https://github.com/sachncs/magicml/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/super-charge-ml)](https://pypi.org/project/super-charge-ml/)
+[![Python](https://img.shields.io/pypi/pyversions/super-charge-ml)](https://pypi.org/project/super-charge-ml/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
+Autonomous, leakage-safe ML lifecycle framework for tabular data. Runs on
+Linux, macOS and Windows with Python 3.11 or newer (tested on 3.11 to 3.14,
+including the free-threaded 3.14 build). The design is described in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+```bash
+pip install super-charge-ml                  # core
+pip install "super-charge-ml[boosting]"      # + LightGBM, XGBoost
+pip install "super-charge-ml[all]"           # most optional extras
+```
+
+The PyPI distribution is `super-charge-ml`; the import name and the command
+are both `scml`. **Status: beta.** The public API may change between `0.x`
+releases; see [`CHANGELOG.md`](CHANGELOG.md).
 
 ```python
 import logging
 
-import mml
+import scml
 
 logging.basicConfig(level=logging.INFO)
-project = mml.MLProject("customers.parquet", target="churn", metric="roc_auc")
+project = scml.MLProject("customers.parquet", target="churn", metric="roc_auc")
 logging.info(project.plan().summary())  # inspect before any training
 result = project.run()  # profile, split, search, test, package
 logging.info("\n%s", result.leaderboard())
@@ -19,7 +34,7 @@ result.save("artifacts/churn", signing_key="...")  # signed bundle
 result.predict("new_customers.parquet")
 ```
 
-CLI: `magicml plan | run | resume | predict` (see `magicml --help`).
+CLI: `scml plan | run | resume | predict` (see `scml --help`).
 More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 
 ## What it does
@@ -108,31 +123,31 @@ wide data). The full tables, and where it is behind, are in
 
 | Package | Responsibility |
 | --- | --- |
-| `mml.contracts` | Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, ABCs |
-| `mml.data` | `readers` (CSV, Parquet, Arrow / Polars interchange), `profiling`, `validation` (column kinds, target and task), `curation` (fold-local preprocessing), `splitting` (leakage-safe and structure-aware strategies) |
-| `mml.features` | Versioned, fitted feature graph (row-wise and series nodes) |
-| `mml.sampling` | Resamplers, synthesis, and the data strategies evaluated inside folds |
-| `mml.models` | `ModelAdapter` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
-| `mml.optimization` | Ask/tell optimizers (random, Optuna) |
-| `mml.experimentation` | Trials, tuning, strategy and ensemble search, experiment stores (SQLite) |
-| `mml.intelligence` | Dataset fingerprint, `Planner` and `PlanningRule`s, recommendations, meta-learning from run history |
-| `mml.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
-| `mml.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
-| `mml.core` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
-| `mml.artifacts` | Signed model bundle, run store, report, replay verification |
-| `mml.inference` | Column mapping, input validation, batch / HTTP serving |
-| `mml.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
-| `mml.governance` | Access ledger, content-addressed model registry, lifecycle manager, run audit |
-| `mml.integrations` | Optional MLflow and Ray adapters |
-| `mml.api` | `MLProject`, `RunResult`, `load_model` / `predict` |
+| `scml.contracts` | Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, ABCs |
+| `scml.data` | `readers` (CSV, Parquet, Arrow / Polars interchange), `profiling`, `validation` (column kinds, target and task), `curation` (fold-local preprocessing), `splitting` (leakage-safe and structure-aware strategies) |
+| `scml.features` | Versioned, fitted feature graph (row-wise and series nodes) |
+| `scml.sampling` | Resamplers, synthesis, and the data strategies evaluated inside folds |
+| `scml.models` | `ModelAdapter` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
+| `scml.optimization` | Ask/tell optimizers (random, Optuna) |
+| `scml.experimentation` | Trials, tuning, strategy and ensemble search, experiment stores (SQLite) |
+| `scml.intelligence` | Dataset fingerprint, `Planner` and `PlanningRule`s, recommendations, meta-learning from run history |
+| `scml.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
+| `scml.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
+| `scml.core` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
+| `scml.artifacts` | Signed model bundle, run store, report, replay verification |
+| `scml.inference` | Column mapping, input validation, batch / HTTP serving |
+| `scml.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
+| `scml.governance` | Access ledger, content-addressed model registry, lifecycle manager, run audit |
+| `scml.integrations` | Optional MLflow and Ray adapters |
+| `scml.api` | `MLProject`, `RunResult`, `load_model` / `predict` |
 
 Extension points are polymorphic: add a `TableReader`, `ColumnKind`,
 `SplitStrategy`, `DataStrategy`, `ModelAdapter`, `Optimizer`, `PlanningRule`,
 `SelectionPolicy`, `Diagnostic`, `PolicyCheckpoint`, `ExecutionBackend`,
 `ExperimentStore`, `ServingAdapter` or `Stage` subclass; no core edits are
 needed ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). Third-party adapters
-can also register via the `mml.models` entry-point group and must pass
-`mml.models.conformance.check_conformance`.
+can also register via the `scml.models` entry-point group and must pass
+`scml.models.conformance.check_conformance`.
 
 ## Conventions
 
@@ -143,7 +158,7 @@ by `ruff` and `mypy`. No underscore-prefixed names anywhere, enforced by
 ```bash
 uv sync --extra boosting --extra optimization
 uv run ruff check . && uv run ruff format --check .
-uv run mypy mml benchmarks
+uv run mypy scml benchmarks
 uv run pytest
 uv run python -m benchmarks.run_benchmarks --offline --output results.json
 uv run python -m benchmarks.check_regression results.json
@@ -179,5 +194,5 @@ installed into a clean environment.
   stop a process from reading the original data file when a path was given,
   and a caller's own in-memory DataFrame still holds every row.
 * Ray and CatBoost have no free-threaded (3.14t) wheels yet.
-* The PyPI names `mlforge` and `magicml` are both taken; choose a distribution
-  name before publishing.
+* Windows: peak-memory reporting counts this process only (finished child
+  processes are not reported), and the free-threaded build is not tested.

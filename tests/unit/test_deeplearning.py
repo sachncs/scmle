@@ -13,12 +13,12 @@ import pytest
 from scipy import sparse
 import support
 
-import mml
-from mml.contracts import tasks
-from mml.models import conformance
-from mml.models import registry as registry_module
-from mml.models.deeplearning import estimators
-from mml.models.deeplearning import worker
+import scml
+from scml.contracts import tasks
+from scml.models import conformance
+from scml.models import registry as registry_module
+from scml.models.deeplearning import estimators
+from scml.models.deeplearning import worker
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None, reason="torch is not installed"
@@ -167,7 +167,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
     assert result.selected_model == "torch_residual"
     features = binary_frame.drop(columns="y").head(20)
     result.save(tmp_path / "net")
-    reloaded = mml.load_model(tmp_path / "net", trusted=True)
+    reloaded = scml.load_model(tmp_path / "net", trusted=True)
     np.testing.assert_array_equal(
         reloaded.predict(features), result.predict(features)
     )
@@ -202,7 +202,7 @@ def test_the_framework_process_never_imports_torch():
         """
         import sys
         import numpy as np
-        from mml.models.deeplearning import estimators
+        from scml.models.deeplearning import estimators
         features = np.random.rand(120, 3).astype("float32")
         target = (features[:, 0] > 0.5).astype(int)
         model = estimators.TorchClassifier(epochs=5).fit(features, target)

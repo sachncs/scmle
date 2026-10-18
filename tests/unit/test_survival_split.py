@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.data.splitting import splitters
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.data.splitting import splitters
 
 
 def spec():

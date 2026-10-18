@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from mml.data.splitting import iterative
+from scml.data.splitting import iterative
 
 
 def labels(rows=1000, seed=0):

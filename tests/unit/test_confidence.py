@@ -2,7 +2,7 @@
 
 import pytest
 
-from mml.evaluation import confidence
+from scml.evaluation import confidence
 
 
 def test_corrected_error_is_wider_than_the_naive_one():

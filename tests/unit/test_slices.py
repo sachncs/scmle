@@ -5,13 +5,13 @@ import dataclasses
 import numpy as np
 import pandas as pd
 
-from mml.contracts import data as data_contracts
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.evaluation import diagnostics
-from mml.evaluation import metrics
-from mml.evaluation import slices
-from mml.models import registry as registry_module
+from scml.contracts import data as data_contracts
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.evaluation import diagnostics
+from scml.evaluation import metrics
+from scml.evaluation import slices
+from scml.models import registry as registry_module
 
 REGISTRY = registry_module.ModelRegistry.with_builtins()
 PLAN = data_contracts.FeaturePlan(("signal",), ("region",))

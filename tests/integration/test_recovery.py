@@ -7,12 +7,12 @@ import pytest
 from sklearn import dummy
 import support
 
-from mml.contracts import errors
-from mml.contracts import models
-from mml.contracts import tasks
-from mml.core import orchestrator as orchestrator_module
-from mml.core import stages as stages_module
-from mml.models import registry as registry_module
+from scml.contracts import errors
+from scml.contracts import models
+from scml.contracts import tasks
+from scml.core import orchestrator as orchestrator_module
+from scml.core import stages as stages_module
+from scml.models import registry as registry_module
 
 BINARY = frozenset({tasks.TaskType.BINARY})
 
@@ -57,9 +57,7 @@ def test_all_trials_failing_ends_in_failed_state(binary_frame, tmp_path):
     registry = registry_module.ModelRegistry((ExplodingAdapter(),))
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
-    with pytest.raises(
-        errors.MagicMLError, match="all trials failed"
-    ) as caught:
+    with pytest.raises(errors.ScmlError, match="all trials failed") as caught:
         project.run()
     assert (
         read_events(caught.value.details["run_dir"])[-1]["kind"]

@@ -16,20 +16,20 @@ time*, a loss `L`, and the population `P(X, Y)` the model will face. The goal is
 to minimise the expected risk `R(f) = E[L(Y, f(X))]` under that population, and
 a success criterion states what value of the metric is good enough to ship.
 
-* Modules: `mml/contracts/tasks.py` (`ProblemSpec`, task types, success
-  criteria), `mml/core/stages.py` (criteria check),
-  `mml/evaluation/criteria.py`.
+* Modules: `scml/contracts/tasks.py` (`ProblemSpec`, task types, success
+  criteria), `scml/core/stages.py` (criteria check),
+  `scml/evaluation/criteria.py`.
 * Tests: `tests/integration/test_problem_spec.py`.
 
 ```python
-import mml
+import scml
 import numpy as np
 import pandas as pd
 
 rng = np.random.default_rng(0)
 data = pd.DataFrame({"a": rng.normal(size=400), "b": rng.normal(size=400)})
 data["y"] = (data.a + 0.5 * data.b + rng.normal(0, 0.7, 400) > 0).astype(int)
-project = mml.MLProject(data, "y", metric="roc_auc", time_budget=60)
+project = scml.MLProject(data, "y", metric="roc_auc", time_budget=60)
 print(project.plan().summary())
 ```
 
@@ -43,18 +43,18 @@ found by confident learning: row `i` is a suspect when the out-of-fold
 probability of its given label is below the class mean `t_k = mean p(k | x)` over
 rows labelled `k` while another class `j` has `p(j | x) >= t_j`.
 
-* Modules: `mml/data/profiling/profiler.py` (distributions, quantiles,
-  missingness), `mml/data/profiling/missingness.py` (MCAR/MAR/MNAR signal),
-  `mml/data/profiling/label_noise.py`,
-  `mml/data/profiling/representativeness.py`, `mml/data/splitting/duplicates.py`
-  (deduplication and leakage), `mml/evaluation/shift.py` (covariate shift).
+* Modules: `scml/data/profiling/profiler.py` (distributions, quantiles,
+  missingness), `scml/data/profiling/missingness.py` (MCAR/MAR/MNAR signal),
+  `scml/data/profiling/label_noise.py`,
+  `scml/data/profiling/representativeness.py`, `scml/data/splitting/duplicates.py`
+  (deduplication and leakage), `scml/evaluation/shift.py` (covariate shift).
 * Tests: `tests/unit/test_data_quality_checks.py`,
   `tests/integration/test_missingness_plan.py`.
 
 ```python
 import numpy as np
 import pandas as pd
-from mml.data.profiling import label_noise, representativeness
+from scml.data.profiling import label_noise, representativeness
 
 rng = np.random.default_rng(0)
 features = pd.DataFrame({"a": rng.normal(size=500), "b": rng.normal(size=500)})
@@ -75,22 +75,22 @@ loop; otherwise the held-out rows leak into the statistics (preprocessing
 leakage). Splits follow the prediction setting: stratified for classes, grouped
 for dependent rows, temporal for the future. The locked test set is touched once.
 
-* Modules: `mml/data/splitting/splitters.py`, `mml/features/feature_graph.py` (encoding,
+* Modules: `scml/data/splitting/splitters.py`, `scml/features/feature_graph.py` (encoding,
   scaling, automatic construction and L1 selection),
-  `mml/data/curation/preprocessing.py`.
+  `scml/data/curation/preprocessing.py`.
 * Tests: `tests/unit/test_splitting.py`, `tests/leakage/test_leakage.py`.
 
 ```python
 import numpy as np
 import pandas as pd
-import mml
+import scml
 
 rng = np.random.default_rng(1)
 data = pd.DataFrame(
     {"group": rng.integers(0, 40, 600), "x": rng.normal(size=600)}
 )
 data["y"] = (data.x + rng.normal(0, 0.8, 600) > 0).astype(int)
-project = mml.MLProject(
+project = scml.MLProject(
     data, "y", metric="roc_auc", time_budget=60, group_column="group"
 )
 print(project.plan().summary())
@@ -104,22 +104,22 @@ baseline always runs first and every candidate must beat it with statistical
 support, not a lucky split. Selection compares paired fold scores and treats
 overlapping intervals as ties.
 
-* Modules: `mml/models/registry.py`, `mml/models/sklearn/`,
-  `mml/models/boosting/`, `mml/models/deeplearning/` (MLP, residual,
-  FT-Transformer), `mml/evaluation/selection.py`,
-  `mml/evaluation/comparison.py`.
+* Modules: `scml/models/registry.py`, `scml/models/sklearn/`,
+  `scml/models/boosting/`, `scml/models/deeplearning/` (MLP, residual,
+  FT-Transformer), `scml/evaluation/selection.py`,
+  `scml/evaluation/comparison.py`.
 * Tests: `tests/integration/test_register_estimator.py`,
   `tests/unit/test_selection.py`.
 
 ```python
 import numpy as np
 import pandas as pd
-import mml
+import scml
 
 rng = np.random.default_rng(2)
 data = pd.DataFrame({"a": rng.normal(size=500), "b": rng.normal(size=500)})
 data["y"] = (data.a * data.b > 0).astype(int)
-result = mml.MLProject(data, "y", metric="roc_auc", time_budget=90).run()
+result = scml.MLProject(data, "y", metric="roc_auc", time_budget=90).run()
 print(result.leaderboard()[["model_name", "status", "score_mean"]])
 ```
 
@@ -133,8 +133,8 @@ Optimiser choice decides how parameters are estimated, architecture decides
 what can be represented. A training-health report flags unstable loss,
 plateaus and divergence.
 
-* Modules: `mml/models/deeplearning/` (optimizers, losses, accumulation,
-  health), `mml/models/deeplearning/keras_engine.py`.
+* Modules: `scml/models/deeplearning/` (optimizers, losses, accumulation,
+  health), `scml/models/deeplearning/keras_engine.py`.
 * Tests: `tests/unit/test_optimizers.py`.
 
 ```python
@@ -162,21 +162,21 @@ neighbours. The bootstrap understates variance, so read the verdict as
 direction, not as an exact split. Learning curves show whether more rows would
 help.
 
-* Sensitivity: `mml/evaluation/sensitivity.py::analyze` separates how much
+* Sensitivity: `scml/evaluation/sensitivity.py::analyze` separates how much
   the score moves with the training seed, with a bootstrap resample of the
   training rows, with the choice of split, and with noise added to the
   features. On scikit-learn's breast-cancer data (ROC AUC, 10 repeats) the
   standard deviations were 0.000 to 0.006, so score differences under about
   0.01 between models there are within noise.
-* Modules: `mml/evaluation/bias_variance.py`,
-  `mml/evaluation/learning_curve.py`, `mml/evaluation/fit_health.py`.
+* Modules: `scml/evaluation/bias_variance.py`,
+  `scml/evaluation/learning_curve.py`, `scml/evaluation/fit_health.py`.
 * Tests: `tests/unit/test_bias_variance.py`.
 
 ```python
 import numpy as np
 import pandas as pd
 from sklearn import linear_model, tree
-from mml.evaluation import bias_variance
+from scml.evaluation import bias_variance
 
 rng = np.random.default_rng(3)
 features = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
@@ -201,9 +201,9 @@ repeated and nested cross-validation, paired bootstrap intervals and conformal
 prediction (coverage `>= 1 - alpha`). Error analysis slices by subgroup, stress
 tests robustness and tests fairness.
 
-* Modules: `mml/evaluation/` (`metrics.py`, `nested.py`, `conformal.py`,
+* Modules: `scml/evaluation/` (`metrics.py`, `nested.py`, `conformal.py`,
   `reliability.py`, `slices.py`, `robustness.py`, `fairness.py`,
-  `ranking.py`, `backtest.py`, `survival.py`), `mml/optimization/optimizers.py` (grid, random,
+  `ranking.py`, `backtest.py`, `survival.py`), `scml/optimization/optimizers.py` (grid, random,
   Bayesian, successive halving, Hyperband, Pareto selection).
 * Tests: `tests/integration/test_evaluation_extras.py`,
   `tests/integration/test_tuning_and_pareto.py`.
@@ -211,12 +211,12 @@ tests robustness and tests fairness.
 ```python
 import numpy as np
 import pandas as pd
-import mml
+import scml
 
 rng = np.random.default_rng(4)
 data = pd.DataFrame({"a": rng.normal(size=500), "b": rng.normal(size=500)})
 data["y"] = (data.a + rng.normal(0, 0.8, 500) > 0).astype(int)
-result = mml.MLProject(data, "y", metric="roc_auc", time_budget=90).run()
+result = scml.MLProject(data, "y", metric="roc_auc", time_budget=90).run()
 print(result.summary())
 ```
 
@@ -229,23 +229,23 @@ runs in shadow on live traffic, an A/B test compares arms with an independent
 bootstrap interval, and a promotion that regresses is rolled back to the
 `previous` registry alias. Retraining is policy-driven with an audit trail.
 
-* Modules: `mml/monitoring/monitor.py`, `mml/monitoring/shadow.py`,
-  `mml/monitoring/abtest.py`, `mml/governance/lifecycle.py`
-  (`check_rollback`, retraining policy), `mml/governance/registry.py`,
-  `mml/inference/` (ONNX export, service package), `mml/artifacts/bundle.py`.
+* Modules: `scml/monitoring/monitor.py`, `scml/monitoring/shadow.py`,
+  `scml/monitoring/abtest.py`, `scml/governance/lifecycle.py`
+  (`check_rollback`, retraining policy), `scml/governance/registry.py`,
+  `scml/inference/` (ONNX export, service package), `scml/artifacts/bundle.py`.
 * Tests: `tests/unit/test_lifecycle_extras.py`,
   `tests/integration/test_serve_and_export.py`.
 
 ```python
 import numpy as np
 import pandas as pd
-import mml
-from mml.monitoring import monitor
+import scml
+from scml.monitoring import monitor
 
 rng = np.random.default_rng(5)
 data = pd.DataFrame({"a": rng.normal(size=500), "b": rng.normal(size=500)})
 data["y"] = (data.a + rng.normal(0, 0.8, 500) > 0).astype(int)
-result = mml.MLProject(data, "y", metric="roc_auc", time_budget=90).run()
+result = scml.MLProject(data, "y", metric="roc_auc", time_budget=90).run()
 live = data.drop(columns="y").copy()
 live["a"] = live["a"] + 2.0
 report = monitor.ModelMonitor(result.load_best_model()).drift(live)

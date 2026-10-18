@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import support
 
-from mml.contracts import errors
+from scml.contracts import errors
 
 ORDER = ["low", "medium", "high", "extreme"]
 

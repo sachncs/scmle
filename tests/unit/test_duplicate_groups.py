@@ -3,9 +3,9 @@
 import numpy as np
 import pandas as pd
 
-from mml.contracts import tasks
-from mml.data.splitting import duplicates
-from mml.data.splitting import splitters
+from scml.contracts import tasks
+from scml.data.splitting import duplicates
+from scml.data.splitting import splitters
 
 
 def spec(task="binary_classification"):

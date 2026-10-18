@@ -3,8 +3,8 @@
 import pandas as pd
 import pytest
 
-from mml.contracts import errors
-from mml.data.readers import tabular
+from scml.contracts import errors
+from scml.data.readers import tabular
 
 
 @pytest.fixture

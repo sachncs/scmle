@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.contracts import data as data_contracts
-from mml.contracts import tasks
-from mml.data.validation import columns
+from scml.contracts import data as data_contracts
+from scml.contracts import tasks
+from scml.data.validation import columns
 
 OPTIONS_SCALED = data_contracts.PreprocessingOptions(scale=True)
 OPTIONS_PLAIN = data_contracts.PreprocessingOptions()
@@ -196,7 +196,7 @@ def test_to_finite_maps_text_and_infinities_to_nan():
 
 
 def test_all_missing_columns_are_reported_as_missing_not_constant():
-    from mml.data.profiling import profiler
+    from scml.data.profiling import profiler
 
     assert (
         profiler.column_exclusion_reason(

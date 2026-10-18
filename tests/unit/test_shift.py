@@ -5,8 +5,8 @@ import dataclasses
 import numpy as np
 import test_diagnostics
 
-from mml.contracts import tasks
-from mml.evaluation import shift
+from scml.contracts import tasks
+from scml.evaluation import shift
 
 
 def shifted_inputs(offset):

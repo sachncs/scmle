@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 import support
 
-import mml
-from mml.contracts import tasks
+import scml
+from scml.contracts import tasks
 
 STRATEGIES = tasks.StrategySpec(top_models=2)
 NO_SEARCH = tasks.SearchSpec(top_models=0)
@@ -88,7 +88,7 @@ def test_adopted_strategy_is_used_for_the_final_model(
         result.evaluation["selected_cv_score"]
     )
     features = imbalanced_frame.drop(columns="y")
-    loaded = mml.ModelBundle.load(
+    loaded = scml.ModelBundle.load(
         result.save(tmp_path / "exported"), trusted=True
     )
     np.testing.assert_allclose(
@@ -173,7 +173,7 @@ def test_strategy_run_resumes_without_recomputation(
 ):
     import shutil
 
-    from mml.experimentation import trials as trials_module
+    from scml.experimentation import trials as trials_module
 
     original = run(
         imbalanced_frame,
@@ -189,7 +189,7 @@ def test_strategy_run_resumes_without_recomputation(
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
-    resumed = mml.MLProject.resume(original.run_dir, data=imbalanced_frame)
+    resumed = scml.MLProject.resume(original.run_dir, data=imbalanced_frame)
     assert calls == []
     assert (
         resumed.evaluation["selected_strategy"]
@@ -245,12 +245,12 @@ def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
 
 
 def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
-    from mml.sampling import strategies as strategy_module
+    from scml.sampling import strategies as strategy_module
 
     monkeypatch.setattr(
         strategy_module.importlib.util, "find_spec", lambda name: None
     )
-    plan = mml.MLProject(
+    plan = scml.MLProject(
         numeric_imbalanced(),
         "y",
         strategies=tasks.StrategySpec(names=["smote"]),
@@ -261,7 +261,7 @@ def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
 
 def test_jitter_augmentation_must_be_requested_explicitly(tmp_path):
     frame = numeric_imbalanced()
-    default_plan = mml.MLProject(frame, "y").plan()
+    default_plan = scml.MLProject(frame, "y").plan()
     assert not any(
         d.technique == "jitter_augment" for d in default_plan.decisions
     )
@@ -278,7 +278,7 @@ def test_copula_augmentation_is_opt_in_and_judged_on_original_folds(tmp_path):
     frame = numeric_imbalanced()
     assert not any(
         d.technique == "copula_augment"
-        for d in mml.MLProject(frame, "y").plan().decisions
+        for d in scml.MLProject(frame, "y").plan().decisions
     )
     opted = tasks.StrategySpec(names=["copula_augment"], top_models=1)
     result = run(frame, tmp_path, strategies=opted, metric="pr_auc")

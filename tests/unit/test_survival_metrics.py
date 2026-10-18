@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mml.evaluation import survival
+from scml.evaluation import survival
 
 
 def test_the_brier_score_matches_a_hand_computation_without_censoring():

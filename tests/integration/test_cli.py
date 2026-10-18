@@ -4,7 +4,7 @@ import logging
 
 import pandas as pd
 
-from mml import cli
+from scml import cli
 
 
 def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):

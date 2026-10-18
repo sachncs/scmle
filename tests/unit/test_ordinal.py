@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 from sklearn import linear_model
 
-from mml.evaluation import ordinal
-from mml.models.ordinal import estimators
+from scml.evaluation import ordinal
+from scml.models.ordinal import estimators
 
 
 def ladder(rows=900, seed=0, levels=4):

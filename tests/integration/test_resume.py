@@ -9,14 +9,14 @@ import pytest
 from sklearn import dummy
 import support
 
-import mml
-from mml.contracts import errors
-from mml.contracts import models
-from mml.contracts import tasks
-from mml.core import orchestrator as orchestrator_module
-from mml.experimentation import stores
-from mml.experimentation import trials as trials_module
-from mml.models import registry as registry_module
+import scml
+from scml.contracts import errors
+from scml.contracts import models
+from scml.contracts import tasks
+from scml.core import orchestrator as orchestrator_module
+from scml.experimentation import stores
+from scml.experimentation import trials as trials_module
+from scml.models import registry as registry_module
 
 BINARY = frozenset({tasks.TaskType.BINARY})
 
@@ -126,7 +126,7 @@ def test_resume_of_tuned_run_recomputes_nothing(
         "evaluate_payload",
         lambda *a, **k: calls.append(1) or real(*a, **k),
     )
-    resumed = mml.MLProject.resume(original.run_dir, data=binary_frame)
+    resumed = scml.MLProject.resume(original.run_dir, data=binary_frame)
     assert calls == [], "all trials were checkpointed, none may be recomputed"
     assert [(t.trial_id, t.status, t.params) for t in resumed.trials] == [
         (t.trial_id, t.status, t.params) for t in original.trials
@@ -143,13 +143,13 @@ def test_resume_of_tuned_run_recomputes_nothing(
 def test_cannot_resume_completed_run_or_changed_config(binary_frame, tmp_path):
     result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
     with pytest.raises(errors.ConfigError, match="already completed"):
-        mml.MLProject.resume(result.run_dir, data=binary_frame)
+        scml.MLProject.resume(result.run_dir, data=binary_frame)
     (result.run_dir / "evaluation.json").unlink()
     changed = support.make_project(binary_frame, "y", seed=1).orchestrator
     with pytest.raises(errors.ConfigError, match="configuration differs"):
         changed.resume(result.run_dir)
     with pytest.raises(FileNotFoundError):
-        mml.MLProject.resume(tmp_path / "nope")
+        scml.MLProject.resume(tmp_path / "nope")
 
 
 def test_tracking_database_records_runs_trials_and_lineage(
@@ -175,7 +175,7 @@ def test_tracking_database_records_runs_trials_and_lineage(
         config["data"]["target"] == "y" and config["validation"]["seed"] == 42
     )
     lineage = json.loads(row["artifacts"])
-    from mml.artifacts import bundle as bundle_module
+    from scml.artifacts import bundle as bundle_module
 
     assert {
         "config.json",

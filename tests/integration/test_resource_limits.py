@@ -10,12 +10,12 @@ import pytest
 from sklearn import dummy
 import support
 
-from mml.contracts import errors
-from mml.contracts import models
-from mml.contracts import tasks
-from mml.core import limits
-from mml.core import orchestrator as orchestrator_module
-from mml.models import registry as registry_module
+from scml.contracts import errors
+from scml.contracts import models
+from scml.contracts import tasks
+from scml.core import limits
+from scml.core import orchestrator as orchestrator_module
+from scml.models import registry as registry_module
 
 
 def run_with(frame, tmp_path, **resources):

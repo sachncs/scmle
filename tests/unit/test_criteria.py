@@ -2,8 +2,8 @@
 
 import pytest
 
-from mml.contracts import errors
-from mml.evaluation import criteria
+from scml.contracts import errors
+from scml.evaluation import criteria
 
 
 def test_a_floor_for_higher_is_better_and_a_ceiling_for_lower_is_better():

@@ -8,7 +8,7 @@ from sklearn import linear_model
 from sklearn import metrics
 from sklearn import tree
 
-from mml.evaluation import sensitivity
+from scml.evaluation import sensitivity
 
 
 def data(rows=400, seed=0):

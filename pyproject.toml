@@ -3,19 +3,23 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "magicml"
+name = "super-charge-ml"
 version = "0.1.0b1"
 description = "Autonomous, leakage-safe ML lifecycle framework for tabular data"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
+authors = [{ name = "Sachin", email = "sch.cs.96@gmail.com" }]
+maintainers = [{ name = "Sachin", email = "sch.cs.96@gmail.com" }]
 keywords = ["automl", "machine-learning", "tabular", "mlops", "leakage"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "Operating System :: OS Independent",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -33,6 +37,7 @@ dependencies = [
     "scipy>=1.16.2",
     "joblib>=1.5",
     "threadpoolctl>=3.6",
+    "psutil>=5.9; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -47,7 +52,7 @@ tabpfn = ["tabpfn>=2.0"]
 # use); not part of `all` because it pulls the transformers stack.
 embeddings = ["sentence-transformers>=3.0"]
 # ONNX export (onnxmltools adds LightGBM and XGBoost); onnxruntime has no
-# free-threaded (3.14t) wheel yet. Any model can ship with `magicml package`.
+# free-threaded (3.14t) wheel yet. Any model can ship with `scml package`.
 onnx = ["skl2onnx>=1.17", "onnxruntime>=1.20", "onnxmltools>=1.13"]
 optimization = ["optuna>=4.0"]
 sampling = ["imbalanced-learn>=0.14.1"]
@@ -56,15 +61,22 @@ tracking = ["mlflow>=3.0"]
 benchmarks = ["huggingface_hub>=0.25"]
 distributed = ["ray>=2.40"]
 all = [
-    "magicml[boosting,catboost,deeplearning,optimization,sampling,polars,tracking,distributed,benchmarks]",
+    "super-charge-ml[boosting,catboost,deeplearning,optimization,sampling,polars,tracking,distributed,benchmarks]",
 ]
 
+[project.urls]
+Homepage = "https://github.com/sachncs/magicml"
+Documentation = "https://github.com/sachncs/magicml/tree/main/docs"
+Issues = "https://github.com/sachncs/magicml/issues"
+Changelog = "https://github.com/sachncs/magicml/blob/main/CHANGELOG.md"
+
 [project.scripts]
-magicml = "mml.cli:main"
+scml = "scml.cli:main"
 
 [dependency-groups]
 dev = [
     "pytest>=9.0",
+    "pytest-cov>=6.0",
     "hypothesis>=6.140",
     "ruff>=0.14",
     "mypy>=1.18",
@@ -75,7 +87,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["mml"]
+packages = ["scml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -97,7 +109,7 @@ convention = "google"
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
 force-single-line = true
-known-first-party = ["mml"]
+known-first-party = ["scml"]
 case-sensitive = false
 order-by-type = false
 

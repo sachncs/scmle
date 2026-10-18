@@ -4,11 +4,11 @@ import random
 
 import pytest
 
-from mml.contracts import errors
-from mml.contracts import search
-from mml.contracts import tasks
-from mml.models import conformance
-from mml.models import registry as registry_module
+from scml.contracts import errors
+from scml.contracts import search
+from scml.contracts import tasks
+from scml.models import conformance
+from scml.models import registry as registry_module
 
 
 def test_parameters_sample_inside_their_domains():
@@ -73,7 +73,7 @@ def test_every_tunable_builtin_samples_valid_configurations():
 def test_conformance_rejects_ignored_search_parameter():
     from sklearn import dummy
 
-    from mml.contracts import models
+    from scml.contracts import models
 
     class Ignoring(models.ModelAdapter):
         name = "ignoring"

@@ -12,8 +12,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from mml.contracts import errors
-from mml.data.readers import streaming
+from scml.contracts import errors
+from scml.data.readers import streaming
 
 
 def write_parquet(path, rows, columns=6, chunk=100_000, seed=0):
@@ -89,7 +89,7 @@ def test_a_file_far_larger_than_the_budget_is_read_in_bounded_memory(tmp_path):
         f"""
         import json, resource, sys
         import numpy as np, pandas as pd
-        from mml.data.readers import streaming
+        from scml.data.readers import streaming
         def peak():
             value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
             return value / (1024 * 1024) if sys.platform == "darwin" else value / 1024

@@ -4,10 +4,10 @@ import types
 
 import pytest
 
-from mml.contracts import search
-from mml.contracts import tasks
-from mml.experimentation import tuning
-from mml.optimization import optimizers
+from scml.contracts import search
+from scml.contracts import tasks
+from scml.experimentation import tuning
+from scml.optimization import optimizers
 
 SPACE = search.SearchSpace(
     (

@@ -8,17 +8,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.data.profiling import profiler
-from mml.data.readers import tabular
-from mml.data.splitting import splitters
-from mml.data.validation import target as target_module
-from mml.models import registry as registry_module
-from mml.models import thresholds
-from mml.monitoring import reference
-from mml.sampling import resampling
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.data.profiling import profiler
+from scml.data.readers import tabular
+from scml.data.splitting import splitters
+from scml.data.validation import target as target_module
+from scml.models import registry as registry_module
+from scml.models import thresholds
+from scml.monitoring import reference
+from scml.sampling import resampling
 
 SETTINGS = settings(
     max_examples=40,
@@ -67,7 +67,7 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
     try:
         task = target_module.TaskResolver(spec).resolve(frame["y"])
         profile = profiler.DatasetProfiler(spec).profile(frame, manifest, task)
-    except errors.MagicMLError:
+    except errors.ScmlError:
         return
     plan = profile.feature_plan
     assert "y" not in plan.features
@@ -92,7 +92,7 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
             .profile(frame, manifest, task)
             .feature_plan
         )
-    except errors.MagicMLError:
+    except errors.ScmlError:
         return
     features = frame.drop(columns="y")
     for name in (

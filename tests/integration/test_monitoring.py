@@ -5,10 +5,10 @@ import pandas as pd
 import pytest
 import support
 
-from mml.contracts import errors
-from mml.monitoring import champion
-from mml.monitoring import events
-from mml.monitoring import monitor as monitor_module
+from scml.contracts import errors
+from scml.monitoring import champion
+from scml.monitoring import events
+from scml.monitoring import monitor as monitor_module
 
 
 def make_frame(rows, seed, shift=0.0, relabel=False):
@@ -198,7 +198,7 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
     import copy
     import dataclasses
 
-    from mml.evaluation import diagnostics
+    from scml.evaluation import diagnostics
 
     seen = []
     real = diagnostics.resample_rows

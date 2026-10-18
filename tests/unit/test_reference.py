@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.contracts import data as data_contracts
-from mml.monitoring import reference
+from scml.contracts import data as data_contracts
+from scml.monitoring import reference
 
 
 def test_psi_is_zero_for_identical_and_grows_with_shift():

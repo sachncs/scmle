@@ -1,4 +1,4 @@
-"""Executable item-by-item verification of `product.md`.
+"""Executable item-by-item verification of the design specification.
 
 Each test names the spec line(s) it covers (`L<number>`) and checks the
 behaviour directly rather than trusting other suites. Section 1 is the
@@ -19,27 +19,27 @@ import pandas as pd
 import pytest
 import support
 
-import mml
-from mml.artifacts import bundle as bundle_module
-from mml.contracts import errors
-from mml.contracts import events
-from mml.contracts import experiments
-from mml.contracts import models as model_contracts
-from mml.contracts import tasks
-from mml.core import scheduler
-from mml.core import stages
-from mml.core import state
-from mml.data.validation import columns
-from mml.data.validation import target as target_module
-from mml.governance import lifecycle
-from mml.inference import mapping as mapping_module
-from mml.integrations import ray_backend
-from mml.models import conformance
-from mml.models import registry as registry_module
-from mml.sampling import strategies as strategies_module
+import scml
+from scml.artifacts import bundle as bundle_module
+from scml.contracts import errors
+from scml.contracts import events
+from scml.contracts import experiments
+from scml.contracts import models as model_contracts
+from scml.contracts import tasks
+from scml.core import scheduler
+from scml.core import stages
+from scml.core import state
+from scml.data.validation import columns
+from scml.data.validation import target as target_module
+from scml.governance import lifecycle
+from scml.inference import mapping as mapping_module
+from scml.integrations import ray_backend
+from scml.models import conformance
+from scml.models import registry as registry_module
+from scml.sampling import strategies as strategies_module
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "mml"
+PACKAGE = ROOT / "scml"
 
 
 def make_frame(rows=600, seed=0):
@@ -65,7 +65,7 @@ def frame():
 @pytest.fixture(scope="module")
 def run(frame, tmp_path_factory):
     """One complete run with every default feature enabled."""
-    project = mml.MLProject(
+    project = scml.MLProject(
         frame,
         "y",
         task="classification",
@@ -166,7 +166,7 @@ def test_l23_to_l39_decision_table(run):
     assert "content_id" in {
         f.name
         for f in dataclasses.fields(
-            __import__("mml.governance.registry", fromlist=["x"]).VersionRecord
+            __import__("scml.governance.registry", fromlist=["x"]).VersionRecord
         )
     }  # content-addressed artifacts
     assert {"tracking", "distributed", "optimization"} <= set(
@@ -197,7 +197,7 @@ def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
     }
     assert not names & forbidden
     code = (
-        "import sys, mml; from mml.models import registry; "
+        "import sys, scml; from scml.models import registry; "
         "registry.ModelRegistry.with_builtins(); "
         "bad=[m for m in ('ray','mlflow','torch','kubernetes') if m in sys.modules]; "
         "assert not bad, bad"
@@ -222,7 +222,7 @@ def test_l101_l105_three_planes_are_separate_packages():
 
 
 def test_l113_l176_package_organization():
-    """L113-L176: every module of the spec's tree exists (flat `mml/`)."""
+    """L113-L176: every module of the spec's tree exists (flat `scml/`)."""
     packages = (
         "api",
         "contracts",
@@ -293,11 +293,11 @@ def test_l178_modules_use_stable_contracts_not_private_internals():
             if (
                 isinstance(node, ast.ImportFrom)
                 and node.module
-                and node.module.startswith("mml")
+                and node.module.startswith("scml")
             ):
                 assert (
-                    node.module.startswith("mml.contracts")
-                    or node.module == "mml"
+                    node.module.startswith("scml.contracts")
+                    or node.module == "scml"
                 ), f"{path.name} imports {node.module}"
     for path in PACKAGE.rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text())):
@@ -337,11 +337,11 @@ def test_l192_cross_field_validation():
             data=tasks.DataSpec(uri="x", target="y"),
             validation=tasks.ValidationSpec(strategy="temporal"),
         )
-    from mml.evaluation import metrics
+    from scml.evaluation import metrics
 
     with pytest.raises(errors.ConfigError):
         metrics.CATALOG.resolve("pr_auc", tasks.TaskType.MULTICLASS)
-    from mml.data.splitting import splitters
+    from scml.data.splitting import splitters
 
     frame = make_frame(100).assign(t="not a date")
     spec = tasks.ProjectSpec(
@@ -359,7 +359,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
     assert dataclasses.fields(
         model_contracts.Capabilities
     )  # capability discovery
-    from mml.experimentation import trials
+    from scml.experimentation import trials
 
     assert {f.name for f in dataclasses.fields(trials.TrialPayload)} >= {
         "job",
@@ -398,9 +398,9 @@ def test_l198_l206_foundational_and_production_contracts(run):
 def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     """L210-L224: key invariant of each module in the I/O matrix."""
     project, result = run
-    from mml.data.profiling import profiler
-    from mml.data.readers import tabular
-    from mml.data.splitting import splitters
+    from scml.data.profiling import profiler
+    from scml.data.readers import tabular
+    from scml.data.splitting import splitters
 
     frame = make_frame(200)
     before = frame.copy()
@@ -534,7 +534,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     """L278-L288: retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
     import shutil
 
-    from mml.core import orchestrator as orchestrator_module
+    from scml.core import orchestrator as orchestrator_module
 
     project = support.make_project(
         frame, "y", time_budget=300, output_dir=tmp_path
@@ -542,7 +542,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     first = project.run()
     (first.run_dir / "evaluation.json").unlink()
     shutil.rmtree(first.run_dir / "model")
-    resumed = mml.MLProject.resume(
+    resumed = scml.MLProject.resume(
         first.run_dir, data=frame
     )  # idempotent retry / restart
     assert [t.trial_id for t in resumed.trials] == [
@@ -626,7 +626,7 @@ def test_l311_l321_decision_policy_examples():
     frame = pd.DataFrame({"x": rng.normal(size=300)})
     frame["c"] = rng.choice([f"k{i}" for i in range(200)], 300)
     frame["y"] = (rng.random(300) < 0.05).astype(int)
-    plan = mml.MLProject(frame, "y", time_budget=60).plan()
+    plan = scml.MLProject(frame, "y", time_budget=60).plan()
     names = set(plan.candidate_models)
     assert (
         "dummy" in names and "logistic_regression" in names
@@ -712,7 +712,7 @@ def test_l360_planner_reads_capabilities_not_library_names():
 
 def test_l370_optimizer_library_is_not_the_architecture():
     """L370: Optuna sits behind our ask/tell interface."""
-    from mml.optimization import optimizers
+    from scml.optimization import optimizers
 
     assert issubclass(optimizers.OptunaOptimizer, optimizers.Optimizer)
     assert issubclass(optimizers.RandomOptimizer, optimizers.Optimizer)
@@ -723,7 +723,7 @@ def test_l370_optimizer_library_is_not_the_architecture():
 
 def test_l374_l393_balancing_and_augmentation(frame):
     """L374-L393: the technique table and its policies."""
-    from mml.sampling import strategies
+    from scml.sampling import strategies
 
     for name in (
         "class_weight",
@@ -739,10 +739,10 @@ def test_l374_l393_balancing_and_augmentation(frame):
         "jitter_augment" in strategies.OPT_IN
         and "copula_augment" in strategies.OPT_IN
     )  # research plugins
-    from mml.contracts import data as data_contracts
-    from mml.data.profiling import profiler
-    from mml.data.readers import tabular
-    from mml.sampling import resampling
+    from scml.contracts import data as data_contracts
+    from scml.data.profiling import profiler
+    from scml.data.readers import tabular
+    from scml.sampling import resampling
 
     # Sampling happens inside the training fold (inside fit), never on the full dataset.
     assert "fit" in resampling.ResamplingClassifier.__dict__
@@ -784,7 +784,7 @@ def test_l399_l409_evaluation_contract(run):
         "calibration",
         "threshold_analysis",
     } <= set(result.diagnostics)
-    from mml.evaluation import metrics
+    from scml.evaluation import metrics
 
     defaults = set(metrics.MetricCatalog.default_metric.values())
     assert not defaults & {
@@ -843,7 +843,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
     assert (
         manifest["train_ids"] and manifest["test_ids"]
     )  # 1 immutable row-id manifest
-    from mml.data.splitting import splitters
+    from scml.data.splitting import splitters
 
     assert (
         dataclasses.is_dataclass(splitters.SplitManifest)
@@ -876,7 +876,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
 
 def test_l439_deployment_scenario_splits(frame):
     """L439: temporal/entity data must not use a random split."""
-    from mml.data.splitting import splitters
+    from scml.data.splitting import splitters
 
     with_time = support.make_project(
         frame.assign(t=range(len(frame))), "y", time_column="t"
@@ -946,7 +946,7 @@ def test_l470_l474_artifact_format_and_untrusted_artifacts(run, tmp_path):
 
 def test_l476_exact_replay_vs_comparable_rerun(run):
     """L476: records reproducibility conditions; distinguishes exact from comparable."""
-    from mml.artifacts import reproducibility
+    from scml.artifacts import reproducibility
 
     assert {
         reproducibility.EXACT,
@@ -954,7 +954,7 @@ def test_l476_exact_replay_vs_comparable_rerun(run):
         reproducibility.DIFFERENT,
     } == {"exact", "comparable", "different"}
     assert "reproducibility" in run[1].evaluation
-    assert hasattr(mml.MLProject, "verify_replay")
+    assert hasattr(scml.MLProject, "verify_replay")
 
 
 def test_l480_l496_inference_contract(run, frame, tmp_path):
@@ -984,7 +984,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     assert caught.value.details["missing"] == ["b"]  # structured errors
     path = tmp_path / "batch.csv"
     features.to_csv(path, index=False)
-    from mml.inference import serving
+    from scml.inference import serving
 
     assert serving.BatchServing(result.bundle).score_file(
         path, tmp_path / "out.csv"
@@ -1025,7 +1025,7 @@ def test_l500_l546_stack_and_extras():
 def test_l548_no_heavy_imports_until_a_model_is_selected():
     """L548: a registry entry must not import GPU/deep-learning dependencies."""
     code = (
-        "import sys; from mml.contracts import tasks; from mml.models import registry; "
+        "import sys; from scml.contracts import tasks; from scml.models import registry; "
         "r = registry.ModelRegistry.with_builtins(); r.candidates(tasks.TaskType.BINARY, 100); "
         "assert not [m for m in ('lightgbm','xgboost','catboost','torch','tensorflow') if m in sys.modules]"
     )
@@ -1037,7 +1037,7 @@ def test_l548_no_heavy_imports_until_a_model_is_selected():
 
 def test_l554_l606_roadmap_deliverables(frame, tmp_path):
     """L554-L600: M0-M4 deliverables are observable behaviours."""
-    from mml.data.readers import tabular
+    from scml.data.readers import tabular
 
     assert tabular.read_table  # M0: CSV/Parquet ingestion + typed config
     result = support.make_project(
@@ -1060,15 +1060,15 @@ def test_l554_l606_roadmap_deliverables(frame, tmp_path):
 
 def test_l610_l629_backlog_priorities(run):
     """L610-L629: each backlog row has a working implementation."""
-    from mml.contracts import models as model_contracts
-    from mml.evaluation import diagnostics
-    from mml.explainability import importance
-    from mml.governance import registry
-    from mml.inference import serving
-    from mml.intelligence import knowledge
-    from mml.models import ensembles
-    from mml.monitoring import monitor
-    from mml.sampling import synthesis
+    from scml.contracts import models as model_contracts
+    from scml.evaluation import diagnostics
+    from scml.explainability import importance
+    from scml.governance import registry
+    from scml.inference import serving
+    from scml.intelligence import knowledge
+    from scml.models import ensembles
+    from scml.monitoring import monitor
+    from scml.sampling import synthesis
 
     result = run[1]
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
@@ -1158,9 +1158,9 @@ def test_l739_l747_first_sprint_outcomes(run):
     assert (ROOT / "pyproject.toml").exists() and list(
         (ROOT / "tests").rglob("test_*.py")
     )  # 2 package skeleton + tests
-    from mml.data.profiling import profiler
-    from mml.data.readers import tabular
-    from mml.data.splitting import splitters
+    from scml.data.profiling import profiler
+    from scml.data.readers import tabular
+    from scml.data.splitting import splitters
 
     frame = make_frame()
     manifest = tabular.build_manifest(frame, "y", "<memory>")
@@ -1180,7 +1180,7 @@ def test_l739_l747_first_sprint_outcomes(run):
 
 def test_l751_l761_frozen_api(frame, tmp_path):
     """L751-L761: the API as written, incl. approved plans and the classification alias."""
-    project = mml.MLProject(
+    project = scml.MLProject(
         frame,
         "y",
         task="classification",
@@ -1215,15 +1215,15 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     """L765-L778: each architectural commitment works, not merely exists."""
     import pickle
 
-    from mml.core import policies
-    from mml.data.splitting import splitters
-    from mml.experimentation import trials
-    from mml.features import feature_graph
-    from mml.intelligence import knowledge
-    from mml.models import registry as models_registry
-    from mml.monitoring import events as monitor_events
-    from mml.sampling import resampling
-    from mml.sampling import synthesis
+    from scml.core import policies
+    from scml.data.splitting import splitters
+    from scml.experimentation import trials
+    from scml.features import feature_graph
+    from scml.intelligence import knowledge
+    from scml.models import registry as models_registry
+    from scml.monitoring import events as monitor_events
+    from scml.sampling import resampling
+    from scml.sampling import synthesis
 
     registry = models_registry.ModelRegistry.with_builtins()
     neural = registry.get("neural_network")  # deep learning: a plugin family
@@ -1250,7 +1250,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(series)
     gaps = [min(held) - max(fit) for fit, held in split.manifest.folds]
     assert all(gap > 5 for gap in gaps)  # time-series: embargo is honoured
-    profile = mml.MLProject(
+    profile = scml.MLProject(
         series.drop(columns="a").assign(b=np.arange(120.0) % 7),
         "y",
         time_column="t",
@@ -1276,12 +1276,12 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     np.testing.assert_allclose(out["sq"], frame["b"] ** 2)
 
     vector = knowledge.fingerprint(
-        mml_profile(frame), tasks.TaskType.BINARY
+        scml_profile(frame), tasks.TaskType.BINARY
     )  # meta-learning fingerprint
     assert set(vector) == set(knowledge.FIELDS)
 
     rejecting = policies.CallbackCheckpoint(lambda review: False)
-    gated = mml.MLProject(
+    gated = scml.MLProject(
         frame, "y", output_dir=tmp_path, checkpoints=(rejecting,)
     )
     with pytest.raises(errors.BlockedError):
@@ -1299,10 +1299,10 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
         assert backend.map(abs, [-1, -2, -3]) == [1, 2, 3]
 
 
-def mml_profile(frame):
+def scml_profile(frame):
     """Profile of `frame` for fingerprint checks."""
-    from mml.data.profiling import profiler
-    from mml.data.readers import tabular
+    from scml.data.profiling import profiler
+    from scml.data.readers import tabular
 
     manifest = tabular.build_manifest(frame, "y", "<memory>")
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
@@ -1315,11 +1315,11 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     frame,
 ):
     """L786-L801: a candidate is a complete, independently evaluable pipeline."""
-    from mml.sampling import strategies
+    from scml.sampling import strategies
 
     registry = registry_module.ModelRegistry.with_builtins()
-    plan = mml.MLProject(frame, "y").plan()
-    profile = mml.MLProject(frame, "y")
+    plan = scml.MLProject(frame, "y").plan()
+    profile = scml.MLProject(frame, "y")
     profile.plan()
     feature_plan = profile.profile.feature_plan
     candidate = strategies.STRATEGIES["default"].build(
@@ -1346,8 +1346,8 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
 
 def test_l805_l829_five_abstractions_and_the_core_path(run):
     """L805-L829: Dataset, Plan, Experiment, Model Bundle, Lifecycle; Dataset->Plan->Experiment->Bundle."""
-    from mml.contracts import data as data_contracts
-    from mml.governance import registry
+    from scml.contracts import data as data_contracts
+    from scml.governance import registry
 
     result = run[1]
     assert isinstance(

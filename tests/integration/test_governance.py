@@ -7,9 +7,9 @@ import pathlib
 import numpy as np
 import support
 
-from mml.contracts import tasks
-from mml.data.splitting import splitters
-from mml.governance import ledger
+from scml.contracts import tasks
+from scml.data.splitting import splitters
+from scml.governance import ledger
 
 
 def read_events(run_dir):

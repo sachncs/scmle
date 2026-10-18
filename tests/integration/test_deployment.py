@@ -11,12 +11,12 @@ import pandas as pd
 import pytest
 import support
 
-import mml
-from mml.contracts import errors
-from mml.governance import lifecycle
-from mml.governance import registry as registry_module
-from mml.inference import serving
-from mml.monitoring import champion as champion_module
+import scml
+from scml.contracts import errors
+from scml.governance import lifecycle
+from scml.governance import registry as registry_module
+from scml.inference import serving
+from scml.monitoring import champion as champion_module
 
 
 def make_frame(rows, seed, relabel=False):
@@ -152,7 +152,7 @@ def test_http_serving_predict_health_schema_and_errors(trained):
         assert status == 404
     finally:
         adapter.stop()
-    with pytest.raises(errors.MagicMLError):
+    with pytest.raises(errors.ScmlError):
         print(adapter.address)
 
 
@@ -271,13 +271,13 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
 
 def count_trainings(monkeypatch):
     runs = []
-    original = mml.MLProject.run
+    original = scml.MLProject.run
 
     def counted(self, *args, **kwargs):
         runs.append(1)
         return original(self, *args, **kwargs)
 
-    monkeypatch.setattr(mml.MLProject, "run", counted)
+    monkeypatch.setattr(scml.MLProject, "run", counted)
     return runs
 
 

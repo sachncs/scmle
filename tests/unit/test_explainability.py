@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 import test_diagnostics
 
-from mml.contracts import tasks
-from mml.evaluation import diagnostics
-from mml.evaluation import suite as full_suite
-from mml.explainability import dependence
-from mml.explainability import importance
-from mml.explainability import local
+from scml.contracts import tasks
+from scml.evaluation import diagnostics
+from scml.evaluation import suite as full_suite
+from scml.explainability import dependence
+from scml.explainability import importance
+from scml.explainability import local
 
 
 def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():

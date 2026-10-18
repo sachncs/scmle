@@ -6,7 +6,7 @@ import pytest
 from sklearn import base
 from sklearn import linear_model
 
-from mml.models import thresholds
+from scml.models import thresholds
 
 
 def labelled(rows=2000, positive_rate=0.1, seed=0):

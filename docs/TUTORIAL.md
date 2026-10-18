@@ -5,17 +5,17 @@
 ```python
 import logging
 
-import mml
+import scml
 
 logging.basicConfig(level=logging.INFO)
-project = mml.MLProject("customers.parquet", target="churn", metric="roc_auc")
+project = scml.MLProject("customers.parquet", target="churn", metric="roc_auc")
 logging.info(project.plan().summary())  # nothing is trained or written
 result = project.run()
 logging.info(
     "\n%s", result.leaderboard()[["model_name", "status", "score_mean"]]
 )
 logging.info("\n%s", result.feature_importance().head())
-result.save("artifacts/churn", signing_key="...")  # or set MAGICML_SIGNING_KEY
+result.save("artifacts/churn", signing_key="...")  # or set SCML_SIGNING_KEY
 ```
 
 Open `runs/run_*/report.html`, and read
@@ -25,9 +25,9 @@ choice.
 ## 2. Make decisions explicit
 
 ```python
-from mml.contracts import tasks
+from scml.contracts import tasks
 
-project = mml.MLProject(
+project = scml.MLProject(
     data,
     "churn",
     decision=tasks.DecisionSpec(  # tune the cutoff to your costs
@@ -41,16 +41,16 @@ project = mml.MLProject(
 ## 3. Group and time structure
 
 ```python
-mml.MLProject(
+scml.MLProject(
     data, "default", group_column="customer_id"
 )  # no customer in both
-mml.MLProject(data, "default", time_column="event_time")  # train on the past
+scml.MLProject(data, "default", time_column="event_time")  # train on the past
 ```
 
 ## 4. Feature graph
 
 ```python
-from mml.contracts import tasks
+from scml.contracts import tasks
 
 graph = tasks.FeatureGraphSpec(
     nodes=[
@@ -80,7 +80,7 @@ graph = tasks.FeatureGraphSpec(
         ),
     ]
 )
-project = mml.MLProject(
+project = scml.MLProject(
     data, "y", time_column="day", group_column="unit", feature_graph=graph
 )
 ```
@@ -98,7 +98,7 @@ validation gaps.
 ## 5. Approval gates, audit trail and replay
 
 ```python
-from mml.core import policies
+from scml.core import policies
 
 
 def reviewer(review):  # review.gate is PLANNING or SELECTING
@@ -106,7 +106,7 @@ def reviewer(review):  # review.gate is PLANNING or SELECTING
     return input("approve? [y/N] ").lower() == "y"
 
 
-project = mml.MLProject(
+project = scml.MLProject(
     data, "churn", checkpoints=(policies.CallbackCheckpoint(reviewer),)
 )
 ```
@@ -116,24 +116,24 @@ locked. `diagnostics/data_access.json` and the `policy.*`, `split.created`,
 `selection.frozen`, `test.opened` events in `events.jsonl` are the audit trail.
 
 ```python
-verdict = mml.MLProject.verify_replay("runs/run_20261015_001", data=data)
+verdict = scml.MLProject.verify_replay("runs/run_20261015_001", data=data)
 logging.info(verdict.level)  # exact | comparable | different
 ```
 
 ## 6. Interrupted runs
 
 ```python
-mml.MLProject.resume("runs/run_20261015_001")  # finished trials are reused
+scml.MLProject.resume("runs/run_20261015_001")  # finished trials are reused
 ```
 
 ## 7. Serve and monitor
 
 ```python
-from mml.governance import lifecycle, registry
-from mml.inference import serving
-from mml.monitoring import monitor
+from scml.governance import lifecycle, registry
+from scml.inference import serving
+from scml.monitoring import monitor
 
-bundle = mml.ModelBundle.load("artifacts/churn", signing_key="...")
+bundle = scml.ModelBundle.load("artifacts/churn", signing_key="...")
 api = serving.HttpServing(bundle)
 api.start()  # POST /predict {"records": [...]}
 
@@ -151,7 +151,7 @@ manager.review(
 Inference is strict about column names unless you state a policy:
 
 ```python
-policy = mml.inference.mapping.ColumnMapping(
+policy = scml.inference.mapping.ColumnMapping(
     {"cust_age": "age"}, case_insensitive=True
 )
 bundle.predict(new_rows, policy)
@@ -163,19 +163,19 @@ whose outcome has arrived, with the labeled fraction alongside.
 ## 8. Command line
 
 ```bash
-magicml plan  data.csv --target churn
-magicml run   data.csv --target churn --workers 4 --time-budget 600
-magicml resume runs/run_20261015_001
-magicml predict artifacts/churn new.csv --output scored.csv   # signed bundles
+scml plan  data.csv --target churn
+scml run   data.csv --target churn --workers 4 --time-budget 600
+scml resume runs/run_20261015_001
+scml predict artifacts/churn new.csv --output scored.csv   # signed bundles
 ```
 
 ## 9. Beyond the basics
 
 ```python
-from mml.contracts import tasks
+from scml.contracts import tasks
 
 # Skip whole families, or single models.
-project = mml.MLProject(
+project = scml.MLProject(
     data, "churn", models=tasks.ModelSpec(exclude_families=["deep_learning"])
 )
 
@@ -183,7 +183,7 @@ project = mml.MLProject(
 selection = tasks.SelectionSpec(uncertainty="bayesian", rope=0.005)
 
 # Series data: rolling-origin validation and delayed columns.
-project = mml.MLProject(
+project = scml.MLProject(
     data,
     "demand",
     time_column="week",
@@ -194,11 +194,11 @@ project = mml.MLProject(
 )
 
 # Your own metric (a module-level function, so trial processes can import it).
-mml.register_metric("business_cost", my_module.cost, greater_is_better=False)
-project = mml.MLProject(data, "churn", metric="business_cost")
+scml.register_metric("business_cost", my_module.cost, greater_is_better=False)
+project = scml.MLProject(data, "churn", metric="business_cost")
 
 # Domain rules and responsibility.
-project = mml.MLProject(
+project = scml.MLProject(
     data,
     "default",
     sensitive_columns=["sex"],
@@ -207,11 +207,11 @@ project = mml.MLProject(
 )
 
 # Rows without a label: set aside, or self-train when it measurably helps.
-project = mml.MLProject(data, "churn", unlabeled="pseudo_label")
+project = scml.MLProject(data, "churn", unlabeled="pseudo_label")
 # result.bundle.rank_for_labeling(pool, count=20) -> rows to label next
 
 # Time to an event with censored rows (target = time, event_column = 0/1).
-project = mml.MLProject(
+project = scml.MLProject(
     data, "months_to_churn", task="survival", event_column="churned"
 )
 # result.bundle.predict_survival(rows, times=[3, 6, 12]) -> P(no event yet)
@@ -221,10 +221,10 @@ result.bundle.export_service("service")
 # ONNX where the model allows it (forests, linear, SVM, LightGBM, XGBoost;
 # HistGradientBoosting is not expressible and goes through the service).
 result.bundle.export_onnx("model.onnx", check=sample_rows)
-# magicml serve runs/<id>/model --trusted --port 8000
+# scml serve runs/<id>/model --trusted --port 8000
 
 # Ordered labels: predictions come back as your labels, in order.
-project = mml.MLProject(
+project = scml.MLProject(
     data, "rating", task="ordinal", ordinal_order=["low", "medium", "high"]
 )
 
@@ -248,11 +248,11 @@ Register any scikit-learn-compatible estimator in one call; the class must be
 defined at module level so trial processes can import it:
 
 ```python
-mml.register_estimator("gaussian_nb", classifier=GaussianNB)
+scml.register_estimator("gaussian_nb", classifier=GaussianNB)
 ```
 
 ## 10. Extending
 
 Subclass `ModelAdapter` and pass `check_conformance`, or register it through
-the `mml.models` entry point. See `docs/ARCHITECTURE.md` for every extension
+the `scml.models` entry point. See `docs/ARCHITECTURE.md` for every extension
 point.

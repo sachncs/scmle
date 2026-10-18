@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.contracts import experiments
-from mml.contracts import tasks
-from mml.data.profiling import profiler
-from mml.data.readers import tabular
-from mml.intelligence import knowledge
+from scml.contracts import experiments
+from scml.contracts import tasks
+from scml.data.profiling import profiler
+from scml.data.readers import tabular
+from scml.intelligence import knowledge
 
 BINARY = tasks.TaskType.BINARY
 

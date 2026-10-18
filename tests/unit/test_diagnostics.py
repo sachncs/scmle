@@ -4,14 +4,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.contracts import data as data_contracts
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.evaluation import diagnostics
-from mml.evaluation import metrics
-from mml.evaluation import suite as full_suite
-from mml.explainability import importance
-from mml.models import registry as registry_module
+from scml.contracts import data as data_contracts
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.evaluation import diagnostics
+from scml.evaluation import metrics
+from scml.evaluation import suite as full_suite
+from scml.explainability import importance
+from scml.models import registry as registry_module
 
 REGISTRY = registry_module.ModelRegistry.with_builtins()
 PLAN = data_contracts.FeaturePlan(("signal", "noise"), ("group",))

@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.data.profiling import profiler
-from mml.data.readers import tabular
-from mml.models import registry as registry_module
-from mml.sampling import resampling
-from mml.sampling import strategies
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.data.profiling import profiler
+from scml.data.readers import tabular
+from scml.models import registry as registry_module
+from scml.sampling import resampling
+from scml.sampling import strategies
 
 REGISTRY = registry_module.ModelRegistry.with_builtins()
 BINARY = tasks.TaskType.BINARY
@@ -70,7 +70,7 @@ def test_imbalance_strategies_apply_only_to_skewed_classification(
 def test_class_weight_requires_estimator_support(skewed_imbalanced):
     from sklearn import dummy
 
-    from mml.contracts import models
+    from scml.contracts import models
 
     class NoWeights(models.ModelAdapter):
         name = "no_weights"

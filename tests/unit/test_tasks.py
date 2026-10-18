@@ -3,7 +3,7 @@
 import pydantic
 import pytest
 
-from mml.contracts import tasks
+from scml.contracts import tasks
 
 
 def make_spec(data_overrides=None, **kwargs):

@@ -12,14 +12,14 @@ import pandas as pd
 import pytest
 import support
 
-from mml import cli
-from mml.artifacts import bundle as bundle_module
-from mml.contracts import data as data_contracts
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.inference import serving
-from mml.models import registry as registry_module
+from scml import cli
+from scml.artifacts import bundle as bundle_module
+from scml.contracts import data as data_contracts
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.inference import serving
+from scml.models import registry as registry_module
 
 
 @pytest.fixture(scope="module")
@@ -60,6 +60,21 @@ def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
         adapter.stop()
 
     assert status == 422 and "missing" in body["details"]
+
+
+def test_the_server_refuses_oversized_bodies_with_413(saved, monkeypatch):
+    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    monkeypatch.setattr(serving, "MAX_REQUEST_BYTES", 10)
+    adapter = serving.HttpServing(model)
+    adapter.start()
+    try:
+        status, body = post(
+            f"{adapter.address}/predict", {"records": [{"a": 1.0, "b": 2.0}]}
+        )
+    finally:
+        adapter.stop()
+
+    assert status == 413 and body["category"] == "request"
 
 
 def test_health_reports_the_model_version_and_checksum(saved):

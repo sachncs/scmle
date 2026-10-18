@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mml.models.boosting import early_stopping
+from scml.models.boosting import early_stopping
 
 
 def noisy_problem(rows=1500, seed=0):

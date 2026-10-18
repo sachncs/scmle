@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 import support
 
-import mml
-from mml.contracts import errors
+import scml
+from scml.contracts import errors
 
 
 def censored_frame(rows=1200, seed=0):
@@ -102,7 +102,7 @@ def test_curves_survive_saving_and_loading(result, tmp_path):
     expected = result.bundle.predict_survival(rows, [0.1, 1.0])
 
     result.bundle.save(tmp_path / "copy")
-    loaded = mml.ModelBundle.load(tmp_path / "copy", trusted=True)
+    loaded = scml.ModelBundle.load(tmp_path / "copy", trusted=True)
 
     np.testing.assert_allclose(
         loaded.predict_survival(rows, [0.1, 1.0]), expected
@@ -142,8 +142,8 @@ def test_time_dependent_metrics_are_reported_on_the_locked_rows(result):
 
 
 def test_the_selected_model_has_a_lower_brier_score_than_kaplan_meier(result):
-    from mml.evaluation import survival as survival_metrics
-    from mml.models.survival import estimators
+    from scml.evaluation import survival as survival_metrics
+    from scml.models.survival import estimators
 
     train = censored_frame(1200, seed=0)
     fresh = censored_frame(1500, seed=5)

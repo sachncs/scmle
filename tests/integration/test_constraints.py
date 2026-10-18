@@ -6,8 +6,8 @@ import pathlib
 import pytest
 import support
 
-from mml.contracts import errors
-from mml.contracts import tasks
+from scml.contracts import errors
+from scml.contracts import tasks
 
 
 def run(frame, tmp_path, selection=None, **kwargs):

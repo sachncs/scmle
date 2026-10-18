@@ -3,10 +3,10 @@
 import pytest
 import support
 
-import mml
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.core import scheduler
+import scml
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.core import scheduler
 
 
 def square(value):
@@ -67,6 +67,6 @@ def test_parallel_run_matches_sequential_run(binary_frame, tmp_path):
 
 
 def test_workers_participate_in_the_config_hash(binary_frame):
-    one = mml.MLProject(binary_frame, "y").spec.config_hash()
-    two = mml.MLProject(binary_frame, "y", workers=2).spec.config_hash()
+    one = scml.MLProject(binary_frame, "y").spec.config_hash()
+    two = scml.MLProject(binary_frame, "y", workers=2).spec.config_hash()
     assert one != two

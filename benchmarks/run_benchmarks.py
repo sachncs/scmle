@@ -1,4 +1,4 @@
-"""Runs magicml end to end on open datasets and reports the results.
+"""Runs scml end to end on open datasets and reports the results.
 
 Usage:
     python -m benchmarks.run_benchmarks [--offline] [--only NAME ...]
@@ -19,7 +19,7 @@ from typing import Any
 from benchmarks import datasets
 from benchmarks import intervals
 from benchmarks import reference
-import mml
+import scml
 
 LOGGER = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ def run_one(
         frame = dataset.load()
         cv_scores: list[float] = []
         for seed in range(seeds):
-            project = mml.MLProject(
+            project = scml.MLProject(
                 frame,
                 dataset.target,
                 task=dataset.task,

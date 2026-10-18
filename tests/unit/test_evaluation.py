@@ -5,12 +5,12 @@ import pandas as pd
 import pytest
 from sklearn import dummy
 
-from mml.contracts import errors
-from mml.contracts import experiments
-from mml.contracts import tasks
-from mml.evaluation import metrics
-from mml.evaluation import selection
-from mml.models import registry as registry_module
+from scml.contracts import errors
+from scml.contracts import experiments
+from scml.contracts import tasks
+from scml.evaluation import metrics
+from scml.evaluation import selection
+from scml.models import registry as registry_module
 
 CATALOG = metrics.CATALOG
 TrialResult = experiments.TrialResult
@@ -108,7 +108,7 @@ def test_baseline_selected_only_when_alone(registry):
 def test_all_failed_raises(registry):
     policy = selection.BestMeanPolicy()
     trials = [make_trial("ridge", 0.0, Status.FAILED)]
-    with pytest.raises(errors.MagicMLError, match="all trials failed"):
+    with pytest.raises(errors.ScmlError, match="all trials failed"):
         policy.select(trials, CATALOG.metrics["rmse"], registry)
 
 
@@ -229,7 +229,7 @@ def test_maximize_sets_the_metric_and_conflicts_are_rejected():
 
 
 def test_latency_safety_factor_scales_the_measured_latency():
-    from mml.evaluation import resources
+    from scml.evaluation import resources
 
     usage = resources.ResourceUsage(1.0, 10.0, 30, "test machine")
     plain = resources.ResourceLimits(max_p95_latency_ms=15.0)

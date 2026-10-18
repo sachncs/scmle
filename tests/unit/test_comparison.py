@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mml.evaluation import comparison
+from scml.evaluation import comparison
 
 
 def test_a_consistent_gain_is_decisive():

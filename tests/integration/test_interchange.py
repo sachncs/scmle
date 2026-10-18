@@ -6,9 +6,9 @@ import pyarrow as pa
 import pytest
 import support
 
-from mml.contracts import errors
-from mml.data.readers import interchange
-from mml.data.readers import tabular
+from scml.contracts import errors
+from scml.data.readers import interchange
+from scml.data.readers import tabular
 
 
 def run(data, tmp_path, **kwargs):

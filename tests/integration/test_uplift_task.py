@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import support
 
-from mml.contracts import errors
+from scml.contracts import errors
 
 
 def trial(rows=5000, seed=0, confounded=False):

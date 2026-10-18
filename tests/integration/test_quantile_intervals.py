@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 import support
 
-import mml
-from mml.contracts import errors
+import scml
+from scml.contracts import errors
 
 
 def heteroscedastic(rows, seed):
@@ -60,7 +60,7 @@ def test_quantile_intervals_survive_saving_and_loading(result, tmp_path):
     expected = result.bundle.predict_interval(grid, method="quantile")
 
     result.bundle.save(tmp_path / "copy")
-    loaded = mml.ModelBundle.load(tmp_path / "copy", trusted=True)
+    loaded = scml.ModelBundle.load(tmp_path / "copy", trusted=True)
 
     pd.testing.assert_frame_equal(
         loaded.predict_interval(grid, method="quantile"), expected

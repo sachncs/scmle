@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 from sklearn import base
 
-from mml.contracts import data as data_contracts
-from mml.contracts import tasks
-from mml.evaluation import diagnostics
-from mml.evaluation import fairness
-from mml.evaluation import metrics
+from scml.contracts import data as data_contracts
+from scml.contracts import tasks
+from scml.evaluation import diagnostics
+from scml.evaluation import fairness
+from scml.evaluation import metrics
 
 PLAN = data_contracts.FeaturePlan(("score",), ("group",))
 

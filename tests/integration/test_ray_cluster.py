@@ -9,8 +9,8 @@ import sys
 import pytest
 import support
 
-from mml.integrations import ray_backend
-from mml.models import registry as registry_module
+from scml.integrations import ray_backend
+from scml.models import registry as registry_module
 
 if importlib.util.find_spec("ray") is not None:
     import ray.cloudpickle

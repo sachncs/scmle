@@ -8,13 +8,13 @@ import pytest
 from sklearn import base
 from sklearn import linear_model
 
-from mml.artifacts import bundle as bundle_module
-from mml.contracts import data as data_contracts
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.evaluation import reliability
-from mml.models import registry as registry_module
+from scml.artifacts import bundle as bundle_module
+from scml.contracts import data as data_contracts
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.evaluation import reliability
+from scml.models import registry as registry_module
 
 
 def test_a_perfectly_confident_correct_model_has_no_error():

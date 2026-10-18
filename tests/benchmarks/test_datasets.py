@@ -1,7 +1,7 @@
 """The benchmark suites are well formed (no downloads)."""
 
 from benchmarks import datasets
-from mml.evaluation import metrics
+from scml.evaluation import metrics
 
 
 def everything():

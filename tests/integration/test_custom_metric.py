@@ -4,15 +4,15 @@ import metric_functions
 import pytest
 import support
 
-import mml
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.evaluation import metrics
+import scml
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.evaluation import metrics
 
 
 @pytest.fixture
 def registered():
-    metric = mml.register_metric(
+    metric = scml.register_metric(
         "business_cost",
         metric_functions.business_cost,
         greater_is_better=False,
@@ -45,10 +45,10 @@ def test_registering_twice_needs_replace_and_unknown_tasks_are_rejected(
     registered,
 ):
     with pytest.raises(errors.ConfigError, match="already exists"):
-        mml.register_metric(
+        scml.register_metric(
             "business_cost", metric_functions.business_cost, False
         )
-    mml.register_metric(
+    scml.register_metric(
         "business_cost",
         metric_functions.business_cost,
         False,
@@ -66,7 +66,7 @@ def test_a_regression_metric_can_be_user_defined(tmp_path):
     rng = np.random.default_rng(2)
     frame = pd.DataFrame({"x": rng.uniform(1, 5, 400)})
     frame["y"] = 3 * frame.x + rng.normal(0, 0.3, 400)
-    mml.register_metric(
+    scml.register_metric(
         "mape",
         metric_functions.mean_absolute_percentage,
         greater_is_better=False,

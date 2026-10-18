@@ -8,27 +8,27 @@ import textwrap
 
 import pytest
 
-from mml.contracts import models as model_contracts
-from mml.core import policies
-from mml.core import scheduler
-from mml.core import stages
-from mml.data.readers import tabular
-from mml.data.splitting import splitters
-from mml.data.validation import columns
-from mml.evaluation import diagnostics
-from mml.evaluation import selection
-from mml.experimentation import stores
-from mml.features import feature_graph
-from mml.inference import serving
-from mml.intelligence import planner
-from mml.models import thresholds
-from mml.models.boosting import boosters
-from mml.models.sklearn import classical
-from mml.monitoring import monitor
-from mml.optimization import optimizers
-from mml.sampling import resampling
-from mml.sampling import strategies
-from mml.sampling import synthesis
+from scml.contracts import models as model_contracts
+from scml.core import policies
+from scml.core import scheduler
+from scml.core import stages
+from scml.data.readers import tabular
+from scml.data.splitting import splitters
+from scml.data.validation import columns
+from scml.evaluation import diagnostics
+from scml.evaluation import selection
+from scml.experimentation import stores
+from scml.features import feature_graph
+from scml.inference import serving
+from scml.intelligence import planner
+from scml.models import thresholds
+from scml.models.boosting import boosters
+from scml.models.sklearn import classical
+from scml.monitoring import monitor
+from scml.optimization import optimizers
+from scml.sampling import resampling
+from scml.sampling import strategies
+from scml.sampling import synthesis
 
 
 def concrete_subclasses(base, *modules):
@@ -138,9 +138,9 @@ def test_registering_and_planning_never_imports_optional_libraries():
     result = run_isolated(
         """
         import sys
-        import mml
-        from mml.contracts import tasks
-        from mml.models import registry
+        import scml
+        from scml.contracts import tasks
+        from scml.models import registry
         reg = registry.ModelRegistry.with_builtins()
         reg.candidates(tasks.TaskType.BINARY, 1000)
         heavy = ["lightgbm", "xgboost", "catboost", "optuna", "imblearn",
@@ -157,8 +157,8 @@ def test_a_model_is_imported_only_when_it_is_built():
     result = run_isolated(
         """
         import sys
-        from mml.contracts import tasks
-        from mml.models import registry
+        from scml.contracts import tasks
+        from scml.models import registry
         reg = registry.ModelRegistry.with_builtins()
         assert "lightgbm" not in sys.modules
         reg.get("lightgbm").build(tasks.TaskType.BINARY, 0)
@@ -169,8 +169,8 @@ def test_a_model_is_imported_only_when_it_is_built():
 
 
 def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
-    from mml.contracts import errors
-    from mml.core import compiler
+    from scml.contracts import errors
+    from scml.core import compiler
 
     default = stages.default_stages()
     kinds = [type(s) for s in default]
@@ -194,7 +194,7 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
 
 
 def test_a_replacement_stage_subclass_satisfies_dependencies():
-    from mml.core import compiler
+    from scml.core import compiler
 
     class Custom(stages.TrainStage):
         pass

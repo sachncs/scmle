@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.artifacts import bundle as bundle_module
-from mml.contracts import data as data_contracts
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.models import registry as registry_module
+from scml.artifacts import bundle as bundle_module
+from scml.contracts import data as data_contracts
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.models import registry as registry_module
 
 PLAN = data_contracts.FeaturePlan(("age", "income"), ("city",))
 REGISTRY = registry_module.ModelRegistry.with_builtins()

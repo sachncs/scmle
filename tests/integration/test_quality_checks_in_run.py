@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-import mml
+import scml
 
 
 def frame(rows=700, seed=0, flip_every=0, shift=0.0):
@@ -25,7 +25,7 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
     reference = tmp_path / "reference.parquet"
     frame(500, seed=9, shift=2.0).drop(columns="y").to_parquet(reference)
 
-    result = mml.MLProject(
+    result = scml.MLProject(
         frame(flip_every=6),
         "y",
         metric="roc_auc",
@@ -42,7 +42,7 @@ def test_clean_data_with_a_matching_reference_reports_nothing(tmp_path):
     reference = tmp_path / "reference.parquet"
     frame(500, seed=9).drop(columns="y").to_parquet(reference)
 
-    result = mml.MLProject(
+    result = scml.MLProject(
         frame(),
         "y",
         metric="roc_auc",

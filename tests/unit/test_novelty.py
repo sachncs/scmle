@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from mml.inference import novelty
+from scml.inference import novelty
 
 
 def training_frame(rows=1500, seed=0):

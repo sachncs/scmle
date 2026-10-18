@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 import support
 
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.models import weighting
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.models import weighting
 
 
 def conflicting_frame(rows=800, seed=0):

@@ -2,8 +2,8 @@
 
 import pytest
 
-from mml.contracts import events
-from mml.core import state
+from scml.contracts import events
+from scml.core import state
 
 
 def test_happy_path_emits_event_per_transition():

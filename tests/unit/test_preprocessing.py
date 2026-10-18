@@ -5,10 +5,10 @@ import pandas as pd
 import pytest
 from sklearn import base
 
-from mml.contracts import data as data_contracts
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.models import registry as registry_module
+from scml.contracts import data as data_contracts
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.models import registry as registry_module
 
 PLAN = data_contracts.FeaturePlan(("num", "flag"), ("cat",))
 BINARY = tasks.TaskType.BINARY

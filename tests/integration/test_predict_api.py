@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import support
 
-import mml
-from mml.contracts import errors
+import scml
+from scml.contracts import errors
 
 
 def test_a_saved_bundle_predicts_without_the_project(binary_frame, tmp_path):
@@ -15,10 +15,10 @@ def test_a_saved_bundle_predicts_without_the_project(binary_frame, tmp_path):
     result.save(tmp_path / "model")
     rows = binary_frame.drop(columns="y").head(10)
 
-    labels = mml.predict(tmp_path / "model", rows, trusted=True)
+    labels = scml.predict(tmp_path / "model", rows, trusted=True)
 
     np.testing.assert_array_equal(labels, result.predict(rows))
-    model = mml.load_model(tmp_path / "model", trusted=True)
+    model = scml.load_model(tmp_path / "model", trusted=True)
     assert model.info.model_version == result.bundle.info.model_version
 
 
@@ -29,4 +29,4 @@ def test_loading_an_unsigned_bundle_needs_trust(binary_frame, tmp_path):
     result.save(tmp_path / "model")
 
     with pytest.raises(errors.ArtifactError):
-        mml.load_model(tmp_path / "model")
+        scml.load_model(tmp_path / "model")

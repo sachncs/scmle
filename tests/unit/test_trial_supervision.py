@@ -7,8 +7,8 @@ import time
 import numpy as np
 import pytest
 
-from mml.contracts import tasks
-from mml.core import limits
+from scml.contracts import tasks
+from scml.core import limits
 
 
 def double(value):

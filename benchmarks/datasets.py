@@ -12,7 +12,7 @@ from typing import ClassVar
 import pandas as pd
 from sklearn import datasets
 
-from mml.contracts import tasks
+from scml.contracts import tasks
 
 
 @dataclasses.dataclass(frozen=True)

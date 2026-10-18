@@ -5,8 +5,8 @@ import os
 import pandas as pd
 import pytest
 
-from mml.contracts import errors
-from mml.governance import vault
+from scml.contracts import errors
+from scml.governance import vault
 
 
 @pytest.fixture

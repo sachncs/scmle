@@ -8,14 +8,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mml.artifacts import bundle as bundle_module
-from mml.artifacts import store as store_module
-from mml.contracts import data as data_contracts
-from mml.contracts import errors
-from mml.contracts import tasks
-from mml.data.curation import preprocessing
-from mml.inference import mapping as mapping_module
-from mml.models import registry as registry_module
+from scml.artifacts import bundle as bundle_module
+from scml.artifacts import store as store_module
+from scml.contracts import data as data_contracts
+from scml.contracts import errors
+from scml.contracts import tasks
+from scml.data.curation import preprocessing
+from scml.inference import mapping as mapping_module
+from scml.models import registry as registry_module
 
 PLAN = data_contracts.FeaturePlan(("num",), ("cat",))
 
@@ -142,7 +142,7 @@ def test_run_store_allocates_unique_directories(tmp_path):
 
 
 def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
-    from mml.monitoring import reference
+    from scml.monitoring import reference
 
     bundle, features = trained
     scores = pd.Series(bundle.predict_proba(features)[:, 1], name="score")
@@ -386,7 +386,7 @@ def test_the_environment_lock_pins_the_build_environment(trained, tmp_path):
     text = bundle.environment_lock(path)
 
     assert path.read_text() == text
-    assert text.startswith("# magicml environment lock")
+    assert text.startswith("# scml environment lock")
     assert f"# python {platform.python_version()}" in text
     assert f"numpy=={np.__version__}" in text
     assert "# platform " in text and "unknown" not in text.splitlines()[2]

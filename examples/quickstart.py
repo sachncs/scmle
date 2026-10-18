@@ -5,7 +5,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-import mml
+import scml
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def main() -> None:
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
     LOGGER.setLevel(logging.INFO)
     data = make_dataset()
-    project = mml.MLProject(data, "churn", metric="roc_auc", time_budget=120)
+    project = scml.MLProject(data, "churn", metric="roc_auc", time_budget=120)
     LOGGER.info(project.plan().summary())
     result = project.run()
     LOGGER.info(result.summary())

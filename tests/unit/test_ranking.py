@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 from sklearn import metrics as sk_metrics
 
-from mml.evaluation import ranking
-from mml.models.ranking import estimators
-from mml.models.ranking import wrapper
+from scml.evaluation import ranking
+from scml.models.ranking import estimators
+from scml.models.ranking import wrapper
 
 
 def corpus(queries=60, per_query=12, seed=0):

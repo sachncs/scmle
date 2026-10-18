@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import support
 
-from mml.contracts import tasks
+from scml.contracts import tasks
 
 
 def biased(rows=3000, seed=0, shift=1.0):

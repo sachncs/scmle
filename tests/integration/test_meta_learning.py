@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import support
 
-import mml
-from mml.experimentation import stores
+import scml
+from scml.experimentation import stores
 
 
 def make_frame(rows, seed):
@@ -99,4 +99,4 @@ def test_old_databases_are_migrated(tmp_path):
         "r", fingerprint={"a": 1.0}, task="regression", selected_strategy="x"
     )
     assert store.runs()[0]["selected_strategy"] == "x"
-    assert isinstance(mml.MLProject, type)
+    assert isinstance(scml.MLProject, type)

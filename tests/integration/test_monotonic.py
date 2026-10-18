@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 import support
 
-from mml.contracts import errors
-from mml.contracts import tasks
+from scml.contracts import errors
+from scml.contracts import tasks
 
 
 def noisy_frame(rows=900, seed=0):

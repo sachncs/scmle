@@ -3,8 +3,8 @@
 import numpy as np
 import support
 
-import mml
-from mml.contracts import tasks
+import scml
+from scml.contracts import tasks
 
 NO_SEARCH = tasks.SearchSpec(top_models=0)
 
@@ -43,7 +43,7 @@ def test_threshold_choice_never_uses_the_test_rows(imbalanced_frame, tmp_path):
     result = run(imbalanced_frame, tmp_path, decision)
     chosen = result.evaluation["decision"]
     assert chosen["validation_rows"] <= result.evaluation["n_dev"]
-    reloaded = mml.ModelBundle.load(
+    reloaded = scml.ModelBundle.load(
         result.save(tmp_path / "bundle"), trusted=True
     )
     assert reloaded.info.decision_threshold == chosen["threshold"]

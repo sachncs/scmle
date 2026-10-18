@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from sklearn import ensemble
 
-from mml.contracts import tasks
-from mml.models import conformance
-from mml.models.sklearn import bagging
+from scml.contracts import tasks
+from scml.models import conformance
+from scml.models.sklearn import bagging
 
 
 @pytest.mark.parametrize("adapter_class", bagging.BAGGING_ADAPTERS)

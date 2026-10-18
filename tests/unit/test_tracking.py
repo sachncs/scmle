@@ -2,9 +2,9 @@
 
 import pytest
 
-from mml.contracts import events
-from mml.contracts import experiments
-from mml.experimentation import stores
+from scml.contracts import events
+from scml.contracts import experiments
+from scml.experimentation import stores
 
 
 def make_trial(
