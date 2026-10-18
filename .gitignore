@@ -8,3 +8,8 @@ runs/
 dist/
 .venv-*/
 mlruns/
+.hypothesis/
+.coverage
+coverage.xml
+htmlcov/
+results.json.tmp
