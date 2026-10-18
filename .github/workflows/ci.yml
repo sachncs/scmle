@@ -23,8 +23,29 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
       - run: uv run ruff check . && uv run ruff format --check .
-      - run: uv run mypy mml benchmarks
-      - run: uv run pytest -q
+      - run: uv run mypy scml benchmarks
+      - run: uv run pytest -q --cov=scml --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: matrix.python == '3.14'
+        with:
+          name: coverage
+          path: coverage.xml
+
+  cross-platform:
+    name: ${{ matrix.os }} (Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
+      - run: uv run pytest -q tests/unit tests/property tests/leakage tests/integration/test_end_to_end.py
+      - name: Smoke test the CLI
+        run: uv run scml --help
 
   minimal-dependencies:
     name: lowest supported dependency versions (Python 3.11)
@@ -87,7 +108,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --python 3.14
-      - run: uv run bandit -q -r mml
+      - run: uv run bandit -q -r scml
       - run: uv run pip-audit --skip-editable
 
   package:
@@ -102,5 +123,5 @@ jobs:
         run: |
           uv venv --python 3.14 /tmp/wheel-env
           uv pip install --python /tmp/wheel-env/bin/python dist/*.whl
-          /tmp/wheel-env/bin/magicml --help
-          /tmp/wheel-env/bin/python -c "import mml; print(mml.__version__)"
+          /tmp/wheel-env/bin/scml --help
+          /tmp/wheel-env/bin/python -c "import scml; print(scml.__version__)"
