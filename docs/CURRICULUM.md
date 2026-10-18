@@ -181,9 +181,13 @@ from mml.evaluation import bias_variance
 rng = np.random.default_rng(3)
 features = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
 target = pd.Series(2 * features.a + rng.normal(0, 0.5, 300))
-for build in (lambda: tree.DecisionTreeRegressor(),
-              lambda: linear_model.Ridge(alpha=1.0)):
-    part = bias_variance.decompose(build, features, target, False, replicates=10)
+for build in (
+    lambda: tree.DecisionTreeRegressor(),
+    lambda: linear_model.Ridge(alpha=1.0),
+):
+    part = bias_variance.decompose(
+        build, features, target, False, replicates=10
+    )
     print(type(build()).__name__, part.verdict)
 ```
 
