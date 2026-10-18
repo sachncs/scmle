@@ -43,6 +43,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - name: LightGBM needs the OpenMP runtime on macOS
+        if: runner.os == 'macOS'
+        run: brew install libomp
       - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
       - run: uv run pytest -q tests/unit tests/property tests/leakage tests/integration/test_end_to_end.py
       - name: Smoke test the CLI
@@ -78,6 +81,7 @@ jobs:
       - run: uv run pytest -q tests/integration/test_integrations.py
         env:
           MLFLOW_DISABLE_AGENT_HINT: "1"
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV: "0"  # workers must use this venv
 
   base-install:
     name: base install without extras
