@@ -16,6 +16,8 @@ pip install "super-charge-ml[boosting]"      # + LightGBM, XGBoost
 pip install "super-charge-ml[all]"           # most optional extras
 ```
 
+On macOS, the `boosting` extra needs the OpenMP runtime (`brew install libomp`).
+
 The PyPI distribution is `super-charge-ml`; the import name and the command
 are both `scml`. **Status: beta.** The public API may change between `0.x`
 releases; see [`CHANGELOG.md`](CHANGELOG.md).
