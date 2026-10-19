@@ -23,6 +23,8 @@ are both `scml`. **Status: beta.** The public API may change between `0.x`
 releases; see [`CHANGELOG.md`](CHANGELOG.md).
 The supported entry points are documented in
 [`docs/API_STABILITY.md`](docs/API_STABILITY.md).
+The release gate is tracked in
+[`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md).
 
 ```python
 import logging
