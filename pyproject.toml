@@ -57,11 +57,12 @@ onnx = ["skl2onnx>=1.17", "onnxruntime>=1.20", "onnxmltools>=1.13"]
 optimization = ["optuna>=4.0"]
 sampling = ["imbalanced-learn>=0.14.1"]
 polars = ["polars>=1.0"]
+spreadsheets = ["openpyxl>=3.1"]
 tracking = ["mlflow>=3.0"]
 benchmarks = ["huggingface_hub>=0.25"]
 distributed = ["ray>=2.40"]
 all = [
-    "super-charge-ml[boosting,catboost,deeplearning,optimization,sampling,polars,tracking,distributed,benchmarks]",
+    "super-charge-ml[boosting,catboost,deeplearning,optimization,sampling,polars,spreadsheets,tracking,distributed,benchmarks]",
 ]
 
 [project.urls]

@@ -44,7 +44,7 @@ def predict(
 
     Args:
         directory: Saved bundle directory.
-        data: DataFrame or path to CSV/Parquet.
+        data: DataFrame or path to a supported tabular dataset.
         trusted: Load an unsigned bundle you vouch for.
         signing_key: HMAC key verifying the bundle signature.
         mapping: Explicit column-name policy; exact names if omitted.
@@ -67,7 +67,7 @@ def score(
 
     Args:
         directory: Saved bundle directory.
-        data: DataFrame or path to CSV/Parquet.
+        data: DataFrame or path to a supported tabular dataset.
         trusted: Load an unsigned bundle you vouch for.
         signing_key: HMAC key verifying the bundle signature.
         mapping: Explicit column-name policy; exact names if omitted.

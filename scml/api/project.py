@@ -96,9 +96,10 @@ class MLProject:
         """Defines a project.
 
         Args:
-            data: CSV / Parquet / Feather path, or an in-memory table:
-                pandas DataFrame, pyarrow Table, Polars frame, or anything
-                implementing the Arrow stream protocol.
+            data: Supported tabular path (CSV/TSV, JSON/JSONL, Excel,
+                Parquet or Feather), or an in-memory table: pandas DataFrame,
+                pyarrow Table, Polars frame, or anything implementing the
+                Arrow stream protocol.
             target: Name of the target column, or for `multilabel` and
                 `multioutput` tasks the list of all target columns.
             task: `auto`, `classification`, `regression`, or an explicit

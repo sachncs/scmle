@@ -464,7 +464,7 @@ class ModelBundle:
         """Predicts and reports the schema diagnostics in one structured result.
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
@@ -507,7 +507,7 @@ class ModelBundle:
         """Flags rows that look unlike the training data.
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
@@ -886,7 +886,7 @@ class ModelBundle:
         """Checks input against the schema without predicting.
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
@@ -905,7 +905,7 @@ class ModelBundle:
         """Validates input and returns the feature columns.
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
 
         Raises:
@@ -936,7 +936,7 @@ class ModelBundle:
         """Predicts labels or values through the full fitted pipeline.
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
         """
         predictions = self.pipeline.predict(self.prepare_frame(data, mapping))
@@ -971,7 +971,7 @@ class ModelBundle:
         """Predicts class probabilities.
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
 
         Raises:
@@ -1046,7 +1046,7 @@ class ModelBundle:
         """Prediction intervals with a stated coverage (regression).
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             coverage: Share of new rows the interval should contain.
             mapping: Explicit column-name policy; exact names if omitted.
             method: `residual` for a margin of the same width everywhere, or
@@ -1227,7 +1227,7 @@ class ModelBundle:
         """Probability of no event yet at each time (survival tasks).
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             times: Times (in the duration column's unit) to read the curve at.
             mapping: Explicit column-name policy; exact names if omitted.
 
@@ -1335,7 +1335,7 @@ class ModelBundle:
         """Scores rows and orders them within each query (ranking tasks).
 
         Args:
-            data: Rows to rank (DataFrame or path to CSV/Parquet).
+            data: Rows to rank (DataFrame or supported tabular path).
             query_column: Column naming each row's query.
             mapping: Explicit column-name policy; exact names if omitted.
 
@@ -1377,7 +1377,7 @@ class ModelBundle:
         width of the quantile band (the model is least sure there).
 
         Args:
-            data: Unlabeled rows (DataFrame or path to CSV/Parquet).
+            data: Unlabeled rows (DataFrame or supported tabular path).
             count: How many rows to return.
             mapping: Explicit column-name policy; exact names if omitted.
 
@@ -1418,7 +1418,7 @@ class ModelBundle:
         """Prediction sets with a stated coverage (classification).
 
         Args:
-            data: DataFrame or path to CSV/Parquet.
+            data: DataFrame or path to a supported tabular dataset.
             coverage: Share of new rows whose true label the set contains.
             mapping: Explicit column-name policy; exact names if omitted.
 

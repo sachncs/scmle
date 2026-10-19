@@ -1186,6 +1186,15 @@ wheels = [
 ]
 
 [[package]]
+name = "et-xmlfile"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d3/38/af70d7ab1ae9d4da450eeec1fa3918940a5fafb9055e934af8d6eb0c2313/et_xmlfile-2.0.0.tar.gz", hash = "sha256:dab3f4764309081ce75662649be815c4c9081e88f0837825f90fd28317d4da54", size = 17234, upload-time = "2024-10-25T17:25:40.039Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl", hash = "sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa", size = 18059, upload-time = "2024-10-25T17:25:39.051Z" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.143.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3360,6 +3369,18 @@ wheels = [
 ]
 
 [[package]]
+name = "openpyxl"
+version = "3.1.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "et-xmlfile" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3d/f9/88d94a75de065ea32619465d2f77b29a0469500e99012523b91cc4141cd1/openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050", size = 186464, upload-time = "2024-06-28T14:03:44.161Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl", hash = "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2", size = 250910, upload-time = "2024-06-28T14:03:41.161Z" },
+]
+
+[[package]]
 name = "opentelemetry-api"
 version = "1.45.1"
 source = { registry = "https://pypi.org/simple" }
@@ -5361,6 +5382,7 @@ all = [
     { name = "keras" },
     { name = "lightgbm" },
     { name = "mlflow" },
+    { name = "openpyxl" },
     { name = "optuna" },
     { name = "polars" },
     { name = "ray" },
@@ -5405,6 +5427,9 @@ polars = [
 sampling = [
     { name = "imbalanced-learn" },
 ]
+spreadsheets = [
+    { name = "openpyxl" },
+]
 tabpfn = [
     { name = "tabpfn" },
 ]
@@ -5437,6 +5462,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.3" },
     { name = "onnxmltools", marker = "extra == 'onnx'", specifier = ">=1.13" },
     { name = "onnxruntime", marker = "extra == 'onnx'", specifier = ">=1.20" },
+    { name = "openpyxl", marker = "extra == 'spreadsheets'", specifier = ">=3.1" },
     { name = "optuna", marker = "extra == 'optimization'", specifier = ">=4.0" },
     { name = "pandas", specifier = ">=3.0" },
     { name = "polars", marker = "extra == 'polars'", specifier = ">=1.0" },
@@ -5448,14 +5474,14 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.16.2" },
     { name = "sentence-transformers", marker = "extra == 'embeddings'", specifier = ">=3.0" },
     { name = "skl2onnx", marker = "extra == 'onnx'", specifier = ">=1.17" },
-    { name = "super-charge-ml", extras = ["boosting", "catboost", "deeplearning", "optimization", "sampling", "polars", "tracking", "distributed", "benchmarks"], marker = "extra == 'all'" },
+    { name = "super-charge-ml", extras = ["boosting", "catboost", "deeplearning", "optimization", "sampling", "polars", "spreadsheets", "tracking", "distributed", "benchmarks"], marker = "extra == 'all'" },
     { name = "tabpfn", marker = "extra == 'tabpfn'", specifier = ">=2.0" },
     { name = "threadpoolctl", specifier = ">=3.6" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'deeplearning'", specifier = ">=2.8", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'deeplearning'", specifier = ">=2.8" },
     { name = "xgboost", marker = "extra == 'boosting'", specifier = ">=3.0" },
 ]
-provides-extras = ["boosting", "catboost", "deeplearning", "tabpfn", "embeddings", "onnx", "optimization", "sampling", "polars", "tracking", "benchmarks", "distributed", "all"]
+provides-extras = ["boosting", "catboost", "deeplearning", "tabpfn", "embeddings", "onnx", "optimization", "sampling", "polars", "spreadsheets", "tracking", "benchmarks", "distributed", "all"]
 
 [package.metadata.requires-dev]
 dev = [

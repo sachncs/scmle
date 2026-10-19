@@ -97,7 +97,7 @@ class ParquetChunks(ChunkSource):
 class CsvChunks(ChunkSource):
     """CSV read in chunks (types are inferred per chunk)."""
 
-    suffixes = (".csv",)
+    suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
 
     def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
         """Yields consecutive chunks."""
@@ -111,7 +111,7 @@ class CsvChunks(ChunkSource):
 class JsonLinesChunks(ChunkSource):
     """Newline-delimited JSON read in bounded chunks."""
 
-    suffixes = (".jsonl", ".ndjson")
+    suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
 
     def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
         """Yields JSON records in bounded batches."""
@@ -139,8 +139,9 @@ def source_for(uri: str | pathlib.Path) -> ChunkSource:
     path = pathlib.Path(uri)
     if not path.exists():
         raise errors.DataError(f"dataset not found: {path}")
+    name = path.name.lower()
     for kind in SOURCES:
-        if path.suffix.lower() in kind.suffixes:
+        if any(name.endswith(suffix) for suffix in kind.suffixes):
             return kind(path)
     raise errors.DataError(
         f"cannot stream '{path.suffix}' files; use Parquet, CSV or JSONL"

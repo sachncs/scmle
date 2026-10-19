@@ -44,9 +44,25 @@ def test_missing_file(tmp_path):
 
 
 def test_unsupported_suffix(tmp_path):
-    (tmp_path / "d.xlsx").write_text("x")
+    (tmp_path / "d.xml").write_text("x")
     with pytest.raises(errors.DataError, match="unsupported"):
-        tabular.read_table(tmp_path / "d.xlsx")
+        tabular.read_table(tmp_path / "d.xml")
+
+
+def test_excel_is_registered_as_an_optional_format():
+    assert ".xlsx" in tabular.DatasetLoader().supported_suffixes()
+
+
+def test_excel_roundtrip_when_optional_dependency_is_installed(tmp_path, frame):
+    openpyxl = pytest.importorskip("openpyxl")
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(list(frame.columns))
+    for row in frame.itertuples(index=False, name=None):
+        sheet.append(list(row))
+    path = tmp_path / "records.xlsx"
+    workbook.save(path)
+    pd.testing.assert_frame_equal(tabular.read_table(path), frame)
 
 
 def test_empty_file(tmp_path):

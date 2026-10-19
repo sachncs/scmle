@@ -40,7 +40,7 @@ class TableReader(abc.ABC):
 class CsvReader(TableReader):
     """Comma-separated values, including compressed CSV files."""
 
-    suffixes = (".csv",)
+    suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
         """Reads a CSV file."""
@@ -50,7 +50,7 @@ class CsvReader(TableReader):
 class TsvReader(TableReader):
     """Tab-separated values."""
 
-    suffixes = (".tsv", ".tab")
+    suffixes = (".tsv", ".tab", ".tsv.gz", ".tab.gz")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
         """Reads a tab-separated table."""
@@ -70,11 +70,31 @@ class JsonReader(TableReader):
 class JsonLinesReader(TableReader):
     """Newline-delimited JSON records."""
 
-    suffixes = (".jsonl", ".ndjson")
+    suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
         """Reads one JSON record per line."""
         return pd.read_json(path, lines=True)
+
+
+class ExcelReader(TableReader):
+    """Excel workbooks, using the first sheet by default."""
+
+    suffixes = (".xlsx", ".xlsm")
+
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads the first worksheet from an Excel workbook.
+
+        Raises:
+            DataError: If the optional spreadsheet dependency is absent.
+        """
+        try:
+            return pd.read_excel(path)
+        except ImportError as error:
+            raise errors.DataError(
+                "Excel input needs the optional 'spreadsheets' dependency; "
+                "install super-charge-ml[spreadsheets]"
+            ) from error
 
 
 class ParquetReader(TableReader):
@@ -111,6 +131,7 @@ class DatasetLoader:
             TsvReader(),
             JsonReader(),
             JsonLinesReader(),
+            ExcelReader(),
             ParquetReader(),
             FeatherReader(),
         )
@@ -131,12 +152,12 @@ class DatasetLoader:
         Raises:
             DataError: If no reader supports the suffix.
         """
-        suffix = path.suffix.lower()
+        name = path.name.lower()
         for reader in self.readers:
-            if suffix in reader.suffixes:
+            if any(name.endswith(suffix) for suffix in reader.suffixes):
                 return reader
         raise errors.DataError(
-            f"unsupported file type '{path.suffix}'; "
+            f"unsupported file type '{path.name}'; "
             f"use one of {self.supported_suffixes()}"
         )
 
