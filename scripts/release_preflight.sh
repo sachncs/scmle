@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# Reproduce the local release evidence without mutating tracked files.
+set -euo pipefail
+
+python_version="${SCML_PYTHON_VERSION:-3.14}"
+benchmark_output="$(mktemp "${TMPDIR:-/tmp}/scml-bench.XXXXXX.json")"
+
+echo "== static checks =="
+uv run --python "$python_version" ruff check .
+uv run --python "$python_version" ruff format --check .
+uv run --python "$python_version" mypy scml benchmarks
+uv run --python "$python_version" bandit -q -r scml
+uv run --python "$python_version" pip-audit --skip-editable
+
+echo "== bounded contract suite =="
+uv run --python "$python_version" pytest -q \
+  --cov=scml --cov-report=xml --cov-fail-under=50 \
+  tests/unit tests/property tests/leakage \
+  tests/integration/test_cli.py \
+  tests/integration/test_end_to_end.py \
+  tests/integration/test_predict_api.py \
+  tests/integration/test_serve_and_export.py
+
+echo "== benchmark regression =="
+uv run --python "$python_version" python -m benchmarks.run_benchmarks \
+  --offline --budget 240 --workers 2 --output "$benchmark_output"
+uv run --python "$python_version" python -m benchmarks.check_regression \
+  "$benchmark_output"
+
+echo "== package =="
+uv build --python "$python_version"
+uv run --python "$python_version" twine check dist/*
+
+echo "== marketing site =="
+(cd website && npm ci && npm audit --omit=dev --audit-level=high && npm run build)
+
+echo "preflight passed; benchmark evidence: $benchmark_output"

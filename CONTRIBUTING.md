@@ -16,6 +16,10 @@ uv run python -m benchmarks.run_benchmarks --offline --output results.json
 uv run python -m benchmarks.check_regression results.json
 ```
 
+To reproduce the bounded release evidence locally, run
+`./scripts/release_preflight.sh`. Set `SCML_PYTHON_VERSION` to test another
+supported interpreter, for example `SCML_PYTHON_VERSION=3.11`.
+
 Rules (all enforced by CI):
 
 * Python 3.11+ (keep the code importable on 3.11), Google style: 80 columns, Google docstrings, `import module`
