@@ -38,13 +38,43 @@ class TableReader(abc.ABC):
 
 
 class CsvReader(TableReader):
-    """Comma-separated values."""
+    """Comma-separated values, including compressed CSV files."""
 
     suffixes = (".csv",)
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
         """Reads a CSV file."""
         return pd.read_csv(path)
+
+
+class TsvReader(TableReader):
+    """Tab-separated values."""
+
+    suffixes = (".tsv", ".tab")
+
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads a tab-separated table."""
+        return pd.read_csv(path, sep="\t")
+
+
+class JsonReader(TableReader):
+    """JSON records or a JSON array of records."""
+
+    suffixes = (".json",)
+
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads JSON records into a table."""
+        return pd.read_json(path)
+
+
+class JsonLinesReader(TableReader):
+    """Newline-delimited JSON records."""
+
+    suffixes = (".jsonl", ".ndjson")
+
+    def load(self, path: pathlib.Path) -> pd.DataFrame:
+        """Reads one JSON record per line."""
+        return pd.read_json(path, lines=True)
 
 
 class ParquetReader(TableReader):
@@ -74,10 +104,13 @@ class DatasetLoader:
         """Initializes the loader.
 
         Args:
-            readers: Readers to dispatch to; defaults to CSV and Parquet.
+            readers: Readers to dispatch to; defaults to common open formats.
         """
         self.readers = readers or (
             CsvReader(),
+            TsvReader(),
+            JsonReader(),
+            JsonLinesReader(),
             ParquetReader(),
             FeatherReader(),
         )
@@ -140,7 +173,7 @@ class DatasetLoader:
 
 
 def read_table(uri: str | pathlib.Path) -> pd.DataFrame:
-    """Reads a CSV or Parquet dataset with the default loader."""
+    """Reads a supported file dataset with the default loader."""
     return DatasetLoader().load(uri)
 
 

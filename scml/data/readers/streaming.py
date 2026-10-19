@@ -108,7 +108,26 @@ class CsvChunks(ChunkSource):
         return None, len(pd.read_csv(self.path, nrows=1).columns)
 
 
-SOURCES: tuple[type[ChunkSource], ...] = (ParquetChunks, CsvChunks)
+class JsonLinesChunks(ChunkSource):
+    """Newline-delimited JSON read in bounded chunks."""
+
+    suffixes = (".jsonl", ".ndjson")
+
+    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
+        """Yields JSON records in bounded batches."""
+        yield from pd.read_json(self.path, lines=True, chunksize=rows)
+
+    def shape(self) -> tuple[int | None, int]:
+        """Only the column count is known without a pass."""
+        first = next(iter(self.batches(rows=1)), None)
+        return None, 0 if first is None else len(first.columns)
+
+
+SOURCES: tuple[type[ChunkSource], ...] = (
+    ParquetChunks,
+    CsvChunks,
+    JsonLinesChunks,
+)
 
 
 def source_for(uri: str | pathlib.Path) -> ChunkSource:
@@ -124,7 +143,7 @@ def source_for(uri: str | pathlib.Path) -> ChunkSource:
         if path.suffix.lower() in kind.suffixes:
             return kind(path)
     raise errors.DataError(
-        f"cannot stream '{path.suffix}' files; use Parquet or CSV"
+        f"cannot stream '{path.suffix}' files; use Parquet, CSV or JSONL"
     )
 
 

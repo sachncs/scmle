@@ -19,6 +19,25 @@ def test_csv_and_parquet_roundtrip(tmp_path, frame):
     assert tabular.read_table(tmp_path / "d.parquet").shape == (3, 3)
 
 
+@pytest.mark.parametrize("suffix", [".tsv", ".tab"])
+def test_delimited_text_roundtrip(tmp_path, frame, suffix):
+    frame.to_csv(tmp_path / f"d{suffix}", sep="\t", index=False)
+    pd.testing.assert_frame_equal(
+        tabular.read_table(tmp_path / f"d{suffix}"), frame
+    )
+
+
+def test_json_and_json_lines_roundtrip(tmp_path, frame):
+    frame.to_json(tmp_path / "records.json", orient="records")
+    frame.to_json(tmp_path / "records.jsonl", orient="records", lines=True)
+    pd.testing.assert_frame_equal(
+        tabular.read_table(tmp_path / "records.json"), frame
+    )
+    pd.testing.assert_frame_equal(
+        tabular.read_table(tmp_path / "records.jsonl"), frame
+    )
+
+
 def test_missing_file(tmp_path):
     with pytest.raises(errors.DataError, match="not found"):
         tabular.read_table(tmp_path / "nope.csv")

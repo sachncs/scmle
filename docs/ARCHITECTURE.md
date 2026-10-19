@@ -18,8 +18,10 @@ TESTING -> PACKAGING -> COMPLETED`, with `FAILED`, `CANCELLED`, `BLOCKED` as
 exits). Each transition is an event in `events.jsonl` and a row update in the
 tracking database.
 
-1. **Ingest** reads CSV/Parquet, fingerprints the data, maps infinities to
-   missing values (reported as findings).
+1. **Ingest** accepts common open tabular formats (CSV/TSV, JSON records,
+   newline-delimited JSON, Parquet, Feather/Arrow), pandas/Arrow-compatible
+   in-memory tables, and bounded streaming sources. It fingerprints the data
+   and maps infinities to missing values (reported as findings).
 2. **Profile** resolves the task, classifies columns (`ColumnKind`), and raises
    leakage *hypotheses* (value association, outcome-dependent recording).
 3. **Plan** splits the data (`SplitStrategy`) behind a `LockedTestSet` and asks

@@ -129,6 +129,16 @@ def test_unsupported_formats_and_missing_files_are_refused(tmp_path):
         streaming.source_for(tmp_path / "missing.parquet")
 
 
+def test_json_lines_is_streamed_in_batches(tmp_path):
+    frame = pd.DataFrame({"a": range(12), "y": [0, 1] * 6})
+    path = tmp_path / "data.jsonl"
+    frame.to_json(path, orient="records", lines=True)
+    source = streaming.source_for(path)
+    batches = list(source.batches(rows=5))
+    assert [len(batch) for batch in batches] == [5, 5, 2]
+    pd.testing.assert_frame_equal(pd.concat(batches, ignore_index=True), frame)
+
+
 def test_sample_sizes_follow_the_memory_budget():
     small = streaming.sample_caps(10, 0.01, 0.2)
     large = streaming.sample_caps(10, 1.0, 0.2)
