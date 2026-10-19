@@ -38,6 +38,15 @@ def test_json_and_json_lines_roundtrip(tmp_path, frame):
     )
 
 
+def test_compressed_text_and_json_lines_roundtrip(tmp_path, frame):
+    csv_path = tmp_path / "records.csv.gz"
+    jsonl_path = tmp_path / "records.jsonl.gz"
+    frame.to_csv(csv_path, index=False, compression="gzip")
+    frame.to_json(jsonl_path, orient="records", lines=True, compression="gzip")
+    pd.testing.assert_frame_equal(tabular.read_table(csv_path), frame)
+    pd.testing.assert_frame_equal(tabular.read_table(jsonl_path), frame)
+
+
 def test_missing_file(tmp_path):
     with pytest.raises(errors.DataError, match="not found"):
         tabular.read_table(tmp_path / "nope.csv")
