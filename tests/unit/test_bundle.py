@@ -165,6 +165,7 @@ def test_run_store_allocates_unique_directories(tmp_path):
     sub = first.make_directory("trials")
     assert json.loads(first.path("a.json").read_text()) == {"x": 1}
     assert sub.is_dir() and first.path("b.txt").read_text() == "hi"
+    assert not list(first.directory.glob(".b.txt.*"))
 
 
 def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):

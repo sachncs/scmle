@@ -2,7 +2,9 @@
 
 import datetime
 import json
+import os
 import pathlib
+import tempfile
 from typing import Any
 from typing import Self
 
@@ -75,14 +77,31 @@ class RunStore:
 
         Unknown value types are rendered as strings.
         """
-        target = self.path(relative)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
+        self.write_text(
+            relative,
             json.dumps(payload, indent=2, default=str),
-            encoding="utf-8",
-            newline="\n",
         )
 
     def write_text(self, relative: str, text: str) -> None:
-        """Writes plain text."""
-        self.path(relative).write_text(text, encoding="utf-8", newline="\n")
+        """Atomically writes plain text.
+
+        The temporary file is created beside the destination so `os.replace`
+        remains atomic on the supported operating systems and filesystems.
+        """
+        target = self.path(relative)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{target.name}.", dir=target.parent
+        )
+        temporary = pathlib.Path(temporary_name)
+        try:
+            with os.fdopen(
+                descriptor, "w", encoding="utf-8", newline="\n"
+            ) as handle:
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, target)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
