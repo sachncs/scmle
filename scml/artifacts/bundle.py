@@ -706,7 +706,9 @@ class ModelBundle:
             files[HISTORY_FILE] = file_sha256(history_path)
         elif (root / HISTORY_FILE).exists():
             (root / HISTORY_FILE).unlink()
-        info = dataclasses.replace(self.info, files=files)
+        info = dataclasses.replace(
+            self.info, format=BUNDLE_FORMAT, files=files
+        )
         manifest_text = json.dumps(info.to_dict(), indent=2)
         (root / MANIFEST_FILE).write_text(
             manifest_text, encoding="utf-8", newline="\n"
@@ -733,6 +735,7 @@ class ModelBundle:
         trusted: bool = False,
         signing_key: str | bytes | None = None,
         allow_version_mismatch: bool = False,
+        allow_legacy_format: bool = False,
     ) -> Self:
         """Loads and verifies a bundle.
 
@@ -749,6 +752,9 @@ class ModelBundle:
             signing_key: HMAC key used to verify the signature.
             allow_version_mismatch: Load despite differing dependency
                 versions.
+            allow_legacy_format: Load a trusted format 1 bundle so it can be
+                re-saved as the current authenticated format. This is refused
+                unless `trusted=True`.
 
         Returns:
             The verified bundle.
@@ -780,12 +786,15 @@ class ModelBundle:
             raise errors.ArtifactError(
                 "invalid model bundle metadata"
             ) from error
-        if manifest.get("format") != BUNDLE_FORMAT:
+        legacy = manifest.get("format") == 1
+        if manifest.get("format") != BUNDLE_FORMAT and not (
+            legacy and allow_legacy_format and trusted
+        ):
             raise errors.ArtifactError(
                 f"unsupported bundle format {manifest.get('format')}"
             )
         info = BundleInfo(**manifest)
-        if SCHEMA_FILE not in info.files:
+        if SCHEMA_FILE not in info.files and not legacy:
             raise errors.ArtifactError(
                 "bundle is missing a schema checksum; re-export it with "
                 f"bundle format {BUNDLE_FORMAT}"
@@ -806,7 +815,9 @@ class ModelBundle:
                 "checksum mismatch: model file was modified or corrupted"
             )
         schema_path = root / SCHEMA_FILE
-        if file_sha256(schema_path) != info.files.get(SCHEMA_FILE):
+        if not legacy and file_sha256(schema_path) != info.files.get(
+            SCHEMA_FILE
+        ):
             raise errors.ArtifactError(
                 "checksum mismatch: schema file was modified or corrupted"
             )

@@ -27,8 +27,8 @@ must not be described as production-ready until every required gate is green.
   optional integrations used by the release.
 - [ ] Complete the scheduled full suite and benchmark regression gate without
   timeout or unexplained skips.
-- [ ] Review and publish migration guidance for bundle format 2 and any public
-  API changes.
+- [x] Publish migration guidance for bundle format 2 and any public API
+  changes.
 - [ ] Define and enforce a coverage threshold for the declared release tiers.
 - [ ] Run an operational rehearsal covering interruption, resume, rollback,
   signing-key rotation, and monitoring handoff.

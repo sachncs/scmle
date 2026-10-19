@@ -17,3 +17,11 @@ the top-level API or documented as a contract.
 
 The project will not claim a stable v1 API until the release, compatibility,
 security, and operational gates in the production-readiness plan are green.
+
+## Bundle migration
+
+Bundle format 2 authenticates `schema.json`. Format 1 bundles are refused by
+default. To migrate a format 1 bundle from a source you explicitly trust,
+load it with `trusted=True, allow_legacy_format=True` and immediately call
+`save()` to write a format 2 bundle. The migrated bundle should then be
+verified with the normal signed loading path.

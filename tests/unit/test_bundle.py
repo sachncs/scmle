@@ -123,6 +123,27 @@ def test_invalid_bundles(tmp_path, trained):
         bundle_module.ModelBundle.load(directory, trusted=True)
 
 
+def test_legacy_bundle_requires_opt_in_and_can_be_migrated(
+    tmp_path, trained
+):
+    directory = trained[0].save(tmp_path / "legacy")
+    manifest_path = directory / bundle_module.MANIFEST_FILE
+    manifest = json.loads(manifest_path.read_text())
+    manifest["format"] = 1
+    manifest["files"].pop(bundle_module.SCHEMA_FILE)
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(errors.ArtifactError, match="unsupported"):
+        bundle_module.ModelBundle.load(directory, trusted=True)
+    legacy = bundle_module.ModelBundle.load(
+        directory, trusted=True, allow_legacy_format=True
+    )
+    migrated = legacy.save(tmp_path / "migrated")
+    assert json.loads(
+        (migrated / bundle_module.MANIFEST_FILE).read_text()
+    )["format"] == bundle_module.BUNDLE_FORMAT
+    assert bundle_module.ModelBundle.load(migrated, trusted=True).info.format == 2
+
+
 def test_malformed_bundle_metadata_is_structured_error(tmp_path, trained):
     directory = trained[0].save(tmp_path / "m")
     (directory / bundle_module.MANIFEST_FILE).write_text("not-json")
