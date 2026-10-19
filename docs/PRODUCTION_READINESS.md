@@ -29,7 +29,8 @@ must not be described as production-ready until every required gate is green.
   timeout or unexplained skips.
 - [x] Publish migration guidance for bundle format 2 and any public API
   changes.
-- [ ] Define and enforce a coverage threshold for the declared release tiers.
+- [x] Define and enforce a 50% coverage threshold for the bounded PR contract
+  tier; the scheduled full suite publishes the broader coverage trend.
 - [ ] Run an operational rehearsal covering interruption, resume, rollback,
   signing-key rotation, and monitoring handoff.
 - [ ] Review the reference HTTP adapter against the deployment threat model;
