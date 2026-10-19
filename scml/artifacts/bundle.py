@@ -159,9 +159,23 @@ def verify_signature(
     key = resolve_key(signing_key)
     if not signature_path.exists() or key is None:
         return False
-    recorded = json.loads(signature_path.read_text(encoding="utf-8")).get(
-        "signature", ""
-    )
+    try:
+        record = json.loads(signature_path.read_text(encoding="utf-8"))
+        algorithm = record.get("algorithm")
+        recorded = record.get("signature", "")
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        AttributeError,
+    ) as error:
+        raise errors.ArtifactError(
+            "invalid bundle signature metadata"
+        ) from error
+    if algorithm != SIGNATURE_ALGORITHM:
+        raise errors.ArtifactError(
+            f"unsupported bundle signature algorithm {algorithm!r}"
+        )
     expected = sign_manifest((root / MANIFEST_FILE).read_bytes(), key)
     if not hmac.compare_digest(recorded, expected):
         raise errors.ArtifactError(
@@ -754,6 +768,17 @@ class ModelBundle:
         except FileNotFoundError as error:
             raise errors.ArtifactError(
                 f"not a model bundle (missing {error.filename})"
+            ) from error
+        except (
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as error:
+            raise errors.ArtifactError(
+                "invalid model bundle metadata"
             ) from error
         if manifest.get("format") != BUNDLE_FORMAT:
             raise errors.ArtifactError(

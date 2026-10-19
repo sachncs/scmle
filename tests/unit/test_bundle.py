@@ -123,6 +123,23 @@ def test_invalid_bundles(tmp_path, trained):
         bundle_module.ModelBundle.load(directory, trusted=True)
 
 
+def test_malformed_bundle_metadata_is_structured_error(tmp_path, trained):
+    directory = trained[0].save(tmp_path / "m")
+    (directory / bundle_module.MANIFEST_FILE).write_text("not-json")
+    with pytest.raises(errors.ArtifactError, match="invalid model bundle"):
+        bundle_module.ModelBundle.load(directory, trusted=True)
+
+
+def test_unknown_signature_algorithm_is_rejected(trained, tmp_path):
+    directory = trained[0].save(tmp_path / "m", signing_key="secret")
+    signature_path = directory / bundle_module.SIGNATURE_FILE
+    record = json.loads(signature_path.read_text())
+    record["algorithm"] = "sha256"
+    signature_path.write_text(json.dumps(record))
+    with pytest.raises(errors.ArtifactError, match="signature algorithm"):
+        bundle_module.ModelBundle.load(directory, signing_key="secret")
+
+
 def test_regression_bundle_has_no_probabilities(tmp_path):
     rng = np.random.default_rng(1)
     features = pd.DataFrame({"num": rng.normal(size=80)})
