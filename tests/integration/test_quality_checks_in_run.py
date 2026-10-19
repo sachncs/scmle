@@ -1,4 +1,6 @@
-"""The profile stage reports label noise and a gap to the reference sample."""
+"""The profile stage reports curation findings before modelling."""
+
+import json
 
 import numpy as np
 import pandas as pd
@@ -36,6 +38,13 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
     text = findings(result)
     assert "label noise" in text
     assert "representativeness" in text and "'a'" in text
+    report = json.loads(
+        (result.run_dir / "curation_report.json").read_text(encoding="utf-8")
+    )
+    assert report["schema_version"] == 1
+    assert report["source_rows"] >= report["profiled_rows"]
+    assert report["quality_findings"]
+    assert report["feature_columns"]["numeric"]
 
 
 def test_clean_data_with_a_matching_reference_reports_nothing(tmp_path):

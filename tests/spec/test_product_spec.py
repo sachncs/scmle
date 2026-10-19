@@ -905,6 +905,7 @@ def test_l443_l466_run_directory_layout(run):
         "environment.lock",
         "dataset_manifest.json",
         "dataset_profile.json",
+        "curation_report.json",
         "validation_manifest.json",
         "execution_plan.json",
         "events.jsonl",

@@ -350,8 +350,39 @@ class ProfileStage(Stage):
                 profile,
                 quality_findings=(*profile.quality_findings, finding),
             )
+        source_rows = (
+            context.stream[1].rows if context.stream is not None else len(frame)
+        )
+        curation = data_contracts.CurationReport(
+            manifest=require(context.manifest, "manifest"),
+            source_rows=source_rows,
+            profiled_rows=len(development),
+            read_seconds=context.read_seconds,
+            streamed=context.stream is not None,
+            cleaning_notes=tuple(context.cleaning_notes),
+            quality_findings=profile.quality_findings,
+            risk_findings=profile.risk_findings,
+            feature_columns={
+                "numeric": profile.feature_plan.numeric,
+                "categorical": profile.feature_plan.categorical,
+                "text": profile.feature_plan.text,
+            },
+            dropped_columns=profile.feature_plan.dropped,
+        )
         context.profile = profile
         context.write_json("dataset_profile.json", profile.to_dict())
+        context.write_json("curation_report.json", curation.to_dict())
+        context.emit(
+            "curation.completed",
+            "dataset curation findings and feature decisions recorded",
+            ("curation_report.json", "dataset_profile.json"),
+            {
+                "source_rows": source_rows,
+                "profiled_rows": len(development),
+                "quality_findings": len(profile.quality_findings),
+                "risk_findings": len(profile.risk_findings),
+            },
+        )
         context.emit(
             "features.selected",
             "feature set and exclusions fixed from the profile",

@@ -182,6 +182,47 @@ class DatasetProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class CurationReport:
+    """Auditable record of what happened before modelling.
+
+    This report deliberately contains no model scores. It describes the
+    source observed at ingestion, the rows used for profiling, repairs made,
+    quality and risk findings, and the resulting feature decisions.
+    """
+
+    manifest: DatasetManifest
+    source_rows: int
+    profiled_rows: int
+    read_seconds: float
+    streamed: bool
+    cleaning_notes: tuple[str, ...]
+    quality_findings: tuple[str, ...]
+    risk_findings: tuple[str, ...]
+    feature_columns: Mapping[str, tuple[str, ...]]
+    dropped_columns: Mapping[str, str]
+    schema_version: int = 1
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-serializable curation record."""
+        return {
+            "schema_version": self.schema_version,
+            "manifest": self.manifest.to_dict(),
+            "source_rows": self.source_rows,
+            "profiled_rows": self.profiled_rows,
+            "read_seconds": self.read_seconds,
+            "streamed": self.streamed,
+            "cleaning_notes": list(self.cleaning_notes),
+            "quality_findings": list(self.quality_findings),
+            "risk_findings": list(self.risk_findings),
+            "feature_columns": {
+                name: list(columns)
+                for name, columns in self.feature_columns.items()
+            },
+            "dropped_columns": dict(self.dropped_columns),
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class PreprocessingOptions:
     """Switches that shape the preprocessing transformers.
 
