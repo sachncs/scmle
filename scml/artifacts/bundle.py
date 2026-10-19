@@ -46,7 +46,10 @@ from scml.inference import validation
 from scml.models import thresholds
 from scml.monitoring import reference as reference_module
 
-BUNDLE_FORMAT = 1
+# Format 2 signs and checksums the schema alongside every serialized model
+# component. Format 1 bundles did not authenticate schema.json and are refused
+# by the loader rather than silently weakening the trust boundary.
+BUNDLE_FORMAT = 2
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
@@ -648,7 +651,11 @@ class ModelBundle:
             encoding="utf-8",
             newline="\n",
         )
-        files = {MODEL_FILE: file_sha256(model_path)}
+        schema_path = root / SCHEMA_FILE
+        files = {
+            MODEL_FILE: file_sha256(model_path),
+            SCHEMA_FILE: file_sha256(schema_path),
+        }
         if self.reference is not None:
             reference_path = root / REFERENCE_FILE
             reference_path.write_text(
@@ -753,6 +760,11 @@ class ModelBundle:
                 f"unsupported bundle format {manifest.get('format')}"
             )
         info = BundleInfo(**manifest)
+        if SCHEMA_FILE not in info.files:
+            raise errors.ArtifactError(
+                "bundle is missing a schema checksum; re-export it with "
+                f"bundle format {BUNDLE_FORMAT}"
+            )
         authentic = verify_signature(root, signing_key)
         if not authentic and not trusted:
             raise errors.ArtifactError(
@@ -767,6 +779,11 @@ class ModelBundle:
         if file_sha256(model_path) != info.files.get(MODEL_FILE):
             raise errors.ArtifactError(
                 "checksum mismatch: model file was modified or corrupted"
+            )
+        schema_path = root / SCHEMA_FILE
+        if file_sha256(schema_path) != info.files.get(SCHEMA_FILE):
+            raise errors.ArtifactError(
+                "checksum mismatch: schema file was modified or corrupted"
             )
         problems = info.compatibility_problems()
         if problems and not allow_version_mismatch:

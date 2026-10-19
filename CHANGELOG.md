@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* Model bundles now checksum `schema.json` and use bundle format 2. Legacy
+  format 1 bundles are refused because their schema was not authenticated.
+
 ## 0.1.0b1
 
 First public release.

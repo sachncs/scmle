@@ -86,6 +86,15 @@ def test_tampering_is_detected(trained, tmp_path):
         bundle_module.ModelBundle.load(directory, trusted=True)
 
 
+def test_schema_tampering_is_detected(trained, tmp_path):
+    bundle = trained[0]
+    directory = bundle.save(tmp_path / "m")
+    schema = directory / bundle_module.SCHEMA_FILE
+    schema.write_text(schema.read_text() + "\n")
+    with pytest.raises(errors.ArtifactError, match="schema file"):
+        bundle_module.ModelBundle.load(directory, trusted=True)
+
+
 def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
     bundle, features = trained
     directory = bundle.save(tmp_path / "m")
