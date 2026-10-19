@@ -32,6 +32,7 @@ jobs:
           uv run pytest -q --cov=scml --cov-report=xml
           --cov-fail-under=50
           tests/unit tests/property tests/leakage
+          tests/integration/test_cli.py
           tests/integration/test_end_to_end.py
           tests/integration/test_predict_api.py
           tests/integration/test_serve_and_export.py
