@@ -4,7 +4,8 @@
 set -euo pipefail
 
 python_version="${SCML_PYTHON_VERSION:-3.14}"
-benchmark_output="$(mktemp "${TMPDIR:-/tmp}/scml-bench.XXXXXX.json")"
+benchmark_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-bench.XXXXXX")"
+benchmark_output="$benchmark_directory/results.json"
 
 echo "== static checks =="
 uv run --python "$python_version" ruff check .
