@@ -105,6 +105,19 @@ jobs:
       - run: uv sync --python 3.14
       - run: uv run pytest -q tests/unit tests/property tests/integration/test_end_to_end.py
 
+  data-formats:
+    name: dataset formats and optional curation dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.14 --extra spreadsheets
+      - run: >-
+          uv run pytest -q tests/unit/test_readers.py
+          tests/unit/test_streaming.py
+          tests/integration/test_interchange.py
+
   benchmarks:
     name: benchmark regression gate
     runs-on: ubuntu-latest
