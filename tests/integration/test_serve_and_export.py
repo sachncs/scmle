@@ -77,6 +77,22 @@ def test_the_server_refuses_oversized_bodies_with_413(saved, monkeypatch):
     assert status == 413 and body["category"] == "request"
 
 
+def test_the_server_refuses_too_many_records_with_413(saved, monkeypatch):
+    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    monkeypatch.setattr(serving, "MAX_REQUEST_RECORDS", 1)
+    adapter = serving.HttpServing(model)
+    adapter.start()
+    try:
+        status, body = post(
+            f"{adapter.address}/predict",
+            {"records": [{"a": 1.0, "b": 2.0}, {"a": 3.0, "b": 4.0}]},
+        )
+    finally:
+        adapter.stop()
+
+    assert status == 413 and body["category"] == "request"
+
+
 def test_health_reports_the_model_version_and_checksum(saved):
     root = saved[0]
     model = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
@@ -85,12 +101,15 @@ def test_health_reports_the_model_version_and_checksum(saved):
     try:
         with urllib.request.urlopen(f"{adapter.address}/health") as response:
             health = json.loads(response.read())
+            headers = response.headers
     finally:
         adapter.stop()
 
     assert health["model_version"] == model.info.model_version
     assert health["model_sha256"] == model.info.files[bundle_module.MODEL_FILE]
     assert len(health["model_sha256"]) == 64
+    assert headers["Cache-Control"] == "no-store"
+    assert headers["X-Content-Type-Options"] == "nosniff"
 
 
 def test_an_unsigned_bundle_is_not_served_unless_trusted(saved):

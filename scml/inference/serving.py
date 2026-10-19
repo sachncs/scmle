@@ -18,6 +18,7 @@ from scml.artifacts import bundle as bundle_module
 from scml.contracts import errors
 
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
+MAX_REQUEST_RECORDS = 10_000
 
 
 class ServingAdapter(abc.ABC):
@@ -141,6 +142,9 @@ class HttpServing(ServingAdapter):
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Referrer-Policy", "no-referrer")
                 self.end_headers()
                 self.wfile.write(body)
 
@@ -186,6 +190,20 @@ class HttpServing(ServingAdapter):
                         )
                         return
                     records = json.loads(self.rfile.read(length))["records"]
+                    if not isinstance(records, list):
+                        raise TypeError("'records' must be a list")
+                    if len(records) > MAX_REQUEST_RECORDS:
+                        self.send_json(
+                            413,
+                            {
+                                "error": "request contains more than "
+                                f"{MAX_REQUEST_RECORDS} records",
+                                "category": "request",
+                            },
+                        )
+                        return
+                    if not all(isinstance(record, dict) for record in records):
+                        raise TypeError("every record must be an object")
                     self.send_json(200, adapter.respond(records))
                 except errors.ScmlError as error:
                     # Rows that break the schema are well-formed requests the
