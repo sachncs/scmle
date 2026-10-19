@@ -9,3 +9,6 @@ npm install
 npm run dev
 npm run build
 ```
+
+The site is static output and is built in CI with `npm ci`, a high-severity
+production dependency audit, and `npm run build`.
