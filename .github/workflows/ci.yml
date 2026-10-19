@@ -14,6 +14,7 @@ jobs:
   quality:
     name: lint, types, tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -25,7 +26,14 @@ jobs:
       - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy scml benchmarks
-      - run: uv run pytest -q --cov=scml --cov-report=xml
+      # Keep pull requests bounded. The scheduled full-suite workflow retains
+      # coverage for every integration and optional path.
+      - run: >-
+          uv run pytest -q --cov=scml --cov-report=xml
+          tests/unit tests/property tests/leakage
+          tests/integration/test_end_to_end.py
+          tests/integration/test_predict_api.py
+          tests/integration/test_serve_and_export.py
       - uses: actions/upload-artifact@v4
         if: matrix.python == '3.14'
         with:
@@ -35,6 +43,7 @@ jobs:
   cross-platform:
     name: ${{ matrix.os }} (Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +63,7 @@ jobs:
   minimal-dependencies:
     name: lowest supported dependency versions (Python 3.11)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -64,6 +74,7 @@ jobs:
   deep-learning:
     name: PyTorch model families (CPU)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -74,6 +85,7 @@ jobs:
   integrations:
     name: MLflow and Ray integrations
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -86,6 +98,7 @@ jobs:
   base-install:
     name: base install without extras
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -95,6 +108,7 @@ jobs:
   benchmarks:
     name: benchmark regression gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -109,6 +123,7 @@ jobs:
   security:
     name: static analysis and dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -119,6 +134,7 @@ jobs:
   package:
     name: build and verify distribution
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -130,3 +146,9 @@ jobs:
           uv pip install --python /tmp/wheel-env/bin/python dist/*.whl
           /tmp/wheel-env/bin/scml --help
           /tmp/wheel-env/bin/python -c "import scml; print(scml.__version__)"
+      - name: Install the source distribution into a clean environment
+        run: |
+          uv venv --python 3.14 /tmp/sdist-env
+          uv pip install --python /tmp/sdist-env/bin/python dist/*.tar.gz
+          /tmp/sdist-env/bin/scml --help
+          /tmp/sdist-env/bin/python -c "import scml; print(scml.__version__)"

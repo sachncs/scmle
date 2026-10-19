@@ -1,0 +1,28 @@
+name: full-suite
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: full-suite
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: complete test suite (Python 3.14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --python 3.14 --extra boosting --extra optimization
+      - run: uv run pytest -q --cov=scml --cov-report=xml --durations=25
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-suite-coverage
+          path: coverage.xml
+          if-no-files-found: ignore
