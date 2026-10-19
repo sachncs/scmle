@@ -52,6 +52,16 @@ jobs:
       - run: uv run python -m benchmarks.check_regression results.json
       - run: uv build --python 3.14
       - run: uv run twine check dist/*
+      - name: Smoke test the wheel and source distribution
+        run: |
+          uv venv --python 3.14 /tmp/release-wheel-env
+          uv pip install --python /tmp/release-wheel-env/bin/python dist/*.whl
+          /tmp/release-wheel-env/bin/scml --help
+          /tmp/release-wheel-env/bin/python -c "import scml; print(scml.__version__)"
+          uv venv --python 3.14 /tmp/release-sdist-env
+          uv pip install --python /tmp/release-sdist-env/bin/python dist/*.tar.gz
+          /tmp/release-sdist-env/bin/scml --help
+          /tmp/release-sdist-env/bin/python -c "import scml; print(scml.__version__)"
       - uses: pypa/gh-action-pypi-publish@release/v1
       - name: GitHub release
         env:
