@@ -31,8 +31,9 @@ must not be described as production-ready until every required gate is green.
   changes.
 - [x] Define and enforce a 50% coverage threshold for the bounded PR contract
   tier; the scheduled full suite publishes the broader coverage trend.
-- [ ] Run an operational rehearsal covering interruption, resume, rollback,
-  signing-key rotation, and monitoring handoff.
+- [ ] Run the [operational rehearsal](OPERATIONS_REHEARSAL.md) covering
+  interruption, resume, rollback, signing-key rotation, and monitoring
+  handoff.
 - [ ] Review the reference HTTP adapter against the deployment threat model;
   it remains gateway-only and does not provide authentication or TLS.
 - [ ] Promote the package version and classifier only after the above gates are
