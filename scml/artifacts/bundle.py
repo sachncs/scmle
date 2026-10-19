@@ -5,6 +5,7 @@ so only load bundles from sources you trust. Checksums detect corruption or
 tampering after saving, not malice at the source.
 """
 
+import contextlib
 import dataclasses
 import hashlib
 import hmac
@@ -14,6 +15,7 @@ import json
 import os
 import pathlib
 import platform
+import tempfile
 from typing import Any
 from typing import Self
 
@@ -726,6 +728,61 @@ class ModelBundle:
             )
         elif signature_path.exists():
             signature_path.unlink()
+        return root
+
+    @classmethod
+    def rotate_signing_key(
+        cls,
+        directory: str | pathlib.Path,
+        current_key: str | bytes,
+        new_key: str | bytes,
+    ) -> pathlib.Path:
+        """Re-sign an existing bundle without reserializing its model.
+
+        The current signature must verify before the new signature is written.
+        Rotation changes only ``signature.json`` and uses an atomic replace, so
+        a failed rotation leaves the previously valid signature in place.
+        """
+        root = pathlib.Path(directory)
+        old = resolve_key(current_key)
+        replacement = resolve_key(new_key)
+        if old is None or replacement is None:
+            raise errors.ArtifactError(
+                "signing-key rotation requires non-empty current and new keys"
+            )
+        manifest_path = root / MANIFEST_FILE
+        try:
+            manifest_text = manifest_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as error:
+            raise errors.ArtifactError(
+                "cannot rotate an incomplete model bundle"
+            ) from error
+        if not verify_signature(root, old):
+            raise errors.ArtifactError(
+                "cannot rotate an unauthenticated model bundle"
+            )
+        signature_path = root / SIGNATURE_FILE
+        fd, temporary_name = tempfile.mkstemp(
+            dir=root, prefix=f".{SIGNATURE_FILE}.", text=True
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+                json.dump(
+                    {
+                        "algorithm": SIGNATURE_ALGORITHM,
+                        "signature": sign_manifest(
+                            manifest_text.encode(), replacement
+                        ),
+                    },
+                    handle,
+                )
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, signature_path)
+        except Exception:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(temporary_name)
+            raise
         return root
 
     @classmethod

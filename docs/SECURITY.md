@@ -31,10 +31,12 @@ file-write path, plus `bandit -r scml` and `pip-audit` (both run in CI).
 ## Guidance for operators
 
 1. Set `SCML_SIGNING_KEY` wherever bundles are produced and verified.
-2. Never pass `trusted=True` (or `scml predict --trusted`) for a bundle you
+2. Rotate keys with `ModelBundle.rotate_signing_key(directory, old, new)`;
+   verify the new key before retiring the old one.
+3. Never pass `trusted=True` (or `scml predict --trusted`) for a bundle you
    did not produce.
-3. Serve behind an authenticating gateway; bind to loopback by default.
-4. Treat the model registry directory as a trust boundary: it is read with
+4. Serve behind an authenticating gateway; bind to loopback by default.
+5. Treat the model registry directory as a trust boundary: it is read with
    `trusted=True` after checksum verification at registration time.
 
 ## Static analysis

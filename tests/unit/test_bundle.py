@@ -278,6 +278,20 @@ def test_key_from_environment_signs_and_verifies(
         bundle_module.ModelBundle.load(directory)
 
 
+def test_signing_key_rotation_preserves_bundle_and_rejects_old_key(
+    trained, tmp_path
+):
+    bundle, features = trained
+    directory = bundle.save(tmp_path / "m", signing_key="old-key")
+    bundle_module.ModelBundle.rotate_signing_key(
+        directory, "old-key", "new-key"
+    )
+    with pytest.raises(errors.ArtifactError, match="signature is invalid"):
+        bundle_module.ModelBundle.load(directory, signing_key="old-key")
+    loaded = bundle_module.ModelBundle.load(directory, signing_key="new-key")
+    assert len(loaded.predict(features)) == len(features)
+
+
 def test_resaving_unsigned_removes_a_stale_signature(
     trained, tmp_path, monkeypatch
 ):
