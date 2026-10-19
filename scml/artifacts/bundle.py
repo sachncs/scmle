@@ -708,9 +708,7 @@ class ModelBundle:
             files[HISTORY_FILE] = file_sha256(history_path)
         elif (root / HISTORY_FILE).exists():
             (root / HISTORY_FILE).unlink()
-        info = dataclasses.replace(
-            self.info, format=BUNDLE_FORMAT, files=files
-        )
+        info = dataclasses.replace(self.info, format=BUNDLE_FORMAT, files=files)
         manifest_text = json.dumps(info.to_dict(), indent=2)
         (root / MANIFEST_FILE).write_text(
             manifest_text, encoding="utf-8", newline="\n"
