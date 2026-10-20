@@ -43,13 +43,16 @@ def fingerprint(
         abs(stats[c].get("skew", 0.0)) for c in plan.numeric if c in stats
     ]
     imbalance = profile.target_summary.get("imbalance_ratio", 1.0)
+    missing_rate = (
+        float(np.mean([stats[c]["missing_rate"] for c in features]))
+        if features
+        else 0.0
+    )
     return {
         "log_rows": math.log10(max(profile.manifest.row_count, 1)),
         "log_features": math.log10(max(len(features), 1)),
         "categorical_share": len(plan.categorical) / max(len(features), 1),
-        "missing_rate": float(
-            np.mean([stats[c]["missing_rate"] for c in features])
-        ),
+        "missing_rate": missing_rate,
         "log_imbalance": math.log10(max(imbalance, 1.0)),
         "mean_abs_skew": float(np.mean(numeric_skews))
         if numeric_skews

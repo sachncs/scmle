@@ -1,5 +1,7 @@
 """Tests for dataset fingerprints and the meta-learner."""
 
+import dataclasses
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -55,6 +57,21 @@ def test_fingerprint_describes_shape_types_and_balance():
     assert result["log_rows"] == pytest.approx(3.0)
     assert result["categorical_share"] == pytest.approx(1 / 3)
     assert result["log_imbalance"] > 0.8 and result["mean_abs_skew"] > 0.3
+
+
+def test_fingerprint_has_a_defined_missing_rate_without_features():
+    """An empty feature plan remains finite and warning-free."""
+    profile = profile_of(
+        pd.DataFrame({"feature": [1.0, 2.0, 3.0, 4.0], "y": [0, 1, 0, 1]})
+    )
+    empty_plan = dataclasses.replace(
+        profile.feature_plan, numeric=(), categorical=(), text=()
+    )
+    profile = dataclasses.replace(profile, feature_plan=empty_plan)
+
+    result = knowledge.fingerprint(profile, BINARY)
+
+    assert result["missing_rate"] == 0.0
 
 
 def test_nearest_datasets_vote_for_their_winners():
