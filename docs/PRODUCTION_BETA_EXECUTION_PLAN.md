@@ -116,7 +116,9 @@ passes 31 focused tests, with Ruff and mypy clean. These
 slices expand what can be validated and profiled; they do not expand the
 supported modelling boundary. The experimental document baseline focused suite
 passes 4 tests, with Ruff and mypy clean; it does not expand the supported
-modelling boundary. The clean-clone acceptance slice is verified, but an independent reviewer
+modelling boundary. The latest label-state curation increment passed 10 image
+tests and 24 graph/media tests, with Ruff, mypy, and the convention gate clean;
+it does not expand the supported modelling boundary. The clean-clone acceptance slice is verified, but an independent reviewer
 must still reproduce the package and sign the release decision. Skipped tests
 and runtime warnings are not release evidence by themselves: each must be
 classified as
