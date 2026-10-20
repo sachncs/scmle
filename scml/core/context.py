@@ -159,6 +159,33 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
     return capabilities.CapabilityRegistry(records)
 
 
+def extension_capability(
+    key: capabilities.CapabilityKey,
+) -> capabilities.Capability:
+    """Describe an explicitly supplied adapter outside the beta guarantee.
+
+    User-registered and test adapters are allowed to exercise the extension
+    boundary, but they must never inherit the supported status of a built-in
+    family. The plan records this distinction before the adapter is fitted.
+    """
+    return capabilities.Capability(
+        key=key,
+        status=capabilities.CapabilityStatus.EXTENSION_ONLY,
+        required_extras=("user-supplied-adapter",),
+        resources=capabilities.ResourceAssumptions(memory_gb=1.0),
+        failure_modes=(
+            "adapter conformance or dependency failure",
+            "resource limits exceeded",
+            "missing end-to-end lifecycle evidence",
+        ),
+        evidence_links=("explicit adapter registration",),
+        limitations=(
+            "not covered by the built-in production-beta guarantee",
+            "model-specific evaluation and recovery evidence is caller-owned",
+        ),
+    )
+
+
 def require(value: T | None, name: str) -> T:
     """Returns a stage product, failing loudly if its stage has not run.
 

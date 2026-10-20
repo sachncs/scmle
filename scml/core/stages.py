@@ -639,9 +639,20 @@ def build_plan(
     task = require(context.task, "task")
     for model_name in plan.candidate_models:
         adapter = context.registry.get(model_name)
-        context.capability_registry.require(
-            capability_key(context, task, adapter.family)
-        )
+        key = capability_key(context, task, adapter.family)
+        try:
+            context.capability_registry.require(key)
+        except capabilities.UnsupportedCapabilityError:
+            if adapter.family not in {"custom", "test"}:
+                raise
+            if context.capability_registry.find(key) is None:
+                context.capability_registry.register(
+                    context_module.extension_capability(key)
+                )
+            context.capability_registry.require(
+                key,
+                allowed_statuses={capabilities.CapabilityStatus.EXTENSION_ONLY},
+            )
     return plan
 
 
