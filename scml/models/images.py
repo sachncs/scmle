@@ -341,6 +341,93 @@ class ImageClassifier:
             ),
         )
 
+    def occlusion_explanation(
+        self,
+        sample: image.ImageSample,
+        top_k: int = 10,
+        patch_size: tuple[int, int] = (4, 4),
+    ) -> ImageExplanation:
+        """Measure predicted-class score changes under regional occlusion.
+
+        Occlusion is performed after the declared resize and color transform.
+        A patch is replaced by the zero-valued feature baseline, which is black
+        for the supported image representations. A positive term means that
+        the unoccluded patch supports the predicted class relative to that
+        baseline.
+
+        Args:
+            sample: Image to explain.
+            top_k: Maximum number of regions to retain.
+            patch_size: Region width and height in transformed pixels.
+
+        Returns:
+            Deterministic local regional perturbation evidence.
+
+        Raises:
+            ValueError: If the requested output or patch dimensions are
+                invalid.
+            RuntimeError: If the classifier has not been fitted.
+        """
+        if top_k < 1:
+            raise ValueError("top_k must be positive")
+        if len(patch_size) != 2 or any(size < 1 for size in patch_size):
+            raise ValueError("patch_size must contain positive dimensions")
+        self.require_fitted()
+        features = self.transform(image.ImageDataset((sample,)))
+        original_score = self.predicted_class_score(features)
+        width, height = self.config.target_size
+        channels = 1 if self.config.mode == "L" else len(self.config.mode)
+        patch_width, patch_height = patch_size
+        terms: list[tuple[str, float]] = []
+        for row in range(0, height, patch_height):
+            for column in range(0, width, patch_width):
+                end_row = min(row + patch_height, height)
+                end_column = min(column + patch_width, width)
+                indexes = [
+                    (pixel_row * width + pixel_column) * channels + channel
+                    for pixel_row in range(row, end_row)
+                    for pixel_column in range(column, end_column)
+                    for channel in range(channels)
+                ]
+                occluded = features.copy()
+                occluded[0, indexes] = 0.0
+                delta = original_score - self.predicted_class_score(occluded)
+                terms.append(
+                    (
+                        f"region[{row}:{end_row},{column}:{end_column}]",
+                        float(delta),
+                    )
+                )
+        selected = sorted(
+            terms,
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:top_k]
+        return ImageExplanation(
+            model_digest=self.model_digest,
+            input_hash=sample.content_hash,
+            method="occlusion_pixel_region",
+            terms=tuple(selected),
+            limitations=(
+                "Occlusion replaces transformed pixels with a black baseline.",
+                "Regions are not raw-image saliency or object localization.",
+                "The score change is associational, not causal.",
+            ),
+        )
+
+    def predicted_class_score(self, features: np.ndarray) -> float:
+        """Return the decision score for the class predicted by the model."""
+        self.require_fitted()
+        estimator = self.estimator
+        if estimator is None:
+            raise RuntimeError("classifier is not fitted")
+        predicted = estimator.predict(features)[0]
+        class_index = int(np.flatnonzero(estimator.classes_ == predicted)[0])
+        decision = np.asarray(estimator.decision_function(features))
+        if decision.ndim == 1:
+            raw_score = float(decision[0])
+            return raw_score if class_index == 1 else -raw_score
+        return float(decision[0, class_index])
+
     def save(self, path: str | pathlib.Path) -> ImageModelArtifact:
         """Atomically save this fitted classifier as a verified package."""
         self.require_fitted()

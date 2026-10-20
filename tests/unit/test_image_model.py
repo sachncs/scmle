@@ -90,6 +90,27 @@ def test_image_classifier_fits_evaluates_and_explains(
     )
     assert local_explanation.terms
 
+    occlusion = classifier.occlusion_explanation(
+        evaluation_data.samples[0], top_k=3, patch_size=(1, 1)
+    )
+    assert occlusion.method == "occlusion_pixel_region"
+    assert occlusion.input_hash == evaluation_data.samples[0].content_hash
+    assert len(occlusion.terms) == 3
+    assert all("region[" in term[0] for term in occlusion.terms)
+    assert all(math.isfinite(value) for _, value in occlusion.terms)
+
+
+@PILLOW_SKIP
+def test_image_occlusion_rejects_invalid_configuration(training_data):
+    """Occlusion validates its output and transformed patch boundaries."""
+    classifier = make_classifier().fit(training_data)
+    sample_value = training_data.samples[0]
+
+    with pytest.raises(ValueError, match="top_k"):
+        classifier.occlusion_explanation(sample_value, top_k=0)
+    with pytest.raises(ValueError, match="patch_size"):
+        classifier.occlusion_explanation(sample_value, patch_size=(0, 1))
+
 
 @PILLOW_SKIP
 def test_image_classifier_rejects_unsafe_training_data(training_data):
