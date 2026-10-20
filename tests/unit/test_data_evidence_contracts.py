@@ -179,3 +179,43 @@ def test_curation_report_serializes_structured_quality_and_risk_findings():
     assert record["quality_findings"] == [quality.to_dict()]
     assert record["risk_findings"] == [risk.to_dict()]
     assert json.loads(json.dumps(record)) == record
+
+
+def test_dataset_card_makes_intended_use_and_limits_explicit():
+    report = data.CurationReport(
+        manifest=data.DatasetManifest(
+            "ds_1",
+            "schema",
+            "data",
+            10,
+            2,
+            "label",
+            snapshot_id="snapshot-1",
+            task="binary_classification",
+            source=data.SourceMetadata(owner="ml-platform"),
+        ),
+        source_rows=12,
+        profiled_rows=10,
+        read_seconds=0.25,
+        streamed=False,
+        cleaning_notes=("two rows were excluded",),
+        quality_findings=(),
+        risk_findings=(),
+        feature_columns={"numeric": ("amount",)},
+        dropped_columns={"email": "sensitive"},
+    )
+
+    card = data.DatasetCard.from_curation(report)
+    record = card.to_dict()
+
+    assert card.owner == "ml-platform"
+    assert card.review_status == "machine_generated_unreviewed"
+    assert record["composition"] == {
+        "source_rows": 12,
+        "profiled_rows": 10,
+        "feature_columns": 1,
+        "dropped_columns": 1,
+    }
+    assert "release approval" in " ".join(record["out_of_scope"])
+    assert "two rows were excluded" in record["limitations"]
+    assert json.loads(json.dumps(record)) == record

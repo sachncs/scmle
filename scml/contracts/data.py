@@ -605,6 +605,135 @@ class CurationReport:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class DatasetCard:
+    """Human-reviewable summary of a dataset snapshot before modelling.
+
+    A card is generated from the curation report, but it is not a release
+    approval. Its explicit intended use, exclusions, limitations, privacy
+    context, and open findings are the minimum context a reviewer needs before
+    trusting a model result derived from the snapshot.
+    """
+
+    dataset_id: str
+    snapshot_id: str
+    modality: str
+    task: str
+    target: str
+    intended_use: str
+    out_of_scope: tuple[str, ...]
+    composition: Mapping[str, int]
+    feature_summary: Mapping[str, tuple[str, ...]]
+    limitations: tuple[str, ...]
+    quality_findings: tuple[CurationFinding, ...]
+    risk_findings: tuple[CurationFinding, ...]
+    source: SourceMetadata
+    lineage: LineageMetadata
+    privacy: PrivacyMetadata
+    owner: str
+    review_status: str = "machine_generated_unreviewed"
+    schema_version: int = 1
+    generated_at: str = dataclasses.field(default_factory=events.utc_timestamp)
+
+    def __post_init__(self) -> None:
+        """Validates the fields that make the card useful to reviewers."""
+        for name, value in (
+            ("dataset_id", self.dataset_id),
+            ("modality", self.modality),
+            ("intended_use", self.intended_use),
+            ("owner", self.owner),
+            ("review_status", self.review_status),
+            ("generated_at", self.generated_at),
+        ):
+            if not value.strip():
+                raise ValueError(f"{name} must not be empty")
+        if self.schema_version < 1:
+            raise ValueError("schema_version must be positive")
+        if any(value < 0 for value in self.composition.values()):
+            raise ValueError("composition counts must not be negative")
+        if not self.out_of_scope:
+            raise ValueError("out_of_scope must not be empty")
+        if not self.limitations:
+            raise ValueError("limitations must not be empty")
+
+    @classmethod
+    def from_curation(cls, report: CurationReport) -> Self:
+        """Builds a card from the immutable curation evidence."""
+        manifest = report.manifest
+        task = manifest.task or "the declared learning task"
+        limitations = [
+            "This machine-generated card requires human review before release.",
+            "Curation findings are observations, not proof of data quality.",
+        ]
+        limitations.extend(report.cleaning_notes)
+        if not report.risk_findings:
+            limitations.append("No risk finding was emitted by the profiler.")
+        return cls(
+            dataset_id=manifest.dataset_id,
+            snapshot_id=manifest.snapshot_id,
+            modality=manifest.modality,
+            task=manifest.task,
+            target=manifest.target,
+            intended_use=(
+                f"Training and evaluation for {task} using the declared "
+                "target and feature decisions."
+            ),
+            out_of_scope=(
+                "It is not evidence of production-population coverage.",
+                "It is not a release approval or a causal claim.",
+                "It must not be used outside the declared task and "
+                "privacy policy.",
+            ),
+            composition={
+                "source_rows": report.source_rows,
+                "profiled_rows": report.profiled_rows,
+                "feature_columns": sum(
+                    len(columns) for columns in report.feature_columns.values()
+                ),
+                "dropped_columns": len(report.dropped_columns),
+            },
+            feature_summary=report.feature_columns,
+            limitations=tuple(limitations),
+            quality_findings=report.quality_findings,
+            risk_findings=report.risk_findings,
+            source=manifest.source,
+            lineage=manifest.lineage,
+            privacy=manifest.privacy,
+            owner=manifest.source.owner or "unassigned",
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-serializable dataset card."""
+        return {
+            "schema_version": self.schema_version,
+            "dataset_id": self.dataset_id,
+            "snapshot_id": self.snapshot_id,
+            "modality": self.modality,
+            "task": self.task,
+            "target": self.target,
+            "intended_use": self.intended_use,
+            "out_of_scope": list(self.out_of_scope),
+            "composition": dict(self.composition),
+            "feature_summary": {
+                name: list(columns)
+                for name, columns in self.feature_summary.items()
+            },
+            "limitations": list(self.limitations),
+            "quality_findings": [
+                finding.to_dict() for finding in self.quality_findings
+            ],
+            "risk_findings": [
+                finding.to_dict() for finding in self.risk_findings
+            ],
+            "source": self.source.to_dict(),
+            "lineage": self.lineage.to_dict(),
+            "privacy": self.privacy.to_dict(),
+            "owner": self.owner,
+            "review_status": self.review_status,
+            "generated_at": self.generated_at,
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class PreprocessingOptions:
     """Switches that shape the preprocessing transformers.
 

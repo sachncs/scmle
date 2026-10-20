@@ -37,6 +37,7 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
         "dataset_manifest.json",
         "dataset_profile.json",
         "curation_report.json",
+        "dataset_card.json",
         "validation_manifest.json",
         "execution_plan.json",
         "events.jsonl",

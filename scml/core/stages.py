@@ -387,13 +387,19 @@ class ProfileStage(Stage):
             },
             dropped_columns=profile.feature_plan.dropped,
         )
+        card = data_contracts.DatasetCard.from_curation(curation)
         context.profile = profile
         context.write_json("dataset_profile.json", profile.to_dict())
         context.write_json("curation_report.json", curation.to_dict())
+        context.write_json("dataset_card.json", card.to_dict())
         context.emit(
             "curation.completed",
             "dataset curation findings and feature decisions recorded",
-            ("curation_report.json", "dataset_profile.json"),
+            (
+                "curation_report.json",
+                "dataset_profile.json",
+                "dataset_card.json",
+            ),
             {
                 "source_rows": source_rows,
                 "profiled_rows": len(development),
@@ -2288,6 +2294,7 @@ class PackageStage(Stage):
         names = (
             "config.json",
             "dataset_manifest.json",
+            "dataset_card.json",
             "provenance.json",
             "sbom.json",
             "evaluation.json",
