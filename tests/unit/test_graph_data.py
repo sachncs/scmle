@@ -171,8 +171,27 @@ def test_graph_curation_records_structure_and_feature_policy(
     assert report.modality == "graph"
     assert report.sample_count == 3
     assert report.profile["node"]["feature_dimension"] == 2
+    assert report.profile["node"]["label_counts"] == {"unlabeled": 3}
     assert report.quality_findings == ()
     assert report.release_ready
+
+
+def test_graph_curation_reports_mixed_label_state():
+    """Graph curation exposes mixed node labels before graph modelling."""
+    graph = GraphData.from_edges(
+        [GraphEdge("a", "b")],
+        nodes=[GraphNode("a", label="source"), GraphNode("b")],
+    )
+
+    report = graph.curate()
+
+    assert report.profile["node"]["label_counts"] == {
+        "str:source": 1,
+        "unlabeled": 1,
+    }
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.graph-mixed-label-state",
+    ]
 
 
 def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(

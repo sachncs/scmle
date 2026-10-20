@@ -21,6 +21,7 @@ import pandas as pd
 
 from scml.contracts import data as data_contracts
 from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import label_counts
 from scml.data.modalities.curation import ModalityCurationReport
 
 
@@ -511,7 +512,11 @@ class GraphData:
     def curate(self) -> ModalityCurationReport:
         """Build graph-structure evidence before choosing a graph model."""
         profile = self.profile()
+        labels = label_counts(node.label for node in self.nodes)
+        profile_data = profile.to_dict()
+        profile_data["node"]["label_counts"] = labels
         quality_findings = []
+        risk_findings = []
         if profile.edge.duplicate_edge_count:
             quality_findings.append(
                 build_finding(
@@ -551,12 +556,25 @@ class GraphData:
                     False,
                 )
             )
+        if "unlabeled" in labels and len(labels) > 1:
+            risk_findings.append(
+                build_finding(
+                    "risk.graph-mixed-label-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"source": self.source_uri},
+                    {"label_counts": labels},
+                    "Declare whether unlabeled nodes are valid for the "
+                    "intended graph task before training.",
+                    False,
+                )
+            )
         return ModalityCurationReport(
             modality="graph",
             dataset_hash=self.identity,
             sample_count=len(self.nodes),
-            profile=profile.to_dict(),
+            profile=profile_data,
             quality_findings=tuple(quality_findings),
+            risk_findings=tuple(risk_findings),
         )
 
 

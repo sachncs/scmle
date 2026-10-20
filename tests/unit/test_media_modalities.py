@@ -193,6 +193,33 @@ def test_geospatial_curation_blocks_missing_crs():
     )
 
 
+def test_geospatial_curation_reports_mixed_label_state():
+    """Spatial curation exposes mixed labels before spatial modelling."""
+    dataset = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "a",
+                {"type": "Point", "coordinates": [0, 0]},
+                label="park",
+            ),
+            geospatial.GeoFeature(
+                "b", {"type": "Point", "coordinates": [1, 1]}
+            ),
+        ),
+        crs="EPSG:4326",
+    )
+
+    report = dataset.curate()
+
+    assert report.profile["label_counts"] == {
+        "str:park": 1,
+        "unlabeled": 1,
+    }
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.geospatial-mixed-label-state",
+    ]
+
+
 def test_raster_identity_requires_spatial_metadata():
     """Raster bytes are not useful without dimensions and CRS provenance."""
     payload = b"raster"

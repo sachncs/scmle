@@ -12,6 +12,7 @@ from typing import Self
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import label_counts
 from scml.data.modalities.curation import ModalityCurationReport
 
 GEOMETRY_TYPES = frozenset(
@@ -257,7 +258,11 @@ class GeospatialDataset:
     def curate(self) -> ModalityCurationReport:
         """Build geometry, CRS, and spatial-interpretation evidence."""
         profile = self.profile()
+        labels = label_counts(feature.label for feature in self.features)
+        profile_data = profile.to_dict()
+        profile_data["label_counts"] = labels
         quality_findings = []
+        risk_findings = []
         if not self.crs.strip():
             quality_findings.append(
                 build_finding(
@@ -282,12 +287,25 @@ class GeospatialDataset:
                     False,
                 )
             )
+        if "unlabeled" in labels and len(labels) > 1:
+            risk_findings.append(
+                build_finding(
+                    "risk.geospatial-mixed-label-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"source": self.source},
+                    {"label_counts": labels},
+                    "Declare whether unlabeled features are valid for the "
+                    "intended spatial task before training.",
+                    False,
+                )
+            )
         return ModalityCurationReport(
             modality="geospatial",
             dataset_hash=self.content_hash,
             sample_count=len(self.features),
-            profile=profile.to_dict(),
+            profile=profile_data,
             quality_findings=tuple(quality_findings),
+            risk_findings=tuple(risk_findings),
         )
 
 
