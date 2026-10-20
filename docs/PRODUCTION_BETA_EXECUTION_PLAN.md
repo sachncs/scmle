@@ -48,7 +48,7 @@ means the code path exists; it does not mean the capability is supported.
 | --- | --- | --- |
 | Tabular ingestion, manifest, structured curation | Implemented / Tested | Unit and integration tests cover deterministic snapshots, local raw-byte hashes, findings, persisted manifests, machine-generated dataset cards, schema-evolution decisions, an atomic durable source registry that survives across runs, and fail-closed blocking-finding disposition before training. Object-store/warehouse/event-stream transports remain incomplete. |
 | Local, DB-API, and bounded object source connectors | Implemented / Tested | Connector contracts cover local files, injected DB-API factories, bounded injected object readers for CSV/JSONL/Parquet, retry budgets, and checkpoints. Range/streaming object reads and broker/warehouse transports remain extension work. |
-| Incremental ingestion semantics | Implemented / Tested | Transport-neutral event contracts bind event IDs to ordered checkpoints and watermarks, classify duplicates, make late-data policy explicit, serialize multi-writer commits with durable atomic state, and provide an idempotent sink commit boundary. The sink documents its crash window and requires downstream event-ID idempotency; broker/warehouse transports and distributed exactly-once guarantees remain incomplete. |
+| Incremental ingestion semantics | Implemented / Tested | Transport-neutral event contracts bind event IDs to ordered checkpoints and watermarks, classify duplicates, make late-data policy explicit, serialize multi-writer commits with durable atomic state, and provide an idempotent sink commit boundary. Atomic state, run evidence, source registries, observability retention, fault evidence, and signing-key rotation now flush both file contents and the containing directory after replacement (`b420ee3`). The sink documents its crash window and requires downstream event-ID idempotency; broker/warehouse transports and distributed exactly-once guarantees remain incomplete. |
 | Tabular library training paths | Implemented / Tested | The pre-training capability gate admits only explicitly declared tabular library paths. Dataset manifests preserve the caller-declared modality, and non-tabular declarations fail closed before model fitting. This is the current beta boundary, not all-modality support. |
 | Image, document, and graph data foundations | Implemented / Tested | Validation, profiling, splitting, and feature-preparation slices exist with focused tests. They are not supported capabilities because modelling, evaluation, packaging, inference, monitoring, and full recovery evidence are not wired. |
 | Release evaluation | Implemented / Tested | Explicit success criteria produce a task-aware policy, release findings, artifact digests, and a persisted evidence index. Runs without thresholds are explicitly `policy_not_declared`, and any run with an unexecuted or unsafe fault plan is independently blocked from release. |
@@ -93,7 +93,8 @@ integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
 seconds. The remaining leakage, property, specification, and benchmark tiers
 completed with `85 passed` in 3 minutes 27 seconds. The prior all-repository
 acceptance run therefore provided `1982 passed, 103 skipped, 6 warnings`; the
-subsequent signed-governance, fault-harness, and incremental-sink slices have
+subsequent signed-governance, fault-harness, incremental-sink, and
+directory-durability slices have
 their focused and complete-unit evidence above, but a new single-command
 acceptance run is still required. The clean-clone acceptance slice is now
 verified, but an independent reviewer must still reproduce the package and

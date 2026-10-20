@@ -19,6 +19,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p>Interrupted or failed runs preserve checkpoints and recoverable trials. Resume only with the same configuration and data identity; stale checkpoints are refused.</p>
   <pre><code>scml resume runs/&lt;run-id&gt;</code></pre>
 
+  <h2>Durable state</h2>
+  <p>Run evidence, incremental checkpoints, source registries, observability retention files, fault evidence, and signing-key rotation use a temporary file, flush its contents, atomically replace the destination, and flush the containing directory. This protects both the bytes and the rename across a sudden process or power failure. It does not make a remote object store transactional; distributed transports still need their own commit protocol.</p>
+
   <h2>Bundle security</h2>
   <p>Sign bundles with <code>SCML_SIGNING_KEY</code> and verify them at load time. Rotate keys without reserializing the model:</p>
   <pre><code>ModelBundle.rotate_signing_key(
