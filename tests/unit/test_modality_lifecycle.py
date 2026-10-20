@@ -1,5 +1,6 @@
 """End-to-end evidence tests for the non-tabular baseline lifecycle."""
 
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -143,6 +144,30 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialAdapter:
     return modality_lifecycle.GeospatialAdapter(dataset, block_size=1.0)
 
 
+def raster_adapter() -> modality_lifecycle.RasterAdapter:
+    """Build a labelled raster metadata fixture with a sidecar."""
+    samples = []
+    labels = {}
+    for index in range(12):
+        source = f"memory://raster-{index}"
+        payload = bytes([index + 1]) * 32
+        samples.append(
+            geospatial.RasterSample(
+                source=source,
+                encoded_bytes=payload,
+                file_hash=hashlib.sha256(payload).hexdigest(),
+                width=32,
+                height=32,
+                bands=3,
+                dtype="uint8",
+                crs="EPSG:3857",
+                transform=(1.0, 0.0, float(index), 0.0, -1.0, 0.0),
+            )
+        )
+        labels[source] = "alpha" if index % 2 else "beta"
+    return modality_lifecycle.RasterAdapter(samples, labels)
+
+
 @pytest.mark.parametrize(
     "factory",
     [
@@ -152,8 +177,17 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialAdapter:
         video_adapter,
         graph_adapter,
         geospatial_adapter,
+        raster_adapter,
     ],
-    ids=["document", "image", "audio", "video", "graph", "geospatial"],
+    ids=[
+        "document",
+        "image",
+        "audio",
+        "video",
+        "graph",
+        "geospatial",
+        "raster",
+    ],
 )
 def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     factory, tmp_path: Path

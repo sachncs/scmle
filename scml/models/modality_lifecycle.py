@@ -11,6 +11,7 @@ integrity, not for claiming state-of-the-art representation quality.
 from __future__ import annotations
 
 import abc
+from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 import hashlib
@@ -30,6 +31,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
+from scml.contracts import data as data_contracts
 from scml.contracts import modalities
 from scml.data.modalities import audio
 from scml.data.modalities import curation
@@ -668,6 +670,193 @@ class GeospatialAdapter(ModalityAdapter):
             "declared CRS.",
             "It does not claim reprojection, raster, spatial-join, or causal "
             "spatial inference support.",
+        )
+
+
+class RasterAdapter(ModalityAdapter):
+    """Adapter for labelled raster metadata with an explicit label sidecar."""
+
+    modality = modalities.Modality.GEOSPATIAL
+
+    def __init__(
+        self,
+        samples: Sequence[geospatial.RasterSample],
+        labels: Mapping[str, object],
+    ) -> None:
+        """Bind raster identities and caller-owned labels.
+
+        Raster payload decoding is intentionally outside the core package.
+        The label sidecar is keyed by the canonical raster source and is part
+        of the caller's dataset evidence.
+        """
+        normalized = tuple(samples)
+        if not normalized:
+            raise ValueError("raster samples must not be empty")
+        sources = tuple(sample.source for sample in normalized)
+        if len(set(sources)) != len(sources):
+            raise ValueError("raster sources must be unique")
+        if any(source not in labels for source in sources):
+            raise ValueError("raster labels must cover every sample source")
+        self.dataset = normalized
+        self.labels_by_source = dict(labels)
+
+    @property
+    def dataset_hash(self) -> str:
+        """Return the raster identity and label-sidecar digest."""
+        identities = (
+            f"{sample.source}\0{sample.file_hash}\0{self.labels_by_source[sample.source]}"
+            for sample in self.dataset
+        )
+        return curation.dataset_hash(identities)
+
+    @property
+    def samples(self) -> tuple[geospatial.RasterSample, ...]:
+        """Return raster samples."""
+        return self.dataset
+
+    def curate(self) -> curation.ModalityCurationReport:
+        """Return raster shape, CRS, transform, and label evidence."""
+        dimensions = sorted(
+            {
+                (sample.width, sample.height, sample.bands)
+                for sample in self.dataset
+            }
+        )
+        crs_values = sorted({sample.crs for sample in self.dataset})
+        dtypes = sorted({sample.dtype for sample in self.dataset})
+        profile = {
+            "dimensions": [list(value) for value in dimensions],
+            "crs": crs_values,
+            "dtypes": dtypes,
+            "transform_lengths": sorted(
+                {len(sample.transform) for sample in self.dataset}
+            ),
+            "total_bytes": sum(sample.byte_size for sample in self.dataset),
+            "label_counts": curation.label_counts(
+                self.labels_by_source.values()
+            ),
+        }
+        quality_findings: tuple[data_contracts.CurationFinding, ...] = ()
+        if len(crs_values) > 1 or len(dimensions) > 1 or len(dtypes) > 1:
+            quality_findings = (
+                curation.build_finding(
+                    "quality.raster-shape-or-crs-drift",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": self.dataset_hash},
+                    {
+                        "dimensions": profile["dimensions"],
+                        "crs": crs_values,
+                        "dtypes": dtypes,
+                    },
+                    "Record an explicit raster normalization policy before "
+                    "promotion.",
+                    False,
+                ),
+            )
+        return curation.ModalityCurationReport(
+            modality="geospatial-raster",
+            dataset_hash=self.dataset_hash,
+            sample_count=len(self.dataset),
+            profile=profile,
+            quality_findings=quality_findings,
+        )
+
+    def split(self, seed: int) -> DatasetPartitions:
+        """Split by source identity because the core lacks raster decoding."""
+        generator = np.random.default_rng(seed)
+        order = generator.permutation(len(self.dataset))
+        test_count = max(1, len(self.dataset) // 5)
+        validation_count = max(1, len(self.dataset) // 5)
+        test_indices = {int(value) for value in order[:test_count]}
+        validation_indices = {
+            int(value)
+            for value in order[test_count : test_count + validation_count]
+        }
+        train = tuple(
+            sample
+            for index, sample in enumerate(self.dataset)
+            if index not in test_indices | validation_indices
+        )
+        validation = tuple(
+            sample
+            for index, sample in enumerate(self.dataset)
+            if index in validation_indices
+        )
+        test = tuple(
+            sample
+            for index, sample in enumerate(self.dataset)
+            if index in test_indices
+        )
+        return DatasetPartitions(
+            train,
+            validation,
+            test,
+            {
+                "train": tuple(sample.source for sample in train),
+                "validation": tuple(sample.source for sample in validation),
+                "test": tuple(sample.source for sample in test),
+            },
+        )
+
+    def features(
+        self, samples: Sequence[geospatial.RasterSample]
+    ) -> FeatureBatch:
+        """Prepare raster metadata features without decoding payloads."""
+        names = (
+            "width",
+            "height",
+            "bands",
+            "byte_size",
+            "transform_0",
+            "transform_1",
+            "transform_2",
+            "transform_3",
+            "transform_4",
+            "transform_5",
+        )
+        rows = []
+        for sample in samples:
+            transform = tuple(sample.transform) + (0.0,) * 6
+            rows.append(
+                (
+                    float(sample.width),
+                    float(sample.height),
+                    float(sample.bands),
+                    float(sample.byte_size),
+                    *transform[:6],
+                )
+            )
+        return FeatureBatch(
+            tuple(sample.source for sample in samples), names, np.asarray(rows)
+        )
+
+    def sample_id(self, sample: geospatial.RasterSample) -> str:
+        """Return the canonical raster source identity."""
+        return sample.source
+
+    def label(self, sample: geospatial.RasterSample) -> object | None:
+        """Return the caller-owned raster label."""
+        return self.labels_by_source[sample.source]
+
+    def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
+        """Return raster profile drift evidence."""
+        if not isinstance(observed, RasterAdapter):
+            raise TypeError("observed adapter must be a RasterAdapter")
+        reference = self.curate()
+        current = observed.curate()
+        return {
+            "reference_hash": reference.dataset_hash,
+            "observed_hash": current.dataset_hash,
+            "profile_changed": current.profile != reference.profile,
+        }
+
+    def modality_notes(self) -> tuple[str, ...]:
+        """Describe raster lifecycle limits."""
+        return (
+            "The baseline uses raster metadata and a caller-owned label "
+            "sidecar; it does not decode pixels.",
+            "Raster transforms, nodata, reprojection, window sampling, and "
+            "spatial joins require an explicit codec policy.",
         )
 
 
@@ -1320,6 +1509,7 @@ __all__ = [
     "ModalityAdapter",
     "ModalityLifecycle",
     "ModellingStage",
+    "RasterAdapter",
     "TextAdapter",
     "VideoAdapter",
     "file_digest",
