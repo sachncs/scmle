@@ -187,12 +187,20 @@ class ImageClassifier:
         """
         report = training_data.curate()
         if report.unresolved_blocking_findings:
+            blocking_ids = tuple(
+                finding.finding_id
+                for finding in report.unresolved_blocking_findings
+            )
+            detail = (
+                "duplicate content has conflicting labels"
+                if "risk.image-conflicting-duplicate-labels" in blocking_ids
+                else "curation policy requires review"
+            )
             raise ValueError(
-                "image curation has unresolved blocking findings: "
-                + ", ".join(
-                    finding.finding_id
-                    for finding in report.unresolved_blocking_findings
-                )
+                "image curation has unresolved blocking findings ("
+                + detail
+                + "): "
+                + ", ".join(blocking_ids)
             )
         if report.profile["duplicate_count"]:
             raise ValueError(

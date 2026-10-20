@@ -347,7 +347,9 @@ class GeospatialDataset:
             raise ValueError("test_fraction must be in [0, 1)")
         if validation_fraction + test_fraction >= 1:
             raise ValueError("validation_fraction + test_fraction must be < 1")
-        origin_x, origin_y, _, _ = self.profile().bounds
+        dataset_bounds = self.profile().bounds
+        origin_x = dataset_bounds[0]
+        origin_y = dataset_bounds[1]
 
         def block_for(feature: GeoFeature) -> str:
             minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
