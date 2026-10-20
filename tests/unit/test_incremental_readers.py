@@ -148,7 +148,8 @@ def test_idempotent_sink_keeps_state_unchanged_when_writer_fails(tmp_path):
         tmp_path / "sink.json", source.source_identity
     )
 
-    def fail(_: tuple[incremental.IncrementalEvent, ...]):
+    def fail(events: tuple[incremental.IncrementalEvent, ...]):
+        del events
         raise OSError("sink unavailable")
 
     with pytest.raises(OSError, match="sink unavailable"):

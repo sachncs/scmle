@@ -35,7 +35,9 @@ def test_harness_persists_digest_bound_evidence_and_passes_scenario(tmp_path):
     scenario = reliability.FaultScenario.PARTIAL_WRITE
     requirements = runner.registry.plans[scenario].evidence_requirements
 
-    plan = runner.run(scenario, lambda _: tuple(map(artifact, requirements)))
+    plan = runner.run(
+        scenario, lambda current_scenario: tuple(map(artifact, requirements))
+    )
 
     assert plan.verification_status is reliability.VerificationStatus.PASSED
     for evidence in plan.evidence:
@@ -50,7 +52,10 @@ def test_harness_keeps_partial_executor_output_inconclusive(tmp_path):
     runner = harness(tmp_path)
     scenario = reliability.FaultScenario.INVALID_SIGNATURE
 
-    plan = runner.run(scenario, lambda _: (artifact("signature_tampering"),))
+    plan = runner.run(
+        scenario,
+        lambda current_scenario: (artifact("signature_tampering"),),
+    )
 
     assert (
         plan.verification_status
@@ -61,7 +66,8 @@ def test_harness_keeps_partial_executor_output_inconclusive(tmp_path):
 def test_harness_wraps_executor_failure_without_claiming_evidence(tmp_path):
     runner = harness(tmp_path)
 
-    def fail(_: reliability.FaultScenario):
+    def fail(scenario: reliability.FaultScenario):
+        del scenario
         raise OSError("worker disappeared")
 
     with pytest.raises(errors.ReliabilityError, match="before evidence"):
