@@ -86,6 +86,20 @@ class PromotionApproval:
         if not self.independent:
             raise ValueError("champion promotion requires independent review")
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return the complete approval record for durable audit evidence."""
+        return {
+            "model": self.model,
+            "version": self.version,
+            "content_id": self.content_id,
+            "reviewer": self.reviewer,
+            "decision": self.decision.value,
+            "reason": self.reason,
+            "evidence": list(self.evidence),
+            "approved_at": self.approved_at,
+            "independent": self.independent,
+        }
+
 
 @dataclasses.dataclass(frozen=True)
 class VersionRecord:
@@ -288,9 +302,7 @@ class ModelRegistryStore:
             alias=alias,
             version=version,
             previous=previous,
-            reviewer=approval.reviewer if approval else None,
-            approval=approval.decision.value if approval else None,
-            approval_evidence=list(approval.evidence) if approval else [],
+            approval_record=approval.to_dict() if approval else None,
         )
 
     def resolve(self, model: str, ref: str | int = CHAMPION) -> VersionRecord:

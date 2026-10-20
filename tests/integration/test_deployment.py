@@ -105,6 +105,17 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
         "promote",
     ]
     assert audit[-1]["previous"] == 1
+    assert audit[-1]["approval_record"] == {
+        "model": "churn",
+        "version": 2,
+        "content_id": second.content_id,
+        "reviewer": "integration-reviewer",
+        "decision": "approved",
+        "reason": "verified integration fixture",
+        "evidence": ["integration-evidence.json"],
+        "approved_at": "2026-10-20T00:00:00+00:00",
+        "independent": True,
+    }
     features = make_frame(20, 1).drop(columns="y")
     np.testing.assert_array_equal(
         store.load("churn").predict(features), trained.predict(features)
