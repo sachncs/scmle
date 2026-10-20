@@ -21,6 +21,37 @@ LICENSE_CLASSIFIERS = {
     "MIT License": "MIT",
     "Mozilla Public License 2.0 (MPL 2.0)": "MPL-2.0",
 }
+LICENSE_FILE_NAMES = frozenset(
+    {
+        "copying",
+        "copying.md",
+        "copying.txt",
+        "license",
+        "license.md",
+        "license.txt",
+    }
+)
+LICENSE_TEXT_PATTERNS = {
+    "Apache-2.0": (
+        "licensed under the apache license, version 2.0",
+        "apache license, version 2.0",
+    ),
+    "BSD": (
+        "redistribution and use in source and binary forms",
+        "redistribution and use in source forms",
+    ),
+    "GPL": (
+        "gnu general public license",
+        "gnu lesser general public license",
+    ),
+    "LGPL": ("gnu lesser general public license",),
+    "MIT": (
+        "permission is hereby granted, free of charge",
+        "mit license",
+    ),
+    "MPL-2.0": ("mozilla public license version 2.0",),
+    "SSPL": ("server side public license",),
+}
 
 
 def metadata_value(
@@ -102,7 +133,35 @@ def license_evidence(
     first_line = license_text.splitlines()[0].strip() if license_text else ""
     if first_line:
         return first_line[:200], "license-field"
+
+    file_licenses = license_file_evidence(distribution)
+    if file_licenses:
+        return file_licenses, "license-file"
     return "UNKNOWN", "missing-metadata"
+
+
+def license_file_evidence(distribution: metadata.Distribution) -> str:
+    """Returns recognized license names from a distribution license file."""
+    if not distribution.files:
+        return ""
+    recognized: set[str] = set()
+    for file_path in distribution.files:
+        file_name = Path(str(file_path)).name.lower()
+        if file_name not in LICENSE_FILE_NAMES:
+            continue
+        license_path = distribution.locate_file(file_path)
+        try:
+            content = Path(str(license_path)).read_bytes()[:131_072].decode(
+                "utf-8", errors="replace"
+            ).lower()
+        except OSError:
+            continue
+        recognized.update(
+            license_name
+            for license_name, patterns in LICENSE_TEXT_PATTERNS.items()
+            if any(pattern in content for pattern in patterns)
+        )
+    return " OR ".join(sorted(recognized))
 
 
 def collect_inventory(
