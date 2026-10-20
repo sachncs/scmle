@@ -6,6 +6,8 @@ import hashlib
 import pathlib
 from typing import Self
 
+import numpy as np
+
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
@@ -63,6 +65,24 @@ class VideoProfile:
     duration_seconds: float
     audio_tracks: int
     byte_size: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VideoFeatures:
+    """Numeric metadata features without a hidden frame-decoding policy."""
+
+    sources: tuple[str, ...]
+    feature_names: tuple[str, ...]
+    values: tuple[tuple[float, ...], ...]
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """Return the number of videos and metadata features."""
+        return (len(self.sources), len(self.feature_names))
+
+    def to_numpy(self) -> np.ndarray:
+        """Return a writable copy of the metadata feature matrix."""
+        return np.asarray(self.values, dtype=np.float64).copy()
 
 
 VideoProbe = Callable[[bytes], VideoMetadata]
@@ -190,6 +210,57 @@ class VideoDataset:
         """Return profiles in source order for deterministic curation."""
         return tuple(sample.profile() for sample in self.samples)
 
+    def prepare_metadata_features(self) -> VideoFeatures:
+        """Prepare deterministic numeric features from probed metadata.
+
+        This method never decodes or samples frames. A future video baseline
+        must add an explicit decoder, temporal sampling policy, resource
+        budget, and synchronization evidence rather than inheriting any of
+        those decisions from this metadata-only contract.
+        """
+        feature_names = (
+            "duration_seconds",
+            "width",
+            "height",
+            "pixel_count",
+            "aspect_ratio",
+            "frame_count",
+            "frames_per_second",
+            "audio_tracks",
+            "byte_size",
+            "bytes_per_frame",
+        )
+        rows = []
+        for sample in self.samples:
+            metadata = sample.metadata
+            rows.append(
+                (
+                    metadata.duration_seconds,
+                    float(metadata.width),
+                    float(metadata.height),
+                    float(metadata.width * metadata.height),
+                    metadata.width / metadata.height,
+                    float(metadata.frame_count),
+                    metadata.frames_per_second,
+                    float(metadata.audio_tracks),
+                    float(sample.byte_size),
+                    sample.byte_size / metadata.frame_count,
+                )
+            )
+        values = np.asarray(rows, dtype=np.float64)
+        if not np.isfinite(values).all():
+            raise VideoValidationError(
+                "video metadata features must be finite",
+                {"code": "non_finite_features"},
+            )
+        return VideoFeatures(
+            sources=tuple(sample.source for sample in self.samples),
+            feature_names=feature_names,
+            values=tuple(
+                tuple(float(value) for value in row) for row in values
+            ),
+        )
+
     def curate(self) -> ModalityCurationReport:
         """Build reviewable metadata and compatibility findings."""
         profiles = self.profiles()
@@ -262,6 +333,7 @@ class VideoDataset:
 
 __all__ = [
     "VideoDataset",
+    "VideoFeatures",
     "VideoMetadata",
     "VideoProbe",
     "VideoProfile",

@@ -162,6 +162,43 @@ def test_video_curation_surfaces_encoding_and_dimension_drift():
     ]
 
 
+def test_video_metadata_features_are_numeric_and_decoder_free():
+    """Video preparation is explicit metadata evidence, not frame sampling."""
+    metadata = video.VideoMetadata("mp4", 1920, 1080, 60, 30.0, "h264", 1)
+    sample = video.VideoSample.from_bytes(
+        b"video-bytes", metadata, source="sample.mp4"
+    )
+
+    prepared = video.VideoDataset((sample,)).prepare_metadata_features()
+
+    assert prepared.shape == (1, 10)
+    assert prepared.feature_names[:5] == (
+        "duration_seconds",
+        "width",
+        "height",
+        "pixel_count",
+        "aspect_ratio",
+    )
+    assert prepared.to_numpy()[0, 0] == 2.0
+    assert prepared.to_numpy()[0, 4] == 1920 / 1080
+
+
+def test_video_metadata_features_preserve_sample_order():
+    """Feature rows remain bound to canonical source order."""
+    first = video.VideoSample.from_bytes(
+        b"one", video.VideoMetadata("mp4", 2, 2, 2, 2.0, "h264"), "one.mp4"
+    )
+    second = video.VideoSample.from_bytes(
+        b"two", video.VideoMetadata("mp4", 4, 2, 4, 2.0, "h264"), "two.mp4"
+    )
+
+    prepared = video.VideoDataset((first, second)).prepare_metadata_features()
+
+    assert prepared.sources[0].endswith("/one.mp4")
+    assert prepared.sources[1].endswith("/two.mp4")
+    assert prepared.to_numpy()[:, 1].tolist() == [2.0, 4.0]
+
+
 def test_geospatial_feature_collection_preserves_bounds_and_crs():
     """GeoJSON validation produces deterministic geometry understanding."""
     dataset = geospatial.GeospatialDataset.from_geojson(

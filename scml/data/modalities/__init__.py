@@ -20,6 +20,7 @@ from scml.data.modalities.graph import GraphNode
 from scml.data.modalities.image import ImageDataset
 from scml.data.modalities.image import ImageSample
 from scml.data.modalities.video import VideoDataset
+from scml.data.modalities.video import VideoFeatures
 from scml.data.modalities.video import VideoMetadata
 from scml.data.modalities.video import VideoProfile
 from scml.data.modalities.video import VideoSample
@@ -45,6 +46,7 @@ __all__ = [
     "ModalityCurationReport",
     "RasterSample",
     "VideoDataset",
+    "VideoFeatures",
     "VideoMetadata",
     "VideoProfile",
     "VideoSample",
