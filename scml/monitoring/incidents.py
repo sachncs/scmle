@@ -168,6 +168,8 @@ class IncidentWorkflow:
             return ()
         events: list[dict[str, Any]] = []
         previous_digest = ""
+        statuses: dict[str, IncidentStatus] = {}
+        previous_records: dict[str, Incident] = {}
         for line in self.path.read_text(encoding="utf-8").splitlines():
             record = json.loads(line)
             if not isinstance(record, dict):
@@ -176,7 +178,48 @@ class IncidentWorkflow:
                 raise ValueError("incident journal chain is invalid")
             if record.get("event_digest") != event_digest(record):
                 raise ValueError("incident journal event digest is invalid")
-            Incident.from_dict(record["incident"])
+            incident = Incident.from_dict(record["incident"])
+            event_type = str(record.get("event_type", ""))
+            expected_status = {
+                "opened": IncidentStatus.OPEN,
+                "acknowledged": IncidentStatus.ACKNOWLEDGED,
+                "resolved": IncidentStatus.RESOLVED,
+            }.get(event_type)
+            if (
+                expected_status is None
+                or incident.status is not expected_status
+            ):
+                raise ValueError("incident journal event type is invalid")
+            previous_status = statuses.get(incident.incident_id)
+            allowed_previous = {
+                IncidentStatus.OPEN: (None,),
+                IncidentStatus.ACKNOWLEDGED: (IncidentStatus.OPEN,),
+                IncidentStatus.RESOLVED: (IncidentStatus.ACKNOWLEDGED,),
+            }[incident.status]
+            if previous_status not in allowed_previous:
+                raise ValueError("incident journal transition is invalid")
+            if previous_status is not None:
+                previous = previous_records[incident.incident_id]
+                if incident.opened_at != previous.opened_at:
+                    raise ValueError("incident journal identity changed")
+                transition_at = (
+                    incident.acknowledged_at
+                    if incident.status is IncidentStatus.ACKNOWLEDGED
+                    else incident.resolved_at
+                )
+                previous_at = (
+                    previous.opened_at
+                    if previous.status is IncidentStatus.OPEN
+                    else previous.acknowledged_at
+                )
+                if transition_at is None or previous_at is None:
+                    raise ValueError("incident journal timestamps are invalid")
+                if slo.parse_timestamp(
+                    transition_at, "incident.transition_at"
+                ) < slo.parse_timestamp(previous_at, "incident.previous_at"):
+                    raise ValueError("incident journal timestamps are invalid")
+            statuses[incident.incident_id] = incident.status
+            previous_records[incident.incident_id] = incident
             events.append(record)
             previous_digest = str(record["event_digest"])
         return tuple(events)

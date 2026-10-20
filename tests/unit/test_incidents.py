@@ -111,6 +111,15 @@ def test_tampered_or_reordered_journal_fails_closed(tmp_path):
         workflow.records()
 
 
+def test_a_valid_digest_cannot_hide_an_invalid_transition(tmp_path):
+    workflow = incidents.IncidentWorkflow(tmp_path / "incidents.jsonl")
+    opened = open_incident(workflow)
+    workflow.append_event("resolved", opened)
+
+    with pytest.raises(ValueError, match="event type"):
+        workflow.records()
+
+
 def test_passing_evaluation_cannot_open_an_incident(tmp_path):
     current = evaluation()
     passing = slo.SLOEvaluation(
