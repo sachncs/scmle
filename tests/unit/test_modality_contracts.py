@@ -7,6 +7,7 @@ from typing import cast
 import pytest
 
 from scml.contracts import capabilities
+from scml.contracts import data
 from scml.contracts import errors
 from scml.contracts import modalities
 from scml.data.modalities import curation
@@ -107,7 +108,7 @@ def test_stage_evidence_requires_json_native_structured_output():
 def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
     """A card cannot claim provenance or privacy that the adapter lacks."""
     report = {
-        "dataset_hash": "dataset-1",
+        "dataset_hash": "a" * 64,
         "sample_count": 3,
         "release_ready": True,
         "quality_findings": [],
@@ -136,6 +137,39 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
             provenance={"status": "declared"},
             privacy={"status": "assessed"},
         )
+
+
+def test_modality_manifest_round_trip_binds_governance_to_content():
+    """A modality manifest preserves source and privacy evidence exactly."""
+    manifest = data.ModalityManifest(
+        dataset_id="image-dataset",
+        snapshot_id="snapshot-1",
+        modality="image",
+        task="binary_classification",
+        sample_count=3,
+        content_hash="b" * 64,
+        source=data.SourceMetadata(
+            owner="vision-team",
+            acquisition_method="licensed object export",
+            license="internal-use",
+        ),
+        lineage=data.LineageMetadata(
+            source_snapshot="source-1",
+            transformations=("resize-v1",),
+        ),
+        privacy=data.PrivacyMetadata(
+            classification="confidential",
+            contains_pii=True,
+            consent_basis="contract",
+            retention_period="30d",
+            deletion_policy="delete-on-request",
+        ),
+    )
+
+    restored = data.ModalityManifest.from_dict(manifest.to_dict())
+
+    assert restored == manifest
+    assert restored.privacy.contains_pii is True
 
 
 def test_declaration_is_immutable():

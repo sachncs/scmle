@@ -83,6 +83,7 @@ class ModalityDatasetCard:
     limitations: tuple[str, ...]
     provenance: Mapping[str, str]
     privacy: Mapping[str, str]
+    manifest: data_contracts.ModalityManifest | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -124,6 +125,15 @@ class ModalityDatasetCard:
                 for key, value in values.items()
             ):
                 raise ValueError(f"{name} must contain non-empty values")
+        if self.manifest is not None:
+            if not isinstance(self.manifest, data_contracts.ModalityManifest):
+                raise TypeError("manifest must be ModalityManifest")
+            if self.manifest.content_hash != self.dataset_hash:
+                raise ValueError("manifest does not match dataset_hash")
+            if self.manifest.sample_count != self.sample_count:
+                raise ValueError("manifest does not match sample_count")
+            if self.manifest.modality != self.modality:
+                raise ValueError("manifest does not match modality")
 
     @classmethod
     def from_report(
@@ -131,6 +141,7 @@ class ModalityDatasetCard:
         modality: str,
         report: Mapping[str, Any],
         limitations: Iterable[str],
+        manifest: data_contracts.ModalityManifest | None = None,
     ) -> Self:
         """Build a card without inventing missing governance decisions."""
         dataset_hash_value = report.get("dataset_hash")
@@ -139,6 +150,54 @@ class ModalityDatasetCard:
             raise ValueError("curation report must contain dataset_hash")
         if not isinstance(sample_count_value, int):
             raise ValueError("curation report must contain sample_count")
+        if manifest is None:
+            manifest = data_contracts.ModalityManifest(
+                dataset_id=f"{modality}-{dataset_hash_value[:16]}",
+                snapshot_id=dataset_hash_value,
+                modality=modality,
+                task="classification",
+                sample_count=sample_count_value,
+                content_hash=dataset_hash_value,
+                findings=tuple(
+                    data_contracts.CurationFinding.from_dict(finding)
+                    for finding in (
+                        *report.get("quality_findings", ()),
+                        *report.get("risk_findings", ()),
+                    )
+                ),
+            )
+        if manifest.content_hash != dataset_hash_value:
+            raise ValueError("manifest does not match dataset_hash")
+        if manifest.sample_count != sample_count_value:
+            raise ValueError("manifest does not match sample_count")
+        if manifest.modality != modality:
+            raise ValueError("manifest does not match modality")
+        declared_provenance = {
+            "status": "declared",
+            "manifest": "source, lineage, and ownership are in manifest",
+        }
+        declared_privacy = {
+            "status": "declared",
+            "manifest": "privacy, consent, and retention are in manifest",
+        }
+        if (
+            not manifest.source.owner
+            and not manifest.source.acquisition_method
+            and manifest.privacy.classification == "unclassified"
+        ):
+            declared_provenance = {
+                "status": "adapter_source_metadata_not_declared",
+                "required_action": (
+                    "record source ownership and lineage before promotion"
+                ),
+            }
+            declared_privacy = {
+                "status": "not_assessed",
+                "required_action": (
+                    "record consent, PII classification, retention, and "
+                    "access policy before promotion"
+                ),
+            }
         return cls(
             modality=modality,
             dataset_hash=dataset_hash_value,
@@ -146,19 +205,9 @@ class ModalityDatasetCard:
             curation=dict(report),
             intended_use="bounded lifecycle validation and baseline comparison",
             limitations=tuple(limitations),
-            provenance={
-                "status": "adapter_source_metadata_not_declared",
-                "required_action": (
-                    "record source ownership and lineage before promotion"
-                ),
-            },
-            privacy={
-                "status": "not_assessed",
-                "required_action": (
-                    "record consent, PII classification, retention, and "
-                    "access policy before promotion"
-                ),
-            },
+            provenance=declared_provenance,
+            privacy=declared_privacy,
+            manifest=manifest,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -173,6 +222,9 @@ class ModalityDatasetCard:
             "limitations": list(self.limitations),
             "provenance": dict(sorted(self.provenance.items())),
             "privacy": dict(sorted(self.privacy.items())),
+            "manifest": (
+                self.manifest.to_dict() if self.manifest is not None else None
+            ),
         }
 
 

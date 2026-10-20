@@ -413,6 +413,101 @@ class DatasetManifest:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class ModalityManifest:
+    """Immutable identity and governance metadata for any modality.
+
+    Unlike ``DatasetManifest``, this contract does not assume rows, columns,
+    or a tabular schema. It binds a modality sample collection to its source,
+    transformation, label, privacy, and curation evidence instead.
+    """
+
+    dataset_id: str
+    snapshot_id: str
+    modality: str
+    task: str
+    sample_count: int
+    content_hash: str
+    schema_version: int = 1
+    source: SourceMetadata = dataclasses.field(default_factory=SourceMetadata)
+    lineage: LineageMetadata = dataclasses.field(
+        default_factory=LineageMetadata
+    )
+    privacy: PrivacyMetadata = dataclasses.field(
+        default_factory=PrivacyMetadata
+    )
+    findings: tuple[CurationFinding, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Validate modality identity and attached governance metadata."""
+        for name, value in (
+            ("dataset_id", self.dataset_id),
+            ("snapshot_id", self.snapshot_id),
+            ("modality", self.modality),
+            ("task", self.task),
+            ("content_hash", self.content_hash),
+        ):
+            if not value.strip():
+                raise ValueError(f"{name} must not be empty")
+        if isinstance(self.sample_count, bool) or self.sample_count < 1:
+            raise ValueError("sample_count must be positive")
+        if self.schema_version < 1:
+            raise ValueError("schema_version must be positive")
+        if len(self.content_hash) != 64 or any(
+            character not in "0123456789abcdef"
+            for character in self.content_hash
+        ):
+            raise ValueError("content_hash must be a SHA-256 hex digest")
+        if not isinstance(self.source, SourceMetadata):
+            raise TypeError("source must be SourceMetadata")
+        if not isinstance(self.lineage, LineageMetadata):
+            raise TypeError("lineage must be LineageMetadata")
+        if not isinstance(self.privacy, PrivacyMetadata):
+            raise TypeError("privacy must be PrivacyMetadata")
+        object.__setattr__(self, "findings", tuple(self.findings))
+        if any(
+            not isinstance(finding, CurationFinding)
+            for finding in self.findings
+        ):
+            raise TypeError("findings must contain CurationFinding records")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON- and Arrow-compatible modality manifest."""
+        return {
+            "dataset_id": self.dataset_id,
+            "snapshot_id": self.snapshot_id,
+            "modality": self.modality,
+            "task": self.task,
+            "sample_count": self.sample_count,
+            "content_hash": self.content_hash,
+            "schema_version": self.schema_version,
+            "source": self.source.to_dict(),
+            "lineage": self.lineage.to_dict(),
+            "privacy": self.privacy.to_dict(),
+            "findings": [finding.to_dict() for finding in self.findings],
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuild a modality manifest from serialized evidence."""
+        return cls(
+            dataset_id=str(record["dataset_id"]),
+            snapshot_id=str(record["snapshot_id"]),
+            modality=str(record["modality"]),
+            task=str(record["task"]),
+            sample_count=int(record["sample_count"]),
+            content_hash=str(record["content_hash"]),
+            schema_version=int(record.get("schema_version", 1)),
+            source=SourceMetadata.from_dict(record.get("source", {})),
+            lineage=LineageMetadata.from_dict(record.get("lineage", {})),
+            privacy=PrivacyMetadata.from_dict(record.get("privacy", {})),
+            findings=tuple(
+                CurationFinding.from_dict(finding)
+                for finding in record.get("findings", ())
+            ),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class FeaturePlan:
     """Which columns become features and why the others were dropped.
 

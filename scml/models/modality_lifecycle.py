@@ -1249,6 +1249,7 @@ class LifecycleContext:
     signing_key: str | bytes
     seed: int
     observed_adapter: ModalityAdapter
+    manifest: data_contracts.ModalityManifest | None = None
     stage_records: dict[modalities.LifecycleStage, dict[str, object]] = (
         dataclasses.field(default_factory=dict)
     )
@@ -1828,6 +1829,7 @@ class DocumentationStage(ModalityLifecycleStage):
             context.adapter.modality.value,
             context.curation_report.to_dict(),
             context.adapter.modality_notes(),
+            manifest=context.manifest,
         )
         context.documentation = {
             "modality": context.adapter.modality.value,
@@ -1918,19 +1920,33 @@ class ModalityLifecycle:
         report_path: str | Path | None = None,
         performance_budget: performance.PerformanceBudget | None = None,
         performance_baseline: performance.PerformanceBaseline | None = None,
+        manifest: data_contracts.ModalityManifest | None = None,
     ) -> LifecycleReport:
-        """Run every stage and optionally persist its evidence report."""
+        """Run every stage and optionally persist its evidence report.
+
+        A supplied manifest is checked against the adapter before any stage
+        executes. This keeps source, task, privacy, and lineage claims bound
+        to the exact modality content used by the lifecycle.
+        """
         observed = observed_adapter or adapter
         if observed.modality is not adapter.modality:
             raise ValueError(
                 "observed adapter modality must match reference modality"
             )
+        if manifest is not None:
+            if manifest.modality != adapter.modality.value:
+                raise ValueError("manifest modality must match adapter")
+            if manifest.content_hash != adapter.dataset_hash:
+                raise ValueError("manifest content_hash must match adapter")
+            if manifest.sample_count != len(adapter.samples):
+                raise ValueError("manifest sample_count must match adapter")
         context = LifecycleContext(
             adapter=adapter,
             package_path=Path(package_path),
             signing_key=signing_key,
             seed=seed,
             observed_adapter=observed,
+            manifest=manifest,
         )
         for stage in self.stages:
             started = time.perf_counter()

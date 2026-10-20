@@ -9,6 +9,7 @@ import wave
 import numpy as np
 import pytest
 
+from scml.contracts import data
 from scml.contracts import modalities
 from scml.contracts import performance
 from scml.data.modalities import audio
@@ -455,6 +456,44 @@ def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     assert local["window_count"] == len(local["windows"])
     assert local["window_count"] > 1
     assert local["feature_space_only"] is True
+
+
+def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):
+    """Lifecycle documentation carries caller-owned governance evidence."""
+    adapter = document_adapter()
+    manifest = data.ModalityManifest(
+        dataset_id="document-dataset",
+        snapshot_id="document-snapshot",
+        modality="document",
+        task="binary_classification",
+        sample_count=len(adapter.samples),
+        content_hash=adapter.dataset_hash,
+        source=data.SourceMetadata(
+            owner="records-team",
+            acquisition_method="approved export",
+            license="internal-use",
+        ),
+        privacy=data.PrivacyMetadata(
+            classification="restricted",
+            contains_pii=True,
+            consent_basis="employment-contract",
+            retention_period="90d",
+            deletion_policy="case-closure",
+        ),
+    )
+
+    report = modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        tmp_path / "manifest-package",
+        signing_key="test-signing-key",
+        manifest=manifest,
+    )
+
+    card = report.documentation["dataset_card"]
+    assert card["manifest"] == manifest.to_dict()
+    assert card["provenance"]["status"] == "declared"
+    assert card["privacy"]["status"] == "declared"
+    assert card["manifest"]["privacy"]["contains_pii"] is True
 
 
 def test_video_lifecycle_emits_temporal_frame_evidence(tmp_path: Path):
