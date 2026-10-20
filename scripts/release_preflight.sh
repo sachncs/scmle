@@ -40,6 +40,7 @@ uv run --python "$python_version" python -m benchmarks.check_regression \
 echo "== package =="
 uv build --python "$python_version"
 uv run --python "$python_version" twine check dist/*
+scripts/verify_release_artifacts.sh
 
 echo "== marketing site =="
 (cd website && npm ci && npm audit --omit=dev --audit-level=high && npm run build)
