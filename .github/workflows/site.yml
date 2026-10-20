@@ -33,3 +33,12 @@ jobs:
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
+      - name: Smoke test generated routes
+        run: |
+          python3 -m http.server 4173 --directory dist > /tmp/super-charge-ml-site.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for route in / /docs/ /docs/architecture/ /docs/data/ /docs/operations/; do
+            curl --fail --silent --show-error "http://127.0.0.1:4173${route}" > /dev/null
+          done
+          grep -q "/super-charge-ml/docs/" dist/index.html
