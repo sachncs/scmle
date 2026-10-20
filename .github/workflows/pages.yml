@@ -42,6 +42,12 @@ jobs:
       - name: Check site accessibility
         run: npm run check:a11y
         working-directory: website
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: website
+      - name: Run browser smoke tests
+        run: npm run test:e2e
+        working-directory: website
       - name: Smoke test generated routes
         run: |
           python3 -m http.server 4173 --directory website/dist > /tmp/super-charge-ml-pages.log 2>&1 &

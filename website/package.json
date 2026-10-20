@@ -6,9 +6,13 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check:a11y": "node scripts/check-a11y.mjs"
+    "check:a11y": "node scripts/check-a11y.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "astro": "^7.4.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
   }
 }

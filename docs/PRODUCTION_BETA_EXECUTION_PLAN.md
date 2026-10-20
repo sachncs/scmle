@@ -58,7 +58,7 @@ means the code path exists; it does not mean the capability is supported.
 | Redacted inference observability | Implemented / Tested | `PredictionLog` emits a redacted sidecar, policy evaluation checks required signals, freshness, future timestamps, and upper-bound threshold breaches, retention enforcement atomically removes expired sidecar events without touching the raw prediction log, and deterministic routing produces idempotent alert IDs. Serving defaults and incident workflows remain incomplete. |
 | Fault injection and recovery | Partial | The complete release-blocking fault plan is persisted with each packaged run, and the registry plus `FaultInjectionHarness` can now record durable, digest-bound full, partial, or unsafe execution evidence with fail-closed status transitions. The harness deliberately delegates process/container/resource fault injection to scenario-specific executors. Worker-loss, disk-full, dependency, signature, connector, fuzzing, mutation, and clean-clone execution evidence is not complete. |
 | Security, provenance, SBOM, and release CI | Implemented / Tested | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, CI SBOM artifact publication, immutable CI action pins, a canonical HMAC-signed release attestation, and an exact-SHA clean-clone rehearsal job are implemented. Release evaluation verifies the attestation and blocks unsigned or tampered evidence. Signer custody/rotation evidence and observed clean-release execution remain incomplete. |
-| Astro developer site | Partial | Standalone docs routes, base-path links, generated accessibility smoke checks, a capability matrix, pinned Pages artifact/deploy jobs, and post-deploy route smoke coverage build successfully. The requested public URL currently returns HTTP 404 because the GitHub repository is private; repository visibility/Pages configuration must be resolved by the owner before deployment can be verified. Playwright coverage and exhaustive modality/operations content remain incomplete. |
+| Astro developer site | Partial | Standalone docs routes, base-path links, generated accessibility smoke checks, browser smoke coverage for all 11 public routes plus keyboard navigation, a capability matrix, pinned Pages artifact/deploy jobs, and post-deploy route smoke coverage build successfully. The requested public URL currently returns HTTP 404 because the GitHub repository is private; repository visibility/Pages configuration must be resolved by the owner before deployment can be verified. Exhaustive modality/operations content remains incomplete. |
 
 ### Verification snapshot — 20 October 2026
 
@@ -76,6 +76,9 @@ its declared core scope (`contracts`, `data`, `evaluation`, `governance`,
 the configured critical mutation scope generated 1,733 mutants, of which
 1,251 were killed, 481 survived, and 1 timed out (72% of scored mutants),
 passing the 70% minimum while leaving survivor triage as evidence debt;
+the Astro build produced 11 pages, the accessibility smoke passed all 11
+HTML files, and the Playwright browser smoke passed both route and keyboard
+navigation tests;
 the latest promotion/lifecycle slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
 seconds. The remaining leakage, property, specification, and benchmark tiers
