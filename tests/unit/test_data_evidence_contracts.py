@@ -1,5 +1,6 @@
 """Tests for dataset provenance and curation evidence contracts."""
 
+import dataclasses
 import json
 
 import pytest
@@ -179,6 +180,59 @@ def test_curation_report_serializes_structured_quality_and_risk_findings():
     assert record["quality_findings"] == [quality.to_dict()]
     assert record["risk_findings"] == [risk.to_dict()]
     assert json.loads(json.dumps(record)) == record
+
+
+def test_curation_report_is_not_release_ready_with_open_blocking_findings():
+    """Open blocking observations must stop the lifecycle before training."""
+    risk = make_finding(
+        finding_id="risk.target-leakage",
+        severity=data.FindingSeverity.ERROR,
+    )
+    report = data.CurationReport(
+        manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
+        source_rows=10,
+        profiled_rows=10,
+        read_seconds=0.25,
+        streamed=False,
+        cleaning_notes=(),
+        quality_findings=(),
+        risk_findings=(risk,),
+        feature_columns={"numeric": ("amount",)},
+        dropped_columns={},
+    )
+
+    assert report.release_ready is False
+    assert report.unresolved_blocking_findings == (risk,)
+    assert report.to_dict()["unresolved_blocking_findings"] == [
+        "risk.target-leakage"
+    ]
+
+
+def test_curation_report_accepts_explicit_safe_dispositions():
+    """Resolved, waived, and false-positive findings are reviewable states."""
+    risk = make_finding(
+        finding_id="risk.target-leakage",
+        severity=data.FindingSeverity.ERROR,
+    )
+    report = data.CurationReport(
+        manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
+        source_rows=10,
+        profiled_rows=10,
+        read_seconds=0.25,
+        streamed=False,
+        cleaning_notes=(),
+        quality_findings=(),
+        risk_findings=(
+            dataclasses.replace(
+                risk, disposition=data.FindingDisposition.RESOLVED
+            ),
+        ),
+        feature_columns={"numeric": ("amount",)},
+        dropped_columns={},
+    )
+
+    assert report.release_ready
+    assert report.unresolved_blocking_findings == ()
 
 
 def test_dataset_card_makes_intended_use_and_limits_explicit():

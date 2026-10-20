@@ -457,6 +457,15 @@ class ProfileStage(Stage):
                 "risk_findings": len(profile.risk_findings),
             },
         )
+        if not curation.release_ready:
+            finding_ids = tuple(
+                finding.finding_id
+                for finding in curation.unresolved_blocking_findings
+            )
+            raise errors.BlockedError(
+                "unresolved blocking curation findings",
+                {"finding_ids": list(finding_ids)},
+            )
         context.emit(
             "features.selected",
             "feature set and exclusions fixed from the profile",

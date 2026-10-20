@@ -580,6 +580,25 @@ class CurationReport:
     dropped_columns: Mapping[str, str]
     schema_version: int = 1
 
+    @property
+    def unresolved_blocking_findings(self) -> tuple[CurationFinding, ...]:
+        """Return blocking findings without an explicit safe disposition."""
+        safe_dispositions = {
+            FindingDisposition.RESOLVED,
+            FindingDisposition.WAIVED,
+            FindingDisposition.FALSE_POSITIVE,
+        }
+        return tuple(
+            finding
+            for finding in (*self.quality_findings, *self.risk_findings)
+            if finding.blocking and finding.disposition not in safe_dispositions
+        )
+
+    @property
+    def release_ready(self) -> bool:
+        """Whether curation has no unresolved blocking findings."""
+        return not self.unresolved_blocking_findings
+
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable curation record."""
         return {
@@ -601,6 +620,11 @@ class CurationReport:
                 for name, columns in self.feature_columns.items()
             },
             "dropped_columns": dict(self.dropped_columns),
+            "release_ready": self.release_ready,
+            "unresolved_blocking_findings": [
+                finding.finding_id
+                for finding in self.unresolved_blocking_findings
+            ],
         }
 
 
