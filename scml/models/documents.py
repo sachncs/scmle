@@ -221,7 +221,7 @@ class DocumentClassifier:
             max_features=self.config.max_features,
             ngram_range=self.config.ngram_range,
             min_df=self.config.min_df,
-            token_pattern=r"(?u)\b\w\w+\b",
+            token_pattern=r"(?u)\b\w\w+\b",  # nosec B106 - regex, not a secret
         )
         matrix = vectorizer.fit_transform([sample.content for sample in values])
         if matrix.shape[1] == 0:
