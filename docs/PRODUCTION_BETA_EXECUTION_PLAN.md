@@ -177,16 +177,17 @@ copyright, and capture-time metadata. The focused image suite passes 17 tests;
 the contract preserves source bytes and requires an explicit redaction or
 privacy approval rather than silently mutating the evidence.
 
-The last complete release preflight at pushed commit `935bb51` passed `1747 passed,
-89 skipped, 2 warnings`; the bounded suite measured 81.50% whole-package
-coverage and the declared core scope measured 86%. The mutation gate killed
-`1253/1735` mutants (72%, above the 70% minimum), all four offline benchmarks
-reported zero regressions, wheel and source distributions passed checks, the
-dependency audit found no known vulnerabilities, and the Astro build produced
-11 pages. The warnings are the known nondeterministic SQLite teardown
-warnings in the curriculum run. Generated mutation artifacts were kept
-outside the repository after the run; no generated evidence is being treated
-as a tracked release claim.
+The complete release preflight at pushed commit `642806b` passed `1750 passed,
+89 skipped, 2 warnings`; the bounded suite measured 81.53% whole-package
+coverage and the declared core scope measured 86%. The mutation gate passed
+the configured 70% minimum, all four offline benchmarks reported zero
+regressions, wheel and source distributions passed checks, the dependency
+audit found no known vulnerabilities, and the Astro build produced 11 pages.
+The remaining warnings are ResourceWarnings for unclosed SQLite connections
+reported while scanning `scml/core/stages.py` in the convention test; they are
+tracked cleanup work, not silently treated as release evidence. Generated
+mutation artifacts were kept outside the repository after the run; no
+generated evidence is being treated as a tracked release claim.
 
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
