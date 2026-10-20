@@ -50,6 +50,31 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 evaluation = SLOMonitor().evaluate(target, metrics, observed_at=now)`}</code></pre>
   <p>Use the result's status, remaining error budget, owner, runbook, and route in the incident record. The monitor uses the worst observation in the window so a breach cannot disappear inside an average.</p>
 
+  <h2>Turn a breach into an incident</h2>
+  <p>An alert is not a recovery plan. Open an incident with the affected run and the exact rollback target, then require an explicit acknowledgement before resolution. The journal is append-only, hash-chained, and rejects tampering; repeating a transition is idempotent.</p>
+  <pre><code>{`from scml.monitoring.incidents import IncidentWorkflow
+
+workflow = IncidentWorkflow("runs/&lt;run-id&gt;/incidents.jsonl")
+incident = workflow.open(
+    evaluation,
+    opened_at=now,
+    run_id="run-42",
+    rollback_target="model-previous",
+)
+workflow.acknowledge(
+    incident.incident_id,
+    actor="ml-on-call",
+    acknowledged_at=now,
+)
+workflow.resolve(
+    incident.incident_id,
+    actor="ml-on-call",
+    resolved_at=resolved_at,
+    resolution="rolled back and replayed the affected window",
+    evidence_digest="sha256:...",
+)`}</code></pre>
+  <p>This local workflow supplies operator evidence; it does not send pages or tickets. Connect it to the organisation's authenticated incident system before claiming external on-call coverage.</p>
+
   <h2>Join serving evidence to the run</h2>
   <p>Prediction telemetry tells you what happened; the evidence graph tells you what produced the bundle. Link an event only with the input and output fingerprints captured at the serving boundary and the exact bundle digest loaded for that request.</p>
   <pre><code>{`from scml.inference.evidence import InferenceEvidenceLinker
