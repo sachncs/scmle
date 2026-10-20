@@ -6,9 +6,12 @@ rather than silently dropped, so performance estimates know their coverage.
 """
 
 import dataclasses
+import datetime
 import hashlib
 import json
+import os
 import pathlib
+import tempfile
 import time
 from typing import Any
 import uuid
@@ -19,6 +22,7 @@ import pandas as pd
 from scml.artifacts import bundle as bundle_module
 from scml.contracts import events
 from scml.contracts import observability
+from scml.monitoring import observability as observability_monitor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -204,6 +208,76 @@ class PredictionLog:
                 )
                 + "\n"
             )
+
+    def enforce_retention(
+        self, observed_at: str | None = None
+    ) -> dict[str, Any]:
+        """Atomically remove redacted events older than the policy window.
+
+        The raw prediction log is intentionally untouched. Retention applies
+        only to the redacted observability sidecar, and malformed evidence
+        aborts before replacement so an operator never receives a silently
+        truncated log.
+        """
+        if self.observability_policy is None:
+            raise ValueError(
+                "retention enforcement requires an observability policy"
+            )
+        observed_text = observed_at or events.utc_timestamp()
+        observed_timestamp = observability_monitor.parse_timestamp(
+            observed_text, "observed_at"
+        )
+        cutoff = observed_timestamp - datetime.timedelta(
+            days=self.observability_policy.retention_days
+        )
+        path = self.observability_path
+        if not path.exists():
+            return {
+                "observed_at": observed_text,
+                "cutoff": cutoff.isoformat(),
+                "retained": 0,
+                "removed": 0,
+            }
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", dir=path.parent
+        )
+        retained = 0
+        removed = 0
+        try:
+            with os.fdopen(
+                descriptor, "w", encoding="utf-8", newline="\n"
+            ) as handle:
+                with path.open(encoding="utf-8") as source:
+                    for line in source:
+                        record = json.loads(line)
+                        if not isinstance(record, dict):
+                            raise ValueError(
+                                "observability records must be JSON objects"
+                            )
+                        if record.get("type") != "inference":
+                            raise ValueError(
+                                "observability records must have type inference"
+                            )
+                        timestamp = observability_monitor.parse_timestamp(
+                            str(record["timestamp"]), "event.timestamp"
+                        )
+                        if timestamp < cutoff:
+                            removed += 1
+                            continue
+                        handle.write(line)
+                        retained += 1
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, path)
+        except BaseException:
+            pathlib.Path(temporary_name).unlink(missing_ok=True)
+            raise
+        return {
+            "observed_at": observed_text,
+            "cutoff": cutoff.isoformat(),
+            "retained": retained,
+            "removed": removed,
+        }
 
     def record_outcomes(self, outcomes: dict[str, Any]) -> list[OutcomeEvent]:
         """Logs outcomes that became known.

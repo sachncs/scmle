@@ -1,6 +1,9 @@
 """Tests for policy-driven observability evaluation."""
 
+import pytest
+
 from scml.contracts import observability
+from scml.monitoring import events
 from scml.monitoring import observability as evaluation
 
 
@@ -74,3 +77,48 @@ def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics()
     assert result.expired_metrics == ("old_latency",)
     assert result.future_metrics == ("future_latency",)
     assert result.threshold_breaches[0]["metric"] == "latency_p95_ms"
+
+
+def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
+    policy = observability.ObservabilityPolicy(
+        retention_days=1,
+        required_signals=(observability.SignalKind.LATENCY,),
+        redacted_fields=(),
+        alert_thresholds={},
+    )
+    log = events.PredictionLog(
+        tmp_path / "predictions.jsonl", observability_policy=policy
+    )
+    log.observability_path.write_text(
+        "\n".join(
+            (
+                '{"type":"inference","timestamp":"2026-10-18T10:00:00+00:00"}',
+                '{"type":"inference","timestamp":"2026-10-20T10:00:00+00:00"}',
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = log.enforce_retention("2026-10-20T10:00:00+00:00")
+
+    assert result["removed"] == 1
+    assert result["retained"] == 1
+    assert (
+        log.observability_path.read_text(encoding="utf-8").count("inference")
+        == 1
+    )
+
+
+def test_prediction_log_does_not_replace_malformed_sidecar(tmp_path):
+    policy = make_policy()
+    log = events.PredictionLog(
+        tmp_path / "predictions.jsonl", observability_policy=policy
+    )
+    original = "not-json\n"
+    log.observability_path.write_text(original, encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        log.enforce_retention("2026-10-20T10:00:00+00:00")
+
+    assert log.observability_path.read_text(encoding="utf-8") == original
