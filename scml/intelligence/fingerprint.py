@@ -199,7 +199,14 @@ def ml_difficulty(
             result = model_selection.cross_val_score(
                 model, features, target, cv=DIFFICULTY_FOLDS, scoring=scoring
             )
-            scores[name] = float(np.nanmean(result))
+            finite = np.asarray(result, dtype=float)
+            finite = finite[np.isfinite(finite)]
+            if not finite.size:
+                return {
+                    "available": False,
+                    "reason": f"{name} baseline produced no finite scores",
+                }
+            scores[name] = float(np.mean(finite))
     except ValueError as error:
         return {"available": False, "reason": str(error)[:200]}
     gain = scores["nonlinear"] - scores["linear"]

@@ -156,6 +156,34 @@ def test_ml_difficulty_reports_baselines_and_headroom():
     assert stats["separability"] == stats["linear_baseline"]
 
 
+def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
+    monkeypatch,
+):
+    """An undefined baseline is reported instead of becoming NaN."""
+    frame = pd.DataFrame({"x": range(30), "y": [0, 1] * 15})
+
+    def undefined_scores(*args, **kwargs):
+        del args, kwargs
+        return np.array([np.nan, np.nan])
+
+    monkeypatch.setattr(
+        fingerprint.model_selection, "cross_val_score", undefined_scores
+    )
+    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
+    manifest = tabular.build_manifest(frame, "y")
+    task = tasks.TaskType.BINARY
+    plan = profiler.DatasetProfiler(spec).profile(
+        frame, manifest, task, 0.25
+    ).feature_plan
+
+    result = fingerprint.ml_difficulty(frame, spec, task, plan)
+
+    assert result == {
+        "available": False,
+        "reason": "constant baseline produced no finite scores",
+    }
+
+
 def test_missingness_patterns_types_and_scale_are_described():
     rng = np.random.default_rng(1)
     rows = 600
