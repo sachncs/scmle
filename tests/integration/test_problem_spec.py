@@ -53,6 +53,12 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
         (result.run_dir / "source_registry.json").read_text()
     )
     assert source_registry["schema_compatibility"]["status"] == "initial"
+    model_card = json.loads((result.run_dir / "model_card.json").read_text())
+    assert (
+        model_card["snapshot_id"]
+        == result.evaluation["provenance"]["dataset"]["snapshot_id"]
+    )
+    assert model_card["review_status"] == "machine_generated_unreviewed"
     assert (
         result.run_dir / "explanations/permutation_importance.json"
     ).exists()

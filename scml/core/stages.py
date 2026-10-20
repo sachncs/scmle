@@ -71,6 +71,7 @@ from scml.experimentation import tuning
 from scml.explainability import suite as explanation_suite
 from scml.features import feature_graph
 from scml.governance import ledger
+from scml.governance import model_card
 from scml.governance import sbom
 from scml.governance import vault
 from scml.inference import novelty
@@ -2300,6 +2301,17 @@ class PackageStage(Stage):
             context.spec.validation.seed,
         )
         bundle.save(store.path("model"))
+        card = model_card.ModelCard.from_run(
+            require(context.manifest, "manifest"),
+            profile,
+            bundle,
+            evaluation,
+            bundle_module.file_sha256(
+                store.path(f"model/{bundle_module.MANIFEST_FILE}")
+            ),
+        )
+        evaluation["model_card"] = card.to_dict()
+        store.write_json("model_card.json", card.to_dict())
         evaluation["reliability_plan"] = self.reliability_plan_record(
             context, store
         )
@@ -2365,6 +2377,7 @@ class PackageStage(Stage):
             "config.json",
             "dataset_manifest.json",
             "dataset_card.json",
+            "model_card.json",
             "source_registry.json",
             "fault_injection_plan.json",
             "provenance.json",
