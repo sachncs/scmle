@@ -223,6 +223,20 @@ with owner, run ID, rollback target, runbook, and resolution evidence. It is a
 local operator contract; external paging, ticketing, and on-call delivery
 remain outside the current release claim.
 
+The complete release preflight at pushed commit `51c5afd` passed `1803 passed,
+89 skipped, 2 warnings` in 8 minutes 11 seconds. Total coverage was 81.86% and
+the declared core scope remained 86%; mutation testing killed `1253/1735`
+mutants (72%), all four offline benchmarks reported zero regressions, package
+and offline artifact verification passed, dependency audits found no known
+vulnerabilities, and Astro built all 11 routes. The two SQLite resource
+warnings remain cleanup debt. That preflight used the historical one-seed
+benchmark command; the stricter five-seed gate was then enabled by `d493b58`
+and passed separately across all four offline datasets with zero regressions.
+The resulting 95% intervals were tie, tie, tie, and ahead respectively, so the
+evidence now satisfies the five-seed statistical criterion while preserving the
+honest conclusion that three of four comparisons are indistinguishable from
+the reference.
+
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
 extension-only until their complete lifecycle evidence is attached.
