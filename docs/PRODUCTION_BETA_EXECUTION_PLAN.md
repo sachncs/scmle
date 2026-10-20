@@ -141,6 +141,11 @@ classified as
 environment-required, intentionally unsupported, or a release blocker before
 a supported-production label is appropriate.
 
+The audio feature-preparation slice at `29c8d15` passes 14 focused media
+tests, Ruff, and mypy. It adds bounded WAV PCM statistics with explicit
+observed-frame and truncation evidence; it does not add codec support,
+audio modelling, serving, or a supported capability claim.
+
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
 extension-only until their complete lifecycle evidence is attached.

@@ -1,6 +1,7 @@
 """First-class data foundations for non-tabular modality lifecycles."""
 
 from scml.data.modalities.audio import AudioDataset
+from scml.data.modalities.audio import AudioFeatures
 from scml.data.modalities.audio import AudioMetadata
 from scml.data.modalities.audio import AudioProfile
 from scml.data.modalities.audio import AudioSample
@@ -25,6 +26,7 @@ from scml.data.modalities.video import VideoSample
 
 __all__ = [
     "AudioDataset",
+    "AudioFeatures",
     "AudioMetadata",
     "AudioProfile",
     "AudioSample",

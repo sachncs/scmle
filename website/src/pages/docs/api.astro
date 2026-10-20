@@ -75,6 +75,17 @@ artifact = model.save("artifacts/image-model")
 restored = ImageClassifier.load(artifact.path, trusted=True)</code></pre>
   <p>This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>ModelBundle</code> integration, HTTP serving, or full release recovery evidence.</p>
 
+  <h2>Experimental audio feature preparation</h2>
+  <p>The audio foundation can produce bounded signal statistics for inspection and future baseline work. It makes the observation boundary explicit; it is not an audio classifier and does not silently decode non-WAV containers.</p>
+  <pre><code>from scml.data.modalities import AudioDataset, AudioSample
+
+clip = AudioSample.from_bytes(wav_bytes, source="clip.wav")
+features = AudioDataset((clip,)).prepare_features(max_frames=100_000)
+print(features.feature_names)
+print(features.to_numpy())
+print(features.frames_truncated)</code></pre>
+  <p>For non-WAV inputs, provide an explicit codec probe for ingestion and a versioned decoder adapter before requesting signal features. The current implementation deliberately stops at bounded WAV statistics; it does not claim spectrogram quality, transcript provenance, speaker leakage controls, time-local explanations, audio modelling, serving, or release evidence.</p>
+
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
   <div class="callout"><p><strong>Bundle compatibility:</strong> format 2 authenticates <code>schema.json</code>. Legacy format 1 bundles are refused by default and should only be migrated from a source you explicitly trust.</p></div>
