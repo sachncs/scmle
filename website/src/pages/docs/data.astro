@@ -37,7 +37,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <h2>What to review before modelling</h2>
   <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, duplicate-content label conflicts, and dropped columns. A curation finding is an input to the modelling decision—not noise around it. Blocking findings stop the run until a reviewer resolves, waives, or marks them false-positive.</p>
   <h2>The dataset card</h2>
-  <p>Every packaged run writes <code>dataset_card.json</code>. It is the human-facing summary of the snapshot: intended use, explicit exclusions, row and feature composition, source ownership, lineage, privacy controls, limitations, and the findings that still need review. Its default status is <code>machine_generated_unreviewed</code>; that is deliberate. A generated card is context, not approval.</p>
+  <p>Tabular packaged runs write <code>dataset_card.json</code>. Experimental modality lifecycles carry the equivalent card inside their documentation evidence. In both cases it is the human-facing summary of the snapshot: intended use, explicit exclusions, composition, source ownership, lineage, privacy controls, limitations, and findings that still need review. Its default status is <code>machine_generated_unreviewed</code>; that is deliberate. A generated card is context, not approval.</p>
   <pre><code>{`{
   "intended_use": "Training and evaluation for binary classification...",
   "out_of_scope": ["It is not a release approval..."],

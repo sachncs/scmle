@@ -11,7 +11,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <div class="callout"><p><strong>Generated is not approved.</strong> A card can be machine-generated from run evidence, but a reviewer still owns the decision to publish it. Keep the generated state and the review decision separate.</p></div>
 
   <h2>Dataset card: what went into the run</h2>
-  <p>The dataset card starts at ingestion, not at the end of modelling. It should identify the source snapshot, schema, curation rules, findings, privacy decisions, and the population the data can represent.</p>
+  <p>The dataset card starts at ingestion, not at the end of modelling. It should identify the source snapshot, schema, curation rules, findings, privacy decisions, and the population the data can represent. Tabular runs write a standalone <code>dataset_card.json</code>; experimental modality lifecycles carry the equivalent card inside their documentation evidence and mark missing provenance or privacy review explicitly.</p>
   <pre><code>{`dataset_card:
   snapshot_id: snapshot-2026-10-20
   source: orders.parquet
