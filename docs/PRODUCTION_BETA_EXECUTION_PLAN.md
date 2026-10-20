@@ -60,8 +60,8 @@ means the code path exists; it does not mean the capability is supported.
 
 ### Verification snapshot — 20 October 2026
 
-The post-fix repository regression run completed with `1907 passed, 103
-skipped, 9 warnings` in 30 minutes 56 seconds using `uv run pytest -q` on the
+The current repository regression run completed with `1927 passed, 103
+skipped, 6 warnings` in 29 minutes 30 seconds using `uv run pytest -q` on the
 local Python 3.14t environment. The suite is green, but the skipped tests and
 runtime warnings are not release evidence by themselves: each must be
 classified as environment-required, intentionally unsupported, or a release
