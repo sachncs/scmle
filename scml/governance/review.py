@@ -6,9 +6,13 @@ import dataclasses
 import datetime
 import enum
 import json
+import os
+from pathlib import Path
+import tempfile
 from typing import Any
 from typing import Self
 
+from scml import durability
 from scml.governance import attestation
 
 
@@ -226,6 +230,38 @@ class IndependentReleaseReview:
             return False
         expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
         return self.signature == expected
+
+    def write(self, path: str | Path) -> None:
+        """Persist the review atomically and flush its directory entry."""
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
+        )
+        os.close(descriptor)
+        temporary = Path(temporary_name)
+        try:
+            with temporary.open("w", encoding="utf-8") as stream:
+                stream.write(
+                    json.dumps(self.to_dict(), indent=2, sort_keys=True)
+                    + "\n"
+                )
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, target)
+            durability.sync_directory(target.parent)
+        except Exception:
+            if temporary.exists():
+                temporary.unlink()
+            raise
+
+    @classmethod
+    def read(cls, path: str | Path) -> Self:
+        """Load and validate a persisted review record."""
+        record = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(record, Mapping):
+            raise ValueError("release review must be a JSON object")
+        return cls.from_dict(record)
 
     def accepted(
         self,

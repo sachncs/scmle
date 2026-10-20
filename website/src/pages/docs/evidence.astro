@@ -52,6 +52,11 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     required_kinds=("metric", "fairness", "explanation"),
     signing_key="&lt;review-key&gt;",
 )`}</code></pre>
+  <p>For a reviewer who has checked out the exact source, the persisted record can be verified without opening the application:</p>
+  <pre><code>{`SCML_REVIEW_SIGNING_KEY="..." \\
+  python scripts/verify_release_review.py release/independent-review.json \\
+  --source-commit "&lt;exact-release-sha&gt;"`}</code></pre>
+  <p>A zero exit status proves that the signed record is accepted for that commit and required claim set. It still does not create the reviewer identity, recompute the claims, or prove that the external environment was independent; those are inputs to the record.</p>
 
   <h2>Read the evidence in order</h2>
   <div class="diagram">

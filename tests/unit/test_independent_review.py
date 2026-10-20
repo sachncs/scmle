@@ -1,5 +1,11 @@
 """Tests for independent release review evidence."""
 
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
 import pytest
 
 from scml.governance import review
@@ -59,6 +65,49 @@ def test_review_round_trips_and_accepts_exact_signed_proof():
     )
     assert not restored.accepted("different", (), "release-key")
     assert not restored.verify_signature("wrong-key")
+
+
+def test_signed_review_writes_atomically_and_cli_verifies_exact_commit(
+    tmp_path: Path,
+):
+    """A reviewer can verify persisted evidence without importing internals."""
+    path = tmp_path / "independent-review.json"
+    make_review().sign("release-key").write(path)
+    restored = review.IndependentReleaseReview.read(path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/verify_release_review.py",
+            str(path),
+            "--source-commit",
+            "abc1234",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "SCML_REVIEW_SIGNING_KEY": "release-key"},
+    )
+
+    assert restored == make_review().sign("release-key")
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["accepted"] is True
+    assert not list(tmp_path.glob("*.tmp"))
+
+    wrong_commit = subprocess.run(
+        [
+            sys.executable,
+            "scripts/verify_release_review.py",
+            str(path),
+            "--source-commit",
+            "different",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "SCML_REVIEW_SIGNING_KEY": "release-key"},
+    )
+    assert wrong_commit.returncode == 1
 
 
 def test_review_fails_closed_for_blocked_or_failed_claims():
