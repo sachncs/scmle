@@ -8,6 +8,7 @@ import abc
 import hashlib
 import pathlib
 from typing import ClassVar
+from urllib.parse import unquote
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
@@ -261,13 +262,35 @@ def uri_semantics(uri: str | pathlib.Path) -> str:
     return f"{scheme}-uri"
 
 
+def raw_source_hash(uri: str | pathlib.Path) -> str:
+    """Returns the raw-byte SHA-256 for an available local source.
+
+    Remote and in-memory sources intentionally return an empty value because
+    this reader has no transport or immutable-byte snapshot authority for
+    them. The parsed-frame hash remains available in ``data_hash``.
+    """
+    parsed = urlsplit(canonical_uri(uri))
+    if parsed.scheme != "file":
+        return ""
+    path = pathlib.Path(unquote(parsed.path))
+    if not path.is_file():
+        return ""
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(chunk)
+    except OSError:
+        return ""
+    return digest.hexdigest()
+
+
 def snapshot_identity(frame: pd.DataFrame, uri: str | pathlib.Path) -> str:
     """Returns a full deterministic identity for a tabular snapshot.
 
-    The identity includes the ordered schema, ordered row content, shape, and
-    canonical URI semantics. The DataFrame index is intentionally excluded so
-    that a table loaded from a file and an equivalent in-memory table have the
-    same content identity when their URI semantics match.
+    The identity includes the ordered schema, ordered row content, shape,
+    canonical URI semantics, and raw source bytes when an available local
+    file is the source. The DataFrame index is intentionally excluded.
 
     Args:
         frame: The ingested table.
@@ -296,6 +319,7 @@ def snapshot_identity(frame: pd.DataFrame, uri: str | pathlib.Path) -> str:
             str(frame.shape[0]),
             str(frame.shape[1]),
             canonical_uri(uri),
+            raw_source_hash(uri),
         )
     )
     return f"snap_{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
@@ -324,6 +348,10 @@ def build_manifest(
         )
     content_hash = data_hash(frame)
     identity = snapshot_identity(frame, uri)
+    raw_hash = raw_source_hash(uri)
+    object_hashes = {"tabular-frame": content_hash}
+    if raw_hash:
+        object_hashes["raw-source"] = raw_hash
     return data_contracts.DatasetManifest(
         dataset_id=f"ds_{content_hash[:8]}",
         schema_hash=schema_hash(frame),
@@ -338,7 +366,7 @@ def build_manifest(
         ),
         lineage=data_contracts.LineageMetadata(
             source_snapshot=identity,
-            object_hashes={"tabular-frame": content_hash},
+            object_hashes=object_hashes,
         ),
     )
 

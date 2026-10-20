@@ -120,6 +120,7 @@ def test_manifest_deterministic_and_input_immutable(frame):
 
 def test_manifest_populates_deterministic_snapshot_and_lineage(frame, tmp_path):
     path = tmp_path / "records.csv"
+    frame.to_csv(path, index=False)
     first = tabular.build_manifest(frame, "y", path)
     second = tabular.build_manifest(frame.copy(), "y", path)
 
@@ -130,7 +131,26 @@ def test_manifest_populates_deterministic_snapshot_and_lineage(frame, tmp_path):
     assert first.source.owner == ""
     assert first.source.license == ""
     assert first.lineage.source_snapshot == first.snapshot_id
-    assert first.lineage.object_hashes == {"tabular-frame": first.data_hash}
+    assert first.lineage.object_hashes["tabular-frame"] == first.data_hash
+    assert first.lineage.object_hashes["raw-source"] == (
+        tabular.raw_source_hash(path)
+    )
+
+
+def test_raw_source_hash_changes_snapshot_when_bytes_change(frame, tmp_path):
+    path = tmp_path / "records.csv"
+    frame.to_csv(path, index=False)
+    first = tabular.build_manifest(frame, "y", path)
+
+    path.write_bytes(path.read_bytes() + b"\n")
+    second = tabular.build_manifest(frame, "y", path)
+
+    assert first.data_hash == second.data_hash
+    assert (
+        first.lineage.object_hashes["raw-source"]
+        != (second.lineage.object_hashes["raw-source"])
+    )
+    assert first.snapshot_id != second.snapshot_id
 
 
 def test_snapshot_identity_changes_for_content_schema_and_uri(frame):
