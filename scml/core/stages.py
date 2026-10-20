@@ -8,6 +8,7 @@ side-effect-free plan preview.
 
 import abc
 import dataclasses
+import datetime
 import json
 import time
 from typing import Any
@@ -23,6 +24,8 @@ from scml.artifacts import report
 from scml.contracts import capabilities
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
+from scml.contracts import evaluation as evaluation_contracts
+from scml.contracts import evidence as evidence_contracts
 from scml.contracts import experiments
 from scml.contracts import tasks
 from scml.core import compiler
@@ -48,7 +51,9 @@ from scml.evaluation import learning_curve
 from scml.evaluation import metrics as metric_catalog
 from scml.evaluation import mitigation
 from scml.evaluation import nested
+from scml.evaluation import policies
 from scml.evaluation import quantile
+from scml.evaluation import release
 from scml.evaluation import replay
 from scml.evaluation import resources
 from scml.evaluation import reweighing
@@ -1548,6 +1553,110 @@ class PackageStage(Stage):
     requires = (FinalEvaluationStage,)
     state = run_state.RunState.PACKAGING
 
+    def evidence_index(
+        self,
+        context: context_module.RunContext,
+        store: Any,
+        policy: evaluation_contracts.EvaluationPolicy,
+    ) -> evidence_contracts.EvidenceIndex:
+        """Collect accepted evidence for artifacts already written.
+
+        Acceptance is deliberately narrow: an automated record is accepted
+        only when the referenced artifact exists and its digest is captured.
+        The evidence limitation records that an independent human review is
+        not represented by this automated run.
+        """
+        manifest = require(context.manifest, "manifest")
+        raw_inputs = {
+            "snapshot_id": manifest.snapshot_id or manifest.data_hash,
+            "config_hash": context.spec.config_hash(),
+        }
+        records: list[evidence_contracts.EvidenceRecord] = []
+        for reference in release.required_evidence_references(policy):
+            path = store.path(reference)
+            if not path.exists():
+                continue
+            records.append(
+                evidence_contracts.EvidenceRecord(
+                    criterion_id=reference,
+                    claim=(
+                        f"artifact exists and matches run output: {reference}"
+                    ),
+                    scope={
+                        "task": require(context.task, "task").value,
+                        "modality": manifest.modality,
+                    },
+                    raw_inputs=raw_inputs,
+                    command_or_test="scml automated release evidence collector",
+                    artifact={
+                        "path": reference,
+                        "sha256": bundle_module.file_sha256(path),
+                    },
+                    result=evidence_contracts.EvidenceResult.PASS,
+                    reviewer="scml.automation",
+                    observed_at=datetime.datetime.now(datetime.UTC).isoformat(),
+                    limitations=(
+                        "automated artifact-presence and digest check; "
+                        "independent human review is not represented",
+                    ),
+                    decision=evidence_contracts.EvidenceDecision.ACCEPTED,
+                )
+            )
+        return evidence_contracts.EvidenceIndex(records)
+
+    def release_evaluation(
+        self,
+        context: context_module.RunContext,
+        store: Any,
+        evaluation: dict[str, Any],
+    ) -> None:
+        """Evaluate explicit success criteria against release evidence."""
+        task = require(context.task, "task")
+        metric = require(context.metric, "metric")
+        policy = policies.release_policy_from_criteria(
+            task,
+            metric.name,
+            metric.greater_is_better,
+            context.spec.problem.success_criteria,
+        )
+        if policy is None:
+            record = {
+                "status": "policy_not_declared",
+                "passed": False,
+                "blocked": True,
+                "blocking_reasons": [
+                    "no explicit success criteria were declared; release "
+                    "thresholds were not invented from observed metrics",
+                ],
+                "findings": [],
+            }
+            evaluation["release_policy"] = None
+            evaluation["release_evaluation"] = record
+            evaluation["release_evidence"] = {"records": [], "ready": False}
+            store.write_json("release_evaluation.json", record)
+            return
+
+        evidence_index = self.evidence_index(context, store, policy)
+        declared_metrics = {metric.name for metric in policy.metrics}
+        release_metrics = {
+            name: value
+            for name, value in evaluation["test_metrics"].items()
+            if name in declared_metrics
+        }
+        outcome = release.evaluate_release(
+            policy,
+            release_metrics,
+            context.diagnostics,
+            {"fairness": context.diagnostics.get("fairness", {})},
+            evidence_index,
+        )
+        evaluation["release_policy"] = policy.to_dict()
+        evaluation["release_evaluation"] = outcome.to_dict()
+        evaluation["release_evidence"] = evidence_index.to_dict()
+        store.write_json("evaluation_policy.json", policy.to_dict())
+        store.write_json("release_evidence.json", evidence_index.to_dict())
+        store.write_json("release_evaluation.json", outcome.to_dict())
+
     def describe(self, context: context_module.RunContext) -> str:
         """Names the stage."""
         return "write bundle and reports"
@@ -1982,6 +2091,7 @@ class PackageStage(Stage):
                 },
             },
         )
+        self.release_evaluation(context, store, evaluation)
         store.write_json("evaluation.json", evaluation)
         result = results.RunResult(
             run_id=store.run_id,

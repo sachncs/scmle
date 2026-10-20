@@ -1,0 +1,80 @@
+"""Construction of explicit release policies from project requirements."""
+
+from collections.abc import Mapping
+
+from scml.contracts import evaluation
+from scml.contracts import tasks
+
+
+def release_policy_from_criteria(
+    task: tasks.TaskType,
+    primary_metric: str,
+    primary_greater_is_better: bool,
+    success_criteria: Mapping[str, float],
+) -> evaluation.EvaluationPolicy | None:
+    """Build a release policy when the project declares score thresholds.
+
+    The project-level success criteria are the only source of numeric release
+    gates. A project without them has no honest threshold to evaluate and
+    therefore returns ``None`` instead of inventing one from the observed
+    score. The metric-uncertainty diagnostic is a blocking evidence gate for
+    every task because a point estimate without an uncertainty report is not
+    sufficient release evidence.
+    """
+    if not success_criteria:
+        return None
+    primary_direction = (
+        evaluation.MetricDirection.MAXIMIZE
+        if primary_greater_is_better
+        else evaluation.MetricDirection.MINIMIZE
+    )
+    declarations: dict[str, evaluation.MetricDeclaration] = {
+        primary_metric: evaluation.MetricDeclaration(
+            name=primary_metric,
+            direction=primary_direction,
+        )
+    }
+    gates: list[evaluation.MetricGate] = []
+    for name, threshold in success_criteria.items():
+        direction = evaluation.METRIC_DIRECTIONS.get(name)
+        if direction is None:
+            raise evaluation.UnsupportedEvaluationPolicyError(
+                f"metric '{name}' has no declared release direction"
+            )
+        declarations[name] = evaluation.MetricDeclaration(
+            name=name,
+            direction=direction,
+        )
+        gates.append(evaluation.MetricGate(name, direction, float(threshold)))
+    evidence_ref = "diagnostics/metric_uncertainty.json"
+    return evaluation.EvaluationPolicy(
+        task=task,
+        primary_metric=primary_metric,
+        metrics=tuple(declarations.values()),
+        uncertainty=evaluation.UncertaintyPolicy(
+            evaluation.UncertaintyMethod.NONE
+        ),
+        calibration=evaluation.CalibrationPolicy(
+            evaluation.CalibrationMethod.NONE
+        ),
+        fairness=evaluation.FairnessPolicy(evaluation.FairnessMethod.NONE),
+        small_groups=evaluation.SmallGroupPolicy(warning_threshold=30),
+        explanations=evaluation.ExplanationPolicy(
+            evaluation.ExplanationAvailability.NONE
+        ),
+        release=evaluation.ReleasePolicy(
+            metric_gates=tuple(gates),
+            diagnostic_gates=(
+                evaluation.DiagnosticGate(
+                    "metric_uncertainty",
+                    evaluation.DiagnosticAction.BLOCK,
+                    (evidence_ref,),
+                ),
+            ),
+            required_evidence=(
+                "dataset_manifest.json",
+                "model/model_manifest.json",
+                evidence_ref,
+            ),
+        ),
+    )
