@@ -81,25 +81,26 @@ HTML files, and the Playwright browser smoke passed both route and keyboard
 navigation tests;
 the pushed exact-SHA clean-clone acceptance slice passed `1649 passed, 80
 skipped, 6 warnings` in 8 minutes 39 seconds and `scml --help` succeeded;
-the complete local release preflight then passed `1672 passed, 89 skipped, 2
-runtime warnings` in 11 minutes 22 seconds, with four offline benchmarks and
-zero regressions, successful wheel/sdist checks, and no known Python
-dependency vulnerabilities; the two warnings are nondeterministic SQLite
-connection teardown warnings in curriculum run 3 and remain release debt;
-the latest critical mutation run killed `1252/1733` mutants (72%, above the
-70% gate), with 480 survivors and one timeout;
+the complete local release preflight at commit `e8d3b63` then passed `1678
+passed, 89 skipped, 2 runtime warnings` in 8 minutes 07 seconds, with core
+scope coverage still at 86%, four offline benchmarks and zero regressions,
+successful wheel/sdist checks, and no known Python dependency vulnerabilities;
+the two warnings are nondeterministic SQLite connection teardown warnings in
+curriculum run 3 and remain release debt; the latest critical mutation run
+killed `1254/1735` mutants (72%, above the 70% gate), with 480 survivors and
+one timeout;
 the latest modality/capability slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
 seconds. The remaining leakage, property, specification, and benchmark tiers
 completed with `85 passed` in 3 minutes 27 seconds. The prior all-repository
 acceptance run therefore provided `1982 passed, 103 skipped, 6 warnings`; the
-subsequent signed-governance, fault-harness, incremental-sink, and
-directory-durability slices have
-their focused and complete-unit evidence above, but a new single-command
-acceptance run is still required. The clean-clone acceptance slice is now
-verified, but an independent reviewer must still reproduce the package and
-sign the release decision. Skipped tests and runtime warnings are not release
-evidence by themselves: each must be classified as
+subsequent signed-governance, fault-harness, incremental-sink,
+directory-durability, and undefined-score slices are included in the new-head
+preflight above.
+The clean-clone acceptance slice is verified, but an independent reviewer
+must still reproduce the package and sign the release decision. Skipped tests
+and runtime warnings are not release evidence by themselves: each must be
+classified as
 environment-required, intentionally unsupported, or a release blocker before
 a supported-production label is appropriate.
 
