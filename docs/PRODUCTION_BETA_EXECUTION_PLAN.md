@@ -876,3 +876,28 @@ Stop and revise the plan if any of these occurs:
 
 In those cases, demote the capability to extension-only with a documented
 reason. Do not weaken the acceptance criteria to preserve the label.
+
+## 10. Current local preflight record
+
+At commit `29d1913` (`docs(evaluation): record benchmark resource gates`),
+the local release preflight passed on 2026-10-21:
+
+- bounded contract suite: 1,866 passed, 89 skipped, 82.34% coverage;
+- mutation gate: 1,294 of 1,794 mutants killed, for a 72% score against a
+  70% minimum;
+- benchmark regression gate: 4 of 4 datasets passed with zero recorded
+  failures, including runtime and peak-memory evidence;
+- static and dependency gates: Ruff, format check, mypy, Bandit, and
+  pip-audit passed;
+- artifact gate: reproducible wheel and source distribution builds passed,
+  followed by network-isolated wheel and source-distribution installation;
+- site gate: Astro built all 15 static pages and npm audit reported zero
+  vulnerabilities.
+
+The test run emitted two non-failing `ResourceWarning` instances from the
+Python 3.14 free-threaded AST/convention test path. The benchmark run emitted
+scikit-learn deprecation warnings. These are recorded as follow-up hygiene
+items, not suppressed as release evidence. This record is local evidence only:
+it does not replace clean-clone execution, hosted optional-dependency audits,
+external/container/kernel fault injection, public GitHub Pages verification,
+or independent review and signature.
