@@ -75,9 +75,7 @@ def label_counts(labels: Iterable[Any]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for label in labels:
         bucket = (
-            "unlabeled"
-            if label is None
-            else f"{type(label).__name__}:{label}"
+            "unlabeled" if label is None else f"{type(label).__name__}:{label}"
         )
         counts[bucket] = counts.get(bucket, 0) + 1
     return dict(sorted(counts.items()))

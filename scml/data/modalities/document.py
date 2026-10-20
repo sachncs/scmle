@@ -416,9 +416,7 @@ class DocumentDataset:
             )
 
         truncated_ids = tuple(
-            profile.document_id
-            for profile in profiles
-            if profile.truncated
+            profile.document_id for profile in profiles if profile.truncated
         )
         if truncated_ids:
             quality_findings.append(

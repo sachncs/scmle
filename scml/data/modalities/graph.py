@@ -534,9 +534,7 @@ class GraphData:
                     "quality.graph-isolated-nodes",
                     data_contracts.FindingSeverity.WARNING,
                     {"source": self.source_uri},
-                    {
-                        "isolated_node_count": profile.node.isolated_node_count
-                    },
+                    {"isolated_node_count": profile.node.isolated_node_count},
                     "Confirm isolated nodes are valid for the intended task.",
                     False,
                 )
