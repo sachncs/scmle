@@ -154,6 +154,9 @@ The audio grouped-split slice at `6ce8ad2` and video grouped-split slice at
 they do not infer speaker, subject, session, or camera identity when the
 caller has not supplied a `group_id`, and they do not expand the supported
 modelling boundary.
+The image grouped-split slice at `006f7b2` adds the same capture-session or
+subject boundary with 11 focused image-data tests and does not expand the
+supported modelling boundary.
 
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
