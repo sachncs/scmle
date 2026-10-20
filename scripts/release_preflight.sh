@@ -27,6 +27,9 @@ uv run --python "$python_version" pytest -q \
 uv run --python "$python_version" coverage report \
   --include='scml/contracts/*,scml/data/*,scml/evaluation/*,scml/governance/*,scml/inference/*,scml/monitoring/*' \
   --fail-under=85
+echo "== critical mutation gate =="
+uv run --python "$python_version" mutmut run --max-children 4
+scripts/check_mutation_score.sh 70
 
 echo "== benchmark regression =="
 uv run --python "$python_version" python -m benchmarks.run_benchmarks \

@@ -28,6 +28,10 @@ jobs:
           uv run coverage report
           --include=scml/contracts/*,scml/data/*,scml/evaluation/*,scml/governance/*,scml/inference/*,scml/monitoring/*
           --fail-under=85
+      - name: Enforce critical mutation score
+        run: |
+          uv run mutmut run --max-children 4
+          scripts/check_mutation_score.sh 70
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

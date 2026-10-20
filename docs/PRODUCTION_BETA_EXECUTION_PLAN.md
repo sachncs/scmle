@@ -73,6 +73,9 @@ completed with `1612 passed, 89 skipped, 8 warnings` in 3 minutes 52 seconds;
 its declared core scope (`contracts`, `data`, `evaluation`, `governance`,
 `inference`, and `monitoring`) measured 86% coverage with the enforced
 `uv run coverage report --include=... --fail-under=85` gate;
+the configured critical mutation scope generated 1,733 mutants, of which
+1,251 were killed, 481 survived, and 1 timed out (72% of scored mutants),
+passing the 70% minimum while leaving survivor triage as evidence debt;
 the latest promotion/lifecycle slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
 seconds. The remaining leakage, property, specification, and benchmark tiers
