@@ -1,9 +1,10 @@
-"""Deterministic source connectors for local files and DB-API queries.
+"""Deterministic source connectors for files, objects, and DB-API queries.
 
 Connectors expose the smallest useful ingestion contract: identify a logical
 source, inspect its schema, and read bounded row batches from a checkpoint.
-Object-store and network-client support deliberately remain outside this
-module; accepting a URI is not the same as implementing its transport.
+Network clients remain caller-owned: transport functions are injected and
+their boundaries are recorded by the connector rather than hidden behind a
+cloud SDK import.
 """
 
 import abc
@@ -15,6 +16,7 @@ import contextlib
 import dataclasses
 import hashlib
 import io
+import json
 import math
 import pathlib
 import time
@@ -31,6 +33,8 @@ from scml.data.readers import tabular
 
 T = TypeVar("T")
 Row = tuple[Any, ...]
+RangeReader = Callable[[str, int, int], bytes]
+SizeReader = Callable[[str], int]
 
 
 class ConnectorError(errors.DataError):
@@ -214,9 +218,11 @@ def decode_cursor(cursor: str) -> tuple[str, int]:
 
 @dataclasses.dataclass(frozen=True)
 class SourceCheckpoint:
-    """A portable row checkpoint bound to a source identity.
+    """A portable source-position checkpoint bound to a source identity.
 
-    A checkpoint can be supplied by explicit ``offset`` or by the opaque
+    A row-oriented connector uses row offsets; a range-oriented connector may
+    use byte offsets. The unit is defined by the connector contract. A
+    checkpoint can be supplied by explicit ``offset`` or by the opaque
     ``cursor`` returned in a previous batch. When both are present they must
     agree. A checkpoint returned by a connector always contains both values.
     """
@@ -740,3 +746,251 @@ class ObjectStoreConnector(SourceConnector):
             checkpoint=next_checkpoint,
             has_more=value.offset + len(rows) < len(frame),
         )
+
+
+class StreamingObjectStoreConnector(SourceConnector):
+    """Range-backed connector for bounded JSONL and NDJSON objects.
+
+    The injected range reader uses half-open byte ranges ``[start, end)``.
+    Checkpoint offsets are byte positions at record boundaries, so a resumed
+    read never needs to download or decode the preceding object content.
+    The connector intentionally supports line-oriented formats only; quoted
+    CSV records and binary containers need a format-specific streaming adapter.
+    """
+
+    supported_schemes = ObjectStoreConnector.supported_schemes
+
+    def __init__(
+        self,
+        source_uri: str,
+        read_range: RangeReader,
+        size_bytes: SizeReader,
+        retry_budget: RetryBudget | None = None,
+        chunk_bytes: int = 1024 * 1024,
+        max_record_bytes: int = 64 * 1024 * 1024,
+    ) -> None:
+        """Initialize a range-backed object connector.
+
+        Args:
+            source_uri: Object URI ending in ``.jsonl`` or ``.ndjson``.
+            read_range: Caller-owned byte-range transport.
+            size_bytes: Caller-owned object-size lookup.
+            retry_budget: Per-operation retry policy.
+            chunk_bytes: Maximum bytes requested per range call.
+            max_record_bytes: Maximum buffered line size.
+        """
+        value = source_uri.strip()
+        scheme = urlsplit(value).scheme.lower()
+        suffix = pathlib.PurePosixPath(urlsplit(value).path).name.lower()
+        if scheme not in self.supported_schemes:
+            raise UnsupportedUriSchemeError(
+                value, scheme, self.supported_schemes
+            )
+        if not suffix.endswith((".jsonl", ".ndjson")):
+            raise ConnectorError(
+                "unsupported_stream_format",
+                "streaming object connector requires JSONL or NDJSON",
+                value,
+                {"supported_formats": ["jsonl", "ndjson"]},
+            )
+        if not callable(read_range) or not callable(size_bytes):
+            raise TypeError("read_range and size_bytes must be callable")
+        if chunk_bytes < 1:
+            raise ValueError("chunk_bytes must be positive")
+        if max_record_bytes < 1:
+            raise ValueError("max_record_bytes must be positive")
+        self.read_range = read_range
+        self.size_bytes = size_bytes
+        self.chunk_bytes = chunk_bytes
+        self.max_record_bytes = max_record_bytes
+        super().__init__(value, retry_budget)
+
+    def object_size(self) -> int:
+        """Return a non-negative object size through the retry policy."""
+        size = execute_with_retries(
+            lambda: self.size_bytes(self.source_uri),
+            "head_object",
+            self.source_uri,
+            self.retry_budget,
+        )
+        if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+            raise ConnectorError(
+                "invalid_object_size",
+                "object size reader must return a non-negative integer",
+                self.source_uri,
+                {"size_type": type(size).__name__, "size": size},
+            )
+        return size
+
+    def read_bytes(self, start: int, end: int) -> bytes:
+        """Read one validated half-open byte range."""
+        payload = execute_with_retries(
+            lambda: self.read_range(self.source_uri, start, end),
+            "read_range",
+            self.source_uri,
+            self.retry_budget,
+        )
+        if not isinstance(payload, bytes):
+            raise ConnectorError(
+                "invalid_range_payload",
+                "range reader must return bytes",
+                self.source_uri,
+                {"payload_type": type(payload).__name__},
+            )
+        requested = end - start
+        if len(payload) > requested:
+            raise ConnectorError(
+                "range_overread",
+                "range reader returned more bytes than requested",
+                self.source_uri,
+                {"requested": requested, "received": len(payload)},
+            )
+        return payload
+
+    def schema(self) -> SourceSchema:
+        """Read one bounded record to discover the source schema."""
+        batch = self.read_rows(limit=1)
+        if not batch.rows:
+            raise ConnectorError(
+                "empty_object",
+                "streaming object contains no JSON records",
+                self.source_uri,
+            )
+        return batch.schema
+
+    def read_rows(
+        self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
+    ) -> RowBatch:
+        """Read JSON records from a byte checkpoint without full download."""
+        self.validate_limit(limit)
+        value = self.validate_checkpoint(checkpoint)
+        total = self.object_size()
+        if value.offset > total:
+            raise CheckpointError(
+                self.source_uri,
+                "checkpoint_beyond_object",
+                "checkpoint offset is beyond the current object size",
+                {"offset": value.offset, "size": total},
+            )
+        records = self.read_record_lines(value.offset, total, limit + 1)
+        if not records:
+            return RowBatch(
+                schema=SourceSchema((SourceColumn("record", "object"),)),
+                rows=(),
+                checkpoint=value,
+                has_more=False,
+            )
+        selected = records[:limit]
+        schema, rows = self.decode_records(selected)
+        next_offset = selected[-1][1]
+        next_checkpoint = value.bind(self.source_identity).advance(
+            next_offset - value.offset
+        )
+        return RowBatch(
+            schema=schema,
+            rows=rows,
+            checkpoint=next_checkpoint,
+            has_more=len(records) > limit,
+        )
+
+    def read_record_lines(
+        self, start: int, total: int, required_records: int
+    ) -> list[tuple[bytes, int]]:
+        """Read complete newline-delimited records from a byte position."""
+        records: list[tuple[bytes, int]] = []
+        buffer = b""
+        buffer_origin = start
+        position = start
+        while position < total and len(records) < required_records:
+            end = min(total, position + self.chunk_bytes)
+            payload = self.read_bytes(position, end)
+            if not payload:
+                raise ConnectorError(
+                    "range_no_progress",
+                    "range reader returned no bytes before object end",
+                    self.source_uri,
+                    {"offset": position, "requested_end": end},
+                )
+            buffer += payload
+            position += len(payload)
+            while b"\n" in buffer and len(records) < required_records:
+                newline = buffer.index(b"\n")
+                line = buffer[:newline].rstrip(b"\r")
+                line_end = buffer_origin + newline + 1
+                buffer = buffer[newline + 1 :]
+                buffer_origin = line_end
+                if line:
+                    records.append((line, line_end))
+            if len(buffer) > self.max_record_bytes:
+                raise ConnectorError(
+                    "record_too_large",
+                    "a JSON record exceeds max_record_bytes",
+                    self.source_uri,
+                    {
+                        "max_record_bytes": self.max_record_bytes,
+                        "offset": buffer_origin,
+                    },
+                )
+        if buffer and position >= total and len(records) < required_records:
+            records.append((buffer, position))
+        return records
+
+    def decode_records(
+        self, records: Sequence[tuple[bytes, int]]
+    ) -> tuple[SourceSchema, tuple[Row, ...]]:
+        """Decode JSON objects and reject silent schema drift."""
+        decoded: list[Mapping[str, Any]] = []
+        for line, _end in records:
+            try:
+                record = json.loads(line.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ConnectorError(
+                    "invalid_json_record",
+                    "streaming object contains invalid UTF-8 JSON",
+                    self.source_uri,
+                    {"error_type": type(error).__name__},
+                ) from error
+            if not isinstance(record, Mapping):
+                raise ConnectorError(
+                    "record_not_object",
+                    "streaming JSON records must be objects",
+                    self.source_uri,
+                    {"record_type": type(record).__name__},
+                )
+            decoded.append(record)
+        names = tuple(decoded[0])
+        schema = SourceSchema(
+            tuple(
+                SourceColumn(name, self.json_type_name(decoded[0][name]))
+                for name in names
+            )
+        )
+        rows: list[Row] = []
+        for record in decoded:
+            if tuple(record) != names:
+                raise ConnectorError(
+                    "schema_changed",
+                    "streaming JSON record fields changed within the object",
+                    self.source_uri,
+                    {"expected": list(names), "observed": list(record)},
+                )
+            rows.append(tuple(record[name] for name in names))
+        return schema, tuple(rows)
+
+    def json_type_name(self, value: Any) -> str:
+        """Return a stable source type name for one JSON value."""
+        if value is None:
+            return "null"
+        if isinstance(value, bool):
+            return "bool"
+        if isinstance(value, int):
+            return "int"
+        if isinstance(value, float):
+            return "float"
+        if isinstance(value, str):
+            return "str"
+        if isinstance(value, list):
+            return "array"
+        if isinstance(value, Mapping):
+            return "object"
+        return type(value).__name__

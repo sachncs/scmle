@@ -4,6 +4,7 @@ from scml.data.readers.connectors import DbApiConnector
 from scml.data.readers.connectors import LocalFileConnector
 from scml.data.readers.connectors import ObjectStoreConnector
 from scml.data.readers.connectors import SourceConnector
+from scml.data.readers.connectors import StreamingObjectStoreConnector
 from scml.data.readers.incremental import CommittedIncrementalState
 from scml.data.readers.incremental import EventBatch
 from scml.data.readers.incremental import EventCheckpoint
@@ -36,4 +37,5 @@ __all__ = [
     "SourceRegistry",
     "SourceRegistryStore",
     "SourceSnapshot",
+    "StreamingObjectStoreConnector",
 ]

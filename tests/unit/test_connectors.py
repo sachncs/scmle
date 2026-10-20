@@ -1,6 +1,7 @@
 """Focused tests for dependency-free source connectors."""
 
 import sqlite3
+from urllib.parse import urlsplit
 
 import pandas as pd
 import pytest
@@ -88,6 +89,74 @@ def test_object_store_connector_rejects_large_payloads_and_bad_formats():
         connectors.ObjectStoreConnector(
             "gs://bucket/source.csv", lambda uri: b"id\n1\n", max_bytes=1
         ).schema()
+
+
+def test_streaming_object_connector_reads_ranges_and_resumes_by_byte_offset():
+    """JSONL range reads do not redownload preceding records."""
+    payload = (
+        b'{"id":1,"label":"a"}\n{"id":2,"label":"b"}\n{"id":3,"label":"c"}\n'
+    )
+    requests: list[tuple[int, int]] = []
+
+    def read_range(uri: str, start: int, end: int) -> bytes:
+        assert urlsplit(uri).scheme == "s3"
+        requests.append((start, end))
+        return payload[start:end]
+
+    connector = connectors.StreamingObjectStoreConnector(
+        "s3://bucket/events.jsonl",
+        read_range,
+        lambda uri: len(payload),
+        chunk_bytes=10,
+    )
+
+    first = connector.read_rows(limit=2)
+    second = connector.read_rows(first.checkpoint, limit=2)
+
+    assert first.rows == ((1, "a"), (2, "b"))
+    assert second.rows == ((3, "c"),)
+    assert first.checkpoint.offset == payload.index(b'{"id":3')
+    assert not second.has_more
+    assert requests[0][0] == 0
+    assert requests[-1][0] >= first.checkpoint.offset
+
+
+def test_streaming_object_connector_rejects_corrupt_and_changed_records():
+    """Malformed JSON and in-object schema drift fail with structured codes."""
+    corrupt = b'{"id":1}\nnot-json\n'
+    corrupt_connector = connectors.StreamingObjectStoreConnector(
+        "https://example.test/events.ndjson",
+        lambda uri, start, end: corrupt[start:end],
+        lambda uri: len(corrupt),
+    )
+    with pytest.raises(connectors.ConnectorError) as corrupt_failure:
+        corrupt_connector.read_rows(limit=2)
+    assert corrupt_failure.value.code == "invalid_json_record"
+
+    changed = b'{"id":1}\n{"label":"a"}\n'
+    changed_connector = connectors.StreamingObjectStoreConnector(
+        "https://example.test/events.ndjson",
+        lambda uri, start, end: changed[start:end],
+        lambda uri: len(changed),
+    )
+    with pytest.raises(connectors.ConnectorError) as changed_failure:
+        changed_connector.read_rows(limit=2)
+    assert changed_failure.value.code == "schema_changed"
+
+
+def test_streaming_object_connector_rejects_oversized_records():
+    """A missing newline cannot grow the in-memory record buffer forever."""
+    payload = b'{"id":"' + b"x" * 12 + b'"}'
+    connector = connectors.StreamingObjectStoreConnector(
+        "s3://bucket/events.jsonl",
+        lambda uri, start, end: payload[start:end],
+        lambda uri: len(payload),
+        chunk_bytes=4,
+        max_record_bytes=8,
+    )
+
+    with pytest.raises(connectors.ConnectorError, match="max_record_bytes"):
+        connector.read_rows(limit=1)
 
     with pytest.raises(connectors.ConnectorError, match="unsupported"):
         connectors.ObjectStoreConnector(
