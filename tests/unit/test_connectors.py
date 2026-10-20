@@ -64,6 +64,37 @@ def test_local_connector_rejects_object_store_uri_without_fake_support():
     assert raised.value.as_dict()["category"] == "data"
 
 
+def test_object_store_connector_reads_bounded_tabular_objects_and_resumes(
+    frame,
+):
+    """Injected object transport supports schema and checkpointed batches."""
+    payload = frame.to_csv(index=False).encode("utf-8")
+    connector = connectors.ObjectStoreConnector(
+        "s3://bucket/source.csv", lambda uri: payload
+    )
+
+    first = connector.read_rows(limit=2)
+    second = connector.read_rows(first.checkpoint, limit=2)
+
+    assert connector.schema().columns[0].name == "id"
+    assert first.rows == ((1, "a"), (2, "b"))
+    assert second.rows == ((3, "c"), (4, "d"))
+    assert not second.has_more
+
+
+def test_object_store_connector_rejects_large_payloads_and_bad_formats():
+    """Bounded object support fails closed instead of hiding memory risk."""
+    with pytest.raises(connectors.ConnectorError, match="max_bytes"):
+        connectors.ObjectStoreConnector(
+            "gs://bucket/source.csv", lambda uri: b"id\n1\n", max_bytes=1
+        ).schema()
+
+    with pytest.raises(connectors.ConnectorError, match="unsupported"):
+        connectors.ObjectStoreConnector(
+            "az://bucket/source.xls", lambda uri: b"data"
+        ).schema()
+
+
 def test_checkpoint_cannot_cross_source_boundaries(tmp_path):
     """A checkpoint from one source cannot silently read another source."""
     first_path = tmp_path / "first.csv"

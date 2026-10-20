@@ -14,6 +14,7 @@ from collections.abc import Sequence
 import contextlib
 import dataclasses
 import hashlib
+import io
 import math
 import pathlib
 import time
@@ -629,3 +630,113 @@ class DbApiConnector(SourceConnector):
                 cursor.close()
         with contextlib.suppress(Exception):
             connection.close()
+
+
+def read_tabular_bytes(source_uri: str, payload: bytes) -> pd.DataFrame:
+    """Decode one supported tabular object from bytes.
+
+    The object-store connector accepts a byte-reader instead of importing a
+    cloud SDK. Credentials and transport-level retries remain caller-owned.
+    """
+    name = pathlib.PurePosixPath(urlsplit(source_uri).path).name.lower()
+    if name.endswith((".csv", ".csv.gz", ".csv.bz2", ".csv.xz")):
+        if name.endswith(".gz"):
+            return pd.read_csv(io.BytesIO(payload), compression="gzip")
+        if name.endswith(".bz2"):
+            return pd.read_csv(io.BytesIO(payload), compression="bz2")
+        if name.endswith(".xz"):
+            return pd.read_csv(io.BytesIO(payload), compression="xz")
+        return pd.read_csv(io.BytesIO(payload))
+    if name.endswith((".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")):
+        if name.endswith(".gz"):
+            return pd.read_json(
+                io.BytesIO(payload), lines=True, compression="gzip"
+            )
+        return pd.read_json(io.BytesIO(payload), lines=True)
+    if name.endswith((".parquet", ".pq")):
+        return pd.read_parquet(io.BytesIO(payload))
+    raise ConnectorError(
+        "unsupported_object_format",
+        f"unsupported tabular object format: {name or '<unknown>'}",
+        source_uri,
+        {"supported_formats": ["csv", "jsonl", "parquet"]},
+    )
+
+
+class ObjectStoreConnector(SourceConnector):
+    """Connector for bounded object-store reads through an injected reader.
+
+    This adapter downloads one object into memory before decoding it and
+    rejects objects over max_bytes. It supports deterministic small-object
+    ingestion, but does not claim range reads or streaming-scale semantics.
+    """
+
+    supported_schemes = ("s3", "gs", "az", "abfs", "http", "https")
+
+    def __init__(
+        self,
+        source_uri: str,
+        read_bytes: Callable[[str], bytes],
+        retry_budget: RetryBudget | None = None,
+        max_bytes: int = 256 * 1024 * 1024,
+    ) -> None:
+        """Initialize an object connector with explicit transport injection."""
+        value = source_uri.strip()
+        scheme = urlsplit(value).scheme.lower()
+        if scheme not in self.supported_schemes:
+            raise UnsupportedUriSchemeError(
+                value, scheme, self.supported_schemes
+            )
+        if not callable(read_bytes):
+            raise TypeError("read_bytes must be callable")
+        if max_bytes < 1:
+            raise ValueError("max_bytes must be positive")
+        self.read_bytes = read_bytes
+        self.max_bytes = max_bytes
+        super().__init__(value, retry_budget)
+
+    def load_frame(self) -> pd.DataFrame:
+        """Download and decode the bounded object once."""
+        payload = execute_with_retries(
+            lambda: self.read_bytes(self.source_uri),
+            "read_object",
+            self.source_uri,
+            self.retry_budget,
+        )
+        if not isinstance(payload, bytes):
+            raise ConnectorError(
+                "invalid_object_payload",
+                "object reader must return bytes",
+                self.source_uri,
+                {"payload_type": type(payload).__name__},
+            )
+        if len(payload) > self.max_bytes:
+            raise ConnectorError(
+                "object_too_large",
+                f"object is larger than max_bytes={self.max_bytes}",
+                self.source_uri,
+                {"bytes": len(payload), "max_bytes": self.max_bytes},
+            )
+        return read_tabular_bytes(self.source_uri, payload)
+
+    def schema(self) -> SourceSchema:
+        """Read and return the bounded object's schema."""
+        return SourceSchema.from_frame(self.load_frame())
+
+    def read_rows(
+        self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
+    ) -> RowBatch:
+        """Read a bounded row batch from an object checkpoint."""
+        self.validate_limit(limit)
+        value = self.validate_checkpoint(checkpoint)
+        frame = self.load_frame()
+        schema = SourceSchema.from_frame(frame)
+        selected = frame.iloc[value.offset : value.offset + limit]
+        rows = tuple(selected.itertuples(index=False, name=None))
+        next_checkpoint = value.advance(len(rows))
+        return RowBatch(
+            schema=schema,
+            rows=rows,
+            checkpoint=next_checkpoint,
+            has_more=value.offset + len(rows) < len(frame),
+        )
