@@ -22,6 +22,11 @@ def wav_bytes(frame_count: int = 8) -> bytes:
     return output.getvalue()
 
 
+def failing_probe(payload: bytes) -> audio.AudioMetadata:
+    """Represent a caller-owned codec probe that fails deterministically."""
+    raise RuntimeError(payload)
+
+
 def test_audio_wav_ingestion_preserves_identity_and_profile():
     """WAV metadata and bytes are bound to the same immutable sample."""
     sample = audio.AudioSample.from_bytes(wav_bytes(), source="clip.wav")
@@ -42,7 +47,7 @@ def test_audio_non_wav_requires_explicit_probe():
         audio.AudioSample.from_bytes(
             b"opaque-audio",
             source="clip.flac",
-            probe=lambda payload: (_ for _ in ()).throw(RuntimeError(payload)),
+            probe=failing_probe,
         )
 
 

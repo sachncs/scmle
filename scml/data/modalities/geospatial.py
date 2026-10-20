@@ -40,7 +40,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def _validate_coordinates(value: Any) -> tuple[float, ...]:
+def validate_coordinates(value: Any) -> tuple[float, ...]:
     """Validate a nested coordinate array and return its numeric leaves."""
     if isinstance(value, (list, tuple)):
         if not value:
@@ -63,7 +63,7 @@ def _validate_coordinates(value: Any) -> tuple[float, ...]:
             return numbers
         flattened: list[float] = []
         for item in value:
-            flattened.extend(_validate_coordinates(item))
+            flattened.extend(validate_coordinates(item))
         return tuple(flattened)
     raise GeospatialValidationError(
         "coordinates must be nested numeric arrays",
@@ -71,7 +71,7 @@ def _validate_coordinates(value: Any) -> tuple[float, ...]:
     )
 
 
-def _geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
+def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
     """Validate a GeoJSON geometry and return all coordinate leaves."""
     geometry_type = geometry.get("type")
     if geometry_type not in GEOMETRY_TYPES:
@@ -93,9 +93,9 @@ def _geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
                     "geometry collection members must be objects",
                     {"code": "invalid_geometry_collection"},
                 )
-            values.extend(_geometry_coordinates(nested))
+            values.extend(geometry_coordinates(nested))
         return tuple(values)
-    return _validate_coordinates(geometry.get("coordinates"))
+    return validate_coordinates(geometry.get("coordinates"))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -116,7 +116,7 @@ class GeoFeature:
             raise GeospatialValidationError(
                 "geometry must be an object", {"code": "invalid_geometry"}
             )
-        _geometry_coordinates(self.geometry)
+        geometry_coordinates(self.geometry)
         payload = json.dumps(
             self.geometry,
             ensure_ascii=True,
@@ -135,7 +135,7 @@ class GeoFeature:
     @property
     def bounds(self) -> tuple[float, float, float, float]:
         """Return the axis-aligned x/y bounds of the geometry."""
-        coordinates = _geometry_coordinates(self.geometry)
+        coordinates = geometry_coordinates(self.geometry)
         xs = coordinates[0::2]
         ys = coordinates[1::2]
         return min(xs), min(ys), max(xs), max(ys)
@@ -294,4 +294,6 @@ __all__ = [
     "GeospatialValidationError",
     "RasterSample",
     "canonical_source",
+    "geometry_coordinates",
+    "validate_coordinates",
 ]
