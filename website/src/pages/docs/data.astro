@@ -47,8 +47,36 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   "composition": {"source_rows": 12000, "profiled_rows": 12000}
 }`}</code></pre>
 
+  <h2>Bind non-tabular governance before modelling</h2>
+  <p>Non-tabular lifecycles accept a typed <code>ModalityManifest</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training.</p>
+  <pre><code>{`from scml.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
+
+manifest = ModalityManifest(
+    dataset_id="documents-2026-10-21",
+    snapshot_id="approved-export-17",
+    modality="document",
+    task="binary_classification",
+    sample_count=len(dataset.samples),
+    content_hash=dataset.content_hash,
+    source=SourceMetadata(
+        owner="records-team",
+        acquisition_method="approved export",
+        license="internal-use",
+    ),
+    privacy=PrivacyMetadata(
+        classification="restricted",
+        contains_pii=True,
+        consent_basis="employment-contract",
+        retention_period="90d",
+        deletion_policy="case-closure",
+    ),
+)
+
+report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)`}</code></pre>
+  <p>The manifest is evidence, not approval. A reviewer still needs to inspect the source, consent, retention, label decisions, and open findings. If metadata is omitted, the generated card says so explicitly instead of implying that provenance or privacy was assessed.</p>
+
   <h2>Data boundaries beyond tables</h2>
-  <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation and dataset cards. Every foundation now exposes a modality curation report; documents and media flag duplicate content with conflicting labels, mixed labeled/unlabeled state, unknown language, and truncated inspection, while other modalities surface shape, encoding, duplicate, graph-structure, and CRS findings. Image ingestion also records EXIF tags and blocks release when camera, author, GPS, copyright, software, or capture-time metadata needs an explicit privacy decision. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
+  <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation, typed modality manifests, and dataset cards. Every foundation now exposes a modality curation report; documents and media flag duplicate content with conflicting labels, mixed labeled/unlabeled state, unknown language, and truncated inspection, while other modalities surface shape, encoding, duplicate, graph-structure, and CRS findings. Image ingestion also records EXIF tags and blocks release when camera, author, GPS, copyright, software, or capture-time metadata needs an explicit privacy decision. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
   <div class="doc-cards">
     <div class="doc-card"><small>AUDIO</small><h3>Probe before decode</h3><p>WAV metadata and bounded PCM signal statistics are read with the standard library. Other containers require an explicit caller-owned probe, so codec versions and optional dependencies remain visible in the run evidence.</p></div>
     <div class="doc-card"><small>VIDEO</small><h3>Decoder policy is yours</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. Use the metadata matrix by default, or provide an audited decoder for bounded, evenly sampled frame statistics. The core package never guesses from a filename or imports a codec stack implicitly.</p></div>

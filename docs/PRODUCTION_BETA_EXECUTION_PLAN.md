@@ -1005,6 +1005,12 @@ Subsequent focused evidence:
   release evidence no longer imports governance from a lower-level contract.
   The architecture rule, attestation, evidence-index, Ruff, and mypy focused
   tests pass (`12 passed` under `-W error::ResourceWarning`).
+- `1e7ef01` adds a modality-neutral `ModalityManifest` for non-tabular
+  datasets, binds its content hash and sample count before lifecycle
+  execution, and persists source, lineage, privacy, task, and finding
+  evidence in the generated dataset card. The focused modality contract and
+  lifecycle suite passes 31 tests under `-W error::ResourceWarning`, with
+  Ruff and mypy clean. Omitted governance remains explicitly unassessed.
 - `84193bf`, `8cb1672`, `65dc5b6`, and `c295e9a` add lifecycle-bound
   image region occlusion, graph one-hop context, CRS-bound geospatial
   geometry/feature evidence, and document span provenance respectively. The
