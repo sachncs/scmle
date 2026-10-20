@@ -929,6 +929,11 @@ or independent review and signature.
 
 Subsequent focused evidence:
 
+- The exact-SHA clean-clone rehearsal for `959fd2f` checked out a clean
+  detached tree, installed the release extras on Python 3.14, and passed the
+  workflow acceptance command with `1,868 passed, 73 skipped` in 6 minutes 46
+  seconds. `scml --help` exited successfully from that clone. This is local
+  reproduction of the hosted rehearsal, not independent reviewer evidence.
 - `c85118e` runs the optional-extra security gate on Python 3.13 with every
   declared extra installed. The license inventory covers 149 packages and
   `pip-audit --skip-editable` reports no known vulnerabilities after raising
