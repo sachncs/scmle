@@ -56,8 +56,8 @@ means the code path exists; it does not mean the capability is supported.
 | Portable model explanation evidence | Implemented / Tested | Existing permutation-importance and partial-dependence reports are packaged with identity, privacy, limitation, and source-report links. Generic explanation quality measures now provide explicit top-k stability and normalized fidelity scores, and release policies can block below-threshold evidence. Modality-specific explanations and production-scale repeated explanation runs remain incomplete. |
 | Promotion and rollback governance | Implemented / Tested | Champion promotion and rollback require an independent, HMAC-signed approval bound to model, version, bundle content, reviewer decision, evidence, and timestamp; invalid, missing, or tampered approvals are rejected and audit records preserve the signature. Lifecycle retraining stages challengers until approval. Independent release sign-off remains incomplete. |
 | Redacted inference observability | Implemented / Tested | `PredictionLog` emits a redacted sidecar, policy evaluation checks required signals, freshness, future timestamps, and upper-bound threshold breaches, retention enforcement atomically removes expired sidecar events without touching the raw prediction log, and deterministic routing produces idempotent alert IDs. Serving defaults and incident workflows remain incomplete. |
-| Fault injection and recovery | Partial | The complete release-blocking fault plan is persisted with each packaged run, and the registry plus `FaultInjectionHarness` can now record durable, digest-bound full, partial, or unsafe execution evidence with fail-closed status transitions. The harness deliberately delegates process/container/resource fault injection to scenario-specific executors. Worker-loss, disk-full, dependency, signature, connector, fuzzing, mutation, and clean-clone execution evidence is not complete. |
-| Security, provenance, SBOM, and release CI | Implemented / Tested | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, CI SBOM artifact publication, immutable CI action pins, a canonical HMAC-signed release attestation, and an exact-SHA clean-clone rehearsal job are implemented. Release evaluation verifies the attestation and blocks unsigned or tampered evidence. Signer custody/rotation evidence and observed clean-release execution remain incomplete. |
+| Fault injection and recovery | Partial | The complete release-blocking fault plan is persisted with each packaged run, and the registry plus `FaultInjectionHarness` can now record durable, digest-bound full, partial, or unsafe execution evidence with fail-closed status transitions. The harness deliberately delegates process/container/resource fault injection to scenario-specific executors. Mutation testing and the exact-SHA clean-clone acceptance slice are now evidenced; worker-loss, disk-full, dependency, signature, connector, fuzzing, and full external-fault execution evidence remain incomplete. |
+| Security, provenance, SBOM, and release CI | Implemented / Tested | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, CI SBOM artifact publication, immutable CI action pins, a canonical HMAC-signed release attestation, and an exact-SHA clean-clone rehearsal job are implemented. Release evaluation verifies the attestation and blocks unsigned or tampered evidence. The clean-clone acceptance slice is verified; signer custody/rotation evidence, independent release review, and a full clean-release execution remain incomplete. |
 | Astro developer site | Partial | Standalone docs routes, base-path links, generated accessibility smoke checks, browser smoke coverage for all 11 public routes plus keyboard navigation, a capability matrix, pinned Pages artifact/deploy jobs, and post-deploy route smoke coverage build successfully. The requested public URL currently returns HTTP 404 because the GitHub repository is private; repository visibility/Pages configuration must be resolved by the owner before deployment can be verified. Exhaustive modality/operations content remains incomplete. |
 
 ### Verification snapshot — 20 October 2026
@@ -79,6 +79,8 @@ passing the 70% minimum while leaving survivor triage as evidence debt;
 the Astro build produced 11 pages, the accessibility smoke passed all 11
 HTML files, and the Playwright browser smoke passed both route and keyboard
 navigation tests;
+the pushed exact-SHA clean-clone acceptance slice passed `1649 passed, 80
+skipped, 6 warnings` in 8 minutes 39 seconds and `scml --help` succeeded;
 the latest promotion/lifecycle slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
 seconds. The remaining leakage, property, specification, and benchmark tiers
@@ -86,8 +88,9 @@ completed with `85 passed` in 3 minutes 27 seconds. The prior all-repository
 acceptance run therefore provided `1982 passed, 103 skipped, 6 warnings`; the
 subsequent signed-governance, fault-harness, and incremental-sink slices have
 their focused and complete-unit evidence above, but a new single-command
-acceptance run is still required. An independent clean-clone run is also
-required before release. Skipped tests and runtime warnings are not release
+acceptance run is still required. The clean-clone acceptance slice is now
+verified, but an independent reviewer must still reproduce the package and
+sign the release decision. Skipped tests and runtime warnings are not release
 evidence by themselves: each must be classified as
 environment-required, intentionally unsupported, or a release blocker before
 a supported-production label is appropriate.
