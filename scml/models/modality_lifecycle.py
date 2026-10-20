@@ -45,6 +45,7 @@ from scml.data.modalities import geospatial
 from scml.data.modalities import graph
 from scml.data.modalities import image
 from scml.data.modalities import video
+from scml.explainability import quality
 from scml.governance import attestation
 from scml.models import documents as document_models
 from scml.models import images as image_models
@@ -1197,6 +1198,54 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:10]
+        decision_values = np.asarray(model.decision_function(batch.values))
+        reference_values = batch.values @ model.coef_.T + model.intercept_
+        if reference_values.ndim == 2 and reference_values.shape[1] == 1:
+            reference_values = reference_values[:, 0]
+        if decision_values.ndim == 2 and decision_values.shape[1] == 1:
+            decision_values = decision_values[:, 0]
+        if decision_values.shape != reference_values.shape:
+            raise ValueError(
+                "linear explanation reference shape does not match model "
+                "decision output"
+            )
+        fidelity = quality.fidelity_score(
+            decision_values.astype(float).reshape(-1).tolist(),
+            reference_values.astype(float).reshape(-1).tolist(),
+        )
+        selected_class = 0
+        if model.coef_.shape[0] > 1:
+            selected_class = int(np.argmax(decision_values[0]))
+        row = batch.values[0]
+        coefficients = model.coef_[selected_class]
+        nonzero = np.flatnonzero(np.abs(row * coefficients) > 1e-12)
+        if len(nonzero):
+            perturbed = np.repeat(row[None, :], len(nonzero), axis=0)
+            perturbed[np.arange(len(nonzero)), nonzero] = 0.0
+            perturbed_decisions = np.asarray(model.decision_function(perturbed))
+            if perturbed_decisions.ndim == 1:
+                observed_change = perturbed_decisions - decision_values[0]
+            else:
+                observed_change = (
+                    perturbed_decisions[:, selected_class]
+                    - decision_values[0, selected_class]
+                )
+            expected_change = -(row[nonzero] * coefficients[nonzero])
+            stability = float(
+                np.mean(np.sign(observed_change) == np.sign(expected_change))
+            )
+        else:
+            stability = 0.0
+        quality_evaluation = quality.evaluate(
+            method="linear_reference_and_zero_ablation",
+            sample_count=len(batch.sample_ids),
+            thresholds=quality.QualityThresholds(
+                stability_minimum=0.999999,
+                fidelity_minimum=0.999999,
+            ),
+            stability=stability,
+            fidelity=fidelity,
+        )
         context.model_explanation = {
             "method": "linear_coefficient_and_local_contribution",
             "model_family": "regularized_linear_classifier",
@@ -1205,10 +1254,13 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                 "sample_id": batch.sample_ids[0],
                 "terms": [list(value) for value in local_terms],
             },
+            "quality": quality_evaluation.to_dict(),
             "limitations": [
                 "Associational explanation only.",
                 "Input representation and linear approximation constrain "
                 "interpretation.",
+                "Quality checks validate the feature-space linear baseline; "
+                "they do not validate raw-modality causality.",
             ],
         }
         context.record(self.stage, context.model_explanation.copy())

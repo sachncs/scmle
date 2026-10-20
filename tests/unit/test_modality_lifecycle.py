@@ -220,6 +220,12 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         ].evidence,
         dict,
     )
+    model_quality = evidence_by_stage[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ].evidence["quality"]
+    assert model_quality["passed"] is True
+    assert model_quality["fidelity_score"] == pytest.approx(1.0)
+    assert model_quality["stability_score"] == pytest.approx(1.0)
     assert report.package.signature
     dataset_card = report.documentation["dataset_card"]
     assert (
