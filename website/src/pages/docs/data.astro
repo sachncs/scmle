@@ -12,6 +12,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>FILES</small><h3>Open tabular formats</h3><p>CSV, TSV, TAB, JSON records, JSONL / NDJSON, Parquet, Feather, Arrow, XLSX, and XLSM.</p></div>
     <div class="doc-card"><small>IN MEMORY</small><h3>Table interchange</h3><p>pandas DataFrame, PyArrow Table, Polars DataFrame or LazyFrame, and Arrow stream protocol objects.</p></div>
     <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
+    <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, and atomic commit state are transport-neutral. Broker and warehouse adapters remain extension work.</p></div>
     <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
   </div>
 
