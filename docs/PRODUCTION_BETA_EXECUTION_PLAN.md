@@ -54,7 +54,7 @@ means the code path exists; it does not mean the capability is supported.
 | Portable model explanation evidence | Implemented / Tested | Existing permutation-importance and partial-dependence reports are packaged with identity, privacy, limitation, and source-report links. Stability/fidelity gates and modality-specific explanations remain incomplete. |
 | Redacted inference observability | Implemented / Tested | `PredictionLog` can emit a redacted observability sidecar with request identity, latency, model/input fingerprints, and categorized errors. Serving defaults, SLOs, retention enforcement, alerts, and incident workflows remain incomplete. |
 | Fault injection and recovery | Partial | Atomic-write cleanup and reliability contracts exist. The complete worker-loss, disk-full, dependency, signature, connector, fuzzing, mutation, and clean-clone matrix is not complete. |
-| Security, provenance, SBOM, and release CI | Partial | Bundle signing, run provenance artifacts, and immutable CI action pins exist. Independent security scans, SBOM publication, and clean-release rehearsal remain incomplete. |
+| Security, provenance, SBOM, and release CI | Partial | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, and immutable CI action pins exist. Independent security scans, signed SBOM/provenance attestation, and clean-release rehearsal remain incomplete. |
 | Astro developer site | Partial | Standalone docs routes and the `/super-charge-ml/` base path build. Accessibility automation, Playwright smoke coverage, deployment verification, and exhaustive modality/operations content remain incomplete. |
 
 The only currently defensible supported boundary is the explicitly gated
