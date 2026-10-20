@@ -34,6 +34,20 @@ predictions = predict(loaded, new_rows)</code></pre>
     modality="tabular",
 )</code></pre>
 
+  <h2>Connect a warehouse without hiding its boundary</h2>
+  <p><code>WarehouseConnector</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>
+  <pre><code>from scml.data.readers import SourceSchema, WarehouseConnector
+
+connector = WarehouseConnector(
+    "warehouse://analytics/events",
+    "select * from events",
+    schema_reader=engine.read_schema,
+    batch_reader=engine.read_batch,
+)
+batch = connector.read_rows(limit=10_000)
+next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
+  <p>Implement the callbacks around the engine you operate—DuckDB, Spark, BigQuery, Snowflake, or another system—and keep its authentication, query planning, and transport evidence in the run record.</p>
+
   <h2>Curation is a release input</h2>
   <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 

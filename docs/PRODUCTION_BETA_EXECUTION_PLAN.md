@@ -46,8 +46,8 @@ means the code path exists; it does not mean the capability is supported.
 
 | Area | Current label | Evidence and boundary |
 | --- | --- | --- |
-| Tabular ingestion, manifest, structured curation | Implemented / Tested | Unit and integration tests cover deterministic snapshots, local raw-byte hashes, findings, persisted manifests, machine-generated dataset cards, schema-evolution decisions, an atomic durable source registry that survives across runs, and fail-closed blocking-finding disposition before training. Object-store/warehouse/event-stream transports remain incomplete. |
-| Local, DB-API, bounded object, and range-backed JSONL source connectors | Implemented / Tested | Connector contracts cover local files, injected DB-API factories, bounded injected object readers for CSV/JSONL/Parquet, and range-backed JSONL/NDJSON reads with byte checkpoints, retry budgets, bounded records, and schema-drift failures. Broker/warehouse transports and arbitrary binary/object formats remain extension work. Evidence: `tests/unit/test_connectors.py`. |
+| Tabular ingestion, manifest, structured curation | Implemented / Tested | Unit and integration tests cover deterministic snapshots, local raw-byte hashes, findings, persisted manifests, machine-generated dataset cards, schema-evolution decisions, an atomic durable source registry that survives across runs, and fail-closed blocking-finding disposition before training. Broker delivery and distributed exactly-once semantics remain incomplete. |
+| Local, DB-API, bounded object, range-backed JSONL, and warehouse/lakehouse source connectors | Implemented / Tested | Connector contracts cover local files, injected DB-API factories, bounded injected object readers for CSV/JSONL/Parquet, range-backed JSONL/NDJSON reads with byte checkpoints, and `WarehouseConnector` callback boundaries with query-bound identity, retries, bounded rows, schema validation, and resumable checkpoints. Broker-specific transports and arbitrary binary/object formats remain extension work. Evidence: `tests/unit/test_connectors.py`. |
 | Incremental ingestion semantics | Implemented / Tested | Transport-neutral event contracts bind event IDs to ordered checkpoints and watermarks, classify duplicates, make late-data policy explicit, serialize multi-writer commits with durable atomic state, and provide an idempotent sink commit boundary. Atomic state, run evidence, source registries, observability retention, fault evidence, and signing-key rotation now flush both file contents and the containing directory after replacement (`b420ee3`). The sink documents its crash window and requires downstream event-ID idempotency; broker/warehouse transports and distributed exactly-once guarantees remain incomplete. |
 | Tabular library training paths | Implemented / Tested | The pre-training capability gate admits only explicitly declared tabular library paths. Dataset manifests preserve the caller-declared modality, and non-tabular declarations fail closed before model fitting. This is the current beta boundary, not all-modality support. |
 | Non-tabular curation and data understanding | Implemented / Tested | `DocumentDataset.curate()` and the shared `ModalityCurationReport` emit JSON-native evidence for documents, images, audio, video, graphs, and geospatial vectors: bounded profiles, identities, composition, duplicate/shape/encoding/CRS/graph findings, label state, and blocking spatial or conflicting-label risks where applicable. The experimental lifecycle now persists a `ModalityDatasetCard` containing the complete curation report plus explicit provenance and privacy status; missing governance metadata is visible rather than inferred. These paths do not provide OCR, production-scale representation models, or a supported `MLProject` non-tabular training path. Evidence: `scml/data/modalities/curation.py`, `scml/models/modality_lifecycle.py`, `tests/unit/test_modality_lifecycle.py`. |
@@ -901,3 +901,18 @@ items, not suppressed as release evidence. This record is local evidence only:
 it does not replace clean-clone execution, hosted optional-dependency audits,
 external/container/kernel fault injection, public GitHub Pages verification,
 or independent review and signature.
+
+Subsequent focused evidence:
+
+- `b59459d` adds a deterministic public-API signature snapshot and executes
+  it in CI and release preflight; the gate passed on Python 3.11 and 3.14.
+  The existing format-1-to-format-2 migration test remains part of the unit
+  contract suite.
+- `1ca350a` and `a84d1dc` add and export `WarehouseConnector`. Its focused
+  connector and incremental-ingestion slice passed 25 tests, with Ruff and
+  mypy clean. The connector supports caller-owned warehouse/lakehouse query
+  engines through bounded callback reads; broker delivery and distributed
+  exactly-once semantics remain explicitly outside the claim.
+- The Astro site build and accessibility smoke passed all 15 routes after the
+  warehouse documentation was added. Public GitHub Pages verification and
+  independent review remain external release gates.
