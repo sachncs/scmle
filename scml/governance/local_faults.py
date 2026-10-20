@@ -14,7 +14,7 @@ import hmac
 import json
 import os
 import pathlib
-import subprocess
+import subprocess  # nosec B404 - bounded child process is the fault target.
 import sys
 import tempfile
 from typing import Any
@@ -145,7 +145,7 @@ class LocalFaultExecutor:
 
     def stop_child(self) -> tuple[bool, int | None]:
         """Terminate a real child process and return its terminal state."""
-        child = subprocess.Popen(
+        child = subprocess.Popen(  # nosec B603 - constant local rehearsal command.
             [sys.executable, "-c", "import time; time.sleep(60)"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
