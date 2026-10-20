@@ -336,6 +336,11 @@ class FaultInjectionPlanRegistry:
             raise ValueError("evidence must be a non-empty tuple")
         if not all(isinstance(item, FaultEvidence) for item in evidence):
             raise TypeError("evidence must contain FaultEvidence values")
+        execution_ids = {item.execution_id for item in evidence}
+        if len(execution_ids) != 1:
+            raise ValueError(
+                "evidence for one scenario must share an execution_id"
+            )
         plan = self.plans[scenario]
         evidence_types = {item.evidence_type for item in evidence}
         unexpected = evidence_types - set(plan.evidence_requirements)

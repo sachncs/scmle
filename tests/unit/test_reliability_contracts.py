@@ -1,5 +1,6 @@
 """Tests for evidence-first reliability fault-injection contracts."""
 
+import dataclasses
 import json
 
 import pytest
@@ -224,4 +225,19 @@ def test_registry_rejects_evidence_not_declared_by_scenario():
         registry.record_evidence(
             reliability.FaultScenario.PROCESS_DEATH,
             (make_evidence("unknown"),),
+        )
+
+
+def test_registry_rejects_evidence_mixed_across_executions():
+    """A scenario result cannot combine unrelated execution evidence."""
+    registry = reliability.FaultInjectionPlanRegistry()
+    registry.register(make_plan())
+    second_execution = dataclasses.replace(
+        make_evidence("checkpoint_resume"), execution_id="fault-run-002"
+    )
+
+    with pytest.raises(ValueError, match="execution_id"):
+        registry.record_evidence(
+            reliability.FaultScenario.PROCESS_DEATH,
+            (make_evidence("process_termination"), second_execution),
         )
