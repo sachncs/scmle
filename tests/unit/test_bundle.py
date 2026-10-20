@@ -192,6 +192,24 @@ def test_run_store_allocates_unique_directories(tmp_path):
     assert not list(first.directory.glob(".b.txt.*"))
 
 
+def test_run_store_cleans_partial_write_when_replace_fails(
+    tmp_path, monkeypatch
+):
+    store = store_module.RunStore.create(tmp_path / "runs")
+    target = store.path("payload.json")
+    store.write_text("payload.json", "original")
+
+    def fail_replace(source, destination):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store_module.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="disk full"):
+        store.write_text("payload.json", "replacement")
+
+    assert target.read_text() == "original"
+    assert not list(store.directory.glob(".payload.json.*"))
+
+
 def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
     from scml.monitoring import reference
 
