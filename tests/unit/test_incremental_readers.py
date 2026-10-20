@@ -113,6 +113,51 @@ def test_incremental_state_rejects_cross_source_reads_and_commits(tmp_path):
         )
 
 
+def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
+    tmp_path,
+):
+    source = incremental.SequenceEventSource(
+        "memory://events", [event("a", 1, 0), event("b", 2, 1)]
+    )
+    ledger = incremental.IncrementalIngestionLedger(
+        tmp_path / "sink.json", source.source_identity
+    )
+    written = []
+
+    first = ledger.commit_with_writer(
+        (event("b", 2, 1), event("a", 1, 0)),
+        lambda values: written.extend(values),
+    )
+    second = ledger.commit_with_writer(
+        (event("a", 1, 0), event("b", 2, 1)),
+        lambda values: written.extend(values),
+    )
+
+    assert first.accepted_event_ids == ("a", "b")
+    assert second.accepted_event_ids == ()
+    assert second.duplicate_event_ids == ("a", "b")
+    assert [item.event_id for item in written] == ["a", "b"]
+    assert first.to_dict()["checkpoint"]["sequence"] == 2
+
+
+def test_idempotent_sink_keeps_state_unchanged_when_writer_fails(tmp_path):
+    source = incremental.SequenceEventSource(
+        "memory://events", [event("a", 1, 0)]
+    )
+    ledger = incremental.IncrementalIngestionLedger(
+        tmp_path / "sink.json", source.source_identity
+    )
+
+    def fail(_: tuple[incremental.IncrementalEvent, ...]):
+        raise OSError("sink unavailable")
+
+    with pytest.raises(OSError, match="sink unavailable"):
+        ledger.commit_with_writer((event("a", 1, 0),), fail)
+
+    assert not ledger.path.exists()
+    assert ledger.load().seen_event_ids == ()
+
+
 def test_event_contract_rejects_naive_timestamps_and_invalid_sequences():
     with pytest.raises(ValueError, match="timezone"):
         event_value = incremental.IncrementalEvent(

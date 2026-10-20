@@ -190,6 +190,41 @@ class EventBatch:
         return tuple(event.event_id for event in self.events)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class EventCommitReceipt:
+    """Result of an idempotent sink commit attempt."""
+
+    source_identity: str
+    accepted_event_ids: tuple[str, ...]
+    duplicate_event_ids: tuple[str, ...]
+    checkpoint: EventCheckpoint
+
+    def __post_init__(self) -> None:
+        """Validate deterministic accepted and duplicate identities."""
+        if not self.source_identity.strip():
+            raise ValueError("source_identity must not be empty")
+        if self.checkpoint.source_identity != self.source_identity:
+            raise ValueError("receipt and checkpoint source identities differ")
+        for name in ("accepted_event_ids", "duplicate_event_ids"):
+            values = getattr(self, name)
+            if tuple(sorted(set(values))) != values:
+                raise ValueError(f"{name} must be sorted and unique")
+        if set(self.accepted_event_ids) & set(self.duplicate_event_ids):
+            raise ValueError(
+                "accepted and duplicate event IDs must be disjoint"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible commit receipt."""
+        return {
+            "schema_version": 1,
+            "source_identity": self.source_identity,
+            "accepted_event_ids": list(self.accepted_event_ids),
+            "duplicate_event_ids": list(self.duplicate_event_ids),
+            "checkpoint": self.checkpoint.to_dict(),
+        }
+
+
 class IncrementalEventSource(abc.ABC):
     """Polymorphic contract for a source that yields ordered events."""
 
@@ -495,3 +530,71 @@ class IncrementalIngestionLedger:
             )
             self.write_atomically(state)
             return state
+
+    def commit_with_writer(
+        self,
+        events: Iterable[IncrementalEvent],
+        writer: Callable[[tuple[IncrementalEvent, ...]], None],
+    ) -> EventCommitReceipt:
+        """Write unseen events and commit their IDs under one ledger lock.
+
+        The writer receives only events not already present in the durable
+        ledger. If it raises, the ledger is unchanged and the caller may
+        retry. A process crash after the writer succeeds but before the
+        ledger replacement can cause a replay; external writers must accept
+        ``event_id`` as an idempotency key. This is an at-least-once boundary,
+        not a claim of distributed exactly-once delivery.
+        """
+        records = tuple(events)
+        if not all(isinstance(event, IncrementalEvent) for event in records):
+            raise TypeError("events must contain IncrementalEvent values")
+        if not callable(writer):
+            raise TypeError("writer must be callable")
+        with self.lock():
+            current = self.load()
+            seen = set(current.seen_event_ids)
+            duplicates: set[str] = set()
+            accepted: list[IncrementalEvent] = []
+            for event in sorted(
+                records, key=lambda value: (value.sequence, value.event_id)
+            ):
+                if event.event_id in seen:
+                    duplicates.add(event.event_id)
+                else:
+                    seen.add(event.event_id)
+                    accepted.append(event)
+            accepted_ids = tuple(event.event_id for event in accepted)
+            if accepted:
+                writer(tuple(accepted))
+                timestamps = [
+                    parse_timestamp(event.event_time, "event_time")
+                    for event in accepted
+                ]
+                current_watermark = (
+                    parse_timestamp(current.checkpoint.watermark, "watermark")
+                    if current.checkpoint.watermark
+                    else None
+                )
+                if current_watermark is not None:
+                    timestamps.append(current_watermark)
+                checkpoint = EventCheckpoint(
+                    self.source_identity,
+                    max(
+                        current.checkpoint.sequence,
+                        *(event.sequence for event in accepted),
+                    ),
+                    max(timestamps).isoformat(),
+                )
+                self.write_atomically(
+                    CommittedIncrementalState(
+                        checkpoint, tuple(sorted(seen))
+                    )
+                )
+            else:
+                checkpoint = current.checkpoint
+            return EventCommitReceipt(
+                self.source_identity,
+                tuple(sorted(accepted_ids)),
+                tuple(sorted(duplicates)),
+                checkpoint,
+            )

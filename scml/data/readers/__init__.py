@@ -7,6 +7,7 @@ from scml.data.readers.connectors import SourceConnector
 from scml.data.readers.incremental import CommittedIncrementalState
 from scml.data.readers.incremental import EventBatch
 from scml.data.readers.incremental import EventCheckpoint
+from scml.data.readers.incremental import EventCommitReceipt
 from scml.data.readers.incremental import IncrementalEvent
 from scml.data.readers.incremental import IncrementalEventSource
 from scml.data.readers.incremental import IncrementalIngestionLedger
@@ -22,6 +23,7 @@ __all__ = [
     "DbApiConnector",
     "EventBatch",
     "EventCheckpoint",
+    "EventCommitReceipt",
     "IncrementalEvent",
     "IncrementalEventSource",
     "IncrementalIngestionLedger",
