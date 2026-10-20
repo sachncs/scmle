@@ -157,6 +157,17 @@ class IngestStage(Stage):
     def execute(self, context: context_module.RunContext) -> None:
         """Loads data (copying in-memory input) and builds the manifest."""
         data = context.spec.data
+        if data.modality != "tabular" and context.input_frame is None:
+            raise capabilities.UnsupportedCapabilityError(
+                "file-backed modality has no registered ingestion adapter",
+                {
+                    "status": "unsupported",
+                    "reason": "file-backed modality has no ingestion adapter",
+                    "modality": data.modality,
+                    "uri": data.uri,
+                    "supported_modalities": ["tabular"],
+                },
+            )
         started = time.monotonic()
         if context.input_frame is not None:
             frame = context.input_frame.copy()

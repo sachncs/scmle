@@ -132,6 +132,35 @@ def test_declared_non_tabular_modality_fails_closed_before_model_fitting():
     assert context.manifest.modality == "image"
 
 
+def test_file_backed_non_tabular_modality_fails_before_tabular_reader(
+    tmp_path,
+):
+    """Unsupported file-backed data returns a structured boundary error."""
+    source = tmp_path / "image-list.txt"
+    source.write_text("image-a.jpg\n")
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri=str(source), target="label", modality="image"),
+        search=tasks.SearchSpec(top_models=0),
+        strategies=tasks.StrategySpec(top_models=0),
+        ensemble=tasks.EnsembleSpec(size=0),
+    )
+    project = orchestrator.Orchestrator(spec, None)
+
+    with pytest.raises(
+        capabilities.UnsupportedCapabilityError,
+        match="file-backed modality has no registered ingestion adapter",
+    ) as failure:
+        stages.IngestStage().execute(project.new_context())
+
+    assert failure.value.details == {
+        "status": "unsupported",
+        "reason": "file-backed modality has no ingestion adapter",
+        "modality": "image",
+        "uri": str(source),
+        "supported_modalities": ["tabular"],
+    }
+
+
 def test_unlisted_model_family_fails_before_model_fitting():
     """A planner candidate needs its own explicit family declaration."""
 
