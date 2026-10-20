@@ -10,6 +10,7 @@ import dataclasses
 import hashlib
 import io
 import pathlib
+import random
 from typing import Any
 from typing import Self
 
@@ -161,12 +162,15 @@ class ImageSample:
     format: str
     byte_size: int
     label: str | int | float | bool | None = None
+    group_id: str | None = None
 
     def __post_init__(self) -> None:
         """Validates immutable identity and geometry metadata."""
         object.__setattr__(self, "encoded_bytes", bytes(self.encoded_bytes))
         if not self.source.strip():
             raise ValueError("source must not be empty")
+        if self.group_id is not None and not self.group_id.strip():
+            raise ValueError("group_id must not be empty when provided")
         if len(self.encoded_bytes) != self.byte_size:
             raise ValueError("byte_size does not match encoded_bytes")
         if self.width <= 0 or self.height <= 0:
@@ -184,6 +188,7 @@ class ImageSample:
         max_bytes: int | None = DEFAULT_MAX_BYTES,
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
         label: str | int | float | bool | None = None,
+        group_id: str | None = None,
     ) -> Self:
         """Builds a validated image sample from encoded bytes.
 
@@ -193,6 +198,7 @@ class ImageSample:
             max_bytes: Maximum encoded payload size, or ``None`` for no limit.
             max_pixels: Maximum decoded pixel count, or ``None`` for no limit.
             label: Optional task label retained for curation evidence.
+            group_id: Optional identity used to prevent split leakage.
 
         Returns:
             A validated immutable image snapshot.
@@ -268,6 +274,7 @@ class ImageSample:
             format=format_name,
             byte_size=len(raw),
             label=label,
+            group_id=group_id,
         )
 
     @classmethod
@@ -277,6 +284,7 @@ class ImageSample:
         max_bytes: int | None = DEFAULT_MAX_BYTES,
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
         label: str | int | float | bool | None = None,
+        group_id: str | None = None,
     ) -> Self:
         """Builds a validated image sample from a local file."""
         file_path = pathlib.Path(path).expanduser()
@@ -310,7 +318,14 @@ class ImageSample:
                 code="read_failure",
                 source=source,
             ) from error
-        return cls.from_bytes(payload, source, max_bytes, max_pixels, label)
+        return cls.from_bytes(
+            payload,
+            source,
+            max_bytes,
+            max_pixels,
+            label,
+            group_id,
+        )
 
     @staticmethod
     def validate_limits(
@@ -383,6 +398,7 @@ class ImageSample:
             "format": self.format,
             "byte_size": self.byte_size,
             "label": self.label,
+            "group_id": self.group_id,
         }
 
 
@@ -410,6 +426,28 @@ class ImageProfile:
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible profile data."""
         return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ImageSplit:
+    """Group-aware image split that keeps related samples together."""
+
+    train: tuple[ImageSample, ...]
+    validation: tuple[ImageSample, ...]
+    test: tuple[ImageSample, ...]
+
+    def group_ids(self) -> dict[str, tuple[str, ...]]:
+        """Return the stable groups assigned to each partition."""
+        return {
+            name: tuple(
+                sorted({sample.group_id or sample.source for sample in samples})
+            )
+            for name, samples in (
+                ("train", self.train),
+                ("validation", self.validation),
+                ("test", self.test),
+            )
+        }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -648,3 +686,71 @@ class ImageDataset:
         if normalize:
             return features.astype(np.float32) / 255.0
         return features
+
+    def split(
+        self,
+        validation_fraction: float = 0.2,
+        test_fraction: float = 0.2,
+        seed: int = 0,
+    ) -> ImageSplit:
+        """Split samples by explicit group identity to prevent leakage.
+
+        A caller should use a subject, capture session, or other identity as
+        ``group_id``. Without one, source identity is the conservative group.
+        """
+        if not self.samples:
+            raise ValueError("cannot split an empty image dataset")
+        if not 0 <= validation_fraction < 1:
+            raise ValueError("validation_fraction must be in [0, 1)")
+        if not 0 <= test_fraction < 1:
+            raise ValueError("test_fraction must be in [0, 1)")
+        if validation_fraction + test_fraction >= 1:
+            raise ValueError("validation_fraction + test_fraction must be < 1")
+        grouped: dict[str, list[ImageSample]] = {}
+        for sample in self.samples:
+            grouped.setdefault(sample.group_id or sample.source, []).append(
+                sample
+            )
+        groups = sorted(grouped)
+        randomizer = random.Random(seed)  # nosec B311 - seeded data split
+        randomizer.shuffle(groups)
+        test_count = int(len(groups) * test_fraction)
+        validation_count = int(len(groups) * validation_fraction)
+        if test_fraction and test_count == 0 and len(groups) >= 3:
+            test_count = 1
+        if validation_fraction and validation_count == 0 and len(groups) >= 3:
+            validation_count = 1
+        while test_count + validation_count >= len(groups):
+            if validation_count > 0:
+                validation_count -= 1
+            elif test_count > 0:
+                test_count -= 1
+            else:
+                break
+        test_groups = set(groups[:test_count])
+        validation_groups = set(
+            groups[test_count : test_count + validation_count]
+        )
+
+        def samples_for(excluded: set[str]) -> tuple[ImageSample, ...]:
+            return tuple(
+                sample
+                for sample in self.samples
+                if (sample.group_id or sample.source) not in excluded
+            )
+
+        validation = tuple(
+            sample
+            for sample in self.samples
+            if (sample.group_id or sample.source) in validation_groups
+        )
+        test = tuple(
+            sample
+            for sample in self.samples
+            if (sample.group_id or sample.source) in test_groups
+        )
+        return ImageSplit(
+            train=samples_for(test_groups | validation_groups),
+            validation=validation,
+            test=test,
+        )

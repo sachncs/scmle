@@ -183,6 +183,34 @@ def test_curation_reports_mixed_label_state():
 
 
 @PILLOW_SKIP
+def test_split_keeps_explicit_capture_groups_together():
+    """Grouped splitting prevents capture-session leakage."""
+    samples = tuple(
+        image.ImageSample.from_bytes(
+            png_bytes((index * 20, 0, 0)),
+            source=f"image-{index}.png",
+            label="red",
+            group_id=f"session-{index // 2}",
+        )
+        for index in range(6)
+    )
+    dataset = image.ImageDataset(samples)
+
+    first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
+    second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
+
+    assignments = first.group_ids()
+    groups = [set(values) for values in assignments.values()]
+    assert sum("session-0" in values for values in groups) == 1
+    assert set().union(*groups) == {
+        "session-0",
+        "session-1",
+        "session-2",
+    }
+    assert first == second
+
+
+@PILLOW_SKIP
 def test_features_are_flattened_with_stable_shape_and_normalization():
     dataset = image.ImageDataset(
         (image.ImageSample.from_bytes(png_bytes((255, 0, 128)), "sample.png"),)
