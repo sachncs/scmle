@@ -107,6 +107,38 @@ def test_valid_policy_contains_task_aware_contracts():
     )
 
 
+def test_explanation_quality_thresholds_are_explicit_and_serialized():
+    policy = evaluation.ExplanationPolicy(
+        evaluation.ExplanationAvailability.GLOBAL,
+        required_methods=("permutation_importance",),
+        required_evidence=("explanation.json",),
+        require_stability=True,
+        require_fidelity=True,
+        stability_threshold=0.8,
+        fidelity_threshold=0.9,
+    )
+
+    assert policy.to_dict()["stability_threshold"] == 0.8
+    assert policy.to_dict()["fidelity_threshold"] == 0.9
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("stability_threshold", "fidelity_threshold"),
+)
+def test_required_explanation_quality_needs_a_threshold(field):
+    values = {
+        "availability": evaluation.ExplanationAvailability.GLOBAL,
+        "required_methods": ("permutation_importance",),
+        "required_evidence": ("explanation.json",),
+        "require_stability": field == "stability_threshold",
+        "require_fidelity": field == "fidelity_threshold",
+    }
+
+    with pytest.raises(ValueError, match="threshold"):
+        evaluation.ExplanationPolicy(**values)
+
+
 def test_unsupported_metric_and_direction_fail_closed():
     with pytest.raises(
         evaluation.UnsupportedEvaluationPolicyError, match="rmse"

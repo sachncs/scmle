@@ -619,6 +619,8 @@ class ExplanationPolicy:
     required_evidence: tuple[str, ...] = ()
     require_stability: bool = False
     require_fidelity: bool = False
+    stability_threshold: float | None = None
+    fidelity_threshold: float | None = None
 
     def __post_init__(self) -> None:
         """Validate explanation methods and evidence declarations."""
@@ -630,11 +632,41 @@ class ExplanationPolicy:
         validate_evidence(
             self.required_evidence, "explanation.required_evidence"
         )
+        if self.stability_threshold is not None:
+            stability = validate_finite(
+                self.stability_threshold, "explanation.stability_threshold"
+            )
+            if not 0.0 <= stability <= 1.0:
+                raise ValueError(
+                    "explanation.stability_threshold must be between 0 and 1"
+                )
+            if not self.require_stability:
+                raise ValueError(
+                    "stability_threshold requires require_stability"
+                )
+        if self.fidelity_threshold is not None:
+            fidelity = validate_finite(
+                self.fidelity_threshold, "explanation.fidelity_threshold"
+            )
+            if not 0.0 <= fidelity <= 1.0:
+                raise ValueError(
+                    "explanation.fidelity_threshold must be between 0 and 1"
+                )
+            if not self.require_fidelity:
+                raise ValueError(
+                    "fidelity_threshold requires require_fidelity"
+                )
+        if self.require_stability and self.stability_threshold is None:
+            raise ValueError("require_stability needs stability_threshold")
+        if self.require_fidelity and self.fidelity_threshold is None:
+            raise ValueError("require_fidelity needs fidelity_threshold")
         if self.availability is ExplanationAvailability.NONE and (
             self.required_methods
             or self.required_evidence
             or self.require_stability
             or self.require_fidelity
+            or self.stability_threshold is not None
+            or self.fidelity_threshold is not None
         ):
             raise ValueError(
                 "explanation requirements need an availability level"
@@ -655,6 +687,8 @@ class ExplanationPolicy:
             "required_evidence": list(self.required_evidence),
             "require_stability": self.require_stability,
             "require_fidelity": self.require_fidelity,
+            "stability_threshold": self.stability_threshold,
+            "fidelity_threshold": self.fidelity_threshold,
         }
 
 

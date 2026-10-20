@@ -23,6 +23,7 @@ class FindingKind(enum.StrEnum):
 
     DIAGNOSTIC = "diagnostic"
     EVIDENCE = "evidence"
+    EXPLANATION = "explanation"
     FAIRNESS = "fairness"
     INPUT = "input"
     METRIC = "metric"
@@ -221,6 +222,24 @@ def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
             visited.add(identity)
             pending.extend(reversed(current))
     return tuple(sorted(values))
+
+
+def explanation_quality_value(
+    report: Any, field_name: str
+) -> float | None:
+    """Return one finite quality score from an explanation report."""
+    if not isinstance(report, Mapping):
+        return None
+    quality = report.get("quality")
+    if not isinstance(quality, Mapping):
+        return None
+    value = quality.get(field_name)
+    if isinstance(value, bool) or not isinstance(value, Real):
+        return None
+    score = float(value)
+    if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+        return None
+    return score
 
 
 def evaluate_release(
@@ -467,6 +486,58 @@ def evaluate_release(
                 evidence=diagnostic_gate.required_evidence,
             )
         )
+
+    quality_requirements = (
+        (
+            "stability_score",
+            policy.explanations.require_stability,
+            policy.explanations.stability_threshold,
+            "stability",
+        ),
+        (
+            "fidelity_score",
+            policy.explanations.require_fidelity,
+            policy.explanations.fidelity_threshold,
+            "fidelity",
+        ),
+    )
+    for method in policy.explanations.required_methods:
+        report = diagnostic_reports.get(method)
+        for field_name, required, threshold, label in quality_requirements:
+            if not required:
+                continue
+            name = f"{method}.{label}"
+            if threshold is None:
+                raise ValueError(
+                    f"explanation '{method}' has no {label} threshold"
+                )
+            score = explanation_quality_value(report, field_name)
+            if score is None:
+                findings.append(
+                    ReleaseFinding(
+                        FindingKind.EXPLANATION,
+                        name,
+                        False,
+                        True,
+                        f"explanation '{method}' has no valid {label} score",
+                        expected=threshold,
+                    )
+                )
+                continue
+            passed = score >= threshold
+            result = "passed" if passed else "failed"
+            findings.append(
+                ReleaseFinding(
+                    FindingKind.EXPLANATION,
+                    name,
+                    passed,
+                    True,
+                    f"explanation '{method}' {label} {result}: "
+                    f"{score:g} >= {threshold:g}",
+                    observed=score,
+                    expected=threshold,
+                )
+            )
 
     if policy.release.fairness_gates:
         if not isinstance(fairness_reports, Mapping):

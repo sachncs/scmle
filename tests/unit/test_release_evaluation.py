@@ -241,6 +241,76 @@ def test_unsupported_reports_and_unaccepted_evidence_block():
     assert any("not accepted" in reason for reason in result.blocking_reasons)
 
 
+def test_explanation_quality_threshold_is_a_blocking_release_gate():
+    """A declared quality threshold must be present and pass."""
+    policy = dataclasses.replace(
+        make_policy(),
+        explanations=evaluation.ExplanationPolicy(
+            evaluation.ExplanationAvailability.GLOBAL,
+            required_methods=("permutation_importance",),
+            required_evidence=("explanation.json",),
+            require_stability=True,
+            stability_threshold=0.8,
+        ),
+    )
+    reports = {
+        "metric_uncertainty": {"estimate": 0.81},
+        "permutation_importance": {
+            "quality": {"stability_score": 0.75}
+        },
+    }
+
+    result = release.evaluate_release(
+        policy,
+        {"roc_auc": 0.81},
+        reports,
+        {},
+        make_index(policy),
+    )
+
+    finding = next(
+        item
+        for item in result.findings
+        if item.kind is release.FindingKind.EXPLANATION
+    )
+    assert finding.name == "permutation_importance.stability"
+    assert finding.observed == 0.75
+    assert not finding.passed
+    assert not result.passed
+
+
+def test_explanation_quality_release_gate_passes_with_valid_evidence():
+    """A quality report above its declared threshold permits this gate."""
+    policy = dataclasses.replace(
+        make_policy(),
+        explanations=evaluation.ExplanationPolicy(
+            evaluation.ExplanationAvailability.GLOBAL,
+            required_methods=("permutation_importance",),
+            required_evidence=("explanation.json",),
+            require_stability=True,
+            require_fidelity=True,
+            stability_threshold=0.8,
+            fidelity_threshold=0.9,
+        ),
+    )
+    reports = {
+        "metric_uncertainty": {"estimate": 0.81},
+        "permutation_importance": {
+            "quality": {"stability_score": 0.95, "fidelity_score": 0.92}
+        },
+    }
+
+    result = release.evaluate_release(
+        policy,
+        {"roc_auc": 0.81},
+        reports,
+        {},
+        make_index(policy),
+    )
+
+    assert result.passed
+
+
 def test_results_are_immutable_and_findings_are_sorted():
     """The public result cannot be mutated and serializes in stable order."""
     policy = make_policy()
