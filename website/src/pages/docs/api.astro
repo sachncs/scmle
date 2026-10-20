@@ -77,7 +77,7 @@ restored = DocumentClassifier.load(artifact.path, trusted=True)</code></pre>
   <p>This is not part of the supported <code>MLProject</code> path. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it. OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary.</p>
 
   <h2>Experimental image baseline</h2>
-  <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for duplicate content and mixed label state, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global and local pixel contributions.</p>
+  <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for duplicate content and mixed label state, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
   <pre><code>from scml.data.modalities import ImageDataset, ImageSample
 from scml.models.images import ImageClassifier, ImageModelConfig
 
@@ -88,9 +88,12 @@ train = ImageDataset((
 model = ImageClassifier(ImageModelConfig(target_size=(16, 16))).fit(train)
 prediction = model.predict(train)
 explanation = model.local_explanation(train.samples[0])
+occlusion = model.occlusion_explanation(
+    train.samples[0], patch_size=(4, 4), top_k=5
+)
 artifact = model.save("artifacts/image-model")
 restored = ImageClassifier.load(artifact.path, trusted=True)</code></pre>
-  <p>This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>ModelBundle</code> integration, HTTP serving, or full release recovery evidence.</p>
+  <p>The occlusion report replaces transformed pixels with a zero-valued black baseline and reports the predicted-class score change for each region. It is perturbation evidence, not raw-image saliency or object localization. This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>ModelBundle</code> integration, HTTP serving, or full release recovery evidence.</p>
 
   <h2>Image metadata review</h2>
   <p><code>ImageSample.from_bytes()</code> keeps source bytes and records EXIF tags as lineage evidence. Use the curation report to find metadata that can identify a person, device, location, or capture event.</p>

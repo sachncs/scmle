@@ -934,6 +934,11 @@ Subsequent focused evidence:
   workflow acceptance command with `1,868 passed, 73 skipped` in 6 minutes 46
   seconds. `scml --help` exited successfully from that clone. This is local
   reproduction of the hosted rehearsal, not independent reviewer evidence.
+- `0de10f5` adds deterministic image occlusion evidence over the declared
+  resized feature representation. Five focused image-model tests pass under
+  `-W error::ResourceWarning`, with Ruff and mypy clean. This is bounded
+  perturbation evidence with an explicit black baseline; it does not claim
+  raw-image saliency fidelity, localization, or production image support.
 - `c85118e` runs the optional-extra security gate on Python 3.13 with every
   declared extra installed. The license inventory covers 149 packages and
   `pip-audit --skip-editable` reports no known vulnerabilities after raising
