@@ -289,7 +289,7 @@ class DocumentDataset:
         for sample in self.samples:
             grouped[sample.document_id].append(sample)
         document_ids = sorted(grouped)
-        randomizer = random.Random(seed)
+        randomizer = random.Random(seed)  # nosec B311 - seeded data split
         randomizer.shuffle(document_ids)
 
         test_count = int(len(document_ids) * test_fraction)

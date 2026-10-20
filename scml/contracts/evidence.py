@@ -13,7 +13,7 @@ from typing import Self
 class EvidenceResult(enum.StrEnum):
     """Observed result of one release criterion."""
 
-    PASS = "pass"
+    PASS = "pass"  # nosec B105 - evidence status, not a credential
     FAIL = "fail"
     WAIVED = "waived"
 
