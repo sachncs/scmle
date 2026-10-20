@@ -9,6 +9,7 @@ side-effect-free plan preview.
 import abc
 import dataclasses
 import datetime
+import hashlib
 import json
 import time
 from typing import Any
@@ -29,6 +30,7 @@ from scml.contracts import evaluation as evaluation_contracts
 from scml.contracts import evidence as evidence_contracts
 from scml.contracts import experiments
 from scml.contracts import explanations
+from scml.contracts import lineage
 from scml.contracts import reliability
 from scml.contracts import tasks
 from scml.core import compiler
@@ -2301,6 +2303,145 @@ class PackageStage(Stage):
             "seasonal_period": data.seasonal_period,
         }
 
+    def build_evidence_graph(
+        self,
+        context: context_module.RunContext,
+        store: Any,
+    ) -> lineage.EvidenceGraph:
+        """Build the content-linked graph for one completed package."""
+        manifest = require(context.manifest, "manifest")
+        split = require(context.split, "split")
+        selected = require(context.selected, "selected")
+        graph = lineage.EvidenceGraph()
+
+        raw_digest = manifest.lineage.object_hashes.get(
+            "raw-source", manifest.data_hash
+        )
+        graph.add_node(
+            lineage.EvidenceNode(
+                "raw-source",
+                lineage.EvidenceNodeKind.RAW_SOURCE,
+                raw_digest,
+                {"uri": manifest.uri},
+            )
+        )
+        graph.add_node(
+            lineage.EvidenceNode(
+                "snapshot",
+                lineage.EvidenceNodeKind.SNAPSHOT,
+                manifest.snapshot_id or manifest.data_hash,
+                {"dataset_id": manifest.dataset_id},
+            )
+        )
+        graph.add_edge(
+            lineage.EvidenceEdge("raw-source", "snapshot", "materializes")
+        )
+        graph.add_node(
+            lineage.EvidenceNode(
+                "curation",
+                lineage.EvidenceNodeKind.CURATION,
+                bundle_module.file_sha256(store.path("curation_report.json")),
+                {"artifact": "curation_report.json"},
+            )
+        )
+        graph.add_edge(lineage.EvidenceEdge("snapshot", "curation", "curated"))
+
+        if context.spec.feature_graph.nodes:
+            graph.add_node(
+                lineage.EvidenceNode(
+                    "feature-graph",
+                    lineage.EvidenceNodeKind.FEATURE_GRAPH,
+                    context.spec.feature_graph.fingerprint(),
+                    {"version": str(context.spec.feature_graph.version)},
+                )
+            )
+            graph.add_edge(
+                lineage.EvidenceEdge("curation", "feature-graph", "transforms")
+            )
+            split_parent = "feature-graph"
+        else:
+            split_parent = "curation"
+
+        graph.add_node(
+            lineage.EvidenceNode(
+                "split",
+                lineage.EvidenceNodeKind.SPLIT,
+                split.manifest.fingerprint,
+                {"artifact": "validation_manifest.json"},
+            )
+        )
+        graph.add_edge(
+            lineage.EvidenceEdge(split_parent, "split", "partitions")
+        )
+
+        pipeline_path = store.path("model/pipeline.joblib")
+        model_manifest_path = store.path(f"model/{bundle_module.MANIFEST_FILE}")
+        graph.add_node(
+            lineage.EvidenceNode(
+                "model",
+                lineage.EvidenceNodeKind.MODEL,
+                bundle_module.file_sha256(pipeline_path),
+                {"model_family": selected.model_name},
+            )
+        )
+        graph.add_edge(lineage.EvidenceEdge("split", "model", "trains"))
+        graph.add_node(
+            lineage.EvidenceNode(
+                "evaluation",
+                lineage.EvidenceNodeKind.EVALUATION,
+                bundle_module.file_sha256(store.path("evaluation.json")),
+                {"artifact": "evaluation.json"},
+            )
+        )
+        graph.add_edge(lineage.EvidenceEdge("model", "evaluation", "evaluates"))
+
+        explanation_paths = sorted(
+            store.path("explanations").glob("*.json")
+            if store.path("explanations").exists()
+            else ()
+        )
+        if explanation_paths:
+            explanation_identity = hashlib.sha256(
+                "\n".join(
+                    f"{path.name}:{bundle_module.file_sha256(path)}"
+                    for path in explanation_paths
+                ).encode("utf-8")
+            ).hexdigest()
+            graph.add_node(
+                lineage.EvidenceNode(
+                    "explanations",
+                    lineage.EvidenceNodeKind.EXPLANATION,
+                    explanation_identity,
+                    {"artifact_count": str(len(explanation_paths))},
+                )
+            )
+            graph.add_edge(
+                lineage.EvidenceEdge("model", "explanations", "explains")
+            )
+            graph.add_edge(
+                lineage.EvidenceEdge(
+                    "evaluation", "explanations", "contextualizes"
+                )
+            )
+
+        graph.add_node(
+            lineage.EvidenceNode(
+                "bundle",
+                lineage.EvidenceNodeKind.BUNDLE,
+                bundle_module.file_sha256(model_manifest_path),
+                {"artifact": "model/" + bundle_module.MANIFEST_FILE},
+            )
+        )
+        graph.add_edge(lineage.EvidenceEdge("model", "bundle", "packages"))
+        graph.add_edge(lineage.EvidenceEdge("evaluation", "bundle", "gates"))
+        if explanation_paths:
+            graph.add_edge(
+                lineage.EvidenceEdge("explanations", "bundle", "includes")
+            )
+        graph.validate()
+        context.evidence_graph = graph
+        return graph
+
     def execute(self, context: context_module.RunContext) -> None:
         """Packages artifacts and assembles the `RunResult`."""
         store = context.run_store
@@ -2416,6 +2557,10 @@ class PackageStage(Stage):
         )
         self.release_evaluation(context, store, evaluation)
         store.write_json("evaluation.json", evaluation)
+        evidence_graph = self.build_evidence_graph(context, store)
+        graph_record = evidence_graph.to_dict()
+        graph_record["graph_digest"] = evidence_graph.digest()
+        store.write_json("evidence_graph.json", graph_record)
         result = results.RunResult(
             run_id=store.run_id,
             run_dir=store.directory,
@@ -2448,6 +2593,7 @@ class PackageStage(Stage):
             "provenance.json",
             "sbom.json",
             "release_attestation.json",
+            "evidence_graph.json",
             "evaluation.json",
             f"model/{bundle_module.MANIFEST_FILE}",
             f"model/{bundle_module.MODEL_FILE}",

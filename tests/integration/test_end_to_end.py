@@ -40,6 +40,7 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
         "dataset_card.json",
         "validation_manifest.json",
         "execution_plan.json",
+        "evidence_graph.json",
         "events.jsonl",
         "leaderboard.parquet",
         "evaluation.json",
@@ -52,6 +53,12 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
     ]
     for relative in expected:
         assert (result.run_dir / relative).exists(), relative
+    evidence_graph = json.loads(
+        (result.run_dir / "evidence_graph.json").read_text()
+    )
+    assert evidence_graph["graph_digest"]
+    assert evidence_graph["topological_order"][0] == "raw-source"
+    assert evidence_graph["topological_order"][-1] == "bundle"
     states = [k for k in read_kinds(result.run_dir) if k.startswith("state.")]
     assert states == [
         f"state.{name}"

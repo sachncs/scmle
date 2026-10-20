@@ -16,6 +16,7 @@ from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.contracts import events
 from scml.contracts import experiments
+from scml.contracts import lineage
 from scml.contracts import metrics as metric_contracts
 from scml.contracts import tasks
 from scml.core import limits
@@ -298,6 +299,9 @@ class RunContext:
     read_seconds: float = 0.0
     cleaning_notes: list[str] = dataclasses.field(default_factory=list)
     manifest: data_contracts.DatasetManifest | None = None
+    evidence_graph: lineage.EvidenceGraph = dataclasses.field(
+        default_factory=lineage.EvidenceGraph
+    )
     task: tasks.TaskType | None = None
     profile: data_contracts.DatasetProfile | None = None
     split: splitters.SplitResult | None = None
