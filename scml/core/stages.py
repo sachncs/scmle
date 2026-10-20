@@ -39,6 +39,7 @@ from scml.data.curation import preprocessing
 from scml.data.profiling import label_noise
 from scml.data.profiling import profiler
 from scml.data.profiling import representativeness
+from scml.data.readers import registry as source_registry
 from scml.data.readers import streaming
 from scml.data.readers import tabular
 from scml.data.splitting import splitters
@@ -165,6 +166,7 @@ class IngestStage(Stage):
             frame = forecasting.add_targets(frame, data)
         context.read_seconds = time.monotonic() - started
         context.manifest = tabular.build_manifest(frame, data.target, data.uri)
+        self.persist_source_snapshot(context, frame)
         frame, infinite = tabular.replace_infinities(frame)
         context.cleaning_notes = [
             f"column '{name}': {count} infinite value(s) treated as missing"
@@ -197,6 +199,51 @@ class IngestStage(Stage):
         context.track(
             dataset_id=context.manifest.dataset_id,
             data_hash=context.manifest.data_hash,
+        )
+
+    def persist_source_snapshot(
+        self, context: context_module.RunContext, frame: pd.DataFrame
+    ) -> None:
+        """Persist source identity and reject breaking resume evolution."""
+        manifest = require(context.manifest, "manifest")
+        snapshot = source_registry.SourceSnapshot.from_manifest(
+            manifest,
+            {
+                str(name): str(dtype)
+                for name, dtype in zip(frame.columns, frame.dtypes, strict=True)
+            },
+            datetime.datetime.now(datetime.UTC).isoformat(),
+        )
+        registry = source_registry.SourceRegistry()
+        if context.store is not None:
+            saved = context.store.path("source_registry.json")
+            if saved.exists():
+                registry = source_registry.SourceRegistry.from_json(
+                    saved.read_text(encoding="utf-8")
+                )
+        compatibility = registry.compatibility(snapshot)
+        if (
+            compatibility.previous_snapshot_id is not None
+            and not compatibility.compatible
+        ):
+            raise errors.ConfigError(
+                "source schema changed incompatibly while resuming: "
+                f"{compatibility.to_dict()}"
+            )
+        registry.register(snapshot)
+        record = registry.to_dict()
+        record["current_snapshot_id"] = snapshot.snapshot_id
+        record["schema_compatibility"] = compatibility.to_dict()
+        context.write_json("source_registry.json", record)
+        context.emit(
+            "source.snapshot",
+            "source identity and schema evolution recorded",
+            ("source_registry.json",),
+            {
+                "source_id": snapshot.source_id,
+                "snapshot_id": snapshot.snapshot_id,
+                "schema_status": compatibility.status,
+            },
         )
 
     def refuse_stale_resume(self, context: context_module.RunContext) -> None:
@@ -2318,6 +2365,7 @@ class PackageStage(Stage):
             "config.json",
             "dataset_manifest.json",
             "dataset_card.json",
+            "source_registry.json",
             "fault_injection_plan.json",
             "provenance.json",
             "sbom.json",

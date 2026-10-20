@@ -1,5 +1,7 @@
 """A run is judged against the success criteria its problem statement set."""
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -47,6 +49,10 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     assert (result.run_dir / "sbom.json").exists()
     assert result.evaluation["reliability_plan"]["release_blocked"] is True
     assert (result.run_dir / "fault_injection_plan.json").exists()
+    source_registry = json.loads(
+        (result.run_dir / "source_registry.json").read_text()
+    )
+    assert source_registry["schema_compatibility"]["status"] == "initial"
     assert (
         result.run_dir / "explanations/permutation_importance.json"
     ).exists()
