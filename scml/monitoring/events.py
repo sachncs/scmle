@@ -19,6 +19,7 @@ import uuid
 import numpy as np
 import pandas as pd
 
+from scml import durability
 from scml.artifacts import bundle as bundle_module
 from scml.contracts import events
 from scml.contracts import observability
@@ -269,6 +270,7 @@ class PredictionLog:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary_name, path)
+            durability.sync_directory(path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise

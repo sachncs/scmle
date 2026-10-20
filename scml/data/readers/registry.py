@@ -9,6 +9,7 @@ import tempfile
 from typing import Any
 from typing import Self
 
+from scml import durability
 from scml.contracts import data as data_contracts
 from scml.data.readers import connectors
 
@@ -303,6 +304,7 @@ class SourceRegistryStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary_name, self.path)
+            durability.sync_directory(self.path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise

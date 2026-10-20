@@ -8,6 +8,8 @@ import tempfile
 from typing import Any
 from typing import Self
 
+from scml import durability
+
 
 class RunStore:
     """A uniquely named run directory with typed write helpers."""
@@ -102,6 +104,7 @@ class RunStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, target)
+            durability.sync_directory(target.parent)
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise

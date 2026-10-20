@@ -27,6 +27,7 @@ from sklearn import calibration
 from sklearn import frozen
 
 import scml
+from scml import durability
 from scml.contracts import artifacts as artifact_contracts
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
@@ -777,6 +778,7 @@ class ModelBundle:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary_name, signature_path)
+            durability.sync_directory(signature_path.parent)
         except Exception:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary_name)

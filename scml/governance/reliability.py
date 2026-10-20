@@ -8,6 +8,7 @@ import os
 import pathlib
 import tempfile
 
+from scml import durability
 from scml.contracts import errors
 from scml.contracts import reliability
 
@@ -140,6 +141,7 @@ class FaultInjectionHarness:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary_name, path)
+            durability.sync_directory(path.parent)
         except Exception:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary_name)
