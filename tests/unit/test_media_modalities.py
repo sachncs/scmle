@@ -222,6 +222,34 @@ def test_video_metadata_features_preserve_sample_order():
     assert prepared.to_numpy()[:, 1].tolist() == [2.0, 4.0]
 
 
+def test_video_split_keeps_explicit_subject_groups_together():
+    """Grouped splitting prevents subject leakage across partitions."""
+    samples = tuple(
+        video.VideoSample.from_bytes(
+            f"video-{index}".encode(),
+            video.VideoMetadata("mp4", 2, 2, 2, 2.0, "h264"),
+            source=f"clip-{index}.mp4",
+            label="action",
+            group_id=f"subject-{index // 2}",
+        )
+        for index in range(6)
+    )
+    dataset = video.VideoDataset(samples)
+
+    first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
+    second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
+
+    assignments = first.group_ids()
+    groups = [set(values) for values in assignments.values()]
+    assert sum("subject-0" in values for values in groups) == 1
+    assert set().union(*groups) == {
+        "subject-0",
+        "subject-1",
+        "subject-2",
+    }
+    assert first == second
+
+
 def test_geospatial_feature_collection_preserves_bounds_and_crs():
     """GeoJSON validation produces deterministic geometry understanding."""
     dataset = geospatial.GeospatialDataset.from_geojson(

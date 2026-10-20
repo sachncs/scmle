@@ -24,6 +24,7 @@ from scml.data.modalities.video import VideoFeatures
 from scml.data.modalities.video import VideoMetadata
 from scml.data.modalities.video import VideoProfile
 from scml.data.modalities.video import VideoSample
+from scml.data.modalities.video import VideoSplit
 
 __all__ = [
     "AudioDataset",
@@ -50,4 +51,5 @@ __all__ = [
     "VideoMetadata",
     "VideoProfile",
     "VideoSample",
+    "VideoSplit",
 ]
