@@ -231,3 +231,47 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
 
     with pytest.raises(ValueError, match="signature"):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
+
+
+def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
+    """Missing CRS evidence blocks before a model or package is created."""
+    features = tuple(
+        geospatial.GeoFeature(
+            feature_id=f"feature-{index}",
+            geometry={"type": "Point", "coordinates": [float(index), 0.0]},
+            label="alpha" if index % 2 else "beta",
+        )
+        for index in range(8)
+    )
+    adapter = modality_lifecycle.GeospatialAdapter(
+        geospatial.GeospatialDataset(features=features, crs=""),
+        block_size=1.0,
+    )
+
+    with pytest.raises(ValueError, match="blocking curation"):
+        modality_lifecycle.ModalityLifecycle().run(
+            adapter,
+            tmp_path / "package",
+            signing_key="test-signing-key",
+        )
+    assert not (tmp_path / "package").exists()
+
+
+def test_graph_without_declared_features_stops_before_modelling(tmp_path: Path):
+    """A topology-only graph cannot silently inherit a feature policy."""
+    nodes = tuple(
+        graph.GraphNode(
+            node_id=f"node-{index}",
+            label="alpha" if index % 2 else "beta",
+        )
+        for index in range(8)
+    )
+    adapter = modality_lifecycle.GraphAdapter(graph.GraphData(nodes=nodes))
+
+    with pytest.raises(ValueError, match="declared node features"):
+        modality_lifecycle.ModalityLifecycle().run(
+            adapter,
+            tmp_path / "package",
+            signing_key="test-signing-key",
+        )
+    assert not (tmp_path / "package").exists()
