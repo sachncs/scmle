@@ -1,0 +1,251 @@
+"""Service-level objectives for measurable ML operations."""
+
+from collections.abc import Sequence
+import dataclasses
+import datetime
+import enum
+import math
+from typing import Any
+
+from scml.contracts import observability
+
+
+class SLOStatus(enum.StrEnum):
+    """Outcome of evaluating one SLO window."""
+
+    PASS = "pass"
+    BREACHED = "breached"
+    INSUFFICIENT_DATA = "insufficient_data"
+    INVALID = "invalid"
+
+
+def require_text(value: str, field_name: str) -> str:
+    """Return a non-empty SLO field."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must not be empty")
+    return value.strip()
+
+
+def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
+    """Parse a timezone-aware timestamp for SLO window checks."""
+    try:
+        parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"{field_name} must be ISO-8601") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must include timezone information")
+    return parsed
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SLOTarget:
+    """One upper-bound operational objective and its incident ownership."""
+
+    name: str
+    metric_name: str
+    kind: observability.SignalKind
+    maximum: float
+    window_days: int
+    minimum_samples: int
+    owner: str
+    runbook: str
+    alert_route: str
+
+    def __post_init__(self) -> None:
+        """Validate the measurable target and response path."""
+        for field_name in (
+            "name",
+            "metric_name",
+            "owner",
+            "runbook",
+            "alert_route",
+        ):
+            require_text(getattr(self, field_name), field_name)
+        if not isinstance(self.kind, observability.SignalKind):
+            object.__setattr__(
+                self, "kind", observability.SignalKind(self.kind)
+            )
+        if not math.isfinite(self.maximum) or self.maximum < 0:
+            raise ValueError("maximum must be finite and non-negative")
+        if self.window_days < 1:
+            raise ValueError("window_days must be at least 1")
+        if self.minimum_samples < 1:
+            raise ValueError("minimum_samples must be at least 1")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return deterministic SLO policy metadata."""
+        return {
+            "name": self.name,
+            "metric_name": self.metric_name,
+            "kind": self.kind.value,
+            "maximum": self.maximum,
+            "window_days": self.window_days,
+            "minimum_samples": self.minimum_samples,
+            "owner": self.owner,
+            "runbook": self.runbook,
+            "alert_route": self.alert_route,
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SLOEvaluation:
+    """Auditable result of one SLO evaluation window."""
+
+    target: SLOTarget
+    observed_at: str
+    status: SLOStatus
+    sample_count: int
+    in_window_count: int
+    observed_maximum: float | None
+    error_budget_remaining: float | None
+    reason: str
+
+    def __post_init__(self) -> None:
+        """Validate the result and its measurable bounds."""
+        if not isinstance(self.target, SLOTarget):
+            raise TypeError("target must be SLOTarget")
+        parse_timestamp(self.observed_at, "observed_at")
+        if not isinstance(self.status, SLOStatus):
+            object.__setattr__(self, "status", SLOStatus(self.status))
+        if self.sample_count < 0 or self.in_window_count < 0:
+            raise ValueError("sample counts must not be negative")
+        if self.in_window_count > self.sample_count:
+            raise ValueError("in_window_count cannot exceed sample_count")
+        if self.observed_maximum is not None and (
+            not math.isfinite(self.observed_maximum)
+            or self.observed_maximum < 0
+        ):
+            raise ValueError("observed_maximum must be finite and non-negative")
+        if (
+            self.error_budget_remaining is not None
+            and not 0 <= self.error_budget_remaining <= 1
+        ):
+            raise ValueError("error_budget_remaining must be between 0 and 1")
+        require_text(self.reason, "reason")
+
+    @property
+    def incident_required(self) -> bool:
+        """Whether the operator must follow the target's incident path."""
+        return self.status in {
+            SLOStatus.BREACHED,
+            SLOStatus.INSUFFICIENT_DATA,
+            SLOStatus.INVALID,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return an operator-facing evaluation record."""
+        return {
+            "target": self.target.to_dict(),
+            "observed_at": self.observed_at,
+            "status": self.status.value,
+            "sample_count": self.sample_count,
+            "in_window_count": self.in_window_count,
+            "observed_maximum": self.observed_maximum,
+            "error_budget_remaining": self.error_budget_remaining,
+            "incident_required": self.incident_required,
+            "owner": self.target.owner,
+            "runbook": self.target.runbook,
+            "alert_route": self.target.alert_route,
+            "reason": self.reason,
+        }
+
+
+class SLOMonitor:
+    """Evaluate upper-bound SLOs against redacted metric samples."""
+
+    def evaluate(
+        self,
+        target: SLOTarget,
+        samples: Sequence[observability.MetricSample],
+        *,
+        observed_at: str,
+    ) -> SLOEvaluation:
+        """Evaluate one target over its declared time window.
+
+        The maximum observed value is used deliberately: a single breach is
+        not averaged away. Missing samples are an explicit operational state,
+        not a passing result.
+        """
+        if not isinstance(target, SLOTarget):
+            raise TypeError("target must be SLOTarget")
+        observed_timestamp = parse_timestamp(observed_at, "observed_at")
+        window_start = observed_timestamp - datetime.timedelta(
+            days=target.window_days
+        )
+        matching = tuple(
+            sample
+            for sample in samples
+            if sample.name == target.metric_name and sample.kind is target.kind
+        )
+        future = tuple(
+            sample
+            for sample in matching
+            if parse_timestamp(sample.timestamp, "metric.timestamp")
+            > observed_timestamp
+        )
+        in_window = tuple(
+            sample
+            for sample in matching
+            if window_start
+            <= parse_timestamp(sample.timestamp, "metric.timestamp")
+            <= observed_timestamp
+        )
+        if future:
+            return SLOEvaluation(
+                target=target,
+                observed_at=observed_at,
+                status=SLOStatus.INVALID,
+                sample_count=len(matching),
+                in_window_count=len(in_window),
+                observed_maximum=None,
+                error_budget_remaining=None,
+                reason="future metric samples cannot support an SLO decision",
+            )
+        if len(in_window) < target.minimum_samples:
+            return SLOEvaluation(
+                target=target,
+                observed_at=observed_at,
+                status=SLOStatus.INSUFFICIENT_DATA,
+                sample_count=len(matching),
+                in_window_count=len(in_window),
+                observed_maximum=None,
+                error_budget_remaining=None,
+                reason=(
+                    f"{len(in_window)} in-window samples; "
+                    f"{target.minimum_samples} required"
+                ),
+            )
+        observed_maximum = max(sample.value for sample in in_window)
+        remaining = max(
+            0.0, 1.0 - observed_maximum / max(target.maximum, 1e-12)
+        )
+        status = (
+            SLOStatus.PASS
+            if observed_maximum <= target.maximum
+            else SLOStatus.BREACHED
+        )
+        reason = (
+            f"maximum {observed_maximum:g} is within {target.maximum:g}"
+            if status is SLOStatus.PASS
+            else f"maximum {observed_maximum:g} exceeds {target.maximum:g}"
+        )
+        return SLOEvaluation(
+            target=target,
+            observed_at=observed_at,
+            status=status,
+            sample_count=len(matching),
+            in_window_count=len(in_window),
+            observed_maximum=observed_maximum,
+            error_budget_remaining=remaining,
+            reason=reason,
+        )
+
+
+__all__ = [
+    "SLOEvaluation",
+    "SLOMonitor",
+    "SLOStatus",
+    "SLOTarget",
+    "parse_timestamp",
+    "require_text",
+]
