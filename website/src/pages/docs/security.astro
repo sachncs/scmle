@@ -34,6 +34,16 @@ bundle = ModelBundle.load(
 # Verify the exact bundle digest before promotion or serving.`}</code></pre>
   <p>The key shown above must come from a deployment secret or approved key service. Do not commit it, print it into logs, or use one shared development key as release identity.</p>
 
+  <h2>Key identity and emergency rotation</h2>
+  <p>Bundle rotation changes the signature, but release operations also need to know which signer was allowed to create it. The metadata-only <code>SigningKeyRegistry</code> records key identity, owner, expiry, retirement, replacement, and revocation without storing the secret. Keep the secret in the deployment secret manager.</p>
+  <pre><code>{`registry.sign(payload, key_id, secret, signed_at)
+registry.retire(key_id, changed_at, "scheduled rotation", replacement_key_id)
+registry.revoke(key_id, changed_at, "credential compromise")
+
+# Retired keys verify old evidence only when explicitly requested.
+registry.verify(payload, envelope, secrets, observed_at, historical=True)`}</code></pre>
+  <p>Retirement stops new signatures while preserving auditable historical proof. Revocation is immediate, including historical verification. That is the intended emergency boundary: rotate forward without silently accepting evidence from a compromised signer.</p>
+
   <h2>Data and dependency controls</h2>
   <ul>
     <li>Keep raw source bytes and derived evidence separate; redact PII in logs and sidecars according to the retention policy.</li>
@@ -44,7 +54,7 @@ bundle = ModelBundle.load(
   </ul>
 
   <h2>What this page does not promise</h2>
-  <p>A valid local signature does not prove key custody, rotation, revocation, or an independent release review. A dependency audit does not prove that a connector, plugin, container, or host is safe. Record those controls in the release decision instead of inferring them from a passing test.</p>
+  <p>A valid local signature does not prove that the secret manager enforced custody, that an operator performed the rotation, or that an independent reviewer approved the release. A dependency audit does not prove that a connector, plugin, container, or host is safe. Record those controls in the release decision instead of inferring them from a passing test.</p>
   <p>For the operational response when a verification fails, go to <a href={`${base}/docs/recovery/`}>Recovery</a>. For the claims a reviewer must recompute, go to <a href={`${base}/docs/evidence/`}>Evidence & gates</a>.</p>
 
   <p class="meta">Security claims are scoped to the evidence that proves them · 0.1 beta</p>

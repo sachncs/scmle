@@ -27,17 +27,27 @@ file-write path, plus `bandit -r scml` and `pip-audit` (both run in CI).
 | Oversized request bodies | The HTTP adapter answers 413 above 16 MiB instead of reading the body | `tests/integration/test_serve_and_export.py` |
 | Secrets | No credentials are read, stored or logged; the signing key lives only in the environment | review |
 | Supply chain | Releases use PyPI trusted publishing (OIDC), no stored token; `pip-audit` gates CI | `.github/workflows` |
+| Signing-key lifecycle | Public key metadata records identity, owner, expiry, retirement, replacement, and emergency revocation without storing secret material | `tests/unit/test_keyring.py` |
 
 ## Guidance for operators
 
 1. Set `SCML_SIGNING_KEY` wherever bundles are produced and verified.
 2. Rotate keys with `ModelBundle.rotate_signing_key(directory, old, new)`;
-   verify the new key before retiring the old one.
+   verify the new key before retiring the old one. Maintain the corresponding
+   `SigningKeyRegistry` record and transition it to `retired` only after
+   parity is confirmed.
 3. Never pass `trusted=True` (or `scml predict --trusted`) for a bundle you
    did not produce.
 4. Serve behind an authenticating gateway; bind to loopback by default.
 5. Treat the model registry directory as a trust boundary: it is read with
    `trusted=True` after checksum verification at registration time.
+
+The registry is metadata-only: the secret remains in the deployment secret
+manager. An active, non-expired key may sign. A retired key cannot sign but
+may verify pre-retirement evidence only when a caller explicitly requests
+historical verification. A revoked key fails verification immediately,
+including historical checks. This distinction is important during emergency
+rotation: preserve evidence without accepting a compromised signer.
 
 ## Static analysis
 
