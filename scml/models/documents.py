@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import shutil
 import tempfile
 from typing import Any
@@ -365,6 +366,97 @@ class DocumentClassifier:
                 "A positive term contribution favors the predicted class.",
             ),
         )
+
+    def term_ablation_explanation(
+        self,
+        sample: document.DocumentSample,
+        top_k: int = 10,
+        max_terms: int = 100,
+    ) -> DocumentExplanation:
+        """Measure predicted-class score changes when terms are removed.
+
+        Candidate terms are selected by absolute local linear contribution,
+        then removed from the original text one at a time. The returned value
+        is the original score minus the ablated score; positive values mean
+        that the term supported the predicted class relative to its absence.
+
+        Args:
+            sample: Document to explain.
+            top_k: Maximum number of ablations to return.
+            max_terms: Maximum number of candidate terms to evaluate.
+
+        Returns:
+            Deterministic raw-text perturbation evidence.
+
+        Raises:
+            ValueError: If an output or candidate bound is invalid.
+            RuntimeError: If the classifier has not been fitted.
+        """
+        if top_k < 1:
+            raise ValueError("top_k must be positive")
+        if max_terms < 1:
+            raise ValueError("max_terms must be positive")
+        self.require_fitted()
+        vectorizer = self.vectorizer
+        estimator = self.estimator
+        if vectorizer is None or estimator is None:
+            raise RuntimeError("classifier is not fitted")
+        matrix = self.transform((sample,))
+        terms = vectorizer.get_feature_names_out()
+        row = matrix.toarray()[0]
+        predicted = estimator.predict(matrix)[0]
+        class_index = int(np.flatnonzero(estimator.classes_ == predicted)[0])
+        coefficients = estimator.coef_[0]
+        if len(estimator.classes_) == 2 and class_index == 0:
+            coefficients = -coefficients
+        elif len(estimator.classes_) > 2:
+            coefficients = estimator.coef_[class_index]
+        candidates = sorted(
+            (
+                (str(terms[index]), float(row[index] * coefficients[index]))
+                for index in np.flatnonzero(row)
+            ),
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:max_terms]
+        original_score = self.predicted_class_score(matrix)
+        ablations: list[tuple[str, float]] = []
+        for term, _ in candidates:
+            pattern = rf"(?iu)\b{re.escape(term)}\b"
+            ablated_content = re.sub(pattern, " ", sample.content)
+            ablated_matrix = vectorizer.transform([ablated_content or " "])
+            delta = original_score - self.predicted_class_score(
+                ablated_matrix
+            )
+            ablations.append((term, float(delta)))
+        selected = sorted(
+            ablations,
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:top_k]
+        return DocumentExplanation(
+            model_digest=self.model_digest,
+            input_hash=sample.content_hash,
+            method="term_ablation",
+            terms=tuple(selected),
+            limitations=(
+                "Ablation removes lexical matches from the original text.",
+                "Candidate evaluation is bounded by max_terms.",
+                "The score change is associational, not causal.",
+            ),
+        )
+
+    def predicted_class_score(self, matrix: Any) -> float:
+        """Return the decision score for the class predicted by the model."""
+        self.require_fitted()
+        estimator = self.estimator
+        if estimator is None:
+            raise RuntimeError("classifier is not fitted")
+        predicted = estimator.predict(matrix)[0]
+        class_index = int(np.flatnonzero(estimator.classes_ == predicted)[0])
+        decision = np.asarray(estimator.decision_function(matrix))
+        if decision.ndim == 1:
+            raw_score = float(decision[0])
+            return raw_score if class_index == 1 else -raw_score
+        return float(decision[0, class_index])
 
     @property
     def classes(self) -> tuple[Any, ...]:

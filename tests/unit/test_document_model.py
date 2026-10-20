@@ -57,6 +57,9 @@ def test_document_classifier_fits_evaluates_and_explains(
     evaluation = classifier.evaluate(evaluation_samples)
     global_explanation = classifier.global_explanation(top_k=5)
     local_explanation = classifier.local_explanation(evaluation_samples[0])
+    ablation = classifier.term_ablation_explanation(
+        evaluation_samples[0], top_k=3, max_terms=5
+    )
 
     assert classifier.fitted
     assert set(classifier.predict(evaluation_samples)) == {"fruit", "water"}
@@ -69,7 +72,24 @@ def test_document_classifier_fits_evaluates_and_explains(
     assert global_explanation.terms
     assert local_explanation.input_hash == evaluation_samples[0].content_hash
     assert local_explanation.terms
+    assert ablation.method == "term_ablation"
+    assert ablation.input_hash == evaluation_samples[0].content_hash
+    assert len(ablation.terms) == 3
+    assert all(math.isfinite(value) for _, value in ablation.terms)
     assert classifier.model_digest == classifier.model_digest
+
+
+def test_document_term_ablation_rejects_invalid_configuration(
+    training_samples,
+):
+    """Term ablation validates both result and work bounds."""
+    classifier = make_classifier().fit(training_samples)
+    sample_value = training_samples[0]
+
+    with pytest.raises(ValueError, match="top_k"):
+        classifier.term_ablation_explanation(sample_value, top_k=0)
+    with pytest.raises(ValueError, match="max_terms"):
+        classifier.term_ablation_explanation(sample_value, max_terms=0)
 
 
 def test_document_classifier_rejects_unlabelled_or_single_class_training():
