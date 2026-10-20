@@ -18,6 +18,8 @@ from sklearn import model_selection
 
 MIN_ROWS = 50
 FOLDS = 5
+ESTIMATOR_MAX_ITER = 50
+ESTIMATOR_MAX_LEAF_NODES = 31
 
 
 @dataclasses.dataclass(frozen=True)
@@ -69,7 +71,11 @@ def find_label_noise(
     if folds < 2:
         raise ValueError("every class needs at least two rows")
     probabilities = model_selection.cross_val_predict(
-        ensemble.HistGradientBoostingClassifier(random_state=seed),
+        ensemble.HistGradientBoostingClassifier(
+            max_iter=ESTIMATOR_MAX_ITER,
+            max_leaf_nodes=ESTIMATOR_MAX_LEAF_NODES,
+            random_state=seed,
+        ),
         features,
         encoded,
         cv=model_selection.StratifiedKFold(
