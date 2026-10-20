@@ -64,3 +64,26 @@ jobs:
           tests/integration/test_deployment.py
       - name: Verify the package entry point from the clean clone
         run: uv run --directory /tmp/super-charge-ml-clean-clone scml --help
+
+  stability:
+    name: repeated test stability and quarantine policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: uv sync --python 3.14
+      - run: >-
+          uv run python scripts/check_test_stability.py
+          --runs 3
+          --quarantine tests/quarantine.json
+          --output test-stability.json
+          tests/unit/test_api_surface.py
+          tests/unit/test_performance_contracts.py
+          tests/unit/test_test_stability.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: test-stability
+          path: test-stability.json
+          if-no-files-found: error
