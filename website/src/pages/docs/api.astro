@@ -35,7 +35,7 @@ predictions = predict(loaded, new_rows)</code></pre>
 )</code></pre>
 
   <h2>Curation is a release input</h2>
-  <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes.</p>
+  <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 
   <h2>What is safe to depend on</h2>
   <p>The supported top-level exports are <code>MLProject</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
@@ -77,6 +77,15 @@ explanation = model.local_explanation(train.samples[0])
 artifact = model.save("artifacts/image-model")
 restored = ImageClassifier.load(artifact.path, trusted=True)</code></pre>
   <p>This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>ModelBundle</code> integration, HTTP serving, or full release recovery evidence.</p>
+
+  <h2>Image metadata review</h2>
+  <p><code>ImageSample.from_bytes()</code> keeps source bytes and records EXIF tags as lineage evidence. Use the curation report to find metadata that can identify a person, device, location, or capture event.</p>
+  <pre><code>{`sample = ImageSample.from_path("field-photo.jpg")
+print(sample.exif_tags)
+print(sample.sensitive_metadata)
+report = ImageDataset((sample,)).curate()
+assert report.release_ready is False if sample.sensitive_metadata else True`}</code></pre>
+  <p>The framework does not silently strip metadata because redaction is a data-governance decision. The blocking finding must be resolved by an approved redaction or documented privacy exception before the asset is used in a release workflow.</p>
 
   <h2>Experimental audio feature preparation</h2>
   <p>The audio foundation can produce bounded signal statistics for inspection and future baseline work. It makes the observation boundary explicit; it is not an audio classifier and does not silently decode non-WAV containers.</p>

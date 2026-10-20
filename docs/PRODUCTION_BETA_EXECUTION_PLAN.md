@@ -171,8 +171,13 @@ The duplicate-label curation slice at `df5739d` passes 47 focused document,
 image, and media tests with Ruff and mypy clean. Image, audio, and video now
 emit blocking risk findings when duplicate content carries incompatible known
 labels; this remains curation evidence, not a modelling-support claim.
+The image privacy slice at `f80b8fe` adds EXIF tag capture and a blocking
+`risk.image-sensitive-metadata` finding for GPS, author, device, software,
+copyright, and capture-time metadata. The focused image suite passes 17 tests;
+the contract preserves source bytes and requires an explicit redaction or
+privacy approval rather than silently mutating the evidence.
 
-The current release preflight at pushed commit `935bb51` passed `1747 passed,
+The last complete release preflight at pushed commit `935bb51` passed `1747 passed,
 89 skipped, 2 warnings`; the bounded suite measured 81.50% whole-package
 coverage and the declared core scope measured 86%. The mutation gate killed
 `1253/1735` mutants (72%, above the 70% minimum), all four offline benchmarks
