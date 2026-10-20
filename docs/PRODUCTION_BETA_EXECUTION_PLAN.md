@@ -1019,6 +1019,12 @@ Subsequent focused evidence:
   evidence in the generated dataset card. The focused modality contract and
   lifecycle suite passes 31 tests under `-W error::ResourceWarning`, with
   Ruff and mypy clean. Omitted governance remains explicitly unassessed.
+- `b091df3` adds a verified `ModalityPredictor` library boundary that loads a
+  signed package, checks modality and feature-schema identity, and predicts
+  on new adapter-owned samples. The focused modality lifecycle suite passes
+  33 tests under `-W error::ResourceWarning`, with Ruff and mypy clean. This
+  is library inference evidence, not reference HTTP serving or raw transport
+  support.
 - `84193bf`, `8cb1672`, `65dc5b6`, and `c295e9a` add lifecycle-bound
   image region occlusion, graph one-hop context, CRS-bound geospatial
   geometry/feature evidence, and document span provenance respectively. The

@@ -75,6 +75,18 @@ manifest = ModalityManifest(
 report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)`}</code></pre>
   <p>The manifest is evidence, not approval. A reviewer still needs to inspect the source, consent, retention, label decisions, and open findings. If metadata is omitted, the generated card says so explicitly instead of implying that provenance or privacy was assessed.</p>
 
+  <h2>Verify a modality package before prediction</h2>
+  <p>The experimental lifecycle exposes a library predictor for callers that already own a typed adapter. It verifies the signed package, modality, feature names, and estimator dimension before converting new samples into features. Codec choice and raw transport remain caller-owned.</p>
+  <pre><code>{`from scml.models.modality_lifecycle import ModalityPredictor
+
+predictor = ModalityPredictor.from_package(
+    adapter, "artifacts/modality-package", signing_key
+)
+predictions = predictor.predict(new_samples)
+probabilities = predictor.predict_proba(new_samples)
+print(predictor.health())`}</code></pre>
+  <p>This is a checked library inference surface, not an HTTP server or a claim that the representation is production-ready. Reference serving, external resource-fault evidence, and independent release review remain open for experimental modalities.</p>
+
   <h2>Data boundaries beyond tables</h2>
   <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation, typed modality manifests, and dataset cards. Every foundation now exposes a modality curation report; documents and media flag duplicate content with conflicting labels, mixed labeled/unlabeled state, unknown language, and truncated inspection, while other modalities surface shape, encoding, duplicate, graph-structure, and CRS findings. Image ingestion also records EXIF tags and blocks release when camera, author, GPS, copyright, software, or capture-time metadata needs an explicit privacy decision. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
   <div class="doc-cards">
