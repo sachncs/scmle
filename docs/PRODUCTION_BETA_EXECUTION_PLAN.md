@@ -223,6 +223,10 @@ with owner, run ID, rollback target, runbook, and resolution evidence. It is a
 local operator contract; external paging, ticketing, and on-call delivery
 remain outside the current release claim.
 
+The transition-hardening fix at `843b693` adds valid-event-type, legal-state,
+identity, and timestamp-order verification while replaying the journal; its
+focused incident, SLO, and convention slice passes 824 tests.
+
 The complete release preflight at pushed commit `51c5afd` passed `1803 passed,
 89 skipped, 2 warnings` in 8 minutes 11 seconds. Total coverage was 81.86% and
 the declared core scope remained 86%; mutation testing killed `1253/1735`
