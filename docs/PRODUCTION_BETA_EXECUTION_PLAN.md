@@ -929,6 +929,13 @@ or independent review and signature.
 
 Subsequent focused evidence:
 
+- `c85118e` runs the optional-extra security gate on Python 3.13 with every
+  declared extra installed. The license inventory covers 149 packages and
+  `pip-audit --skip-editable` reports no known vulnerabilities after raising
+  the Pillow floor to 13.0. The checker now recognizes standard license files
+  when wheel metadata omits license fields. Python 3.14 free-threaded macOS
+  remains an intentionally unsupported audit environment for the Ray extra;
+  the hosted Linux CI job remains the cross-platform authority.
 - `b59459d` adds a deterministic public-API signature snapshot and executes
   it in CI and release preflight; the gate passed on Python 3.11 and 3.14.
   The existing format-1-to-format-2 migration test remains part of the unit
