@@ -145,6 +145,36 @@ jobs:
       - run: uv sync --python 3.14
       - run: uv run bandit -q -r scml
       - run: uv run pip-audit --skip-editable
+      - name: Generate deterministic CycloneDX SBOM
+        run: |
+          uv run python - <<'PY'
+          import json
+          import os
+          from importlib.metadata import distributions
+          from pathlib import Path
+
+          import scml
+          from scml.governance import sbom
+
+          packages = {
+              str(distribution.metadata["Name"]): distribution.version
+              for distribution in distributions()
+              if distribution.metadata.get("Name")
+          }
+          record = sbom.build(
+              packages,
+              run_id=f"ci-{os.environ['GITHUB_SHA']}",
+              software_version=scml.__version__,
+          )
+          Path("sbom.cyclonedx.json").write_text(
+              json.dumps(record, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-sbom
+          path: sbom.cyclonedx.json
+          if-no-files-found: error
 
   package:
     name: build and verify distribution
