@@ -34,6 +34,22 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; <code>release_attestation.json</code> for the canonical HMAC binding across those records; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. Set <code>SCML_SIGNING_KEY</code> in the release environment. The release evaluator verifies the attestation and blocks unsigned or tampered evidence. <code>FaultInjectionHarness</code> persists digest-bound scenario artifacts, while <code>LocalFaultExecutor</code> supplies bounded local execution evidence. External transport, container, and kernel-resource injectors remain a separate release requirement.</p>
   <p>For inference telemetry, use the redacted observability sidecar and evaluate it against an explicit policy. Missing required signals, stale or future timestamps, and threshold breaches must remain visible as failed evidence instead of being silently dropped.</p>
 
+  <h2>Make reliability operable</h2>
+  <p>An alert threshold is not an SLO until someone owns the response. <code>SLOTarget</code> binds a metric and worst-sample window to a minimum sample count, an owner, a runbook, and an alert route. Missing telemetry and future-dated samples are incident-visible states; they are never treated as healthy.</p>
+  <pre><code>{`target = SLOTarget(
+    name="prediction-latency",
+    metric_name="p95_latency_ms",
+    kind=SignalKind.LATENCY,
+    maximum=250.0,
+    window_days=7,
+    minimum_samples=30,
+    owner="ml-on-call",
+    runbook="https://runbooks.example/prediction-latency",
+    alert_route="on-call",
+)
+evaluation = SLOMonitor().evaluate(target, metrics, observed_at=now)`}</code></pre>
+  <p>Use the result's status, remaining error budget, owner, runbook, and route in the incident record. The monitor uses the worst observation in the window so a breach cannot disappear inside an average.</p>
+
   <h2>Join serving evidence to the run</h2>
   <p>Prediction telemetry tells you what happened; the evidence graph tells you what produced the bundle. Link an event only with the input and output fingerprints captured at the serving boundary and the exact bundle digest loaded for that request.</p>
   <pre><code>{`from scml.inference.evidence import InferenceEvidenceLinker
