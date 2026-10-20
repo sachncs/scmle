@@ -940,7 +940,8 @@ class StreamingObjectStoreConnector(SourceConnector):
     ) -> tuple[SourceSchema, tuple[Row, ...]]:
         """Decode JSON objects and reject silent schema drift."""
         decoded: list[Mapping[str, Any]] = []
-        for line, _end in records:
+        lines = [record[0] for record in records]
+        for line in lines:
             try:
                 record = json.loads(line.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError) as error:
