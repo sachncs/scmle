@@ -10,6 +10,7 @@ import dataclasses
 import json
 import logging
 import pathlib
+import platform
 import sys
 import tempfile
 import time
@@ -20,6 +21,7 @@ from benchmarks import datasets
 from benchmarks import intervals
 from benchmarks import reference
 import scml
+from scml.core import limits
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +45,11 @@ class BenchmarkRecord:
         reference_test: Plain HistGradientBoosting score on the same split.
         trials: Number of trials run.
         seconds: Wall-clock time.
+        peak_memory_gb: Observed peak resident memory.
+        machine: Hardware and operating-system identity.
+        software: Interpreter identity used for the benchmark.
+        completed_seeds: Number of repetitions that completed.
+        failure_rate: Fraction of requested repetitions that failed.
         findings: Quality and leakage findings raised by profiling.
         error: Error text when failed.
         seeds: Repetitions with different seeds (split and models).
@@ -64,6 +71,11 @@ class BenchmarkRecord:
     reference_test: float = float("nan")
     trials: int = 0
     seconds: float = 0.0
+    peak_memory_gb: float = 0.0
+    machine: str = ""
+    software: str = ""
+    completed_seeds: int = 0
+    failure_rate: float = 1.0
     findings: list[str] = dataclasses.field(default_factory=list)
     error: str = ""
     seeds: int = 1
@@ -91,8 +103,11 @@ def run_one(
     Returns:
         The record, averaged over seeds; failures are captured, not raised.
     """
+    if seeds < 1:
+        raise ValueError("seeds must be at least 1")
     record = BenchmarkRecord(dataset.name, seeds=seeds)
     started = time.monotonic()
+    completed_seeds = 0
     try:
         frame = dataset.load()
         cv_scores: list[float] = []
@@ -136,6 +151,7 @@ def run_one(
                     record.task != "regression",
                 )
             )
+            completed_seeds += 1
         record.cv_score = sum(cv_scores) / seeds
         record.test_score = sum(record.test_scores) / seeds
         record.reference_test = sum(record.reference_scores) / seeds
@@ -155,7 +171,15 @@ def run_one(
     except Exception:  # Report every dataset, even when one fails.
         record.status = "error"
         record.error = traceback.format_exc(limit=4)
-    record.seconds = time.monotonic() - started
+    finally:
+        record.completed_seeds = completed_seeds
+        record.failure_rate = (seeds - completed_seeds) / seeds
+        record.peak_memory_gb = limits.peak_memory_gb()
+        record.machine = platform.platform()
+        record.software = (
+            f"{platform.python_implementation()} {platform.python_version()}"
+        )
+        record.seconds = time.monotonic() - started
     return record
 
 
@@ -172,6 +196,8 @@ COLUMNS = (
     "advantage (95% CI)",
     "verdict",
     "trials",
+    "peak memory GB",
+    "failure rate",
     "seconds",
 )
 
@@ -197,7 +223,7 @@ def to_markdown(records: list[BenchmarkRecord]) -> str:
     ]
     for record in records:
         if record.status != "ok":
-            cells = [record.name, "", "ERROR"] + [""] * 9
+            cells = [record.name, "", "ERROR"] + [""] * 11
             cells.append(f"{record.seconds:.0f}")
         else:
             cells = [
@@ -213,6 +239,8 @@ def to_markdown(records: list[BenchmarkRecord]) -> str:
                 describe_advantage(record),
                 record.advantage["verdict"],
                 str(record.trials),
+                f"{record.peak_memory_gb:.4f}",
+                f"{record.failure_rate:.3f}",
                 f"{record.seconds:.0f}",
             ]
         lines.append("| " + " | ".join(cells) + " |")

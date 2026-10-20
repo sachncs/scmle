@@ -90,3 +90,36 @@ def test_a_whole_interval_beyond_the_bound_fails_repeated_runs():
     worse = repeated("a", "roc_auc", [0.80, 0.81, 0.79, 0.80])
 
     assert check_regression.violations([worse], {"a": BASELINE["a"]})
+
+
+def test_optional_resource_limits_are_release_gates():
+    """Benchmark resource measurements can block a release independently."""
+    baseline = {
+        "a": {
+            **BASELINE["a"],
+            "max_seconds": 10.0,
+            "max_peak_memory_gb": 2.0,
+            "max_failure_rate": 0.0,
+        }
+    }
+    good = record("a", "roc_auc", 0.95)
+    good.update(seconds=9.0, peak_memory_gb=1.5, failure_rate=0.0)
+    bad = record("a", "roc_auc", 0.95)
+    bad.update(seconds=11.0, peak_memory_gb=2.5, failure_rate=0.2)
+
+    assert check_regression.violations([good], baseline) == []
+    problems = check_regression.violations([bad], baseline)
+    assert any("runtime" in item for item in problems)
+    assert any("peak memory" in item for item in problems)
+    assert any("failure rate" in item for item in problems)
+
+
+def test_declared_resource_limit_fails_closed_without_measurement():
+    """A declared resource gate cannot pass from an old incomplete record."""
+    baseline = {"a": {**BASELINE["a"], "max_seconds": 10.0}}
+
+    problems = check_regression.violations(
+        [record("a", "roc_auc", 0.95)], baseline
+    )
+
+    assert problems == ["a: runtime evidence is missing"]

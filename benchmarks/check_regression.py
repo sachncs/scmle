@@ -62,6 +62,21 @@ def violations(results: list[dict], baseline: dict[str, dict]) -> list[str]:
             problems.append(
                 f"{name}: {metric} {score:.4f} breaches bound {bound}"
             )
+        for field, label in (
+            ("seconds", "runtime"),
+            ("peak_memory_gb", "peak memory"),
+            ("failure_rate", "failure rate"),
+        ):
+            limit = expected.get(f"max_{field}")
+            if limit is None:
+                continue
+            observed = record.get(field)
+            if observed is None:
+                problems.append(f"{name}: {label} evidence is missing")
+            elif observed > limit:
+                problems.append(
+                    f"{name}: {label} {observed:.4f} exceeds limit {limit}"
+                )
     return problems
 
 
