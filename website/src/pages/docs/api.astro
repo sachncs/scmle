@@ -26,6 +26,14 @@ predictions = predict(loaded, new_rows)</code></pre>
     <li><code>load_model</code> verifies a bundle before it is used for inference.</li>
   </ul>
 
+  <h2>Declare the dataset family</h2>
+  <p><code>modality</code> is keyword-only and becomes part of the dataset manifest and capability decision. The current supported workflow is explicitly tabular; declaring another family preserves the claim in evidence and fails closed before modelling until that lifecycle is registered.</p>
+  <pre><code>project = MLProject(
+    data=records,
+    target="outcome",
+    modality="tabular",
+)</code></pre>
+
   <h2>What is safe to depend on</h2>
   <p>The supported top-level exports are <code>MLProject</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
 

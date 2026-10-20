@@ -16,6 +16,14 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
   </div>
 
+  <h2>Declare before you ingest</h2>
+  <p>The modality is a semantic contract, not a file-extension guess. Set it explicitly when constructing <code>MLProject</code> or <code>DataSpec</code>. The manifest carries that declaration into planning; a non-tabular declaration cannot silently inherit the tabular beta path.</p>
+  <pre><code>project = MLProject(
+    data="events.parquet",
+    target="label",
+    modality="tabular",
+)</code></pre>
+
   <h2>The curation pass</h2>
   <ol>
     <li><strong>Identify:</strong> fingerprint the schema, rows, target, and source.</li>
