@@ -185,6 +185,8 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: uv build --python 3.14
       - run: uv run --python 3.14 twine check dist/*
+      - name: Verify reproducible and network-isolated artifacts
+        run: scripts/verify_release_artifacts.sh
       - name: Install the wheel into a clean environment
         run: |
           uv venv --python 3.14 /tmp/wheel-env
