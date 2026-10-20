@@ -9,6 +9,7 @@ import pytest
 from scml.contracts import capabilities
 from scml.contracts import errors
 from scml.contracts import modalities
+from scml.data.modalities import curation
 
 
 def make_evidence(
@@ -100,6 +101,40 @@ def test_stage_evidence_requires_json_native_structured_output():
         modalities.StageEvidence(
             stage=modalities.LifecycleStage.INGESTION,
             evidence={"invalid": object()},
+        )
+
+
+def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
+    """A card cannot claim provenance or privacy that the adapter lacks."""
+    report = {
+        "dataset_hash": "dataset-1",
+        "sample_count": 3,
+        "release_ready": True,
+        "quality_findings": [],
+        "risk_findings": [],
+    }
+
+    card = curation.ModalityDatasetCard.from_report(
+        "image", report, ("bounded representation",)
+    )
+
+    payload = card.to_dict()
+    assert payload["curation"] == report
+    assert payload["privacy"]["status"] == "not_assessed"
+    assert payload["provenance"]["status"] == (
+        "adapter_source_metadata_not_declared"
+    )
+
+    with pytest.raises(ValueError, match="does not match dataset_hash"):
+        curation.ModalityDatasetCard(
+            modality="image",
+            dataset_hash="different",
+            sample_count=3,
+            curation=report,
+            intended_use="test",
+            limitations=("bounded",),
+            provenance={"status": "declared"},
+            privacy={"status": "assessed"},
         )
 
 

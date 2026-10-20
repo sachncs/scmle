@@ -1282,6 +1282,13 @@ class DocumentationStage(ModalityLifecycleStage):
 
     def execute(self, context: LifecycleContext) -> None:
         """Record support status, intended use, and limitations."""
+        if context.curation_report is None:
+            raise RuntimeError("profiling must precede documentation")
+        dataset_card = curation.ModalityDatasetCard.from_report(
+            context.adapter.modality.value,
+            context.curation_report.to_dict(),
+            context.adapter.modality_notes(),
+        )
         context.documentation = {
             "modality": context.adapter.modality.value,
             "status": "experimental",
@@ -1290,6 +1297,7 @@ class DocumentationStage(ModalityLifecycleStage):
             ),
             "dataset_hash": context.adapter.dataset_hash,
             "model_family": "regularized_linear_classifier",
+            "dataset_card": dataset_card.to_dict(),
             "limitations": list(context.adapter.modality_notes()),
             "promotion_requirements": [
                 "independent metric recomputation",

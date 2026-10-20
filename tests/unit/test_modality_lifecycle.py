@@ -220,6 +220,14 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         dict,
     )
     assert report.package.signature
+    dataset_card = report.documentation["dataset_card"]
+    assert (
+        dataset_card["dataset_hash"] == dataset_card["curation"]["dataset_hash"]
+    )
+    assert dataset_card["privacy"]["status"] == "not_assessed"
+    assert dataset_card["provenance"]["status"] == (
+        "adapter_source_metadata_not_declared"
+    )
     assert report.inference == {
         "package_verified": True,
         "prediction_count": report.evaluation["sample_count"],
