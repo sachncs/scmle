@@ -233,7 +233,7 @@ Every curation finding must contain:
 
 ### Phase 2 — Complete modality lifecycles
 
-Implement each modality through the same 16-stage contract:
+Implement each modality through the same 15-stage contract:
 
 1. ingestion
 2. validation
@@ -463,7 +463,7 @@ authoritative evidence in the release evidence index.
 - 100% of required contract tests pass; no unexplained skips or xfails.
 - Core package contract coverage is at least 85%; critical paths have explicit
   mutation coverage with a target of at least 70% killed mutations.
-- Every advertised modality passes all 16 lifecycle stages.
+- Every advertised modality passes all 15 lifecycle stages.
 - Every advertised task/model combination appears in the capability registry.
 - Invalid, empty, malformed, corrupted, oversized, shifted, and adversarial
   fixtures have deterministic, documented outcomes.
