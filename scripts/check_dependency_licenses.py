@@ -151,9 +151,12 @@ def license_file_evidence(distribution: metadata.Distribution) -> str:
             continue
         license_path = distribution.locate_file(file_path)
         try:
-            content = Path(str(license_path)).read_bytes()[:131_072].decode(
-                "utf-8", errors="replace"
-            ).lower()
+            content = (
+                Path(str(license_path))
+                .read_bytes()[:131_072]
+                .decode("utf-8", errors="replace")
+                .lower()
+            )
         except OSError:
             continue
         recognized.update(

@@ -424,9 +424,7 @@ class DocumentClassifier:
             pattern = rf"(?iu)\b{re.escape(term)}\b"
             ablated_content = re.sub(pattern, " ", sample.content)
             ablated_matrix = vectorizer.transform([ablated_content or " "])
-            delta = original_score - self.predicted_class_score(
-                ablated_matrix
-            )
+            delta = original_score - self.predicted_class_score(ablated_matrix)
             ablations.append((term, float(delta)))
         selected = sorted(
             ablations,
