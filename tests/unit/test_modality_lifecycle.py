@@ -226,6 +226,19 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     assert model_quality["passed"] is True
     assert model_quality["fidelity_score"] == pytest.approx(1.0)
     assert model_quality["stability_score"] == pytest.approx(1.0)
+    data_explanation = evidence_by_stage[
+        modalities.LifecycleStage.DATA_EXPLAINABILITY
+    ].evidence
+    assert data_explanation["partition_counts"]["train"] > 0
+    assert data_explanation["partition_counts"]["test"] > 0
+    assert (
+        data_explanation["label_distribution"]["sample_count"]
+        == (data_explanation["partition_counts"]["train"])
+    )
+    assert all(
+        statistics["nonfinite_count"] == 0
+        for statistics in data_explanation["feature_statistics"].values()
+    )
     assert report.package.signature
     dataset_card = report.documentation["dataset_card"]
     assert (

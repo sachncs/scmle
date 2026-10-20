@@ -1149,6 +1149,27 @@ class DataExplainabilityStage(ModalityLifecycleStage):
     def execute(self, context: LifecycleContext) -> None:
         """Record data lineage and non-causal feature summaries."""
         batch = context.feature_batches["train"]
+        partitions = context.partitions
+        if partitions is None:
+            raise RuntimeError("splitting must precede data explanation")
+        labels = context.adapter.labels(partitions.train)
+        label_counts: dict[str, int] = {}
+        for label in labels:
+            key = str(label)
+            label_counts[key] = label_counts.get(key, 0) + 1
+        statistics: dict[str, dict[str, float | int]] = {}
+        for index, name in enumerate(batch.feature_names):
+            values = batch.values[:, index]
+            statistics[name] = {
+                "min": float(np.min(values)),
+                "max": float(np.max(values)),
+                "mean": float(np.mean(values)),
+                "std": float(np.std(values)),
+                "q05": float(np.quantile(values, 0.05)),
+                "median": float(np.median(values)),
+                "q95": float(np.quantile(values, 0.95)),
+                "nonfinite_count": int(np.count_nonzero(~np.isfinite(values))),
+            }
         context.data_explanation = {
             "dataset_hash": context.adapter.dataset_hash,
             "sample_ids": list(batch.sample_ids),
@@ -1159,9 +1180,17 @@ class DataExplainabilityStage(ModalityLifecycleStage):
                 }
                 for index, name in enumerate(batch.feature_names)
             },
-            "split_groups": context.partitions.groups
-            if context.partitions
-            else {},
+            "feature_statistics": statistics,
+            "label_distribution": {
+                "counts": dict(sorted(label_counts.items())),
+                "sample_count": len(labels),
+            },
+            "partition_counts": {
+                "train": len(partitions.train),
+                "validation": len(partitions.validation),
+                "test": len(partitions.test),
+            },
+            "split_groups": partitions.groups,
             "limitations": [
                 "Feature summaries describe association and coverage, not "
                 "causation.",
