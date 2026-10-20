@@ -990,3 +990,19 @@ Subsequent focused evidence:
 - The Astro site build and accessibility smoke passed all 15 routes after the
   warehouse documentation was added. Public GitHub Pages verification and
   independent review remain external release gates.
+
+Hosted-state observation on 2026-10-21:
+
+- The repository is private and currently has no `main` branch; its default
+  branch is `feat/v0.1-foundation`. The Pages workflow previously triggered
+  deployment only from `main`, so the requested public URL could never be
+  produced from the current repository state. Commit `TBD` changes the Pages
+  trigger and deploy/verify guards to include the actual default branch while
+  retaining the `main` path for a later branch migration.
+- GitHub Actions run `39506512353` for commit `6b34516` reported all 17 CI
+  jobs as failed within seconds and exposed no job logs. Local preflight
+  success therefore cannot be promoted to hosted CI evidence; the run needs
+  an owner-side Actions/billing/runner diagnosis before release approval.
+- The public URL `https://sachncs.github.io/super-charge-ml/` still returns
+  HTTP 404. This remains an external deployment gate, not evidence that the
+  static site build is broken locally.
