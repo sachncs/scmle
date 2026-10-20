@@ -10,6 +10,8 @@ import random
 from typing import Any
 from typing import Self
 
+import numpy as np
+
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
@@ -177,6 +179,25 @@ class SpatialSplit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class GeospatialFeatures:
+    """Numeric geometry features tied to an explicit CRS."""
+
+    feature_ids: tuple[str, ...]
+    feature_names: tuple[str, ...]
+    values: tuple[tuple[float, ...], ...]
+    crs: str
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """Return the number of geometries and prepared features."""
+        return (len(self.feature_ids), len(self.feature_names))
+
+    def to_numpy(self) -> np.ndarray:
+        """Return a writable copy of the numeric feature matrix."""
+        return np.asarray(self.values, dtype=np.float64).copy()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialDataset:
     """Immutable GeoJSON-like vector collection with CRS provenance."""
 
@@ -324,6 +345,61 @@ class GeospatialDataset:
             risk_findings=tuple(risk_findings),
         )
 
+    def prepare_features(self) -> GeospatialFeatures:
+        """Prepare bounded geometry features without changing CRS units.
+
+        The output is a geometry envelope and centroid representation. It does
+        not perform reprojection, spatial joins, rasterization, or distance
+        calculations; those operations require an explicit, versioned policy.
+        """
+        if not self.crs.strip():
+            raise GeospatialValidationError(
+                "geospatial feature preparation requires a declared CRS",
+                {"code": "missing_crs"},
+            )
+        feature_names = (
+            "min_x",
+            "min_y",
+            "max_x",
+            "max_y",
+            "width",
+            "height",
+            "centroid_x",
+            "centroid_y",
+            "coordinate_value_count",
+        )
+        rows = []
+        for feature in self.features:
+            minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
+            coordinates = geometry_coordinates(feature.geometry)
+            rows.append(
+                (
+                    minimum_x,
+                    minimum_y,
+                    maximum_x,
+                    maximum_y,
+                    maximum_x - minimum_x,
+                    maximum_y - minimum_y,
+                    (minimum_x + maximum_x) / 2,
+                    (minimum_y + maximum_y) / 2,
+                    float(len(coordinates)),
+                )
+            )
+        values = np.asarray(rows, dtype=np.float64)
+        if not np.isfinite(values).all():
+            raise GeospatialValidationError(
+                "geospatial features must be finite",
+                {"code": "non_finite_features"},
+            )
+        return GeospatialFeatures(
+            feature_ids=tuple(feature.feature_id for feature in self.features),
+            feature_names=feature_names,
+            values=tuple(
+                tuple(float(value) for value in row) for row in values
+            ),
+            crs=self.crs,
+        )
+
     def split_spatial(
         self,
         block_size: float,
@@ -447,6 +523,7 @@ __all__ = [
     "GEOMETRY_TYPES",
     "GeoFeature",
     "GeospatialDataset",
+    "GeospatialFeatures",
     "GeospatialProfile",
     "GeospatialValidationError",
     "RasterSample",

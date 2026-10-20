@@ -414,6 +414,43 @@ def test_geospatial_spatial_split_keeps_blocks_together():
     assert first.block_size == 5
 
 
+def test_geospatial_feature_preparation_preserves_crs_units():
+    """Geometry envelopes are prepared only after CRS provenance exists."""
+    dataset = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "point", {"type": "Point", "coordinates": [2, 1]}
+            ),
+            geospatial.GeoFeature(
+                "line",
+                {"type": "LineString", "coordinates": [[-3, 4], [5, -2]]},
+            ),
+        ),
+        crs="EPSG:4326",
+    )
+
+    prepared = dataset.prepare_features()
+
+    assert prepared.shape == (2, 9)
+    assert prepared.crs == "EPSG:4326"
+    assert prepared.feature_ids == ("point", "line")
+    assert prepared.to_numpy()[1, 4:6].tolist() == [8.0, 6.0]
+
+
+def test_geospatial_feature_preparation_rejects_missing_crs():
+    """Coordinates cannot become model features without a reference CRS."""
+    dataset = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "point", {"type": "Point", "coordinates": [0, 0]}
+            ),
+        )
+    )
+
+    with pytest.raises(geospatial.GeospatialValidationError, match="CRS"):
+        dataset.prepare_features()
+
+
 def test_raster_identity_requires_spatial_metadata():
     """Raster bytes are not useful without dimensions and CRS provenance."""
     payload = b"raster"

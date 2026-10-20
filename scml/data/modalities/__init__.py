@@ -12,6 +12,7 @@ from scml.data.modalities.document import DocumentFormat
 from scml.data.modalities.document import DocumentReader
 from scml.data.modalities.geospatial import GeoFeature
 from scml.data.modalities.geospatial import GeospatialDataset
+from scml.data.modalities.geospatial import GeospatialFeatures
 from scml.data.modalities.geospatial import GeospatialProfile
 from scml.data.modalities.geospatial import RasterSample
 from scml.data.modalities.graph import GraphData
@@ -39,6 +40,7 @@ __all__ = [
     "DocumentReader",
     "GeoFeature",
     "GeospatialDataset",
+    "GeospatialFeatures",
     "GeospatialProfile",
     "GraphData",
     "GraphEdge",
