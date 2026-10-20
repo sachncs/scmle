@@ -22,8 +22,10 @@ Automated evidence: `tests/integration/test_resume.py` and
 
 ## 2. Rollback
 
-1. Register a known-good bundle and promote it with a
-   `PromotionApproval` bound to its content digest.
+1. Register a known-good bundle and promote it with a signed
+   `PromotionApproval` bound to its content digest, review decision, and
+   evidence references. Pass the release verification key to the promotion
+   call.
 2. Stage a challenger under the `challenger` alias; do not move the serving
    alias as part of the training step.
 3. Score the same sufficiently large labeled batch with both versions.
@@ -36,6 +38,23 @@ Automated evidence: `tests/integration/test_resume.py` and
 Automated evidence: `tests/unit/test_lifecycle_extras.py` and
 `tests/integration/test_deployment.py`.
 
+## 5. Fault evidence recording
+
+1. Build the complete `FaultInjectionPlanRegistry` for the disposable
+   release candidate.
+2. Use `FaultInjectionHarness` with a unique execution ID, reviewer, and
+   evidence directory.
+3. Run one scenario-specific injector and return one `FaultArtifact` for
+   every declared evidence requirement.
+4. Confirm each artifact is atomically persisted, its SHA-256 digest is
+   recorded, and missing or unsafe observations remain inconclusive or
+   failed.
+5. Do not treat this recorder test as evidence that process death, disk
+   exhaustion, or worker loss has actually been exercised; those injectors
+   still require an environment-specific executor.
+
+Automated evidence: `tests/unit/test_reliability_harness.py`.
+
 ## 3. Signing-key rotation
 
 1. Produce a signed bundle with the current key.
@@ -47,7 +66,7 @@ Automated evidence: `tests/unit/test_lifecycle_extras.py` and
 
 Automated evidence: `tests/unit/test_bundle.py::test_signing_key_rotation_preserves_bundle_and_rejects_old_key`.
 
-## 4. Monitoring handoff
+## 6. Monitoring handoff
 
 1. Assess a fresh labeled batch with the promoted bundle.
 2. Record row count, labeled coverage, drift findings, recommendation, and
