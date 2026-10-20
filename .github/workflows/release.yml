@@ -48,10 +48,12 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: uv sync --python 3.14 --extra boosting --extra optimization
       - run: uv run pytest -q
-      - run: uv run python -m benchmarks.run_benchmarks --offline --budget 240 --workers 2 --output results.json
+      - run: uv run python -m benchmarks.run_benchmarks --offline --seeds 5 --budget 120 --workers 2 --output results.json
       - run: uv run python -m benchmarks.check_regression results.json
       - run: uv build --python 3.14
       - run: uv run twine check dist/*
+      - name: Verify reproducible and network-isolated artifacts
+        run: scripts/verify_release_artifacts.sh
       - name: Smoke test the wheel and source distribution
         run: |
           uv venv --python 3.14 /tmp/release-wheel-env
