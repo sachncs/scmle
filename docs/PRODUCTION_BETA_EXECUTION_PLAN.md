@@ -108,6 +108,15 @@ critical mutation gate killed `1253/1735` mutants (72%, above the 70% minimum),
 all four offline benchmarks had zero regressions, both distribution checks
 passed, and the Astro build produced 11 pages. The document baseline focused
 tests passed 4 tests in isolation and are included in this repository run.
+The current preflight at pushed commit `3e28a11` passed `1728 passed, 89
+skipped, 2 warnings` in 8 minutes 18 seconds; total coverage was 86%, the
+critical mutation gate killed `1252/1735` mutants (72%, above the 70% minimum),
+all four offline benchmarks had zero regressions, both distribution checks
+passed, the dependency audit found no known vulnerabilities, and the Astro
+build produced 11 pages. The two warnings remain nondeterministic SQLite
+teardown warnings in curriculum run 3. The atomic model-package failure-path
+suite passed 6 focused tests; the latest label-state curation increment passed
+10 image tests and 24 graph/media tests.
 The latest non-tabular data-foundation slice at `b15c701` passed 8 focused
 media/geospatial tests, the existing modality and capability integration set
 passed 46 tests, and Ruff plus mypy passed for the new modules. The document
