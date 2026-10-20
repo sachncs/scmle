@@ -172,9 +172,11 @@ def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
     manifest = tabular.build_manifest(frame, "y")
     task = tasks.TaskType.BINARY
-    plan = profiler.DatasetProfiler(spec).profile(
-        frame, manifest, task, 0.25
-    ).feature_plan
+    plan = (
+        profiler.DatasetProfiler(spec)
+        .profile(frame, manifest, task, 0.25)
+        .feature_plan
+    )
 
     result = fingerprint.ml_difficulty(frame, spec, task, plan)
 
