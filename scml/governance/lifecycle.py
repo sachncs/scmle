@@ -153,13 +153,17 @@ class LifecycleManager:
         return None
 
     def register_run(
-        self, result: results.RunResult, promote: bool = True
+        self,
+        result: results.RunResult,
+        promote: bool = False,
+        approval: registry_module.PromotionApproval | None = None,
     ) -> registry_module.VersionRecord:
         """Registers a finished run and optionally makes it the champion.
 
         Args:
             result: A completed run.
-            promote: Point the champion alias at it.
+            promote: Point the champion alias at it. Defaults to staging only.
+            approval: Independent approval for champion promotion.
 
         Returns:
             The registered version.
@@ -174,7 +178,22 @@ class LifecycleManager:
             trusted=True,  # exported moments ago by this very process
         )
         if promote:
-            self.registry.promote(self.model, record.version)
+            self.registry.promote(self.model, record.version, approval=approval)
+        return record
+
+    def promote_challenger(
+        self, approval: registry_module.PromotionApproval
+    ) -> registry_module.VersionRecord:
+        """Promotes the staged challenger after independent review."""
+        record = self.registry.resolve(self.model, registry_module.CHALLENGER)
+        self.registry.promote(self.model, record.version, approval=approval)
+        self.registry.audit(
+            "lifecycle.challenger_promoted",
+            model=self.model,
+            version=record.version,
+            reviewer=approval.reviewer,
+            approval_evidence=list(approval.evidence),
+        )
         return record
 
     def review(
@@ -188,7 +207,8 @@ class LifecycleManager:
 
         If monitoring recommends retraining, a challenger is trained on part
         of the fresh data and compared with the champion on the held-out
-        remainder; it is promoted only when it is clearly better.
+        remainder. A clearly better challenger is staged, but champion
+        promotion requires a separate call to `promote_challenger`.
 
         Args:
             fresh: Recent served rows including the true target column.
@@ -262,21 +282,28 @@ class LifecycleManager:
             )
             notes.append("challenger was not clearly better; champion kept")
             return LifecycleOutcome(report, True, comparison, None, notes)
-        record = self.register_run(challenger_run, promote=True)
+        record = self.register_run(challenger_run)
+        self.registry.promote(
+            self.model, record.version, registry_module.CHALLENGER
+        )
         self.registry.audit(
-            "lifecycle.challenger_promoted",
+            "lifecycle.challenger_staged",
             model=self.model,
             version=record.version,
             **evidence,
         )
-        notes.append(f"promoted challenger as v{record.version}")
-        return LifecycleOutcome(report, True, comparison, record.version, notes)
+        notes.append(
+            f"staged challenger as v{record.version}; independent approval "
+            "required before champion promotion"
+        )
+        return LifecycleOutcome(report, True, comparison, None, notes)
 
     def check_rollback(
         self,
         fresh: pd.DataFrame,
         target: str,
         policy: RollbackPolicy | None = None,
+        approval: registry_module.PromotionApproval | None = None,
     ) -> RollbackOutcome:
         """Takes the previous champion back if the new one is clearly worse.
 
@@ -290,6 +317,7 @@ class LifecycleManager:
             fresh: Recent served rows including the true target.
             target: Name of the target column.
             policy: Evidence required; defaults to `RollbackPolicy()`.
+            approval: Independent approval for the rollback promotion.
         """
         rule = policy or RollbackPolicy()
         aliases = self.registry.aliases(self.model)
@@ -311,14 +339,28 @@ class LifecycleManager:
             model=self.model,
             current=aliases[registry_module.CHAMPION],
             previous=previous,
-            rolled_back=worse,
+            rollback_required=worse,
+            rolled_back=worse and approval is not None,
             **dataclasses.asdict(comparison),
         )
         if not worse:
             return RollbackOutcome(
                 False, comparison, None, "the new champion holds up"
             )
-        self.registry.promote(self.model, previous)
+        if approval is None:
+            self.registry.audit(
+                "lifecycle.rollback_pending_approval",
+                model=self.model,
+                version=previous,
+                reason="new champion is clearly worse",
+            )
+            return RollbackOutcome(
+                False,
+                comparison,
+                None,
+                "rollback requires independent approval",
+            )
+        self.registry.promote(self.model, previous, approval=approval)
         return RollbackOutcome(
             True,
             comparison,

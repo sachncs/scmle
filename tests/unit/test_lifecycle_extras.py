@@ -39,6 +39,19 @@ def bundle_of(name, frame):
     )
 
 
+def approval_for(record):
+    return registry_module.PromotionApproval(
+        model=record.model,
+        version=record.version,
+        content_id=record.content_id,
+        reviewer="unit-reviewer",
+        decision=registry_module.PromotionDecision.APPROVED,
+        reason="verified unit fixture",
+        evidence=("unit-evidence.json",),
+        approved_at="2026-10-20T00:00:00+00:00",
+    )
+
+
 @pytest.fixture(scope="module")
 def good():
     return bundle_of("logistic_regression", traffic())
@@ -137,7 +150,7 @@ def registry_with(tmp_path, first, second):
     for index, model in enumerate((first, second), start=1):
         directory = model.save(tmp_path / f"export{index}")
         record = store.register("m", directory, trusted=True)
-        store.promote("m", record.version)
+        store.promote("m", record.version, approval=approval_for(record))
     return store, manager
 
 
@@ -146,7 +159,9 @@ def test_a_clearly_worse_new_champion_is_rolled_back(good, tmp_path):
     store, manager = registry_with(tmp_path, good, broken)
     fresh = traffic(1200, seed=20)
 
-    outcome = manager.check_rollback(fresh, "y")
+    outcome = manager.check_rollback(
+        fresh, "y", approval=approval_for(store.resolve("m", 1))
+    )
 
     assert outcome.rolled_back and outcome.restored_version == 1
     assert store.resolve("m").version == 1
@@ -158,6 +173,18 @@ def test_a_clearly_worse_new_champion_is_rolled_back(good, tmp_path):
         if "rollback_check" in line
     ]
     assert actions and '"rolled_back": true' in actions[0]
+
+
+def test_a_clearly_worse_new_champion_waits_for_approval(good, tmp_path):
+    broken = bundle_of("logistic_regression", traffic(seed=0, flip=True))
+    store, manager = registry_with(tmp_path, good, broken)
+
+    outcome = manager.check_rollback(traffic(1200, seed=20), "y")
+
+    assert not outcome.rolled_back
+    assert outcome.restored_version is None
+    assert "requires independent approval" in outcome.reason
+    assert store.resolve("m").version == 2
 
 
 def test_a_new_champion_that_holds_up_stays(good, tmp_path):
@@ -177,7 +204,7 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     record = store.register("m", good.save(tmp_path / "e"), trusted=True)
-    store.promote("m", record.version)
+    store.promote("m", record.version, approval=approval_for(record))
 
     assert "no previous" in manager.check_rollback(traffic(300), "y").reason
     second = store.register(
@@ -185,5 +212,5 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
         bundle_of("decision_tree", traffic(100, seed=9)).save(tmp_path / "f"),
         trusted=True,
     )
-    store.promote("m", second.version)
+    store.promote("m", second.version, approval=approval_for(second))
     assert "fewer than" in manager.check_rollback(traffic(20), "y").reason

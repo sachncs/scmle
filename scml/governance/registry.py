@@ -8,6 +8,7 @@ Layout under the registry root:
 """
 
 import dataclasses
+import enum
 import json
 import pathlib
 import shutil
@@ -20,7 +21,70 @@ from scml.contracts import events
 INDEX_FILE = "registry.json"
 AUDIT_FILE = "audit.jsonl"
 CHAMPION = "champion"
+CHALLENGER = "challenger"
 PREVIOUS = "previous"
+
+
+class PromotionDecision(enum.StrEnum):
+    """Decision recorded by an independent promotion reviewer."""
+
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PromotionApproval:
+    """Approval bound to one exact registered model bundle."""
+
+    model: str
+    version: int
+    content_id: str
+    reviewer: str
+    decision: PromotionDecision
+    reason: str
+    evidence: tuple[str, ...]
+    approved_at: str
+    independent: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate the review record before it can authorize promotion."""
+        for name in (
+            "model",
+            "content_id",
+            "reviewer",
+            "reason",
+            "approved_at",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must not be empty")
+        if self.version < 1:
+            raise ValueError("version must be positive")
+        if not isinstance(self.decision, PromotionDecision):
+            object.__setattr__(
+                self, "decision", PromotionDecision(self.decision)
+            )
+        if not self.evidence or any(not item.strip() for item in self.evidence):
+            raise ValueError("evidence must contain non-empty references")
+        if not isinstance(self.independent, bool):
+            raise TypeError("independent must be bool")
+
+    def validate_target(
+        self, model: str, version: int, content_id: str
+    ) -> None:
+        """Require exact identity and independent approval for promotion."""
+        if (self.model, self.version, self.content_id) != (
+            model,
+            version,
+            content_id,
+        ):
+            raise ValueError(
+                "promotion approval does not match bundle identity"
+            )
+        if self.decision is not PromotionDecision.APPROVED:
+            raise ValueError("promotion was rejected by the reviewer")
+        if not self.independent:
+            raise ValueError("champion promotion requires independent review")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -178,21 +242,41 @@ class ModelRegistryStore:
         entry = self.read_index()["models"].get(model, {"aliases": {}})
         return {alias: int(v) for alias, v in entry["aliases"].items()}
 
-    def promote(self, model: str, version: int, alias: str = CHAMPION) -> None:
+    def promote(
+        self,
+        model: str,
+        version: int,
+        alias: str = CHAMPION,
+        approval: PromotionApproval | None = None,
+    ) -> None:
         """Points `alias` at `version`.
 
         Args:
             model: Model name.
             version: Registered version number.
             alias: Alias to move (default `champion`).
+            approval: Independent review bound to the exact bundle. Required
+                when moving the champion alias; staging aliases do not serve
+                traffic and may be moved without approval.
 
         Raises:
-            ArtifactError: If the model or version does not exist.
+            ArtifactError: If the model or version does not exist, or if a
+                champion promotion lacks valid independent approval.
         """
         index = self.read_index()
         entry = index["models"].get(model)
         if entry is None or str(version) not in entry["versions"]:
             raise errors.ArtifactError(f"{model} v{version} is not registered")
+        record = VersionRecord(**entry["versions"][str(version)])
+        if alias == CHAMPION:
+            if approval is None:
+                raise errors.ArtifactError(
+                    "champion promotion requires independent approval"
+                )
+            try:
+                approval.validate_target(model, version, record.content_id)
+            except (TypeError, ValueError) as error:
+                raise errors.ArtifactError(str(error)) from error
         previous = entry["aliases"].get(alias)
         entry["aliases"][alias] = version
         if alias == CHAMPION and previous is not None and previous != version:
@@ -204,6 +288,9 @@ class ModelRegistryStore:
             alias=alias,
             version=version,
             previous=previous,
+            reviewer=approval.reviewer if approval else None,
+            approval=approval.decision.value if approval else None,
+            approval_evidence=list(approval.evidence) if approval else [],
         )
 
     def resolve(self, model: str, ref: str | int = CHAMPION) -> VersionRecord:

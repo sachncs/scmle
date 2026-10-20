@@ -53,6 +53,25 @@ def post(url, payload):
         return error.code, json.loads(error.read())
 
 
+def approval_for(record):
+    return registry_module.PromotionApproval(
+        model=record.model,
+        version=record.version,
+        content_id=record.content_id,
+        reviewer="integration-reviewer",
+        decision=registry_module.PromotionDecision.APPROVED,
+        reason="verified integration fixture",
+        evidence=("integration-evidence.json",),
+        approved_at="2026-10-20T00:00:00+00:00",
+    )
+
+
+def register_champion(manager, store, result):
+    record = manager.register_run(result)
+    store.promote(manager.model, record.version, approval=approval_for(record))
+    return record
+
+
 def test_registry_versions_aliases_and_audit(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     bundle_dir = trained.save(tmp_path / "export")
@@ -67,12 +86,12 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
     )
     assert (first.version, second.version) == (1, 2)
     assert first.content_id != second.content_id
-    store.promote("churn", 1)
+    store.promote("churn", 1, approval=approval_for(first))
     store.promote("churn", 2, "challenger")
     assert store.aliases("churn") == {"champion": 1, "challenger": 2}
     assert store.resolve("churn", "challenger").run_id == "r2"
     assert store.resolve("churn", 2).metrics == {"roc_auc": 0.91}
-    store.promote("churn", 2)
+    store.promote("churn", 2, approval=approval_for(second))
     assert store.resolve("churn").version == 2
     audit = [
         json.loads(line)
@@ -107,6 +126,35 @@ def test_registry_rejects_bad_requests(trained, tmp_path):
     broken.mkdir()
     with pytest.raises(errors.ArtifactError):
         store.register("m", broken, trusted=True)
+
+
+def test_champion_promotion_requires_matching_independent_approval(
+    trained, tmp_path
+):
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    record = store.register(
+        "m", trained.save(tmp_path / "export"), trusted=True
+    )
+    with pytest.raises(errors.ArtifactError, match="independent approval"):
+        store.promote("m", record.version)
+    with pytest.raises(errors.ArtifactError, match="bundle identity"):
+        store.promote(
+            "m",
+            record.version,
+            approval=dataclasses.replace(
+                approval_for(record), content_id="wrong-content"
+            ),
+        )
+    with pytest.raises(errors.ArtifactError, match="rejected"):
+        store.promote(
+            "m",
+            record.version,
+            approval=dataclasses.replace(
+                approval_for(record),
+                decision=registry_module.PromotionDecision.REJECTED,
+            ),
+        )
+    assert store.aliases("m") == {}
 
 
 def test_registry_refuses_tampered_bundles(trained, tmp_path):
@@ -183,7 +231,7 @@ def test_batch_serving_scores_files(trained, tmp_path):
 def test_lifecycle_keeps_a_healthy_champion(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
-    record = manager.register_run(trained)
+    record = register_champion(manager, store, trained)
     assert store.resolve("churn").version == record.version == 1
     outcome = manager.review(make_frame(600, 4), "y")
     assert not outcome.retrained and outcome.promoted_version is None
@@ -193,7 +241,7 @@ def test_lifecycle_keeps_a_healthy_champion(trained, tmp_path):
 def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
-    manager.register_run(trained)
+    register_champion(manager, store, trained)
     drifted = make_frame(2400, 5, relabel=True)
     outcome = manager.review(
         drifted,
@@ -207,9 +255,12 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
     )
     assert outcome.monitoring.recommendation.action == "retrain"
     assert outcome.retrained and outcome.comparison.decision == "promote"
-    assert outcome.promoted_version == 2 and store.resolve("churn").version == 2
+    assert outcome.promoted_version is None
+    candidate = store.resolve("churn", registry_module.CHALLENGER)
+    manager.promote_challenger(approval_for(candidate))
+    assert store.resolve("churn").version == 2
     assert [v.version for v in store.versions("churn")] == [1, 2]
-    assert any("promoted challenger" in note for note in outcome.notes)
+    assert any("independent approval" in note for note in outcome.notes)
     fresh = make_frame(300, 6, relabel=True)
     new = store.load("churn")
     accuracy = (new.predict(fresh.drop(columns="y")) == fresh["y"]).mean()
@@ -219,7 +270,7 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
 def test_review_can_be_report_only(trained, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
-    manager.register_run(trained)
+    register_champion(manager, store, trained)
     outcome = manager.review(
         make_frame(1000, 7, relabel=True), "y", retrain=False
     )
@@ -261,7 +312,7 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
     bundle_dir = trained.bundle.save(tmp_path / "export", signing_key=key)
     record = store.register("m", bundle_dir, signing_key=key)
     assert record.signed is True
-    store.promote("m", record.version)
+    store.promote("m", record.version, approval=approval_for(record))
     features = make_frame(10, 3).drop(columns="y")
     loaded = store.load("m", signing_key=key)
     assert len(loaded.predict(features)) == 10
@@ -300,7 +351,7 @@ def test_repeated_checks_of_the_same_drift_retrain_exactly_once(
     runs = count_trainings(monkeypatch)
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
-    manager.register_run(trained)
+    register_champion(manager, store, trained)
     runs.clear()
     drifted = make_frame(2400, 5, relabel=True)
 
@@ -309,7 +360,8 @@ def test_repeated_checks_of_the_same_drift_retrain_exactly_once(
     third = manager.review(drifted, "y", project_options=FAST_OPTIONS)
 
     assert len(runs) == 1
-    assert first.promoted_version == 2
+    assert first.promoted_version is None
+    assert store.resolve("churn", registry_module.CHALLENGER).version == 2
     assert second.skipped in {None, "already_handled"}
     assert not second.retrained and not third.retrained
 
@@ -325,7 +377,7 @@ def test_a_rejected_challenger_is_recorded_and_not_retried_at_once(
         str(tmp_path / "work"),
         lifecycle.RetrainPolicy(min_rows=200, cooldown_rows=1500),
     )
-    manager.register_run(trained)
+    register_champion(manager, store, trained)
     runs.clear()
     monkeypatch.setattr(
         champion_module.ChampionChallenger,
@@ -372,7 +424,7 @@ def test_too_few_labeled_rows_do_not_trigger_training(
         str(tmp_path / "work"),
         lifecycle.RetrainPolicy(min_rows=5000),
     )
-    manager.register_run(trained)
+    register_champion(manager, store, trained)
     runs.clear()
 
     outcome = manager.review(
