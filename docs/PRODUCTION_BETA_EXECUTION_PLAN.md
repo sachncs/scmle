@@ -1003,6 +1003,10 @@ Hosted-state observation on 2026-10-21:
   jobs as failed within seconds and exposed no job logs. Local preflight
   success therefore cannot be promoted to hosted CI evidence; the run needs
   an owner-side Actions/billing/runner diagnosis before release approval.
+- After `405ca1b` enabled the correct branch trigger, Pages runs `39507068972`
+  and `39507078394` reached the `build` job but failed before producing logs;
+  `deploy` and `verify` were skipped. This confirms the workflow trigger fix
+  while leaving the hosted runner/environment diagnosis open.
 - The public URL `https://sachncs.github.io/super-charge-ml/` still returns
   HTTP 404. This remains an external deployment gate, not evidence that the
   static site build is broken locally.
