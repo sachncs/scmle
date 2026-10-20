@@ -142,10 +142,33 @@ logging.info(report.recommendation)  # none / investigate / retrain
 
 store = registry.ModelRegistryStore("registry")
 manager = lifecycle.LifecycleManager(store, "churn", "work")
-manager.register_run(result)  # becomes the champion
-manager.review(
-    fresh_labeled_rows, target="churn"
-)  # retrain + promote if clearly better
+record = manager.register_run(result)  # registers a staged version
+approval = registry.PromotionApproval(
+    model="churn",
+    version=record.version,
+    content_id=record.content_id,
+    reviewer="reviewer@example.com",
+    decision=registry.PromotionDecision.APPROVED,
+    reason="reviewed evaluation, limitations, and recovery evidence",
+    evidence=("evidence/release-review.json",),
+    approved_at="2026-10-20T00:00:00+00:00",
+)
+store.promote("churn", record.version, approval=approval)
+outcome = manager.review(fresh_labeled_rows, target="churn")
+# A better challenger is staged, then promoted only after a second review.
+if outcome.comparison and outcome.comparison.decision == "promote":
+    candidate = store.resolve("churn", "challenger")
+    candidate_approval = registry.PromotionApproval(
+        model="churn",
+        version=candidate.version,
+        content_id=candidate.content_id,
+        reviewer="reviewer@example.com",
+        decision=registry.PromotionDecision.APPROVED,
+        reason="reviewed challenger evidence independently",
+        evidence=("evidence/challenger-review.json",),
+        approved_at="2026-10-20T00:00:00+00:00",
+    )
+    manager.promote_challenger(candidate_approval)
 ```
 
 Inference is strict about column names unless you state a policy:
