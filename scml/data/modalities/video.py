@@ -1,0 +1,197 @@
+"""Video data contracts with explicit, caller-owned probing."""
+
+from collections.abc import Callable
+import dataclasses
+import hashlib
+import pathlib
+from typing import Self
+
+from scml.contracts import errors
+
+
+class VideoValidationError(errors.DataError):
+    """A video sample violates an ingestion or metadata invariant."""
+
+    category = "video_validation"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VideoMetadata:
+    """Decoded container metadata required for bounded video profiling."""
+
+    format: str
+    width: int
+    height: int
+    frame_count: int
+    frames_per_second: float
+    codec: str
+    audio_tracks: int = 0
+
+    def __post_init__(self) -> None:
+        """Validate dimensions, timing, and track counts."""
+        if not self.format.strip() or not self.codec.strip():
+            raise ValueError("format and codec must not be empty")
+        if self.width < 1 or self.height < 1:
+            raise ValueError("video dimensions must be positive")
+        if self.frame_count < 1 or self.frames_per_second <= 0:
+            raise ValueError("video frame timing must be positive")
+        if self.audio_tracks < 0:
+            raise ValueError("audio_tracks must not be negative")
+
+    @property
+    def duration_seconds(self) -> float:
+        """Return the duration implied by frame count and rate."""
+        return self.frame_count / self.frames_per_second
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VideoProfile:
+    """Bounded data-understanding summary for one video sample."""
+
+    source: str
+    format: str
+    codec: str
+    width: int
+    height: int
+    frame_count: int
+    frames_per_second: float
+    duration_seconds: float
+    audio_tracks: int
+    byte_size: int
+
+
+VideoProbe = Callable[[bytes], VideoMetadata]
+
+
+def canonical_source(source: str | pathlib.Path) -> str:
+    """Return a stable source identifier for a path or URI-like value."""
+    value = str(source).strip()
+    if not value:
+        return "memory://"
+    if "://" in value:
+        return value
+    return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VideoSample:
+    """Immutable encoded video tied to metadata observed by a probe."""
+
+    source: str
+    encoded_bytes: bytes = dataclasses.field(repr=False)
+    file_hash: str
+    metadata: VideoMetadata
+    label: str | int | float | bool | None = None
+    byte_size: int = dataclasses.field(init=False)
+
+    def __post_init__(self) -> None:
+        """Validate the payload and its content identity."""
+        raw = bytes(self.encoded_bytes)
+        object.__setattr__(self, "encoded_bytes", raw)
+        if not self.source.strip():
+            raise ValueError("source must not be empty")
+        if not raw:
+            raise VideoValidationError(
+                "video payload is empty", {"code": "empty_payload"}
+            )
+        if len(self.file_hash) != 64 or any(
+            character not in "0123456789abcdef" for character in self.file_hash
+        ):
+            raise ValueError("file_hash must be a SHA-256 hex digest")
+        if hashlib.sha256(raw).hexdigest() != self.file_hash:
+            raise ValueError("file_hash does not match encoded_bytes")
+        object.__setattr__(self, "byte_size", len(raw))
+
+    @classmethod
+    def from_bytes(
+        cls,
+        encoded_bytes: bytes,
+        metadata: VideoMetadata,
+        source: str = "memory://",
+        max_bytes: int | None = 2 * 1024 * 1024 * 1024,
+    ) -> Self:
+        """Create a sample from bytes and explicit probe output.
+
+        Video codecs are intentionally not imported by core. A production
+        adapter should record the probe version alongside the sample manifest.
+        """
+        raw = bytes(encoded_bytes)
+        if not raw:
+            raise VideoValidationError(
+                "video payload is empty", {"code": "empty_payload"}
+            )
+        if max_bytes is not None and (max_bytes < 1 or len(raw) > max_bytes):
+            raise VideoValidationError(
+                "video payload exceeds the configured byte limit",
+                {
+                    "code": "encoded_size_limit",
+                    "byte_size": len(raw),
+                    "max_bytes": max_bytes,
+                },
+            )
+        return cls(
+            source=canonical_source(source),
+            encoded_bytes=raw,
+            file_hash=hashlib.sha256(raw).hexdigest(),
+            metadata=metadata,
+        )
+
+    def profile(self) -> VideoProfile:
+        """Return bounded metadata suitable for curation and data cards."""
+        return VideoProfile(
+            source=self.source,
+            format=self.metadata.format,
+            codec=self.metadata.codec,
+            width=self.metadata.width,
+            height=self.metadata.height,
+            frame_count=self.metadata.frame_count,
+            frames_per_second=self.metadata.frames_per_second,
+            duration_seconds=self.metadata.duration_seconds,
+            audio_tracks=self.metadata.audio_tracks,
+            byte_size=self.byte_size,
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VideoDataset:
+    """Immutable video collection with deterministic source identity."""
+
+    samples: tuple[VideoSample, ...]
+    content_hash: str = dataclasses.field(init=False)
+
+    def __post_init__(self) -> None:
+        """Reject duplicate sources and derive a stable dataset hash."""
+        normalized = tuple(self.samples)
+        if not normalized:
+            raise VideoValidationError(
+                "video dataset must contain at least one sample",
+                {"code": "empty_dataset"},
+            )
+        sources = [sample.source for sample in normalized]
+        if len(sources) != len(set(sources)):
+            raise VideoValidationError(
+                "video dataset contains duplicate sources",
+                {"code": "duplicate_source"},
+            )
+        digest = hashlib.sha256(
+            "\n".join(
+                f"{sample.source}\0{sample.file_hash}" for sample in normalized
+            ).encode("utf-8")
+        ).hexdigest()
+        object.__setattr__(self, "samples", normalized)
+        object.__setattr__(self, "content_hash", digest)
+
+    def profiles(self) -> tuple[VideoProfile, ...]:
+        """Return profiles in source order for deterministic curation."""
+        return tuple(sample.profile() for sample in self.samples)
+
+
+__all__ = [
+    "VideoDataset",
+    "VideoMetadata",
+    "VideoProbe",
+    "VideoProfile",
+    "VideoSample",
+    "VideoValidationError",
+    "canonical_source",
+]
