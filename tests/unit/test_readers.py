@@ -118,6 +118,48 @@ def test_manifest_deterministic_and_input_immutable(frame):
     assert changed_manifest.schema_hash == first.schema_hash
 
 
+def test_manifest_populates_deterministic_snapshot_and_lineage(frame, tmp_path):
+    path = tmp_path / "records.csv"
+    first = tabular.build_manifest(frame, "y", path)
+    second = tabular.build_manifest(frame.copy(), "y", path)
+
+    assert first.snapshot_id == second.snapshot_id
+    assert first.snapshot_id.startswith("snap_")
+    assert len(first.snapshot_id) == len("snap_") + 64
+    assert first.source.acquisition_method == "local-file"
+    assert first.source.owner == ""
+    assert first.source.license == ""
+    assert first.lineage.source_snapshot == first.snapshot_id
+    assert first.lineage.object_hashes == {"tabular-frame": first.data_hash}
+
+
+def test_snapshot_identity_changes_for_content_schema_and_uri(frame):
+    baseline = tabular.build_manifest(frame, "y", "s3://bucket/records")
+    changed_content = tabular.build_manifest(
+        frame.assign(a=[9, 2, 3]), "y", "s3://bucket/records"
+    )
+    changed_schema = tabular.build_manifest(
+        frame.astype({"a": "float64"}), "y", "s3://bucket/records"
+    )
+    changed_uri = tabular.build_manifest(
+        frame, "y", "s3://bucket/other-records"
+    )
+
+    assert changed_content.snapshot_id != baseline.snapshot_id
+    assert changed_schema.snapshot_id != baseline.snapshot_id
+    assert changed_uri.snapshot_id != baseline.snapshot_id
+
+
+def test_uri_semantics_are_explicit_without_ownership_or_license_claims(frame):
+    manifest = tabular.build_manifest(frame, "y", "s3://bucket/records")
+
+    assert manifest.source.acquisition_method == "s3-uri"
+    assert manifest.source.owner == ""
+    assert manifest.source.license == ""
+    assert tabular.uri_semantics("<in-memory>") == "memory"
+    assert tabular.canonical_uri("<memory>") == "memory://"
+
+
 def test_manifest_requires_target(frame):
     with pytest.raises(errors.DataError, match="target"):
         tabular.build_manifest(frame, "nope")

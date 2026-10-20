@@ -8,6 +8,8 @@ import abc
 import hashlib
 import pathlib
 from typing import ClassVar
+from urllib.parse import urlsplit
+from urllib.parse import urlunsplit
 
 import numpy as np
 import pandas as pd
@@ -211,8 +213,96 @@ def data_hash(frame: pd.DataFrame) -> str:
     return hashlib.sha256(rows.tobytes()).hexdigest()[:16]
 
 
+def canonical_uri(uri: str | pathlib.Path) -> str:
+    """Returns the canonical URI used for snapshot identity and lineage.
+
+    Empty strings and the two supported in-memory markers are represented as
+    ``memory://``. Local paths become absolute ``file://`` URIs. Other URI
+    schemes retain their resource semantics while normalizing the scheme
+    name. The caller-provided URI remains available on ``DatasetManifest``.
+
+    Args:
+        uri: A local path, remote URI, or in-memory marker.
+
+    Returns:
+        A stable URI representation for identity and lineage records.
+    """
+    value = str(uri).strip()
+    if not value or value in {"<memory>", "<in-memory>"}:
+        return "memory://"
+    parsed = urlsplit(value)
+    if parsed.scheme and not (len(parsed.scheme) == 1 and value[1:2] == ":"):
+        return urlunsplit(
+            (
+                parsed.scheme.lower(),
+                parsed.netloc,
+                parsed.path,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
+    return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
+
+
+def uri_semantics(uri: str | pathlib.Path) -> str:
+    """Returns the acquisition semantics directly implied by ``uri``.
+
+    Args:
+        uri: A local path, remote URI, or in-memory marker.
+
+    Returns:
+        ``memory``, ``local-file``, or ``<scheme>-uri``.
+    """
+    scheme = urlsplit(canonical_uri(uri)).scheme
+    if scheme == "memory":
+        return "memory"
+    if scheme == "file":
+        return "local-file"
+    return f"{scheme}-uri"
+
+
+def snapshot_identity(frame: pd.DataFrame, uri: str | pathlib.Path) -> str:
+    """Returns a full deterministic identity for a tabular snapshot.
+
+    The identity includes the ordered schema, ordered row content, shape, and
+    canonical URI semantics. The DataFrame index is intentionally excluded so
+    that a table loaded from a file and an equivalent in-memory table have the
+    same content identity when their URI semantics match.
+
+    Args:
+        frame: The ingested table.
+        uri: The source path, URI, or in-memory marker.
+
+    Returns:
+        A ``snap_``-prefixed SHA-256 identity.
+    """
+    schema = "|".join(
+        f"{name}:{dtype}"
+        for name, dtype in zip(
+            frame.columns, frame.dtypes.astype(str), strict=True
+        )
+    )
+    schema_digest = hashlib.sha256(schema.encode("utf-8")).hexdigest()
+    rows = pd.util.hash_pandas_object(frame, index=False).to_numpy(
+        dtype="uint64"
+    )
+    content_digest = hashlib.sha256(
+        rows.astype("<u8", copy=False).tobytes()
+    ).hexdigest()
+    payload = "|".join(
+        (
+            schema_digest,
+            content_digest,
+            str(frame.shape[0]),
+            str(frame.shape[1]),
+            canonical_uri(uri),
+        )
+    )
+    return f"snap_{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
+
+
 def build_manifest(
-    frame: pd.DataFrame, target: str, uri: str = ""
+    frame: pd.DataFrame, target: str, uri: str | pathlib.Path = ""
 ) -> data_contracts.DatasetManifest:
     """Builds the immutable identity of a dataset.
 
@@ -233,6 +323,7 @@ def build_manifest(
             f"columns: {list(frame.columns)[:20]}"
         )
     content_hash = data_hash(frame)
+    identity = snapshot_identity(frame, uri)
     return data_contracts.DatasetManifest(
         dataset_id=f"ds_{content_hash[:8]}",
         schema_hash=schema_hash(frame),
@@ -241,6 +332,14 @@ def build_manifest(
         column_count=frame.shape[1],
         target=target,
         uri=str(uri),
+        snapshot_id=identity,
+        source=data_contracts.SourceMetadata(
+            acquisition_method=uri_semantics(uri),
+        ),
+        lineage=data_contracts.LineageMetadata(
+            source_snapshot=identity,
+            object_hashes={"tabular-frame": content_hash},
+        ),
     )
 
 
