@@ -4,13 +4,10 @@ on:
   push:
     branches:
       - main
-      - feat/v0.1-foundation
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -20,6 +17,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -29,24 +28,62 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: website/package-lock.json
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - name: Install site dependencies
         run: npm ci
+        working-directory: website
+      - name: Audit site dependencies
+        run: npm audit --omit=dev --audit-level=high
         working-directory: website
       - name: Build site
         run: npm run build
         working-directory: website
+      - name: Check site accessibility
+        run: npm run check:a11y
+        working-directory: website
+      - name: Smoke test generated routes
+        run: |
+          python3 -m http.server 4173 --directory website/dist > /tmp/super-charge-ml-pages.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/capabilities/ /docs/evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/operations/ /docs/troubleshooting/; do
+            curl --fail --silent --show-error "http://127.0.0.1:4173${route}" > /dev/null
+          done
+          grep -q "/super-charge-ml/docs/" website/dist/index.html
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: website/dist
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  verify:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Smoke test published site
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/capabilities/ /docs/evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/operations/ /docs/troubleshooting/; do
+            curl --fail --silent --show-error --location "${PAGE_URL%/}${route}" > /dev/null
+          done
