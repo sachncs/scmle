@@ -343,6 +343,32 @@ def test_geospatial_curation_reports_mixed_label_state():
     ]
 
 
+def test_geospatial_spatial_split_keeps_blocks_together():
+    """Spatial blocks remain isolated across train and evaluation data."""
+    features = tuple(
+        geospatial.GeoFeature(
+            f"feature-{index}",
+            {"type": "Point", "coordinates": [float(index * 10), 0]},
+            label="class",
+        )
+        for index in range(6)
+    )
+    dataset = geospatial.GeospatialDataset(features, crs="EPSG:3857")
+
+    first = dataset.split_spatial(
+        block_size=5, validation_fraction=0.25, test_fraction=0.25, seed=3
+    )
+    second = dataset.split_spatial(
+        block_size=5, validation_fraction=0.25, test_fraction=0.25, seed=3
+    )
+
+    block_assignments = first.block_ids()
+    blocks = [set(values) for values in block_assignments.values()]
+    assert len(set().union(*blocks)) == 6
+    assert first == second
+    assert first.block_size == 5
+
+
 def test_raster_identity_requires_spatial_metadata():
     """Raster bytes are not useful without dimensions and CRS provenance."""
     payload = b"raster"

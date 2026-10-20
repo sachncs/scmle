@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import pathlib
+import random
 from typing import Any
 from typing import Self
 
@@ -161,6 +162,21 @@ class GeospatialProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class SpatialSplit:
+    """Spatial-block split that keeps nearby feature blocks together."""
+
+    train: tuple[GeoFeature, ...]
+    validation: tuple[GeoFeature, ...]
+    test: tuple[GeoFeature, ...]
+    block_size: float
+    blocks: Mapping[str, tuple[str, ...]]
+
+    def block_ids(self) -> dict[str, tuple[str, ...]]:
+        """Return the stable spatial blocks assigned to each partition."""
+        return {name: tuple(values) for name, values in self.blocks.items()}
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialDataset:
     """Immutable GeoJSON-like vector collection with CRS provenance."""
 
@@ -308,6 +324,84 @@ class GeospatialDataset:
             risk_findings=tuple(risk_findings),
         )
 
+    def split_spatial(
+        self,
+        block_size: float,
+        validation_fraction: float = 0.2,
+        test_fraction: float = 0.2,
+        seed: int = 0,
+    ) -> SpatialSplit:
+        """Split features by CRS-unit spatial blocks.
+
+        ``block_size`` is expressed in the dataset CRS units. The method uses
+        geometry centroids for block assignment and keeps every block in one
+        partition. Large geometries that cross block boundaries need a
+        domain-specific spatial join policy before this split is suitable for
+        release.
+        """
+        if not math.isfinite(block_size) or block_size <= 0:
+            raise ValueError("block_size must be a positive finite number")
+        if not 0 <= validation_fraction < 1:
+            raise ValueError("validation_fraction must be in [0, 1)")
+        if not 0 <= test_fraction < 1:
+            raise ValueError("test_fraction must be in [0, 1)")
+        if validation_fraction + test_fraction >= 1:
+            raise ValueError("validation_fraction + test_fraction must be < 1")
+        origin_x, origin_y, _, _ = self.profile().bounds
+
+        def block_for(feature: GeoFeature) -> str:
+            minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
+            centroid_x = (minimum_x + maximum_x) / 2
+            centroid_y = (minimum_y + maximum_y) / 2
+            block_x = math.floor((centroid_x - origin_x) / block_size)
+            block_y = math.floor((centroid_y - origin_y) / block_size)
+            return f"{block_x}:{block_y}"
+
+        grouped: dict[str, list[GeoFeature]] = {}
+        for feature in self.features:
+            grouped.setdefault(block_for(feature), []).append(feature)
+        blocks = sorted(grouped)
+        randomizer = random.Random(seed)  # nosec B311 - seeded data split
+        randomizer.shuffle(blocks)
+        test_count = int(len(blocks) * test_fraction)
+        validation_count = int(len(blocks) * validation_fraction)
+        if test_fraction and test_count == 0 and len(blocks) >= 3:
+            test_count = 1
+        if validation_fraction and validation_count == 0 and len(blocks) >= 3:
+            validation_count = 1
+        while test_count + validation_count >= len(blocks):
+            if validation_count > 0:
+                validation_count -= 1
+            elif test_count > 0:
+                test_count -= 1
+            else:
+                break
+        test_blocks = set(blocks[:test_count])
+        validation_blocks = set(
+            blocks[test_count : test_count + validation_count]
+        )
+
+        def features_for(selected: set[str]) -> tuple[GeoFeature, ...]:
+            return tuple(
+                feature
+                for feature in self.features
+                if block_for(feature) in selected
+            )
+
+        return SpatialSplit(
+            train=features_for(set(blocks) - test_blocks - validation_blocks),
+            validation=features_for(validation_blocks),
+            test=features_for(test_blocks),
+            block_size=block_size,
+            blocks={
+                "train": tuple(
+                    sorted(set(blocks) - test_blocks - validation_blocks)
+                ),
+                "validation": tuple(sorted(validation_blocks)),
+                "test": tuple(sorted(test_blocks)),
+            },
+        )
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RasterSample:
@@ -354,6 +448,7 @@ __all__ = [
     "GeospatialProfile",
     "GeospatialValidationError",
     "RasterSample",
+    "SpatialSplit",
     "canonical_source",
     "geometry_coordinates",
     "validate_coordinates",
