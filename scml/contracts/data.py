@@ -2,9 +2,280 @@
 
 from collections.abc import Mapping
 import dataclasses
+import enum
+import math
 from typing import Any
+from typing import Self
+
+from scml.contracts import events
 
 HIGH_CARDINALITY_LEVELS = 20
+
+
+class FindingSeverity(enum.StrEnum):
+    """Severity assigned to a curation finding."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+class FindingDisposition(enum.StrEnum):
+    """Review state assigned to a curation finding."""
+
+    OPEN = "open"
+    ACCEPTED = "accepted"
+    RESOLVED = "resolved"
+    WAIVED = "waived"
+    FALSE_POSITIVE = "false_positive"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class CurationFinding:
+    """One reviewable, reproducible observation about a dataset.
+
+    Attributes:
+        finding_id: Stable identifier for the rule finding.
+        rule_version: Version of the rule that produced the finding.
+        severity: Operational impact if the finding is not addressed.
+        confidence: Confidence in the finding, from zero through one.
+        affected_scope: Columns, rows, partitions, or objects affected.
+        evidence: Reproducible measurements or references supporting it.
+        remediation: Action required to resolve or assess the finding.
+        owner: Person or team responsible for the finding.
+        reviewer: Person who reviewed it, if review has happened.
+        disposition: Current review decision.
+        blocking: Whether the finding blocks training or release.
+        timestamp: UTC timestamp when the finding was observed.
+    """
+
+    finding_id: str
+    rule_version: str
+    severity: FindingSeverity
+    confidence: float
+    affected_scope: Mapping[str, Any]
+    evidence: Mapping[str, Any]
+    remediation: str
+    owner: str
+    reviewer: str | None
+    disposition: FindingDisposition
+    blocking: bool
+    timestamp: str = dataclasses.field(default_factory=events.utc_timestamp)
+
+    def __post_init__(self) -> None:
+        """Validates fields that determine finding identity and decisions."""
+        if not self.finding_id.strip():
+            raise ValueError("finding_id must not be empty")
+        if not self.rule_version.strip():
+            raise ValueError("rule_version must not be empty")
+        if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
+            raise ValueError(
+                "confidence must be finite and between zero and one"
+            )
+        if not self.remediation.strip():
+            raise ValueError("remediation must not be empty")
+        if not self.owner.strip():
+            raise ValueError("owner must not be empty")
+        if not self.timestamp.strip():
+            raise ValueError("timestamp must not be empty")
+        if not isinstance(self.severity, FindingSeverity):
+            object.__setattr__(self, "severity", FindingSeverity(self.severity))
+        if not isinstance(self.disposition, FindingDisposition):
+            object.__setattr__(
+                self, "disposition", FindingDisposition(self.disposition)
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON- and Arrow-compatible mapping."""
+        return {
+            "id": self.finding_id,
+            "rule_version": self.rule_version,
+            "severity": self.severity.value,
+            "confidence": self.confidence,
+            "affected_scope": dict(self.affected_scope),
+            "evidence": dict(self.evidence),
+            "remediation": self.remediation,
+            "owner": self.owner,
+            "reviewer": self.reviewer,
+            "disposition": self.disposition.value,
+            "blocking": self.blocking,
+            "timestamp": self.timestamp,
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds a finding from its serialized representation."""
+        return cls(
+            finding_id=str(record["id"]),
+            rule_version=str(record["rule_version"]),
+            severity=FindingSeverity(record["severity"]),
+            confidence=float(record["confidence"]),
+            affected_scope=dict(record["affected_scope"]),
+            evidence=dict(record["evidence"]),
+            remediation=str(record["remediation"]),
+            owner=str(record["owner"]),
+            reviewer=record.get("reviewer"),
+            disposition=FindingDisposition(record["disposition"]),
+            blocking=bool(record["blocking"]),
+            timestamp=str(record["timestamp"]),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SourceMetadata:
+    """Provenance and semantic context for the dataset source.
+
+    Attributes:
+        owner: Team or organization accountable for the source.
+        acquisition_method: How the source was acquired.
+        captured_at: Source capture timestamp, when known.
+        timezone: Timezone used by source timestamps.
+        sampling_frame: Population or sampling frame represented by the data.
+        units: Units by semantic field name.
+        semantic_definitions: Human-readable definitions by field name.
+        extraction_query: Query or predicate used to extract the source.
+        object_prefix: Object-store prefix or partition selector.
+        license: License or usage grant covering the source.
+        access_policy: Policy governing access to the source.
+    """
+
+    owner: str = ""
+    acquisition_method: str = ""
+    captured_at: str = ""
+    timezone: str = ""
+    sampling_frame: str = ""
+    units: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    semantic_definitions: Mapping[str, str] = dataclasses.field(
+        default_factory=dict
+    )
+    extraction_query: str = ""
+    object_prefix: str = ""
+    license: str = ""
+    access_policy: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON- and Arrow-compatible mapping."""
+        return {
+            "owner": self.owner,
+            "acquisition_method": self.acquisition_method,
+            "captured_at": self.captured_at,
+            "timezone": self.timezone,
+            "sampling_frame": self.sampling_frame,
+            "units": dict(self.units),
+            "semantic_definitions": dict(self.semantic_definitions),
+            "extraction_query": self.extraction_query,
+            "object_prefix": self.object_prefix,
+            "license": self.license,
+            "access_policy": self.access_policy,
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds source metadata from its serialized representation."""
+        return cls(
+            owner=str(record.get("owner", "")),
+            acquisition_method=str(record.get("acquisition_method", "")),
+            captured_at=str(record.get("captured_at", "")),
+            timezone=str(record.get("timezone", "")),
+            sampling_frame=str(record.get("sampling_frame", "")),
+            units=dict(record.get("units", {})),
+            semantic_definitions=dict(record.get("semantic_definitions", {})),
+            extraction_query=str(record.get("extraction_query", "")),
+            object_prefix=str(record.get("object_prefix", "")),
+            license=str(record.get("license", "")),
+            access_policy=str(record.get("access_policy", "")),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LineageMetadata:
+    """Transform and label provenance for an immutable dataset snapshot."""
+
+    source_snapshot: str = ""
+    parent_datasets: tuple[str, ...] = ()
+    transformations: tuple[str, ...] = ()
+    label_source: str = ""
+    label_generator_version: str = ""
+    annotator_version: str = ""
+    adjudication_status: str = ""
+    partition_ids: tuple[str, ...] = ()
+    object_hashes: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    schema_evolution: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON- and Arrow-compatible mapping."""
+        return {
+            "source_snapshot": self.source_snapshot,
+            "parent_datasets": list(self.parent_datasets),
+            "transformations": list(self.transformations),
+            "label_source": self.label_source,
+            "label_generator_version": self.label_generator_version,
+            "annotator_version": self.annotator_version,
+            "adjudication_status": self.adjudication_status,
+            "partition_ids": list(self.partition_ids),
+            "object_hashes": dict(self.object_hashes),
+            "schema_evolution": self.schema_evolution,
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds lineage metadata from its serialized representation."""
+        return cls(
+            source_snapshot=str(record.get("source_snapshot", "")),
+            parent_datasets=tuple(record.get("parent_datasets", ())),
+            transformations=tuple(record.get("transformations", ())),
+            label_source=str(record.get("label_source", "")),
+            label_generator_version=str(
+                record.get("label_generator_version", "")
+            ),
+            annotator_version=str(record.get("annotator_version", "")),
+            adjudication_status=str(record.get("adjudication_status", "")),
+            partition_ids=tuple(record.get("partition_ids", ())),
+            object_hashes=dict(record.get("object_hashes", {})),
+            schema_evolution=str(record.get("schema_evolution", "")),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PrivacyMetadata:
+    """Privacy, consent, and retention controls for a dataset snapshot."""
+
+    classification: str = "unclassified"
+    contains_pii: bool = False
+    sensitive_fields: tuple[str, ...] = ()
+    consent_basis: str = ""
+    retention_period: str = ""
+    deletion_policy: str = ""
+    access_policy: str = ""
+    redaction_required: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON- and Arrow-compatible mapping."""
+        return {
+            "classification": self.classification,
+            "contains_pii": self.contains_pii,
+            "sensitive_fields": list(self.sensitive_fields),
+            "consent_basis": self.consent_basis,
+            "retention_period": self.retention_period,
+            "deletion_policy": self.deletion_policy,
+            "access_policy": self.access_policy,
+            "redaction_required": self.redaction_required,
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds privacy metadata from its serialized representation."""
+        return cls(
+            classification=str(record.get("classification", "unclassified")),
+            contains_pii=bool(record.get("contains_pii", False)),
+            sensitive_fields=tuple(record.get("sensitive_fields", ())),
+            consent_basis=str(record.get("consent_basis", "")),
+            retention_period=str(record.get("retention_period", "")),
+            deletion_policy=str(record.get("deletion_policy", "")),
+            access_policy=str(record.get("access_policy", "")),
+            redaction_required=bool(record.get("redaction_required", False)),
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -19,6 +290,14 @@ class DatasetManifest:
         column_count: Number of columns.
         target: Name of the target column.
         uri: Where the data was read from.
+        snapshot_id: Immutable identity of the source snapshot.
+        modality: Dataset modality, such as `tabular` or `image`.
+        task: Intended learning task, when known.
+        schema_version: Version of this manifest contract.
+        source: Source ownership, acquisition, and semantic metadata.
+        lineage: Source, transformation, and label lineage metadata.
+        privacy: Privacy, consent, retention, and access metadata.
+        findings: Structured findings attached to this snapshot.
     """
 
     dataset_id: str
@@ -28,10 +307,62 @@ class DatasetManifest:
     column_count: int
     target: str
     uri: str = ""
+    snapshot_id: str = ""
+    modality: str = "tabular"
+    task: str = ""
+    schema_version: int = 1
+    source: SourceMetadata = dataclasses.field(default_factory=SourceMetadata)
+    lineage: LineageMetadata = dataclasses.field(
+        default_factory=LineageMetadata
+    )
+    privacy: PrivacyMetadata = dataclasses.field(
+        default_factory=PrivacyMetadata
+    )
+    findings: tuple[CurationFinding, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
-        return dataclasses.asdict(self)
+        """Returns a JSON- and Arrow-compatible mapping."""
+        return {
+            "dataset_id": self.dataset_id,
+            "schema_hash": self.schema_hash,
+            "data_hash": self.data_hash,
+            "row_count": self.row_count,
+            "column_count": self.column_count,
+            "target": self.target,
+            "uri": self.uri,
+            "snapshot_id": self.snapshot_id,
+            "modality": self.modality,
+            "task": self.task,
+            "schema_version": self.schema_version,
+            "source": self.source.to_dict(),
+            "lineage": self.lineage.to_dict(),
+            "privacy": self.privacy.to_dict(),
+            "findings": [finding.to_dict() for finding in self.findings],
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds a manifest from its serialized representation."""
+        return cls(
+            dataset_id=str(record["dataset_id"]),
+            schema_hash=str(record["schema_hash"]),
+            data_hash=str(record["data_hash"]),
+            row_count=int(record["row_count"]),
+            column_count=int(record["column_count"]),
+            target=str(record["target"]),
+            uri=str(record.get("uri", "")),
+            snapshot_id=str(record.get("snapshot_id", "")),
+            modality=str(record.get("modality", "tabular")),
+            task=str(record.get("task", "")),
+            schema_version=int(record.get("schema_version", 1)),
+            source=SourceMetadata.from_dict(record.get("source", {})),
+            lineage=LineageMetadata.from_dict(record.get("lineage", {})),
+            privacy=PrivacyMetadata.from_dict(record.get("privacy", {})),
+            findings=tuple(
+                CurationFinding.from_dict(finding)
+                for finding in record.get("findings", ())
+            ),
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -196,8 +527,8 @@ class CurationReport:
     read_seconds: float
     streamed: bool
     cleaning_notes: tuple[str, ...]
-    quality_findings: tuple[str, ...]
-    risk_findings: tuple[str, ...]
+    quality_findings: tuple[CurationFinding, ...]
+    risk_findings: tuple[CurationFinding, ...]
     feature_columns: Mapping[str, tuple[str, ...]]
     dropped_columns: Mapping[str, str]
     schema_version: int = 1
@@ -212,8 +543,12 @@ class CurationReport:
             "read_seconds": self.read_seconds,
             "streamed": self.streamed,
             "cleaning_notes": list(self.cleaning_notes),
-            "quality_findings": list(self.quality_findings),
-            "risk_findings": list(self.risk_findings),
+            "quality_findings": [
+                finding.to_dict() for finding in self.quality_findings
+            ],
+            "risk_findings": [
+                finding.to_dict() for finding in self.risk_findings
+            ],
             "feature_columns": {
                 name: list(columns)
                 for name, columns in self.feature_columns.items()
