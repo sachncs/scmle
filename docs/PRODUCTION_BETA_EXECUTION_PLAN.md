@@ -82,15 +82,15 @@ HTML files, and the Playwright browser smoke passed both route and keyboard
 navigation tests;
 the pushed exact-SHA clean-clone acceptance slice passed `1649 passed, 80
 skipped, 6 warnings` in 8 minutes 39 seconds and `scml --help` succeeded;
-the complete local release preflight at commit `fcbe704` then passed `1694
-passed, 89 skipped, 2 runtime warnings` in 8 minutes 12 seconds, with 85%
+the complete local release preflight at commit `ec3a676` then passed `1705
+passed, 89 skipped, 2 runtime warnings` in 8 minutes 17 seconds, with 86%
 total coverage and core scope coverage at 86%, mutation testing at
-`1253/1735` killed (72%, above the 70% gate), four offline benchmarks and zero
+`1254/1735` killed (72%, above the 70% gate), four offline benchmarks and zero
 regressions, successful wheel/sdist checks, and no known Python dependency
 vulnerabilities;
 the two warnings are nondeterministic SQLite connection teardown warnings in
 curriculum run 3 and remain release debt; the latest critical mutation run
-killed `1253/1735` mutants (72%, above the 70% gate), with 481 survivors and
+killed `1254/1735` mutants (72%, above the 70% gate), with 480 survivors and
 one timeout;
 the latest modality/capability slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
