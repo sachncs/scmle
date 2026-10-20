@@ -9,14 +9,17 @@ Layout under the registry root:
 
 import dataclasses
 import enum
+import hmac
 import json
 import pathlib
 import shutil
 from typing import Any
+from typing import Self
 
 from scml.artifacts import bundle as bundle_module
 from scml.contracts import errors
 from scml.contracts import events
+from scml.governance import attestation
 
 INDEX_FILE = "registry.json"
 AUDIT_FILE = "audit.jsonl"
@@ -45,6 +48,7 @@ class PromotionApproval:
     evidence: tuple[str, ...]
     approved_at: str
     independent: bool = True
+    signature: str | None = None
 
     def __post_init__(self) -> None:
         """Validate the review record before it can authorize promotion."""
@@ -68,11 +72,52 @@ class PromotionApproval:
             raise ValueError("evidence must contain non-empty references")
         if not isinstance(self.independent, bool):
             raise TypeError("independent must be bool")
+        if self.signature is not None and (
+            not isinstance(self.signature, str) or not self.signature.strip()
+        ):
+            raise ValueError("signature must be non-empty text")
+
+    def unsigned_dict(self) -> dict[str, Any]:
+        """Return the approval fields covered by its signature."""
+        return {
+            "model": self.model,
+            "version": self.version,
+            "content_id": self.content_id,
+            "reviewer": self.reviewer,
+            "decision": self.decision.value,
+            "reason": self.reason,
+            "evidence": list(self.evidence),
+            "approved_at": self.approved_at,
+            "independent": self.independent,
+        }
+
+    def sign(self, signing_key: str | bytes) -> Self:
+        """Return this approval with a content-bound HMAC signature."""
+        return dataclasses.replace(
+            self,
+            signature=attestation.sign_payload(
+                self.unsigned_dict(), signing_key
+            ),
+        )
+
+    def verify(self, signing_key: str | bytes | None = None) -> bool:
+        """Verify the approval signature using an explicit or env key."""
+        if self.signature is None:
+            return False
+        key = attestation.resolve_key(signing_key)
+        if key is None:
+            return False
+        expected = attestation.sign_payload(self.unsigned_dict(), key)
+        return hmac.compare_digest(self.signature, expected)
 
     def validate_target(
-        self, model: str, version: int, content_id: str
+        self,
+        model: str,
+        version: int,
+        content_id: str,
+        signing_key: str | bytes | None = None,
     ) -> None:
-        """Require exact identity and independent approval for promotion."""
+        """Require exact identity, independence, and a valid signature."""
         if (self.model, self.version, self.content_id) != (
             model,
             version,
@@ -85,20 +130,15 @@ class PromotionApproval:
             raise ValueError("promotion was rejected by the reviewer")
         if not self.independent:
             raise ValueError("champion promotion requires independent review")
+        if not self.verify(signing_key):
+            raise ValueError("champion promotion requires a valid signature")
 
     def to_dict(self) -> dict[str, Any]:
         """Return the complete approval record for durable audit evidence."""
-        return {
-            "model": self.model,
-            "version": self.version,
-            "content_id": self.content_id,
-            "reviewer": self.reviewer,
-            "decision": self.decision.value,
-            "reason": self.reason,
-            "evidence": list(self.evidence),
-            "approved_at": self.approved_at,
-            "independent": self.independent,
-        }
+        record = self.unsigned_dict()
+        if self.signature is not None:
+            record["signature"] = self.signature
+        return record
 
 
 @dataclasses.dataclass(frozen=True)
@@ -262,6 +302,7 @@ class ModelRegistryStore:
         version: int,
         alias: str = CHAMPION,
         approval: PromotionApproval | None = None,
+        signing_key: str | bytes | None = None,
     ) -> None:
         """Points `alias` at `version`.
 
@@ -272,6 +313,8 @@ class ModelRegistryStore:
             approval: Independent review bound to the exact bundle. Required
                 when moving the champion alias; staging aliases do not serve
                 traffic and may be moved without approval.
+            signing_key: HMAC key for the approval signature. Defaults to
+                ``$SCML_SIGNING_KEY``.
 
         Raises:
             ArtifactError: If the model or version does not exist, or if a
@@ -288,7 +331,12 @@ class ModelRegistryStore:
                     "champion promotion requires independent approval"
                 )
             try:
-                approval.validate_target(model, version, record.content_id)
+                approval.validate_target(
+                    model,
+                    version,
+                    record.content_id,
+                    signing_key,
+                )
             except (TypeError, ValueError) as error:
                 raise errors.ArtifactError(str(error)) from error
         previous = entry["aliases"].get(alias)

@@ -17,6 +17,7 @@ from scml.monitoring import shadow
 
 PLAN = data_contracts.FeaturePlan(("a", "b"), ())
 MODELS = models_module.ModelRegistry.with_builtins()
+APPROVAL_KEY = "promotion-review-key"
 
 
 def traffic(rows=600, seed=0, flip=False):
@@ -49,7 +50,7 @@ def approval_for(record):
         reason="verified unit fixture",
         evidence=("unit-evidence.json",),
         approved_at="2026-10-20T00:00:00+00:00",
-    )
+    ).sign(APPROVAL_KEY)
 
 
 @pytest.fixture(scope="module")
@@ -150,7 +151,12 @@ def registry_with(tmp_path, first, second):
     for index, model in enumerate((first, second), start=1):
         directory = model.save(tmp_path / f"export{index}")
         record = store.register("m", directory, trusted=True)
-        store.promote("m", record.version, approval=approval_for(record))
+        store.promote(
+            "m",
+            record.version,
+            approval=approval_for(record),
+            signing_key=APPROVAL_KEY,
+        )
     return store, manager
 
 
@@ -160,7 +166,10 @@ def test_a_clearly_worse_new_champion_is_rolled_back(good, tmp_path):
     fresh = traffic(1200, seed=20)
 
     outcome = manager.check_rollback(
-        fresh, "y", approval=approval_for(store.resolve("m", 1))
+        fresh,
+        "y",
+        approval=approval_for(store.resolve("m", 1)),
+        signing_key=APPROVAL_KEY,
     )
 
     assert outcome.rolled_back and outcome.restored_version == 1
@@ -204,7 +213,9 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     record = store.register("m", good.save(tmp_path / "e"), trusted=True)
-    store.promote("m", record.version, approval=approval_for(record))
+    store.promote(
+        "m", record.version, approval=approval_for(record), signing_key=APPROVAL_KEY
+    )
 
     assert "no previous" in manager.check_rollback(traffic(300), "y").reason
     second = store.register(
@@ -212,5 +223,7 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
         bundle_of("decision_tree", traffic(100, seed=9)).save(tmp_path / "f"),
         trusted=True,
     )
-    store.promote("m", second.version, approval=approval_for(second))
+    store.promote(
+        "m", second.version, approval=approval_for(second), signing_key=APPROVAL_KEY
+    )
     assert "fewer than" in manager.check_rollback(traffic(20), "y").reason

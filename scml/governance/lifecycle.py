@@ -157,6 +157,7 @@ class LifecycleManager:
         result: results.RunResult,
         promote: bool = False,
         approval: registry_module.PromotionApproval | None = None,
+        signing_key: str | bytes | None = None,
     ) -> registry_module.VersionRecord:
         """Registers a finished run and optionally makes it the champion.
 
@@ -164,6 +165,7 @@ class LifecycleManager:
             result: A completed run.
             promote: Point the champion alias at it. Defaults to staging only.
             approval: Independent approval for champion promotion.
+            signing_key: HMAC key for the approval signature.
 
         Returns:
             The registered version.
@@ -178,15 +180,27 @@ class LifecycleManager:
             trusted=True,  # exported moments ago by this very process
         )
         if promote:
-            self.registry.promote(self.model, record.version, approval=approval)
+            self.registry.promote(
+                self.model,
+                record.version,
+                approval=approval,
+                signing_key=signing_key,
+            )
         return record
 
     def promote_challenger(
-        self, approval: registry_module.PromotionApproval
+        self,
+        approval: registry_module.PromotionApproval,
+        signing_key: str | bytes | None = None,
     ) -> registry_module.VersionRecord:
         """Promotes the staged challenger after independent review."""
         record = self.registry.resolve(self.model, registry_module.CHALLENGER)
-        self.registry.promote(self.model, record.version, approval=approval)
+        self.registry.promote(
+            self.model,
+            record.version,
+            approval=approval,
+            signing_key=signing_key,
+        )
         self.registry.audit(
             "lifecycle.challenger_promoted",
             model=self.model,
@@ -304,6 +318,7 @@ class LifecycleManager:
         target: str,
         policy: RollbackPolicy | None = None,
         approval: registry_module.PromotionApproval | None = None,
+        signing_key: str | bytes | None = None,
     ) -> RollbackOutcome:
         """Takes the previous champion back if the new one is clearly worse.
 
@@ -318,6 +333,7 @@ class LifecycleManager:
             target: Name of the target column.
             policy: Evidence required; defaults to `RollbackPolicy()`.
             approval: Independent approval for the rollback promotion.
+            signing_key: HMAC key for the approval signature.
         """
         rule = policy or RollbackPolicy()
         aliases = self.registry.aliases(self.model)
@@ -360,7 +376,12 @@ class LifecycleManager:
                 None,
                 "rollback requires independent approval",
             )
-        self.registry.promote(self.model, previous, approval=approval)
+        self.registry.promote(
+            self.model,
+            previous,
+            approval=approval,
+            signing_key=signing_key,
+        )
         return RollbackOutcome(
             True,
             comparison,

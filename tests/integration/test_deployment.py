@@ -18,6 +18,8 @@ from scml.governance import registry as registry_module
 from scml.inference import serving
 from scml.monitoring import champion as champion_module
 
+APPROVAL_KEY = "promotion-review-key"
+
 
 def make_frame(rows, seed, relabel=False):
     rng = np.random.default_rng(seed)
@@ -63,12 +65,17 @@ def approval_for(record):
         reason="verified integration fixture",
         evidence=("integration-evidence.json",),
         approved_at="2026-10-20T00:00:00+00:00",
-    )
+    ).sign(APPROVAL_KEY)
 
 
 def register_champion(manager, store, result):
     record = manager.register_run(result)
-    store.promote(manager.model, record.version, approval=approval_for(record))
+    store.promote(
+        manager.model,
+        record.version,
+        approval=approval_for(record),
+        signing_key=APPROVAL_KEY,
+    )
     return record
 
 
@@ -86,12 +93,16 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
     )
     assert (first.version, second.version) == (1, 2)
     assert first.content_id != second.content_id
-    store.promote("churn", 1, approval=approval_for(first))
+    store.promote(
+        "churn", 1, approval=approval_for(first), signing_key=APPROVAL_KEY
+    )
     store.promote("churn", 2, "challenger")
     assert store.aliases("churn") == {"champion": 1, "challenger": 2}
     assert store.resolve("churn", "challenger").run_id == "r2"
     assert store.resolve("churn", 2).metrics == {"roc_auc": 0.91}
-    store.promote("churn", 2, approval=approval_for(second))
+    store.promote(
+        "churn", 2, approval=approval_for(second), signing_key=APPROVAL_KEY
+    )
     assert store.resolve("churn").version == 2
     audit = [
         json.loads(line)
@@ -105,17 +116,7 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
         "promote",
     ]
     assert audit[-1]["previous"] == 1
-    assert audit[-1]["approval_record"] == {
-        "model": "churn",
-        "version": 2,
-        "content_id": second.content_id,
-        "reviewer": "integration-reviewer",
-        "decision": "approved",
-        "reason": "verified integration fixture",
-        "evidence": ["integration-evidence.json"],
-        "approved_at": "2026-10-20T00:00:00+00:00",
-        "independent": True,
-    }
+    assert audit[-1]["approval_record"] == approval_for(second).to_dict()
     features = make_frame(20, 1).drop(columns="y")
     np.testing.assert_array_equal(
         store.load("churn").predict(features), trained.predict(features)
@@ -155,6 +156,7 @@ def test_champion_promotion_requires_matching_independent_approval(
             approval=dataclasses.replace(
                 approval_for(record), content_id="wrong-content"
             ),
+            signing_key=APPROVAL_KEY,
         )
     with pytest.raises(errors.ArtifactError, match="rejected"):
         store.promote(
@@ -164,6 +166,23 @@ def test_champion_promotion_requires_matching_independent_approval(
                 approval_for(record),
                 decision=registry_module.PromotionDecision.REJECTED,
             ),
+            signing_key=APPROVAL_KEY,
+        )
+    with pytest.raises(errors.ArtifactError, match="valid signature"):
+        store.promote(
+            "m",
+            record.version,
+            approval=dataclasses.replace(approval_for(record), signature=None),
+            signing_key=APPROVAL_KEY,
+        )
+    with pytest.raises(errors.ArtifactError, match="valid signature"):
+        store.promote(
+            "m",
+            record.version,
+            approval=dataclasses.replace(
+                approval_for(record), reason="tampered review"
+            ),
+            signing_key=APPROVAL_KEY,
         )
     assert store.aliases("m") == {}
 
@@ -268,7 +287,9 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
     assert outcome.retrained and outcome.comparison.decision == "promote"
     assert outcome.promoted_version is None
     candidate = store.resolve("churn", registry_module.CHALLENGER)
-    manager.promote_challenger(approval_for(candidate))
+    manager.promote_challenger(
+        approval_for(candidate), signing_key=APPROVAL_KEY
+    )
     assert store.resolve("churn").version == 2
     assert [v.version for v in store.versions("churn")] == [1, 2]
     assert any("independent approval" in note for note in outcome.notes)
@@ -323,7 +344,9 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
     bundle_dir = trained.bundle.save(tmp_path / "export", signing_key=key)
     record = store.register("m", bundle_dir, signing_key=key)
     assert record.signed is True
-    store.promote("m", record.version, approval=approval_for(record))
+    store.promote(
+        "m", record.version, approval=approval_for(record), signing_key=APPROVAL_KEY
+    )
     features = make_frame(10, 3).drop(columns="y")
     loaded = store.load("m", signing_key=key)
     assert len(loaded.predict(features)) == 10
