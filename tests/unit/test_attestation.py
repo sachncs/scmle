@@ -53,3 +53,29 @@ def test_attestation_rejects_missing_or_ambiguous_signature_claim():
 
     with pytest.raises(ValueError, match=r"signature\.present"):
         attestation.ReleaseAttestation.from_records(provenance, sbom)
+
+
+def test_attestation_signature_binds_all_release_subjects():
+    provenance, sbom = records()
+
+    record = attestation.ReleaseAttestation.from_records(
+        provenance, sbom, signing_key="release-key"
+    )
+
+    assert record.attestation_signature
+    assert record.verify(provenance, sbom, signing_key="release-key")
+    assert not record.verify(provenance, sbom, signing_key="wrong-key")
+    assert attestation.ReleaseAttestation.from_dict(record.to_dict()) == record
+
+
+def test_attestation_signature_rejects_tampered_persisted_record():
+    provenance, sbom = records()
+    record = attestation.ReleaseAttestation.from_records(
+        provenance, sbom, signing_key="release-key"
+    )
+    persisted = record.to_dict()
+    persisted["subjects"]["sbom_sha256"] = "tampered"
+
+    loaded = attestation.ReleaseAttestation.from_dict(persisted)
+
+    assert not loaded.verify(provenance, sbom, signing_key="release-key")

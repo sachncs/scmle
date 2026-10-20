@@ -9,6 +9,7 @@ import support
 
 from scml.contracts import errors
 from scml.contracts import tasks
+from scml.governance import attestation
 
 
 def frame(rows=700, seed=0):
@@ -97,3 +98,25 @@ def test_no_criteria_means_nothing_to_miss(tmp_path):
 def test_a_misspelled_metric_stops_the_run_before_the_test_is_opened(tmp_path):
     with pytest.raises(errors.ConfigError, match="unreported metrics"):
         run(tmp_path, {"rocauc": 0.8})
+
+
+def test_packaged_release_attestation_is_signed_when_key_is_configured(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("SCML_SIGNING_KEY", "release-key")
+
+    result = run(tmp_path, {"roc_auc": 0.8})
+    record = attestation.ReleaseAttestation.from_dict(
+        result.evaluation["release_attestation"]
+    )
+
+    assert record.attestation_signature
+    assert record.verify(
+        result.evaluation["provenance"],
+        result.evaluation["sbom"],
+        signing_key="release-key",
+    )
+    assert not any(
+        finding["kind"] == "security"
+        for finding in result.evaluation["release_evaluation"]["findings"]
+    )

@@ -1742,6 +1742,21 @@ class PackageStage(Stage):
         outcome = release.apply_reliability_gate(
             outcome, evaluation.get("reliability_plan")
         )
+        verification = False
+        try:
+            release_attestation = attestation.ReleaseAttestation.from_dict(
+                evaluation["release_attestation"]
+            )
+            verification = release_attestation.verify(
+                evaluation["provenance"],
+                evaluation["sbom"],
+                signing_key=attestation.resolve_key(None),
+            )
+        except (KeyError, TypeError, ValueError):
+            verification = False
+        outcome = release.apply_attestation_gate(
+            outcome, evaluation.get("release_attestation"), verification
+        )
         evaluation["release_policy"] = policy.to_dict()
         evaluation["release_evaluation"] = outcome.to_dict()
         evaluation["release_evidence"] = evidence_index.to_dict()
@@ -2333,7 +2348,9 @@ class PackageStage(Stage):
             context, store, bundle
         )
         release_attestation = attestation.ReleaseAttestation.from_records(
-            evaluation["provenance"], evaluation["sbom"]
+            evaluation["provenance"],
+            evaluation["sbom"],
+            signing_key=attestation.resolve_key(None),
         ).to_dict()
         evaluation["release_attestation"] = release_attestation
         store.write_json("release_attestation.json", release_attestation)

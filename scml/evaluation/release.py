@@ -28,6 +28,7 @@ class FindingKind(enum.StrEnum):
     INPUT = "input"
     METRIC = "metric"
     RELIABILITY = "reliability"
+    SECURITY = "security"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -276,6 +277,62 @@ def apply_reliability_gate(
         ),
         expected="execution_status=passed and release_blocked=false",
         evidence=("fault_injection_plan.json",),
+    )
+    findings = tuple(
+        sorted(
+            (*outcome.findings, finding),
+            key=lambda item: (item.kind.value, item.name, item.reason),
+        )
+    )
+    blocking_reasons = tuple(
+        item.reason for item in findings if not item.passed and item.blocking
+    )
+    return ReleaseEvaluation(
+        task=outcome.task,
+        policy_schema_version=outcome.policy_schema_version,
+        passed=False,
+        findings=findings,
+        blocking_reasons=blocking_reasons,
+    )
+
+
+def apply_attestation_gate(
+    outcome: ReleaseEvaluation,
+    attestation_record: Any,
+    verified: bool | None = None,
+) -> ReleaseEvaluation:
+    """Block release until packaged evidence has a valid signed attestation."""
+    if not isinstance(outcome, ReleaseEvaluation):
+        raise TypeError("outcome must be ReleaseEvaluation")
+    signature = (
+        attestation_record.get("signature")
+        if isinstance(attestation_record, Mapping)
+        else None
+    )
+    passed = (
+        isinstance(signature, Mapping)
+        and signature.get("algorithm") == "hmac-sha256"
+        and isinstance(signature.get("value"), str)
+        and bool(signature["value"].strip())
+        and (verified is None or verified)
+    )
+    if passed:
+        return outcome
+    finding = ReleaseFinding(
+        FindingKind.SECURITY,
+        "release_attestation",
+        False,
+        True,
+        "release attestation is missing or invalid; release blocked",
+        observed=(
+            "invalid"
+            if signature and verified is False
+            else "signed"
+            if signature
+            else "unsigned"
+        ),
+        expected="verified hmac-sha256 attestation signature",
+        evidence=("release_attestation.json",),
     )
     findings = tuple(
         sorted(

@@ -371,3 +371,55 @@ def test_results_are_immutable_and_findings_are_sorted():
         result.findings,
         key=lambda item: (item.kind.value, item.name, item.reason),
     )
+
+
+def test_attestation_gate_requires_a_signed_release_record():
+    """A release record without an HMAC signature fails closed."""
+    outcome = release.ReleaseEvaluation(
+        task="classification",
+        policy_schema_version=1,
+        passed=True,
+        findings=(),
+        blocking_reasons=(),
+    )
+
+    blocked = release.apply_attestation_gate(outcome, {})
+    signed = release.apply_attestation_gate(
+        outcome,
+        {
+            "signature": {
+                "algorithm": "hmac-sha256",
+                "value": "digest",
+            }
+        },
+        verified=True,
+    )
+
+    assert not blocked.passed
+    assert blocked.findings[-1].kind is release.FindingKind.SECURITY
+    assert signed is outcome
+
+
+def test_attestation_gate_rejects_a_tampered_signature():
+    """A present signature is insufficient when verification fails."""
+    outcome = release.ReleaseEvaluation(
+        task="classification",
+        policy_schema_version=1,
+        passed=True,
+        findings=(),
+        blocking_reasons=(),
+    )
+
+    blocked = release.apply_attestation_gate(
+        outcome,
+        {
+            "signature": {
+                "algorithm": "hmac-sha256",
+                "value": "tampered",
+            }
+        },
+        verified=False,
+    )
+
+    assert not blocked.passed
+    assert blocked.findings[-1].observed == "invalid"

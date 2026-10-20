@@ -3,9 +3,14 @@
 from collections.abc import Mapping
 import dataclasses
 import hashlib
+import hmac
 import json
+import os
 from typing import Any
 from typing import Self
+
+SIGNING_KEY_ENV = "SCML_SIGNING_KEY"
+SIGNATURE_ALGORITHM = "hmac-sha256"
 
 
 def canonical_digest(record: Mapping[str, Any]) -> str:
@@ -31,6 +36,35 @@ def required_text(record: Mapping[str, Any], path: str) -> str:
     return value
 
 
+def resolve_key(signing_key: str | bytes | None) -> bytes | None:
+    """Return the explicit signing key or the configured environment key."""
+    key = (
+        signing_key
+        if signing_key is not None
+        else os.environ.get(SIGNING_KEY_ENV)
+    )
+    if key is None or key == "":
+        return None
+    return key.encode() if isinstance(key, str) else key
+
+
+def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
+    """Return an HMAC signature for a canonical attestation payload."""
+    resolved = resolve_key(key)
+    if resolved is None:
+        raise ValueError("attestation signing key must not be empty")
+    return hmac.new(
+        resolved,
+        json.dumps(
+            payload,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class ReleaseAttestation:
     """Immutable digest binding for one packaged release candidate."""
@@ -40,6 +74,7 @@ class ReleaseAttestation:
     provenance_sha256: str
     sbom_sha256: str
     signature_present: bool
+    attestation_signature: str | None = None
 
     def __post_init__(self) -> None:
         """Reject incomplete identity or signature claims."""
@@ -54,12 +89,18 @@ class ReleaseAttestation:
                 raise ValueError(f"{field_name} must not be empty")
         if not isinstance(self.signature_present, bool):
             raise TypeError("signature_present must be bool")
+        if self.attestation_signature is not None and (
+            not isinstance(self.attestation_signature, str)
+            or not self.attestation_signature.strip()
+        ):
+            raise ValueError("attestation_signature must be non-empty text")
 
     @classmethod
     def from_records(
         cls,
         provenance: Mapping[str, Any],
         sbom: Mapping[str, Any],
+        signing_key: str | bytes | None = None,
     ) -> Self:
         """Build an attestation from the records emitted by a package run."""
         signature = provenance.get("signature")
@@ -67,7 +108,7 @@ class ReleaseAttestation:
             signature.get("present"), bool
         ):
             raise ValueError("provenance.signature.present must be bool")
-        return cls(
+        record = cls(
             run_id=required_text(provenance, "run_id"),
             model_manifest_sha256=required_text(
                 provenance, "model.manifest_sha256"
@@ -76,9 +117,46 @@ class ReleaseAttestation:
             sbom_sha256=canonical_digest(sbom),
             signature_present=signature["present"],
         )
+        key = resolve_key(signing_key)
+        if key is None:
+            return record
+        return dataclasses.replace(
+            record,
+            attestation_signature=sign_payload(record.unsigned_dict(), key),
+        )
 
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible attestation record."""
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Parse a persisted release attestation without trusting its claims."""
+        subjects = record.get("subjects")
+        if not isinstance(subjects, Mapping):
+            raise ValueError("attestation.subjects must be an object")
+        signature = record.get("signature")
+        signature_value: str | None = None
+        if signature is not None:
+            if not isinstance(signature, Mapping):
+                raise ValueError("attestation.signature must be an object")
+            if signature.get("algorithm") != SIGNATURE_ALGORITHM:
+                raise ValueError("unsupported attestation signature algorithm")
+            value = signature.get("value")
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(
+                    "attestation signature value must be non-empty"
+                )
+            signature_value = value
+        return cls(
+            run_id=required_text(record, "run_id"),
+            model_manifest_sha256=required_text(
+                subjects, "model_manifest_sha256"
+            ),
+            provenance_sha256=required_text(subjects, "provenance_sha256"),
+            sbom_sha256=required_text(subjects, "sbom_sha256"),
+            signature_present=record.get("signature_present", False),
+            attestation_signature=signature_value,
+        )
+
+    def unsigned_dict(self) -> dict[str, Any]:
+        """Return the canonical content covered by the attestation signature."""
         return {
             "schema_version": 1,
             "run_id": self.run_id,
@@ -90,14 +168,25 @@ class ReleaseAttestation:
             "signature_present": self.signature_present,
         }
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible attestation record."""
+        record = self.unsigned_dict()
+        if self.attestation_signature is not None:
+            record["signature"] = {
+                "algorithm": SIGNATURE_ALGORITHM,
+                "value": self.attestation_signature,
+            }
+        return record
+
     def verify(
         self,
         provenance: Mapping[str, Any],
         sbom: Mapping[str, Any],
+        signing_key: str | bytes | None = None,
     ) -> bool:
         """Verify that the attestation still matches its source records."""
         try:
-            expected = type(self).from_records(provenance, sbom)
+            expected = type(self).from_records(provenance, sbom, signing_key)
         except (TypeError, ValueError):
             return False
         return self == expected
