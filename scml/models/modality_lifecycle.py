@@ -249,14 +249,14 @@ class DocumentAdapter(ModalityAdapter):
             dtype=np.float64,
         )
         return FeatureBatch(
-            tuple(sample.document_id for sample in samples),
+            tuple(self.sample_id(sample) for sample in samples),
             ("character_count", "token_count"),
             rows,
         )
 
     def sample_id(self, sample: document.DocumentSample) -> str:
-        """Return a document identity."""
-        return sample.document_id
+        """Return a stable identity for one document sample or chunk."""
+        return f"{sample.document_id}:{sample.content_hash}"
 
     def label(self, sample: document.DocumentSample) -> object | None:
         """Return the document label."""
@@ -335,12 +335,12 @@ class ImageAdapter(ModalityAdapter):
             for channel in range(channels)
         )
         return FeatureBatch(
-            tuple(sample.content_hash for sample in samples), names, values
+            tuple(self.sample_id(sample) for sample in samples), names, values
         )
 
     def sample_id(self, sample: image.ImageSample) -> str:
-        """Return the immutable image content identity."""
-        return sample.content_hash
+        """Return a source-and-content identity for one image sample."""
+        return f"{sample.source}:{sample.content_hash}"
 
     def label(self, sample: image.ImageSample) -> object | None:
         """Return the image label."""
