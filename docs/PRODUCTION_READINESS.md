@@ -18,6 +18,8 @@ must not be described as production-ready until every required gate is green.
   baseline no-cache/content-type security headers.
 - [x] Dataset curation writes `curation_report.json` with findings, repairs,
   feature decisions, and source/profiled row counts.
+- [x] Champion promotion and rollback require an independent approval bound to
+  the exact registered bundle content and persist the complete approval record.
 - [x] Common tabular, compressed, spreadsheet, Arrow, in-memory, and bounded
   streaming inputs have dedicated tests and CI coverage.
 
