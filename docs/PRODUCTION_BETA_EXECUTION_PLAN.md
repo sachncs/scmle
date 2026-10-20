@@ -158,6 +158,17 @@ The image grouped-split slice at `006f7b2` adds the same capture-session or
 subject boundary with 11 focused image-data tests and does not expand the
 supported modelling boundary.
 
+The current release preflight at pushed commit `bd570a7` passed `1743 passed,
+89 skipped, 2 warnings`; the bounded suite measured 81.48% whole-package
+coverage and the declared core scope measured 86%. The mutation gate killed
+`1252/1735` mutants (72%, above the 70% minimum), all four offline benchmarks
+reported zero regressions, wheel and source distributions passed checks, the
+dependency audit found no known vulnerabilities, and the Astro build produced
+11 pages. The warnings are the known nondeterministic SQLite teardown
+warnings in the curriculum run. Generated mutation artifacts were kept
+outside the repository after the run; no generated evidence is being treated
+as a tracked release claim.
+
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
 extension-only until their complete lifecycle evidence is attached.
