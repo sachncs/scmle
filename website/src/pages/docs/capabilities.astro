@@ -1,0 +1,65 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Capability matrix" description="The evidence boundary for each dataset modality in super-charge-ml." current="capabilities">
+  <p class="eyebrow"><span></span> Support boundary</p>
+  <h1>Know what is<br /><em>actually supported.</em></h1>
+  <p class="lead">A parser is not a production capability. A dataset family is supported only when ingestion, curation, modelling, evaluation, packaging, inference, monitoring, documentation, and recovery have evidence.</p>
+
+  <div class="callout"><p><strong>Read the label literally.</strong> <code>supported</code> means the complete lifecycle is proven for the declared scope. <code>experimental</code> means you can explore it with explicit opt-in. <code>extension-only</code> means the integration boundary exists, but this beta makes no lifecycle guarantee.</p></div>
+
+  <h2>Current beta matrix</h2>
+  <div class="capability-table" role="region" aria-label="Capability support matrix" tabindex="0">
+    <table>
+      <thead><tr><th>Dataset family</th><th>Current label</th><th>What exists</th><th>What is missing</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Tabular library path</th><td><span class="status status-supported">Supported*</span></td><td>Readers, profiling, curation gates, leakage-aware splits, task-aware evaluation, bundles, inference, and monitoring contracts.</td><td>Independent clean-clone and full fault-plan evidence before production-proven status.</td></tr>
+        <tr><th scope="row">Text and documents</th><td><span class="status status-experimental">Experimental</span></td><td>Document boundaries, encoding checks, OCR-aware foundations, and provenance structures.</td><td>End-to-end modelling, evaluation, packaging, serving, monitoring, and recovery evidence.</td></tr>
+        <tr><th scope="row">Images</th><td><span class="status status-experimental">Experimental</span></td><td>Bounded decoding, safety limits, metadata, content hashes, deduplication, and baseline features.</td><td>Model lifecycle, saliency validation, serving, drift, and resource recovery evidence.</td></tr>
+        <tr><th scope="row">Audio and video</th><td><span class="status status-extension">Extension-only</span></td><td>Capability can be declared without making an unsupported claim.</td><td>Ingestion, temporal provenance, resource budgets, models, explanations, and recovery.</td></tr>
+        <tr><th scope="row">Graph and geospatial</th><td><span class="status status-experimental">Experimental</span></td><td>Data structures and validation foundations exist in bounded slices.</td><td>Complete lifecycle contracts and independent evidence for production use.</td></tr>
+        <tr><th scope="row">Warehouse and event streams</th><td><span class="status status-extension">Extension-only</span></td><td>Injected DB-API and bounded object connectors establish transport seams.</td><td>Watermarks, late data, deduplication, exactly-once recovery, and warehouse-specific evidence.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="meta">* The supported claim is intentionally narrow: the explicitly gated tabular library workflow, not every possible tabular source or model.</p>
+
+  <h2>The lifecycle gate</h2>
+  <figure class="diagram">
+    <figcaption class="diagram-caption"><span>SUPPORT DECISION</span><strong>One missing stage keeps the claim below supported.</strong></figcaption>
+    <div class="flow-row">
+      <div class="flow-node"><span>01</span><b>Declare</b><small>modality · task · scope</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>02</span><b>Evidence</b><small>tests · artifacts · failures</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node active"><span>03</span><b>Review</b><small>independent decision</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>04</span><b>Publish</b><small>label · limits · owner</small></div>
+    </div>
+  </figure>
+  <p>Declarations are checked before training. They name required extras, resources, known failure modes, limitations, and evidence links. An incomplete declaration cannot be promoted by calling it experimental; the missing stages remain visible.</p>
+
+  <h2>What to add when expanding support</h2>
+  <ol>
+    <li>Start from raw fixtures: valid, empty, corrupt, oversized, shifted, duplicated, leaked, and privacy-sensitive inputs.</li>
+    <li>Implement the modality-neutral contracts first: snapshot identity, curation findings, split identity, lineage, release evaluation, and explanation metadata.</li>
+    <li>Run the same 16-stage lifecycle: ingestion, validation, profiling, curation, splitting, feature preparation, modelling, evaluation, data explainability, model explainability, packaging, inference, monitoring, documentation, recovery, and resource tests.</li>
+    <li>Only then change the capability label, and attach the command, artifact, digest, reviewer, and limitations to the evidence index.</li>
+  </ol>
+
+  <div class="callout"><p><strong>Contributor rule:</strong> if a new model works only because the data contract is bypassed, it is not an expansion of support. It is an unreviewed exception.</p></div>
+</DocsLayout>
+
+<style>
+  .capability-table { border: 1px solid #d9ddd2; margin: 28px 0 10px; overflow-x: auto; }
+  table { border-collapse: collapse; min-width: 720px; width: 100%; }
+  th, td { border-bottom: 1px solid #d9ddd2; color: #52615a; font-size: 13px; line-height: 1.5; padding: 15px; text-align: left; vertical-align: top; }
+  thead th { background: #eef0e7; color: #18231f; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+  tbody th { color: #18231f; font-weight: 600; min-width: 145px; }
+  .status { display: inline-block; font: 10px 'DM Mono', monospace; padding: 5px 7px; text-transform: uppercase; white-space: nowrap; }
+  .status-supported { background: #dfe9a4; color: #31413a; }
+  .status-experimental { background: #f1edc5; color: #665f2a; }
+  .status-extension { background: #e8ebe2; color: #65716c; }
+</style>

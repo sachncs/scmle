@@ -31,6 +31,22 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. The fault plan is intentionally marked <code>planned</code> until an execution harness supplies reviewed evidence—its presence is not a claim that recovery has passed.</p>
   <p>For inference telemetry, use the redacted observability sidecar and evaluate it against an explicit policy. Missing required signals, stale or future timestamps, and threshold breaches must remain visible as failed evidence instead of being silently dropped.</p>
 
+  <h2>Promote only an approved bundle</h2>
+  <p>A better challenger is not automatically the new champion. The lifecycle stages it under the <code>challenger</code> alias. An independent reviewer must approve the exact model version and content digest before the registry moves <code>champion</code>.</p>
+  <pre><code>candidate = registry.resolve("customers", "challenger")
+approval = PromotionApproval(
+    model="customers",
+    version=candidate.version,
+    content_id=candidate.content_id,
+    reviewer="reviewer@example.com",
+    decision=PromotionDecision.APPROVED,
+    reason="held-out, slice, explanation, and recovery evidence reviewed",
+    evidence=("evidence/release-2026-10-20.json",),
+    approved_at="2026-10-20T00:00:00+00:00",
+)
+manager.promote_challenger(approval)</code></pre>
+  <p>The approval is bound to the bundle content and written to the append-only audit log. A rejected, mismatched, or non-independent approval cannot move the serving alias. Rollback uses the same gate.</p>
+
   <h2>Deployment boundary</h2>
   <p>The built-in HTTP adapter is a reference server. Put it behind an authenticating gateway with TLS, request policy, logs, and operational ownership.</p>
   <div class="callout"><p><strong>Release rehearsal:</strong> before promotion, replay a known input, verify the signed bundle, confirm the serving schema, exercise resume from a checkpoint, inspect monitoring output, and record who reviewed the evidence. A green training run is not by itself a release decision.</p></div>
