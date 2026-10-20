@@ -167,10 +167,10 @@ image, and media tests with Ruff and mypy clean. Image, audio, and video now
 emit blocking risk findings when duplicate content carries incompatible known
 labels; this remains curation evidence, not a modelling-support claim.
 
-The current release preflight at pushed commit `bd570a7` passed `1743 passed,
-89 skipped, 2 warnings`; the bounded suite measured 81.48% whole-package
+The current release preflight at pushed commit `935bb51` passed `1747 passed,
+89 skipped, 2 warnings`; the bounded suite measured 81.50% whole-package
 coverage and the declared core scope measured 86%. The mutation gate killed
-`1252/1735` mutants (72%, above the 70% minimum), all four offline benchmarks
+`1253/1735` mutants (72%, above the 70% minimum), all four offline benchmarks
 reported zero regressions, wheel and source distributions passed checks, the
 dependency audit found no known vulnerabilities, and the Astro build produced
 11 pages. The warnings are the known nondeterministic SQLite teardown
