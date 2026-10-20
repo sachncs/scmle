@@ -980,6 +980,18 @@ Subsequent focused evidence:
   media and lifecycle suite passes 37 tests under
   `-W error::ResourceWarning`; this does not claim raw waveform attribution,
   transcript grounding, or causal audio-event explanations.
+- `fc5aa3d` adds an explicit caller-owned video frame decoder boundary,
+  deterministic evenly spaced frame sampling, per-frame pixel limits, frame
+  statistics, sampled-index provenance, and temporal frame-statistics
+  occlusion evidence. The media and lifecycle slice passes 44 tests under
+  `-W error::ResourceWarning`, with Ruff and mypy clean. This remains
+  experimental: it does not claim raw pixel saliency, motion attribution,
+  audio-video synchronization, causal temporal localization, or production
+  video serving.
+- `9a1b4b6` moves shared HMAC signing primitives into the contracts layer so
+  release evidence no longer imports governance from a lower-level contract.
+  The architecture rule, attestation, evidence-index, Ruff, and mypy focused
+  tests pass (`12 passed` under `-W error::ResourceWarning`).
 - `84193bf`, `8cb1672`, `65dc5b6`, and `c295e9a` add lifecycle-bound
   image region occlusion, graph one-hop context, CRS-bound geospatial
   geometry/feature evidence, and document span provenance respectively. The

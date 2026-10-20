@@ -121,14 +121,22 @@ print(features.frames_truncated)</code></pre>
   <p>For non-WAV inputs, provide an explicit codec probe for ingestion and a versioned decoder adapter before requesting signal features. The current implementation deliberately stops at bounded WAV statistics; it does not claim spectrogram quality, transcript provenance, speaker leakage controls, time-local explanations, audio modelling, serving, or release evidence.</p>
 
   <h2>Experimental video metadata features</h2>
-  <p>Video currently exposes metadata evidence rather than decoded frames. This is useful for curation, size planning, and explicit hand-off to a future temporal adapter.</p>
+  <p>Video exposes metadata evidence by default. When you own a versioned decoder, you can opt into a bounded temporal baseline without hiding codec or resource decisions inside the core package.</p>
   <pre><code>from scml.data.modalities import VideoDataset, VideoSample
 
 clip = VideoSample.from_bytes(encoded, metadata, source="clip.mp4")
 features = VideoDataset((clip,)).prepare_metadata_features()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>
-  <p>The method intentionally does not select frames, decode codecs, infer synchronization, or produce temporal explanations. Those decisions need a versioned decoder, sampling policy, resource budget, leakage review, and independent evaluation before a video model can be considered for release. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit. The same explicit grouping rule applies to image datasets.</p>
+  <pre><code>def decode_frame(encoded_bytes, frame_index):
+    # Bind this to your audited codec/runtime.
+    return decoder.read(encoded_bytes, frame_index)
+
+temporal = VideoDataset((clip,)).prepare_frame_features(
+    decode_frame, max_frames=8, max_frame_pixels=1_000_000
+)
+print(temporal.sampled_frame_indices)</code></pre>
+  <p><code>prepare_frame_features</code> selects evenly spaced frames, records their indices, computes bounded pixel statistics, and rejects oversized, malformed, or non-finite decoder output. The lifecycle can use the same explicit decoder to emit frame-statistics occlusion evidence. This is not raw saliency, motion attribution, synchronization proof, or a production video model; those require a versioned decoder policy, temporal leakage review, independent evaluation, serving, and recovery evidence. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit.</p>
 
   <h2>Experimental spatial splitting</h2>
   <p>Geospatial data uses a spatial-block split instead of pretending that random feature splits are independent.</p>

@@ -24,6 +24,7 @@ from scml.data.modalities.image import ImageSample
 from scml.data.modalities.image import ImageSplit
 from scml.data.modalities.video import VideoDataset
 from scml.data.modalities.video import VideoFeatures
+from scml.data.modalities.video import VideoFrameDecoder
 from scml.data.modalities.video import VideoMetadata
 from scml.data.modalities.video import VideoProfile
 from scml.data.modalities.video import VideoSample
@@ -54,6 +55,7 @@ __all__ = [
     "RasterSample",
     "VideoDataset",
     "VideoFeatures",
+    "VideoFrameDecoder",
     "VideoMetadata",
     "VideoProfile",
     "VideoSample",
