@@ -60,12 +60,16 @@ means the code path exists; it does not mean the capability is supported.
 
 ### Verification snapshot — 20 October 2026
 
-The current repository regression run completed with `1927 passed, 103
+The last complete repository regression run completed with `1927 passed, 103
 skipped, 6 warnings` in 29 minutes 30 seconds using `uv run pytest -q` on the
-local Python 3.14t environment. The suite is green, but the skipped tests and
-runtime warnings are not release evidence by themselves: each must be
-classified as environment-required, intentionally unsupported, or a release
-blocker before a supported-production label is appropriate.
+local Python 3.14t environment. After the subsequent release, data,
+observability, security, and reliability changes, the complete unit suite
+completed with `1553 passed, 87 skipped, 6 warnings` in 2 minutes 21 seconds;
+focused integration suites also passed. A new full-repository run is still
+required before release. Skipped tests and runtime warnings are not release
+evidence by themselves: each must be classified as environment-required,
+intentionally unsupported, or a release blocker before a supported-production
+label is appropriate.
 
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
