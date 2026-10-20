@@ -33,7 +33,7 @@ scripts/check_mutation_score.sh 70
 
 echo "== benchmark regression =="
 uv run --python "$python_version" python -m benchmarks.run_benchmarks \
-  --offline --budget 240 --workers 2 --output "$benchmark_output"
+  --offline --seeds 5 --budget 120 --workers 2 --output "$benchmark_output"
 uv run --python "$python_version" python -m benchmarks.check_regression \
   "$benchmark_output"
 
