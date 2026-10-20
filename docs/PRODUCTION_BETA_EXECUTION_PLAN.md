@@ -68,12 +68,14 @@ security, reliability, and governance changes, the complete unit suite
 completed with `1554 passed, 87 skipped, 6 warnings` in 2 minutes 23 seconds;
 the latest promotion/lifecycle slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
-seconds. The unit and integration commands were run separately, so a new
-single-command full-repository run and independent clean-clone run are still
-required before release. Skipped tests and runtime warnings are not release
-evidence by themselves: each must be classified as environment-required,
-intentionally unsupported, or a release blocker before a supported-production
-label is appropriate.
+seconds. The remaining leakage, property, specification, and benchmark tiers
+completed with `85 passed` in 3 minutes 27 seconds. Together these current
+tiers provide `1973 passed, 103 skipped, 6 warnings`; they were run as
+separate commands, so a single-command full-repository run and independent
+clean-clone run are still required before release. Skipped tests and runtime
+warnings are not release evidence by themselves: each must be classified as
+environment-required, intentionally unsupported, or a release blocker before
+a supported-production label is appropriate.
 
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
