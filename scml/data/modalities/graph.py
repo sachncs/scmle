@@ -19,6 +19,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from scml.contracts import data as data_contracts
+from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import ModalityCurationReport
+
 
 class GraphError(ValueError):
     """Base error for invalid graph data or graph input."""
@@ -502,6 +506,59 @@ class GraphData:
             component_count=len(self.connected_components()),
             node=self.profile_nodes(),
             edge=self.profile_edges(),
+        )
+
+    def curate(self) -> ModalityCurationReport:
+        """Build graph-structure evidence before choosing a graph model."""
+        profile = self.profile()
+        quality_findings = []
+        if profile.edge.duplicate_edge_count:
+            quality_findings.append(
+                build_finding(
+                    "quality.graph-duplicate-edges",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"source": self.source_uri},
+                    {
+                        "duplicate_edge_count": (
+                            profile.edge.duplicate_edge_count
+                        )
+                    },
+                    "Declare whether parallel edges are valid or "
+                    "deduplicate them.",
+                    False,
+                )
+            )
+        if profile.node.isolated_node_count:
+            quality_findings.append(
+                build_finding(
+                    "quality.graph-isolated-nodes",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"source": self.source_uri},
+                    {
+                        "isolated_node_count": profile.node.isolated_node_count
+                    },
+                    "Confirm isolated nodes are valid for the intended task.",
+                    False,
+                )
+            )
+        if not self.feature_names:
+            quality_findings.append(
+                build_finding(
+                    "quality.graph-no-declared-features",
+                    data_contracts.FindingSeverity.INFO,
+                    {"source": self.source_uri},
+                    {"node_count": profile.node.node_count},
+                    "Declare node features or select a topology-only model "
+                    "explicitly.",
+                    False,
+                )
+            )
+        return ModalityCurationReport(
+            modality="graph",
+            dataset_hash=self.identity,
+            sample_count=len(self.nodes),
+            profile=profile.to_dict(),
+            quality_findings=tuple(quality_findings),
         )
 
 

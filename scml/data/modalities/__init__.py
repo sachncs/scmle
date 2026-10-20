@@ -4,6 +4,7 @@ from scml.data.modalities.audio import AudioDataset
 from scml.data.modalities.audio import AudioMetadata
 from scml.data.modalities.audio import AudioProfile
 from scml.data.modalities.audio import AudioSample
+from scml.data.modalities.curation import ModalityCurationReport
 from scml.data.modalities.document import DocumentCurationReport
 from scml.data.modalities.document import DocumentDataset
 from scml.data.modalities.document import DocumentFormat
@@ -39,6 +40,7 @@ __all__ = [
     "GraphNode",
     "ImageDataset",
     "ImageSample",
+    "ModalityCurationReport",
     "RasterSample",
     "VideoDataset",
     "VideoMetadata",

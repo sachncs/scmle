@@ -60,6 +60,19 @@ def test_audio_dataset_rejects_duplicate_sources():
         audio.AudioDataset((first, duplicate))
 
 
+def test_audio_curation_reports_metadata_and_label_composition():
+    """Audio data understanding is explicit before a model is selected."""
+    sample = audio.AudioSample.from_bytes(wav_bytes(), source="one.wav")
+
+    report = audio.AudioDataset((sample,)).curate()
+
+    assert report.modality == "audio"
+    assert report.sample_count == 1
+    assert report.profile["sample_rates"] == [8]
+    assert report.profile["label_counts"] == {"unlabeled": 1}
+    assert report.release_ready
+
+
 def test_video_metadata_is_explicit_and_profiled():
     """Video data records probe output instead of guessing from a suffix."""
     metadata = video.VideoMetadata(
@@ -91,6 +104,27 @@ def test_video_rejects_hash_mismatch():
             file_hash="0" * 64,
             metadata=metadata,
         )
+
+
+def test_video_curation_surfaces_encoding_and_dimension_drift():
+    """Video curation records normalization risks instead of guessing."""
+    first_metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
+    second_metadata = video.VideoMetadata("webm", 4, 4, 2, 1.0, "vp9")
+    dataset = video.VideoDataset(
+        (
+            video.VideoSample.from_bytes(b"one", first_metadata, "one.mp4"),
+            video.VideoSample.from_bytes(b"two", second_metadata, "two.webm"),
+        )
+    )
+
+    report = dataset.curate()
+
+    assert report.profile["formats"] == ["mp4", "webm"]
+    assert report.profile["dimensions"] == [[2, 2], [4, 4]]
+    assert [finding.finding_id for finding in report.quality_findings] == [
+        "quality.video-encoding-drift",
+        "quality.video-dimension-drift",
+    ]
 
 
 def test_geospatial_feature_collection_preserves_bounds_and_crs():
@@ -134,6 +168,29 @@ def test_geospatial_rejects_invalid_geometry():
         geospatial.GeoFeature(
             "broken", {"type": "Point", "coordinates": [float("nan"), 1]}
         )
+
+
+def test_geospatial_curation_blocks_missing_crs():
+    """Spatial coordinates cannot enter modelling without a reference CRS."""
+    dataset = geospatial.GeospatialDataset.from_geojson(
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "a",
+                    "geometry": {"type": "Point", "coordinates": [0, 0]},
+                }
+            ],
+        }
+    )
+
+    report = dataset.curate()
+
+    assert report.release_ready is False
+    assert report.unresolved_blocking_findings[0].finding_id == (
+        "quality.geospatial-missing-crs"
+    )
 
 
 def test_raster_identity_requires_spatial_metadata():

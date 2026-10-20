@@ -162,6 +162,19 @@ def test_components_and_profiles_are_deterministic(
     assert profile.edge.weight_mean == 1.0
 
 
+def test_graph_curation_records_structure_and_feature_policy(
+    shifted_graph: GraphData,
+) -> None:
+    """Graph curation explains structure before model selection."""
+    report = shifted_graph.curate()
+
+    assert report.modality == "graph"
+    assert report.sample_count == 3
+    assert report.profile["node"]["feature_dimension"] == 2
+    assert report.quality_findings == ()
+    assert report.release_ready
+
+
 def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(
     shifted_graph: GraphData,
 ) -> None:

@@ -9,7 +9,10 @@ import pathlib
 from typing import Any
 from typing import Self
 
+from scml.contracts import data as data_contracts
 from scml.contracts import errors
+from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import ModalityCurationReport
 
 GEOMETRY_TYPES = frozenset(
     {
@@ -151,6 +154,10 @@ class GeospatialProfile:
     bounds: tuple[float, float, float, float]
     content_hash: str
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible geospatial profile data."""
+        return dataclasses.asdict(self)
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialDataset:
@@ -245,6 +252,42 @@ class GeospatialDataset:
                 max(bounds[3::4]),
             ),
             content_hash=self.content_hash,
+        )
+
+    def curate(self) -> ModalityCurationReport:
+        """Build geometry, CRS, and spatial-interpretation evidence."""
+        profile = self.profile()
+        quality_findings = []
+        if not self.crs.strip():
+            quality_findings.append(
+                build_finding(
+                    "quality.geospatial-missing-crs",
+                    data_contracts.FindingSeverity.ERROR,
+                    {"source": self.source},
+                    {"feature_count": len(self.features)},
+                    "Declare the source CRS before spatial transforms or "
+                    "modelling.",
+                    True,
+                )
+            )
+        if len(profile.geometry_types) > 1:
+            quality_findings.append(
+                build_finding(
+                    "quality.geospatial-mixed-geometry",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"source": self.source},
+                    {"geometry_types": list(profile.geometry_types)},
+                    "Choose a geometry normalization or task-specific "
+                    "handling policy.",
+                    False,
+                )
+            )
+        return ModalityCurationReport(
+            modality="geospatial",
+            dataset_hash=self.content_hash,
+            sample_count=len(self.features),
+            profile=profile.to_dict(),
+            quality_findings=tuple(quality_findings),
         )
 
 

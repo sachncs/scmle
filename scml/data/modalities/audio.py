@@ -13,7 +13,12 @@ import pathlib
 from typing import Self
 import wave
 
+from scml.contracts import data as data_contracts
 from scml.contracts import errors
+from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import dataset_hash
+from scml.data.modalities.curation import label_counts
+from scml.data.modalities.curation import ModalityCurationReport
 
 
 class AudioValidationError(errors.DataError):
@@ -223,6 +228,76 @@ class AudioDataset:
     def profiles(self) -> tuple[AudioProfile, ...]:
         """Return profiles in source order for deterministic curation."""
         return tuple(sample.profile() for sample in self.samples)
+
+    def curate(self) -> ModalityCurationReport:
+        """Build reviewable metadata and compatibility findings."""
+        profiles = self.profiles()
+        formats = sorted({profile.format for profile in profiles})
+        sample_rates = sorted({profile.sample_rate for profile in profiles})
+        channels = sorted({profile.channels for profile in profiles})
+        durations = [profile.duration_seconds for profile in profiles]
+        labels = label_counts(sample.label for sample in self.samples)
+        quality_findings = []
+        if len(formats) > 1:
+            quality_findings.append(
+                build_finding(
+                    "quality.audio-format-drift",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"sources": [profile.source for profile in profiles]},
+                    {"formats": formats},
+                    "Select an explicit codec normalization policy before "
+                    "training.",
+                    False,
+                )
+            )
+        if len(sample_rates) > 1 or len(channels) > 1:
+            quality_findings.append(
+                build_finding(
+                    "quality.audio-shape-drift",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"sources": [profile.source for profile in profiles]},
+                    {
+                        "sample_rates": sample_rates,
+                        "channels": channels,
+                    },
+                    "Resample or channel-normalize with the transformation "
+                    "recorded.",
+                    False,
+                )
+            )
+        risk_findings = []
+        if "unlabeled" in labels and len(labels) > 1:
+            risk_findings.append(
+                build_finding(
+                    "risk.audio-mixed-label-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": self.content_hash},
+                    {"label_counts": labels},
+                    "Declare whether unlabeled clips are valid for the "
+                    "intended task.",
+                    False,
+                )
+            )
+        return ModalityCurationReport(
+            modality="audio",
+            dataset_hash=dataset_hash(
+                f"{sample.source}\0{sample.file_hash}"
+                for sample in self.samples
+            ),
+            sample_count=len(self.samples),
+            profile={
+                "formats": formats,
+                "sample_rates": sample_rates,
+                "channels": channels,
+                "duration_min_seconds": min(durations),
+                "duration_max_seconds": max(durations),
+                "duration_mean_seconds": sum(durations) / len(durations),
+                "total_bytes": sum(profile.byte_size for profile in profiles),
+                "label_counts": labels,
+            },
+            quality_findings=tuple(quality_findings),
+            risk_findings=tuple(risk_findings),
+        )
 
 
 __all__ = [

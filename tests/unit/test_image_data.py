@@ -140,6 +140,27 @@ def test_profile_is_bounded_and_detects_shift():
 
 
 @PILLOW_SKIP
+def test_curation_reports_duplicate_and_sampling_findings():
+    """Image curation makes duplicate and bounded-profile risk visible."""
+    payload = png_bytes((0, 0, 0))
+    dataset = image.ImageDataset(
+        (
+            image.ImageSample.from_bytes(payload, "first.png"),
+            image.ImageSample.from_bytes(payload, "second.png"),
+        )
+    )
+
+    report = dataset.curate(max_samples=1, profile_size=(2, 2))
+
+    assert report.modality == "image"
+    assert report.profile["duplicate_count"] == 0
+    assert report.profile["truncated"] is True
+    assert [finding.finding_id for finding in report.quality_findings] == [
+        "quality.image-profile-truncated",
+    ]
+
+
+@PILLOW_SKIP
 def test_features_are_flattened_with_stable_shape_and_normalization():
     dataset = image.ImageDataset(
         (image.ImageSample.from_bytes(png_bytes((255, 0, 128)), "sample.png"),)

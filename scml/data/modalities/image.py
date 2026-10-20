@@ -15,7 +15,11 @@ from typing import Self
 
 import numpy as np
 
+from scml.contracts import data as data_contracts
 from scml.contracts import errors
+from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import dataset_hash
+from scml.data.modalities.curation import ModalityCurationReport
 
 PillowModule: Any = None
 try:
@@ -535,6 +539,62 @@ class ImageDataset:
             height_mean=float(np.mean([sample.height for sample in profiled])),
             mean_pixel=tuple(float(value) for value in mean),
             pixel_std=tuple(float(value) for value in np.sqrt(variance)),
+        )
+
+    def curate(
+        self,
+        max_samples: int = 1024,
+        profile_size: tuple[int, int] = DEFAULT_PROFILE_SIZE,
+    ) -> ModalityCurationReport:
+        """Build bounded image statistics and reviewable findings."""
+        profile = self.profile(max_samples, profile_size)
+        quality_findings = []
+        if not self.samples:
+            quality_findings.append(
+                build_finding(
+                    "quality.image-empty-dataset",
+                    data_contracts.FindingSeverity.CRITICAL,
+                    {"dataset": "empty"},
+                    {"sample_count": 0},
+                    "Provide at least one validated image before training.",
+                    True,
+                )
+            )
+        if profile.duplicate_count:
+            quality_findings.append(
+                build_finding(
+                    "quality.image-duplicate-content",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": "profiled_samples"},
+                    {"duplicate_count": profile.duplicate_count},
+                    "Review duplicate content and prevent split contamination.",
+                    False,
+                )
+            )
+        if profile.truncated:
+            quality_findings.append(
+                build_finding(
+                    "quality.image-profile-truncated",
+                    data_contracts.FindingSeverity.INFO,
+                    {"dataset": "profiled_samples"},
+                    {
+                        "max_samples": max_samples,
+                        "profiled_count": profile.profiled_count,
+                    },
+                    "Run a full-content audit before release or record the "
+                    "sampling policy.",
+                    False,
+                )
+            )
+        return ModalityCurationReport(
+            modality="image",
+            dataset_hash=dataset_hash(
+                f"{sample.source}\0{sample.content_hash}"
+                for sample in self.samples
+            ),
+            sample_count=len(self.samples),
+            profile=profile.to_dict(),
+            quality_findings=tuple(quality_findings),
         )
 
     def prepare_tabular_features(
