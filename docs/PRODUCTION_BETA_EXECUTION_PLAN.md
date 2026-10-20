@@ -245,6 +245,12 @@ passed. The two SQLite resource-cleanup warnings remain a release-debt item;
 the unit/property/leakage slice separately passes with
 `-W error::ResourceWarning`.
 
+The tag-publish alignment at `2673ec1` applies the same five-seed benchmark
+and reproducible, network-isolated artifact gate to the release workflow. A
+tagged publish has not been executed; the workflow change is verified by
+static diff review and the local gate, not by a PyPI or GitHub Release side
+effect.
+
 The complete release preflight at pushed commit `51c5afd` passed `1803 passed,
 89 skipped, 2 warnings` in 8 minutes 11 seconds. Total coverage was 81.86% and
 the declared core scope remained 86%; mutation testing killed `1253/1735`
