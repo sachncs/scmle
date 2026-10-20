@@ -323,6 +323,57 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
 
 
+def test_modality_predictor_verifies_package_and_predicts_new_samples(
+    tmp_path: Path,
+):
+    """Signed modality packages expose checked library inference."""
+    adapter = image_adapter()
+    report = modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        tmp_path / "predictor-package",
+        signing_key="test-signing-key",
+    )
+
+    predictor = modality_lifecycle.ModalityPredictor.from_package(
+        adapter,
+        report.package.path,
+        "test-signing-key",
+    )
+    predictions = predictor.predict(adapter.samples[:2])
+    probabilities = predictor.predict_proba(adapter.samples[:2])
+
+    assert predictions.shape == (2,)
+    assert probabilities.shape == (2, 2)
+    assert predictor.health() == {
+        "package_verified": True,
+        "modality": "image",
+        "training_dataset_hash": adapter.dataset_hash,
+        "feature_names": list(predictor.feature_names),
+        "model_sha256": report.package.model_sha256,
+    }
+    with pytest.raises(ValueError, match="samples must not be empty"):
+        predictor.predict(())
+
+
+def test_modality_predictor_rejects_a_different_adapter_modality(
+    tmp_path: Path,
+):
+    """A signed package cannot be paired with a different modality."""
+    image = image_adapter()
+    report = modality_lifecycle.ModalityLifecycle().run(
+        image,
+        tmp_path / "predictor-package",
+        signing_key="test-signing-key",
+    )
+
+    with pytest.raises(ValueError, match="package modality"):
+        modality_lifecycle.ModalityPredictor.from_package(
+            document_adapter(),
+            report.package.path,
+            "test-signing-key",
+        )
+
+
 def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
     """The image adapter exposes bounded transformed-pixel occlusion."""
     report = modality_lifecycle.ModalityLifecycle().run(

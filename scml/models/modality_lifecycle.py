@@ -25,6 +25,7 @@ import time
 from typing import Any
 from typing import cast
 from typing import ClassVar
+from typing import Self
 
 import joblib
 import numpy as np
@@ -113,6 +114,100 @@ class LifecyclePackage:
     def to_dict(self) -> dict[str, object]:
         """Return JSON-native package evidence."""
         return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ModalityPredictor:
+    """Verified library inference for a signed modality lifecycle package.
+
+    The caller supplies an adapter configured with the decoder and
+    representation policy required for new samples. This class does not
+    infer a codec, deserialize arbitrary raw transport payloads, or expose an
+    HTTP server; it keeps those deployment decisions outside the package.
+    """
+
+    adapter: ModalityAdapter
+    model: LogisticRegression = dataclasses.field(repr=False)
+    package: LifecyclePackage
+    feature_names: tuple[str, ...]
+    training_dataset_hash: str
+
+    @classmethod
+    def from_package(
+        cls,
+        adapter: ModalityAdapter,
+        package_path: str | Path,
+        signing_key: str | bytes,
+    ) -> Self:
+        """Load and validate a signed package for one modality adapter."""
+        model = load_package(package_path, signing_key)
+        manifest_path = Path(package_path) / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise ValueError("modality package manifest must be an object")
+        if manifest.get("modality") != adapter.modality.value:
+            raise ValueError("package modality does not match adapter")
+        raw_features = manifest.get("feature_names")
+        if not isinstance(raw_features, list) or not all(
+            isinstance(name, str) and name.strip() for name in raw_features
+        ):
+            raise ValueError("package feature_names are invalid")
+        feature_names = tuple(raw_features)
+        if getattr(model, "n_features_in_", len(feature_names)) != len(
+            feature_names
+        ):
+            raise ValueError("package model and feature schema do not match")
+        dataset_hash = manifest.get("dataset_hash")
+        model_digest = manifest.get("model_sha256")
+        signature = manifest.get("signature")
+        if not isinstance(dataset_hash, str) or not dataset_hash.strip():
+            raise ValueError("package dataset_hash is invalid")
+        if not isinstance(model_digest, str) or not model_digest.strip():
+            raise ValueError("package model_sha256 is invalid")
+        if not isinstance(signature, dict) or not isinstance(
+            signature.get("value"), str
+        ):
+            raise ValueError("package signature is invalid")
+        package = LifecyclePackage(
+            path=str(package_path),
+            model_sha256=model_digest,
+            signature=signature["value"],
+        )
+        return cls(
+            adapter=adapter,
+            model=model,
+            package=package,
+            feature_names=feature_names,
+            training_dataset_hash=dataset_hash,
+        )
+
+    def features_for(self, samples: Sequence[Any]) -> FeatureBatch:
+        """Prepare and validate features for new modality samples."""
+        values = tuple(samples)
+        if not values:
+            raise ValueError("samples must not be empty")
+        batch = self.adapter.features(values)
+        if batch.feature_names != self.feature_names:
+            raise ValueError("new sample feature schema does not match package")
+        return batch
+
+    def predict(self, samples: Sequence[Any]) -> np.ndarray:
+        """Return predictions after validating the signed feature contract."""
+        return self.model.predict(self.features_for(samples).values)
+
+    def predict_proba(self, samples: Sequence[Any]) -> np.ndarray:
+        """Return class probabilities after feature-contract validation."""
+        return self.model.predict_proba(self.features_for(samples).values)
+
+    def health(self) -> dict[str, object]:
+        """Return machine-readable package and inference readiness evidence."""
+        return {
+            "package_verified": True,
+            "modality": self.adapter.modality.value,
+            "training_dataset_hash": self.training_dataset_hash,
+            "feature_names": list(self.feature_names),
+            "model_sha256": self.package.model_sha256,
+        }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -2152,6 +2247,7 @@ __all__ = [
     "LifecycleReport",
     "ModalityAdapter",
     "ModalityLifecycle",
+    "ModalityPredictor",
     "ModellingStage",
     "RasterAdapter",
     "TextAdapter",
