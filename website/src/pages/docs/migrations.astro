@@ -1,0 +1,49 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Migrations" description="Upgrade super-charge-ml deliberately: review the contract, regenerate evidence, and avoid silent compatibility shims." current="migrations">
+  <p class="eyebrow"><span></span> Versioned change</p>
+  <h1>Upgrade with<br /><em>evidence.</em></h1>
+  <p class="lead">A migration is complete when the new contract is understood and the affected evidence has been rerun. Do not treat a successful import as proof that an old model, dataset, or release decision still means the same thing.</p>
+
+  <div class="callout"><p><strong>0.1 beta policy:</strong> compatibility is explicit. The project does not add thin wrappers or silent backward-compatibility shims to make an old claim look valid under a new contract.</p></div>
+
+  <h2>The migration checklist</h2>
+  <ol>
+    <li>Pin the source commit, lockfile, Python version, and current artifact digests.</li>
+    <li>Read the capability matrix for status changes, renamed fields, newly blocking findings, and changed resource limits.</li>
+    <li>Regenerate the dataset card, model card, explanation evidence, and evidence graph from the new run.</li>
+    <li>Run the focused migration tests, full reliability gate, artifact verification, and site smoke suite.</li>
+    <li>Recompute one critical metric, one fairness result, and one explanation independently.</li>
+    <li>Record a release decision that names the accepted differences or blocks the upgrade.</li>
+  </ol>
+
+  <h2>Known 0.1 boundaries</h2>
+  <ul>
+    <li>The supported top-level workflow is the explicitly gated tabular library path.</li>
+    <li>Non-tabular lifecycle adapters are experimental and their structured evidence must not be presented as a supported <code>MLProject</code> or <code>ModelBundle</code> migration.</li>
+    <li>A changed source snapshot creates a new dataset identity; it is not an in-place data migration.</li>
+    <li>A changed signing key requires explicit rotation evidence and verification of the replacement bundle; do not reuse a stale signature.</li>
+  </ul>
+
+  <h2>Example migration record</h2>
+  <pre><code>{`migration:
+  from: 0.1.0-beta.2
+  to: 0.1.0-beta.3
+  source_commit: sha:...
+  input_snapshot: sha256:...
+  old_bundle: sha256:...
+  new_bundle: sha256:...
+  changed_contracts:
+    - structured modality stage evidence
+  rerun:
+    - curation
+    - evaluation
+    - explanation
+    - recovery
+  decision: accepted-with-limitations`}</code></pre>
+  <p>If an upgrade changes a support label, update the capability matrix and model card together. The most honest migration outcome can be a demotion to experimental or extension-only.</p>
+
+  <p class="meta">Migrations preserve meaning, not just imports · 0.1 beta</p>
+</DocsLayout>

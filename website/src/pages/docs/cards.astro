@@ -1,0 +1,68 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout title="Cards & explanations" description="Write dataset, model, and explanation cards that preserve provenance, limitations, and review decisions." current="cards">
+  <p class="eyebrow"><span></span> Reviewable artefacts</p>
+  <h1>Make the context<br /><em>travel with the model.</em></h1>
+  <p class="lead">A score without its data boundary is easy to misread. Cards make the intended use, provenance, quality decisions, and uncertainty visible to the next person who operates or reviews the system.</p>
+
+  <div class="callout"><p><strong>Generated is not approved.</strong> A card can be machine-generated from run evidence, but a reviewer still owns the decision to publish it. Keep the generated state and the review decision separate.</p></div>
+
+  <h2>Dataset card: what went into the run</h2>
+  <p>The dataset card starts at ingestion, not at the end of modelling. It should identify the source snapshot, schema, curation rules, findings, privacy decisions, and the population the data can represent.</p>
+  <pre><code>{`dataset_card:
+  snapshot_id: snapshot-2026-10-20
+  source: orders.parquet
+  content_digest: sha256:...
+  modality: tabular
+  intended_use: renewal-risk model development
+  quality:
+    missingness: curation_report.json
+    duplicates: duplicate_report.json
+    leakage: feature_graph.json
+  privacy:
+    sensitive_fields: [email, postcode]
+    disposition: redacted-before-training
+  limitations:
+    - historical customers only
+    - no evidence for new-market behaviour
+  review: machine_generated_unreviewed`}</code></pre>
+  <p>Do not replace a finding with a reassuring sentence. Link the finding, its evidence, remediation, owner, and disposition. An unresolved blocking finding must stop the run before fitting.</p>
+
+  <h2>Model card: what the candidate can and cannot claim</h2>
+  <p>The model card binds a model fingerprint to the exact dataset snapshot, feature graph, evaluation policy, thresholds, subgroup results, explanation methods, and deployment surface. It is a decision record, not a marketing paragraph.</p>
+  <div class="diagram">
+    <div class="diagram-caption"><span>Model card spine</span><strong>identity before interpretation</strong></div>
+    <div class="planes">
+      <div class="plane"><span>01 / Identity</span><strong>What is this artefact?</strong><p>bundle digest · source commit · feature graph · software environment</p></div>
+      <div class="plane plane-execution"><span>02 / Behaviour</span><strong>How was it evaluated?</strong><p>locked test · uncertainty · calibration · fairness · slice results</p></div>
+      <div class="plane plane-evidence"><span>03 / Limits</span><strong>When should it not be used?</strong><p>population shift · unavailable features · known failure modes · abstention</p></div>
+    </div>
+  </div>
+
+  <h2>Explanation card: what the explanation actually measures</h2>
+  <p>Every explanation should name the model digest, input fingerprint, method, parameters, timestamp, software version, stability or fidelity evidence, privacy decision, and limitation. State whether the result is associational; do not let a feature attribution sound causal by accident.</p>
+  <pre><code>{`explanation:
+  model_digest: sha256:...
+  input_fingerprint: row:customer-42
+  method: permutation_importance
+  parameters: {repeats: 20, scoring: roc_auc}
+  output: explanations/permutation.json
+  stability: {top_k: 10, agreement: 0.84}
+  fidelity: {score: 0.91, reference: held-out-reconstruction}
+  privacy: redacted
+  limitation: associational; not a causal effect`}</code></pre>
+
+  <h2>Read the three cards together</h2>
+  <ol>
+    <li>Start with the dataset card: is the source appropriate and clean enough for this decision?</li>
+    <li>Read the model card: does the evaluation scope match the intended use?</li>
+    <li>Inspect the explanation card: is the method stable, faithful enough for its purpose, and honest about causality?</li>
+    <li>Check the evidence graph: do all three point to the same snapshot, feature graph, and bundle?</li>
+  </ol>
+  <p>For the exact release gate and evidence index format, continue to <a href={`${base}/docs/evidence/`}>Evidence & gates</a>. For operational failures, use the <a href={`${base}/docs/recovery/`}>recovery guide</a>.</p>
+
+  <p class="meta">Cards are part of the interface between data, modelling, and operations · 0.1 beta</p>
+</DocsLayout>

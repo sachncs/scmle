@@ -1,0 +1,51 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout title="Security" description="Understand signing, dependency, privacy, and trust boundaries before using super-charge-ml in a release workflow." current="security">
+  <p class="eyebrow"><span></span> Trust boundaries</p>
+  <h1>Know what is<br /><em>trusted.</em></h1>
+  <p class="lead">Security here means more than a clean dependency scan. It means knowing which bytes, identities, keys, and operators a claim depends on—and refusing to turn missing evidence into a green status.</p>
+
+  <div class="callout"><p><strong>Local-first is not automatically safe.</strong> A local filesystem, signing key, webhook, or plugin still has an owner and a threat model. Put the package behind the controls your deployment requires.</p></div>
+
+  <h2>Trust boundaries in one run</h2>
+  <div class="diagram">
+    <div class="diagram-caption"><span>Trust map</span><strong>identity is checked at every hand-off</strong></div>
+    <div class="flow-row">
+      <div class="flow-node active"><span>01 / INPUT</span><b>Source bytes</b><small>snapshot + digest</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node"><span>02 / BUILD</span><b>Run evidence</b><small>curation + lineage</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node"><span>03 / SHIP</span><b>Signed bundle</b><small>manifest + payload</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node active"><span>04 / SERVE</span><b>Inference</b><small>exact digest</small></div>
+    </div>
+    <div class="evidence-rail"><span>operator evidence</span><i></i><span>review + policy</span></div>
+  </div>
+
+  <h2>Bundle verification is mandatory</h2>
+  <p>A bundle load verifies the manifest signature, model payload digest, model digest, and fitted type before deserialization. Treat <code>trusted=True</code> as an explicit executable-code boundary, not as a convenience switch.</p>
+  <pre><code>{`from scml import ModelBundle
+
+bundle = ModelBundle.load(
+    "runs/run-42/model",
+    trusted=True,
+    signing_key=release_key,
+)
+# Verify the exact bundle digest before promotion or serving.`}</code></pre>
+  <p>The key shown above must come from a deployment secret or approved key service. Do not commit it, print it into logs, or use one shared development key as release identity.</p>
+
+  <h2>Data and dependency controls</h2>
+  <ul>
+    <li>Keep raw source bytes and derived evidence separate; redact PII in logs and sidecars according to the retention policy.</li>
+    <li>Review image EXIF, document provenance, source URIs, and label fields before distribution.</li>
+    <li>Pin CI actions, audit runtime and site dependencies, and retain the SBOM and license inventory with the release evidence.</li>
+    <li>Keep optional extras outside the supported claim until their licenses, vulnerabilities, and resource assumptions are audited.</li>
+    <li>Use HTTPS for alert webhooks. Local plaintext is allowed only in an explicit localhost test.</li>
+  </ul>
+
+  <h2>What this page does not promise</h2>
+  <p>A valid local signature does not prove key custody, rotation, revocation, or an independent release review. A dependency audit does not prove that a connector, plugin, container, or host is safe. Record those controls in the release decision instead of inferring them from a passing test.</p>
+  <p>For the operational response when a verification fails, go to <a href={`${base}/docs/recovery/`}>Recovery</a>. For the claims a reviewer must recompute, go to <a href={`${base}/docs/evidence/`}>Evidence & gates</a>.</p>
+
+  <p class="meta">Security claims are scoped to the evidence that proves them · 0.1 beta</p>
+</DocsLayout>

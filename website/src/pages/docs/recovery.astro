@@ -1,0 +1,53 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout title="Recovery" description="Recover interrupted runs, rejected artefacts, failed connectors, and operational incidents without hiding the original evidence." current="recovery">
+  <p class="eyebrow"><span></span> Failure playbook</p>
+  <h1>When it fails,<br /><em>keep the evidence.</em></h1>
+  <p class="lead">Recovery is a state transition, not a cleanup script. Preserve the failed attempt, identify the boundary that failed, and resume only when the same input and configuration can be proved safe.</p>
+
+  <div class="callout"><p><strong>Never promote a partial directory.</strong> A missing manifest, invalid signature, stale checkpoint, or mismatched snapshot is a blocked state. Quarantine it, record why, and create a new attempt with a traceable identity.</p></div>
+
+  <h2>The recovery loop</h2>
+  <div class="diagram">
+    <div class="diagram-caption"><span>Recovery sequence</span><strong>observe before you mutate</strong></div>
+    <div class="data-path">
+      <div class="path-step highlighted"><span>01</span><b>Observe failure</b></div><i class="path-line"></i>
+      <div class="path-step"><span>02</span><b>Quarantine output</b></div><i class="path-line"></i>
+      <div class="path-step"><span>03</span><b>Verify identity</b></div><i class="path-line"></i>
+      <div class="path-step"><span>04</span><b>Resume or restart</b></div><i class="path-line"></i>
+      <div class="path-step highlighted"><span>05</span><b>Re-evaluate</b></div>
+    </div>
+  </div>
+
+  <h2>Choose the response by failure class</h2>
+  <ul>
+    <li><strong>Interrupted worker or timeout:</strong> inspect the checkpoint and run state. Resume only when the configuration hash and snapshot identity match; otherwise start a new run.</li>
+    <li><strong>Connector retry exhaustion:</strong> retain the source error and checkpoint. Do not silently skip records or advance the watermark.</li>
+    <li><strong>Changed source snapshot:</strong> stop. Create a new dataset identity and rerun curation; never attach new bytes to an old run.</li>
+    <li><strong>Corrupt or unsigned artifact:</strong> quarantine it and reload the last verified bundle. A failed verification is not permission to bypass signing.</li>
+    <li><strong>Policy, fairness, or explanation failure:</strong> keep the model as a challenger at most. Fix the evidence or demote the capability before promotion.</li>
+    <li><strong>SLO breach:</strong> dispatch the stable alert once, open the incident with its run and rollback target, and require acknowledgement before resolution.</li>
+  </ul>
+
+  <h2>Recovery evidence to retain</h2>
+  <pre><code>{`recovery:
+  original_run: run-42
+  failure: stale_checkpoint
+  observed_at: 2026-10-20T12:00:00+00:00
+  source_snapshot: sha256:...
+  configuration_hash: sha256:...
+  quarantined_path: runs/run-42/failed-output
+  decision: restarted
+  replacement_run: run-43
+  reviewer: ml-on-call`}</code></pre>
+  <p>The local fault harness exercises these boundaries with bounded fixtures. It does not prove physical disk-full, host-wide OOM, cloud transport, container, kernel, or external pager behavior; those need environment-specific rehearsals.</p>
+
+  <h2>After recovery: evaluate again</h2>
+  <p>Compare the replacement run with the same declared metrics, uncertainty, fairness slices, resource budget, and explanation checks. A successful restart proves execution recovered; it does not prove that the new model is equivalent or safe to promote.</p>
+  <p>Use <a href={`${base}/docs/operations/`}>Operations</a> for the normal run path and <a href={`${base}/docs/evidence/`}>Evidence & gates</a> for the release decision.</p>
+
+  <p class="meta">A recovered run is a new claim with new evidence · 0.1 beta</p>
+</DocsLayout>

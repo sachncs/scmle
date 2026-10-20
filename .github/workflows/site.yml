@@ -42,7 +42,7 @@ jobs:
           python3 -m http.server 4173 --directory dist > /tmp/super-charge-ml-site.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
-          for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/capabilities/ /docs/evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/operations/ /docs/troubleshooting/; do
+          for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/capabilities/ /docs/evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/cards/ /docs/operations/ /docs/security/ /docs/recovery/ /docs/migrations/ /docs/troubleshooting/; do
             curl --fail --silent --show-error "http://127.0.0.1:4173${route}" > /dev/null
           done
           grep -q "/super-charge-ml/docs/" dist/index.html

@@ -10,7 +10,11 @@ const routes = [
   "./docs/workflows/",
   "./docs/api/",
   "./docs/architecture/",
+  "./docs/cards/",
   "./docs/operations/",
+  "./docs/security/",
+  "./docs/recovery/",
+  "./docs/migrations/",
   "./docs/troubleshooting/",
 ];
 
