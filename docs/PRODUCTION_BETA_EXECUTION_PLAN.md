@@ -194,6 +194,16 @@ gate clean. It is evidence for the local failure boundary only; it does not
 turn controlled capacity guards into physical disk-full or host-wide OOM
 evidence, and it does not close the independent external-fault gap.
 
+The current complete release preflight at pushed commit `a10e693` passed
+`1780 passed, 89 skipped, 2 warnings` in 8 minutes 28 seconds. Total coverage
+was 81.75%, the declared core scope measured 86%, the mutation gate killed
+`1252/1735` mutants (72%, above the 70% minimum), all four offline benchmarks
+had zero regressions, wheel/sdist and Twine checks passed, `pip-audit` and npm
+audit reported no known vulnerabilities, and Astro built all 11 routes. The
+two warnings remain the known SQLite resource-cleanup warnings from the
+convention scan; mutation survivors and external-fault evidence remain open
+engineering debt.
+
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
 extension-only until their complete lifecycle evidence is attached.
