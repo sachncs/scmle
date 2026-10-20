@@ -11,6 +11,7 @@ from PIL import Image
 import pytest
 
 from scml.contracts import modalities
+from scml.contracts import performance
 from scml.data.modalities import audio
 from scml.data.modalities import document
 from scml.data.modalities import geospatial
@@ -233,6 +234,17 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         "prediction_count": report.evaluation["sample_count"],
         "predictions_match": True,
     }
+    performance_evidence = report.performance
+    assert [
+        observation["operation"]
+        for observation in performance_evidence["observations"]
+    ] == [operation.value for operation in performance.PerformanceOperation]
+    assert all(
+        observation["sample_count"] > 0
+        for observation in performance_evidence["observations"]
+    )
+    assert performance_evidence["budget"] is None
+    assert performance_evidence["result"] is None
     assert report.recovery["tampered_manifest_rejected"] is True
     declaration = modality_lifecycle.ModalityLifecycle().declaration(report)
     assert declaration.status is modalities.ModalityStatus.EXPERIMENTAL
@@ -252,6 +264,35 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
 
     with pytest.raises(ValueError, match="signature"):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
+
+
+def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
+    """A lifecycle budget is emitted as evidence and fails closed."""
+    adapter = document_adapter()
+    budget = performance.PerformanceBudget(
+        dict.fromkeys(performance.PerformanceOperation, 30.0)
+    )
+    report = modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        tmp_path / "passing-package",
+        signing_key="test-signing-key",
+        performance_budget=budget,
+    )
+
+    assert report.performance["budget"] == budget.to_dict()
+    assert report.performance["result"]["passed"] is True
+
+    with pytest.raises(ValueError, match="performance budget failed"):
+        modality_lifecycle.ModalityLifecycle().run(
+            adapter,
+            tmp_path / "failing-package",
+            signing_key="test-signing-key",
+            performance_budget=performance.PerformanceBudget(
+                {
+                    performance.PerformanceOperation.INGEST: 0.000001,
+                }
+            ),
+        )
 
 
 def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):

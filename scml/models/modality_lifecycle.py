@@ -18,8 +18,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import shutil
 import tempfile
+import time
 from typing import Any
 from typing import cast
 from typing import ClassVar
@@ -32,7 +34,9 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
 from scml.contracts import data as data_contracts
+from scml.contracts import events
 from scml.contracts import modalities
+from scml.contracts import performance
 from scml.data.modalities import audio
 from scml.data.modalities import curation
 from scml.data.modalities import document
@@ -117,6 +121,7 @@ class LifecycleReport:
     dataset_hash: str
     stage_evidence: tuple[modalities.StageEvidence, ...]
     evaluation: dict[str, object]
+    performance: dict[str, object]
     package: LifecyclePackage
     inference: dict[str, object]
     monitoring: dict[str, object]
@@ -133,6 +138,7 @@ class LifecycleReport:
                 evidence.to_dict() for evidence in self.stage_evidence
             ],
             "evaluation": self.evaluation,
+            "performance": self.performance,
             "package": self.package.to_dict(),
             "inference": self.inference,
             "monitoring": self.monitoring,
@@ -879,6 +885,10 @@ class LifecycleContext:
     )
     model: LogisticRegression | None = None
     evaluation: dict[str, object] = dataclasses.field(default_factory=dict)
+    performance_observations: dict[
+        performance.PerformanceOperation,
+        performance.PerformanceObservation,
+    ] = dataclasses.field(default_factory=dict)
     data_explanation: dict[str, object] = dataclasses.field(
         default_factory=dict
     )
@@ -899,11 +909,32 @@ class LifecycleContext:
         """Record one stage result for the final evidence index."""
         self.stage_records[stage] = payload
 
+    def record_performance(
+        self,
+        operation: performance.PerformanceOperation,
+        elapsed_seconds: float,
+        sample_count: int,
+    ) -> None:
+        """Record one measured operation with machine and timestamp context."""
+        self.performance_observations[operation] = (
+            performance.PerformanceObservation(
+                operation=operation,
+                elapsed_seconds=elapsed_seconds,
+                peak_memory_gb=None,
+                sample_count=sample_count,
+                machine=platform.platform(),
+                observed_at=events.utc_timestamp(),
+            )
+        )
+
 
 class ModalityLifecycleStage(abc.ABC):
     """One polymorphic stage in a modality lifecycle."""
 
     stage: ClassVar[modalities.LifecycleStage]
+    performance_operation: ClassVar[performance.PerformanceOperation | None] = (
+        None
+    )
 
     @abc.abstractmethod
     def execute(self, context: LifecycleContext) -> None:
@@ -914,6 +945,7 @@ class IngestionStage(ModalityLifecycleStage):
     """Confirm source identity and sample cardinality."""
 
     stage = modalities.LifecycleStage.INGESTION
+    performance_operation = performance.PerformanceOperation.INGEST
 
     def execute(self, context: LifecycleContext) -> None:
         """Record immutable source identity."""
@@ -1053,6 +1085,7 @@ class ModellingStage(ModalityLifecycleStage):
     """Fit the bounded regularized linear baseline on training features."""
 
     stage = modalities.LifecycleStage.MODELLING
+    performance_operation = performance.PerformanceOperation.FIT
 
     def execute(self, context: LifecycleContext) -> None:
         """Fit only on the training partition."""
@@ -1180,6 +1213,7 @@ class PackagingStage(ModalityLifecycleStage):
     """Write and sign a digest-bound model package atomically."""
 
     stage = modalities.LifecycleStage.PACKAGING
+    performance_operation = performance.PerformanceOperation.PACKAGE
 
     def execute(self, context: LifecycleContext) -> None:
         """Persist the estimator and signed manifest."""
@@ -1248,8 +1282,20 @@ class InferenceStage(ModalityLifecycleStage):
             raise RuntimeError(
                 "package and partitions are required before inference"
             )
+        started = time.perf_counter()
         loaded = load_package(context.package.path, context.signing_key)
+        context.record_performance(
+            performance.PerformanceOperation.LOAD,
+            time.perf_counter() - started,
+            len(context.feature_batches["test"].sample_ids),
+        )
+        started = time.perf_counter()
         predictions = loaded.predict(context.feature_batches["test"].values)
+        context.record_performance(
+            performance.PerformanceOperation.INFERENCE,
+            time.perf_counter() - started,
+            len(context.feature_batches["test"].sample_ids),
+        )
         expected = context.evaluation["predictions"]
         actual = [str(value) for value in predictions]
         if actual != expected:
@@ -1376,6 +1422,7 @@ class ModalityLifecycle:
         seed: int = 0,
         observed_adapter: ModalityAdapter | None = None,
         report_path: str | Path | None = None,
+        performance_budget: performance.PerformanceBudget | None = None,
     ) -> LifecycleReport:
         """Run every stage and optionally persist its evidence report."""
         observed = observed_adapter or adapter
@@ -1391,7 +1438,25 @@ class ModalityLifecycle:
             observed_adapter=observed,
         )
         for stage in self.stages:
+            started = time.perf_counter()
             stage.execute(context)
+            operation = stage.performance_operation
+            if operation is not None:
+                if operation is performance.PerformanceOperation.INGEST:
+                    sample_count = len(context.adapter.samples)
+                elif operation is performance.PerformanceOperation.FIT:
+                    sample_count = len(
+                        context.feature_batches["train"].sample_ids
+                    )
+                else:
+                    sample_count = len(
+                        context.feature_batches["train"].sample_ids
+                    )
+                context.record_performance(
+                    operation,
+                    time.perf_counter() - started,
+                    sample_count,
+                )
         records = tuple(
             modalities.StageEvidence(
                 stage=stage,
@@ -1404,11 +1469,37 @@ class ModalityLifecycle:
         package = context.package
         if package is None:
             raise RuntimeError("packaging stage did not produce a package")
+        observations = tuple(
+            context.performance_observations[operation]
+            for operation in performance.PerformanceOperation
+            if operation in context.performance_observations
+        )
+        performance_result = (
+            performance_budget.evaluate(observations)
+            if performance_budget is not None
+            else None
+        )
+        performance_evidence: dict[str, object] = {
+            "observations": [
+                observation.to_dict() for observation in observations
+            ],
+            "budget": (
+                performance_budget.to_dict()
+                if performance_budget is not None
+                else None
+            ),
+            "result": (
+                performance_result.to_dict()
+                if performance_result is not None
+                else None
+            ),
+        }
         report = LifecycleReport(
             modality=adapter.modality.value,
             dataset_hash=adapter.dataset_hash,
             stage_evidence=records,
             evaluation=context.evaluation,
+            performance=performance_evidence,
             package=package,
             inference=context.inference,
             monitoring=context.monitoring,
@@ -1421,6 +1512,11 @@ class ModalityLifecycle:
             path.write_text(
                 json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
+            )
+        if performance_result is not None and not performance_result.passed:
+            raise ValueError(
+                "performance budget failed: "
+                + "; ".join(performance_result.violations)
             )
         return report
 
