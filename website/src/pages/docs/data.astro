@@ -14,6 +14,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
     <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. The sink exposes its crash window instead of claiming distributed exactly-once delivery. Broker and warehouse adapters remain extension work.</p></div>
     <div class="doc-card"><small>RANGE READS</small><h3>Bounded object scans</h3><p>Range-backed JSONL and NDJSON sources read only the requested byte windows and resume from byte checkpoints. Record-size limits, invalid JSON, and in-object schema changes fail with structured errors; arbitrary binary formats still require an explicit adapter.</p></div>
+    <div class="doc-card"><small>DOCUMENTS</small><h3>Curate before NLP</h3><p>Document collections preserve content hashes, page and section provenance, bounded language profiles, duplicate groups, label composition, and conflicting-label findings before a tokenizer or model is chosen.</p></div>
     <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
   </div>
 
@@ -45,19 +46,26 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 }`}</code></pre>
 
   <h2>Data boundaries beyond tables</h2>
-  <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation and dataset cards. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
+  <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation and dataset cards. Documents additionally produce a reviewable <code>DocumentCurationReport</code>; it flags duplicate content, conflicting labels, mixed labeled/unlabeled state, unknown language, and truncated inspection. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
   <div class="doc-cards">
     <div class="doc-card"><small>AUDIO</small><h3>Probe before decode</h3><p>WAV metadata is read with the standard library. Other containers require an explicit caller-owned probe, so codec versions and optional dependencies remain visible in the run evidence.</p></div>
     <div class="doc-card"><small>VIDEO</small><h3>Metadata is evidence</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. The core package does not guess from a filename or import a codec stack implicitly.</p></div>
     <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Raster samples require dimensions, bands, dtype, CRS, and transform metadata.</p></div>
   </div>
   <pre><code>{`from scml.data.modalities import AudioSample, GeospatialDataset, VideoSample
+from scml.data.modalities import DocumentDataset, DocumentSample
 
 audio = AudioSample.from_bytes(wav_bytes, source="clip.wav")
 video = VideoSample.from_bytes(encoded, video_metadata, source="clip.mp4")
 places = GeospatialDataset.from_geojson(
     feature_collection, source="places.geojson", crs="EPSG:4326"
 )
+documents = DocumentDataset((
+    DocumentSample("policy-1", "...", label="approved"),
+    DocumentSample("policy-2", "...", label="review"),
+))
+curation = documents.curate()
+assert curation.dataset_hash == documents.content_hash
 
 # These objects can be profiled and curated. They do not silently opt into
 # tabular modelling or a production support claim.`}</code></pre>
