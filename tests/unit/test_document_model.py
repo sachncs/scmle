@@ -1,11 +1,13 @@
 """Tests for the bounded document modelling lifecycle."""
 
+import json
 import math
 
 import pytest
 
 from scml.data.modalities.document import DocumentDataset
 from scml.data.modalities.document import DocumentSample
+from scml.models import documents
 from scml.models.documents import DocumentClassifier
 from scml.models.documents import DocumentModelConfig
 from scml.models.documents import DocumentMonitor
@@ -112,6 +114,49 @@ def test_document_classifier_atomic_trusted_package_round_trip(
         (EOFError, KeyError, ModuleNotFoundError, TypeError, ValueError)
     ):
         DocumentClassifier.load(path, trusted=True)
+
+
+def test_document_classifier_rejects_tampered_manifest(
+    tmp_path,
+    training_samples,
+):
+    """Manifest changes cannot silently alter the trusted package identity."""
+    classifier = make_classifier().fit(training_samples)
+    path = tmp_path / "document-model"
+    classifier.save(path)
+
+    manifest_path = path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["model_digest"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="model digest"):
+        DocumentClassifier.load(path, trusted=True)
+
+
+def test_document_classifier_cleans_failed_atomic_replacement(
+    monkeypatch,
+    tmp_path,
+    training_samples,
+):
+    """A failed package replacement leaves no misleading partial artifact."""
+    classifier = make_classifier().fit(training_samples)
+    target = tmp_path / "document-model"
+    real_replace = documents.os.replace
+
+    def fail_replace(source, destination):
+        """Inject a failure at the atomic directory replacement boundary."""
+        if destination == target:
+            raise OSError("injected replacement failure")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(documents.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="injected replacement failure"):
+        classifier.save(target)
+
+    assert not target.exists()
+    assert tuple(tmp_path.glob(".document-model.*")) == ()
 
 
 def test_document_monitor_detects_profile_shift(training_samples):
