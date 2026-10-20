@@ -17,13 +17,16 @@ import numpy as np
 
 from scml.contracts import errors
 
+PillowModule: Any = None
 try:
-    from PIL import Image as PillowImage
+    from PIL import Image as ImportedImage
 except ImportError:
-    PillowImage = None
+    pass
+else:
+    PillowModule = ImportedImage
 
 
-PILLOW_AVAILABLE = PillowImage is not None
+PILLOW_AVAILABLE = PillowModule is not None
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 DEFAULT_MAX_PIXELS = 25_000_000
 DEFAULT_PROFILE_SIZE = (16, 16)
@@ -88,9 +91,9 @@ def require_pillow(operation: str = "image data") -> Any:
     Raises:
         ImageDependencyError: If Pillow is not installed.
     """
-    if not PILLOW_AVAILABLE or PillowImage is None:
+    if not PILLOW_AVAILABLE or PillowModule is None:
         raise ImageDependencyError(operation)
-    return PillowImage
+    return PillowModule
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
@@ -209,9 +212,9 @@ class ImageSample:
                 details={"byte_size": len(raw), "max_bytes": max_bytes},
             )
         try:
-            with PillowImage.open(io.BytesIO(raw)) as opened:
+            with PillowModule.open(io.BytesIO(raw)) as opened:
                 opened.verify()
-            with PillowImage.open(io.BytesIO(raw)) as opened:
+            with PillowModule.open(io.BytesIO(raw)) as opened:
                 width, height = opened.size
                 if width <= 0 or height <= 0:
                     raise ImageValidationError(
