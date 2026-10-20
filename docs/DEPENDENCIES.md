@@ -24,6 +24,9 @@
 * **Upper bounds** are not pinned in the library; `uv.lock` records the
   combination that CI exercises.
 * **Audit:** `pip-audit` runs in CI; a vulnerable release fails the build.
-* **Licenses:** the project is Apache-2.0. All base dependencies are
-  permissively licensed (BSD, Apache-2.0, MIT); review before adding any
-  copyleft package to an extra.
+* **Licenses:** the project is Apache-2.0. CI traverses the installed base
+  runtime dependency closure and publishes `dependency-licenses.json`. A
+  missing license record or copyleft license (`GPL`, `LGPL`, `AGPL`, `SSPL`,
+  `BUSL`, or Elastic) fails the security job. Optional extras must be audited
+  in the environment where they are enabled before a release claim includes
+  them; review before adding any copyleft package to an extra.
