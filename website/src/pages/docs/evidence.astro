@@ -56,5 +56,14 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     </div>
   </div>
 
+  <h2>The run also carries a lineage graph</h2>
+  <p>Completed packages write <code>evidence_graph.json</code>. It is a deterministic, content-linked DAG rather than a second copy of the event log: each node names an identity and each edge says how one artifact produced or constrained the next.</p>
+  <pre><code>{`raw-source → snapshot → curation → split → model
+                                      ├→ evaluation → explanations
+                                      └→ bundle
+
+The graph digest changes when an identity or relationship changes.`}</code></pre>
+  <p>Use the graph to answer “which snapshot and curation decision produced this bundle?” Use the event log to answer “what happened, and in what order?” Both are necessary; neither is a release approval on its own.</p>
+
   <p class="meta">Evidence is a product surface, not an appendix · 0.1 beta</p>
 </DocsLayout>
