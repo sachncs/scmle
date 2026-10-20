@@ -102,6 +102,12 @@ acceptance run therefore provided `1982 passed, 103 skipped, 6 warnings`; the
 subsequent signed-governance, fault-harness, incremental-sink,
 directory-durability, and undefined-score slices are included in the new-head
 preflight above.
+The final preflight at pushed commit `020ec74` passed `1723 passed, 89
+skipped, 2 warnings` in 8 minutes 10 seconds; total coverage was 86%, the
+critical mutation gate killed `1253/1735` mutants (72%, above the 70% minimum),
+all four offline benchmarks had zero regressions, both distribution checks
+passed, and the Astro build produced 11 pages. The document baseline focused
+tests passed 4 tests in isolation and are included in this repository run.
 The latest non-tabular data-foundation slice at `b15c701` passed 8 focused
 media/geospatial tests, the existing modality and capability integration set
 passed 46 tests, and Ruff plus mypy passed for the new modules. The document
