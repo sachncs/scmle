@@ -724,6 +724,60 @@ class GraphAdapter(ModalityAdapter):
         """Return the node label."""
         return sample.label
 
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return one-hop graph context and node-feature evidence."""
+        if not isinstance(sample, graph.GraphNode):
+            raise TypeError("sample must be a GraphNode")
+        incident_edges = tuple(
+            edge
+            for edge in self.dataset.edges
+            if edge.source == sample.node_id or edge.target == sample.node_id
+        )
+        neighbors = sorted(
+            {
+                edge.target if edge.source == sample.node_id else edge.source
+                for edge in incident_edges
+            }
+        )
+        values = np.asarray(sample.features, dtype=np.float64)
+        decision = np.asarray(model.decision_function(values[None]))
+        feature_terms = sorted(
+            (
+                (name, float(values[index] * coefficients[index]))
+                for index, name in enumerate(feature_names)
+            ),
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:10]
+        return {
+            "status": "available",
+            "method": "one_hop_graph_context_and_node_feature_contribution",
+            "node_id": sample.node_id,
+            "neighbors": neighbors,
+            "edges": [
+                {
+                    "source": edge.source,
+                    "target": edge.target,
+                    "weight": edge.weight,
+                    "relation": edge.relation,
+                }
+                for edge in incident_edges
+            ],
+            "feature_terms": [[name, value] for name, value in feature_terms],
+            "decision_score": float(decision.reshape(-1)[0]),
+            "model_uses_topology": False,
+            "limitations": [
+                "The baseline uses declared node features, not graph topology.",
+                "One-hop context is evidence for review, not GNN attribution.",
+                "No causal or counterfactual graph claim is made.",
+            ],
+        }
+
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
         """Return graph identity and profile drift evidence."""
         if not isinstance(observed, GraphAdapter):

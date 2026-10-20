@@ -313,6 +313,50 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
     assert local["feature_space_only"] is True
 
 
+def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
+    """The graph adapter exposes bounded topology context explicitly."""
+    nodes = tuple(
+        graph.GraphNode(
+            node_id=f"node-{index}",
+            features=(float(index), float(index + 1)),
+            label="alpha" if index % 2 else "beta",
+        )
+        for index in range(12)
+    )
+    edges = tuple(
+        graph.GraphEdge(
+            source=f"node-{index}",
+            target=f"node-{index + 1}",
+            relation="next",
+        )
+        for index in range(11)
+    )
+    adapter = modality_lifecycle.GraphAdapter(
+        graph.GraphData(
+            nodes=nodes,
+            edges=edges,
+            feature_names=("first", "second"),
+        )
+    )
+    report = modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        tmp_path / "graph-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    local = evidence["modality_specific"]
+    assert local["status"] == "available"
+    assert (
+        local["method"] == "one_hop_graph_context_and_node_feature_contribution"
+    )
+    assert local["neighbors"]
+    assert local["edges"]
+    assert local["model_uses_topology"] is False
+
+
 def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     """The audio adapter exposes bounded frame-window score evidence."""
     report = modality_lifecycle.ModalityLifecycle().run(
