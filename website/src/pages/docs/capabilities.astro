@@ -10,6 +10,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <div class="callout"><p><strong>Read the label literally.</strong> <code>supported</code> means the complete lifecycle is proven for the declared scope. <code>experimental</code> means you can explore it with explicit opt-in. <code>extension-only</code> means the integration boundary exists, but this beta makes no lifecycle guarantee.</p></div>
 
   <h2>Current beta matrix</h2>
+  <p class="table-hint">On a narrow screen, scroll the matrix horizontally to read the full evidence boundary.</p>
   <div class="capability-table" role="region" aria-label="Capability support matrix" tabindex="0">
     <table>
       <thead><tr><th>Dataset family</th><th>Current label</th><th>What exists</th><th>What is missing</th></tr></thead>
@@ -53,6 +54,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
 <style>
   .capability-table { border: 1px solid #d9ddd2; margin: 28px 0 10px; overflow-x: auto; }
+  .table-hint { color: #7e8e21; font: 10px 'DM Mono', monospace !important; margin: 0 0 10px; text-transform: uppercase; }
   table { border-collapse: collapse; min-width: 720px; width: 100%; }
   th, td { border-bottom: 1px solid #d9ddd2; color: #52615a; font-size: 13px; line-height: 1.5; padding: 15px; text-align: left; vertical-align: top; }
   thead th { background: #eef0e7; color: #18231f; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; }
