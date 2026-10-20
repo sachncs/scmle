@@ -4,6 +4,7 @@ import hashlib
 import io
 import wave
 
+import numpy as np
 import pytest
 
 from scml.data.modalities import audio
@@ -279,6 +280,46 @@ def test_video_metadata_features_preserve_sample_order():
     assert prepared.sources[0].endswith("/one.mp4")
     assert prepared.sources[1].endswith("/two.mp4")
     assert prepared.to_numpy()[:, 1].tolist() == [2.0, 4.0]
+
+
+def test_video_frame_features_use_a_bounded_explicit_decoder():
+    """Temporal features record evenly sampled frame identities."""
+    metadata = video.VideoMetadata("mp4", 4, 4, 5, 2.0, "h264")
+    sample = video.VideoSample.from_bytes(
+        b"video-bytes", metadata, source="sample.mp4"
+    )
+    calls: list[int] = []
+
+    def decoder(payload: bytes, frame_index: int) -> np.ndarray:
+        assert payload == sample.encoded_bytes
+        calls.append(frame_index)
+        return np.full((2, 2, 3), frame_index, dtype=np.uint8)
+
+    prepared = video.VideoDataset((sample,)).prepare_frame_features(
+        decoder, max_frames=3, max_frame_pixels=32
+    )
+
+    assert calls == [0, 2, 4]
+    assert prepared.sampled_frame_indices == ((0, 2, 4),)
+    assert prepared.shape == (1, 15)
+    assert prepared.feature_names[0] == "frame[0].mean"
+    assert prepared.to_numpy()[0, 0] == 0.0
+    assert prepared.to_numpy()[0, 5] == 2.0
+    assert prepared.to_numpy()[0, 14] == 1.0
+
+
+def test_video_frame_features_reject_oversized_decoded_frames():
+    """A decoder cannot bypass the configured per-frame resource budget."""
+    metadata = video.VideoMetadata("mp4", 4, 4, 1, 1.0, "h264")
+    sample = video.VideoSample.from_bytes(
+        b"video-bytes", metadata, source="sample.mp4"
+    )
+
+    with pytest.raises(video.VideoValidationError, match="pixel limit"):
+        video.VideoDataset((sample,)).prepare_frame_features(
+            lambda payload, frame_index: np.zeros((8, 8), dtype=np.uint8),
+            max_frame_pixels=16,
+        )
 
 
 def test_video_split_keeps_explicit_subject_groups_together():

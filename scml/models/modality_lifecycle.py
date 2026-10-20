@@ -631,13 +631,24 @@ class AudioAdapter(ModalityAdapter):
 
 
 class VideoAdapter(ModalityAdapter):
-    """Adapter for caller-probed video metadata and bounded features."""
+    """Adapter for probed video metadata or an explicit frame decoder."""
 
     modality = modalities.Modality.VIDEO
 
-    def __init__(self, dataset: video.VideoDataset) -> None:
-        """Bind an immutable video dataset."""
+    def __init__(
+        self,
+        dataset: video.VideoDataset,
+        frame_decoder: video.VideoFrameDecoder | None = None,
+        max_frames: int = 8,
+        max_frame_pixels: int = 1_000_000,
+    ) -> None:
+        """Bind a dataset and an optional bounded caller-owned decoder."""
+        if max_frames < 1 or max_frame_pixels < 1:
+            raise ValueError("frame bounds must be positive")
         self.dataset = dataset
+        self.frame_decoder = frame_decoder
+        self.max_frames = max_frames
+        self.max_frame_pixels = max_frame_pixels
 
     @property
     def dataset_hash(self) -> str:
@@ -661,9 +672,17 @@ class VideoAdapter(ModalityAdapter):
         )
 
     def features(self, samples: Sequence[video.VideoSample]) -> FeatureBatch:
-        """Prepare explicit probed metadata features without hidden decoding."""
+        """Prepare metadata or explicitly decoded temporal features."""
         dataset = video.VideoDataset(tuple(samples))
-        prepared = dataset.prepare_metadata_features()
+        prepared = (
+            dataset.prepare_frame_features(
+                self.frame_decoder,
+                max_frames=self.max_frames,
+                max_frame_pixels=self.max_frame_pixels,
+            )
+            if self.frame_decoder is not None
+            else dataset.prepare_metadata_features()
+        )
         return FeatureBatch(
             tuple(prepared.sources), prepared.feature_names, prepared.to_numpy()
         )
@@ -694,12 +713,80 @@ class VideoAdapter(ModalityAdapter):
 
     def modality_notes(self) -> tuple[str, ...]:
         """Describe video lifecycle limits."""
+        representation = (
+            "The baseline uses caller-decoded, evenly sampled frame "
+            "statistics with a bounded pixel budget."
+            if self.frame_decoder is not None
+            else "The baseline uses probed container metadata and never "
+            "silently decodes frames."
+        )
         return (
-            "The baseline uses probed container metadata and never silently "
-            "decodes frames.",
+            representation,
             "Temporal, audio-video synchronization, and frame-local "
             "explanations require a decoder policy.",
         )
+
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return bounded temporal frame-statistics occlusion evidence."""
+        if not isinstance(sample, video.VideoSample):
+            raise TypeError("sample must be a VideoSample")
+        if self.frame_decoder is None:
+            return {
+                "status": "not_available",
+                "method": "temporal_frame_statistics_occlusion",
+                "reason": "an explicit frame decoder is required",
+            }
+        prepared = self.features((sample,))
+        values = prepared.values[0]
+        full_score = float(
+            np.asarray(model.decision_function(values[None])).reshape(-1)[0]
+        )
+        terms: list[dict[str, object]] = []
+        slot_width = 5
+        frame_indices = self.dataset.frame_indices_for(sample, self.max_frames)
+        for slot, frame_index in enumerate(frame_indices):
+            occluded = values.copy()
+            start = slot * slot_width
+            occluded[start : start + slot_width] = 0.0
+            score = float(
+                np.asarray(model.decision_function(occluded[None])).reshape(-1)[
+                    0
+                ]
+            )
+            terms.append(
+                {
+                    "frame_index": frame_index,
+                    "time_seconds": frame_index
+                    / sample.metadata.frames_per_second,
+                    "score_delta": score - full_score,
+                }
+            )
+        terms.sort(
+            key=lambda item: (
+                -abs(float(cast(float, item["score_delta"]))),
+                int(cast(int, item["frame_index"])),
+            )
+        )
+        return {
+            "status": "available",
+            "method": "temporal_frame_statistics_occlusion",
+            "terms": terms,
+            "sampled_frame_indices": list(frame_indices),
+            "feature_space_only": True,
+            "limitations": [
+                "Occlusion removes decoded frame statistics, not raw pixels or "
+                "motion vectors.",
+                "Audio-video synchronization and temporal event localization "
+                "are not established.",
+                "Score changes are associational and not causal.",
+            ],
+        }
 
 
 class GraphAdapter(ModalityAdapter):

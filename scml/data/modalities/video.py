@@ -71,11 +71,37 @@ class VideoProfile:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class VideoFeatures:
-    """Numeric metadata features without a hidden frame-decoding policy."""
+    """Numeric video features with explicit sampled-frame provenance."""
 
     sources: tuple[str, ...]
     feature_names: tuple[str, ...]
     values: tuple[tuple[float, ...], ...]
+    sampled_frame_indices: tuple[tuple[int, ...], ...] = ()
+
+    def __post_init__(self) -> None:
+        """Validate feature dimensions and sampled-frame metadata."""
+        if len(self.values) != len(self.sources):
+            raise ValueError("feature rows must match video sources")
+        if any(len(row) != len(self.feature_names) for row in self.values):
+            raise ValueError("feature columns must match feature names")
+        if not np.isfinite(np.asarray(self.values, dtype=np.float64)).all():
+            raise ValueError("video features must be finite")
+        sampled = tuple(
+            tuple(int(index) for index in indices)
+            for indices in self.sampled_frame_indices
+        )
+        if sampled and len(sampled) != len(self.sources):
+            raise ValueError("sampled frame metadata must match video sources")
+        if any(index < 0 for indices in sampled for index in indices):
+            raise ValueError("sampled frame indices must not be negative")
+        object.__setattr__(self, "sources", tuple(self.sources))
+        object.__setattr__(self, "feature_names", tuple(self.feature_names))
+        object.__setattr__(
+            self,
+            "values",
+            tuple(tuple(float(value) for value in row) for row in self.values),
+        )
+        object.__setattr__(self, "sampled_frame_indices", sampled)
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -110,6 +136,7 @@ class VideoSplit:
 
 
 VideoProbe = Callable[[bytes], VideoMetadata]
+VideoFrameDecoder = Callable[[bytes, int], np.ndarray]
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
@@ -292,6 +319,149 @@ class VideoDataset:
             ),
         )
 
+    def prepare_frame_features(
+        self,
+        decoder: VideoFrameDecoder,
+        max_frames: int = 8,
+        max_frame_pixels: int = 1_000_000,
+    ) -> VideoFeatures:
+        """Prepare bounded temporal statistics through an explicit decoder.
+
+        The core package does not select or import a video codec. The caller
+        supplies a decoder that accepts encoded bytes and an absolute frame
+        index. The contract samples evenly spaced frames, validates each
+        decoded array, and records the selected indices beside the features.
+        Each sampled frame contributes mean, standard deviation, minimum,
+        maximum, and an observation flag; absent frame slots are zero-filled.
+
+        Args:
+            decoder: Caller-owned frame decoder.
+            max_frames: Maximum number of frames decoded per sample.
+            max_frame_pixels: Maximum number of decoded array elements per
+                frame, including channels.
+
+        Returns:
+            Numeric frame-statistics features with temporal provenance.
+
+        Raises:
+            ValueError: If the bounds or decoder are invalid.
+            VideoValidationError: If a decoded frame violates its metadata
+                or cannot be converted to finite numeric values.
+        """
+        if not callable(decoder):
+            raise TypeError("decoder must be callable")
+        if max_frames < 1 or max_frame_pixels < 1:
+            raise ValueError("frame bounds must be positive")
+        slot_names = ("mean", "std", "min", "max", "observed")
+        feature_names = tuple(
+            f"frame[{slot}].{name}"
+            for slot in range(max_frames)
+            for name in slot_names
+        )
+        rows: list[tuple[float, ...]] = []
+        sampled_indices: list[tuple[int, ...]] = []
+        for sample in self.samples:
+            indices = self.frame_indices_for(sample, max_frames)
+            values = np.zeros(max_frames * len(slot_names), dtype=np.float64)
+            for slot, frame_index in enumerate(indices):
+                try:
+                    frame = np.asarray(
+                        decoder(sample.encoded_bytes, frame_index)
+                    )
+                except Exception as error:
+                    raise VideoValidationError(
+                        "video frame decoding failed",
+                        {
+                            "code": "frame_decode_failed",
+                            "source": sample.source,
+                            "frame_index": frame_index,
+                        },
+                    ) from error
+                if frame.ndim not in {2, 3}:
+                    raise VideoValidationError(
+                        "decoded video frames must be grayscale or "
+                        "channel-last",
+                        {
+                            "code": "invalid_frame_shape",
+                            "source": sample.source,
+                            "frame_index": frame_index,
+                            "shape": list(frame.shape),
+                        },
+                    )
+                if frame.size < 1 or frame.size > max_frame_pixels:
+                    raise VideoValidationError(
+                        "decoded video frame exceeds the configured pixel "
+                        "limit",
+                        {
+                            "code": "frame_pixel_limit",
+                            "source": sample.source,
+                            "frame_index": frame_index,
+                            "pixel_count": int(frame.size),
+                            "max_frame_pixels": max_frame_pixels,
+                        },
+                    )
+                if (
+                    frame.shape[0] > sample.metadata.height
+                    or frame.shape[1] > sample.metadata.width
+                ):
+                    raise VideoValidationError(
+                        "decoded video frame exceeds probed dimensions",
+                        {
+                            "code": "frame_dimension_mismatch",
+                            "source": sample.source,
+                            "frame_index": frame_index,
+                            "shape": list(frame.shape),
+                            "declared": [
+                                sample.metadata.height,
+                                sample.metadata.width,
+                            ],
+                        },
+                    )
+                numeric = np.asarray(frame, dtype=np.float64)
+                if not np.isfinite(numeric).all():
+                    raise VideoValidationError(
+                        "decoded video frame contains non-finite values",
+                        {
+                            "code": "non_finite_frame",
+                            "source": sample.source,
+                            "frame_index": frame_index,
+                        },
+                    )
+                start = slot * len(slot_names)
+                values[start : start + len(slot_names)] = (
+                    float(numeric.mean()),
+                    float(numeric.std()),
+                    float(np.min(numeric)),
+                    float(np.max(numeric)),
+                    1.0,
+                )
+            rows.append(tuple(float(value) for value in values))
+            sampled_indices.append(indices)
+        return VideoFeatures(
+            sources=tuple(sample.source for sample in self.samples),
+            feature_names=feature_names,
+            values=tuple(rows),
+            sampled_frame_indices=tuple(sampled_indices),
+        )
+
+    @staticmethod
+    def frame_indices_for(
+        sample: VideoSample, max_frames: int
+    ) -> tuple[int, ...]:
+        """Return deterministic, evenly spaced frame indices for a sample."""
+        if max_frames < 1:
+            raise ValueError("max_frames must be positive")
+        count = min(max_frames, sample.metadata.frame_count)
+        return tuple(
+            int(index)
+            for index in np.linspace(
+                0,
+                sample.metadata.frame_count - 1,
+                count,
+                dtype=int,
+            )
+        )
+
     def split(
         self,
         validation_fraction: float = 0.2,
@@ -449,6 +619,7 @@ class VideoDataset:
 __all__ = [
     "VideoDataset",
     "VideoFeatures",
+    "VideoFrameDecoder",
     "VideoMetadata",
     "VideoProbe",
     "VideoProfile",

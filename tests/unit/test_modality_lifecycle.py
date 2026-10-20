@@ -105,6 +105,34 @@ def video_adapter() -> modality_lifecycle.VideoAdapter:
     return modality_lifecycle.VideoAdapter(video.VideoDataset(samples))
 
 
+def decoded_video_adapter() -> modality_lifecycle.VideoAdapter:
+    """Build a video baseline with an explicit bounded frame decoder."""
+    samples = tuple(
+        video.VideoSample.from_bytes(
+            bytes([index + 1]) * 16,
+            video.VideoMetadata(
+                "fixture",
+                16 + index,
+                16,
+                8 + index,
+                8.0,
+                "fixture-codec",
+            ),
+            source=f"decoded-video-{index}.fixture",
+            label="alpha" if index % 2 else "beta",
+            group_id=f"camera-{index}",
+        )
+        for index in range(12)
+    )
+
+    def decoder(payload: bytes, frame_index: int) -> np.ndarray:
+        return np.full((2, 2, 3), payload[0] + frame_index, dtype=np.uint8)
+
+    return modality_lifecycle.VideoAdapter(
+        video.VideoDataset(samples), frame_decoder=decoder, max_frames=4
+    )
+
+
 def graph_adapter() -> modality_lifecycle.GraphAdapter:
     """Build an inductive labelled graph fixture."""
     nodes = tuple(
@@ -427,6 +455,25 @@ def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     assert local["window_count"] == len(local["windows"])
     assert local["window_count"] > 1
     assert local["feature_space_only"] is True
+
+
+def test_video_lifecycle_emits_temporal_frame_evidence(tmp_path: Path):
+    """A supplied decoder enables bounded frame-local score evidence."""
+    report = modality_lifecycle.ModalityLifecycle().run(
+        decoded_video_adapter(),
+        tmp_path / "video-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    local = evidence["modality_specific"]
+    assert local["status"] == "available"
+    assert local["method"] == "temporal_frame_statistics_occlusion"
+    assert local["feature_space_only"] is True
+    assert len(local["terms"]) == 4
+    assert len(local["sampled_frame_indices"]) == 4
 
 
 def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
