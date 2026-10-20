@@ -118,6 +118,12 @@ build produced 11 pages. The two warnings remain nondeterministic SQLite
 teardown warnings in curriculum run 3. The atomic model-package failure-path
 suite passed 6 focused tests; the latest label-state curation increment passed
 10 image tests and 24 graph/media tests.
+The current image-model preflight at pushed commit `632853d` passed `1736
+passed, 89 skipped, 2 warnings` in 8 minutes 12 seconds; total coverage was
+86%, the critical mutation gate killed `1254/1735` mutants (72%), all four
+offline benchmarks had zero regressions, both distribution checks passed, and
+the Astro build produced 11 pages. The two warnings remain the known
+curriculum SQLite teardown warnings.
 The latest non-tabular data-foundation slice at `b15c701` passed 8 focused
 media/geospatial tests, the existing modality and capability integration set
 passed 46 tests, and Ruff plus mypy passed for the new modules. The document
