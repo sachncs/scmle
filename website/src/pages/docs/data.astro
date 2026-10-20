@@ -13,6 +13,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>IN MEMORY</small><h3>Table interchange</h3><p>pandas DataFrame, PyArrow Table, Polars DataFrame or LazyFrame, and Arrow stream protocol objects.</p></div>
     <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
     <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. The sink exposes its crash window instead of claiming distributed exactly-once delivery. Broker and warehouse adapters remain extension work.</p></div>
+    <div class="doc-card"><small>RANGE READS</small><h3>Bounded object scans</h3><p>Range-backed JSONL and NDJSON sources read only the requested byte windows and resume from byte checkpoints. Record-size limits, invalid JSON, and in-object schema changes fail with structured errors; arbitrary binary formats still require an explicit adapter.</p></div>
     <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
   </div>
 
@@ -60,6 +61,6 @@ places = GeospatialDataset.from_geojson(
 
 # These objects can be profiled and curated. They do not silently opt into
 # tabular modelling or a production support claim.`}</code></pre>
-  <p>Image, document, graph, audio, video, and geospatial foundations remain experimental or extension-only until modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence is attached to the capability registry. The supported release boundary is the explicitly gated tabular library path.</p>
+  <p>Image, document, graph, audio, video, and geospatial foundations remain experimental or extension-only until modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence is attached to the capability registry. The supported release boundary is the explicitly gated tabular library path. The same rule applies to warehouse and broker transports: a transport seam is not a production guarantee.</p>
   <div class="callout"><p><strong>Data hand-off:</strong> once curation is complete, the run carries forward the normalized schema, profile findings, selected validation strategy, and the decisions made about labels and unavailable features. The model stage consumes that contract; it does not redefine it.</p></div>
 </DocsLayout>
