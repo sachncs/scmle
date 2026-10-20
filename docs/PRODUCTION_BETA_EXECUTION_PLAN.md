@@ -162,6 +162,11 @@ media/geospatial tests, Ruff, and mypy. It requires an explicit CRS-unit
 block size and keeps blocks together; centroid assignment for large or
 cross-block geometries remains a documented limitation and does not expand
 the supported modelling boundary.
+The geospatial feature-preparation slice at `c65b26d` passes 23 focused
+media/geospatial tests with Ruff and mypy clean. It requires CRS provenance
+and emits only bounds, centroids, and coordinate counts; it does not claim
+reprojection, spatial joins, rasterization, distances, or a supported model
+path.
 The duplicate-label curation slice at `df5739d` passes 47 focused document,
 image, and media tests with Ruff and mypy clean. Image, audio, and video now
 emit blocking risk findings when duplicate content carries incompatible known

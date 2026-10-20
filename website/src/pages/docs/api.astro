@@ -113,6 +113,10 @@ print(features.to_numpy())</code></pre>
 )
 print(split.block_ids())</code></pre>
   <p><code>block_size</code> is expressed in the declared CRS units. The implementation uses feature centroids and reports the assigned block IDs. Geometry that spans multiple blocks, spatial autocorrelation diagnostics, and map-based explanation remain domain-specific work.</p>
+  <pre><code>features = places.prepare_features()
+print(features.feature_names)
+print(features.to_numpy())</code></pre>
+  <p>Feature preparation refuses a missing CRS and preserves the source coordinate units. It does not reproject, join, rasterize, or calculate distances.</p>
 
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
