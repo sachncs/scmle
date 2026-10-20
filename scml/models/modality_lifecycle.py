@@ -863,6 +863,51 @@ class GeospatialAdapter(ModalityAdapter):
         """Return the feature label."""
         return sample.label
 
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return CRS-bound geometry and feature-contribution evidence."""
+        if not isinstance(sample, geospatial.GeoFeature):
+            raise TypeError("sample must be a GeoFeature")
+        feature_index = next(
+            index
+            for index, item in enumerate(self.dataset.features)
+            if item.feature_id == sample.feature_id
+        )
+        values = np.asarray(
+            self.dataset.prepare_features().to_numpy()[feature_index],
+            dtype=np.float64,
+        )
+        decision = np.asarray(model.decision_function(values[None]))
+        feature_terms = sorted(
+            (
+                (name, float(values[index] * coefficients[index]))
+                for index, name in enumerate(feature_names)
+            ),
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:10]
+        return {
+            "status": "available",
+            "method": "crs_bound_geometry_and_feature_contribution",
+            "feature_id": sample.feature_id,
+            "crs": self.dataset.crs,
+            "geometry_type": sample.geometry_type,
+            "bounds": list(sample.bounds),
+            "feature_terms": [[name, value] for name, value in feature_terms],
+            "decision_score": float(decision.reshape(-1)[0]),
+            "spatial_units_preserved": True,
+            "limitations": [
+                "Coordinates remain in the declared CRS and are not "
+                "reprojected.",
+                "The result is not a map attribution, spatial join, or causal "
+                "claim.",
+            ],
+        }
+
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
         """Return geospatial identity, CRS, and profile drift evidence."""
         if not isinstance(observed, GeospatialAdapter):

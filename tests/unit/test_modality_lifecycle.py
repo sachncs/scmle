@@ -357,6 +357,40 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
     assert local["model_uses_topology"] is False
 
 
+def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
+    """The geospatial adapter preserves CRS and geometry evidence."""
+    features = tuple(
+        geospatial.GeoFeature(
+            feature_id=f"feature-{index}",
+            geometry={
+                "type": "Point",
+                "coordinates": [float(index), float(index % 3)],
+            },
+            label="alpha" if index % 2 else "beta",
+        )
+        for index in range(12)
+    )
+    adapter = modality_lifecycle.GeospatialAdapter(
+        geospatial.GeospatialDataset(features=features, crs="EPSG:4326"),
+        block_size=1.0,
+    )
+    report = modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        tmp_path / "geospatial-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    local = evidence["modality_specific"]
+    assert local["status"] == "available"
+    assert local["method"] == "crs_bound_geometry_and_feature_contribution"
+    assert local["crs"] == "EPSG:4326"
+    assert local["spatial_units_preserved"] is True
+    assert local["feature_terms"]
+
+
 def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     """The audio adapter exposes bounded frame-window score evidence."""
     report = modality_lifecycle.ModalityLifecycle().run(
