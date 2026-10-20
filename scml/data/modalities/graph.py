@@ -804,7 +804,7 @@ def prepare_features(
             matrix = (matrix - means) / scales
         values = tuple(tuple(float(value) for value in row) for row in matrix)
     else:
-        values = tuple(() for _ in rows)
+        values = tuple(() for row in rows)
     return PreparedFeatures(
         node_ids=tuple(node.node_id for node in nodes),
         feature_names=tuple(names),

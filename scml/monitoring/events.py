@@ -121,7 +121,7 @@ class PredictionLog:
                 else [None] * len(frame)
             )
         except Exception as error:
-            self._log_observability(
+            self.log_observability(
                 bundle,
                 ids[0] if ids else uuid.uuid4().hex,
                 started,
@@ -142,7 +142,7 @@ class PredictionLog:
             ).encode("utf-8")
         input_fingerprint = hashlib.sha256(payload).hexdigest()
         for event_id in ids:
-            self._log_observability(
+            self.log_observability(
                 bundle,
                 event_id,
                 started,
@@ -166,7 +166,7 @@ class PredictionLog:
             logged.append(event)
         return logged
 
-    def _log_observability(
+    def log_observability(
         self,
         bundle: bundle_module.ModelBundle,
         request_id: str,
