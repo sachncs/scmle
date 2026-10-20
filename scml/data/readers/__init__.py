@@ -10,6 +10,7 @@ from scml.data.readers.incremental import CommittedIncrementalState
 from scml.data.readers.incremental import EventBatch
 from scml.data.readers.incremental import EventCheckpoint
 from scml.data.readers.incremental import EventCommitReceipt
+from scml.data.readers.incremental import EventStreamSource
 from scml.data.readers.incremental import IncrementalEvent
 from scml.data.readers.incremental import IncrementalEventSource
 from scml.data.readers.incremental import IncrementalIngestionLedger
@@ -26,6 +27,7 @@ __all__ = [
     "EventBatch",
     "EventCheckpoint",
     "EventCommitReceipt",
+    "EventStreamSource",
     "IncrementalEvent",
     "IncrementalEventSource",
     "IncrementalIngestionLedger",

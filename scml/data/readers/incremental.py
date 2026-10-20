@@ -22,6 +22,7 @@ import pathlib
 import tempfile
 from typing import Any
 from typing import Self
+from urllib.parse import urlsplit
 
 from scml import durability
 from scml.contracts import errors
@@ -245,24 +246,10 @@ class IncrementalEventSource(abc.ABC):
     def available_events(self) -> Iterable[IncrementalEvent]:
         """Return available events without changing committed state."""
 
-    def read_events(
-        self,
-        checkpoint: EventCheckpoint | None = None,
-        seen_event_ids: Iterable[str] = (),
-        limit: int = 1_000,
-    ) -> EventBatch:
-        """Select a bounded batch without committing its side effects.
-
-        Args:
-            checkpoint: Last committed sequence and watermark.
-            seen_event_ids: IDs already durably committed for deduplication.
-            limit: Maximum number of new events to return.
-
-        Raises:
-            IncrementalError: If a late event violates the policy.
-        """
-        if limit <= 0:
-            raise ValueError("limit must be positive")
+    def validate_checkpoint(
+        self, checkpoint: EventCheckpoint | None
+    ) -> EventCheckpoint:
+        """Bind a checkpoint to this source or fail before polling."""
         current = checkpoint or EventCheckpoint(self.source_identity)
         try:
             current.bind(self.source_identity)
@@ -273,14 +260,37 @@ class IncrementalEventSource(abc.ABC):
                 self.source_uri,
                 {"checkpoint": current.to_dict()},
             ) from error
+        return current
+
+    def select_events(
+        self,
+        records: Iterable[IncrementalEvent],
+        checkpoint: EventCheckpoint | None = None,
+        seen_event_ids: Iterable[str] = (),
+        limit: int = 1_000,
+    ) -> EventBatch:
+        """Select a bounded, deduplicated batch from transport records.
+
+        Args:
+            records: Events returned by a transport boundary.
+            checkpoint: Last committed sequence and watermark.
+            seen_event_ids: IDs already durably committed for deduplication.
+            limit: Maximum number of new events to return.
+
+        Raises:
+            IncrementalError: If a late event violates the policy.
+        """
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        current = self.validate_checkpoint(checkpoint)
         committed = frozenset(seen_event_ids)
-        records = tuple(self.available_events())
-        if any(not isinstance(event, IncrementalEvent) for event in records):
+        values = tuple(records)
+        if any(not isinstance(event, IncrementalEvent) for event in values):
             raise TypeError(
-                "available_events must yield IncrementalEvent values"
+                "transport records must yield IncrementalEvent values"
             )
         ordered = tuple(
-            sorted(records, key=lambda event: (event.sequence, event.event_id))
+            sorted(values, key=lambda event: (event.sequence, event.event_id))
         )
         duplicates: set[str] = set()
         late: set[str] = set()
@@ -338,6 +348,26 @@ class IncrementalEventSource(abc.ABC):
             has_more=len(eligible) > len(selected),
         )
 
+    def read_events(
+        self,
+        checkpoint: EventCheckpoint | None = None,
+        seen_event_ids: Iterable[str] = (),
+        limit: int = 1_000,
+    ) -> EventBatch:
+        """Select a bounded batch without committing its side effects.
+
+        Args:
+            checkpoint: Last committed sequence and watermark.
+            seen_event_ids: IDs already durably committed for deduplication.
+            limit: Maximum number of new events to return.
+
+        Raises:
+            IncrementalError: If a late event violates the policy.
+        """
+        return self.select_events(
+            self.available_events(), checkpoint, seen_event_ids, limit
+        )
+
 
 class SequenceEventSource(IncrementalEventSource):
     """Deterministic source adapter for tests and local replay fixtures."""
@@ -360,6 +390,99 @@ class SequenceEventSource(IncrementalEventSource):
     def available_events(self) -> Iterable[IncrementalEvent]:
         """Return the current event view supplied by the transport seam."""
         return self.event_factory()
+
+
+class EventStreamSource(IncrementalEventSource):
+    """Bounded event-stream adapter around a caller-owned poll boundary.
+
+    The callback is the only transport-specific surface. It receives the
+    canonical source URI, the committed checkpoint, and the requested limit;
+    it must return at most that many events without acknowledging them. The
+    durable ledger remains responsible for commit and downstream idempotency.
+    """
+
+    supported_schemes = (
+        "eventhubs",
+        "kafka",
+        "kinesis",
+        "nats",
+        "pulsar",
+        "pubsub",
+        "redpanda",
+    )
+
+    def __init__(
+        self,
+        source_uri: str,
+        event_reader: Callable[
+            [str, EventCheckpoint, int], Iterable[IncrementalEvent]
+        ],
+        late_data_policy: LateDataPolicy = LateDataPolicy.REJECT,
+        retry_budget: connectors.RetryBudget | None = None,
+    ) -> None:
+        """Initialize a source around an injected broker poll callback.
+
+        Args:
+            source_uri: Broker URI identifying topic, stream, or subscription.
+            event_reader: Callback receiving URI, checkpoint, and batch limit.
+            late_data_policy: Policy applied to events behind the checkpoint.
+            retry_budget: Retry policy for transport polling.
+        """
+        value = source_uri.strip()
+        scheme = urlsplit(value).scheme.lower()
+        if scheme not in self.supported_schemes:
+            raise connectors.UnsupportedUriSchemeError(
+                value, scheme, self.supported_schemes
+            )
+        if not callable(event_reader):
+            raise TypeError("event_reader must be callable")
+        super().__init__(value, late_data_policy)
+        self.event_reader = event_reader
+        self.retry_budget = retry_budget or connectors.RetryBudget()
+
+    def available_events(self) -> Iterable[IncrementalEvent]:
+        """Reject unbounded polling without a checkpoint and limit."""
+        raise IncrementalError(
+            "bounded_poll_required",
+            "event streams require read_events with a checkpoint and limit",
+            self.source_uri,
+            {},
+        )
+
+    def poll_events(
+        self, checkpoint: EventCheckpoint, limit: int
+    ) -> tuple[IncrementalEvent, ...]:
+        """Poll a bounded transport batch with retry evidence."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        records = connectors.execute_with_retries(
+            lambda: tuple(
+                self.event_reader(self.source_uri, checkpoint, limit)
+            ),
+            "poll_events",
+            self.source_uri,
+            self.retry_budget,
+        )
+        if len(records) > limit:
+            raise IncrementalError(
+                "batch_limit_exceeded",
+                "event reader returned more events than requested",
+                self.source_uri,
+                {"limit": limit, "received": len(records)},
+            )
+        return records
+
+    def read_events(
+        self,
+        checkpoint: EventCheckpoint | None = None,
+        seen_event_ids: Iterable[str] = (),
+        limit: int = 1_000,
+    ) -> EventBatch:
+        """Poll and select one bounded event batch without acknowledging it."""
+        current = self.validate_checkpoint(checkpoint)
+        return self.select_events(
+            self.poll_events(current, limit), current, seen_event_ids, limit
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

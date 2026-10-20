@@ -89,6 +89,74 @@ def test_late_data_policy_is_explicit():
         ).read_events(checkpoint)
 
 
+def test_event_stream_source_polls_bounded_batches_with_retry_and_checkpoint():
+    """Broker callbacks receive bounded, resumable transport positions."""
+    calls = []
+    records = {
+        0: (event("a", 1, 0), event("b", 2, 1)),
+        2: (event("c", 3, 2),),
+    }
+
+    def read(uri, checkpoint, limit):
+        calls.append((uri, checkpoint.sequence, limit))
+        if len(calls) == 1:
+            raise OSError("broker temporarily unavailable")
+        return records.get(checkpoint.sequence, ())
+
+    source = incremental.EventStreamSource(
+        "kafka://cluster/orders",
+        read,
+        retry_budget=incremental.connectors.RetryBudget(max_retries=1),
+    )
+
+    first = source.read_events(limit=2)
+    second = source.read_events(first.next_checkpoint, first.event_ids, limit=2)
+
+    assert first.event_ids == ("a", "b")
+    assert second.event_ids == ("c",)
+    assert calls == [
+        (source.source_uri, 0, 2),
+        (source.source_uri, 0, 2),
+        (source.source_uri, 2, 2),
+    ]
+
+
+def test_event_stream_source_fails_closed_for_unbounded_or_oversized_reads():
+    """Transport callbacks cannot bypass the bounded event contract."""
+    source = incremental.EventStreamSource(
+        "pulsar://cluster/topic",
+        lambda uri, checkpoint, limit: (
+            event("a", 1, 0),
+            event("b", 2, 1),
+        ),
+    )
+
+    with pytest.raises(
+        incremental.IncrementalError, match="require read_events"
+    ):
+        source.available_events()
+    with pytest.raises(incremental.IncrementalError, match="more events"):
+        source.read_events(limit=1)
+
+
+def test_event_stream_source_rejects_wrong_checkpoint_before_polling():
+    """A broker callback is never called with another source checkpoint."""
+    calls = []
+
+    def read(uri, checkpoint, limit):
+        calls.append((uri, checkpoint, limit))
+        return ()
+
+    source = incremental.EventStreamSource("nats://cluster/topic", read)
+    other = incremental.SequenceEventSource(
+        "memory://other", ()
+    ).source_identity
+
+    with pytest.raises(incremental.IncrementalError, match="different source"):
+        source.read_events(incremental.EventCheckpoint(other))
+    assert calls == []
+
+
 def test_incremental_state_rejects_cross_source_reads_and_commits(tmp_path):
     first = incremental.SequenceEventSource(
         "memory://first", [event("a", 1, 0)]
