@@ -212,7 +212,7 @@ def test_contracts_are_immutable_and_profile_is_json_native():
     """Frozen contracts prevent mutation and profiles remain serializable."""
     sample = document.DocumentSample("immutable", "content")
     with pytest.raises(dataclasses.FrozenInstanceError):
-        setattr(sample, "content", "changed")
+        sample.content = "changed"  # type: ignore[misc]
 
     profile = sample.profile()
     assert json.loads(json.dumps(dataclasses.asdict(profile))) == {
