@@ -47,6 +47,8 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     assert (result.run_dir / "provenance.json").exists()
     assert result.evaluation["sbom"]["bomFormat"] == "CycloneDX"
     assert (result.run_dir / "sbom.json").exists()
+    assert result.evaluation["release_attestation"]["schema_version"] == 1
+    assert (result.run_dir / "release_attestation.json").exists()
     assert result.evaluation["reliability_plan"]["release_blocked"] is True
     assert (result.run_dir / "fault_injection_plan.json").exists()
     source_registry = json.loads(

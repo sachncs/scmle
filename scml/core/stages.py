@@ -70,6 +70,7 @@ from scml.experimentation import trials
 from scml.experimentation import tuning
 from scml.explainability import suite as explanation_suite
 from scml.features import feature_graph
+from scml.governance import attestation
 from scml.governance import ledger
 from scml.governance import model_card
 from scml.governance import sbom
@@ -2319,6 +2320,11 @@ class PackageStage(Stage):
         evaluation["provenance"] = self.provenance_record(
             context, store, bundle
         )
+        release_attestation = attestation.ReleaseAttestation.from_records(
+            evaluation["provenance"], evaluation["sbom"]
+        ).to_dict()
+        evaluation["release_attestation"] = release_attestation
+        store.write_json("release_attestation.json", release_attestation)
         evaluation["explanation_evidence"] = self.explanation_evidence(
             context, store
         )
@@ -2382,6 +2388,7 @@ class PackageStage(Stage):
             "fault_injection_plan.json",
             "provenance.json",
             "sbom.json",
+            "release_attestation.json",
             "evaluation.json",
             f"model/{bundle_module.MANIFEST_FILE}",
             f"model/{bundle_module.MODEL_FILE}",
