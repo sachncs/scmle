@@ -29,6 +29,7 @@ from scml.contracts import evaluation as evaluation_contracts
 from scml.contracts import evidence as evidence_contracts
 from scml.contracts import experiments
 from scml.contracts import explanations
+from scml.contracts import reliability
 from scml.contracts import tasks
 from scml.core import compiler
 from scml.core import context as context_module
@@ -1826,6 +1827,25 @@ class PackageStage(Stage):
         store.write_json("sbom.json", record)
         return record
 
+    def reliability_plan_record(
+        self,
+        context: context_module.RunContext,
+        store: Any,
+    ) -> dict[str, Any]:
+        """Persist the complete, unexecuted production fault plan."""
+        del context
+        record = (
+            reliability.FaultInjectionPlanRegistry.production_beta().to_dict()
+        )
+        record["execution_status"] = "planned"
+        record["release_blocked"] = True
+        record["limitation"] = (
+            "The plan declares required fault evidence; it does not claim "
+            "that the scenarios have executed."
+        )
+        store.write_json("fault_injection_plan.json", record)
+        return record
+
     def describe(self, context: context_module.RunContext) -> str:
         """Names the stage."""
         return "write bundle and reports"
@@ -2233,6 +2253,9 @@ class PackageStage(Stage):
             context.spec.validation.seed,
         )
         bundle.save(store.path("model"))
+        evaluation["reliability_plan"] = self.reliability_plan_record(
+            context, store
+        )
         evaluation["sbom"] = self.sbom_record(context, store, bundle)
         evaluation["provenance"] = self.provenance_record(
             context, store, bundle
@@ -2295,6 +2318,7 @@ class PackageStage(Stage):
             "config.json",
             "dataset_manifest.json",
             "dataset_card.json",
+            "fault_injection_plan.json",
             "provenance.json",
             "sbom.json",
             "evaluation.json",
