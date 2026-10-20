@@ -17,6 +17,7 @@ import random
 import re
 from typing import Any
 
+from scml.contracts import data as data_contracts
 from scml.contracts import errors
 
 
@@ -109,6 +110,83 @@ class DocumentProfile:
             raise ValueError("profile counts must not be negative")
         if not self.language.strip():
             raise ValueError("language must not be empty")
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DocumentCurationReport:
+    """Reviewable data-understanding evidence for a document dataset.
+
+    The report describes the observed corpus before any modelling decision.
+    It intentionally keeps findings separate from model quality: a document
+    corpus can be useful for retrieval or unsupervised work even when labels
+    are absent, while conflicting labels on identical content remain a risk
+    that must be reviewed.
+    """
+
+    dataset_hash: str
+    sample_count: int
+    document_count: int
+    profiles: tuple[DocumentProfile, ...]
+    duplicate_groups: tuple[tuple[str, ...], ...]
+    language_counts: dict[str, int]
+    format_counts: dict[str, int]
+    label_counts: dict[str, int]
+    quality_findings: tuple[data_contracts.CurationFinding, ...]
+    risk_findings: tuple[data_contracts.CurationFinding, ...]
+    max_characters: int
+    max_tokens: int
+
+    @property
+    def unresolved_blocking_findings(
+        self,
+    ) -> tuple[data_contracts.CurationFinding, ...]:
+        """Return blocking findings without a safe review disposition."""
+        safe_dispositions = {
+            data_contracts.FindingDisposition.RESOLVED,
+            data_contracts.FindingDisposition.WAIVED,
+            data_contracts.FindingDisposition.FALSE_POSITIVE,
+        }
+        return tuple(
+            finding
+            for finding in (*self.quality_findings, *self.risk_findings)
+            if finding.blocking and finding.disposition not in safe_dispositions
+        )
+
+    @property
+    def release_ready(self) -> bool:
+        """Return whether no unresolved finding blocks the next lifecycle."""
+        return not self.unresolved_blocking_findings
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native evidence for a dataset card or run artifact."""
+        return {
+            "schema_version": 1,
+            "dataset_hash": self.dataset_hash,
+            "sample_count": self.sample_count,
+            "document_count": self.document_count,
+            "profiles": [
+                dataclasses.asdict(profile) for profile in self.profiles
+            ],
+            "duplicate_groups": [
+                list(group) for group in self.duplicate_groups
+            ],
+            "language_counts": dict(self.language_counts),
+            "format_counts": dict(self.format_counts),
+            "label_counts": dict(self.label_counts),
+            "quality_findings": [
+                finding.to_dict() for finding in self.quality_findings
+            ],
+            "risk_findings": [
+                finding.to_dict() for finding in self.risk_findings
+            ],
+            "max_characters": self.max_characters,
+            "max_tokens": self.max_tokens,
+            "release_ready": self.release_ready,
+            "unresolved_blocking_findings": [
+                finding.finding_id
+                for finding in self.unresolved_blocking_findings
+            ],
+        }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -263,6 +341,165 @@ class DocumentDataset:
         return tuple(
             sample.profile(max_characters, max_tokens)
             for sample in self.samples
+        )
+
+    def curate(
+        self,
+        max_characters: int = 100_000,
+        max_tokens: int = 20_000,
+    ) -> DocumentCurationReport:
+        """Build bounded, reviewable curation evidence for the corpus.
+
+        Duplicate content is reported separately from conflicting labels. A
+        duplicate is often expected for replicated sources, while identical
+        content with different labels is a blocking risk for supervised work.
+        The method does not silently remove samples or infer a modelling task.
+        """
+        if max_characters < 1 or max_tokens < 1:
+            raise ValueError("curation bounds must be positive")
+
+        profiles = self.profile(max_characters, max_tokens)
+        duplicate_groups = self.duplicate_groups()
+        language_counts: dict[str, int] = defaultdict(int)
+        format_counts: dict[str, int] = defaultdict(int)
+        label_counts: dict[str, int] = defaultdict(int)
+        sample_by_id = {sample.document_id: sample for sample in self.samples}
+
+        def label_key(label: str | int | float | bool | None) -> str:
+            """Return a stable human-readable label bucket."""
+            if label is None:
+                return "unlabeled"
+            return f"{type(label).__name__}:{label}"
+
+        for sample, profile in zip(self.samples, profiles, strict=True):
+            language_counts[profile.language] += 1
+            format_counts[sample.format.value] += 1
+            label_counts[label_key(sample.label)] += 1
+
+        quality_findings: list[data_contracts.CurationFinding] = []
+        risk_findings: list[data_contracts.CurationFinding] = []
+
+        def create_finding(
+            finding_id: str,
+            severity: data_contracts.FindingSeverity,
+            scope: dict[str, Any],
+            evidence: dict[str, Any],
+            remediation: str,
+            blocking: bool,
+        ) -> data_contracts.CurationFinding:
+            """Create a document-specific finding with one stable rule."""
+            return data_contracts.CurationFinding(
+                finding_id=finding_id,
+                rule_version="document-curation.v1",
+                severity=severity,
+                confidence=1.0,
+                affected_scope=scope,
+                evidence=evidence,
+                remediation=remediation,
+                owner="data-curation",
+                reviewer=None,
+                disposition=data_contracts.FindingDisposition.OPEN,
+                blocking=blocking,
+            )
+
+        if duplicate_groups:
+            quality_findings.append(
+                create_finding(
+                    "quality.duplicate-document-content",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"groups": [list(group) for group in duplicate_groups]},
+                    {"group_count": len(duplicate_groups)},
+                    "Confirm duplicates are intentional or deduplicate "
+                    "before training.",
+                    False,
+                )
+            )
+
+        truncated_ids = tuple(
+            profile.document_id
+            for profile in profiles
+            if profile.truncated
+        )
+        if truncated_ids:
+            quality_findings.append(
+                create_finding(
+                    "quality.profile-truncated",
+                    data_contracts.FindingSeverity.INFO,
+                    {"document_ids": list(truncated_ids)},
+                    {
+                        "max_characters": max_characters,
+                        "max_tokens": max_tokens,
+                    },
+                    "Increase profiling bounds or run a full-content audit "
+                    "before release.",
+                    False,
+                )
+            )
+
+        unknown_ids = tuple(
+            profile.document_id
+            for profile in profiles
+            if profile.language == "unknown"
+        )
+        if unknown_ids:
+            quality_findings.append(
+                create_finding(
+                    "quality.unknown-language",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"document_ids": list(unknown_ids)},
+                    {"count": len(unknown_ids)},
+                    "Confirm language coverage and configure an appropriate "
+                    "tokenizer.",
+                    False,
+                )
+            )
+
+        for group in duplicate_groups:
+            labels = {
+                label_key(sample_by_id[document_id].label)
+                for document_id in group
+            }
+            if len(labels) > 1:
+                risk_findings.append(
+                    create_finding(
+                        "risk.conflicting-duplicate-labels",
+                        data_contracts.FindingSeverity.ERROR,
+                        {"document_ids": list(group)},
+                        {"labels": sorted(labels)},
+                        "Resolve the label conflict or explicitly exclude "
+                        "the affected content.",
+                        True,
+                    )
+                )
+        mixed_label_state = (
+            "unlabeled" in label_counts and len(label_counts) > 1
+        )
+        if mixed_label_state:
+            risk_findings.append(
+                create_finding(
+                    "risk.mixed-label-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": self.content_hash},
+                    {"label_counts": dict(label_counts)},
+                    "Declare whether unlabeled samples are valid for the "
+                    "intended task.",
+                    False,
+                )
+            )
+
+        return DocumentCurationReport(
+            dataset_hash=self.content_hash,
+            sample_count=len(self.samples),
+            document_count=len({sample.document_id for sample in self.samples}),
+            profiles=profiles,
+            duplicate_groups=duplicate_groups,
+            language_counts=dict(sorted(language_counts.items())),
+            format_counts=dict(sorted(format_counts.items())),
+            label_counts=dict(sorted(label_counts.items())),
+            quality_findings=tuple(quality_findings),
+            risk_findings=tuple(risk_findings),
+            max_characters=max_characters,
+            max_tokens=max_tokens,
         )
 
     def split(

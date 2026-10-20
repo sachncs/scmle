@@ -222,3 +222,56 @@ def test_contracts_are_immutable_and_profile_is_json_native():
         "language": "en",
         "truncated": False,
     }
+
+
+def test_curation_reports_composition_duplicates_and_bounded_profiles(
+    duplicate_dataset,
+):
+    """Curation makes document understanding reviewable before modelling."""
+    report = duplicate_dataset.curate(max_characters=5, max_tokens=1)
+
+    assert report.dataset_hash == duplicate_dataset.content_hash
+    assert report.sample_count == 3
+    assert report.document_count == 3
+    assert report.duplicate_groups == (("first", "second"),)
+    assert report.language_counts == {"en": 3}
+    assert report.format_counts == {"text": 3}
+    assert report.label_counts == {"unlabeled": 3}
+    assert [finding.finding_id for finding in report.quality_findings] == [
+        "quality.duplicate-document-content",
+        "quality.profile-truncated",
+    ]
+    assert report.risk_findings == ()
+    assert json.loads(json.dumps(report.to_dict())) == report.to_dict()
+
+
+def test_curation_blocks_identical_content_with_conflicting_labels():
+    """Duplicate content with different labels is a supervised-data risk."""
+    dataset = document.DocumentDataset(
+        (
+            document.DocumentSample("positive", "same text", label="yes"),
+            document.DocumentSample("negative", "same text", label="no"),
+            document.DocumentSample("unlabeled", "other text"),
+        )
+    )
+
+    report = dataset.curate()
+
+    assert report.release_ready is False
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.conflicting-duplicate-labels",
+        "risk.mixed-label-state",
+    ]
+    assert report.unresolved_blocking_findings[0].affected_scope == {
+        "document_ids": ["negative", "positive"]
+    }
+
+
+def test_curation_bounds_must_be_positive():
+    """Curation cannot silently turn off the bounded inspection contract."""
+    dataset = document.DocumentDataset(
+        (document.DocumentSample("doc", "content"),)
+    )
+
+    with pytest.raises(ValueError, match="curation bounds"):
+        dataset.curate(max_characters=0)
