@@ -52,7 +52,7 @@ means the code path exists; it does not mean the capability is supported.
 | Image, document, and graph data foundations | Implemented / Tested | Validation, profiling, splitting, and feature-preparation slices exist with focused tests. They are not supported capabilities because modelling, evaluation, packaging, inference, monitoring, and full recovery evidence are not wired. |
 | Release evaluation | Implemented / Tested | Explicit success criteria produce a task-aware policy, release findings, artifact digests, and a persisted evidence index. Runs without thresholds are explicitly `policy_not_declared` and blocked from release. |
 | Dataset and model cards | Implemented / Tested | Curated runs persist machine-generated cards tied to dataset snapshots, model-manifest digests, evaluation context, intended use, limitations, privacy, and review status. Independent review and promotion approval remain incomplete. |
-| Portable model explanation evidence | Implemented / Tested | Existing permutation-importance and partial-dependence reports are packaged with identity, privacy, limitation, and source-report links. Stability/fidelity gates and modality-specific explanations remain incomplete. |
+| Portable model explanation evidence | Implemented / Tested | Existing permutation-importance and partial-dependence reports are packaged with identity, privacy, limitation, and source-report links. Generic explanation quality measures now provide explicit top-k stability and normalized fidelity scores, and release policies can block below-threshold evidence. Modality-specific explanations and production-scale repeated explanation runs remain incomplete. |
 | Redacted inference observability | Implemented / Tested | `PredictionLog` emits a redacted sidecar, policy evaluation checks required signals, freshness, future timestamps, and upper-bound threshold breaches, and retention enforcement atomically removes expired sidecar events without touching the raw prediction log. Serving defaults, alert routing, and incident workflows remain incomplete. |
 | Fault injection and recovery | Partial | The complete release-blocking fault plan is persisted with each packaged run, and atomic-write cleanup/reliability contracts exist. Worker-loss, disk-full, dependency, signature, connector, fuzzing, mutation, and clean-clone execution evidence is not complete. |
 | Security, provenance, SBOM, and release CI | Partial | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, CI SBOM artifact publication, and immutable CI action pins exist. Signed SBOM/provenance attestation and clean-release rehearsal remain incomplete. |
@@ -336,7 +336,9 @@ Implement and test:
 - explanations are reproducibly tied to the exact model, input, data, and
   method;
 - all known limitations are machine-readable and visible in the model card;
-- explanation stability and fidelity thresholds are declared per method;
+- generic explanation stability and fidelity thresholds are declared per
+  method and enforced by the release evaluator; modality-specific repeated
+  perturbation and independent-ground-truth suites remain required;
 - no causal claim is emitted by an associational method.
 
 ### Phase 5 — Engineering and production reliability
