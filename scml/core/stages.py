@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 from sklearn import base
 
+import scml
 from scml.api import results
 from scml.artifacts import bundle as bundle_module
 from scml.artifacts import report
@@ -27,6 +28,7 @@ from scml.contracts import errors
 from scml.contracts import evaluation as evaluation_contracts
 from scml.contracts import evidence as evidence_contracts
 from scml.contracts import experiments
+from scml.contracts import explanations
 from scml.contracts import tasks
 from scml.core import compiler
 from scml.core import context as context_module
@@ -64,6 +66,7 @@ from scml.experimentation import ensemble_search
 from scml.experimentation import strategy_search
 from scml.experimentation import trials
 from scml.experimentation import tuning
+from scml.explainability import suite as explanation_suite
 from scml.features import feature_graph
 from scml.governance import ledger
 from scml.governance import vault
@@ -1657,6 +1660,86 @@ class PackageStage(Stage):
         store.write_json("release_evidence.json", evidence_index.to_dict())
         store.write_json("release_evaluation.json", outcome.to_dict())
 
+    def explanation_evidence(
+        self,
+        context: context_module.RunContext,
+        store: Any,
+    ) -> dict[str, dict[str, Any]]:
+        """Persist portable evidence for explanations produced by the run."""
+        manifest = require(context.manifest, "manifest")
+        split = require(context.split, "split")
+        model_manifest = store.path(f"model/{bundle_module.MANIFEST_FILE}")
+        bundle_digest = bundle_module.file_sha256(model_manifest)
+        snapshot = explanations.DatasetSnapshot(
+            identifier=manifest.dataset_id,
+            version=manifest.snapshot_id or manifest.data_hash,
+            digest=manifest.data_hash,
+        )
+        feature_graph = explanations.FeatureGraphReference(
+            version=context.spec.feature_graph.version,
+            fingerprint=context.spec.feature_graph.fingerprint(),
+        )
+        diagnostics_by_name = {
+            diagnostic.name: diagnostic
+            for diagnostic in explanation_suite.default_suite()
+        }
+        evidence: dict[str, dict[str, Any]] = {}
+        for name, diagnostic in diagnostics_by_name.items():
+            result = context.diagnostics.get(name)
+            if result is None or "error" in result:
+                continue
+            report_path = store.path(f"diagnostics/{name}.json")
+            if not report_path.exists():
+                continue
+            limitations = [
+                "associational evidence is not causal evidence",
+                "stability and fidelity require separate validation",
+            ]
+            if result.get("truncated"):
+                limitations.append("feature coverage was truncated by budget")
+            record = explanation_suite.ExplanationEvidenceBuilder().build(
+                diagnostic,
+                result,
+                model_fingerprint=bundle_digest,
+                bundle_digest=bundle_digest,
+                input_fingerprint=split.manifest.fingerprint,
+                dataset_snapshot=snapshot,
+                feature_graph=feature_graph,
+                method_parameters={"seed": context.spec.validation.seed},
+                timestamp=datetime.datetime.now(datetime.UTC),
+                software_version=scml.__version__,
+                uncertainty={
+                    "status": "not_estimated",
+                    "reason": "explanation evidence does not estimate "
+                    "prediction uncertainty",
+                },
+                stability={
+                    "status": "not_estimated",
+                    "reason": "repeatability must be evaluated separately",
+                },
+                limitations=tuple(limitations),
+                causal_warning=(
+                    "This explanation describes model associations; it does "
+                    "not establish that changing a feature causes an outcome."
+                ),
+                privacy_decision=explanations.PrivacyDecision(
+                    decision="allowed",
+                    reason=(
+                        "diagnostic output contains aggregate feature evidence"
+                    ),
+                ),
+                evidence_links=(
+                    explanations.EvidenceLink(
+                        relation="diagnostic-report",
+                        uri=f"diagnostics/{name}.json",
+                        digest=bundle_module.file_sha256(report_path),
+                    ),
+                ),
+            )
+            evidence[name] = record.to_dict()
+            store.write_json(f"explanations/{name}.json", record.to_dict())
+        return evidence
+
     def describe(self, context: context_module.RunContext) -> str:
         """Names the stage."""
         return "write bundle and reports"
@@ -2064,6 +2147,9 @@ class PackageStage(Stage):
             context.spec.validation.seed,
         )
         bundle.save(store.path("model"))
+        evaluation["explanation_evidence"] = self.explanation_evidence(
+            context, store
+        )
         evaluation["artifact_verification"] = bundle.verify_round_trip(
             store.path("model"), split.dev_features.head(PARITY_ROWS)
         )
