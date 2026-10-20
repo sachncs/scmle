@@ -243,6 +243,10 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         observation["sample_count"] > 0
         for observation in performance_evidence["observations"]
     )
+    assert all(
+        observation["peak_memory_gb"] > 0
+        for observation in performance_evidence["observations"]
+    )
     assert performance_evidence["budget"] is None
     assert performance_evidence["result"] is None
     assert report.recovery["tampered_manifest_rejected"] is True
@@ -270,7 +274,8 @@ def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
     """A lifecycle budget is emitted as evidence and fails closed."""
     adapter = document_adapter()
     budget = performance.PerformanceBudget(
-        dict.fromkeys(performance.PerformanceOperation, 30.0)
+        dict.fromkeys(performance.PerformanceOperation, 30.0),
+        max_peak_memory_gb=1024.0,
     )
     report = modality_lifecycle.ModalityLifecycle().run(
         adapter,

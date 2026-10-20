@@ -37,6 +37,7 @@ from scml.contracts import data as data_contracts
 from scml.contracts import events
 from scml.contracts import modalities
 from scml.contracts import performance
+from scml.core import limits
 from scml.data.modalities import audio
 from scml.data.modalities import curation
 from scml.data.modalities import document
@@ -920,7 +921,7 @@ class LifecycleContext:
             performance.PerformanceObservation(
                 operation=operation,
                 elapsed_seconds=elapsed_seconds,
-                peak_memory_gb=None,
+                peak_memory_gb=limits.peak_memory_gb(),
                 sample_count=sample_count,
                 machine=platform.platform(),
                 observed_at=events.utc_timestamp(),
