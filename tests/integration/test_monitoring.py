@@ -1,11 +1,14 @@
 """Drift, delayed labels, retraining advice and champion-challenger."""
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
 import support
 
 from scml.contracts import errors
+from scml.contracts import observability
 from scml.monitoring import champion
 from scml.monitoring import events
 from scml.monitoring import monitor as monitor_module
@@ -111,6 +114,37 @@ def test_prediction_log_joins_late_outcomes(trained, tmp_path):
         features, outcomes
     )
     assert report.performance.labeled_rows == 40
+
+
+def test_prediction_log_can_emit_redacted_observability_sidecar(
+    trained, tmp_path
+):
+    policy = observability.ObservabilityPolicy(
+        retention_days=30,
+        required_signals=(
+            observability.SignalKind.LATENCY,
+            observability.SignalKind.ERROR,
+        ),
+        redacted_fields=("features",),
+        alert_thresholds={},
+    )
+    log = events.PredictionLog(
+        tmp_path / "log" / "events.jsonl",
+        observability_policy=policy,
+        run_id="serve-1",
+    )
+    frame = make_frame(3, 7).drop(columns="y")
+    log.log_predictions(trained.bundle, frame, event_ids=["a", "b", "c"])
+
+    records = [
+        json.loads(line)
+        for line in log.observability_path.read_text().splitlines()
+    ]
+    assert [record["request_id"] for record in records] == ["a", "b", "c"]
+    assert all(record["run_id"] == "serve-1" for record in records)
+    assert all(record["outcome"] == "success" for record in records)
+    assert all(record["redacted_fields"] == ["features"] for record in records)
+    assert all("features" not in record for record in records)
 
 
 def test_empty_log_is_empty(tmp_path):

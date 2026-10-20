@@ -6,8 +6,10 @@ rather than silently dropped, so performance estimates know their coverage.
 """
 
 import dataclasses
+import hashlib
 import json
 import pathlib
+import time
 from typing import Any
 import uuid
 
@@ -16,6 +18,7 @@ import pandas as pd
 
 from scml.artifacts import bundle as bundle_module
 from scml.contracts import events
+from scml.contracts import observability
 
 
 @dataclasses.dataclass(frozen=True)
@@ -57,13 +60,30 @@ class OutcomeEvent:
 class PredictionLog:
     """Append-only JSONL log of predictions and outcomes."""
 
-    def __init__(self, path: str | pathlib.Path) -> None:
+    def __init__(
+        self,
+        path: str | pathlib.Path,
+        *,
+        observability_policy: observability.ObservabilityPolicy | None = None,
+        run_id: str | None = None,
+    ) -> None:
         """Initializes the log.
 
         Args:
             path: JSONL file; created on first write.
+            observability_policy: Optional policy enabling a redacted
+                observability sidecar beside the prediction log.
+            run_id: Stable serving-run identity used in observability events;
+                the model version is used when omitted.
         """
         self.path = pathlib.Path(path)
+        self.observability_policy = observability_policy
+        self.run_id = run_id
+
+    @property
+    def observability_path(self) -> pathlib.Path:
+        """Path of the redacted sidecar, next to the prediction log."""
+        return self.path.with_suffix(".observability.jsonl")
 
     def append(self, kind: str, record: dict[str, Any]) -> None:
         """Appends one typed record."""
@@ -88,14 +108,47 @@ class PredictionLog:
         Returns:
             The logged events, in row order.
         """
-        frame = bundle.prepare_frame(data)
-        predictions = bundle.predict(data)
-        probabilities: list[float | None] = (
-            [float(p) for p in bundle.predict_proba(data)[:, 1]]
-            if bundle.schema.task == "binary_classification"
-            else [None] * len(frame)
-        )
-        ids = event_ids or [uuid.uuid4().hex for row in range(len(frame))]
+        started = time.perf_counter()
+        if event_ids is not None and len(event_ids) != len(data):
+            raise ValueError("event_ids must have one id per input row")
+        ids = event_ids or [uuid.uuid4().hex for row in range(len(data))]
+        try:
+            frame = bundle.prepare_frame(data)
+            predictions = bundle.predict(data)
+            probabilities: list[float | None] = (
+                [float(p) for p in bundle.predict_proba(data)[:, 1]]
+                if bundle.schema.task == "binary_classification"
+                else [None] * len(frame)
+            )
+        except Exception as error:
+            self._log_observability(
+                bundle,
+                ids[0] if ids else uuid.uuid4().hex,
+                started,
+                "error",
+                input_fingerprint=None,
+                error_category=type(error).__name__,
+            )
+            raise
+        try:
+            payload = (
+                pd.util.hash_pandas_object(frame, index=False)
+                .to_numpy(dtype="uint64")
+                .tobytes()
+            )
+        except (TypeError, ValueError):
+            payload = frame.to_json(
+                orient="split", date_format="iso", default_handler=str
+            ).encode("utf-8")
+        input_fingerprint = hashlib.sha256(payload).hexdigest()
+        for event_id in ids:
+            self._log_observability(
+                bundle,
+                event_id,
+                started,
+                "success",
+                input_fingerprint=input_fingerprint,
+            )
         logged = []
         for row, event_id in enumerate(ids):
             event = PredictionEvent(
@@ -112,6 +165,45 @@ class PredictionLog:
             self.append("prediction", dataclasses.asdict(event))
             logged.append(event)
         return logged
+
+    def _log_observability(
+        self,
+        bundle: bundle_module.ModelBundle,
+        request_id: str,
+        started: float,
+        outcome: str,
+        *,
+        input_fingerprint: str | None,
+        error_category: str | None = None,
+    ) -> None:
+        """Writes one redacted inference event when telemetry is enabled."""
+        if self.observability_policy is None:
+            return
+        model_fingerprint = bundle.info.files.get(
+            bundle_module.MODEL_FILE, bundle.info.model_version
+        )
+        event = observability.InferenceEvent(
+            request_id=request_id,
+            run_id=self.run_id or bundle.info.model_version,
+            model_fingerprint=model_fingerprint,
+            outcome=outcome,
+            latency_ms=(time.perf_counter() - started) * 1000.0,
+            timestamp=events.utc_timestamp(),
+            input_fingerprint=input_fingerprint,
+            error_category=error_category,
+            redacted_fields=self.observability_policy.redacted_fields,
+        )
+        path = self.observability_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {"type": "inference", **event.to_dict()},
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
+            )
 
     def record_outcomes(self, outcomes: dict[str, Any]) -> list[OutcomeEvent]:
         """Logs outcomes that became known.
