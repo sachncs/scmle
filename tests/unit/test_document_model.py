@@ -75,7 +75,7 @@ def test_document_classifier_fits_evaluates_and_explains(
     assert ablation.method == "term_ablation"
     assert ablation.input_hash == evaluation_samples[0].content_hash
     assert len(ablation.terms) == 3
-    assert all(math.isfinite(value) for _, value in ablation.terms)
+    assert all(math.isfinite(value) and term for term, value in ablation.terms)
     assert classifier.model_digest == classifier.model_digest
 
 

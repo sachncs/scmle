@@ -97,7 +97,7 @@ def test_image_classifier_fits_evaluates_and_explains(
     assert occlusion.input_hash == evaluation_data.samples[0].content_hash
     assert len(occlusion.terms) == 3
     assert all("region[" in term[0] for term in occlusion.terms)
-    assert all(math.isfinite(value) for _, value in occlusion.terms)
+    assert all(math.isfinite(value) and term for term, value in occlusion.terms)
 
 
 @PILLOW_SKIP

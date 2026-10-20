@@ -420,7 +420,8 @@ class DocumentClassifier:
         )[:max_terms]
         original_score = self.predicted_class_score(matrix)
         ablations: list[tuple[str, float]] = []
-        for term, _ in candidates:
+        for candidate in candidates:
+            term = candidate[0]
             pattern = rf"(?iu)\b{re.escape(term)}\b"
             ablated_content = re.sub(pattern, " ", sample.content)
             ablated_matrix = vectorizer.transform([ablated_content or " "])
