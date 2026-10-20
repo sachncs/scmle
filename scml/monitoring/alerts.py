@@ -213,7 +213,8 @@ class WebhookAlertSink(AlertSink):
             )
             try:
                 with url_request.urlopen(
-                    request, timeout=self.timeout_seconds
+                    request,
+                    timeout=self.timeout_seconds,  # nosec B310 - URL scheme is validated in the constructor.
                 ) as response:
                     status = int(response.status)
                     if 200 <= status < 300:
