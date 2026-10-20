@@ -13,6 +13,8 @@ import pathlib
 from typing import Self
 import wave
 
+import numpy as np
+
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
@@ -75,6 +77,26 @@ class AudioProfile:
     byte_size: int
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class AudioFeatures:
+    """Bounded numeric signal features with their observation boundary."""
+
+    sources: tuple[str, ...]
+    feature_names: tuple[str, ...]
+    values: tuple[tuple[float, ...], ...]
+    frames_observed: tuple[int, ...]
+    frames_truncated: tuple[bool, ...]
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """Return the number of samples and features."""
+        return (len(self.sources), len(self.feature_names))
+
+    def to_numpy(self) -> np.ndarray:
+        """Return a writable copy of the feature matrix."""
+        return np.asarray(self.values, dtype=np.float64).copy()
+
+
 AudioProbe = Callable[[bytes], AudioMetadata]
 
 
@@ -104,6 +126,88 @@ def wav_metadata(encoded_bytes: bytes) -> AudioMetadata:
             "audio payload is not a readable WAV file",
             {"code": "invalid_wav"},
         ) from error
+
+
+def wav_signal_features(
+    encoded_bytes: bytes,
+    max_frames: int,
+) -> tuple[tuple[float, ...], int]:
+    """Extract bounded, normalized PCM statistics from one WAV payload.
+
+    The returned statistics describe the observed prefix when ``max_frames``
+    is smaller than the clip. Callers receive the observed frame count so the
+    truncation boundary cannot be mistaken for a full-clip measurement.
+    """
+    try:
+        with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
+            sample_width = opened.getsampwidth()
+            channels = opened.getnchannels()
+            sample_rate = opened.getframerate()
+            requested_frames = min(opened.getnframes(), max_frames)
+            raw = opened.readframes(requested_frames)
+    except (EOFError, wave.Error) as error:
+        raise AudioValidationError(
+            "audio payload is not a readable WAV file",
+            {"code": "invalid_wav"},
+        ) from error
+
+    frame_width = sample_width * channels
+    complete_bytes = len(raw) - (len(raw) % frame_width)
+    raw = raw[:complete_bytes]
+    if not raw:
+        raise AudioValidationError(
+            "WAV payload contains no complete audio frames",
+            {"code": "empty_audio_frames"},
+        )
+    frame_count = len(raw) // frame_width
+    if sample_width == 1:
+        samples = np.frombuffer(raw, dtype=np.uint8).astype(np.float64)
+        samples = (samples - 128.0) / 128.0
+        scale = 1.0
+    elif sample_width in (2, 4):
+        dtype = np.dtype("<i2" if sample_width == 2 else "<i4")
+        samples = np.frombuffer(raw, dtype=dtype).astype(np.float64)
+        scale = float(2 ** (sample_width * 8 - 1))
+        samples /= scale
+    elif sample_width == 3:
+        packed = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
+        unsigned = (
+            packed[:, 0].astype(np.int64)
+            | (packed[:, 1].astype(np.int64) << 8)
+            | (packed[:, 2].astype(np.int64) << 16)
+        )
+        signed = unsigned - ((unsigned & 0x800000) << 1)
+        samples = signed.astype(np.float64)
+        scale = float(2**23)
+        samples /= scale
+    else:
+        raise AudioValidationError(
+            "WAV sample width is unsupported",
+            {"code": "unsupported_sample_width", "sample_width": sample_width},
+        )
+
+    matrix = samples.reshape(-1, channels)
+    absolute = np.abs(matrix)
+    frame_values = np.asarray(
+        [
+            float(matrix.mean()),
+            float(absolute.mean()),
+            float(np.sqrt(np.mean(np.square(matrix)))),
+            float(absolute.max()),
+            float(np.mean(absolute >= 0.999)),
+            float(np.mean(absolute <= 0.01)),
+            float(frame_count / sample_rate),
+            float(frame_count),
+            float(scale),
+        ],
+        dtype=np.float64,
+    )
+    if not np.isfinite(frame_values).all():
+        raise AudioValidationError(
+            "WAV signal features must be finite",
+            {"code": "non_finite_features"},
+        )
+    return tuple(float(value) for value in frame_values), frame_count
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -229,6 +333,62 @@ class AudioDataset:
         """Return profiles in source order for deterministic curation."""
         return tuple(sample.profile() for sample in self.samples)
 
+    def prepare_features(self, max_frames: int = 100_000) -> AudioFeatures:
+        """Prepare bounded PCM and metadata features for an audio baseline.
+
+        Core decoding is intentionally limited to WAV. Samples ingested with
+        a caller-owned probe remain valid data contracts, but require a codec
+        adapter before signal features can be prepared. The feature rows use
+        only an observed prefix and record whether that prefix was truncated.
+        """
+        if max_frames < 1:
+            raise ValueError("max_frames must be at least one")
+        feature_names = (
+            "mean_amplitude",
+            "mean_absolute_amplitude",
+            "rms_amplitude",
+            "peak_amplitude",
+            "clipping_fraction",
+            "silence_fraction",
+            "observed_duration_seconds",
+            "frames_observed",
+            "pcm_scale",
+            "duration_seconds",
+            "sample_rate",
+            "channels",
+            "sample_width",
+        )
+        rows = []
+        frames_observed = []
+        frames_truncated = []
+        for sample in self.samples:
+            if sample.metadata.format.lower() != "wav":
+                raise AudioDependencyError(
+                    "audio signal features require a WAV decoder for "
+                    f"'{sample.source}'"
+                )
+            signal_values, observed = wav_signal_features(
+                sample.encoded_bytes, max_frames
+            )
+            rows.append(
+                (
+                    *signal_values,
+                    sample.metadata.duration_seconds,
+                    float(sample.metadata.sample_rate),
+                    float(sample.metadata.channels),
+                    float(sample.metadata.sample_width or 0),
+                )
+            )
+            frames_observed.append(observed)
+            frames_truncated.append(observed < sample.metadata.frame_count)
+        return AudioFeatures(
+            sources=tuple(sample.source for sample in self.samples),
+            feature_names=feature_names,
+            values=tuple(rows),
+            frames_observed=tuple(frames_observed),
+            frames_truncated=tuple(frames_truncated),
+        )
+
     def curate(self) -> ModalityCurationReport:
         """Build reviewable metadata and compatibility findings."""
         profiles = self.profiles()
@@ -303,6 +463,7 @@ class AudioDataset:
 __all__ = [
     "AudioDataset",
     "AudioDependencyError",
+    "AudioFeatures",
     "AudioMetadata",
     "AudioProbe",
     "AudioProfile",
@@ -310,4 +471,5 @@ __all__ = [
     "AudioValidationError",
     "canonical_source",
     "wav_metadata",
+    "wav_signal_features",
 ]

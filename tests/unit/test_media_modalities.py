@@ -27,6 +27,11 @@ def failing_probe(payload: bytes) -> audio.AudioMetadata:
     raise RuntimeError(payload)
 
 
+def flac_probe(payload: bytes) -> audio.AudioMetadata:
+    """Represent metadata returned by an explicit non-WAV codec adapter."""
+    return audio.AudioMetadata("flac", 16_000, 1, len(payload))
+
+
 def test_audio_wav_ingestion_preserves_identity_and_profile():
     """WAV metadata and bytes are bound to the same immutable sample."""
     sample = audio.AudioSample.from_bytes(wav_bytes(), source="clip.wav")
@@ -71,6 +76,36 @@ def test_audio_curation_reports_metadata_and_label_composition():
     assert report.profile["sample_rates"] == [8]
     assert report.profile["label_counts"] == {"unlabeled": 1}
     assert report.release_ready
+
+
+def test_audio_feature_preparation_is_bounded_and_explainable():
+    """Signal features expose the observed prefix and deterministic names."""
+    sample = audio.AudioSample.from_bytes(
+        wav_bytes(frame_count=8), source="one.wav"
+    )
+
+    prepared = audio.AudioDataset((sample,)).prepare_features(max_frames=3)
+
+    assert prepared.shape == (1, 13)
+    assert prepared.frames_observed == (3,)
+    assert prepared.frames_truncated == (True,)
+    assert prepared.feature_names[:4] == (
+        "mean_amplitude",
+        "mean_absolute_amplitude",
+        "rms_amplitude",
+        "peak_amplitude",
+    )
+    assert prepared.to_numpy()[0, 2] == 0.0
+
+
+def test_audio_feature_preparation_requires_a_wav_decoder():
+    """Explicit probe metadata does not silently imply signal decoding."""
+    sample = audio.AudioSample.from_bytes(
+        b"opaque-audio", source="clip.flac", probe=flac_probe
+    )
+
+    with pytest.raises(audio.AudioDependencyError, match="WAV decoder"):
+        audio.AudioDataset((sample,)).prepare_features()
 
 
 def test_video_metadata_is_explicit_and_profiled():
