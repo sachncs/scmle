@@ -44,6 +44,22 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 }`}</code></pre>
 
   <h2>Data boundaries beyond tables</h2>
-  <p>Image, document, and graph readers have validation and profiling foundations, but the 0.1 beta does not claim their complete modelling, evaluation, packaging, inference, monitoring, and recovery lifecycle. Treat them as experimental or extension-only until the capability registry says otherwise. The supported release boundary is the explicitly gated tabular library path.</p>
+  <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation and dataset cards. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
+  <div class="doc-cards">
+    <div class="doc-card"><small>AUDIO</small><h3>Probe before decode</h3><p>WAV metadata is read with the standard library. Other containers require an explicit caller-owned probe, so codec versions and optional dependencies remain visible in the run evidence.</p></div>
+    <div class="doc-card"><small>VIDEO</small><h3>Metadata is evidence</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. The core package does not guess from a filename or import a codec stack implicitly.</p></div>
+    <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Raster samples require dimensions, bands, dtype, CRS, and transform metadata.</p></div>
+  </div>
+  <pre><code>{`from scml.data.modalities import AudioSample, GeospatialDataset, VideoSample
+
+audio = AudioSample.from_bytes(wav_bytes, source="clip.wav")
+video = VideoSample.from_bytes(encoded, video_metadata, source="clip.mp4")
+places = GeospatialDataset.from_geojson(
+    feature_collection, source="places.geojson", crs="EPSG:4326"
+)
+
+# These objects can be profiled and curated. They do not silently opt into
+# tabular modelling or a production support claim.`}</code></pre>
+  <p>Image, document, graph, audio, video, and geospatial foundations remain experimental or extension-only until modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence is attached to the capability registry. The supported release boundary is the explicitly gated tabular library path.</p>
   <div class="callout"><p><strong>Data hand-off:</strong> once curation is complete, the run carries forward the normalized schema, profile findings, selected validation strategy, and the decisions made about labels and unavailable features. The model stage consumes that contract; it does not redefine it.</p></div>
 </DocsLayout>
