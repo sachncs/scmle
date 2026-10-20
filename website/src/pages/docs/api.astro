@@ -37,6 +37,28 @@ predictions = predict(loaded, new_rows)</code></pre>
   <h2>What is safe to depend on</h2>
   <p>The supported top-level exports are <code>MLProject</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
 
+  <h2>Experimental document baseline</h2>
+  <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global and local term evidence, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
+  <pre><code>from scml.data.modalities import DocumentDataset, DocumentSample
+from scml.models.documents import DocumentClassifier, DocumentModelConfig
+
+train = DocumentDataset((
+    DocumentSample("a", "red apple orchard", label="fruit"),
+    DocumentSample("b", "blue ocean water", label="water"),
+    DocumentSample("c", "red orange harvest", label="fruit"),
+    DocumentSample("d", "blue lake sailing", label="water"),
+    DocumentSample("e", "sweet apple fruit", label="fruit"),
+    DocumentSample("f", "deep ocean boat", label="water"),
+    DocumentSample("g", "orchard orange crop", label="fruit"),
+    DocumentSample("h", "lake water vessel", label="water"),
+))
+split = train.split(validation_fraction=0, test_fraction=0.25, seed=7)
+model = DocumentClassifier(DocumentModelConfig()).fit(split.train)
+evaluation = model.evaluate(split.test)
+artifact = model.save("artifacts/document-model")
+restored = DocumentClassifier.load(artifact.path, trusted=True)</code></pre>
+  <p>This is not part of the supported <code>MLProject</code> path. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it. OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary.</p>
+
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
   <div class="callout"><p><strong>Bundle compatibility:</strong> format 2 authenticates <code>schema.json</code>. Legacy format 1 bundles are refused by default and should only be migrated from a source you explicitly trust.</p></div>
