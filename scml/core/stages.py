@@ -1760,6 +1760,50 @@ class PackageStage(Stage):
             store.write_json(f"explanations/{name}.json", record.to_dict())
         return evidence
 
+    def provenance_record(
+        self,
+        context: context_module.RunContext,
+        store: Any,
+        bundle: bundle_module.ModelBundle,
+    ) -> dict[str, Any]:
+        """Build a content-linked provenance record for the packaged run."""
+        manifest = require(context.manifest, "manifest")
+        model_manifest = store.path(f"model/{bundle_module.MANIFEST_FILE}")
+        record = {
+            "schema_version": 1,
+            "run_id": store.run_id,
+            "software_version": scml.__version__,
+            "config_hash": context.spec.config_hash(),
+            "dataset": {
+                "snapshot_id": manifest.snapshot_id or manifest.data_hash,
+                "dataset_id": manifest.dataset_id,
+                "data_hash": manifest.data_hash,
+                "raw_source_hash": manifest.lineage.object_hashes.get(
+                    "raw-source"
+                ),
+            },
+            "model": {
+                "manifest_path": f"model/{bundle_module.MANIFEST_FILE}",
+                "manifest_sha256": bundle_module.file_sha256(model_manifest),
+                "model_name": bundle.info.model_name,
+                "model_version": bundle.info.model_version,
+            },
+            "environment": {
+                "python": bundle.info.python,
+                "platform": bundle.info.platform,
+                "libraries": bundle.info.libraries,
+                "lock": bundle.info.environment_lock(),
+            },
+            "signature": {
+                "path": f"model/{bundle_module.SIGNATURE_FILE}",
+                "present": store.path(
+                    f"model/{bundle_module.SIGNATURE_FILE}"
+                ).exists(),
+            },
+        }
+        store.write_json("provenance.json", record)
+        return record
+
     def describe(self, context: context_module.RunContext) -> str:
         """Names the stage."""
         return "write bundle and reports"
@@ -2167,6 +2211,9 @@ class PackageStage(Stage):
             context.spec.validation.seed,
         )
         bundle.save(store.path("model"))
+        evaluation["provenance"] = self.provenance_record(
+            context, store, bundle
+        )
         evaluation["explanation_evidence"] = self.explanation_evidence(
             context, store
         )
@@ -2224,6 +2271,7 @@ class PackageStage(Stage):
         names = (
             "config.json",
             "dataset_manifest.json",
+            "provenance.json",
             "evaluation.json",
             f"model/{bundle_module.MANIFEST_FILE}",
             f"model/{bundle_module.MODEL_FILE}",
