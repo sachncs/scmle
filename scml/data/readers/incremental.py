@@ -586,9 +586,7 @@ class IncrementalIngestionLedger:
                     max(timestamps).isoformat(),
                 )
                 self.write_atomically(
-                    CommittedIncrementalState(
-                        checkpoint, tuple(sorted(seen))
-                    )
+                    CommittedIncrementalState(checkpoint, tuple(sorted(seen)))
                 )
             else:
                 checkpoint = current.checkpoint

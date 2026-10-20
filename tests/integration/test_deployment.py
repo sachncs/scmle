@@ -345,7 +345,10 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
     record = store.register("m", bundle_dir, signing_key=key)
     assert record.signed is True
     store.promote(
-        "m", record.version, approval=approval_for(record), signing_key=APPROVAL_KEY
+        "m",
+        record.version,
+        approval=approval_for(record),
+        signing_key=APPROVAL_KEY,
     )
     features = make_frame(10, 3).drop(columns="y")
     loaded = store.load("m", signing_key=key)

@@ -43,9 +43,10 @@ def test_harness_persists_digest_bound_evidence_and_passes_scenario(tmp_path):
     for evidence in plan.evidence:
         path = tmp_path / evidence.artifact_uri.rsplit("/", 1)[-1]
         assert path.exists()
-        assert evidence.artifact_digest == hashlib.sha256(
-            path.read_bytes()
-        ).hexdigest()
+        assert (
+            evidence.artifact_digest
+            == hashlib.sha256(path.read_bytes()).hexdigest()
+        )
 
 
 def test_harness_keeps_partial_executor_output_inconclusive(tmp_path):
@@ -58,8 +59,7 @@ def test_harness_keeps_partial_executor_output_inconclusive(tmp_path):
     )
 
     assert (
-        plan.verification_status
-        is reliability.VerificationStatus.INCONCLUSIVE
+        plan.verification_status is reliability.VerificationStatus.INCONCLUSIVE
     )
 
 

@@ -24,9 +24,10 @@ class Alert:
     def __post_init__(self) -> None:
         """Validate the alert envelope before delivery."""
         for name in ("alert_id", "metric", "unit", "observed_at", "route"):
-            if not isinstance(getattr(self, name), str) or not getattr(
-                self, name
-            ).strip():
+            if (
+                not isinstance(getattr(self, name), str)
+                or not getattr(self, name).strip()
+            ):
                 raise ValueError(f"{name} must not be empty")
 
     def to_dict(self) -> dict[str, Any]:

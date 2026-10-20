@@ -653,9 +653,7 @@ class ExplanationPolicy:
                     "explanation.fidelity_threshold must be between 0 and 1"
                 )
             if not self.require_fidelity:
-                raise ValueError(
-                    "fidelity_threshold requires require_fidelity"
-                )
+                raise ValueError("fidelity_threshold requires require_fidelity")
         if self.require_stability and self.stability_threshold is None:
             raise ValueError("require_stability needs stability_threshold")
         if self.require_fidelity and self.fidelity_threshold is None:

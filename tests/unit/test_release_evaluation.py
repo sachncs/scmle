@@ -255,9 +255,7 @@ def test_explanation_quality_threshold_is_a_blocking_release_gate():
     )
     reports = {
         "metric_uncertainty": {"estimate": 0.81},
-        "permutation_importance": {
-            "quality": {"stability_score": 0.75}
-        },
+        "permutation_importance": {"quality": {"stability_score": 0.75}},
     }
 
     result = release.evaluate_release(
@@ -348,10 +346,13 @@ def test_release_reliability_gate_requires_explicit_completed_plan():
         make_index(make_policy()),
     )
 
-    assert release.apply_reliability_gate(
-        outcome,
-        {"execution_status": "passed", "release_blocked": False},
-    ) == outcome
+    assert (
+        release.apply_reliability_gate(
+            outcome,
+            {"execution_status": "passed", "release_blocked": False},
+        )
+        == outcome
+    )
 
 
 def test_results_are_immutable_and_findings_are_sorted():

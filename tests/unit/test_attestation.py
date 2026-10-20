@@ -38,9 +38,7 @@ def test_attestation_binds_model_provenance_and_sbom_digests():
 def test_attestation_fails_after_a_source_record_changes():
     provenance, sbom = records()
     record = attestation.ReleaseAttestation.from_records(provenance, sbom)
-    changed = dataclasses.replace(
-        record, signature_present=False
-    )
+    changed = dataclasses.replace(record, signature_present=False)
 
     assert not changed.verify(provenance, sbom)
     sbom["components"] = []

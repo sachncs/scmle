@@ -171,9 +171,7 @@ if outcome.comparison and outcome.comparison.decision == "promote":
         evidence=("evidence/challenger-review.json",),
         approved_at="2026-10-20T00:00:00+00:00",
     ).sign(approval_key)
-    manager.promote_challenger(
-        candidate_approval, signing_key=approval_key
-    )
+    manager.promote_challenger(candidate_approval, signing_key=approval_key)
 ```
 
 Inference is strict about column names unless you state a policy:

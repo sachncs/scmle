@@ -35,9 +35,7 @@ class FaultArtifact:
             raise ValueError("evidence_type must be a path-safe name")
         if not isinstance(self.content, bytes) or not self.content:
             raise ValueError("content must be non-empty bytes")
-        if not isinstance(
-            self.observed_outcome, reliability.EvidenceOutcome
-        ):
+        if not isinstance(self.observed_outcome, reliability.EvidenceOutcome):
             raise TypeError("observed_outcome must be EvidenceOutcome")
         if not self.observation.strip():
             raise ValueError("observation must not be empty")
@@ -146,4 +144,3 @@ class FaultInjectionHarness:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary_name)
             raise
-

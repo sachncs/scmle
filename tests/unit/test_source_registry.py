@@ -102,7 +102,9 @@ def test_registry_rejects_conflicting_repeated_snapshot():
         registry_value.register(conflict)
 
 
-def test_durable_registry_store_compares_snapshots_across_process_runs(tmp_path):
+def test_durable_registry_store_compares_snapshots_across_process_runs(
+    tmp_path,
+):
     store = registry.SourceRegistryStore(tmp_path / "sources.json")
     first = make_snapshot()
     additive = make_snapshot(
@@ -116,7 +118,9 @@ def test_durable_registry_store_compares_snapshots_across_process_runs(tmp_path)
     assert store.register(additive).status == "additive"
 
     restored = registry.SourceRegistryStore(store.path).load()
-    assert [item.snapshot_id for item in restored.snapshots[first.source_id]] == [
+    assert [
+        item.snapshot_id for item in restored.snapshots[first.source_id]
+    ] == [
         "snapshot-1",
         "snapshot-2",
     ]

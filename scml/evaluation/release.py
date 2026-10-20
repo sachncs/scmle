@@ -226,9 +226,7 @@ def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
     return tuple(sorted(values))
 
 
-def explanation_quality_value(
-    report: Any, field_name: str
-) -> float | None:
+def explanation_quality_value(report: Any, field_name: str) -> float | None:
     """Return one finite quality score from an explanation report."""
     if not isinstance(report, Mapping):
         return None

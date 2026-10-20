@@ -214,7 +214,10 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     record = store.register("m", good.save(tmp_path / "e"), trusted=True)
     store.promote(
-        "m", record.version, approval=approval_for(record), signing_key=APPROVAL_KEY
+        "m",
+        record.version,
+        approval=approval_for(record),
+        signing_key=APPROVAL_KEY,
     )
 
     assert "no previous" in manager.check_rollback(traffic(300), "y").reason
@@ -224,6 +227,9 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
         trusted=True,
     )
     store.promote(
-        "m", second.version, approval=approval_for(second), signing_key=APPROVAL_KEY
+        "m",
+        second.version,
+        approval=approval_for(second),
+        signing_key=APPROVAL_KEY,
     )
     assert "fewer than" in manager.check_rollback(traffic(20), "y").reason
