@@ -200,6 +200,10 @@ class PerformanceBaseline:
         expected = {
             observation.operation for observation in runs[0].observations
         }
+        expected_sample_counts = {
+            observation.operation: observation.sample_count
+            for observation in runs[0].observations
+        }
         if not expected:
             raise ValueError(
                 "performance baseline operations must not be empty"
@@ -212,6 +216,21 @@ class PerformanceBaseline:
             raise ValueError(
                 "performance baseline runs must share the same operations"
             )
+        for run in runs[1:]:
+            for operation in expected:
+                observation = run.observation(operation)
+                if observation is None:
+                    raise ValueError(
+                        "performance baseline runs must share the same "
+                        "operations"
+                    )
+                if (
+                    observation.sample_count
+                    != expected_sample_counts[operation]
+                ):
+                    raise ValueError(
+                        "performance baseline runs must share sample counts"
+                    )
         environments = {
             (observation.machine, observation.software)
             for run in runs
@@ -266,6 +285,34 @@ class PerformanceBaseline:
                 violations=(
                     "performance comparison environment differs from baseline",
                 ),
+            )
+
+        sample_count_violations_list: list[str] = []
+        for operation in sorted(expected, key=lambda item: item.value):
+            baseline_observation = self.reference_runs[0].observation(operation)
+            current_observation = current.observation(operation)
+            if baseline_observation is None or current_observation is None:
+                raise RuntimeError(
+                    "validated sample-count observation disappeared: "
+                    f"{operation.value}"
+                )
+            if (
+                current_observation.sample_count
+                != baseline_observation.sample_count
+            ):
+                sample_count_violations_list.append(
+                    f"{operation.value} sample count differs from baseline: "
+                    f"expected {baseline_observation.sample_count}, "
+                    f"observed {current_observation.sample_count}"
+                )
+        sample_count_violations = tuple(sample_count_violations_list)
+        if sample_count_violations:
+            return PerformanceComparison(
+                passed=False,
+                baseline_run_count=len(self.reference_runs),
+                current_run_id=current.run_id,
+                relative_regressions={},
+                violations=sample_count_violations,
             )
 
         regressions: dict[str, dict[str, float | None]] = {}

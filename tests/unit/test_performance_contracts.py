@@ -12,13 +12,14 @@ def observation(
     elapsed: float = 1.0,
     memory: float | None = 1.0,
     machine: str = "test-machine",
+    sample_count: int = 10,
 ) -> performance.PerformanceObservation:
     """Build one deterministic performance observation."""
     return performance.PerformanceObservation(
         operation=operation,
         elapsed_seconds=elapsed,
         peak_memory_gb=memory,
-        sample_count=10,
+        sample_count=sample_count,
         machine=machine,
         observed_at=OBSERVED,
         software="test-python",
@@ -30,6 +31,7 @@ def run(
     elapsed: float = 1.0,
     memory: float | None = 1.0,
     machine: str = "test-machine",
+    sample_count: int = 10,
 ) -> performance.PerformanceRun:
     """Build a deterministic repeated performance run."""
     return performance.PerformanceRun(
@@ -40,12 +42,14 @@ def run(
                 elapsed,
                 memory,
                 machine,
+                sample_count,
             ),
             observation(
                 performance.PerformanceOperation.FIT,
                 elapsed,
                 memory,
                 machine,
+                sample_count,
             ),
         ),
     )
@@ -227,4 +231,19 @@ def test_repeated_baseline_fails_closed_for_environment_drift():
     assert not result.passed
     assert result.violations == (
         "performance comparison environment differs from baseline",
+    )
+
+
+def test_repeated_baseline_fails_closed_for_workload_drift():
+    """A performance comparison cannot silently change its sample count."""
+    baseline = performance.PerformanceBaseline(
+        (run("reference-1"), run("reference-2"))
+    )
+
+    result = baseline.evaluate(run("current", sample_count=11))
+
+    assert not result.passed
+    assert result.violations == (
+        "fit sample count differs from baseline: expected 10, observed 11",
+        "ingest sample count differs from baseline: expected 10, observed 11",
     )
