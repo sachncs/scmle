@@ -38,6 +38,15 @@ DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 DEFAULT_MAX_PIXELS = 25_000_000
 DEFAULT_PROFILE_SIZE = (16, 16)
 SUPPORTED_FEATURE_MODES = ("L", "RGB", "RGBA")
+SENSITIVE_METADATA_TAGS = {
+    271: "camera_make",
+    272: "camera_model",
+    305: "software",
+    315: "artist",
+    33432: "copyright",
+    34853: "gps_info",
+    36867: "date_time_original",
+}
 
 
 class ImageError(errors.DataError):
@@ -164,6 +173,8 @@ class ImageSample:
     byte_size: int
     label: str | int | float | bool | None = None
     group_id: str | None = None
+    exif_tags: tuple[str, ...] = ()
+    sensitive_metadata: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates immutable identity and geometry metadata."""
@@ -172,6 +183,10 @@ class ImageSample:
             raise ValueError("source must not be empty")
         if self.group_id is not None and not self.group_id.strip():
             raise ValueError("group_id must not be empty when provided")
+        object.__setattr__(self, "exif_tags", tuple(self.exif_tags))
+        object.__setattr__(
+            self, "sensitive_metadata", tuple(self.sensitive_metadata)
+        )
         if len(self.encoded_bytes) != self.byte_size:
             raise ValueError("byte_size does not match encoded_bytes")
         if self.width <= 0 or self.height <= 0:
@@ -254,6 +269,14 @@ class ImageSample:
                 format_name = opened.format or "unknown"
                 opened.load()
                 content_hash = image_content_hash(opened, width, height)
+                exif_tags = tuple(sorted(str(tag) for tag in opened.getexif()))
+                sensitive_metadata = tuple(
+                    sorted(
+                        SENSITIVE_METADATA_TAGS[tag]
+                        for tag in opened.getexif()
+                        if tag in SENSITIVE_METADATA_TAGS
+                    )
+                )
         except ImageValidationError:
             raise
         except Exception as error:
@@ -276,6 +299,8 @@ class ImageSample:
             byte_size=len(raw),
             label=label,
             group_id=group_id,
+            exif_tags=exif_tags,
+            sensitive_metadata=sensitive_metadata,
         )
 
     @classmethod
@@ -400,6 +425,8 @@ class ImageSample:
             "byte_size": self.byte_size,
             "label": self.label,
             "group_id": self.group_id,
+            "exif_tags": list(self.exif_tags),
+            "sensitive_metadata": list(self.sensitive_metadata),
         }
 
 
@@ -602,6 +629,14 @@ class ImageDataset:
         profile_data = profile.to_dict()
         profile_data["label_counts"] = labels
         profile_data["conflicting_label_groups"] = list(conflicts)
+        sensitive_metadata = sorted(
+            {
+                tag
+                for sample in self.samples
+                for tag in sample.sensitive_metadata
+            }
+        )
+        profile_data["sensitive_metadata"] = sensitive_metadata
         quality_findings = []
         risk_findings = []
         if not self.samples:
@@ -635,6 +670,18 @@ class ImageDataset:
                     {"groups": list(conflicts)},
                     "Resolve the label conflict or explicitly exclude the "
                     "affected content.",
+                    True,
+                )
+            )
+        if sensitive_metadata:
+            risk_findings.append(
+                build_finding(
+                    "risk.image-sensitive-metadata",
+                    data_contracts.FindingSeverity.ERROR,
+                    {"dataset": "all_samples"},
+                    {"tags": sensitive_metadata},
+                    "Review, redact, or explicitly approve image metadata "
+                    "before training or distribution.",
                     True,
                 )
             )

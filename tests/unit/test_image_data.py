@@ -203,6 +203,26 @@ def test_curation_blocks_conflicting_duplicate_labels():
 
 
 @PILLOW_SKIP
+def test_curation_blocks_sensitive_exif_metadata():
+    """GPS and author metadata require an explicit privacy disposition."""
+    canvas = Image.new("RGB", (4, 3), (10, 20, 30))
+    exif = Image.Exif()
+    exif[34853] = {}
+    exif[315] = "annotator"
+    output = io.BytesIO()
+    canvas.save(output, format="JPEG", exif=exif)
+
+    sample = image.ImageSample.from_bytes(output.getvalue(), "private.jpg")
+    report = image.ImageDataset((sample,)).curate()
+
+    assert report.profile["sensitive_metadata"] == ["artist", "gps_info"]
+    assert report.release_ready is False
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.image-sensitive-metadata",
+    ]
+
+
+@PILLOW_SKIP
 def test_split_keeps_explicit_capture_groups_together():
     """Grouped splitting prevents capture-session leakage."""
     samples = tuple(
