@@ -71,3 +71,9 @@ class CancelledError(ScmlError):
     """The run was cancelled before completion."""
 
     category = "cancelled"
+
+
+class ReliabilityError(ScmlError):
+    """A fault-injection execution cannot produce trustworthy evidence."""
+
+    category = "reliability"
