@@ -21,7 +21,12 @@ uv run --python "$python_version" pytest -q \
   tests/integration/test_cli.py \
   tests/integration/test_end_to_end.py \
   tests/integration/test_predict_api.py \
+  tests/integration/test_deployment.py \
+  tests/integration/test_monitoring.py \
   tests/integration/test_serve_and_export.py
+uv run --python "$python_version" coverage report \
+  --include='scml/contracts/*,scml/data/*,scml/evaluation/*,scml/governance/*,scml/inference/*,scml/monitoring/*' \
+  --fail-under=85
 
 echo "== benchmark regression =="
 uv run --python "$python_version" python -m benchmarks.run_benchmarks \

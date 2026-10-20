@@ -67,7 +67,12 @@ skipped, 6 warnings` in 29 minutes 30 seconds using `uv run pytest -q` on the
 local Python 3.14t environment. After subsequent data, observability,
 security, reliability, governance, and incremental-ingestion changes, the
 complete unit suite completed with `1577 passed, 87 skipped, 6 warnings` in 2
-minutes 24 seconds;
+minutes 24 seconds. The bounded critical-path suite (unit tests plus CLI,
+end-to-end, deployment, monitoring, prediction, and serving integrations)
+completed with `1612 passed, 89 skipped, 8 warnings` in 3 minutes 52 seconds;
+its declared core scope (`contracts`, `data`, `evaluation`, `governance`,
+`inference`, and `monitoring`) measured 86% coverage with the enforced
+`uv run coverage report --include=... --fail-under=85` gate;
 the latest promotion/lifecycle slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
 seconds. The remaining leakage, property, specification, and benchmark tiers
