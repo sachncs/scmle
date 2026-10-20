@@ -879,6 +879,31 @@ reason. Do not weaken the acceptance criteria to preserve the label.
 
 ## 10. Current local preflight record
 
+The latest complete release preflight at pushed commit `357e392` passed on
+2026-10-21:
+
+- bounded contract suite: 1,891 passed, 75 skipped, 82.82% whole-package
+  coverage; the declared core scope measured 86%;
+- mutation gate: 1,358 of 1,898 mutants killed, for a 71% score against the
+  configured 70% minimum;
+- five-seed benchmark regression gate: all four offline datasets passed with
+  zero failures and zero failed repetitions; breast cancer, wine, and digits
+  were statistically tied with their independent references, while diabetes
+  progression was ahead;
+- static and dependency gates: Ruff, format check, mypy, Bandit, and
+  pip-audit passed;
+- artifact gate: wheel and source distribution checks passed, both builds were
+  reproducible, and network-isolated wheel and source-distribution installs
+  passed;
+- site gate: Astro built all 15 static pages, accessibility smoke passed, and
+  npm audit reported zero vulnerabilities.
+
+This remains local evidence only. The two existing SQLite `ResourceWarning`
+summaries and scikit-learn deprecation warnings remain hygiene follow-ups. The
+run does not replace clean-clone execution, hosted optional-dependency audits,
+external/container/kernel fault injection, public GitHub Pages verification,
+or independent review and signature.
+
 At commit `29d1913` (`docs(evaluation): record benchmark resource gates`),
 the local release preflight passed on 2026-10-21:
 
