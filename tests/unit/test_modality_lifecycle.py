@@ -300,6 +300,45 @@ def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
         )
 
 
+def test_lifecycle_compares_against_a_repeated_performance_baseline(
+    tmp_path: Path,
+):
+    """Lifecycle evidence can enforce a repeated resource baseline."""
+    adapter = document_adapter()
+    reference_reports = [
+        modality_lifecycle.ModalityLifecycle().run(
+            adapter,
+            tmp_path / f"reference-package-{index}",
+            signing_key="test-signing-key",
+            seed=index,
+        )
+        for index in range(2)
+    ]
+    reference_runs = tuple(
+        performance.PerformanceRun.from_dict(
+            {
+                "run_id": f"reference-{index}",
+                "observations": report.performance["observations"],
+            }
+        )
+        for index, report in enumerate(reference_reports)
+    )
+    baseline = performance.PerformanceBaseline(
+        reference_runs, max_relative_regression=10.0
+    )
+
+    report = modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        tmp_path / "current-package",
+        signing_key="test-signing-key",
+        seed=2,
+        performance_baseline=baseline,
+    )
+
+    assert report.performance["comparison"]["passed"] is True
+    assert report.performance["comparison"]["baseline_run_count"] == 2
+
+
 def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
     """Missing CRS evidence blocks before a model or package is created."""
     features = tuple(

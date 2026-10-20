@@ -1424,6 +1424,7 @@ class ModalityLifecycle:
         observed_adapter: ModalityAdapter | None = None,
         report_path: str | Path | None = None,
         performance_budget: performance.PerformanceBudget | None = None,
+        performance_baseline: performance.PerformanceBaseline | None = None,
     ) -> LifecycleReport:
         """Run every stage and optionally persist its evidence report."""
         observed = observed_adapter or adapter
@@ -1475,12 +1476,22 @@ class ModalityLifecycle:
             for operation in performance.PerformanceOperation
             if operation in context.performance_observations
         )
+        performance_run = performance.PerformanceRun(
+            run_id=f"{adapter.dataset_hash}:{seed}",
+            observations=observations,
+        )
         performance_result = (
             performance_budget.evaluate(observations)
             if performance_budget is not None
             else None
         )
+        performance_comparison = (
+            performance_baseline.evaluate(performance_run)
+            if performance_baseline is not None
+            else None
+        )
         performance_evidence: dict[str, object] = {
+            "run": performance_run.to_dict(),
             "observations": [
                 observation.to_dict() for observation in observations
             ],
@@ -1492,6 +1503,16 @@ class ModalityLifecycle:
             "result": (
                 performance_result.to_dict()
                 if performance_result is not None
+                else None
+            ),
+            "baseline": (
+                performance_baseline.to_dict()
+                if performance_baseline is not None
+                else None
+            ),
+            "comparison": (
+                performance_comparison.to_dict()
+                if performance_comparison is not None
                 else None
             ),
         }
@@ -1518,6 +1539,14 @@ class ModalityLifecycle:
             raise ValueError(
                 "performance budget failed: "
                 + "; ".join(performance_result.violations)
+            )
+        if (
+            performance_comparison is not None
+            and not performance_comparison.passed
+        ):
+            raise ValueError(
+                "performance baseline failed: "
+                + "; ".join(performance_comparison.violations)
             )
         return report
 

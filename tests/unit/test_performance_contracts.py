@@ -23,6 +23,23 @@ def observation(
     )
 
 
+def run(
+    run_id: str,
+    elapsed: float = 1.0,
+    memory: float | None = 1.0,
+) -> performance.PerformanceRun:
+    """Build a deterministic repeated performance run."""
+    return performance.PerformanceRun(
+        run_id,
+        (
+            observation(
+                performance.PerformanceOperation.INGEST, elapsed, memory
+            ),
+            observation(performance.PerformanceOperation.FIT, elapsed, memory),
+        ),
+    )
+
+
 def test_budget_requires_every_declared_operation_and_passes_complete_input():
     """A green budget requires measurements for every requested operation."""
     budget = performance.PerformanceBudget(
@@ -123,3 +140,65 @@ def test_result_and_budget_are_deterministic():
     )
 
     assert list(budget.to_dict()["max_seconds"]) == ["inference", "ingest"]
+
+
+def test_repeated_baseline_compares_median_time_and_memory():
+    """A repeated baseline compares current cost with stable central values."""
+    baseline = performance.PerformanceBaseline(
+        (run("reference-1", 1.0, 1.0), run("reference-2", 1.1, 1.1)),
+        max_relative_regression=0.20,
+    )
+
+    result = baseline.evaluate(run("current", 1.2, 1.2))
+
+    assert result.passed
+    assert result.baseline_run_count == 2
+    assert result.relative_regressions["ingest"][
+        "elapsed_seconds"
+    ] == pytest.approx((1.2 - 1.05) / 1.05)
+    assert result.to_dict()["current_run_id"] == "current"
+
+
+def test_repeated_baseline_fails_time_and_memory_regressions():
+    """A repeated baseline blocks a run beyond the declared regression limit."""
+    baseline = performance.PerformanceBaseline(
+        (run("reference-1"), run("reference-2", 1.1, 1.1)),
+        max_relative_regression=0.10,
+    )
+
+    result = baseline.evaluate(run("current", 1.4, 1.4))
+
+    assert not result.passed
+    assert any("time regression" in item for item in result.violations)
+    assert any("memory regression" in item for item in result.violations)
+
+
+def test_repeated_baseline_requires_repeated_consistent_evidence():
+    """A baseline cannot be declared from one run or mixed operations."""
+    with pytest.raises(ValueError, match="at least two"):
+        performance.PerformanceBaseline((run("only"),))
+    with pytest.raises(ValueError, match="same operations"):
+        performance.PerformanceBaseline(
+            (
+                run("reference-1"),
+                performance.PerformanceRun(
+                    "reference-2",
+                    (observation(performance.PerformanceOperation.INGEST),),
+                ),
+            )
+        )
+
+
+def test_repeated_baseline_fails_closed_for_missing_memory():
+    """A memory regression gate rejects an unmeasured current run."""
+    baseline = performance.PerformanceBaseline(
+        (run("reference-1"), run("reference-2"))
+    )
+
+    result = baseline.evaluate(run("current", memory=None))
+
+    assert not result.passed
+    assert result.violations == (
+        "missing peak memory observation: fit",
+        "missing peak memory observation: ingest",
+    )
