@@ -206,6 +206,18 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     stages = tuple(evidence.stage for evidence in report.stage_evidence)
     assert stages == modalities.REQUIRED_LIFECYCLE_STAGES
     assert all(evidence.evidenced for evidence in report.stage_evidence)
+    evidence_by_stage = {
+        evidence.stage: evidence for evidence in report.stage_evidence
+    }
+    assert evidence_by_stage[modalities.LifecycleStage.INGESTION].evidence == {
+        "dataset_hash": report.dataset_hash,
+        "sample_count": len(adapter.samples),
+    }
+    assert isinstance(
+        evidence_by_stage[modalities.LifecycleStage.MODEL_EXPLAINABILITY]
+        .evidence,
+        dict,
+    )
     assert report.package.signature
     assert report.inference == {
         "package_verified": True,

@@ -1388,7 +1388,8 @@ class ModalityLifecycle:
             modalities.StageEvidence(
                 stage=stage,
                 evidence_links=("modality_lifecycle.json",),
-                notes=(str(context.stage_records[stage]),),
+                evidence=context.stage_records[stage],
+                notes=(f"completed {stage.value}",),
             )
             for stage in modalities.REQUIRED_LIFECYCLE_STAGES
         )

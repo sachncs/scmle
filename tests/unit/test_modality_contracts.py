@@ -82,6 +82,25 @@ def test_complete_declaration_serializes_evidence_in_required_stage_order():
         stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
     ]
     assert resources["memory_gb"] == 4.0
+    assert stage_records[0]["evidence"] == {}
+
+
+def test_stage_evidence_requires_json_native_structured_output():
+    """Stage payloads remain machine-readable and reject non-JSON values."""
+    record = modalities.StageEvidence(
+        stage=modalities.LifecycleStage.INGESTION,
+        evidence={"sample_count": 2, "groups": ["a", "b"]},
+    )
+
+    assert record.to_dict()["evidence"] == {
+        "groups": ["a", "b"],
+        "sample_count": 2,
+    }
+    with pytest.raises(ValueError, match="JSON-native"):
+        modalities.StageEvidence(
+            stage=modalities.LifecycleStage.INGESTION,
+            evidence={"invalid": object()},
+        )
 
 
 def test_declaration_is_immutable():

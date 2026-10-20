@@ -7,6 +7,7 @@ registry never treats an incomplete declaration as usable support.
 
 from collections.abc import Collection
 from collections.abc import Iterable
+from collections.abc import Mapping
 import dataclasses
 import enum
 import json
@@ -72,11 +73,13 @@ class StageEvidence:
         stage: Lifecycle stage covered by the record.
         evidence_links: Test, report, or artifact references proving the
             stage.
+        evidence: JSON-native structured output produced by the stage.
         notes: Human-readable boundaries or observations for the stage.
     """
 
     stage: LifecycleStage
     evidence_links: tuple[str, ...] = ()
+    evidence: Mapping[str, object] = dataclasses.field(default_factory=dict)
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -84,6 +87,21 @@ class StageEvidence:
         if not isinstance(self.stage, LifecycleStage):
             raise TypeError("stage must be LifecycleStage")
         object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+        if not isinstance(self.evidence, Mapping):
+            raise TypeError("evidence must be a mapping")
+        try:
+            normalized = json.loads(
+                json.dumps(
+                    dict(self.evidence),
+                    allow_nan=False,
+                    sort_keys=True,
+                )
+            )
+        except (TypeError, ValueError) as error:
+            raise ValueError("evidence must be JSON-native") from error
+        if not isinstance(normalized, dict):
+            raise ValueError("evidence must serialize to an object")
+        object.__setattr__(self, "evidence", normalized)
         object.__setattr__(self, "notes", tuple(self.notes))
         for field_name, values in (
             ("evidence_links", self.evidence_links),
@@ -102,6 +120,7 @@ class StageEvidence:
         return {
             "stage": self.stage.value,
             "evidence_links": list(self.evidence_links),
+            "evidence": dict(self.evidence),
             "notes": list(self.notes),
         }
 
