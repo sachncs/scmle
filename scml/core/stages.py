@@ -716,7 +716,16 @@ class PlanStage(Stage):
         """Plans candidates."""
         plan = build_plan(context)
         context.plan = plan
+        declared_capabilities = context.capability_registry.list_capabilities()
         context.write_json("execution_plan.json", plan.to_dict())
+        context.write_json(
+            "capability_registry.json",
+            {
+                "capabilities": [
+                    capability.to_dict() for capability in declared_capabilities
+                ]
+            },
+        )
         context.write_json(
             "diagnostics/decision_log.json",
             {"plan": [d.to_dict() for d in plan.decisions], "outcomes": []},
