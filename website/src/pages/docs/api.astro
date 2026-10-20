@@ -59,6 +59,22 @@ artifact = model.save("artifacts/document-model")
 restored = DocumentClassifier.load(artifact.path, trusted=True)</code></pre>
   <p>This is not part of the supported <code>MLProject</code> path. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it. OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary.</p>
 
+  <h2>Experimental image baseline</h2>
+  <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for duplicate content and mixed label state, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global and local pixel contributions.</p>
+  <pre><code>from scml.data.modalities import ImageDataset, ImageSample
+from scml.models.images import ImageClassifier, ImageModelConfig
+
+train = ImageDataset((
+    ImageSample.from_path("red.png", label="red"),
+    ImageSample.from_path("blue.png", label="blue"),
+))
+model = ImageClassifier(ImageModelConfig(target_size=(16, 16))).fit(train)
+prediction = model.predict(train)
+explanation = model.local_explanation(train.samples[0])
+artifact = model.save("artifacts/image-model")
+restored = ImageClassifier.load(artifact.path, trusted=True)</code></pre>
+  <p>This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>ModelBundle</code> integration, HTTP serving, or full release recovery evidence.</p>
+
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
   <div class="callout"><p><strong>Bundle compatibility:</strong> format 2 authenticates <code>schema.json</code>. Legacy format 1 bundles are refused by default and should only be migrated from a source you explicitly trust.</p></div>
