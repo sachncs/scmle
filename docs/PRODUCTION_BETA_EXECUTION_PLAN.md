@@ -145,6 +145,10 @@ The audio feature-preparation slice at `29c8d15` passes 14 focused media
 tests, Ruff, and mypy. It adds bounded WAV PCM statistics with explicit
 observed-frame and truncation evidence; it does not add codec support,
 audio modelling, serving, or a supported capability claim.
+The video metadata-feature slice at `cd1da09` passes 16 focused media tests,
+Ruff, formatting, and mypy. It adds numeric evidence from explicit probe
+metadata only; it does not add frame decoding, temporal sampling,
+synchronization, video modelling, serving, or a supported capability claim.
 
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or

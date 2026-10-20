@@ -86,6 +86,16 @@ print(features.to_numpy())
 print(features.frames_truncated)</code></pre>
   <p>For non-WAV inputs, provide an explicit codec probe for ingestion and a versioned decoder adapter before requesting signal features. The current implementation deliberately stops at bounded WAV statistics; it does not claim spectrogram quality, transcript provenance, speaker leakage controls, time-local explanations, audio modelling, serving, or release evidence.</p>
 
+  <h2>Experimental video metadata features</h2>
+  <p>Video currently exposes metadata evidence rather than decoded frames. This is useful for curation, size planning, and explicit hand-off to a future temporal adapter.</p>
+  <pre><code>from scml.data.modalities import VideoDataset, VideoSample
+
+clip = VideoSample.from_bytes(encoded, metadata, source="clip.mp4")
+features = VideoDataset((clip,)).prepare_metadata_features()
+print(features.feature_names)
+print(features.to_numpy())</code></pre>
+  <p>The method intentionally does not select frames, decode codecs, infer synchronization, or produce temporal explanations. Those decisions need a versioned decoder, sampling policy, resource budget, leakage review, and independent evaluation before a video model can be considered for release.</p>
+
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
   <div class="callout"><p><strong>Bundle compatibility:</strong> format 2 authenticates <code>schema.json</code>. Legacy format 1 bundles are refused by default and should only be migrated from a source you explicitly trust.</p></div>
