@@ -111,6 +111,27 @@ def test_empty_override_fails_before_model_fitting():
         stages.build_plan(context)
 
 
+def test_declared_non_tabular_modality_fails_closed_before_model_fitting():
+    """A modality declaration cannot silently inherit tabular support."""
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="<in-memory>", target="y", modality="image"),
+        search=tasks.SearchSpec(top_models=0),
+        strategies=tasks.StrategySpec(top_models=0),
+        ensemble=tasks.EnsembleSpec(size=0),
+    )
+    context = make_context(spec=spec)
+
+    with pytest.raises(
+        capabilities.UnsupportedCapabilityError,
+        match="unsupported capability",
+    ) as failure:
+        stages.build_plan(context)
+
+    assert failure.value.details["key"]["modality"] == "image"
+    assert context.manifest is not None
+    assert context.manifest.modality == "image"
+
+
 def test_unlisted_model_family_fails_before_model_fitting():
     """A planner candidate needs its own explicit family declaration."""
 

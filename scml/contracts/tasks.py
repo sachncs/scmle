@@ -64,6 +64,23 @@ TaskRequest = Literal[
 ]
 """Public task requests; `classification` is resolved from the target."""
 
+DatasetModality = Literal[
+    "tabular",
+    "text",
+    "document",
+    "image",
+    "audio",
+    "video",
+    "graph",
+    "geospatial",
+]
+"""Dataset families accepted by the configuration contract.
+
+The modality is an explicit declaration, not an inference from file suffixes.
+Each declared modality must still cross the capability registry before a run
+can train a model.
+"""
+
 
 def horizon_names(value: str, horizon: int) -> list[str]:
     """Names of the future-value targets `<value>__h1 .. <value>__h<H>`."""
@@ -182,6 +199,9 @@ class DataSpec(FrozenModel):
     Attributes:
         uri: Where the data lives.
         target: Target column.
+        modality: Dataset family declared by the caller. The current supported
+            execution path is `tabular`; other values remain explicit so a
+            future reader cannot be mistaken for production support.
         id_columns: Identifier columns (never features).
         group_column: Entity column for grouped and series data.
         time_column: Column ordering the rows in time.
@@ -262,6 +282,7 @@ class DataSpec(FrozenModel):
 
     uri: str
     target: str
+    modality: DatasetModality = "tabular"
     id_columns: list[str] = pydantic.Field(default_factory=list)
     group_column: str | None = None
     time_column: str | None = None

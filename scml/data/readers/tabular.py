@@ -326,7 +326,10 @@ def snapshot_identity(frame: pd.DataFrame, uri: str | pathlib.Path) -> str:
 
 
 def build_manifest(
-    frame: pd.DataFrame, target: str, uri: str | pathlib.Path = ""
+    frame: pd.DataFrame,
+    target: str,
+    uri: str | pathlib.Path = "",
+    modality: str = "tabular",
 ) -> data_contracts.DatasetManifest:
     """Builds the immutable identity of a dataset.
 
@@ -334,6 +337,7 @@ def build_manifest(
         frame: The ingested data (not modified).
         target: Name of the target column.
         uri: Where the data came from.
+        modality: Dataset family declared by the caller.
 
     Returns:
         The dataset manifest.
@@ -361,6 +365,7 @@ def build_manifest(
         target=target,
         uri=str(uri),
         snapshot_id=identity,
+        modality=modality,
         source=data_contracts.SourceMetadata(
             acquisition_method=uri_semantics(uri),
         ),

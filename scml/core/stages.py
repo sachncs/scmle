@@ -167,7 +167,9 @@ class IngestStage(Stage):
         if data.horizon:
             frame = forecasting.add_targets(frame, data)
         context.read_seconds = time.monotonic() - started
-        context.manifest = tabular.build_manifest(frame, data.target, data.uri)
+        context.manifest = tabular.build_manifest(
+            frame, data.target, data.uri, data.modality
+        )
         self.persist_source_snapshot(context, frame)
         frame, infinite = tabular.replace_infinities(frame)
         context.cleaning_notes = [
@@ -737,13 +739,30 @@ def capability_key(
         capabilities.UnsupportedCapabilityError: If the requested fairness
             behavior is not implemented for ``task``.
     """
+    manifest = require(context.manifest, "manifest")
+    try:
+        modality = capabilities.Modality(manifest.modality)
+    except ValueError as error:
+        raise capabilities.UnsupportedCapabilityError(
+            "unsupported dataset modality before training",
+            {
+                "status": "unsupported",
+                "reason": "dataset manifest has an unknown modality",
+                "modality": manifest.modality,
+            },
+        ) from error
+    if manifest.modality != context.spec.data.modality:
+        raise errors.ConfigError(
+            "dataset manifest modality does not match the project data "
+            f"spec: {manifest.modality!r} != {context.spec.data.modality!r}"
+        )
     fairness = (
         capabilities.Fairness.NONE
         if context.spec.fairness.mitigation == "none"
         else capabilities.Fairness.MITIGATION
     )
     key = capabilities.CapabilityKey(
-        modality=capabilities.Modality.TABULAR,
+        modality=modality,
         task=task,
         model_family=model_family,
         evaluation=context_module.TABULAR_BETA_EVALUATIONS[task],
