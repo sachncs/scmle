@@ -55,7 +55,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <pre><code>{`from scml.data.modalities import AudioSample, GeospatialDataset, VideoSample
 from scml.data.modalities import DocumentDataset, DocumentSample
 
-audio = AudioSample.from_bytes(wav_bytes, source="clip.wav")
+audio = AudioSample.from_bytes(
+    wav_bytes, source="clip.wav", group_id="speaker-17"
+)
 video = VideoSample.from_bytes(encoded, video_metadata, source="clip.mp4")
 places = GeospatialDataset.from_geojson(
     feature_collection, source="places.geojson", crs="EPSG:4326"
@@ -69,6 +71,7 @@ assert curation.dataset_hash == documents.content_hash
 
 audio_features = AudioDataset((audio,)).prepare_features(max_frames=100_000)
 assert audio_features.frames_truncated == (False,)
+audio_split = AudioDataset((audio,)).split(test_fraction=0)
 
 # These objects can be profiled and curated. They do not silently opt into
 # tabular modelling or a production support claim.`}</code></pre>
@@ -79,5 +82,7 @@ assert audio_features.frames_truncated == (False,)
   <h2>Video feature boundary</h2>
   <p><code>VideoDataset.prepare_metadata_features()</code> produces numeric evidence from the probe output: duration, dimensions, pixel count, aspect ratio, frame count and rate, audio-track count, byte size, and bytes per frame. It never decodes or samples frames, so it cannot silently choose a temporal windowing policy or claim that container metadata represents visual content.</p>
   <p>Frame sampling, audio/video synchronization, temporal leakage controls, decoder resource budgets, temporal explanations, and video modelling remain explicit extension work. The metadata matrix is useful for curation and budget checks, not a production video capability.</p>
+  <h2>Leakage-aware splitting</h2>
+  <p>Audio and video datasets accept an optional <code>group_id</code> such as speaker, session, subject, or camera. Their split methods keep each group in exactly one partition. If a caller does not provide a group, the source itself is the conservative unit; the framework will not guess speaker or identity relationships from filenames.</p>
   <div class="callout"><p><strong>Data hand-off:</strong> once curation is complete, the run carries forward the normalized schema, profile findings, selected validation strategy, and the decisions made about labels and unavailable features. The model stage consumes that contract; it does not redefine it.</p></div>
 </DocsLayout>

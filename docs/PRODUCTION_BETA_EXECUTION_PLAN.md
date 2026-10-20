@@ -149,6 +149,11 @@ The video metadata-feature slice at `cd1da09` passes 16 focused media tests,
 Ruff, formatting, and mypy. It adds numeric evidence from explicit probe
 metadata only; it does not add frame decoding, temporal sampling,
 synchronization, video modelling, serving, or a supported capability claim.
+The audio grouped-split slice at `6ce8ad2` and video grouped-split slice at
+`46d8790` add deterministic identity-aware partitioning with focused tests;
+they do not infer speaker, subject, session, or camera identity when the
+caller has not supplied a `group_id`, and they do not expand the supported
+modelling boundary.
 
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or

@@ -79,8 +79,12 @@ restored = ImageClassifier.load(artifact.path, trusted=True)</code></pre>
   <p>The audio foundation can produce bounded signal statistics for inspection and future baseline work. It makes the observation boundary explicit; it is not an audio classifier and does not silently decode non-WAV containers.</p>
   <pre><code>from scml.data.modalities import AudioDataset, AudioSample
 
-clip = AudioSample.from_bytes(wav_bytes, source="clip.wav")
-features = AudioDataset((clip,)).prepare_features(max_frames=100_000)
+clip = AudioSample.from_bytes(
+    wav_bytes, source="clip.wav", group_id="speaker-17"
+)
+dataset = AudioDataset((clip,))
+features = dataset.prepare_features(max_frames=100_000)
+split = dataset.split(test_fraction=0)
 print(features.feature_names)
 print(features.to_numpy())
 print(features.frames_truncated)</code></pre>
@@ -94,7 +98,7 @@ clip = VideoSample.from_bytes(encoded, metadata, source="clip.mp4")
 features = VideoDataset((clip,)).prepare_metadata_features()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>
-  <p>The method intentionally does not select frames, decode codecs, infer synchronization, or produce temporal explanations. Those decisions need a versioned decoder, sampling policy, resource budget, leakage review, and independent evaluation before a video model can be considered for release.</p>
+  <p>The method intentionally does not select frames, decode codecs, infer synchronization, or produce temporal explanations. Those decisions need a versioned decoder, sampling policy, resource budget, leakage review, and independent evaluation before a video model can be considered for release. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit.</p>
 
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
