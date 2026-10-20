@@ -50,6 +50,24 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 evaluation = SLOMonitor().evaluate(target, metrics, observed_at=now)`}</code></pre>
   <p>Use the result's status, remaining error budget, owner, runbook, and route in the incident record. The monitor uses the worst observation in the window so a breach cannot disappear inside an average.</p>
 
+  <h2>Deliver the alert once</h2>
+  <p><code>AlertDispatcher</code> keeps the SLO decision separate from delivery. It derives a stable alert identity from the evidence, records successful delivery, and deduplicates replays. Use the local JSONL sink for an operator handoff or the bounded HTTPS webhook sink for an authenticated incident gateway.</p>
+  <pre><code>{`from scml.monitoring.alerts import Alert, AlertDispatcher, WebhookAlertSink
+
+alert = Alert.from_evidence(
+    route="on-call",
+    severity="high",
+    title="prediction latency SLO breached",
+    details={"run_id": "run-42", "rollback_target": "model-previous"},
+    evidence=evaluation.to_dict(),
+    created_at=now,
+)
+delivery = AlertDispatcher(
+    {"on-call": WebhookAlertSink("https://pager.example/alerts", token=token)},
+    "runs/run-42/alert-deliveries.jsonl",
+).dispatch(alert)`}</code></pre>
+  <p>Retries are bounded and a failed webhook is recorded as failed rather than silently treated as a page. This proves the local routing contract; the organisation still needs to exercise its real pager, ticketing, authentication, and on-call escalation path.</p>
+
   <h2>Turn a breach into an incident</h2>
   <p>An alert is not a recovery plan. Open an incident with the affected run and the exact rollback target, then require an explicit acknowledgement before resolution. The journal is append-only, hash-chained, and rejects tampering; repeating a transition is idempotent.</p>
   <pre><code>{`from scml.monitoring.incidents import IncidentWorkflow
@@ -73,7 +91,7 @@ workflow.resolve(
     resolution="rolled back and replayed the affected window",
     evidence_digest="sha256:...",
 )`}</code></pre>
-  <p>This local workflow supplies operator evidence; it does not send pages or tickets. Connect it to the organisation's authenticated incident system before claiming external on-call coverage.</p>
+  <p>This local workflow supplies operator evidence; connect its alert route to the organisation's authenticated incident system before claiming external on-call coverage.</p>
 
   <h2>Join serving evidence to the run</h2>
   <p>Prediction telemetry tells you what happened; the evidence graph tells you what produced the bundle. Link an event only with the input and output fingerprints captured at the serving boundary and the exact bundle digest loaded for that request.</p>
