@@ -46,7 +46,7 @@ means the code path exists; it does not mean the capability is supported.
 
 | Area | Current label | Evidence and boundary |
 | --- | --- | --- |
-| Tabular ingestion, manifest, structured curation | Implemented / Tested | Unit and integration tests cover deterministic snapshots, local raw-byte hashes, findings, persisted manifests, machine-generated dataset cards, and a source snapshot registry with schema-evolution decisions. Object-store/warehouse/event-stream transports and durable cross-run registry operation remain incomplete. |
+| Tabular ingestion, manifest, structured curation | Implemented / Tested | Unit and integration tests cover deterministic snapshots, local raw-byte hashes, findings, persisted manifests, machine-generated dataset cards, schema-evolution decisions, and an atomic durable source registry that survives across runs. Object-store/warehouse/event-stream transports remain incomplete. |
 | Local and DB-API source connectors | Implemented / Tested | Connector contracts cover local files, injected DB-API factories, retry budgets, and checkpoints. Object stores, warehouses, event streams, watermarks, and exactly-once semantics remain extension work. |
 | Tabular library training paths | Implemented / Tested | The pre-training capability gate admits only explicitly declared tabular library paths. This is the current beta boundary, not all-modality support. |
 | Image, document, and graph data foundations | Implemented / Tested | Validation, profiling, splitting, and feature-preparation slices exist with focused tests. They are not supported capabilities because modelling, evaluation, packaging, inference, monitoring, and full recovery evidence are not wired. |
