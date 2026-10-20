@@ -925,6 +925,10 @@ class LifecycleContext:
                 sample_count=sample_count,
                 machine=platform.platform(),
                 observed_at=events.utc_timestamp(),
+                software=(
+                    f"{platform.python_implementation()} "
+                    f"{platform.python_version()}"
+                ),
             )
         )
 

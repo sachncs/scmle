@@ -38,6 +38,7 @@ class PerformanceObservation:
     sample_count: int
     machine: str
     observed_at: str
+    software: str
 
     def __post_init__(self) -> None:
         """Reject measurements that cannot support a budget decision."""
@@ -57,6 +58,8 @@ class PerformanceObservation:
             raise ValueError("sample_count must be non-negative")
         if not isinstance(self.machine, str) or not self.machine.strip():
             raise ValueError("machine must not be empty")
+        if not isinstance(self.software, str) or not self.software.strip():
+            raise ValueError("software must not be empty")
         parse_timestamp(self.observed_at, "observed_at")
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,6 +71,7 @@ class PerformanceObservation:
             "sample_count": self.sample_count,
             "machine": self.machine,
             "observed_at": self.observed_at,
+            "software": self.software,
         }
 
     @classmethod
@@ -84,6 +88,7 @@ class PerformanceObservation:
             sample_count=int(record["sample_count"]),
             machine=str(record["machine"]),
             observed_at=str(record["observed_at"]),
+            software=str(record["software"]),
         )
 
 
@@ -105,6 +110,14 @@ class PerformanceRun:
         if len(set(operations)) != len(operations):
             raise ValueError(
                 "performance run observations must be unique per operation"
+            )
+        environments = {
+            (observation.machine, observation.software)
+            for observation in normalized
+        }
+        if len(environments) != 1:
+            raise ValueError(
+                "performance run observations must share one environment"
             )
         object.__setattr__(self, "observations", normalized)
 
@@ -199,6 +212,15 @@ class PerformanceBaseline:
             raise ValueError(
                 "performance baseline runs must share the same operations"
             )
+        environments = {
+            (observation.machine, observation.software)
+            for run in runs
+            for observation in run.observations
+        }
+        if len(environments) != 1:
+            raise ValueError(
+                "performance baseline runs must share one environment"
+            )
         object.__setattr__(self, "reference_runs", runs)
 
     def evaluate(self, current: PerformanceRun) -> PerformanceComparison:
@@ -225,6 +247,25 @@ class PerformanceBaseline:
             raise ValueError(
                 "performance comparison operations differ: "
                 + ", ".join(details)
+            )
+
+        reference_environment = (
+            self.reference_runs[0].observations[0].machine,
+            self.reference_runs[0].observations[0].software,
+        )
+        current_environment = (
+            current.observations[0].machine,
+            current.observations[0].software,
+        )
+        if current_environment != reference_environment:
+            return PerformanceComparison(
+                passed=False,
+                baseline_run_count=len(self.reference_runs),
+                current_run_id=current.run_id,
+                relative_regressions={},
+                violations=(
+                    "performance comparison environment differs from baseline",
+                ),
             )
 
         regressions: dict[str, dict[str, float | None]] = {}

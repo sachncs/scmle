@@ -11,6 +11,7 @@ def observation(
     operation: performance.PerformanceOperation,
     elapsed: float = 1.0,
     memory: float | None = 1.0,
+    machine: str = "test-machine",
 ) -> performance.PerformanceObservation:
     """Build one deterministic performance observation."""
     return performance.PerformanceObservation(
@@ -18,8 +19,9 @@ def observation(
         elapsed_seconds=elapsed,
         peak_memory_gb=memory,
         sample_count=10,
-        machine="test-machine",
+        machine=machine,
         observed_at=OBSERVED,
+        software="test-python",
     )
 
 
@@ -27,15 +29,24 @@ def run(
     run_id: str,
     elapsed: float = 1.0,
     memory: float | None = 1.0,
+    machine: str = "test-machine",
 ) -> performance.PerformanceRun:
     """Build a deterministic repeated performance run."""
     return performance.PerformanceRun(
         run_id,
         (
             observation(
-                performance.PerformanceOperation.INGEST, elapsed, memory
+                performance.PerformanceOperation.INGEST,
+                elapsed,
+                memory,
+                machine,
             ),
-            observation(performance.PerformanceOperation.FIT, elapsed, memory),
+            observation(
+                performance.PerformanceOperation.FIT,
+                elapsed,
+                memory,
+                machine,
+            ),
         ),
     )
 
@@ -127,6 +138,7 @@ def test_invalid_measurement_and_budget_values_fail_at_the_boundary():
             1,
             "machine",
             "2026-10-21T00:00:00",
+            "test-python",
         )
 
 
@@ -201,4 +213,18 @@ def test_repeated_baseline_fails_closed_for_missing_memory():
     assert result.violations == (
         "missing peak memory observation: fit",
         "missing peak memory observation: ingest",
+    )
+
+
+def test_repeated_baseline_fails_closed_for_environment_drift():
+    """A resource comparison cannot silently cross hardware environments."""
+    baseline = performance.PerformanceBaseline(
+        (run("reference-1"), run("reference-2"))
+    )
+
+    result = baseline.evaluate(run("current", machine="other-machine"))
+
+    assert not result.passed
+    assert result.violations == (
+        "performance comparison environment differs from baseline",
     )
