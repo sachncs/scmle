@@ -34,6 +34,20 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; <code>release_attestation.json</code> for the canonical HMAC binding across those records; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. Set <code>SCML_SIGNING_KEY</code> in the release environment. The release evaluator verifies the attestation and blocks unsigned or tampered evidence. <code>FaultInjectionHarness</code> persists digest-bound scenario artifacts, while <code>LocalFaultExecutor</code> supplies bounded local execution evidence. External transport, container, and kernel-resource injectors remain a separate release requirement.</p>
   <p>For inference telemetry, use the redacted observability sidecar and evaluate it against an explicit policy. Missing required signals, stale or future timestamps, and threshold breaches must remain visible as failed evidence instead of being silently dropped.</p>
 
+  <h2>Join serving evidence to the run</h2>
+  <p>Prediction telemetry tells you what happened; the evidence graph tells you what produced the bundle. Link an event only with the input and output fingerprints captured at the serving boundary and the exact bundle digest loaded for that request.</p>
+  <pre><code>{`from scml.inference.evidence import InferenceEvidenceLinker
+
+InferenceEvidenceLinker().link(
+    "runs/&lt;run-id&gt;/evidence_graph.json",
+    event_id="request-123",
+    input_fingerprint="sha256:...",
+    output_fingerprint="sha256:...",
+    bundle_digest="sha256:...",
+    timestamp="2026-10-20T12:00:00+00:00",
+)`}</code></pre>
+  <p>The linker verifies the graph and bundle identities, writes the graph atomically, and makes exact event replay idempotent. It does not replace redaction, retention, access control, or independent release review.</p>
+
   <h2>Run the local fault matrix</h2>
   <p>The repository includes a bounded local executor for all 15 declared fault scenarios. It exercises real child-process termination, timeout cancellation, atomic publication, artifact quarantine, signature rejection, checkpoint and snapshot mismatch, retry exhaustion, duplicate-event idempotency, incomplete lineage, and rejected approvals.</p>
   <pre><code>{`from pathlib import Path
