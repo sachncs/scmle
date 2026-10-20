@@ -350,6 +350,58 @@ def apply_attestation_gate(
     )
 
 
+def apply_evidence_index_gate(
+    outcome: ReleaseEvaluation,
+    index: evidence.EvidenceIndex | None,
+    verified: bool,
+) -> ReleaseEvaluation:
+    """Block release until the persisted evidence index is signed."""
+    if not isinstance(outcome, ReleaseEvaluation):
+        raise TypeError("outcome must be ReleaseEvaluation")
+    passed = (
+        isinstance(index, evidence.EvidenceIndex)
+        and index.signature is not None
+        and verified
+    )
+    if passed:
+        return outcome
+    finding = ReleaseFinding(
+        FindingKind.SECURITY,
+        "release_evidence",
+        False,
+        True,
+        (
+            "release evidence index is missing or has an invalid signature; "
+            "release blocked"
+        ),
+        observed=(
+            "invalid"
+            if isinstance(index, evidence.EvidenceIndex)
+            and index.signature is not None
+            and not verified
+            else "unsigned"
+        ),
+        expected="verified hmac-sha256 evidence index signature",
+        evidence=("release_evidence.json",),
+    )
+    findings = tuple(
+        sorted(
+            (*outcome.findings, finding),
+            key=lambda item: (item.kind.value, item.name, item.reason),
+        )
+    )
+    blocking_reasons = tuple(
+        item.reason for item in findings if not item.passed and item.blocking
+    )
+    return ReleaseEvaluation(
+        task=outcome.task,
+        policy_schema_version=outcome.policy_schema_version,
+        passed=False,
+        findings=findings,
+        blocking_reasons=blocking_reasons,
+    )
+
+
 def evaluate_release(
     policy: evaluation.EvaluationPolicy,
     metric_values: Mapping[str, Any],

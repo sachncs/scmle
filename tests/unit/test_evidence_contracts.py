@@ -50,6 +50,29 @@ def test_record_round_trips_and_index_is_deterministic():
     )
 
 
+def test_signed_index_round_trips_and_rejects_tampering():
+    index = evidence.EvidenceIndex([make_record()])
+    signature = index.sign("evidence-key")
+
+    assert signature
+    assert index.verify("evidence-key")
+    restored = evidence.EvidenceIndex.from_dict(index.to_dict())
+    assert restored.verify("evidence-key")
+    assert restored.to_dict() == index.to_dict()
+    restored.records["quality.contracts"] = evidence.EvidenceRecord.from_dict(
+        {**make_record().to_dict(), "claim": "tampered claim"}
+    )
+    assert not restored.verify("evidence-key")
+
+
+def test_signed_index_cannot_be_changed():
+    index = evidence.EvidenceIndex([make_record()])
+    index.sign("evidence-key")
+
+    with pytest.raises(ValueError, match="signed evidence index"):
+        index.register(make_record("second"))
+
+
 def test_index_rejects_duplicate_and_pending_records():
     index = evidence.EvidenceIndex([make_record()])
 

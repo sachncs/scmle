@@ -1758,6 +1758,9 @@ class PackageStage(Stage):
             return
 
         evidence_index = self.evidence_index(context, store, policy)
+        signing_key = attestation.resolve_key(None)
+        if signing_key is not None:
+            evidence_index.sign(signing_key)
         declared_metrics = {metric.name for metric in policy.metrics}
         release_metrics = {
             name: value
@@ -1788,6 +1791,12 @@ class PackageStage(Stage):
             verification = False
         outcome = release.apply_attestation_gate(
             outcome, evaluation.get("release_attestation"), verification
+        )
+        evidence_verified = signing_key is not None and evidence_index.verify(
+            signing_key
+        )
+        outcome = release.apply_evidence_index_gate(
+            outcome, evidence_index, evidence_verified
         )
         evaluation["release_policy"] = policy.to_dict()
         evaluation["release_evaluation"] = outcome.to_dict()
@@ -2593,6 +2602,7 @@ class PackageStage(Stage):
             "provenance.json",
             "sbom.json",
             "release_attestation.json",
+            "release_evidence.json",
             "evidence_graph.json",
             "evaluation.json",
             f"model/{bundle_module.MANIFEST_FILE}",

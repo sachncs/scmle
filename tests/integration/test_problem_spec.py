@@ -8,6 +8,7 @@ import pytest
 import support
 
 from scml.contracts import errors
+from scml.contracts import evidence
 from scml.contracts import tasks
 from scml.governance import attestation
 
@@ -116,6 +117,11 @@ def test_packaged_release_attestation_is_signed_when_key_is_configured(
         result.evaluation["sbom"],
         signing_key="release-key",
     )
+    evidence_index = evidence.EvidenceIndex.from_dict(
+        result.evaluation["release_evidence"]
+    )
+    assert evidence_index.verify("release-key")
+    assert (result.run_dir / "release_evidence.json").exists()
     assert not any(
         finding["kind"] == "security"
         for finding in result.evaluation["release_evaluation"]["findings"]

@@ -5,9 +5,12 @@ from collections.abc import Mapping
 import dataclasses
 import datetime
 import enum
+import hmac
 import json
 from typing import Any
 from typing import Self
+
+from scml.governance import attestation
 
 
 class EvidenceResult(enum.StrEnum):
@@ -133,14 +136,23 @@ class EvidenceRecord:
 class EvidenceIndex:
     """Deterministic collection of unique release evidence records."""
 
-    def __init__(self, records: Iterable[EvidenceRecord] = ()) -> None:
+    def __init__(
+        self,
+        records: Iterable[EvidenceRecord] = (),
+        signature: str | None = None,
+    ) -> None:
         """Creates an index and registers the supplied records."""
         self.records: dict[str, EvidenceRecord] = {}
+        self.signature = signature
+        if signature is not None:
+            require_text(signature, "signature")
         for record in records:
             self.register(record)
 
     def register(self, record: EvidenceRecord) -> None:
         """Registers one criterion without silently replacing evidence."""
+        if self.signature is not None:
+            raise ValueError("a signed evidence index cannot be changed")
         if record.criterion_id in self.records:
             raise ValueError(
                 f"duplicate evidence criterion: {record.criterion_id}"
@@ -168,14 +180,69 @@ class EvidenceIndex:
         """Whether every registered criterion is an accepted pass."""
         return bool(self.records) and not self.pending()
 
+    def unsigned_dict(self) -> dict[str, Any]:
+        """Return the versioned content covered by the index signature."""
+        return {
+            "schema_version": 1,
+            "records": [record.to_dict() for record in self.ordered()],
+        }
+
+    def sign(self, signing_key: str | bytes) -> str:
+        """Sign the complete index and return its HMAC value."""
+        self.signature = attestation.sign_payload(
+            self.unsigned_dict(), signing_key
+        )
+        return self.signature
+
+    def verify(self, signing_key: str | bytes) -> bool:
+        """Verify the index signature against its current records."""
+        if self.signature is None:
+            return False
+        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        return hmac.compare_digest(self.signature, expected)
+
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic, JSON-compatible evidence index."""
-        return {"records": [record.to_dict() for record in self.ordered()]}
+        record = self.unsigned_dict()
+        if self.signature is not None:
+            record["signature"] = {
+                "algorithm": attestation.SIGNATURE_ALGORITHM,
+                "value": self.signature,
+            }
+        return record
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuild and validate a versioned evidence index."""
+        if record.get("schema_version") != 1:
+            raise ValueError("unsupported evidence index schema version")
+        raw_records = record.get("records")
+        if not isinstance(raw_records, list):
+            raise ValueError("evidence index records must be a list")
+        signature_record = record.get("signature")
+        signature: str | None = None
+        if signature_record is not None:
+            if not isinstance(signature_record, Mapping):
+                raise ValueError("evidence index signature must be an object")
+            if (
+                signature_record.get("algorithm")
+                != attestation.SIGNATURE_ALGORITHM
+            ):
+                raise ValueError(
+                    "unsupported evidence index signature algorithm"
+                )
+            signature = require_text(
+                str(signature_record.get("value", "")),
+                "signature",
+            )
+        index = cls(EvidenceRecord.from_dict(item) for item in raw_records)
+        index.signature = signature
+        return index
 
     def canonical_json(self) -> str:
         """Returns stable JSON suitable for hashing and signing."""
         return json.dumps(
-            self.to_dict(),
+            self.unsigned_dict(),
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,

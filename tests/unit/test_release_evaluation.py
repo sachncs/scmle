@@ -145,6 +145,29 @@ def test_release_evaluation_passes_and_serializes_deterministically():
     assert json.loads(first.canonical_json())["passed"] is True
 
 
+def test_release_evidence_gate_requires_a_verified_signature():
+    """A passing policy cannot bypass an unsigned evidence index."""
+    policy = make_policy()
+    outcome = release.evaluate_release(
+        policy,
+        {"roc_auc": 0.81},
+        {"metric_uncertainty": {"estimate": 0.81}},
+        {},
+        make_index(policy),
+    )
+    unsigned = make_index(policy)
+    blocked = release.apply_evidence_index_gate(outcome, unsigned, False)
+    assert not blocked.passed
+    assert any(
+        finding.name == "release_evidence" for finding in blocked.findings
+    )
+
+    signed = make_index(policy)
+    signed.sign("evidence-key")
+    accepted = release.apply_evidence_index_gate(outcome, signed, True)
+    assert accepted == outcome
+
+
 def test_metric_failure_and_missing_evidence_block_release():
     """A failed metric and an absent required record are blocking findings."""
     policy = make_policy()
