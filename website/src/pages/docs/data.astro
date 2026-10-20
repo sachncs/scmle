@@ -50,7 +50,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <div class="doc-cards">
     <div class="doc-card"><small>AUDIO</small><h3>Probe before decode</h3><p>WAV metadata and bounded PCM signal statistics are read with the standard library. Other containers require an explicit caller-owned probe, so codec versions and optional dependencies remain visible in the run evidence.</p></div>
     <div class="doc-card"><small>VIDEO</small><h3>Metadata is evidence</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. A metadata-only feature matrix is available for inspection; the core package does not guess from a filename or import a codec stack implicitly.</p></div>
-    <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Raster samples require dimensions, bands, dtype, CRS, and transform metadata.</p></div>
+    <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Spatial-block splitting keeps nearby features together in CRS units. Raster samples require dimensions, bands, dtype, CRS, and transform metadata.</p></div>
   </div>
   <pre><code>{`from scml.data.modalities import AudioSample, GeospatialDataset, VideoSample
 from scml.data.modalities import DocumentDataset, DocumentSample
@@ -76,6 +76,9 @@ audio_split = AudioDataset((audio,)).split(test_fraction=0)
 # These objects can be profiled and curated. They do not silently opt into
 # tabular modelling or a production support claim.`}</code></pre>
   <p>Image, document, graph, audio, video, and geospatial foundations remain experimental or extension-only until modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence is attached to the capability registry. The supported release boundary is the explicitly gated tabular library path. The same rule applies to warehouse and broker transports: a transport seam is not a production guarantee.</p>
+  <h2>Spatial split boundary</h2>
+  <p><code>GeospatialDataset.split_spatial(block_size=...)</code> requires a block size in the dataset CRS units and assigns each feature to one spatial block using its geometry centroid. Blocks, not individual features, are assigned to train, validation, and test. This prevents the common mistake of evaluating on points immediately adjacent to training points.</p>
+  <p>Large polygons or lines that cross block boundaries need a domain-specific spatial join policy. The core contract does not pretend that centroid assignment solves every spatial leakage problem.</p>
   <h2>Audio feature boundary</h2>
   <p><code>AudioDataset.prepare_features()</code> produces a small, inspectable baseline matrix: amplitude mean and spread, RMS, peak level, clipping fraction, silence fraction, observed duration, PCM scale, and recorded metadata. It reads a bounded prefix and exposes <code>frames_observed</code> and <code>frames_truncated</code> beside the values. This makes resource limits and measurement scope visible in data evidence.</p>
   <p>The core implementation intentionally decodes WAV only. A sample accepted through an explicit FLAC, MP3, or other codec probe can be curated, but signal preparation stops until the caller supplies a versioned decoder adapter. There is no hidden resampling, speaker identification, transcript generation, spectrogram claim, or production audio model behind this API.</p>

@@ -157,6 +157,11 @@ modelling boundary.
 The image grouped-split slice at `006f7b2` adds the same capture-session or
 subject boundary with 11 focused image-data tests and does not expand the
 supported modelling boundary.
+The geospatial spatial-block slice at `1a0ed48` passes 19 focused
+media/geospatial tests, Ruff, and mypy. It requires an explicit CRS-unit
+block size and keeps blocks together; centroid assignment for large or
+cross-block geometries remains a documented limitation and does not expand
+the supported modelling boundary.
 
 The current release preflight at pushed commit `bd570a7` passed `1743 passed,
 89 skipped, 2 warnings`; the bounded suite measured 81.48% whole-package

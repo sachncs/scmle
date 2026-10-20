@@ -100,6 +100,17 @@ print(features.feature_names)
 print(features.to_numpy())</code></pre>
   <p>The method intentionally does not select frames, decode codecs, infer synchronization, or produce temporal explanations. Those decisions need a versioned decoder, sampling policy, resource budget, leakage review, and independent evaluation before a video model can be considered for release. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit. The same explicit grouping rule applies to image datasets.</p>
 
+  <h2>Experimental spatial splitting</h2>
+  <p>Geospatial data uses a spatial-block split instead of pretending that random feature splits are independent.</p>
+  <pre><code>split = places.split_spatial(
+    block_size=1_000,
+    validation_fraction=0.2,
+    test_fraction=0.2,
+    seed=7,
+)
+print(split.block_ids())</code></pre>
+  <p><code>block_size</code> is expressed in the declared CRS units. The implementation uses feature centroids and reports the assigned block IDs. Geometry that spans multiple blocks, spatial autocorrelation diagnostics, and map-based explanation remain domain-specific work.</p>
+
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
   <div class="callout"><p><strong>Bundle compatibility:</strong> format 2 authenticates <code>schema.json</code>. Legacy format 1 bundles are refused by default and should only be migrated from a source you explicitly trust.</p></div>
