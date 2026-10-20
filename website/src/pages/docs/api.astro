@@ -34,6 +34,9 @@ predictions = predict(loaded, new_rows)</code></pre>
     modality="tabular",
 )</code></pre>
 
+  <h2>Curation is a release input</h2>
+  <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes.</p>
+
   <h2>What is safe to depend on</h2>
   <p>The supported top-level exports are <code>MLProject</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
 

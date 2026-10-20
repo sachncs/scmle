@@ -35,7 +35,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   </ol>
 
   <h2>What to review before modelling</h2>
-  <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, and dropped columns. A curation finding is an input to the modelling decision—not noise around it.</p>
+  <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, duplicate-content label conflicts, and dropped columns. A curation finding is an input to the modelling decision—not noise around it. Blocking findings stop the run until a reviewer resolves, waives, or marks them false-positive.</p>
   <h2>The dataset card</h2>
   <p>Every packaged run writes <code>dataset_card.json</code>. It is the human-facing summary of the snapshot: intended use, explicit exclusions, row and feature composition, source ownership, lineage, privacy controls, limitations, and the findings that still need review. Its default status is <code>machine_generated_unreviewed</code>; that is deliberate. A generated card is context, not approval.</p>
   <pre><code>{`{
@@ -46,7 +46,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 }`}</code></pre>
 
   <h2>Data boundaries beyond tables</h2>
-  <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation and dataset cards. Every foundation now exposes a modality curation report; documents flag duplicate content, conflicting labels, mixed labeled/unlabeled state, unknown language, and truncated inspection, while other modalities surface shape, encoding, duplicate, graph-structure, and CRS findings. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
+  <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation and dataset cards. Every foundation now exposes a modality curation report; documents and media flag duplicate content with conflicting labels, mixed labeled/unlabeled state, unknown language, and truncated inspection, while other modalities surface shape, encoding, duplicate, graph-structure, and CRS findings. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
   <div class="doc-cards">
     <div class="doc-card"><small>AUDIO</small><h3>Probe before decode</h3><p>WAV metadata and bounded PCM signal statistics are read with the standard library. Other containers require an explicit caller-owned probe, so codec versions and optional dependencies remain visible in the run evidence.</p></div>
     <div class="doc-card"><small>VIDEO</small><h3>Metadata is evidence</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. A metadata-only feature matrix is available for inspection; the core package does not guess from a filename or import a codec stack implicitly.</p></div>

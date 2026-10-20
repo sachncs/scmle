@@ -162,6 +162,10 @@ media/geospatial tests, Ruff, and mypy. It requires an explicit CRS-unit
 block size and keeps blocks together; centroid assignment for large or
 cross-block geometries remains a documented limitation and does not expand
 the supported modelling boundary.
+The duplicate-label curation slice at `df5739d` passes 47 focused document,
+image, and media tests with Ruff and mypy clean. Image, audio, and video now
+emit blocking risk findings when duplicate content carries incompatible known
+labels; this remains curation evidence, not a modelling-support claim.
 
 The current release preflight at pushed commit `bd570a7` passed `1743 passed,
 89 skipped, 2 warnings`; the bounded suite measured 81.48% whole-package
