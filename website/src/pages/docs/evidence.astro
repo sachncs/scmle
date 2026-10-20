@@ -1,0 +1,57 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Evidence & gates" description="Turn data, model, reliability, and release claims into reviewable evidence." current="evidence">
+  <p class="eyebrow"><span></span> Proof before promotion</p>
+  <h1>Make the claim.<br /><em>Show the evidence.</em></h1>
+  <p class="lead">A green training run is not a release decision. super-charge-ml records the raw inputs, reproducible command, artifact, reviewer, limitations, and disposition behind each claim.</p>
+
+  <div class="callout"><p><strong>The rule:</strong> implemented means code exists; supported means the declared lifecycle passes; production-proven means an independent reviewer reproduced the evidence from a clean checkout.</p></div>
+
+  <h2>One claim, one evidence record</h2>
+  <p>Every release criterion is a named record. Do not write “quality checked” when the useful claim is “the curation report contains a structured finding for every detected issue.” The record should make the claim falsifiable.</p>
+  <pre><code>{`criterion_id:
+  claim: structured curation findings are persisted
+  scope: {release: beta, area: data}
+  raw_inputs: {dataset: sha256:...}
+  command_or_test: uv run pytest tests/integration/test_quality_checks_in_run.py
+  artifact: {path: curation_report.json, digest: sha256:...}
+  result: pass
+  reviewer: independent-reviewer
+  observed_at: 2026-10-20T12:00:00+00:00
+  limitations: [connector object hashes are not yet raw-byte hashes]
+  decision: accepted`}</code></pre>
+
+  <h2>How the gates work</h2>
+  <ol>
+    <li><strong>Declare the boundary:</strong> a capability names its modality, task, model family, evaluation, uncertainty, fairness, explainability, and inference surface.</li>
+    <li><strong>Collect raw evidence:</strong> keep dataset snapshots, test output, artifact digests, resource measurements, and failure traces.</li>
+    <li><strong>Evaluate the claim:</strong> compare results with explicit thresholds, uncertainty, subgroup warnings, and known limitations.</li>
+    <li><strong>Review independently:</strong> reproduce from a clean checkout and recompute at least one critical result.</li>
+    <li><strong>Promote or demote:</strong> accept the capability, block the release, or mark it extension-only. Never hide an incomplete stage.</li>
+  </ol>
+
+  <h2>What blocks a release</h2>
+  <ul>
+    <li>A supported modality is missing evidence for any of its 15 lifecycle stages.</li>
+    <li>A required metric, diagnostic, fairness result, uncertainty result, or explanation is absent.</li>
+    <li>A fault scenario has no verified safe outcome or recovery evidence.</li>
+    <li>A dataset snapshot, model bundle, or dependency cannot be identified and reproduced.</li>
+    <li>A reviewer cannot distinguish a warning from a release-blocking finding.</li>
+  </ul>
+
+  <h2>Read the evidence in order</h2>
+  <div class="diagram">
+    <div class="diagram-caption"><span>Evidence path</span><strong>raw source to release decision</strong></div>
+    <div class="data-path">
+      <div class="path-step highlighted"><span>01</span><b>Raw source</b></div><i class="path-line"></i>
+      <div class="path-step"><span>02</span><b>Snapshot</b></div><i class="path-line"></i>
+      <div class="path-step"><span>03</span><b>Run & bundle</b></div><i class="path-line"></i>
+      <div class="path-step"><span>04</span><b>Evaluation</b></div><i class="path-line"></i>
+      <div class="path-step highlighted"><span>05</span><b>Review</b></div>
+    </div>
+  </div>
+
+  <p class="meta">Evidence is a product surface, not an appendix · 0.1 beta</p>
+</DocsLayout>
