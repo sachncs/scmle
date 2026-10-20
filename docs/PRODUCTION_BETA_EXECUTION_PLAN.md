@@ -57,6 +57,15 @@ means the code path exists; it does not mean the capability is supported.
 | Security, provenance, SBOM, and release CI | Partial | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, and immutable CI action pins exist. Independent security scans, signed SBOM/provenance attestation, and clean-release rehearsal remain incomplete. |
 | Astro developer site | Partial | Standalone docs routes and the `/super-charge-ml/` base path build. Accessibility automation, Playwright smoke coverage, deployment verification, and exhaustive modality/operations content remain incomplete. |
 
+### Verification snapshot — 20 October 2026
+
+The post-fix repository regression run completed with `1907 passed, 103
+skipped, 9 warnings` in 30 minutes 56 seconds using `uv run pytest -q` on the
+local Python 3.14t environment. The suite is green, but the skipped tests and
+runtime warnings are not release evidence by themselves: each must be
+classified as environment-required, intentionally unsupported, or a release
+blocker before a supported-production label is appropriate.
+
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
 extension-only until their complete lifecycle evidence is attached.
