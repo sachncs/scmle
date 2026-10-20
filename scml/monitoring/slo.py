@@ -13,7 +13,7 @@ from scml.contracts import observability
 class SLOStatus(enum.StrEnum):
     """Outcome of evaluating one SLO window."""
 
-    PASS = "pass"
+    PASS = "pass"  # nosec B105 - operational status, not a credential
     BREACHED = "breached"
     INSUFFICIENT_DATA = "insufficient_data"
     INVALID = "invalid"
