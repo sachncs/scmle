@@ -879,6 +879,19 @@ reason. Do not weaken the acceptance criteria to preserve the label.
 
 ## 10. Current local preflight record
 
+At pushed commit `ef48335`, the current-head strict regression gate passed on
+2026-10-21 with:
+
+- `uv run pytest -q tests -W error::ResourceWarning`: 2,247 passed and 88
+  skipped in 28 minutes;
+- no failure, error, or warning promoted to a failure by the strict warning
+  policy.
+
+This verifies the current source tree's contract and reliability suite, but it
+is not a complete production release decision: coverage, mutation, benchmark,
+clean-clone, hosted CI/Pages, external-fault, and independent-review evidence
+remain separate gates below.
+
 The latest complete local release preflight at pushed commit `2eb767e` passed
 on 2026-10-21:
 
