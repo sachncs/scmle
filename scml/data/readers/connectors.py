@@ -638,6 +638,125 @@ class DbApiConnector(SourceConnector):
             connection.close()
 
 
+class WarehouseConnector(SourceConnector):
+    """Connector for caller-owned warehouse or lakehouse query engines.
+
+    The connector injects the query engine boundary instead of importing a
+    warehouse SDK. A DuckDB, Spark, BigQuery, Snowflake, or lakehouse
+    integration can provide the two callbacks while this contract owns
+    bounded reads, retries, checkpoints, schema validation, and failure
+    evidence.
+    """
+
+    supported_schemes = ("warehouse", "lakehouse")
+
+    def __init__(
+        self,
+        source_uri: str,
+        query: str,
+        schema_reader: Callable[[str], SourceSchema],
+        batch_reader: Callable[
+            [str, int, int], tuple[SourceSchema, Sequence[Row], bool]
+        ],
+        retry_budget: RetryBudget | None = None,
+    ) -> None:
+        """Initialize a warehouse connector around injected query callbacks.
+
+        Args:
+            source_uri: Logical ``warehouse://`` or ``lakehouse://`` URI.
+            query: Versioned query or table expression used by the engine.
+            schema_reader: Callback returning the source schema for ``query``.
+            batch_reader: Callback accepting query, row offset, and row limit.
+            retry_budget: Per-operation retry policy.
+        """
+        value = source_uri.strip()
+        scheme = urlsplit(value).scheme.lower()
+        if scheme not in self.supported_schemes:
+            raise UnsupportedUriSchemeError(
+                value, scheme, self.supported_schemes
+            )
+        if not query.strip():
+            raise ValueError("query must not be empty")
+        if not callable(schema_reader) or not callable(batch_reader):
+            raise TypeError("schema_reader and batch_reader must be callable")
+        self.query = query
+        self.schema_reader = schema_reader
+        self.batch_reader = batch_reader
+        super().__init__(value, retry_budget)
+        self.source_identity = source_identity(
+            f"{self.source_uri}|query={self.query}"
+        )
+
+    def schema(self) -> SourceSchema:
+        """Read and validate the schema without consuming a checkpoint."""
+        return execute_with_retries(
+            lambda: self.validate_schema(self.schema_reader(self.query)),
+            "schema",
+            self.source_uri,
+            self.retry_budget,
+        )
+
+    def read_rows(
+        self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
+    ) -> RowBatch:
+        """Read one bounded batch from the injected warehouse engine."""
+        self.validate_limit(limit)
+        value = self.validate_checkpoint(checkpoint)
+        return execute_with_retries(
+            lambda: self.read_batch(value, limit),
+            "read_rows",
+            self.source_uri,
+            self.retry_budget,
+        )
+
+    def read_batch(self, checkpoint: SourceCheckpoint, limit: int) -> RowBatch:
+        """Validate one callback result and bind its next checkpoint."""
+        schema, raw_rows, has_more = self.batch_reader(
+            self.query, checkpoint.offset, limit
+        )
+        schema = self.validate_schema(schema)
+        if not isinstance(has_more, bool):
+            raise ConnectorError(
+                "invalid_batch_more_flag",
+                "batch reader has_more must be bool",
+                self.source_uri,
+                {"value_type": type(has_more).__name__},
+            )
+        rows = tuple(tuple(row) for row in raw_rows)
+        if len(rows) > limit:
+            raise ConnectorError(
+                "batch_limit_exceeded",
+                "batch reader returned more rows than requested",
+                self.source_uri,
+                {"limit": limit, "received": len(rows)},
+            )
+        width = len(schema.columns)
+        if any(len(row) != width for row in rows):
+            raise ConnectorError(
+                "row_width_mismatch",
+                "warehouse row width does not match its schema",
+                self.source_uri,
+                {"expected": width},
+            )
+        return RowBatch(
+            schema=schema,
+            rows=rows,
+            checkpoint=checkpoint.advance(len(rows)),
+            has_more=has_more,
+        )
+
+    def validate_schema(self, schema: SourceSchema) -> SourceSchema:
+        """Validate a callback schema at the connector boundary."""
+        if not isinstance(schema, SourceSchema):
+            raise ConnectorError(
+                "invalid_schema",
+                "schema reader must return SourceSchema",
+                self.source_uri,
+                {"schema_type": type(schema).__name__},
+            )
+        return schema
+
+
 def read_tabular_bytes(source_uri: str, payload: bytes) -> pd.DataFrame:
     """Decode one supported tabular object from bytes.
 

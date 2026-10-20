@@ -218,6 +218,65 @@ def test_dbapi_connector_rejects_unsupported_uri_scheme():
         )
 
 
+def test_warehouse_connector_reads_bounded_batches_through_injected_engine(
+    frame,
+):
+    """Warehouse reads preserve query identity and portable checkpoints."""
+    schema = connectors.SourceSchema.from_frame(frame)
+
+    def read_schema(query):
+        assert query == "select * from records"
+        return schema
+
+    def read_batch(query, offset, limit):
+        assert query == "select * from records"
+        selected = frame.iloc[offset : offset + limit]
+        rows = tuple(selected.itertuples(index=False, name=None))
+        return schema, rows, offset + len(rows) < len(frame)
+
+    connector = connectors.WarehouseConnector(
+        "warehouse://analytics/records",
+        "select * from records",
+        read_schema,
+        read_batch,
+    )
+    first = connector.read_rows(limit=2)
+    second = connector.read_rows(first.checkpoint, limit=2)
+
+    assert connector.schema() == schema
+    assert first.rows == ((1, "a"), (2, "b"))
+    assert second.rows == ((3, "c"), (4, "d"))
+    assert second.checkpoint.source_identity == connector.source_identity
+    assert not second.has_more
+
+
+def test_warehouse_connector_retries_and_rejects_invalid_callback_rows(frame):
+    """Engine failures retry, while unsafe callback results fail closed."""
+    attempts = []
+
+    def read_schema(query):
+        attempts.append(query)
+        if len(attempts) == 1:
+            raise OSError("warehouse unavailable")
+        return connectors.SourceSchema.from_frame(frame)
+
+    connector = connectors.WarehouseConnector(
+        "lakehouse://bronze/records",
+        "records",
+        read_schema,
+        lambda query, offset, limit: (
+            connectors.SourceSchema.from_frame(frame),
+            ((1,),),
+            False,
+        ),
+        connectors.RetryBudget(max_retries=1),
+    )
+
+    assert connector.schema().columns[0].name == "id"
+    with pytest.raises(connectors.ConnectorError, match="row width"):
+        connector.read_rows(limit=1)
+
+
 def test_dbapi_connector_retries_transient_factory_failure(tmp_path):
     """The retry budget counts retries after the initial operation."""
     database = tmp_path / "source.sqlite"
