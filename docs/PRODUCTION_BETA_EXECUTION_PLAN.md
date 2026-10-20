@@ -939,6 +939,11 @@ Subsequent focused evidence:
   `-W error::ResourceWarning`, with Ruff and mypy clean. This is bounded
   perturbation evidence with an explicit black baseline; it does not claim
   raw-image saliency fidelity, localization, or production image support.
+- `ad4e434` adds bounded raw-text term-ablation evidence to the experimental
+  document baseline. Seven focused document-model tests pass under
+  `-W error::ResourceWarning`, with Ruff and mypy clean. The result is tied to
+  the exact input and model digest but does not claim OCR, citation grounding,
+  causal attribution, or supported document modelling.
 - `c85118e` runs the optional-extra security gate on Python 3.13 with every
   declared extra installed. The license inventory covers 149 packages and
   `pip-audit --skip-editable` reports no known vulnerabilities after raising

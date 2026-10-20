@@ -55,7 +55,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
   <p>The supported top-level exports are <code>MLProject</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
 
   <h2>Experimental document baseline</h2>
-  <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global and local term evidence, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
+  <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
   <pre><code>from scml.data.modalities import DocumentDataset, DocumentSample
 from scml.models.documents import DocumentClassifier, DocumentModelConfig
 
@@ -72,9 +72,10 @@ train = DocumentDataset((
 split = train.split(validation_fraction=0, test_fraction=0.25, seed=7)
 model = DocumentClassifier(DocumentModelConfig()).fit(split.train)
 evaluation = model.evaluate(split.test)
+ablation = model.term_ablation_explanation(split.test[0], top_k=5)
 artifact = model.save("artifacts/document-model")
 restored = DocumentClassifier.load(artifact.path, trusted=True)</code></pre>
-  <p>This is not part of the supported <code>MLProject</code> path. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it. OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary.</p>
+  <p>Term ablation removes lexical matches from the original text one at a time and measures the predicted-class score change; its candidate work is explicitly bounded by <code>max_terms</code>. This is perturbation evidence, not citation grounding or a causal claim. The path is not part of the supported <code>MLProject</code> workflow. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it. OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary.</p>
 
   <h2>Experimental image baseline</h2>
   <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for duplicate content and mixed label state, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
