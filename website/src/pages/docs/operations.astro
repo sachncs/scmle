@@ -32,7 +32,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p>For inference telemetry, use the redacted observability sidecar and evaluate it against an explicit policy. Missing required signals, stale or future timestamps, and threshold breaches must remain visible as failed evidence instead of being silently dropped.</p>
 
   <h2>Promote only an approved bundle</h2>
-  <p>A better challenger is not automatically the new champion. The lifecycle stages it under the <code>challenger</code> alias. An independent reviewer must approve the exact model version and content digest before the registry moves <code>champion</code>.</p>
+  <p>A better challenger is not automatically the new champion. The lifecycle stages it under the <code>challenger</code> alias. An independent reviewer must approve the exact model version and content digest, and the approval must be HMAC-signed, before the registry moves <code>champion</code>.</p>
   <pre><code>candidate = registry.resolve("customers", "challenger")
 approval = PromotionApproval(
     model="customers",
@@ -43,9 +43,9 @@ approval = PromotionApproval(
     reason="held-out, slice, explanation, and recovery evidence reviewed",
     evidence=("evidence/release-2026-10-20.json",),
     approved_at="2026-10-20T00:00:00+00:00",
-)
-manager.promote_challenger(approval)</code></pre>
-  <p>The approval is bound to the bundle content and written to the append-only audit log. A rejected, mismatched, or non-independent approval cannot move the serving alias. Rollback uses the same gate.</p>
+).sign("release-key")
+manager.promote_challenger(approval, signing_key="release-key")</code></pre>
+  <p>The approval is bound to the bundle content, reviewer decision, evidence, and timestamp, then written to the append-only audit log. A missing, rejected, mismatched, tampered, or non-independent approval cannot move the serving alias. Rollback uses the same gate.</p>
 
   <h2>Deployment boundary</h2>
   <p>The built-in HTTP adapter is a reference server. Put it behind an authenticating gateway with TLS, request policy, logs, and operational ownership.</p>
