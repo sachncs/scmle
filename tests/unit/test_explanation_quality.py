@@ -24,6 +24,44 @@ def test_ranking_stability_measures_top_k_overlap():
     assert score == pytest.approx(1.0 / 3.0)
 
 
+def test_linear_contribution_report_is_ranked_and_json_native():
+    result = quality.linear_contribution_report(
+        "sample-1",
+        ("signal", "noise", "age"),
+        (2.0, 10.0, -1.0),
+        (0.5, 0.01, -2.0),
+        top_k=2,
+    )
+
+    assert result == {
+        "sample_id": "sample-1",
+        "features": [
+            {"feature": "age", "importance": 2.0},
+            {"feature": "signal", "importance": 1.0},
+        ],
+        "terms": [["age", 2.0], ["signal", 1.0]],
+    }
+
+
+@pytest.mark.parametrize(
+    "factory",
+    (
+        lambda: quality.linear_contribution_report(
+            "", ("signal",), (1.0,), (1.0,)
+        ),
+        lambda: quality.linear_contribution_report(
+            "sample", ("signal",), (1.0,), (1.0,), top_k=2
+        ),
+        lambda: quality.linear_contribution_report(
+            "sample", ("signal",), (1.0,), (1.0, 2.0)
+        ),
+    ),
+)
+def test_linear_contribution_report_rejects_incomplete_contract(factory):
+    with pytest.raises(ValueError):
+        factory()
+
+
 def test_fidelity_scores_reconstruction_against_mean_baseline():
     assert quality.fidelity_score((0.0, 1.0, 2.0), (0.0, 1.0, 2.0)) == 1.0
     assert quality.fidelity_score((0.0, 1.0, 2.0), (1.0, 1.0, 1.0)) == 0.0

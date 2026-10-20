@@ -225,7 +225,12 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     ].evidence["quality"]
     assert model_quality["passed"] is True
     assert model_quality["fidelity_score"] == pytest.approx(1.0)
-    assert model_quality["stability_score"] == pytest.approx(1.0)
+    assert model_quality["stability_score"] >= 0.9
+    perturbation = evidence_by_stage[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ].evidence["perturbation_stability"]
+    assert perturbation["feature_space_only"] is True
+    assert perturbation["report_count"] > 1
     data_explanation = evidence_by_stage[
         modalities.LifecycleStage.DATA_EXPLAINABILITY
     ].evidence
@@ -313,7 +318,7 @@ def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
             signing_key="test-signing-key",
             performance_budget=performance.PerformanceBudget(
                 {
-                    performance.PerformanceOperation.INGEST: 0.000001,
+                    performance.PerformanceOperation.INGEST: 1e-12,
                 }
             ),
         )

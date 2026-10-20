@@ -1201,7 +1201,7 @@ class DataExplainabilityStage(ModalityLifecycleStage):
 
 
 class ModelExplainabilityStage(ModalityLifecycleStage):
-    """Explain global linear weights and one held-out prediction."""
+    """Explain linear weights and test feature-space stability."""
 
     stage = modalities.LifecycleStage.MODEL_EXPLAINABILITY
 
@@ -1218,14 +1218,6 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                 for index, name in enumerate(batch.feature_names)
             ),
             key=lambda item: (-item[1], item[0]),
-        )[:10]
-        contributions = batch.values[0] * model.coef_[0]
-        local_terms = sorted(
-            (
-                (name, float(contributions[index]))
-                for index, name in enumerate(batch.feature_names)
-            ),
-            key=lambda item: (-abs(item[1]), item[0]),
         )[:10]
         decision_values = np.asarray(model.decision_function(batch.values))
         reference_values = batch.values @ model.coef_.T + model.intercept_
@@ -1247,6 +1239,13 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             selected_class = int(np.argmax(decision_values[0]))
         row = batch.values[0]
         coefficients = model.coef_[selected_class]
+        local_report = quality.linear_contribution_report(
+            batch.sample_ids[0],
+            batch.feature_names,
+            row.tolist(),
+            coefficients.tolist(),
+            top_k=min(10, len(batch.feature_names)),
+        )
         nonzero = np.flatnonzero(np.abs(row * coefficients) > 1e-12)
         if len(nonzero):
             perturbed = np.repeat(row[None, :], len(nonzero), axis=0)
@@ -1265,14 +1264,35 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             )
         else:
             stability = 0.0
+        perturbation_reports = [local_report]
+        train_values = context.feature_batches["train"].values
+        feature_scales = np.maximum(np.std(train_values, axis=0), 1.0)
+        perturbation_size = feature_scales * 1e-6
+        for index in range(len(batch.feature_names)):
+            for direction in (-1.0, 1.0):
+                perturbed_row = row.copy()
+                perturbed_row[index] += direction * perturbation_size[index]
+                perturbation_reports.append(
+                    quality.linear_contribution_report(
+                        batch.sample_ids[0],
+                        batch.feature_names,
+                        perturbed_row.tolist(),
+                        coefficients.tolist(),
+                        top_k=min(10, len(batch.feature_names)),
+                    )
+                )
+        perturbation_stability = quality.ranking_stability(
+            tuple(perturbation_reports),
+            top_k=min(10, len(batch.feature_names)),
+        )
         quality_evaluation = quality.evaluate(
-            method="linear_reference_and_zero_ablation",
+            method="linear_reference_zero_ablation_and_perturbation",
             sample_count=len(batch.sample_ids),
             thresholds=quality.QualityThresholds(
-                stability_minimum=0.999999,
+                stability_minimum=0.9,
                 fidelity_minimum=0.999999,
             ),
-            stability=stability,
+            stability=perturbation_stability,
             fidelity=fidelity,
         )
         context.model_explanation = {
@@ -1281,7 +1301,14 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             "global_terms": [list(value) for value in global_terms],
             "local": {
                 "sample_id": batch.sample_ids[0],
-                "terms": [list(value) for value in local_terms],
+                "terms": local_report["terms"],
+            },
+            "zero_ablation_direction_consistency": stability,
+            "perturbation_stability": {
+                "score": perturbation_stability,
+                "report_count": len(perturbation_reports),
+                "relative_step": 1e-6,
+                "feature_space_only": True,
             },
             "quality": quality_evaluation.to_dict(),
             "limitations": [

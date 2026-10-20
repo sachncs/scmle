@@ -97,6 +97,63 @@ def explanation_ranking(report: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(ranking)
 
 
+def linear_contribution_report(
+    sample_id: str,
+    feature_names: Sequence[str],
+    values: Sequence[float],
+    coefficients: Sequence[float],
+    top_k: int = 10,
+) -> dict[str, object]:
+    """Build a deterministic local ranking from linear contributions.
+
+    The returned ranking is an explanation of the supplied feature
+    representation. It deliberately does not infer meaning for the features
+    or make a causal claim about the raw input.
+
+    Args:
+        sample_id: Stable identity of the explained sample.
+        feature_names: Feature names in matrix-column order.
+        values: One feature row in the same order as ``feature_names``.
+        coefficients: Model coefficients for the explained class.
+        top_k: Maximum number of ranked terms to return.
+
+    Returns:
+        A JSON-native local explanation report.
+
+    Raises:
+        ValueError: If identities, values, or bounds are inconsistent.
+    """
+    if not sample_id.strip():
+        raise ValueError("sample_id must not be empty")
+    if not 1 <= top_k <= len(feature_names):
+        raise ValueError("top_k must be within the feature-name count")
+    if len(feature_names) != len(values) or len(values) != len(coefficients):
+        raise ValueError("feature names, values, and coefficients must align")
+    names = tuple(feature_names)
+    if len(set(names)) != len(names) or any(not name.strip() for name in names):
+        raise ValueError("feature names must be unique and non-empty")
+    contributions = []
+    for name, value, coefficient in zip(
+        names, values, coefficients, strict=True
+    ):
+        contribution = float(value) * float(coefficient)
+        if not math.isfinite(contribution):
+            raise ValueError("linear contributions must be finite")
+        contributions.append((name, contribution))
+    ranked = sorted(
+        contributions,
+        key=lambda item: (-abs(item[1]), item[0]),
+    )[:top_k]
+    return {
+        "sample_id": sample_id,
+        "features": [
+            {"feature": name, "importance": contribution}
+            for name, contribution in ranked
+        ],
+        "terms": [[name, contribution] for name, contribution in ranked],
+    }
+
+
 def ranking_stability(
     reports: Sequence[Mapping[str, Any]], top_k: int | None = None
 ) -> float:
