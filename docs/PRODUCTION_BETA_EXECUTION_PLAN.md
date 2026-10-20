@@ -283,6 +283,22 @@ evidence now satisfies the five-seed statistical criterion while preserving the
 honest conclusion that three of four comparisons are indistinguishable from
 the reference.
 
+The current-head preflight at `e25f3ce` passed `1824 passed, 89 skipped`. The
+bounded contract suite reported two ordinary
+`ResourceWarning` summaries, but the same suite rerun with
+`-W error::ResourceWarning` also passed `1824 passed, 89 skipped`; therefore
+the exercised API paths do not leave SQLite connections open. Total coverage
+was 82.25%, the declared core scope was 86%, and the critical mutation gate
+killed `1294/1794` mutants (72%, above the 70% minimum). The five-seed
+benchmark gate checked breast cancer, wine, digits, and diabetes progression
+with zero regressions; the verdicts were tie, tie, tie, and ahead, with
+95%-interval evidence retained in the benchmark artifact. Twine checks,
+reproducible wheel and source-distribution verification, offline artifact
+installation, dependency audit, and the Astro site build all passed. This is
+local release evidence, not independent release sign-off: the external
+reviewer signature, optional-extra license audit, public Pages deployment, and
+external transport/resource-fault rehearsal remain open.
+
 The only currently defensible supported boundary is the explicitly gated
 tabular library path. All other modality rows must remain experimental or
 extension-only until their complete lifecycle evidence is attached.
