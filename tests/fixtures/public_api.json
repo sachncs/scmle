@@ -1,0 +1,42 @@
+{
+  "exports": {
+    "MLProject": {
+      "kind": "class",
+      "signature_sha256": "c83892514057660ad6a540fb8eb74bed1ae395a5850d64da0442d6deddcd2357"
+    },
+    "ModelBundle": {
+      "kind": "class",
+      "signature_sha256": "711014aeb1a77f78329141e9afb53c8d2343c01ff94c43df683a33cb1a6d9a37"
+    },
+    "RunResult": {
+      "kind": "class",
+      "signature_sha256": "3c579a130a5fc5c97e410bea14d15d5df1a494dd972b19b637f6099d0b60ee5f"
+    },
+    "__version__": {
+      "kind": "value",
+      "value": "0.1.0b1"
+    },
+    "load_model": {
+      "kind": "callable",
+      "signature_sha256": "b2570d34fa027ba62369eb032bca7044b3ea4ff0964852288fb4c38173c3e13e"
+    },
+    "predict": {
+      "kind": "callable",
+      "signature_sha256": "a438fb38781d4095156a7252b76a2d2b14c3eb8960444474f99ae726de01af7a"
+    },
+    "register_estimator": {
+      "kind": "callable",
+      "signature_sha256": "bac7c7b6b3f23dd029475dfc5586dc7e98ccb053d555ef6589537b325e6aa908"
+    },
+    "register_metric": {
+      "kind": "callable",
+      "signature_sha256": "204205d9ecbf58dffda0d2288aa56de417730506434f0ad2f3d66019eeafb3bb"
+    },
+    "unregister_estimator": {
+      "kind": "callable",
+      "signature_sha256": "fe0fd9428b7396a18a2f9240650f0dc4c56f5371ac4b9f56163fae9135fe6b8e"
+    }
+  },
+  "release": "0.1.0b1",
+  "schema_version": 1
+}

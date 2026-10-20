@@ -13,6 +13,8 @@ uv run --python "$python_version" ruff format --check .
 uv run --python "$python_version" mypy scml benchmarks
 uv run --python "$python_version" bandit -q -r scml
 uv run --python "$python_version" pip-audit --skip-editable
+uv run --python "$python_version" python scripts/check_api_compatibility.py \
+  tests/fixtures/public_api.json
 
 echo "== bounded contract suite =="
 uv run --python "$python_version" pytest -q \

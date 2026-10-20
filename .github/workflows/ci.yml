@@ -26,6 +26,7 @@ jobs:
       - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy scml benchmarks
+      - run: uv run python scripts/check_api_compatibility.py tests/fixtures/public_api.json
       # Keep pull requests bounded. The scheduled full-suite workflow retains
       # coverage for every integration and optional path.
       - run: >-
