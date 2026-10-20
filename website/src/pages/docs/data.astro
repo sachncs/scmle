@@ -25,5 +25,16 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>What to review before modelling</h2>
   <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, and dropped columns. A curation finding is an input to the modelling decision—not noise around it.</p>
+  <h2>The dataset card</h2>
+  <p>Every packaged run writes <code>dataset_card.json</code>. It is the human-facing summary of the snapshot: intended use, explicit exclusions, row and feature composition, source ownership, lineage, privacy controls, limitations, and the findings that still need review. Its default status is <code>machine_generated_unreviewed</code>; that is deliberate. A generated card is context, not approval.</p>
+  <pre><code>{`{
+  "intended_use": "Training and evaluation for binary classification...",
+  "out_of_scope": ["It is not a release approval..."],
+  "review_status": "machine_generated_unreviewed",
+  "composition": {"source_rows": 12000, "profiled_rows": 12000}
+}`}</code></pre>
+
+  <h2>Data boundaries beyond tables</h2>
+  <p>Image, document, and graph readers have validation and profiling foundations, but the 0.1 beta does not claim their complete modelling, evaluation, packaging, inference, monitoring, and recovery lifecycle. Treat them as experimental or extension-only until the capability registry says otherwise. The supported release boundary is the explicitly gated tabular library path.</p>
   <div class="callout"><p><strong>Data hand-off:</strong> once curation is complete, the run carries forward the normalized schema, profile findings, selected validation strategy, and the decisions made about labels and unavailable features. The model stage consumes that contract; it does not redefine it.</p></div>
 </DocsLayout>

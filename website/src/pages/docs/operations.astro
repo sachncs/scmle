@@ -27,6 +27,10 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     new_key,
 )</code></pre>
 
+  <h2>Read the release controls</h2>
+  <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. The fault plan is intentionally marked <code>planned</code> until an execution harness supplies reviewed evidence—its presence is not a claim that recovery has passed.</p>
+  <p>For inference telemetry, use the redacted observability sidecar and evaluate it against an explicit policy. Missing required signals, stale or future timestamps, and threshold breaches must remain visible as failed evidence instead of being silently dropped.</p>
+
   <h2>Deployment boundary</h2>
   <p>The built-in HTTP adapter is a reference server. Put it behind an authenticating gateway with TLS, request policy, logs, and operational ownership.</p>
   <div class="callout"><p><strong>Release rehearsal:</strong> before promotion, replay a known input, verify the signed bundle, confirm the serving schema, exercise resume from a checkpoint, inspect monitoring output, and record who reviewed the evidence. A green training run is not by itself a release decision.</p></div>

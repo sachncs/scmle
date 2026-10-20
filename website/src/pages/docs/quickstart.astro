@@ -33,13 +33,17 @@ CSV</code></pre>
 
   <h2>4. Inspect the evidence</h2>
   <pre><code>runs/customers/&lt;run-id&gt;/
+├── dataset_card.json
 ├── curation_report.json
+├── provenance.json
+├── sbom.json
+├── fault_injection_plan.json
 ├── events.jsonl
 ├── execution_plan.json
 ├── evaluation.json
 ├── model/
 └── config.json</code></pre>
-  <p>Start with <code>curation_report.json</code>. If the data is not trustworthy, a better score is not a better result.</p>
+  <p>Start with <code>dataset_card.json</code> for intended use, exclusions, ownership, privacy, and limitations; then read <code>curation_report.json</code> for row-level decisions. If the data is not trustworthy, a better score is not a better result.</p>
 
   <h2>5. Score new rows</h2>
   <pre><code>scml predict runs/customers/&lt;run-id&gt;/model \
