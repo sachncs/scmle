@@ -23,6 +23,7 @@ const capabilities = [
   "Missingness, duplicates, drift, representativeness, and label quality",
   "Signed bundles, lineage, replay checks, and operational monitoring",
 ];
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <!doctype html>
@@ -31,9 +32,9 @@ const capabilities = [
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content="Super-charge-ml turns messy tables into trustworthy machine learning systems." />
-    <link rel="canonical" href="https://super-charge-ml.dev/" />
+    <link rel="canonical" href="https://sachncs.github.io/super-charge-ml/" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://super-charge-ml.dev/" />
+    <meta property="og:url" content="https://sachncs.github.io/super-charge-ml/" />
     <meta property="og:title" content="super-charge-ml — curate first, model with confidence" />
     <meta property="og:description" content="Turn messy tables into trustworthy machine learning systems." />
     <meta name="twitter:card" content="summary" />
@@ -41,7 +42,7 @@ const capabilities = [
   </head>
   <body>
     <header class="nav shell">
-      <a class="brand" href="/" aria-label="super-charge-ml home">
+      <a class="brand" href={`${base}/`} aria-label="super-charge-ml home">
         <span class="brand-mark">✳</span>
         <span>super-charge-ml</span>
       </a>
@@ -50,7 +51,7 @@ const capabilities = [
         <a href="#capabilities">Capabilities</a>
         <a href="https://github.com/sachncs/magicml">GitHub ↗</a>
       </nav>
-      <a class="nav-cta" href="https://github.com/sachncs/magicml">View the repo <span>↗</span></a>
+        <a class="nav-cta" href={`${base}/docs/`}>Read the docs <span>→</span></a>
     </header>
 
     <main>
@@ -58,9 +59,9 @@ const capabilities = [
         <div class="hero-copy">
           <p class="eyebrow"><span></span> Open-source ML lifecycle infrastructure</p>
           <h1>Better data in.<br /><em>Better decisions out.</em></h1>
-          <p class="lede">Most ML projects do not fail because the model is too simple. They fail because the data was not understood, curated, or governed well enough.</p>
+          <p class="lede">A Python workflow for profiling messy tabular data, choosing leakage-safe validation, comparing bounded model candidates, and exporting an auditable bundle.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/sachncs/magicml">Explore on GitHub <span>↗</span></a>
+            <a class="button button-primary" href={`${base}/docs/`}>Explore the docs <span>→</span></a>
             <a class="text-link" href="#approach">See how it works <span>↓</span></a>
           </div>
         </div>
@@ -68,11 +69,11 @@ const capabilities = [
           <div class="orbit orbit-one"></div>
           <div class="orbit orbit-two"></div>
           <div class="data-card card-main">
-            <div class="card-top"><span class="status-dot"></span><span>dataset health</span><b>97.4%</b></div>
+            <div class="card-top"><span class="status-dot"></span><span>example curation pass</span><b>review</b></div>
             <div class="signal"><span class="signal-label">schema</span><span class="signal-bar"><i style="width: 94%"></i></span><strong>clean</strong></div>
             <div class="signal"><span class="signal-label">leakage</span><span class="signal-bar"><i style="width: 100%"></i></span><strong>blocked</strong></div>
             <div class="signal"><span class="signal-label">coverage</span><span class="signal-bar"><i style="width: 86%"></i></span><strong>ready</strong></div>
-            <div class="card-foot"><span>curation pass</span><span>01 / 03</span></div>
+            <div class="card-foot"><span>illustrative workflow</span><span>01 / 03</span></div>
           </div>
           <div class="data-card card-chip chip-left"><span class="chip-icon">⌁</span><span>raw tables</span></div>
           <div class="data-card card-chip chip-right"><span class="chip-icon">✓</span><span>audited bundle</span></div>
@@ -86,7 +87,7 @@ const capabilities = [
 
       <section class="approach shell" id="approach">
         <div class="section-intro"><p class="eyebrow"><span></span> The operating principle</p><h2>Data curation is the product.</h2></div>
-        <div class="intro-copy"><p>super-charge-ml is an opinionated Python framework for turning heterogeneous, imperfect datasets into reliable ML workflows.</p><p>It makes the invisible work visible: what was inspected, what was excluded, what was learned, and why a model earned the right to ship.</p></div>
+        <div class="intro-copy"><p>super-charge-ml is a Python framework for turning heterogeneous, imperfect datasets into reproducible ML workflows.</p><p>Here, <strong>curation</strong> means checking what each column means, when it becomes available, how labels are formed, how rows should be split, and which quality problems must be resolved before training.</p></div>
         <div class="pillars">
           {pillars.map((pillar) => <article class="pillar"><span class="pillar-number">{pillar.number}</span><h3>{pillar.title}</h3><p>{pillar.copy}</p></article>)}
         </div>
@@ -94,7 +95,7 @@ const capabilities = [
 
       <section class="capability-section" id="capabilities">
         <div class="shell capability-grid">
-          <div><p class="eyebrow light"><span></span> Built for real tables</p><h2>Meet your data<br /><em>where it is.</em></h2><p class="light-copy">From a clean Parquet file to a streaming table with missing labels, the workflow starts with the dataset—not an assumption about the model.</p><a class="button button-light" href="https://github.com/sachncs/magicml">Read the architecture <span>↗</span></a></div>
+          <div><p class="eyebrow light"><span></span> Built for real tables</p><h2>Meet your data<br /><em>where it is.</em></h2><p class="light-copy">From a clean Parquet file to a streaming table with missing labels, the workflow starts with the dataset—not an assumption about the model.</p><a class="button button-light" href={`${base}/docs/data/`}>Read the data docs <span>→</span></a></div>
           <ul class="capabilities">{capabilities.map((capability, index) => <li><span>0{index + 1}</span><p>{capability}</p><b>↗</b></li>)}</ul>
         </div>
       </section>
@@ -102,12 +103,12 @@ const capabilities = [
       <section class="closing shell">
         <p class="eyebrow"><span></span> Start with the data</p>
         <h2>Build systems<br /><em>you can explain.</em></h2>
-        <p>Open-source tooling for teams who know that trustworthy ML is mostly careful work before training begins.</p>
-        <a class="button button-primary" href="https://github.com/sachncs/magicml">Get started on GitHub <span>↗</span></a>
+        <p>Start with a tiny table, inspect the decisions, then bring the same workflow to your real data.</p>
+        <a class="button button-primary" href={`${base}/docs/quickstart/`}>Start the quickstart <span>→</span></a>
       </section>
     </main>
 
-    <footer class="footer shell"><a class="brand" href="/"><span class="brand-mark">✳</span><span>super-charge-ml</span></a><span>Open-source ML lifecycle infrastructure</span><span>© 2026</span></footer>
+    <footer class="footer shell"><a class="brand" href={`${base}/`}><span class="brand-mark">✳</span><span>super-charge-ml</span></a><span>Open-source ML lifecycle infrastructure</span><span>© 2026</span></footer>
   </body>
 </html>
 

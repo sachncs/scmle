@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://super-charge-ml.dev/sitemap.xml
+Sitemap: https://sachncs.github.io/super-charge-ml/sitemap.xml
