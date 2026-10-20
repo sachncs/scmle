@@ -303,6 +303,64 @@ class FaultInjectionPlanRegistry:
             raise ValueError(f"scenario already registered: {plan.scenario}")
         self.plans[plan.scenario] = plan
 
+    def record_evidence(
+        self,
+        scenario: FaultScenario,
+        evidence: tuple[FaultEvidence, ...],
+    ) -> FaultScenarioPlan:
+        """Record one execution and derive its verification status.
+
+        Safe evidence for every declared requirement produces ``PASSED``.
+        Unsafe evidence produces ``FAILED`` even when other requirements are
+        missing. A run with no unsafe evidence but incomplete coverage is
+        ``INCONCLUSIVE``. The registry is updated only after the complete
+        replacement plan validates, so malformed evidence cannot overwrite a
+        planned scenario.
+
+        Args:
+            scenario: Scenario whose execution produced the evidence.
+            evidence: Unique evidence records from one execution.
+
+        Returns:
+            The updated scenario plan.
+
+        Raises:
+            TypeError: If the scenario or evidence shape is invalid.
+            KeyError: If the scenario is not registered.
+            ValueError: If evidence is empty or belongs to another scenario's
+                requirements.
+        """
+        if not isinstance(scenario, FaultScenario):
+            raise TypeError("scenario must be FaultScenario")
+        if not isinstance(evidence, tuple) or not evidence:
+            raise ValueError("evidence must be a non-empty tuple")
+        if not all(isinstance(item, FaultEvidence) for item in evidence):
+            raise TypeError("evidence must contain FaultEvidence values")
+        plan = self.plans[scenario]
+        evidence_types = {item.evidence_type for item in evidence}
+        unexpected = evidence_types - set(plan.evidence_requirements)
+        if unexpected:
+            names = ", ".join(sorted(unexpected))
+            raise ValueError(f"evidence has unexpected requirements: {names}")
+        missing = set(plan.evidence_requirements) - evidence_types
+        has_unsafe = any(
+            item.observed_outcome is EvidenceOutcome.UNSAFE_OUTCOME_OBSERVED
+            for item in evidence
+        )
+        if has_unsafe:
+            status = VerificationStatus.FAILED
+        elif missing:
+            status = VerificationStatus.INCONCLUSIVE
+        else:
+            status = VerificationStatus.PASSED
+        updated = dataclasses.replace(
+            plan,
+            verification_status=status,
+            evidence=evidence,
+        )
+        self.plans[scenario] = updated
+        return updated
+
     def validate_complete(self) -> None:
         """Reject a registry that omits any required production scenario."""
         missing = set(FaultScenario) - set(self.plans)

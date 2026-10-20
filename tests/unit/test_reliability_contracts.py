@@ -172,3 +172,56 @@ def test_evidence_round_trip_preserves_observed_result():
     restored = reliability.FaultEvidence.from_dict(evidence.to_dict())
 
     assert restored == evidence
+
+
+def test_registry_marks_a_scenario_passed_only_after_full_safe_evidence():
+    registry = reliability.FaultInjectionPlanRegistry()
+    registry.register(make_plan())
+
+    plan = registry.record_evidence(
+        reliability.FaultScenario.PROCESS_DEATH,
+        (
+            make_evidence("process_termination"),
+            make_evidence("checkpoint_resume"),
+        ),
+    )
+
+    assert plan.verification_status is reliability.VerificationStatus.PASSED
+    assert registry.plans[reliability.FaultScenario.PROCESS_DEATH] == plan
+
+
+def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inconclusive():
+    registry = reliability.FaultInjectionPlanRegistry()
+    registry.register(make_plan())
+
+    inconclusive = registry.record_evidence(
+        reliability.FaultScenario.PROCESS_DEATH,
+        (make_evidence("process_termination"),),
+    )
+    assert (
+        inconclusive.verification_status
+        is reliability.VerificationStatus.INCONCLUSIVE
+    )
+
+    failed = registry.record_evidence(
+        reliability.FaultScenario.PROCESS_DEATH,
+        (
+            make_evidence("process_termination"),
+            make_evidence(
+                "checkpoint_resume",
+                reliability.EvidenceOutcome.UNSAFE_OUTCOME_OBSERVED,
+            ),
+        ),
+    )
+    assert failed.verification_status is reliability.VerificationStatus.FAILED
+
+
+def test_registry_rejects_evidence_not_declared_by_scenario():
+    registry = reliability.FaultInjectionPlanRegistry()
+    registry.register(make_plan())
+
+    with pytest.raises(ValueError, match="unexpected requirements"):
+        registry.record_evidence(
+            reliability.FaultScenario.PROCESS_DEATH,
+            (make_evidence("unknown"),),
+        )
