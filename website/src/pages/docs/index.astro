@@ -1,0 +1,33 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout
+  title="Start here"
+  description="Developer onboarding for super-charge-ml: install the framework, run your first curation-first workflow, and understand the evidence it produces."
+  current="start"
+>
+  <p class="eyebrow"><span></span> Developer onboarding</p>
+  <h1>Start with the data.<br /><em>Ship with evidence.</em></h1>
+  <p class="lead">A practical path from your first install to a reproducible, monitored ML workflow. super-charge-ml treats curation as a first-class engineering job and modelling as one measured step inside it.</p>
+
+  <div class="callout"><p><strong>New here?</strong> Follow the <a href={`${base}/docs/quickstart/`}>quickstart</a> first. It takes a table, profiles it, validates the split, trains a small candidate set, and leaves an auditable run directory behind.</p></div>
+
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/quickstart/`}><small>01 / FIRST RUN</small><h3>Quickstart</h3><p>Install the package and run your first curation-first project.</p></a>
+    <a class="doc-card" href={`${base}/docs/data/`}><small>02 / INPUTS</small><h3>Data & curation</h3><p>Choose an input path, understand supported formats, and read the curation report.</p></a>
+    <a class="doc-card" href={`${base}/docs/workflows/`}><small>03 / BUILD</small><h3>Workflows</h3><p>Move from a project declaration to plans, runs, resumes, and predictions.</p></a>
+    <a class="doc-card" href={`${base}/docs/api/`}><small>04 / CODE</small><h3>Python API</h3><p>Use the stable top-level objects and understand what is safe to depend on.</p></a>
+    <a class="doc-card" href={`${base}/docs/architecture/`}><small>05 / MENTAL MODEL</small><h3>Architecture</h3><p>See how ingestion, profiling, evaluation, packaging, and monitoring connect.</p></a>
+    <a class="doc-card" href={`${base}/docs/operations/`}><small>06 / SHIPPING</small><h3>Operations</h3><p>Resume interrupted work, verify bundles, monitor models, and evolve safely.</p></a>
+  </div>
+
+  <h2>What you will learn</h2>
+  <ol>
+    <li>How to give heterogeneous tabular data a stable identity before modelling.</li>
+    <li>How leakage-safe validation and curation findings shape the experiment plan.</li>
+    <li>How run artifacts, signed bundles, and monitoring reports make decisions inspectable.</li>
+  </ol>
+  <p class="meta">Documentation follows the 0.1 beta API · Last reviewed October 2026</p>
+</DocsLayout>

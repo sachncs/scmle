@@ -1,0 +1,29 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Data & curation" description="Supported dataset formats and the curation-first workflow in super-charge-ml." current="data">
+  <p class="eyebrow"><span></span> Inputs and evidence</p>
+  <h1>Meet the data<br /><em>where it is.</em></h1>
+  <p class="lead">The framework accepts common files, in-memory tables, and bounded streams. The input contract is broad; the curation contract is strict.</p>
+
+  <h2>Supported inputs</h2>
+  <div class="doc-cards">
+    <div class="doc-card"><small>FILES</small><h3>Open tabular formats</h3><p>CSV, TSV, TAB, JSON records, JSONL / NDJSON, Parquet, Feather, Arrow, XLSX, and XLSM.</p></div>
+    <div class="doc-card"><small>IN MEMORY</small><h3>Table interchange</h3><p>pandas DataFrame, PyArrow Table, Polars DataFrame or LazyFrame, and Arrow stream protocol objects.</p></div>
+    <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
+    <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
+  </div>
+
+  <h2>The curation pass</h2>
+  <ol>
+    <li><strong>Identify:</strong> fingerprint the schema, rows, target, and source.</li>
+    <li><strong>Profile:</strong> inspect missingness, duplicates, label quality, representativeness, and feature roles.</li>
+    <li><strong>Protect:</strong> detect leakage and choose a validation strategy that matches time, groups, treatment, or events.</li>
+    <li><strong>Decide:</strong> record what was kept, repaired, excluded, or deferred in <code>curation_report.json</code>.</li>
+  </ol>
+
+  <h2>What to review before modelling</h2>
+  <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, and dropped columns. A curation finding is an input to the modelling decision—not noise around it.</p>
+  <div class="callout"><p><strong>Data hand-off:</strong> once curation is complete, the run carries forward the normalized schema, profile findings, selected validation strategy, and the decisions made about labels and unavailable features. The model stage consumes that contract; it does not redefine it.</p></div>
+</DocsLayout>

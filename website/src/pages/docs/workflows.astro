@@ -1,0 +1,44 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Workflows" description="Configure, plan, run, resume, and score super-charge-ml projects." current="workflows">
+  <p class="eyebrow"><span></span> The working loop</p>
+  <h1>Make the workflow<br /><em>deliberate.</em></h1>
+  <p class="lead">A project declaration is a decision record. It says what the target means, when a feature is available, how rows may be split, how much compute is allowed, and what evidence must exist before a result is used.</p>
+
+  <h2>Declare the problem</h2>
+  <pre><code>from scml import MLProject
+
+project = MLProject(
+    data="data/orders.parquet",
+    target="renewed",
+    task="binary_classification",
+    metric="roc_auc",
+    group_column="account_id",
+    time_column="observed_at",
+    unavailable_at_prediction=["renewal_reason"],
+    validation="group",
+    time_budget=900,
+    output_dir="runs/orders",
+)</code></pre>
+  <p>The important fields are the constraints around the model. <code>group_column</code> prevents one account leaking across splits. <code>time_column</code> preserves ordering. <code>unavailable_at_prediction</code> makes post-outcome columns explicit instead of relying on a reviewer to notice them later.</p>
+
+  <h2>Plan before you spend compute</h2>
+  <pre><code>scml plan data/orders.parquet \
+  --target renewed \
+  --task binary_classification \
+  --validation group \
+  --group-column account_id</code></pre>
+  <p>A plan is the cheapest place to catch an unclear target, an incompatible split, missing labels, or a dataset too large for the selected training mode. Treat it as a reviewable artifact in a pull request.</p>
+
+  <h2>Run, resume, predict</h2>
+  <pre><code>scml run data/orders.parquet --target renewed --output-dir runs/orders
+scml resume runs/orders/&lt;run-id&gt;
+scml predict runs/orders/&lt;run-id&gt;/model --input data/new_orders.parquet</code></pre>
+  <p>Runs are bounded and restartable. If a worker or host disappears, resume from the run directory rather than starting a second experiment with a different implicit state. Predictions should be made from the packaged bundle, not from an estimator reconstructed by hand.</p>
+
+  <h2>Choose the task explicitly when it matters</h2>
+  <p>Supported task requests include binary and multiclass classification, regression, survival, ordinal, ranking, multilabel, multioutput, forecast, and uplift. <code>auto</code> is useful for exploration; a named task is better for a release because it documents the intended semantics.</p>
+  <div class="callout"><p><strong>Review rule:</strong> a higher validation score does not override a bad split, an unavailable feature, a weak label definition, or an unreviewed curation finding.</p></div>
+</DocsLayout>

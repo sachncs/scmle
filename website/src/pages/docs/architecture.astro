@@ -1,0 +1,71 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Architecture" description="How super-charge-ml turns heterogeneous datasets into reproducible ML workflows." current="architecture">
+  <p class="eyebrow"><span></span> Mental model</p>
+  <h1>One workflow.<br /><em>Many kinds of evidence.</em></h1>
+  <p class="lead">super-charge-ml separates the control plane, execution plane, and evidence plane so that modelling never hides the decisions that make a result trustworthy. The diagrams below are the shortest route through the system for a new contributor.</p>
+
+  <h2>Start with the system map</h2>
+  <figure class="diagram diagram-lifecycle">
+    <figcaption class="diagram-caption"><span>THE LIFECYCLE</span><strong>Every stage leaves a decision trail.</strong></figcaption>
+    <div class="flow-row">
+      <div class="flow-node"><span>01</span><b>Ingest</b><small>read + identify</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node active"><span>02</span><b>Curate</b><small>profile + protect</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>03</span><b>Evaluate</b><small>compare + test</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>04</span><b>Package</b><small>sign + ship</small></div>
+    </div>
+    <div class="evidence-rail"><span>evidence</span><i></i><b>manifest</b><i></i><b>curation report</b><i></i><b>evaluation</b><i></i><b>model bundle</b></div>
+  </figure>
+  <p>The order is intentional. A model cannot repair a target that was defined incorrectly, a split that leaks entities, or a feature that will not exist at prediction time. The system earns the right to model only after those questions have an explicit answer.</p>
+
+  <h2>Three planes, one run</h2>
+  <figure class="diagram planes">
+    <figcaption class="diagram-caption"><span>THREE PLANES</span><strong>One run, three responsibilities.</strong></figcaption>
+    <div class="plane plane-control"><span>CONTROL PLANE</span><strong>What should happen?</strong><p>MLProject · policies · task · validation · budget</p></div>
+    <div class="plane-connector">↓ declares work</div>
+    <div class="plane plane-execution"><span>EXECUTION PLANE</span><strong>What happened?</strong><p>readers · curation · search · workers · checkpoints</p></div>
+    <div class="plane-connector">↓ records proof</div>
+    <div class="plane plane-evidence"><span>EVIDENCE PLANE</span><strong>Can we explain it?</strong><p>events · reports · metrics · checksums · signed bundle</p></div>
+  </figure>
+  <p>Contributors should decide which plane a change belongs to before editing code. A new policy parameter belongs in the control plane; a reader or trainer belongs in execution; a new artifact or event belongs in evidence. Keeping those responsibilities separate makes failures easier to locate and reviews easier to perform.</p>
+
+  <h2>The lifecycle</h2>
+  <div class="doc-cards">
+    <div class="doc-card"><small>01 / INGEST</small><h3>Read and identify</h3><p>Normalize files or in-memory tables into a common frame and create a dataset manifest.</p></div>
+    <div class="doc-card"><small>02 / CURATE</small><h3>Profile and protect</h3><p>Find quality risks, leakage, unavailable features, and the validation structure the data requires.</p></div>
+    <div class="doc-card"><small>03 / EVALUATE</small><h3>Compare candidates</h3><p>Run bounded trials against locked evaluation data with task-aware metrics and uncertainty.</p></div>
+    <div class="doc-card"><small>04 / PACKAGE</small><h3>Ship a bundle</h3><p>Persist the schema, checksums, environment, monitoring reference, and prediction pipeline.</p></div>
+  </div>
+
+  <h2>What a dataset becomes</h2>
+  <figure class="diagram data-path">
+    <figcaption class="diagram-caption"><span>DATA HAND-OFF</span><strong>Each boundary makes an assumption explicit.</strong></figcaption>
+    <div class="path-step"><span>source</span><b>CSV · JSONL · Parquet · Excel · table</b></div>
+    <div class="path-line"></div>
+    <div class="path-step"><span>adapter</span><b>common table contract</b></div>
+    <div class="path-line"></div>
+    <div class="path-step highlighted"><span>curation</span><b>schema · missingness · leakage · labels</b></div>
+    <div class="path-line"></div>
+    <div class="path-step"><span>evaluation</span><b>split · candidates · metrics · uncertainty</b></div>
+    <div class="path-line"></div>
+    <div class="path-step"><span>release</span><b>bundle · signature · monitor</b></div>
+  </figure>
+  <p>Readers are deliberately boring: they translate many input forms into one internal table contract. The valuable reasoning starts after that boundary, where curation records what the rows mean and what the model is allowed to see.</p>
+
+  <h2>Where the evidence lives</h2>
+  <ul>
+    <li><code>events.jsonl</code> records state transitions and decisions in order.</li>
+    <li><code>curation_report.json</code> explains the data decisions before training.</li>
+    <li><code>evaluation.json</code> stores metrics, splits, selected strategy, and test results.</li>
+    <li>The model bundle stores its schema, checksums, environment, and monitoring reference.</li>
+  </ul>
+
+  <h2>Why modelling is limited</h2>
+  <p>The planner chooses only models compatible with the data contract, objective, resource budget, and declared constraints. A model is not allowed to compensate for an unresolved leakage, representativeness, or label-quality problem.</p>
+  <div class="callout"><p><strong>Contributor rule:</strong> if a change improves a score but makes the data decision less visible, it is moving in the wrong direction. Add the contract, event, report field, or test that makes the decision inspectable.</p></div>
+</DocsLayout>

@@ -1,0 +1,50 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout title="Quickstart" description="Run your first super-charge-ml project." current="quickstart">
+  <p class="eyebrow"><span></span> First run</p>
+  <h1>From table to<br /><em>evidence.</em></h1>
+  <p class="lead">The smallest useful workflow is deliberately boring: install, point at a dataset, declare the target, and inspect what the system learned before choosing a model.</p>
+
+  <h2>1. Install</h2>
+  <pre><code>python -m venv .venv
+source .venv/bin/activate
+pip install super-charge-ml</code></pre>
+
+  <h2>2. Create a tiny dataset</h2>
+  <p>Use this fixture to verify the installation before connecting a production table:</p>
+  <pre><code>cat &gt; customers.csv &lt;&lt;'CSV'
+customer_id,tenure_months,monthly_spend,churned
+c001,3,49.0,1
+c002,24,79.0,0
+c003,8,55.0,1
+c004,36,89.0,0
+CSV</code></pre>
+
+  <h2>3. Run a project</h2>
+  <p>The target is <code>churned</code>; the identifier is not a feature:</p>
+  <pre><code>scml run customers.csv \
+  --target churned \
+  --id-columns customer_id \
+  --output-dir runs/customers</code></pre>
+  <p>The workflow profiles the table, makes a validation plan, evaluates compatible candidates, packages the winner, and writes the decisions to the run directory. On a real dataset, choose the validation strategy from how rows were generated; do not copy this tiny fixture’s defaults into production.</p>
+
+  <h2>4. Inspect the evidence</h2>
+  <pre><code>runs/customers/&lt;run-id&gt;/
+├── curation_report.json
+├── events.jsonl
+├── execution_plan.json
+├── evaluation.json
+├── model/
+└── config.json</code></pre>
+  <p>Start with <code>curation_report.json</code>. If the data is not trustworthy, a better score is not a better result.</p>
+
+  <h2>5. Score new rows</h2>
+  <pre><code>scml predict runs/customers/&lt;run-id&gt;/model \
+  new_customers.csv \
+  --output predictions.csv</code></pre>
+  <div class="callout"><p>Bundles are pickle-based. Sign them in production and load them with the signing key; only use <code>--trusted</code> for artifacts whose source you explicitly control.</p></div>
+  <p>Next: learn how to bring <a href={`${base}/docs/data/`}>different kinds of data</a> into the curation pipeline, then use the <a href={`${base}/docs/workflows/`}>workflow guide</a> to move beyond the first run.</p>
+</DocsLayout>

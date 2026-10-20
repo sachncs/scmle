@@ -1,0 +1,35 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Python API" description="The supported top-level Python API for super-charge-ml." current="api">
+  <p class="eyebrow"><span></span> Stable surface</p>
+  <h1>Use the API<br /><em>with intent.</em></h1>
+  <p class="lead">The package keeps its supported surface small: define an <code>MLProject</code>, inspect a <code>RunResult</code>, save or load a signed <code>ModelBundle</code>, and extend registries when the built-ins are not enough.</p>
+
+  <h2>The lifecycle objects</h2>
+  <pre><code>from scml import MLProject, load_model, predict
+
+project = MLProject(data=df, target="outcome", task="regression")
+plan = project.plan()
+result = project.run()
+print(result.metrics)
+
+bundle = result.bundle
+bundle.save("artifacts/outcome-model")
+loaded = load_model("artifacts/outcome-model")
+predictions = predict(loaded, new_rows)</code></pre>
+  <ul>
+    <li><code>MLProject</code> is the declarative input and policy boundary.</li>
+    <li><code>RunResult</code> points to metrics, evidence, and the selected model.</li>
+    <li><code>ModelBundle</code> packages the schema, preprocessing, estimator, provenance, and signature.</li>
+    <li><code>load_model</code> verifies a bundle before it is used for inference.</li>
+  </ul>
+
+  <h2>What is safe to depend on</h2>
+  <p>The supported top-level exports are <code>MLProject</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
+
+  <h2>Extending without forking</h2>
+  <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
+  <div class="callout"><p><strong>Bundle compatibility:</strong> format 2 authenticates <code>schema.json</code>. Legacy format 1 bundles are refused by default and should only be migrated from a source you explicitly trust.</p></div>
+</DocsLayout>

@@ -1,0 +1,25 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Troubleshooting" description="Diagnose common data, validation, runtime, and bundle problems in super-charge-ml." current="troubleshooting">
+  <p class="eyebrow"><span></span> Diagnose first</p>
+  <h1>When a run stops,<br /><em>read the evidence.</em></h1>
+  <p class="lead">Most failures are useful signals: the input contract is unclear, the split does not match the data-generating process, or the runtime policy caught a resource problem. Start with the run directory and the structured error before changing the model.</p>
+
+  <h2>“Target column not found”</h2>
+  <p>Inspect the normalized schema and column spelling. JSON records may contain nested or inconsistent keys; Excel files may have a header row offset. Load the table independently, normalize the column name, and pass the exact target name. Do not fix this by silently selecting a similarly named column.</p>
+
+  <h2>“Validation is not feasible”</h2>
+  <p>Check the number of groups, classes, time points, or positive labels against <code>folds</code>. Reduce folds only when the smaller estimate is defensible, or choose the validation strategy that matches the data. A random split is not a safe fallback for grouped or temporal records.</p>
+
+  <h2>“Feature is unavailable at prediction”</h2>
+  <p>Move the column into <code>unavailable_at_prediction</code>, or document why it is available at the actual decision time. If the value arrives later, use <code>feature_delays</code> with a time column. This warning is about the production decision boundary, not a model preference.</p>
+
+  <h2>Memory or time limits</h2>
+  <p>Use streaming for large CSV or JSONL inputs, set <code>memory_budget_gb</code>, and lower concurrent <code>workers</code> before increasing the host size. The hard enforcement mode isolates trials so an over-budget candidate cannot consume the entire run.</p>
+
+  <h2>Signature or schema verification failed</h2>
+  <p>Keep the bundle directory immutable after signing. Rebuild the bundle if a schema or artifact was edited. For an old format 1 bundle, migrate once from a trusted source, save it as format 2, and verify it through the normal loading path.</p>
+  <div class="callout"><p><strong>Escalation checklist:</strong> capture the command, package version, Python version, run ID, input manifest, structured error, and the last successful checkpoint. That makes a failure reproducible instead of anecdotal.</p></div>
+</DocsLayout>

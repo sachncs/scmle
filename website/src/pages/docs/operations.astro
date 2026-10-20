@@ -1,0 +1,33 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Operations" description="Operate, observe, and safely evolve super-charge-ml workflows." current="operations">
+  <p class="eyebrow"><span></span> Shipping with evidence</p>
+  <h1>Observe the run.<br /><em>Earn the release.</em></h1>
+  <p class="lead">A production workflow is more than a serving endpoint. It must be resumable, inspectable, authenticated, monitored, and reversible.</p>
+
+  <h2>Operational loop</h2>
+  <ol>
+    <li><strong>Measure:</strong> capture coverage, benchmark results, resource use, and data-quality findings.</li>
+    <li><strong>Observe:</strong> retain events, manifests, fingerprints, bundle checksums, and monitoring reports.</li>
+    <li><strong>Evaluate:</strong> compare candidates on locked data and compare live behavior with the champion.</li>
+    <li><strong>Evolve:</strong> turn recurring findings into tests, validation rules, benchmarks, or focused changes.</li>
+  </ol>
+
+  <h2>Safe recovery</h2>
+  <p>Interrupted or failed runs preserve checkpoints and recoverable trials. Resume only with the same configuration and data identity; stale checkpoints are refused.</p>
+  <pre><code>scml resume runs/&lt;run-id&gt;</code></pre>
+
+  <h2>Bundle security</h2>
+  <p>Sign bundles with <code>SCML_SIGNING_KEY</code> and verify them at load time. Rotate keys without reserializing the model:</p>
+  <pre><code>ModelBundle.rotate_signing_key(
+    "runs/&lt;run-id&gt;/model",
+    current_key,
+    new_key,
+)</code></pre>
+
+  <h2>Deployment boundary</h2>
+  <p>The built-in HTTP adapter is a reference server. Put it behind an authenticating gateway with TLS, request policy, logs, and operational ownership.</p>
+  <div class="callout"><p><strong>Release rehearsal:</strong> before promotion, replay a known input, verify the signed bundle, confirm the serving schema, exercise resume from a checkpoint, inspect monitoring output, and record who reviewed the evidence. A green training run is not by itself a release decision.</p></div>
+</DocsLayout>
