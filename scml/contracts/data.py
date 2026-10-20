@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 import dataclasses
 import enum
+import hashlib
 import math
 from typing import Any
 from typing import Self
@@ -102,6 +103,52 @@ class CurationFinding:
             "blocking": self.blocking,
             "timestamp": self.timestamp,
         }
+
+    @classmethod
+    def from_observation(
+        cls,
+        message: str,
+        category: str,
+        severity: FindingSeverity = FindingSeverity.WARNING,
+    ) -> Self:
+        """Creates a structured finding from a pipeline observation.
+
+        The profiling layer may produce a human-readable observation while a
+        rule is being developed. This constructor gives that observation a
+        stable identity and evidence envelope before it is persisted. It is a
+        canonical contract conversion, not a second finding representation.
+
+        Args:
+            message: Human-readable observation emitted by a profiling rule.
+            category: Stable category such as ``quality`` or ``risk``.
+            severity: Operational severity assigned by the caller.
+
+        Returns:
+            A reviewable finding with a deterministic ID.
+
+        Raises:
+            ValueError: If the message or category is empty.
+        """
+        observation = message.strip()
+        finding_category = category.strip().lower()
+        if not observation:
+            raise ValueError("message must not be empty")
+        if not finding_category:
+            raise ValueError("category must not be empty")
+        digest = hashlib.sha256(observation.encode("utf-8")).hexdigest()
+        return cls(
+            finding_id=f"{finding_category}.{digest[:16]}",
+            rule_version="pipeline-observation.v1",
+            severity=severity,
+            confidence=1.0,
+            affected_scope={"category": finding_category},
+            evidence={"message": observation},
+            remediation="Review the observation and record a disposition.",
+            owner="pipeline",
+            reviewer=None,
+            disposition=FindingDisposition.OPEN,
+            blocking=False,
+        )
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:

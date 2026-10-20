@@ -44,6 +44,24 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
     assert report["schema_version"] == 1
     assert report["source_rows"] >= report["profiled_rows"]
     assert report["quality_findings"]
+    assert all(
+        set(finding)
+        == {
+            "id",
+            "rule_version",
+            "severity",
+            "confidence",
+            "affected_scope",
+            "evidence",
+            "remediation",
+            "owner",
+            "reviewer",
+            "disposition",
+            "blocking",
+            "timestamp",
+        }
+        for finding in report["quality_findings"]
+    )
     assert report["feature_columns"]["numeric"]
 
 

@@ -73,6 +73,26 @@ def test_curation_finding_rejects_invalid_confidence(confidence):
         )
 
 
+def test_observation_conversion_has_deterministic_identity_and_evidence():
+    first = data.CurationFinding.from_observation(
+        "column 'income' has missing values", "quality"
+    )
+    second = data.CurationFinding.from_observation(
+        "column 'income' has missing values", "quality"
+    )
+
+    assert first.finding_id == second.finding_id
+    assert first.finding_id.startswith("quality.")
+    assert (
+        first.rule_version == second.rule_version == "pipeline-observation.v1"
+    )
+    assert (
+        first.evidence
+        == second.evidence
+        == {"message": "column 'income' has missing values"}
+    )
+
+
 def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
     finding = make_finding()
     manifest = data.DatasetManifest(

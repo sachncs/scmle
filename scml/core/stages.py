@@ -360,8 +360,16 @@ class ProfileStage(Stage):
             read_seconds=context.read_seconds,
             streamed=context.stream is not None,
             cleaning_notes=tuple(context.cleaning_notes),
-            quality_findings=profile.quality_findings,
-            risk_findings=profile.risk_findings,
+            quality_findings=tuple(
+                data_contracts.CurationFinding.from_observation(
+                    finding, "quality"
+                )
+                for finding in profile.quality_findings
+            ),
+            risk_findings=tuple(
+                data_contracts.CurationFinding.from_observation(finding, "risk")
+                for finding in profile.risk_findings
+            ),
             feature_columns={
                 "numeric": profile.feature_plan.numeric,
                 "categorical": profile.feature_plan.categorical,
