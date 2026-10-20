@@ -66,17 +66,18 @@ The last complete repository regression run completed with `1927 passed, 103
 skipped, 6 warnings` in 29 minutes 30 seconds using `uv run pytest -q` on the
 local Python 3.14t environment. After subsequent data, observability,
 security, reliability, governance, and incremental-ingestion changes, the
-complete unit suite completed with `1563 passed, 87 skipped, 6 warnings` in 2
-minutes 23 seconds;
+complete unit suite completed with `1577 passed, 87 skipped, 6 warnings` in 2
+minutes 24 seconds;
 the latest promotion/lifecycle slice passed `27` focused tests, and the full
 integration suite completed with `334 passed, 16 skipped` in 24 minutes 2
 seconds. The remaining leakage, property, specification, and benchmark tiers
-completed with `85 passed` in 3 minutes 27 seconds. Together these current
-tiers provide `1982 passed, 103 skipped, 6 warnings`. The single-command
-`uv run pytest -q` acceptance run also completed with `1982 passed, 103
-skipped, 6 warnings` in 29 minutes 40 seconds. An independent clean-clone run
-is still required before release. Skipped tests and runtime warnings are not
-release evidence by themselves: each must be classified as
+completed with `85 passed` in 3 minutes 27 seconds. The prior all-repository
+acceptance run therefore provided `1982 passed, 103 skipped, 6 warnings`; the
+subsequent signed-governance, fault-harness, and incremental-sink slices have
+their focused and complete-unit evidence above, but a new single-command
+acceptance run is still required. An independent clean-clone run is also
+required before release. Skipped tests and runtime warnings are not release
+evidence by themselves: each must be classified as
 environment-required, intentionally unsupported, or a release blocker before
 a supported-production label is appropriate.
 
