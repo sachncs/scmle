@@ -22,12 +22,16 @@ Automated evidence: `tests/integration/test_resume.py` and
 
 ## 2. Rollback
 
-1. Register and promote a known-good bundle.
-2. Promote a challenger in the disposable registry.
+1. Register a known-good bundle and promote it with a
+   `PromotionApproval` bound to its content digest.
+2. Stage a challenger under the `challenger` alias; do not move the serving
+   alias as part of the training step.
 3. Score the same sufficiently large labeled batch with both versions.
-4. Run the rollback check with the declared tolerance.
-5. Confirm a clearly worse champion restores the previous alias and writes a
-   `lifecycle.rollback_check` audit event.
+4. Run the rollback check with the declared tolerance and confirm a clearly
+   worse champion remains in place while approval is pending.
+5. Approve the previous version independently, rerun the rollback action, and
+   confirm it restores the previous alias with a complete approval record in
+   the `lifecycle.rollback_check` audit trail.
 
 Automated evidence: `tests/unit/test_lifecycle_extras.py` and
 `tests/integration/test_deployment.py`.
