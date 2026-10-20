@@ -12,6 +12,7 @@ import numpy as np
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import conflicting_label_groups
 from scml.data.modalities.curation import dataset_hash
 from scml.data.modalities.curation import label_counts
 from scml.data.modalities.curation import ModalityCurationReport
@@ -368,6 +369,10 @@ class VideoDataset:
         )
         durations = [profile.duration_seconds for profile in profiles]
         labels = label_counts(sample.label for sample in self.samples)
+        conflicts = conflicting_label_groups(
+            (sample.file_hash, sample.source, sample.label)
+            for sample in self.samples
+        )
         quality_findings = []
         if len(formats) > 1 or len(codecs) > 1:
             quality_findings.append(
@@ -406,6 +411,18 @@ class VideoDataset:
                     False,
                 )
             )
+        if conflicts:
+            risk_findings.append(
+                build_finding(
+                    "risk.video-conflicting-duplicate-labels",
+                    data_contracts.FindingSeverity.ERROR,
+                    {"dataset": self.content_hash},
+                    {"groups": list(conflicts)},
+                    "Resolve the label conflict or explicitly exclude the "
+                    "affected video content.",
+                    True,
+                )
+            )
         return ModalityCurationReport(
             modality="video",
             dataset_hash=dataset_hash(
@@ -422,6 +439,7 @@ class VideoDataset:
                 "duration_mean_seconds": sum(durations) / len(durations),
                 "total_bytes": sum(profile.byte_size for profile in profiles),
                 "label_counts": labels,
+                "conflicting_label_groups": list(conflicts),
             },
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),

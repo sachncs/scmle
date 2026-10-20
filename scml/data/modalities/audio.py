@@ -19,6 +19,7 @@ import numpy as np
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import conflicting_label_groups
 from scml.data.modalities.curation import dataset_hash
 from scml.data.modalities.curation import label_counts
 from scml.data.modalities.curation import ModalityCurationReport
@@ -494,6 +495,10 @@ class AudioDataset:
         channels = sorted({profile.channels for profile in profiles})
         durations = [profile.duration_seconds for profile in profiles]
         labels = label_counts(sample.label for sample in self.samples)
+        conflicts = conflicting_label_groups(
+            (sample.file_hash, sample.source, sample.label)
+            for sample in self.samples
+        )
         quality_findings = []
         if len(formats) > 1:
             quality_findings.append(
@@ -535,6 +540,18 @@ class AudioDataset:
                     False,
                 )
             )
+        if conflicts:
+            risk_findings.append(
+                build_finding(
+                    "risk.audio-conflicting-duplicate-labels",
+                    data_contracts.FindingSeverity.ERROR,
+                    {"dataset": self.content_hash},
+                    {"groups": list(conflicts)},
+                    "Resolve the label conflict or explicitly exclude the "
+                    "affected audio content.",
+                    True,
+                )
+            )
         return ModalityCurationReport(
             modality="audio",
             dataset_hash=dataset_hash(
@@ -551,6 +568,7 @@ class AudioDataset:
                 "duration_mean_seconds": sum(durations) / len(durations),
                 "total_bytes": sum(profile.byte_size for profile in profiles),
                 "label_counts": labels,
+                "conflicting_label_groups": list(conflicts),
             },
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),

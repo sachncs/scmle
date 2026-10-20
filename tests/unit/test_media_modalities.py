@@ -78,6 +78,28 @@ def test_audio_curation_reports_metadata_and_label_composition():
     assert report.release_ready
 
 
+def test_audio_curation_blocks_conflicting_duplicate_labels():
+    """Duplicate audio bytes cannot silently carry incompatible labels."""
+    dataset = audio.AudioDataset(
+        (
+            audio.AudioSample.from_bytes(
+                wav_bytes(), source="first.wav", label="speech"
+            ),
+            audio.AudioSample.from_bytes(
+                wav_bytes(), source="second.wav", label="music"
+            ),
+        )
+    )
+
+    report = dataset.curate()
+
+    assert report.profile["conflicting_label_groups"]
+    assert report.release_ready is False
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.audio-conflicting-duplicate-labels",
+    ]
+
+
 def test_audio_feature_preparation_is_bounded_and_explainable():
     """Signal features expose the observed prefix and deterministic names."""
     sample = audio.AudioSample.from_bytes(
@@ -182,6 +204,29 @@ def test_video_curation_surfaces_encoding_and_dimension_drift():
     assert [finding.finding_id for finding in report.quality_findings] == [
         "quality.video-encoding-drift",
         "quality.video-dimension-drift",
+    ]
+
+
+def test_video_curation_blocks_conflicting_duplicate_labels():
+    """Duplicate video bytes cannot silently carry incompatible labels."""
+    metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
+    dataset = video.VideoDataset(
+        (
+            video.VideoSample.from_bytes(
+                b"same-video", metadata, "first.mp4", label="event"
+            ),
+            video.VideoSample.from_bytes(
+                b"same-video", metadata, "second.mp4", label="background"
+            ),
+        )
+    )
+
+    report = dataset.curate()
+
+    assert report.profile["conflicting_label_groups"]
+    assert report.release_ready is False
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.video-conflicting-duplicate-labels",
     ]
 
 

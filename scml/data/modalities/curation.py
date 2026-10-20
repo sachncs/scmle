@@ -81,6 +81,41 @@ def label_counts(labels: Iterable[Any]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def conflicting_label_groups(
+    items: Iterable[tuple[str, str, Any]],
+) -> tuple[dict[str, object], ...]:
+    """Return duplicate identities carrying more than one known label.
+
+    Each item contains an identity, source, and optional label. Unlabeled
+    samples do not create a conflict by themselves; disagreement between two
+    known labels does.
+    """
+    grouped: dict[str, dict[str, Any]] = {}
+    for identity, source, label in items:
+        if label is None:
+            continue
+        bucket = next(iter(label_counts((label,))))
+        record = grouped.setdefault(
+            identity, {"sources": set(), "labels": set()}
+        )
+        record["sources"].add(source)
+        record["labels"].add(bucket)
+    conflicts: list[dict[str, object]] = []
+    for identity, record in grouped.items():
+        labels = record["labels"]
+        if len(labels) > 1:
+            conflicts.append(
+                {
+                    "identity": identity,
+                    "sources": sorted(record["sources"]),
+                    "labels": sorted(labels),
+                }
+            )
+    return tuple(
+        sorted(conflicts, key=lambda conflict: str(conflict["identity"]))
+    )
+
+
 def build_finding(
     finding_id: str,
     severity: data_contracts.FindingSeverity,
@@ -108,6 +143,7 @@ def build_finding(
 __all__ = [
     "ModalityCurationReport",
     "build_finding",
+    "conflicting_label_groups",
     "dataset_hash",
     "label_counts",
 ]

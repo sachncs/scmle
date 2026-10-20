@@ -183,6 +183,26 @@ def test_curation_reports_mixed_label_state():
 
 
 @PILLOW_SKIP
+def test_curation_blocks_conflicting_duplicate_labels():
+    """Duplicate pixels cannot silently carry incompatible labels."""
+    payload = png_bytes((10, 20, 30))
+    report = image.ImageDataset(
+        (
+            image.ImageSample.from_bytes(payload, "first.png", label="object"),
+            image.ImageSample.from_bytes(
+                payload, "second.png", label="background"
+            ),
+        )
+    ).curate()
+
+    assert report.profile["conflicting_label_groups"]
+    assert report.release_ready is False
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.image-conflicting-duplicate-labels",
+    ]
+
+
+@PILLOW_SKIP
 def test_split_keeps_explicit_capture_groups_together():
     """Grouped splitting prevents capture-session leakage."""
     samples = tuple(

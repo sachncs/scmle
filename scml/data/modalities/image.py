@@ -19,6 +19,7 @@ import numpy as np
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
+from scml.data.modalities.curation import conflicting_label_groups
 from scml.data.modalities.curation import dataset_hash
 from scml.data.modalities.curation import label_counts
 from scml.data.modalities.curation import ModalityCurationReport
@@ -594,8 +595,13 @@ class ImageDataset:
         """Build bounded image statistics and reviewable findings."""
         profile = self.profile(max_samples, profile_size)
         labels = label_counts(sample.label for sample in self.samples)
+        conflicts = conflicting_label_groups(
+            (sample.content_hash, sample.source, sample.label)
+            for sample in self.samples
+        )
         profile_data = profile.to_dict()
         profile_data["label_counts"] = labels
+        profile_data["conflicting_label_groups"] = list(conflicts)
         quality_findings = []
         risk_findings = []
         if not self.samples:
@@ -618,6 +624,18 @@ class ImageDataset:
                     {"duplicate_count": profile.duplicate_count},
                     "Review duplicate content and prevent split contamination.",
                     False,
+                )
+            )
+        if conflicts:
+            risk_findings.append(
+                build_finding(
+                    "risk.image-conflicting-duplicate-labels",
+                    data_contracts.FindingSeverity.ERROR,
+                    {"dataset": "all_samples"},
+                    {"groups": list(conflicts)},
+                    "Resolve the label conflict or explicitly exclude the "
+                    "affected content.",
+                    True,
                 )
             )
         if profile.truncated:
