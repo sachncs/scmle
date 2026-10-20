@@ -10,7 +10,9 @@ events through ``IncrementalEventSource``.
 import abc
 from collections.abc import Callable
 from collections.abc import Iterable
+from collections.abc import Iterator
 from collections.abc import Mapping
+import contextlib
 import dataclasses
 import datetime
 import enum
@@ -364,6 +366,37 @@ class IncrementalIngestionLedger:
     path: pathlib.Path
     source_identity: str
 
+    @property
+    def lock_path(self) -> pathlib.Path:
+        """Return the sidecar path used to serialize ledger writers."""
+        return self.path.with_name(f"{self.path.name}.lock")
+
+    @contextlib.contextmanager
+    def lock(self) -> Iterator[None]:
+        """Serialize ledger writers with the platform's advisory file lock."""
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+b") as handle:
+            if os.name == "nt":
+                import msvcrt
+
+                windows_lock: Any = msvcrt
+                handle.seek(0)
+                windows_lock.locking(handle.fileno(), windows_lock.LK_LOCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                if os.name == "nt":
+                    handle.seek(0)
+                    windows_lock.locking(
+                        handle.fileno(), windows_lock.LK_UNLCK, 1
+                    )
+                else:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
     def load(self) -> CommittedIncrementalState:
         """Load committed state or initialize an empty source state."""
         if not self.path.exists():
@@ -395,37 +428,19 @@ class IncrementalIngestionLedger:
         state = self.load()
         return source.read_events(state.checkpoint, state.seen_event_ids, limit)
 
-    def commit(self, batch: EventBatch) -> CommittedIncrementalState:
-        """Atomically publish a processed batch's IDs and checkpoint."""
-        if batch.source_identity != self.source_identity:
+    def write_atomically(self, state: CommittedIncrementalState) -> None:
+        """Publish state with a durable temporary-file replacement.
+
+        Callers that combine a read and write must hold ``lock``. This method
+        remains public so transports can persist a prepared state explicitly.
+        """
+        if state.checkpoint.source_identity != self.source_identity:
             raise IncrementalError(
-                "batch_source_mismatch",
-                "batch does not match ingestion ledger",
+                "state_source_mismatch",
+                "state does not match ingestion ledger",
                 self.source_identity,
-                {"batch_source_identity": batch.source_identity},
+                {"state_source_identity": state.checkpoint.source_identity},
             )
-        current = self.load()
-        candidate_ids = set(batch.event_ids)
-        current_ids = set(current.seen_event_ids)
-        if (
-            candidate_ids <= current_ids
-            and batch.next_checkpoint.sequence <= current.checkpoint.sequence
-        ):
-            return current
-        if batch.next_checkpoint.sequence < current.checkpoint.sequence:
-            raise IncrementalError(
-                "checkpoint_regression",
-                "batch checkpoint moves backwards",
-                self.source_identity,
-                {
-                    "current": current.checkpoint.to_dict(),
-                    "candidate": batch.next_checkpoint.to_dict(),
-                },
-            )
-        state = CommittedIncrementalState(
-            batch.next_checkpoint,
-            tuple(sorted(set(current.seen_event_ids) | set(batch.event_ids))),
-        )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{self.path.name}.", dir=self.path.parent
@@ -442,4 +457,41 @@ class IncrementalIngestionLedger:
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise
-        return state
+
+    def commit(self, batch: EventBatch) -> CommittedIncrementalState:
+        """Atomically publish a processed batch's IDs and checkpoint."""
+        if batch.source_identity != self.source_identity:
+            raise IncrementalError(
+                "batch_source_mismatch",
+                "batch does not match ingestion ledger",
+                self.source_identity,
+                {"batch_source_identity": batch.source_identity},
+            )
+        with self.lock():
+            current = self.load()
+            candidate_ids = set(batch.event_ids)
+            current_ids = set(current.seen_event_ids)
+            if (
+                candidate_ids <= current_ids
+                and batch.next_checkpoint.sequence
+                <= current.checkpoint.sequence
+            ):
+                return current
+            if batch.next_checkpoint.sequence < current.checkpoint.sequence:
+                raise IncrementalError(
+                    "checkpoint_regression",
+                    "batch checkpoint moves backwards",
+                    self.source_identity,
+                    {
+                        "current": current.checkpoint.to_dict(),
+                        "candidate": batch.next_checkpoint.to_dict(),
+                    },
+                )
+            state = CommittedIncrementalState(
+                batch.next_checkpoint,
+                tuple(
+                    sorted(set(current.seen_event_ids) | set(batch.event_ids))
+                ),
+            )
+            self.write_atomically(state)
+            return state

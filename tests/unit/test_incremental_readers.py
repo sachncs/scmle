@@ -59,6 +59,7 @@ def test_ingestion_ledger_commits_atomically_and_retries_idempotently(tmp_path):
     assert committed == retried == reopened
     assert committed.checkpoint.sequence == 1
     assert next_batch.event_ids == ("b",)
+    assert ledger.lock_path.exists()
     assert json.loads(ledger.path.read_text())["schema_version"] == 1
 
 
