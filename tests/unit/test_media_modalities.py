@@ -120,6 +120,20 @@ def test_audio_feature_preparation_is_bounded_and_explainable():
     assert prepared.to_numpy()[0, 2] == 0.0
 
 
+def test_audio_feature_preparation_supports_a_bounded_window():
+    """A decoded WAV window remains tied to its source frame boundary."""
+    sample = audio.AudioSample.from_bytes(
+        wav_bytes(frame_count=8), source="one.wav"
+    )
+
+    prepared = audio.AudioDataset((sample,)).prepare_features(
+        max_frames=3, start_frame=4
+    )
+
+    assert prepared.frames_observed == (3,)
+    assert prepared.to_numpy()[0, 7] == 3.0
+
+
 def test_audio_feature_preparation_requires_a_wav_decoder():
     """Explicit probe metadata does not silently imply signal decoding."""
     sample = audio.AudioSample.from_bytes(

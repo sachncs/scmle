@@ -194,6 +194,29 @@ class ModalityAdapter(abc.ABC):
     def modality_notes(self) -> tuple[str, ...]:
         """Return representation limits that belong in the model card."""
 
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return explicit modality-specific explanation evidence.
+
+        The default is an honest unavailable result. Adapters override this
+        hook only when they own a decoder or perturbation policy that can be
+        represented and tested without inventing raw-modality semantics.
+        """
+        return {
+            "status": "not_available",
+            "modality": self.modality.value,
+            "reason": "the adapter has no modality-specific explanation policy",
+            "limitations": [
+                "The lifecycle explanation remains in feature space.",
+                "No raw-modality or causal interpretation is provided.",
+            ],
+        }
+
     def labels(self, samples: Sequence[Any]) -> tuple[object, ...]:
         """Return labels in sample order."""
         return tuple(self.label(sample) for sample in samples)
@@ -442,6 +465,67 @@ class AudioAdapter(ModalityAdapter):
             "The baseline does not claim transcript, speaker, or time-local "
             "explanations.",
         )
+
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return bounded time-local score evidence for WAV samples."""
+        if not isinstance(sample, audio.AudioSample):
+            raise TypeError("sample must be an AudioSample")
+        if sample.metadata.format.lower() != "wav":
+            return {
+                "status": "not_available",
+                "method": "time_local_wav_window_score",
+                "reason": "an explicit WAV decoder is required",
+            }
+        window_count = min(8, sample.metadata.frame_count)
+        window_frames = max(
+            1, int(np.ceil(sample.metadata.frame_count / window_count))
+        )
+        full_features = self.features((sample,)).values[0]
+        full_decision = np.asarray(model.decision_function(full_features[None]))
+        full_score = float(full_decision.reshape(-1)[0])
+        windows: list[dict[str, object]] = []
+        for start_frame in range(0, sample.metadata.frame_count, window_frames):
+            prepared = audio.AudioDataset((sample,)).prepare_features(
+                max_frames=window_frames,
+                start_frame=start_frame,
+            )
+            values = prepared.to_numpy()[0]
+            decision = np.asarray(model.decision_function(values[None]))
+            windows.append(
+                {
+                    "start_seconds": start_frame / sample.metadata.sample_rate,
+                    "end_seconds": min(
+                        sample.metadata.frame_count,
+                        start_frame + prepared.frames_observed[0],
+                    )
+                    / sample.metadata.sample_rate,
+                    "start_frame": start_frame,
+                    "frames_observed": prepared.frames_observed[0],
+                    "score": float(decision.reshape(-1)[0]),
+                    "score_delta_from_full": float(
+                        decision.reshape(-1)[0] - full_score
+                    ),
+                }
+            )
+        return {
+            "status": "available",
+            "method": "time_local_wav_window_score",
+            "window_count": len(windows),
+            "windows": windows,
+            "feature_space_only": True,
+            "limitations": [
+                "Windows summarize decoded WAV statistics rather than raw "
+                "waveform attribution.",
+                "The score is associational and does not establish a causal "
+                "audio event.",
+            ],
+        }
 
 
 class VideoAdapter(ModalityAdapter):
@@ -1209,8 +1293,11 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
         """Record signed coefficient contributions with limitations."""
         model = context.model
         batch = context.feature_batches["test"]
-        if model is None or not len(batch.sample_ids):
-            raise RuntimeError("model and test features are required")
+        partitions = context.partitions
+        if model is None or partitions is None or not len(batch.sample_ids):
+            raise RuntimeError(
+                "model, partitions, and test features are required"
+            )
         strength = np.mean(np.abs(model.coef_), axis=0)
         global_terms = sorted(
             (
@@ -1310,6 +1397,12 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                 "relative_step": 1e-6,
                 "feature_space_only": True,
             },
+            "modality_specific": context.adapter.modality_specific_explanation(
+                partitions.test[0],
+                model,
+                batch.feature_names,
+                coefficients,
+            ),
             "quality": quality_evaluation.to_dict(),
             "limitations": [
                 "Associational explanation only.",

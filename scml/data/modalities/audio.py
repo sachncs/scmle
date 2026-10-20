@@ -155,19 +155,36 @@ def wav_metadata(encoded_bytes: bytes) -> AudioMetadata:
 def wav_signal_features(
     encoded_bytes: bytes,
     max_frames: int,
+    start_frame: int = 0,
 ) -> tuple[tuple[float, ...], int]:
     """Extract bounded, normalized PCM statistics from one WAV payload.
 
-    The returned statistics describe the observed prefix when ``max_frames``
-    is smaller than the clip. Callers receive the observed frame count so the
-    truncation boundary cannot be mistaken for a full-clip measurement.
+    The returned statistics describe the bounded window beginning at
+    'start_frame'. Callers receive the observed frame count so a truncated
+    boundary cannot be mistaken for a full-clip measurement.
     """
+    if max_frames < 1:
+        raise ValueError("max_frames must be at least one")
+    if start_frame < 0:
+        raise ValueError("start_frame must not be negative")
     try:
         with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
             sample_width = opened.getsampwidth()
             channels = opened.getnchannels()
             sample_rate = opened.getframerate()
-            requested_frames = min(opened.getnframes(), max_frames)
+            if start_frame >= opened.getnframes():
+                raise AudioValidationError(
+                    "audio window starts beyond the available frames",
+                    {
+                        "code": "window_start_out_of_range",
+                        "start_frame": start_frame,
+                    },
+                )
+            opened.setpos(start_frame)
+            requested_frames = min(
+                opened.getnframes() - start_frame,
+                max_frames,
+            )
             raw = opened.readframes(requested_frames)
     except (EOFError, wave.Error) as error:
         raise AudioValidationError(
@@ -364,7 +381,11 @@ class AudioDataset:
         """Return profiles in source order for deterministic curation."""
         return tuple(sample.profile() for sample in self.samples)
 
-    def prepare_features(self, max_frames: int = 100_000) -> AudioFeatures:
+    def prepare_features(
+        self,
+        max_frames: int = 100_000,
+        start_frame: int = 0,
+    ) -> AudioFeatures:
         """Prepare bounded PCM and metadata features for an audio baseline.
 
         Core decoding is intentionally limited to WAV. Samples ingested with
@@ -374,6 +395,8 @@ class AudioDataset:
         """
         if max_frames < 1:
             raise ValueError("max_frames must be at least one")
+        if start_frame < 0:
+            raise ValueError("start_frame must not be negative")
         feature_names = (
             "mean_amplitude",
             "mean_absolute_amplitude",
@@ -399,7 +422,7 @@ class AudioDataset:
                     f"'{sample.source}'"
                 )
             signal_values, observed = wav_signal_features(
-                sample.encoded_bytes, max_frames
+                sample.encoded_bytes, max_frames, start_frame
             )
             rows.append(
                 (

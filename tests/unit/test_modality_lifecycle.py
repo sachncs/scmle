@@ -294,6 +294,25 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
 
 
+def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
+    """The audio adapter exposes bounded frame-window score evidence."""
+    report = modality_lifecycle.ModalityLifecycle().run(
+        audio_adapter(),
+        tmp_path / "audio-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    local = evidence["modality_specific"]
+    assert local["status"] == "available"
+    assert local["method"] == "time_local_wav_window_score"
+    assert local["window_count"] == len(local["windows"])
+    assert local["window_count"] > 1
+    assert local["feature_space_only"] is True
+
+
 def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
     """A lifecycle budget is emitted as evidence and fails closed."""
     adapter = document_adapter()
