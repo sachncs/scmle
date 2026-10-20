@@ -39,6 +39,7 @@ class MLProject:
         data: Any,
         target: str | list[str],
         task: tasks.TaskRequest = "auto",
+        modality: tasks.DatasetModality = "tabular",
         metric: str | None = None,
         time_budget: int = 1800,
         *,
@@ -104,6 +105,9 @@ class MLProject:
                 `multioutput` tasks the list of all target columns.
             task: `auto`, `classification`, `regression`, or an explicit
                 binary/multiclass task.
+            modality: Dataset family declaration. The supported beta path is
+                `tabular`; other families fail closed until their complete
+                lifecycle is registered.
             metric: Primary metric; defaults per task.
             time_budget: Wall-clock budget in seconds.
             executor: `process` (default) or `ray`.
@@ -204,6 +208,7 @@ class MLProject:
             data=tasks.DataSpec(
                 uri="<in-memory>" if frame is not None else str(data),
                 target=target if isinstance(target, str) else target[0],
+                modality=modality,
                 targets=[] if isinstance(target, str) else list(target),
                 id_columns=id_columns or [],
                 group_column=group_column,
