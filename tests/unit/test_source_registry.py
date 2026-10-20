@@ -100,3 +100,38 @@ def test_registry_rejects_conflicting_repeated_snapshot():
 
     with pytest.raises(ValueError, match="different evidence"):
         registry_value.register(conflict)
+
+
+def test_durable_registry_store_compares_snapshots_across_process_runs(tmp_path):
+    store = registry.SourceRegistryStore(tmp_path / "sources.json")
+    first = make_snapshot()
+    additive = make_snapshot(
+        "snapshot-2",
+        "data-2",
+        {"value": "int64", "label": "int64", "region": "string"},
+    )
+
+    assert store.load().snapshots == {}
+    assert store.register(first).status == "initial"
+    assert store.register(additive).status == "additive"
+
+    restored = registry.SourceRegistryStore(store.path).load()
+    assert [item.snapshot_id for item in restored.snapshots[first.source_id]] == [
+        "snapshot-1",
+        "snapshot-2",
+    ]
+    assert store.path.read_text(encoding="utf-8").endswith("\n")
+
+
+def test_durable_registry_store_does_not_replace_on_conflicting_snapshot(
+    tmp_path,
+):
+    store = registry.SourceRegistryStore(tmp_path / "sources.json")
+    first = make_snapshot()
+    store.register(first)
+    original = store.path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="different evidence"):
+        store.register(make_snapshot(data_hash="different"))
+
+    assert store.path.read_text(encoding="utf-8") == original

@@ -3,6 +3,9 @@
 from collections.abc import Mapping
 import dataclasses
 import json
+import os
+import pathlib
+import tempfile
 from typing import Any
 from typing import Self
 
@@ -264,3 +267,50 @@ class SourceRegistry:
         if not isinstance(record, Mapping):
             raise TypeError("serialized registry must contain an object")
         return cls.from_dict(record)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SourceRegistryStore:
+    """Durable, atomic file store for source history across runs."""
+
+    path: pathlib.Path
+
+    def load(self) -> SourceRegistry:
+        """Load the registry or return an empty registry for a new store."""
+        if not self.path.exists():
+            return SourceRegistry()
+        return SourceRegistry.from_json(self.path.read_text(encoding="utf-8"))
+
+    def save(self, registry: SourceRegistry) -> None:
+        """Atomically publish a complete registry snapshot.
+
+        A failed serialization or write leaves the previous registry intact.
+        The caller owns coordination between multiple writers; this store
+        guarantees that readers never observe a partial JSON document.
+        """
+        if not isinstance(registry, SourceRegistry):
+            raise TypeError("registry must be SourceRegistry")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{self.path.name}.", dir=self.path.parent
+        )
+        try:
+            with os.fdopen(
+                descriptor, "w", encoding="utf-8", newline="\n"
+            ) as handle:
+                handle.write(registry.to_json())
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, self.path)
+        except BaseException:
+            pathlib.Path(temporary_name).unlink(missing_ok=True)
+            raise
+
+    def register(self, snapshot: SourceSnapshot) -> SchemaCompatibility:
+        """Compare, register, and durably publish one source snapshot."""
+        registry = self.load()
+        compatibility = registry.compatibility(snapshot)
+        registry.register(snapshot)
+        self.save(registry)
+        return compatibility
