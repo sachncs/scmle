@@ -5607,6 +5607,7 @@ all = [
     { name = "mlflow" },
     { name = "openpyxl" },
     { name = "optuna" },
+    { name = "pillow" },
     { name = "polars" },
     { name = "ray" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
@@ -5635,6 +5636,9 @@ distributed = [
 ]
 embeddings = [
     { name = "sentence-transformers" },
+]
+multimodal = [
+    { name = "pillow" },
 ]
 onnx = [
     { name = "onnxmltools" },
@@ -5689,6 +5693,7 @@ requires-dist = [
     { name = "openpyxl", marker = "extra == 'spreadsheets'", specifier = ">=3.1" },
     { name = "optuna", marker = "extra == 'optimization'", specifier = ">=4.0" },
     { name = "pandas", specifier = ">=3.0" },
+    { name = "pillow", marker = "extra == 'multimodal'", specifier = ">=12.0" },
     { name = "polars", marker = "extra == 'polars'", specifier = ">=1.0" },
     { name = "psutil", marker = "sys_platform == 'win32'", specifier = ">=5.9" },
     { name = "pyarrow", specifier = ">=22" },
@@ -5698,14 +5703,14 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.16.2" },
     { name = "sentence-transformers", marker = "extra == 'embeddings'", specifier = ">=3.0" },
     { name = "skl2onnx", marker = "extra == 'onnx'", specifier = ">=1.17" },
-    { name = "super-charge-ml", extras = ["boosting", "catboost", "deeplearning", "optimization", "sampling", "polars", "spreadsheets", "tracking", "distributed", "benchmarks"], marker = "extra == 'all'" },
+    { name = "super-charge-ml", extras = ["boosting", "catboost", "deeplearning", "optimization", "sampling", "polars", "spreadsheets", "tracking", "distributed", "benchmarks", "multimodal"], marker = "extra == 'all'" },
     { name = "tabpfn", marker = "extra == 'tabpfn'", specifier = ">=2.0" },
     { name = "threadpoolctl", specifier = ">=3.6" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'deeplearning'", specifier = ">=2.8", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'deeplearning'", specifier = ">=2.8" },
     { name = "xgboost", marker = "extra == 'boosting'", specifier = ">=3.0" },
 ]
-provides-extras = ["boosting", "catboost", "deeplearning", "tabpfn", "embeddings", "onnx", "optimization", "sampling", "polars", "spreadsheets", "tracking", "benchmarks", "distributed", "all"]
+provides-extras = ["boosting", "catboost", "deeplearning", "tabpfn", "embeddings", "onnx", "optimization", "sampling", "polars", "spreadsheets", "tracking", "benchmarks", "distributed", "multimodal", "all"]
 
 [package.metadata.requires-dev]
 dev = [

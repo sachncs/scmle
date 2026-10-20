@@ -7,6 +7,9 @@ python_version="${SCML_PYTHON_VERSION:-3.14}"
 benchmark_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-bench.XXXXXX")"
 benchmark_output="$benchmark_directory/results.json"
 
+uv sync --python "$python_version" \
+  --extra boosting --extra optimization --extra multimodal
+
 echo "== static checks =="
 uv run --python "$python_version" ruff check .
 uv run --python "$python_version" ruff format --check .

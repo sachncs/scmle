@@ -162,7 +162,7 @@ by `ruff` and `mypy`. No underscore-prefixed names anywhere, enforced by
 `tests/unit/test_conventions.py`.
 
 ```bash
-uv sync --extra boosting --extra optimization
+uv sync --extra boosting --extra optimization --extra multimodal
 uv run ruff check . && uv run ruff format --check .
 uv run mypy scml benchmarks
 uv run pytest

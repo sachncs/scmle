@@ -7,7 +7,6 @@ from pathlib import Path
 import wave
 
 import numpy as np
-from PIL import Image
 import pytest
 
 from scml.contracts import modalities
@@ -37,7 +36,8 @@ def document_adapter() -> modality_lifecycle.DocumentAdapter:
 
 def image_bytes(value: int) -> bytes:
     """Encode one deterministic RGB image."""
-    canvas = Image.new("RGB", (4, 4), (value, 255 - value, value // 2))
+    pillow_image = pytest.importorskip("PIL.Image")
+    canvas = pillow_image.new("RGB", (4, 4), (value, 255 - value, value // 2))
     output = io.BytesIO()
     canvas.save(output, format="PNG")
     return output.getvalue()

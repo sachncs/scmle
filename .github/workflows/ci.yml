@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
-      - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
+      - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization --extra multimodal
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy scml benchmarks
       - run: uv run python scripts/check_api_compatibility.py tests/fixtures/public_api.json
@@ -58,7 +58,7 @@ jobs:
       - name: LightGBM needs the OpenMP runtime on macOS
         if: runner.os == 'macOS'
         run: brew install libomp
-      - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization
+      - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization --extra multimodal
       - run: uv run pytest -q tests/unit tests/property tests/leakage tests/integration/test_end_to_end.py
       - name: Smoke test the CLI
         run: uv run scml --help
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
-      - run: uv sync --python 3.11 --resolution lowest-direct --extra boosting --extra optimization
+      - run: uv sync --python 3.11 --resolution lowest-direct --extra boosting --extra optimization --extra multimodal
       - run: uv run pytest -q tests/unit tests/property tests/leakage
 
   deep-learning:
