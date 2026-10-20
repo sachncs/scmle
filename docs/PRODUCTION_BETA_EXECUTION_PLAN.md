@@ -234,6 +234,17 @@ an explicit schema version and signed canonical content when
 signing key remains an HMAC deployment secret, so custody, rotation, and
 independent release review are still separate requirements.
 
+The current-head complete release preflight at `ae57eec` passed `1807 passed,
+89 skipped, 2 warnings` in 8 minutes 8 seconds. Total coverage was 81.86%,
+the declared core scope was 86%, and the critical mutation gate killed
+`1295/1794` mutants (72%, above the 70% minimum). The five-seed benchmark gate
+reported zero regressions with intervals of tie, tie, tie, and ahead across the
+four offline datasets; Twine, reproducible wheel/sdist verification, offline
+artifact installation, dependency audits, and the 11-route Astro build all
+passed. The two SQLite resource-cleanup warnings remain a release-debt item;
+the unit/property/leakage slice separately passes with
+`-W error::ResourceWarning`.
+
 The complete release preflight at pushed commit `51c5afd` passed `1803 passed,
 89 skipped, 2 warnings` in 8 minutes 11 seconds. Total coverage was 81.86% and
 the declared core scope remained 86%; mutation testing killed `1253/1735`
