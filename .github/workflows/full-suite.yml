@@ -9,6 +9,9 @@ concurrency:
   group: full-suite
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: complete test suite (Python 3.14)
@@ -26,3 +29,29 @@ jobs:
           name: full-suite-coverage
           path: coverage.xml
           if-no-files-found: ignore
+
+  clean-clone:
+    name: exact-SHA clean-clone rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Clone the published repository into a fresh directory
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            /tmp/super-charge-ml-clean-clone
+          git -C /tmp/super-charge-ml-clean-clone checkout --detach "${GITHUB_SHA}"
+          test -z "$(git -C /tmp/super-charge-ml-clean-clone status --porcelain)"
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --directory /tmp/super-charge-ml-clean-clone --python 3.14 --extra boosting --extra optimization
+      - name: Run the clean-clone acceptance slice
+        run: >-
+          uv run --directory /tmp/super-charge-ml-clean-clone pytest -q
+          tests/unit tests/property tests/leakage
+          tests/integration/test_end_to_end.py
+          tests/integration/test_deployment.py
+      - name: Verify the package entry point from the clean clone
+        run: uv run --directory /tmp/super-charge-ml-clean-clone scml --help
