@@ -379,6 +379,73 @@ class ImageAdapter(ModalityAdapter):
         """Return the image label."""
         return sample.label
 
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return bounded occlusion evidence on transformed RGB pixels."""
+        if not isinstance(sample, image.ImageSample):
+            raise TypeError("sample must be an ImageSample")
+        features = self.features((sample,)).values
+        if features.shape[1] != 16 * 16 * 3:
+            raise ValueError("image lifecycle expects 16x16 RGB features")
+        decision = np.asarray(model.decision_function(features))
+        if decision.ndim == 1:
+            selected_class = 0
+            original_score = float(decision[0])
+        else:
+            predicted = model.predict(features)[0]
+            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            original_score = float(decision[0, selected_class])
+        terms: list[tuple[str, float]] = []
+        width = 16
+        height = 16
+        channels = 3
+        for row in range(0, height, 4):
+            for column in range(0, width, 4):
+                end_row = min(row + 4, height)
+                end_column = min(column + 4, width)
+                indexes = [
+                    (pixel_row * width + pixel_column) * channels + channel
+                    for pixel_row in range(row, end_row)
+                    for pixel_column in range(column, end_column)
+                    for channel in range(channels)
+                ]
+                occluded = features.copy()
+                occluded[0, indexes] = 0.0
+                occluded_decision = np.asarray(
+                    model.decision_function(occluded)
+                )
+                if occluded_decision.ndim == 1:
+                    occluded_score = float(occluded_decision[0])
+                else:
+                    occluded_score = float(occluded_decision[0, selected_class])
+                terms.append(
+                    (
+                        f"region[{row}:{end_row},{column}:{end_column}]",
+                        original_score - occluded_score,
+                    )
+                )
+        selected = sorted(
+            terms,
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:10]
+        return {
+            "status": "available",
+            "method": "transformed_pixel_region_occlusion",
+            "terms": [[name, float(value)] for name, value in selected],
+            "baseline": "zero-valued transformed RGB pixels",
+            "feature_space_only": True,
+            "limitations": [
+                "Occlusion occurs after resizing and RGB conversion.",
+                "Regions are not object localization or raw-image saliency.",
+                "Score changes are associational and not causal.",
+            ],
+        }
+
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
         """Return mean-pixel and duplicate drift evidence."""
         if not isinstance(observed, ImageAdapter):

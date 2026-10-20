@@ -294,6 +294,25 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
 
 
+def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
+    """The image adapter exposes bounded transformed-pixel occlusion."""
+    report = modality_lifecycle.ModalityLifecycle().run(
+        image_adapter(),
+        tmp_path / "image-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    local = evidence["modality_specific"]
+    assert local["status"] == "available"
+    assert local["method"] == "transformed_pixel_region_occlusion"
+    assert local["baseline"] == "zero-valued transformed RGB pixels"
+    assert len(local["terms"]) == 10
+    assert local["feature_space_only"] is True
+
+
 def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     """The audio adapter exposes bounded frame-window score evidence."""
     report = modality_lifecycle.ModalityLifecycle().run(
