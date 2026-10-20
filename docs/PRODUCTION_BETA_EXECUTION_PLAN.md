@@ -55,7 +55,7 @@ means the code path exists; it does not mean the capability is supported.
 | Redacted inference observability | Implemented / Tested | `PredictionLog` emits a redacted sidecar, and policy evaluation checks required signals, freshness, future timestamps, and upper-bound threshold breaches. Serving defaults, retention enforcement, alert routing, and incident workflows remain incomplete. |
 | Fault injection and recovery | Partial | The complete release-blocking fault plan is persisted with each packaged run, and atomic-write cleanup/reliability contracts exist. Worker-loss, disk-full, dependency, signature, connector, fuzzing, mutation, and clean-clone execution evidence is not complete. |
 | Security, provenance, SBOM, and release CI | Partial | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, and immutable CI action pins exist. Independent security scans, signed SBOM/provenance attestation, and clean-release rehearsal remain incomplete. |
-| Astro developer site | Partial | Standalone docs routes and the `/super-charge-ml/` base path build. Accessibility automation, Playwright smoke coverage, deployment verification, and exhaustive modality/operations content remain incomplete. |
+| Astro developer site | Partial | Standalone docs routes, base-path links, and CI route smoke coverage build successfully; accessibility automation, Playwright coverage, public deployment verification, and exhaustive modality/operations content remain incomplete. |
 
 ### Verification snapshot — 20 October 2026
 
