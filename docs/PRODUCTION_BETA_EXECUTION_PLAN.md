@@ -892,6 +892,14 @@ is not a complete production release decision: coverage, mutation, benchmark,
 clean-clone, hosted CI/Pages, external-fault, and independent-review evidence
 remain separate gates below.
 
+At pushed commit `2a7b939`, the post-manifest current-head strict regression
+gate also passed on 2026-10-21:
+
+- `uv run pytest -q tests -W error::ResourceWarning`: 2,249 passed and 88
+  skipped in 27 minutes 53 seconds;
+- no failure, error, or warning promoted to a failure by the strict warning
+  policy after the modality manifest changes.
+
 The latest complete local release preflight at pushed commit `2eb767e` passed
 on 2026-10-21:
 
