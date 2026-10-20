@@ -20,6 +20,7 @@ from sklearn import base
 from scml.api import results
 from scml.artifacts import bundle as bundle_module
 from scml.artifacts import report
+from scml.contracts import capabilities
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.contracts import experiments
@@ -605,10 +606,20 @@ def attach_feature_graph(
 def build_plan(
     context: context_module.RunContext,
 ) -> experiments.ExperimentPlan:
-    """Creates the experiment plan from a profiled context."""
+    """Creates and validates the experiment plan from a profiled context.
+
+    The planner remains responsible for adapter compatibility and search
+    policy. The capability registry is the separate release boundary: every
+    candidate in the resulting plan must have an explicit complete capability
+    declaration before the plan can reach ``TrainStage``.
+
+    Raises:
+        capabilities.UnsupportedCapabilityError: If any planned candidate or
+            requested fairness contract is not explicitly supported.
+    """
     approved = context.approved_plan
     planner = planner_module.Planner(context.registry, context.catalog)
-    return planner.plan(
+    plan = planner.plan(
         planner_module.PlanningContext(
             context.spec,
             require(context.profile, "profile"),
@@ -617,6 +628,54 @@ def build_plan(
             context.history,
         )
     )
+    task = require(context.task, "task")
+    for model_name in plan.candidate_models:
+        adapter = context.registry.get(model_name)
+        context.capability_registry.require(
+            capability_key(context, task, adapter.family)
+        )
+    return plan
+
+
+def capability_key(
+    context: context_module.RunContext,
+    task: tasks.TaskType,
+    model_family: str,
+) -> capabilities.CapabilityKey:
+    """Builds the complete capability request for a planned candidate.
+
+    The current beta exposes tabular data through the library inference path.
+    Selection uncertainty is deliberately not translated into predictive
+    uncertainty: it is a model-selection policy, not an output contract.
+
+    Raises:
+        capabilities.UnsupportedCapabilityError: If the requested fairness
+            behavior is not implemented for ``task``.
+    """
+    fairness = (
+        capabilities.Fairness.NONE
+        if context.spec.fairness.mitigation == "none"
+        else capabilities.Fairness.MITIGATION
+    )
+    key = capabilities.CapabilityKey(
+        modality=capabilities.Modality.TABULAR,
+        task=task,
+        model_family=model_family,
+        evaluation=context_module.TABULAR_BETA_EVALUATIONS[task],
+        uncertainty=capabilities.Uncertainty.NONE,
+        fairness=fairness,
+        explainability=capabilities.Explainability.NONE,
+        inference=capabilities.Inference.LIBRARY,
+    )
+    if (
+        context.spec.fairness.mitigation == "group_thresholds"
+        and task is not tasks.TaskType.BINARY
+    ):
+        context.capability_registry.raise_unsupported(
+            key,
+            "group-threshold mitigation is implemented for binary tasks only",
+        )
+    return key
 
 
 def advise(context: context_module.RunContext) -> tuple[Any, ...]:

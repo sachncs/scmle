@@ -11,6 +11,7 @@ import pandas as pd
 from scml.api import results
 from scml.artifacts import bundle as bundle_module
 from scml.artifacts import store as store_module
+from scml.contracts import capabilities
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.contracts import events
@@ -28,6 +29,134 @@ from scml.intelligence import recommendations as recommendations_module
 from scml.models import registry as registry_module
 
 T = TypeVar("T")
+
+
+TABULAR_BETA_TASK_FAMILIES = (
+    (
+        tasks.TaskType.BINARY,
+        (
+            "baseline",
+            "linear",
+            "tree",
+            "boosting",
+            "kernel",
+            "neighbors",
+            "neural",
+            "bagging",
+        ),
+    ),
+    (
+        tasks.TaskType.MULTICLASS,
+        (
+            "baseline",
+            "linear",
+            "tree",
+            "boosting",
+            "kernel",
+            "neighbors",
+            "neural",
+            "bagging",
+        ),
+    ),
+    (
+        tasks.TaskType.REGRESSION,
+        (
+            "baseline",
+            "linear",
+            "tree",
+            "boosting",
+            "kernel",
+            "neighbors",
+            "neural",
+            "bagging",
+        ),
+    ),
+    (tasks.TaskType.SURVIVAL, ("baseline", "linear", "boosting")),
+    (tasks.TaskType.ORDINAL, ("baseline", "linear", "tree", "boosting")),
+    (tasks.TaskType.RANKING, ("baseline", "boosting")),
+    (
+        tasks.TaskType.MULTILABEL,
+        ("baseline", "linear", "tree", "boosting"),
+    ),
+    (
+        tasks.TaskType.MULTIOUTPUT,
+        ("baseline", "linear", "tree", "boosting"),
+    ),
+    (tasks.TaskType.FORECAST, ("baseline", "linear", "tree", "boosting")),
+    (tasks.TaskType.UPLIFT, ("baseline", "causal")),
+)
+"""Explicit tabular model-family paths covered by the current beta."""
+
+
+TABULAR_BETA_EVALUATIONS = {
+    tasks.TaskType.BINARY: capabilities.Evaluation.STANDARD,
+    tasks.TaskType.MULTICLASS: capabilities.Evaluation.STANDARD,
+    tasks.TaskType.REGRESSION: capabilities.Evaluation.STANDARD,
+    tasks.TaskType.SURVIVAL: capabilities.Evaluation.SURVIVAL,
+    tasks.TaskType.ORDINAL: capabilities.Evaluation.STANDARD,
+    tasks.TaskType.RANKING: capabilities.Evaluation.RANKING,
+    tasks.TaskType.MULTILABEL: capabilities.Evaluation.MULTILABEL,
+    tasks.TaskType.MULTIOUTPUT: capabilities.Evaluation.MULTIOUTPUT,
+    tasks.TaskType.FORECAST: capabilities.Evaluation.FORECASTING,
+    tasks.TaskType.UPLIFT: capabilities.Evaluation.UPLIFT,
+}
+"""Canonical evaluation contract for each tabular task path."""
+
+
+def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
+    """Builds the explicit capability registry for the tabular beta.
+
+    The registry intentionally declares only the library inference path with
+    no portable explanation or predictive-uncertainty promise. Modalities,
+    task/model paths, and contract dimensions not listed here are rejected
+    before fitting rather than being inferred from an adapter's existence.
+    """
+    records: list[capabilities.Capability] = []
+    for task, families in TABULAR_BETA_TASK_FAMILIES:
+        for model_family in families:
+            for fairness in (
+                (capabilities.Fairness.NONE,)
+                if task
+                not in (tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS)
+                else (
+                    capabilities.Fairness.NONE,
+                    capabilities.Fairness.MITIGATION,
+                )
+            ):
+                records.append(
+                    capabilities.Capability(
+                        key=capabilities.CapabilityKey(
+                            modality=capabilities.Modality.TABULAR,
+                            task=task,
+                            model_family=model_family,
+                            evaluation=TABULAR_BETA_EVALUATIONS[task],
+                            uncertainty=capabilities.Uncertainty.NONE,
+                            fairness=fairness,
+                            explainability=capabilities.Explainability.NONE,
+                            inference=capabilities.Inference.LIBRARY,
+                        ),
+                        status=capabilities.CapabilityStatus.SUPPORTED,
+                        required_extras=("core",),
+                        resources=capabilities.ResourceAssumptions(
+                            memory_gb=1.0
+                        ),
+                        failure_modes=(
+                            "malformed or schema-incompatible input",
+                            "model-family dependency unavailable",
+                            "resource limits exceeded",
+                        ),
+                        evidence_links=(
+                            "tests/integration/test_capability_gate.py",
+                        ),
+                        limitations=(
+                            "tabular modality only",
+                            "library inference only",
+                            "no portable explanation contract",
+                            "no predictive uncertainty contract",
+                        ),
+                    )
+                )
+    return capabilities.CapabilityRegistry(records)
 
 
 def require(value: T | None, name: str) -> T:
@@ -118,6 +247,9 @@ class RunContext:
     registry: registry_module.ModelRegistry
     catalog: metrics.MetricCatalog
     policy: selection.SelectionPolicy
+    capability_registry: capabilities.CapabilityRegistry = dataclasses.field(
+        default_factory=tabular_beta_capability_registry
+    )
     store: store_module.RunStore | None = None
     log: events.EventLog | None = None
     tracker: tracking_stores.ExperimentStore = dataclasses.field(
