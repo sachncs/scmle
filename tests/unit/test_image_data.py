@@ -158,6 +158,28 @@ def test_curation_reports_duplicate_and_sampling_findings():
     assert [finding.finding_id for finding in report.quality_findings] == [
         "quality.image-profile-truncated",
     ]
+    assert report.profile["label_counts"] == {"unlabeled": 2}
+
+
+@PILLOW_SKIP
+def test_curation_reports_mixed_label_state():
+    """Image curation makes an unlabeled training boundary visible."""
+    report = image.ImageDataset(
+        (
+            image.ImageSample.from_bytes(
+                png_bytes((0, 0, 0)), "labelled.png", label="dark"
+            ),
+            image.ImageSample.from_bytes(png_bytes((255, 255, 255)), "raw.png"),
+        )
+    ).curate()
+
+    assert report.profile["label_counts"] == {
+        "str:dark": 1,
+        "unlabeled": 1,
+    }
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.image-mixed-label-state",
+    ]
 
 
 @PILLOW_SKIP

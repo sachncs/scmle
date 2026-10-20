@@ -19,6 +19,7 @@ from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
 from scml.data.modalities.curation import dataset_hash
+from scml.data.modalities.curation import label_counts
 from scml.data.modalities.curation import ModalityCurationReport
 
 PillowModule: Any = None
@@ -159,6 +160,7 @@ class ImageSample:
     mode: str
     format: str
     byte_size: int
+    label: str | int | float | bool | None = None
 
     def __post_init__(self) -> None:
         """Validates immutable identity and geometry metadata."""
@@ -181,6 +183,7 @@ class ImageSample:
         source: str = "memory://",
         max_bytes: int | None = DEFAULT_MAX_BYTES,
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
+        label: str | int | float | bool | None = None,
     ) -> Self:
         """Builds a validated image sample from encoded bytes.
 
@@ -189,6 +192,7 @@ class ImageSample:
             source: Stable source label or URI for lineage.
             max_bytes: Maximum encoded payload size, or ``None`` for no limit.
             max_pixels: Maximum decoded pixel count, or ``None`` for no limit.
+            label: Optional task label retained for curation evidence.
 
         Returns:
             A validated immutable image snapshot.
@@ -263,6 +267,7 @@ class ImageSample:
             mode=mode,
             format=format_name,
             byte_size=len(raw),
+            label=label,
         )
 
     @classmethod
@@ -271,6 +276,7 @@ class ImageSample:
         path: str | pathlib.Path,
         max_bytes: int | None = DEFAULT_MAX_BYTES,
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
+        label: str | int | float | bool | None = None,
     ) -> Self:
         """Builds a validated image sample from a local file."""
         file_path = pathlib.Path(path).expanduser()
@@ -304,7 +310,7 @@ class ImageSample:
                 code="read_failure",
                 source=source,
             ) from error
-        return cls.from_bytes(payload, source, max_bytes, max_pixels)
+        return cls.from_bytes(payload, source, max_bytes, max_pixels, label)
 
     @staticmethod
     def validate_limits(
@@ -376,6 +382,7 @@ class ImageSample:
             "mode": self.mode,
             "format": self.format,
             "byte_size": self.byte_size,
+            "label": self.label,
         }
 
 
@@ -548,7 +555,11 @@ class ImageDataset:
     ) -> ModalityCurationReport:
         """Build bounded image statistics and reviewable findings."""
         profile = self.profile(max_samples, profile_size)
+        labels = label_counts(sample.label for sample in self.samples)
+        profile_data = profile.to_dict()
+        profile_data["label_counts"] = labels
         quality_findings = []
+        risk_findings = []
         if not self.samples:
             quality_findings.append(
                 build_finding(
@@ -586,6 +597,18 @@ class ImageDataset:
                     False,
                 )
             )
+        if "unlabeled" in labels and len(labels) > 1:
+            risk_findings.append(
+                build_finding(
+                    "risk.image-mixed-label-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": "all_samples"},
+                    {"label_counts": labels},
+                    "Declare whether unlabeled images are valid for the "
+                    "intended task before training.",
+                    False,
+                )
+            )
         return ModalityCurationReport(
             modality="image",
             dataset_hash=dataset_hash(
@@ -593,8 +616,9 @@ class ImageDataset:
                 for sample in self.samples
             ),
             sample_count=len(self.samples),
-            profile=profile.to_dict(),
+            profile=profile_data,
             quality_findings=tuple(quality_findings),
+            risk_findings=tuple(risk_findings),
         )
 
     def prepare_tabular_features(
