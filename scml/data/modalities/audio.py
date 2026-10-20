@@ -10,6 +10,7 @@ import dataclasses
 import hashlib
 import io
 import pathlib
+import random
 from typing import Self
 import wave
 
@@ -95,6 +96,28 @@ class AudioFeatures:
     def to_numpy(self) -> np.ndarray:
         """Return a writable copy of the feature matrix."""
         return np.asarray(self.values, dtype=np.float64).copy()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class AudioSplit:
+    """Group-aware audio split that keeps related clips together."""
+
+    train: tuple["AudioSample", ...]
+    validation: tuple["AudioSample", ...]
+    test: tuple["AudioSample", ...]
+
+    def group_ids(self) -> dict[str, tuple[str, ...]]:
+        """Return the stable groups assigned to each partition."""
+        return {
+            name: tuple(
+                sorted({sample.group_id or sample.source for sample in samples})
+            )
+            for name, samples in (
+                ("train", self.train),
+                ("validation", self.validation),
+                ("test", self.test),
+            )
+        }
 
 
 AudioProbe = Callable[[bytes], AudioMetadata]
@@ -219,6 +242,7 @@ class AudioSample:
     file_hash: str
     metadata: AudioMetadata
     label: str | int | float | bool | None = None
+    group_id: str | None = None
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -227,6 +251,8 @@ class AudioSample:
         object.__setattr__(self, "encoded_bytes", raw)
         if not self.source.strip():
             raise ValueError("source must not be empty")
+        if self.group_id is not None and not self.group_id.strip():
+            raise ValueError("group_id must not be empty when provided")
         if not raw:
             raise AudioValidationError(
                 "audio payload is empty", {"code": "empty_payload"}
@@ -246,6 +272,8 @@ class AudioSample:
         source: str = "memory://",
         probe: AudioProbe | None = None,
         max_bytes: int | None = 500 * 1024 * 1024,
+        label: str | int | float | bool | None = None,
+        group_id: str | None = None,
     ) -> Self:
         """Create a sample from bytes and an explicit codec probe.
 
@@ -285,6 +313,8 @@ class AudioSample:
             encoded_bytes=raw,
             file_hash=hashlib.sha256(raw).hexdigest(),
             metadata=metadata,
+            label=label,
+            group_id=group_id,
         )
 
     def profile(self) -> AudioProfile:
@@ -389,6 +419,73 @@ class AudioDataset:
             frames_truncated=tuple(frames_truncated),
         )
 
+    def split(
+        self,
+        validation_fraction: float = 0.2,
+        test_fraction: float = 0.2,
+        seed: int = 0,
+    ) -> AudioSplit:
+        """Split clips by explicit group identity to prevent leakage.
+
+        A caller should use a speaker, session, device, or other identity as
+        ``group_id``. Without one, source identity is the conservative group
+        and repeated clips are not assumed to share a speaker.
+        """
+        if not 0 <= validation_fraction < 1:
+            raise ValueError("validation_fraction must be in [0, 1)")
+        if not 0 <= test_fraction < 1:
+            raise ValueError("test_fraction must be in [0, 1)")
+        if validation_fraction + test_fraction >= 1:
+            raise ValueError("validation_fraction + test_fraction must be < 1")
+        grouped: dict[str, list[AudioSample]] = {}
+        for sample in self.samples:
+            grouped.setdefault(sample.group_id or sample.source, []).append(
+                sample
+            )
+        groups = sorted(grouped)
+        randomizer = random.Random(seed)  # nosec B311 - seeded data split
+        randomizer.shuffle(groups)
+        test_count = int(len(groups) * test_fraction)
+        validation_count = int(len(groups) * validation_fraction)
+        if test_fraction and test_count == 0 and len(groups) >= 3:
+            test_count = 1
+        if validation_fraction and validation_count == 0 and len(groups) >= 3:
+            validation_count = 1
+        while test_count + validation_count >= len(groups):
+            if validation_count > 0:
+                validation_count -= 1
+            elif test_count > 0:
+                test_count -= 1
+            else:
+                break
+        test_groups = set(groups[:test_count])
+        validation_groups = set(
+            groups[test_count : test_count + validation_count]
+        )
+
+        def samples_for(excluded: set[str]) -> tuple[AudioSample, ...]:
+            return tuple(
+                sample
+                for sample in self.samples
+                if (sample.group_id or sample.source) not in excluded
+            )
+
+        validation = tuple(
+            sample
+            for sample in self.samples
+            if (sample.group_id or sample.source) in validation_groups
+        )
+        test = tuple(
+            sample
+            for sample in self.samples
+            if (sample.group_id or sample.source) in test_groups
+        )
+        return AudioSplit(
+            train=samples_for(test_groups | validation_groups),
+            validation=validation,
+            test=test,
+        )
+
     def curate(self) -> ModalityCurationReport:
         """Build reviewable metadata and compatibility findings."""
         profiles = self.profiles()
@@ -468,6 +565,7 @@ __all__ = [
     "AudioProbe",
     "AudioProfile",
     "AudioSample",
+    "AudioSplit",
     "AudioValidationError",
     "canonical_source",
     "wav_metadata",

@@ -108,6 +108,29 @@ def test_audio_feature_preparation_requires_a_wav_decoder():
         audio.AudioDataset((sample,)).prepare_features()
 
 
+def test_audio_split_keeps_explicit_speaker_groups_together():
+    """Grouped splitting prevents speaker leakage across partitions."""
+    samples = tuple(
+        audio.AudioSample.from_bytes(
+            wav_bytes(),
+            source=f"clip-{index}.wav",
+            label="speech",
+            group_id=f"speaker-{index // 2}",
+        )
+        for index in range(6)
+    )
+    dataset = audio.AudioDataset(samples)
+
+    first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
+    second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
+
+    assignments = first.group_ids()
+    groups = [set(values) for values in assignments.values()]
+    assert sum("speaker-0" in values for values in groups) == 1
+    assert set().union(*groups) == {"speaker-0", "speaker-1", "speaker-2"}
+    assert first == second
+
+
 def test_video_metadata_is_explicit_and_profiled():
     """Video data records probe output instead of guessing from a suffix."""
     metadata = video.VideoMetadata(
