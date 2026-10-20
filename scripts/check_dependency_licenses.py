@@ -40,9 +40,7 @@ def distribution_map() -> dict[str, metadata.Distribution]:
     }
 
 
-def dependency_names(
-    project_file: Path, include_all_extras: bool
-) -> set[str]:
+def dependency_names(project_file: Path, include_all_extras: bool) -> set[str]:
     """Returns the project's declared runtime dependency roots."""
     project = tomllib.loads(project_file.read_text(encoding="utf-8"))["project"]
     requirements = list(project.get("dependencies", []))

@@ -214,8 +214,9 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         "sample_count": len(adapter.samples),
     }
     assert isinstance(
-        evidence_by_stage[modalities.LifecycleStage.MODEL_EXPLAINABILITY]
-        .evidence,
+        evidence_by_stage[
+            modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        ].evidence,
         dict,
     )
     assert report.package.signature

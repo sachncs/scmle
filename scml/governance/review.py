@@ -243,8 +243,7 @@ class IndependentReleaseReview:
         try:
             with temporary.open("w", encoding="utf-8") as stream:
                 stream.write(
-                    json.dumps(self.to_dict(), indent=2, sort_keys=True)
-                    + "\n"
+                    json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
                 )
                 stream.flush()
                 os.fsync(stream.fileno())
