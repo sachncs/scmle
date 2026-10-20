@@ -311,6 +311,49 @@ def test_explanation_quality_release_gate_passes_with_valid_evidence():
     assert result.passed
 
 
+def test_release_is_blocked_when_fault_plan_is_unexecuted():
+    """Statistical success does not override an unverified fault plan."""
+    outcome = release.evaluate_release(
+        make_policy(),
+        {"roc_auc": 0.81},
+        {"metric_uncertainty": {"estimate": 0.81}},
+        {},
+        make_index(make_policy()),
+    )
+
+    blocked = release.apply_reliability_gate(
+        outcome,
+        {
+            "execution_status": "planned",
+            "release_blocked": True,
+        },
+    )
+
+    finding = next(
+        item
+        for item in blocked.findings
+        if item.kind is release.FindingKind.RELIABILITY
+    )
+    assert not blocked.passed
+    assert finding.observed == "planned"
+
+
+def test_release_reliability_gate_requires_explicit_completed_plan():
+    """Only an explicit completed, unblocked plan can pass this gate."""
+    outcome = release.evaluate_release(
+        make_policy(),
+        {"roc_auc": 0.81},
+        {"metric_uncertainty": {"estimate": 0.81}},
+        {},
+        make_index(make_policy()),
+    )
+
+    assert release.apply_reliability_gate(
+        outcome,
+        {"execution_status": "passed", "release_blocked": False},
+    ) == outcome
+
+
 def test_results_are_immutable_and_findings_are_sorted():
     """The public result cannot be mutated and serializes in stable order."""
     policy = make_policy()

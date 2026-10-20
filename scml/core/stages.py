@@ -1730,6 +1730,9 @@ class PackageStage(Stage):
             {"fairness": context.diagnostics.get("fairness", {})},
             evidence_index,
         )
+        outcome = release.apply_reliability_gate(
+            outcome, evaluation.get("reliability_plan")
+        )
         evaluation["release_policy"] = policy.to_dict()
         evaluation["release_evaluation"] = outcome.to_dict()
         evaluation["release_evidence"] = evidence_index.to_dict()

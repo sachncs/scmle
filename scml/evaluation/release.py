@@ -27,6 +27,7 @@ class FindingKind(enum.StrEnum):
     FAIRNESS = "fairness"
     INPUT = "input"
     METRIC = "metric"
+    RELIABILITY = "reliability"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -240,6 +241,58 @@ def explanation_quality_value(
     if not math.isfinite(score) or not 0.0 <= score <= 1.0:
         return None
     return score
+
+
+def apply_reliability_gate(
+    outcome: ReleaseEvaluation, reliability_plan: Any
+) -> ReleaseEvaluation:
+    """Block release until the persisted fault plan has verified evidence.
+
+    A model may satisfy its statistical success criteria while still being
+    unsafe to release. The fault-injection plan is therefore an independent
+    release gate. Only an explicitly completed plan with
+    ``execution_status=passed`` and ``release_blocked=false`` can pass this
+    gate; malformed or planned evidence fails closed.
+    """
+    if not isinstance(outcome, ReleaseEvaluation):
+        raise TypeError("outcome must be ReleaseEvaluation")
+    passed = (
+        isinstance(reliability_plan, Mapping)
+        and reliability_plan.get("execution_status") == "passed"
+        and reliability_plan.get("release_blocked") is False
+    )
+    if passed:
+        return outcome
+    finding = ReleaseFinding(
+        FindingKind.RELIABILITY,
+        "fault_injection",
+        False,
+        True,
+        "fault-injection recovery evidence is not complete; release blocked",
+        observed=(
+            str(reliability_plan.get("execution_status"))
+            if isinstance(reliability_plan, Mapping)
+            else "missing"
+        ),
+        expected="execution_status=passed and release_blocked=false",
+        evidence=("fault_injection_plan.json",),
+    )
+    findings = tuple(
+        sorted(
+            (*outcome.findings, finding),
+            key=lambda item: (item.kind.value, item.name, item.reason),
+        )
+    )
+    blocking_reasons = tuple(
+        item.reason for item in findings if not item.passed and item.blocking
+    )
+    return ReleaseEvaluation(
+        task=outcome.task,
+        policy_schema_version=outcome.policy_schema_version,
+        passed=False,
+        findings=findings,
+        blocking_reasons=blocking_reasons,
+    )
 
 
 def evaluate_release(

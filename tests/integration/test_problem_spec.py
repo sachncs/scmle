@@ -39,7 +39,11 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
 
     assert result.meets_criteria
     assert result.evaluation["success_criteria"][0]["met"]
-    assert result.evaluation["release_evaluation"]["passed"]
+    assert not result.evaluation["release_evaluation"]["passed"]
+    assert any(
+        finding["kind"] == "reliability"
+        for finding in result.evaluation["release_evaluation"]["findings"]
+    )
     assert result.evaluation["explanation_evidence"]
     assert result.evaluation["provenance"]["config_hash"]
     assert result.evaluation["provenance"]["dataset"]["snapshot_id"]
