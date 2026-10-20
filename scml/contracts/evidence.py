@@ -10,7 +10,7 @@ import json
 from typing import Any
 from typing import Self
 
-from scml.governance import attestation
+from scml.contracts import signing
 
 
 class EvidenceResult(enum.StrEnum):
@@ -189,7 +189,7 @@ class EvidenceIndex:
 
     def sign(self, signing_key: str | bytes) -> str:
         """Sign the complete index and return its HMAC value."""
-        self.signature = attestation.sign_payload(
+        self.signature = signing.sign_payload(
             self.unsigned_dict(), signing_key
         )
         return self.signature
@@ -198,7 +198,7 @@ class EvidenceIndex:
         """Verify the index signature against its current records."""
         if self.signature is None:
             return False
-        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def to_dict(self) -> dict[str, Any]:
@@ -206,7 +206,7 @@ class EvidenceIndex:
         record = self.unsigned_dict()
         if self.signature is not None:
             record["signature"] = {
-                "algorithm": attestation.SIGNATURE_ALGORITHM,
+                "algorithm": signing.SIGNATURE_ALGORITHM,
                 "value": self.signature,
             }
         return record
@@ -226,7 +226,7 @@ class EvidenceIndex:
                 raise ValueError("evidence index signature must be an object")
             if (
                 signature_record.get("algorithm")
-                != attestation.SIGNATURE_ALGORITHM
+                != signing.SIGNATURE_ALGORITHM
             ):
                 raise ValueError(
                     "unsupported evidence index signature algorithm"

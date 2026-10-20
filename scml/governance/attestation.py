@@ -3,14 +3,13 @@
 from collections.abc import Mapping
 import dataclasses
 import hashlib
-import hmac
 import json
-import os
 from typing import Any
 from typing import Self
 
-SIGNING_KEY_ENV = "SCML_SIGNING_KEY"
-SIGNATURE_ALGORITHM = "hmac-sha256"
+from scml.contracts.signing import resolve_key
+from scml.contracts.signing import sign_payload
+from scml.contracts.signing import SIGNATURE_ALGORITHM
 
 
 def canonical_digest(record: Mapping[str, Any]) -> str:
@@ -34,35 +33,6 @@ def required_text(record: Mapping[str, Any], path: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"attestation field must be non-empty text: {path}")
     return value
-
-
-def resolve_key(signing_key: str | bytes | None) -> bytes | None:
-    """Return the explicit signing key or the configured environment key."""
-    key = (
-        signing_key
-        if signing_key is not None
-        else os.environ.get(SIGNING_KEY_ENV)
-    )
-    if key is None or key == "":
-        return None
-    return key.encode() if isinstance(key, str) else key
-
-
-def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
-    """Return an HMAC signature for a canonical attestation payload."""
-    resolved = resolve_key(key)
-    if resolved is None:
-        raise ValueError("attestation signing key must not be empty")
-    return hmac.new(
-        resolved,
-        json.dumps(
-            payload,
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
