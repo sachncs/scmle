@@ -15,6 +15,7 @@ from scml.data.profiling import profiler
 from scml.data.readers import tabular
 from scml.data.splitting import splitters
 from scml.data.validation import target as target_module
+from scml.governance import attestation
 from scml.models import registry as registry_module
 from scml.models import thresholds
 from scml.monitoring import reference
@@ -57,6 +58,28 @@ def frames(draw, min_rows=40, max_rows=240):
 
 def spec_for(**kwargs):
     return tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y", **kwargs))
+
+
+JSON_SCALARS = st.none() | st.booleans() | st.integers() | st.text(max_size=20)
+JSON_VALUES = st.recursive(
+    JSON_SCALARS,
+    lambda children: (
+        st.lists(children, max_size=5)
+        | st.dictionaries(st.text(max_size=12), children, max_size=8)
+    ),
+    max_leaves=30,
+)
+
+
+@SETTINGS
+@given(payload=st.dictionaries(st.text(max_size=12), JSON_VALUES, max_size=12))
+def test_attestation_parser_fails_closed_on_arbitrary_json(payload):
+    """Malformed persisted evidence never escapes as an incidental error."""
+    try:
+        parsed = attestation.ReleaseAttestation.from_dict(payload)
+    except (TypeError, ValueError):
+        return
+    assert parsed.to_dict()["run_id"] == parsed.run_id
 
 
 @SETTINGS
