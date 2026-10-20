@@ -183,7 +183,17 @@ class SourceRegistry:
         history = self.snapshots.get(snapshot.source_id, ())
         for existing in history:
             if existing.snapshot_id == snapshot.snapshot_id:
-                if existing != snapshot:
+                same_content = (
+                    existing.source_id == snapshot.source_id
+                    and existing.source_uri == snapshot.source_uri
+                    and existing.schema_hash == snapshot.schema_hash
+                    and existing.data_hash == snapshot.data_hash
+                    and existing.raw_source_hash == snapshot.raw_source_hash
+                    and existing.row_count == snapshot.row_count
+                    and dict(existing.schema) == dict(snapshot.schema)
+                    and existing.watermark == snapshot.watermark
+                )
+                if not same_content:
                     raise ValueError(
                         "snapshot id is already registered with different "
                         "evidence"

@@ -1,5 +1,6 @@
 """Tests for source snapshot identity and schema evolution."""
 
+import dataclasses
 import json
 
 import pandas as pd
@@ -39,9 +40,12 @@ def make_snapshot(
 
 def test_registry_round_trips_and_repeats_are_idempotent():
     source = make_snapshot()
+    observed_again = dataclasses.replace(
+        source, captured_at="2026-10-20T10:01:00+00:00"
+    )
     registry_value = registry.SourceRegistry()
     registry_value.register(source)
-    registry_value.register(source)
+    registry_value.register(observed_again)
 
     serialized = registry_value.to_json()
     restored = registry.SourceRegistry.from_json(serialized)
