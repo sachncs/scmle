@@ -295,6 +295,41 @@ class DocumentAdapter(ModalityAdapter):
         """Return the document label."""
         return sample.label
 
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return page and section provenance for a document explanation."""
+        if not isinstance(sample, document.DocumentSample):
+            raise TypeError("sample must be a DocumentSample")
+        return {
+            "status": "available",
+            "method": "document_span_provenance",
+            "document_id": sample.document_id,
+            "source_uri": sample.source_uri,
+            "format": sample.format.value,
+            "content_hash": sample.content_hash,
+            "spans": [
+                {
+                    "kind": span.kind,
+                    "start": span.start,
+                    "end": span.end,
+                    "label": span.label,
+                    "page_number": span.page_number,
+                }
+                for span in sample.provenance
+            ],
+            "limitations": [
+                "Span provenance identifies source context; it is not OCR "
+                "confidence or citation grounding.",
+                "The lifecycle model uses bounded lexical counts.",
+                "No causal claim is made.",
+            ],
+        }
+
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
         """Return the document profile drift report."""
         if not isinstance(observed, DocumentAdapter):

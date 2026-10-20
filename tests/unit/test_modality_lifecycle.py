@@ -313,6 +313,25 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
     assert local["feature_space_only"] is True
 
 
+def test_document_lifecycle_emits_span_provenance_evidence(tmp_path: Path):
+    """The document adapter preserves page and section source context."""
+    report = modality_lifecycle.ModalityLifecycle().run(
+        document_adapter(),
+        tmp_path / "document-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    local = evidence["modality_specific"]
+    assert local["status"] == "available"
+    assert local["method"] == "document_span_provenance"
+    assert local["content_hash"]
+    assert local["spans"]
+    assert {span["kind"] for span in local["spans"]} == {"page"}
+
+
 def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
     """The graph adapter exposes bounded topology context explicitly."""
     nodes = tuple(
