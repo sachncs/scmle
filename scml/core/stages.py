@@ -69,6 +69,7 @@ from scml.experimentation import tuning
 from scml.explainability import suite as explanation_suite
 from scml.features import feature_graph
 from scml.governance import ledger
+from scml.governance import sbom
 from scml.governance import vault
 from scml.inference import novelty
 from scml.intelligence import knowledge
@@ -1804,6 +1805,21 @@ class PackageStage(Stage):
         store.write_json("provenance.json", record)
         return record
 
+    def sbom_record(
+        self,
+        context: context_module.RunContext,
+        store: Any,
+        bundle: bundle_module.ModelBundle,
+    ) -> dict[str, Any]:
+        """Build and persist the packaged environment's SBOM."""
+        record = sbom.build(
+            bundle.info.environment,
+            run_id=store.run_id,
+            software_version=scml.__version__,
+        )
+        store.write_json("sbom.json", record)
+        return record
+
     def describe(self, context: context_module.RunContext) -> str:
         """Names the stage."""
         return "write bundle and reports"
@@ -2211,6 +2227,7 @@ class PackageStage(Stage):
             context.spec.validation.seed,
         )
         bundle.save(store.path("model"))
+        evaluation["sbom"] = self.sbom_record(context, store, bundle)
         evaluation["provenance"] = self.provenance_record(
             context, store, bundle
         )
@@ -2272,6 +2289,7 @@ class PackageStage(Stage):
             "config.json",
             "dataset_manifest.json",
             "provenance.json",
+            "sbom.json",
             "evaluation.json",
             f"model/{bundle_module.MANIFEST_FILE}",
             f"model/{bundle_module.MODEL_FILE}",

@@ -43,6 +43,8 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     assert result.evaluation["provenance"]["dataset"]["snapshot_id"]
     assert result.evaluation["provenance"]["model"]["manifest_sha256"]
     assert (result.run_dir / "provenance.json").exists()
+    assert result.evaluation["sbom"]["bomFormat"] == "CycloneDX"
+    assert (result.run_dir / "sbom.json").exists()
     assert (
         result.run_dir / "explanations/permutation_importance.json"
     ).exists()
