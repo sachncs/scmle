@@ -39,6 +39,33 @@ The project must retain explicit labels for:
 No release note, README, model card, or API response may use a stronger label
 than the evidence supports.
 
+### Current evidence ledger — 20 October 2026
+
+This is the implementation boundary at the time of writing. “Implemented”
+means the code path exists; it does not mean the capability is supported.
+
+| Area | Current label | Evidence and boundary |
+| --- | --- | --- |
+| Tabular ingestion, manifest, structured curation | Implemented / Tested | Unit and integration tests cover deterministic snapshots, findings, and persisted manifests. Raw-byte hashing, full source registry, and dataset cards are still incomplete. |
+| Local and DB-API source connectors | Implemented / Tested | Connector contracts cover local files, injected DB-API factories, retry budgets, and checkpoints. Object stores, warehouses, event streams, watermarks, and exactly-once semantics remain extension work. |
+| Tabular library training paths | Implemented / Tested | The pre-training capability gate admits only explicitly declared tabular library paths. This is the current beta boundary, not all-modality support. |
+| Image, document, and graph data foundations | Implemented / Tested | Validation, profiling, splitting, and feature-preparation slices exist with focused tests. They are not supported capabilities because modelling, evaluation, packaging, inference, monitoring, and full recovery evidence are not wired. |
+| Release evaluation | Implemented / Tested | Explicit success criteria produce a task-aware policy, release findings, artifact digests, and a persisted evidence index. Runs without thresholds are explicitly `policy_not_declared` and blocked from release. |
+| Portable model explanation evidence | Implemented / Tested | Existing permutation-importance and partial-dependence reports are packaged with identity, privacy, limitation, and source-report links. Stability/fidelity gates and modality-specific explanations remain incomplete. |
+| Redacted inference observability | Implemented / Tested | `PredictionLog` can emit a redacted observability sidecar with request identity, latency, model/input fingerprints, and categorized errors. Serving defaults, SLOs, retention enforcement, alerts, and incident workflows remain incomplete. |
+| Fault injection and recovery | Partial | Atomic-write cleanup and reliability contracts exist. The complete worker-loss, disk-full, dependency, signature, connector, fuzzing, mutation, and clean-clone matrix is not complete. |
+| Security, provenance, SBOM, and release CI | Partial | Bundle signing and verification primitives exist. Independent security scans, SBOM/provenance publication, immutable CI action pinning, and clean-release rehearsal remain incomplete. |
+| Astro developer site | Partial | Standalone docs routes and the `/super-charge-ml/` base path build. Accessibility automation, Playwright smoke coverage, deployment verification, and exhaustive modality/operations content remain incomplete. |
+
+The only currently defensible supported boundary is the explicitly gated
+tabular library path. All other modality rows must remain experimental or
+extension-only until their complete lifecycle evidence is attached.
+
+The remaining work is therefore not “add more models.” It is to connect each
+new data foundation to the same contracts, independent evaluation, signed
+packaging, safe inference, monitoring, recovery tests, and developer-facing
+documentation before changing its support label.
+
 ## 2. What a principal practitioner adds beyond the request
 
 Before adding capabilities, a principal ML platform engineer would establish:
