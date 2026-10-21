@@ -1205,3 +1205,35 @@ Incremental acknowledgement evidence at `61d921f` on 2026-10-21:
   broker SDK leases, partition assignment, broker transactions, or distributed
   exactly-once evidence; those remain transport-specific and externally
   reviewable release work.
+
+Clean-head release preflight evidence at `32f9fd2` on 2026-10-21:
+
+- Static checks passed: Ruff, format, mypy, Bandit, pip-audit, and public API
+  compatibility. Bandit retained the existing comment-parser and documented
+  `B608` nosec warnings only; no finding failed the gate.
+- The bounded contract suite passed with 1,921 tests and 75 skips. Total
+  coverage was 82.82%; the declared core scope reached 86%. Two SQLite
+  `ResourceWarning` instances remain in the lifecycle-extras path and are
+  recorded as hygiene debt rather than suppressed.
+- The critical mutation gate killed 1,495 of 2,049 mutants, for a 72% score
+  against the 70% minimum. Surviving mutants and one timeout remain available
+  for triage; the threshold passed.
+- Five-seed offline benchmarks passed for breast cancer, wine, digits, and
+  diabetes progression with zero failed repetitions and zero regressions.
+  Runtime was 91/66/632/60 seconds, peak memory was 0.3557/0.3756/0.4251/
+  0.4290 GB, and failure rate was zero for each dataset. The independent-
+  reference verdicts were tie, tie, tie, and ahead.
+- Wheel and source-distribution checks passed, both artifacts were reproducible
+  (`wheel` SHA-256
+  `d0942ff38efec1fcd95627cfe4f34e4fdd6b80e7d6d955bfa45bdb02456ba175`, `sdist`
+  SHA-256
+  `8860e9b43aca4f01108f6add0c19ab26d2f85cc3f28eaf0c4156b077482ddb48`), and
+  network-isolated wheel and source-distribution installs passed.
+- The Astro site built all 15 routes and npm audit reported zero
+  vulnerabilities. This is clean local evidence for `32f9fd2`, not hosted or
+  independent release proof.
+- GitHub Pages remains HTTP 404, hosted Actions remain unavailable before job
+  logs, and external key custody, external-fault execution, and independent
+  review/signature remain release blockers. The two SQLite warnings, 75
+  unexplained-by-default skips, and surviving/timeout mutants also remain
+  engineering follow-up rather than production-readiness evidence.
