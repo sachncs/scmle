@@ -91,6 +91,7 @@ class DocumentExplanation:
     method: str
     terms: tuple[tuple[str, float], ...]
     limitations: tuple[str, ...]
+    citations: tuple[document.DocumentCitation, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-compatible explanation evidence."""
@@ -100,6 +101,7 @@ class DocumentExplanation:
             "method": self.method,
             "terms": [list(term) for term in self.terms],
             "limitations": list(self.limitations),
+            "citations": [citation.to_dict() for citation in self.citations],
         }
 
 
@@ -365,6 +367,7 @@ class DocumentClassifier:
                 "Contributions explain this fitted linear approximation only.",
                 "A positive term contribution favors the predicted class.",
             ),
+            citations=sample.citations(),
         )
 
     def term_ablation_explanation(
@@ -441,6 +444,7 @@ class DocumentClassifier:
                 "Candidate evaluation is bounded by max_terms.",
                 "The score change is associational, not causal.",
             ),
+            citations=sample.citations(),
         )
 
     def predicted_class_score(self, matrix: Any) -> float:

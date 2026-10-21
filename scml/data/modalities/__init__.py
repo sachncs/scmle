@@ -9,6 +9,7 @@ from scml.data.modalities.audio import AudioTranscript
 from scml.data.modalities.audio import AudioTranscriptSegment
 from scml.data.modalities.curation import ModalityCurationReport
 from scml.data.modalities.curation import ModalityDatasetCard
+from scml.data.modalities.document import DocumentCitation
 from scml.data.modalities.document import DocumentCurationReport
 from scml.data.modalities.document import DocumentDataset
 from scml.data.modalities.document import DocumentElement
@@ -53,6 +54,7 @@ __all__ = [
     "AudioSample",
     "AudioTranscript",
     "AudioTranscriptSegment",
+    "DocumentCitation",
     "DocumentCurationReport",
     "DocumentDataset",
     "DocumentElement",

@@ -1,6 +1,7 @@
 """Tests for the dependency-light document data foundation."""
 
 import dataclasses
+import hashlib
 import json
 
 import pytest
@@ -67,6 +68,12 @@ def test_reader_loads_utf8_markdown_and_builds_identity_and_provenance(
     assert sample.encoding == "utf-8"
     assert sample.size_bytes == len(valid_markdown)
     assert len(sample.content_hash) == 64
+    assert sample.source_digest == hashlib.sha256(valid_markdown).hexdigest()
+    assert [citation.locator for citation in sample.citations()] == [
+        "page 1",
+        "Introduction",
+        "Method",
+    ]
     assert {span.kind for span in sample.provenance} == {"page", "section"}
     assert [
         span.label for span in sample.provenance if span.kind == "section"
@@ -86,6 +93,37 @@ def test_plain_text_reader_infers_path_format(tmp_path):
     assert sample.format is document.DocumentFormat.TEXT
     assert sample.document_id == "notes.txt"
     assert sample.source_uri == path.resolve().as_uri()
+    assert sample.source_digest == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_curation_reports_source_traceability_without_inventing_citations():
+    """Curation exposes raw-source coverage and preserves missing identity."""
+    sourced = document.DocumentReader().load(
+        b"source-backed", document_id="sourced"
+    )
+    in_memory = document.DocumentSample("manual", "manual content")
+
+    report = document.DocumentDataset((sourced, in_memory)).curate()
+
+    assert report.source_traceability_coverage == 0.5
+    assert report.citation_count == len(sourced.citations())
+    assert in_memory.citations() == ()
+    assert report.to_dict()["source_traceability_coverage"] == 0.5
+
+
+def test_partial_source_identity_is_visible_as_a_quality_finding():
+    """A URI without a raw digest cannot claim citation traceability."""
+    sample = document.DocumentSample(
+        "partial",
+        "content",
+        source_uri="file:///tmp/partial.txt",
+    )
+
+    report = document.DocumentDataset((sample,)).curate()
+
+    assert [finding.finding_id for finding in report.quality_findings] == [
+        "quality.document-source-traceability-incomplete",
+    ]
 
 
 def test_document_layout_records_ocr_and_table_provenance():

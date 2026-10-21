@@ -443,8 +443,12 @@ class DocumentAdapter(ModalityAdapter):
             "method": "document_span_provenance",
             "document_id": sample.document_id,
             "source_uri": sample.source_uri,
+            "source_digest": sample.source_digest,
             "format": sample.format.value,
             "content_hash": sample.content_hash,
+            "citations": [
+                citation.to_dict() for citation in sample.citations()
+            ],
             "spans": [
                 {
                     "kind": span.kind,
@@ -482,6 +486,7 @@ class DocumentAdapter(ModalityAdapter):
             selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
             original_score = float(original_decision[0, selected_class])
         spans: list[dict[str, object]] = []
+        citations = sample.citations()
         for provenance in sample.provenance:
             characters = list(sample.content)
             characters[provenance.start : provenance.end] = " " * (
@@ -496,6 +501,7 @@ class DocumentAdapter(ModalityAdapter):
                 format=sample.format,
                 source_uri=sample.source_uri,
                 encoding=sample.encoding,
+                source_digest=sample.source_digest,
                 label=sample.label,
                 provenance=sample.provenance,
             )
@@ -513,6 +519,15 @@ class DocumentAdapter(ModalityAdapter):
                     "start": provenance.start,
                     "end": provenance.end,
                     "page_number": provenance.page_number,
+                    "citation": next(
+                        (
+                            citation.to_dict()
+                            for citation in citations
+                            if citation.start == provenance.start
+                            and citation.end == provenance.end
+                        ),
+                        None,
+                    ),
                     "score_delta_from_full": original_score - masked_score,
                     "masked_content_hash": masked_sample.content_hash,
                 }
@@ -521,6 +536,7 @@ class DocumentAdapter(ModalityAdapter):
             "status": "available",
             "method": "raw_document_span_occlusion",
             "spans": spans,
+            "citations": [citation.to_dict() for citation in citations],
             "baseline": "space replacement in source character spans",
             "feature_space_only": False,
             "limitations": [

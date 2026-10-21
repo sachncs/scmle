@@ -123,6 +123,38 @@ class DocumentSpan:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class DocumentCitation:
+    """A source-backed locator for a document character span."""
+
+    document_id: str
+    source_uri: str
+    source_digest: str
+    start: int
+    end: int
+    locator: str
+    page_number: int | None = None
+
+    def __post_init__(self) -> None:
+        """Validate the source identity and character locator."""
+        if not self.document_id.strip():
+            raise ValueError("document_id must not be empty")
+        if not self.source_uri.strip():
+            raise ValueError("source_uri must not be empty")
+        if not re.fullmatch(r"[0-9a-f]{64}", self.source_digest):
+            raise ValueError("source_digest must be a lowercase SHA-256 digest")
+        if self.start < 0 or self.end <= self.start:
+            raise ValueError("citation must have a positive character range")
+        if not self.locator.strip():
+            raise ValueError("locator must not be empty")
+        if self.page_number is not None and self.page_number < 1:
+            raise ValueError("page_number must be positive")
+
+    def to_dict(self) -> dict[str, object]:
+        """Return JSON-native citation evidence."""
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class DocumentElement:
     """One extracted layout, OCR, or table element with source offsets."""
 
@@ -254,6 +286,8 @@ class DocumentCurationReport:
     sensitive_match_counts: dict[str, int] = dataclasses.field(
         default_factory=dict
     )
+    source_traceability_coverage: float = 0.0
+    citation_count: int = 0
 
     @property
     def unresolved_blocking_findings(
@@ -307,6 +341,8 @@ class DocumentCurationReport:
             "ocr_confidence_min": self.ocr_confidence_min,
             "ocr_confidence_max": self.ocr_confidence_max,
             "sensitive_match_counts": dict(self.sensitive_match_counts),
+            "source_traceability_coverage": self.source_traceability_coverage,
+            "citation_count": self.citation_count,
             "release_ready": self.release_ready,
             "unresolved_blocking_findings": [
                 finding.finding_id
@@ -324,6 +360,7 @@ class DocumentSample:
     format: DocumentFormat = DocumentFormat.TEXT
     source_uri: str = ""
     encoding: str = "utf-8"
+    source_digest: str | None = None
     label: str | int | float | bool | None = None
     provenance: tuple[DocumentSpan, ...] = ()
     layout: DocumentLayout | None = None
@@ -349,6 +386,14 @@ class DocumentSample:
                 "unsupported_encoding",
                 {"encoding": self.encoding},
             )
+        if self.source_digest is not None and not re.fullmatch(
+            r"[0-9a-f]{64}", self.source_digest
+        ):
+            raise DocumentValidationError(
+                "source_digest must be a lowercase SHA-256 digest",
+                "invalid_source_digest",
+                {"document_id": self.document_id},
+            )
         if not isinstance(self.format, DocumentFormat):
             object.__setattr__(self, "format", DocumentFormat(self.format))
         normalized_provenance = tuple(self.provenance)
@@ -370,6 +415,29 @@ class DocumentSample:
             hashlib.sha256(content_bytes).hexdigest(),
         )
         object.__setattr__(self, "size_bytes", len(content_bytes))
+
+    def citations(self) -> tuple[DocumentCitation, ...]:
+        """Return source-backed citations for the document provenance spans.
+
+        A citation is intentionally unavailable when the caller created an
+        in-memory sample without a raw-source identity. The method never
+        invents a URI or treats the decoded content digest as a raw-source
+        digest.
+        """
+        if not self.source_uri.strip() or self.source_digest is None:
+            return ()
+        return tuple(
+            DocumentCitation(
+                document_id=self.document_id,
+                source_uri=self.source_uri,
+                source_digest=self.source_digest,
+                start=span.start,
+                end=span.end,
+                locator=span.label or f"{span.kind}:{span.start}-{span.end}",
+                page_number=span.page_number,
+            )
+            for span in self.provenance
+        )
 
     def profile(
         self,
@@ -673,6 +741,34 @@ class DocumentDataset:
                 )
             )
 
+        traceable_samples = tuple(
+            sample
+            for sample in self.samples
+            if sample.source_uri.strip() and sample.source_digest is not None
+        )
+        partially_traceable = tuple(
+            sample
+            for sample in self.samples
+            if bool(sample.source_uri.strip())
+            != (sample.source_digest is not None)
+        )
+        if partially_traceable:
+            quality_findings.append(
+                create_finding(
+                    "quality.document-source-traceability-incomplete",
+                    data_contracts.FindingSeverity.WARNING,
+                    {
+                        "document_ids": [
+                            sample.document_id for sample in partially_traceable
+                        ]
+                    },
+                    {"sample_count": len(partially_traceable)},
+                    "Provide both the source URI and raw-source digest before "
+                    "claiming citation traceability.",
+                    False,
+                )
+            )
+
         return DocumentCurationReport(
             dataset_hash=self.content_hash,
             sample_count=len(self.samples),
@@ -697,6 +793,12 @@ class DocumentDataset:
                 max(ocr_confidences) if ocr_confidences else None
             ),
             sensitive_match_counts=dict(sorted(sensitive_counts.items())),
+            source_traceability_coverage=(
+                len(traceable_samples) / len(self.samples)
+            ),
+            citation_count=sum(
+                len(sample.citations()) for sample in traceable_samples
+            ),
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),
             max_characters=max_characters,
@@ -889,6 +991,7 @@ class DocumentReader:
             content=content,
             format=resolved_format,
             source_uri=source_uri,
+            source_digest=hashlib.sha256(raw_bytes).hexdigest(),
             label=label,
             layout=layout,
         )

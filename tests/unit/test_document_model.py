@@ -6,6 +6,7 @@ import math
 import pytest
 
 from scml.data.modalities.document import DocumentDataset
+from scml.data.modalities.document import DocumentReader
 from scml.data.modalities.document import DocumentSample
 from scml.models import documents
 from scml.models.documents import DocumentClassifier
@@ -77,6 +78,24 @@ def test_document_classifier_fits_evaluates_and_explains(
     assert len(ablation.terms) == 3
     assert all(math.isfinite(value) and term for term, value in ablation.terms)
     assert classifier.model_digest == classifier.model_digest
+
+
+def test_document_explanations_preserve_source_citations():
+    """Local explanations carry source identity supplied by the reader."""
+    reader = DocumentReader()
+    training = (
+        reader.load(b"alpha document", document_id="alpha", label="yes"),
+        reader.load(b"beta document", document_id="beta", label="no"),
+    )
+    classifier = make_classifier().fit(training)
+
+    explanation = classifier.local_explanation(training[0])
+    payload = explanation.to_dict()
+
+    assert explanation.citations
+    assert payload["citations"][0]["source_digest"] == (
+        training[0].source_digest
+    )
 
 
 def test_document_term_ablation_rejects_invalid_configuration(
