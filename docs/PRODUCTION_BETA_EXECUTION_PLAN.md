@@ -2007,6 +2007,35 @@ Document extraction boundary at `26bc8a0` on 2026-10-22:
   extraction quality, semantic citation grounding, and production-scale
   recovery remain release evidence owned by the caller or deployment.
 
+Current-head release preflight after the layout extraction boundary at
+`b38dbbf` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed static checks, formatting, mypy over
+  239 source files, Bandit, pip-audit, public API compatibility, explicit JUnit
+  skip-reason auditing, the bounded suite, mutation testing, benchmarks,
+  packaging, reproducible builds, isolated installs, and the Astro site gate.
+- The bounded release suite passed `1,998` tests with `75` optional
+  dependency skips. Every skip had an explicit reason. Total coverage was
+  `83.13%`; the declared core scope was `86%`.
+- Mutation testing killed `1,503` of `2,057` mutants (`73%`), above the 70%
+  threshold. One mutation timed out and 553 survived for follow-up triage.
+- The five-seed offline benchmark regression checked breast cancer, wine,
+  digits, and diabetes progression with zero regressions and zero failed
+  repetitions. Verdicts were tie, tie, tie, and ahead; peak memory was
+  0.3659, 0.3897, 0.4528, and 0.4595 GB respectively, with elapsed seconds
+  of 105, 76, 633, and 70.
+- Wheel and source-distribution checks passed, artifacts reproduced
+  byte-for-byte with wheel hash
+  `344a8d8705708cd119f75a141db9bc95f3d6ccbf9b303a2c4078929fa54bdaaf` and
+  sdist hash
+  `7f5e9e8e79e5448a3c09ff0c977a8c418e8b22879e29802b3142bbd6391edc5f`.
+  Both network-isolated installation paths passed.
+- The site audit found 0 npm vulnerabilities, built all 17 static pages,
+  passed accessibility checks for all 17 HTML files, passed 384 internal-link
+  checks, and passed both Chromium Playwright smoke tests. Hosted Linux and
+  Pages, external transport/resource-fault execution, secret custody, and
+  independent reviewer evidence remain separate release gates.
+
 Extension dataset-family contract at `17a9417` on 2026-10-22:
 
 - `ExtensionModality` gives caller-defined dataset families a stable,
