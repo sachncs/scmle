@@ -1356,3 +1356,15 @@ Warning-strict bounded release suite at `a6dfc29` on 2026-10-21:
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
+
+Optional-skip inventory at `ac1d68d` on 2026-10-21:
+
+- The bounded suite was rerun with `-q --tb=no -rs` and passed with 1,933
+  tests and 75 skips in 8 minutes 5 seconds.
+- Every skip had an explicit optional-dependency reason: CatBoost, Torch or
+  Torch/Keras, sentence-transformers, ONNX tooling, openpyxl, or imbalanced-
+  learn. No skip was caused by an unlisted failure, an error, or an unknown
+  runtime condition.
+- These are environment capability boundaries, not silently accepted failures;
+  the corresponding optional tests remain outside the core release claim until
+  their extras are installed and audited in the hosted matrix.
