@@ -227,6 +227,89 @@ class EventCommitReceipt:
         }
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class EventAcknowledgement:
+    """Broker acknowledgement prepared after a durable sink commit.
+
+    The transport adapter owns the actual acknowledgement call. This record
+    carries the source, consumer group, event identities, and committed
+    checkpoint that the adapter must bind to that call. Persisting it before
+    delivery lets a restarted consumer retry an acknowledgement without
+    re-running the sink writer.
+    """
+
+    source_identity: str
+    consumer_group: str
+    event_ids: tuple[str, ...]
+    checkpoint: EventCheckpoint
+
+    def __post_init__(self) -> None:
+        """Validate the acknowledgement's source and deterministic IDs."""
+        if not self.source_identity.strip():
+            raise ValueError("source_identity must not be empty")
+        if not self.consumer_group.strip():
+            raise ValueError("consumer_group must not be empty")
+        if tuple(sorted(set(self.event_ids))) != self.event_ids:
+            raise ValueError("event_ids must be sorted and unique")
+        if self.checkpoint.source_identity != self.source_identity:
+            raise ValueError(
+                "acknowledgement and checkpoint source identities differ"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible acknowledgement record."""
+        return {
+            "schema_version": 1,
+            "source_identity": self.source_identity,
+            "consumer_group": self.consumer_group,
+            "event_ids": list(self.event_ids),
+            "checkpoint": self.checkpoint.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuild a staged acknowledgement from durable JSON."""
+        if record.get("schema_version") != 1:
+            raise ValueError("unsupported acknowledgement schema version")
+        return cls(
+            source_identity=str(record["source_identity"]),
+            consumer_group=str(record["consumer_group"]),
+            event_ids=tuple(str(value) for value in record["event_ids"]),
+            checkpoint=EventCheckpoint.from_dict(record["checkpoint"]),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class EventConsumerResult:
+    """Evidence from one durable consume-and-acknowledge cycle."""
+
+    source_identity: str
+    consumer_group: str
+    receipt: EventCommitReceipt
+    acknowledged_event_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        """Validate the result's source, group, and acknowledgement IDs."""
+        if self.receipt.source_identity != self.source_identity:
+            raise ValueError("result and receipt source identities differ")
+        if not self.consumer_group.strip():
+            raise ValueError("consumer_group must not be empty")
+        if tuple(sorted(set(self.acknowledged_event_ids))) != (
+            self.acknowledged_event_ids
+        ):
+            raise ValueError("acknowledged_event_ids must be sorted and unique")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible consume evidence."""
+        return {
+            "schema_version": 1,
+            "source_identity": self.source_identity,
+            "consumer_group": self.consumer_group,
+            "receipt": self.receipt.to_dict(),
+            "acknowledged_event_ids": list(self.acknowledged_event_ids),
+        }
+
+
 class IncrementalEventSource(abc.ABC):
     """Polymorphic contract for a source that yields ordered events."""
 
@@ -530,6 +613,11 @@ class IncrementalIngestionLedger:
         """Return the sidecar path used to serialize ledger writers."""
         return self.path.with_name(f"{self.path.name}.lock")
 
+    @property
+    def pending_acknowledgement_path(self) -> pathlib.Path:
+        """Return the durable sidecar awaiting acknowledgement delivery."""
+        return self.path.with_name(f"{self.path.name}.ack")
+
     @contextlib.contextmanager
     def lock(self) -> Iterator[None]:
         """Serialize ledger writers with the platform's advisory file lock."""
@@ -618,6 +706,68 @@ class IncrementalIngestionLedger:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise
 
+    def write_pending_acknowledgement(
+        self, acknowledgement: EventAcknowledgement
+    ) -> None:
+        """Stage an acknowledgement with durable atomic replacement."""
+        if acknowledgement.source_identity != self.source_identity:
+            raise IncrementalError(
+                "acknowledgement_source_mismatch",
+                "acknowledgement does not match ingestion ledger",
+                self.source_identity,
+                {"ack_source_identity": acknowledgement.source_identity},
+            )
+        self.pending_acknowledgement_path.parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{self.pending_acknowledgement_path.name}.",
+            dir=self.pending_acknowledgement_path.parent,
+        )
+        try:
+            with os.fdopen(
+                descriptor, "w", encoding="utf-8", newline="\n"
+            ) as handle:
+                json.dump(acknowledgement.to_dict(), handle, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, self.pending_acknowledgement_path)
+            durability.sync_directory(self.pending_acknowledgement_path.parent)
+        except BaseException:
+            pathlib.Path(temporary_name).unlink(missing_ok=True)
+            raise
+
+    def load_pending_acknowledgement(self) -> EventAcknowledgement | None:
+        """Load the acknowledgement that still needs transport delivery."""
+        if not self.pending_acknowledgement_path.exists():
+            return None
+        try:
+            record = json.loads(
+                self.pending_acknowledgement_path.read_text(encoding="utf-8")
+            )
+            acknowledgement = EventAcknowledgement.from_dict(record)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise IncrementalError(
+                "invalid_pending_acknowledgement",
+                "pending acknowledgement is not valid JSON evidence",
+                self.source_identity,
+                {"path": str(self.pending_acknowledgement_path)},
+            ) from error
+        if acknowledgement.source_identity != self.source_identity:
+            raise IncrementalError(
+                "acknowledgement_source_mismatch",
+                "pending acknowledgement belongs to another source",
+                self.source_identity,
+                {"ack_source_identity": acknowledgement.source_identity},
+            )
+        return acknowledgement
+
+    def clear_pending_acknowledgement(self) -> None:
+        """Remove a delivered acknowledgement and flush the directory entry."""
+        self.pending_acknowledgement_path.unlink(missing_ok=True)
+        durability.sync_directory(self.pending_acknowledgement_path.parent)
+
     def commit(self, batch: EventBatch) -> CommittedIncrementalState:
         """Atomically publish a processed batch's IDs and checkpoint."""
         if batch.source_identity != self.source_identity:
@@ -660,6 +810,7 @@ class IncrementalIngestionLedger:
         self,
         events: Iterable[IncrementalEvent],
         writer: Callable[[tuple[IncrementalEvent, ...]], None],
+        acknowledgement: EventAcknowledgement | None = None,
     ) -> EventCommitReceipt:
         """Write unseen events and commit their IDs under one ledger lock.
 
@@ -675,6 +826,16 @@ class IncrementalIngestionLedger:
             raise TypeError("events must contain IncrementalEvent values")
         if not callable(writer):
             raise TypeError("writer must be callable")
+        if (
+            acknowledgement is not None
+            and acknowledgement.source_identity != self.source_identity
+        ):
+            raise IncrementalError(
+                "acknowledgement_source_mismatch",
+                "acknowledgement does not match ingestion ledger",
+                self.source_identity,
+                {"ack_source_identity": acknowledgement.source_identity},
+            )
         with self.lock():
             current = self.load()
             seen = set(current.seen_event_ids)
@@ -715,9 +876,109 @@ class IncrementalIngestionLedger:
                 )
             else:
                 checkpoint = current.checkpoint
+            if acknowledgement is not None and acknowledgement.event_ids:
+                self.write_pending_acknowledgement(
+                    dataclasses.replace(acknowledgement, checkpoint=checkpoint)
+                )
             return EventCommitReceipt(
                 self.source_identity,
                 tuple(sorted(accepted_ids)),
                 tuple(sorted(duplicates)),
                 checkpoint,
             )
+
+
+class EventConsumer:
+    """Consume events with a durable sink commit and explicit acknowledgements.
+
+    This class is the transport-neutral consumer-group boundary. The source
+    supplies bounded events, the writer owns the downstream sink, and the
+    acknowledgement callback owns the broker SDK. The ledger stages the
+    acknowledgement after the sink commit and retries it on the next call if
+    delivery fails. A callback must therefore make acknowledgement delivery
+    idempotent; distributed broker transactions remain outside this package.
+    """
+
+    def __init__(
+        self,
+        source: IncrementalEventSource,
+        ledger: IncrementalIngestionLedger,
+        consumer_group: str,
+        writer: Callable[[tuple[IncrementalEvent, ...]], None],
+        acknowledge: Callable[[EventAcknowledgement], None],
+    ) -> None:
+        """Initialize a consumer around explicit transport and sink seams."""
+        group = consumer_group.strip()
+        if not group:
+            raise ValueError("consumer_group must not be empty")
+        if source.source_identity != ledger.source_identity:
+            raise IncrementalError(
+                "source_mismatch",
+                "source does not match consumer ledger",
+                ledger.source_identity,
+                {"source_identity": source.source_identity},
+            )
+        if not callable(writer):
+            raise TypeError("writer must be callable")
+        if not callable(acknowledge):
+            raise TypeError("acknowledge must be callable")
+        self.source = source
+        self.ledger = ledger
+        self.consumer_group = group
+        self.writer = writer
+        self.acknowledge = acknowledge
+
+    def deliver_pending_acknowledgement(self) -> tuple[str, ...]:
+        """Deliver and clear a previously staged acknowledgement."""
+        pending = self.ledger.load_pending_acknowledgement()
+        if pending is None:
+            return ()
+        if pending.consumer_group != self.consumer_group:
+            raise IncrementalError(
+                "consumer_group_mismatch",
+                "pending acknowledgement belongs to another consumer group",
+                self.source.source_uri,
+                {"pending_group": pending.consumer_group},
+            )
+        try:
+            self.acknowledge(pending)
+        except Exception as error:
+            raise IncrementalError(
+                "acknowledgement_failed",
+                "transport acknowledgement failed; retry is required",
+                self.source.source_uri,
+                {
+                    "consumer_group": self.consumer_group,
+                    "event_ids": list(pending.event_ids),
+                },
+            ) from error
+        self.ledger.clear_pending_acknowledgement()
+        return pending.event_ids
+
+    def consume(self, limit: int = 1_000) -> EventConsumerResult:
+        """Consume, durably commit, acknowledge, and return evidence."""
+        self.deliver_pending_acknowledgement()
+        batch = self.ledger.read_batch(self.source, limit)
+        event_ids = tuple(
+            sorted(
+                set(batch.event_ids)
+                | set(batch.duplicate_event_ids)
+                | set(batch.late_event_ids)
+            )
+        )
+        acknowledgement = EventAcknowledgement(
+            source_identity=self.source.source_identity,
+            consumer_group=self.consumer_group,
+            event_ids=event_ids,
+            checkpoint=batch.next_checkpoint,
+        )
+        receipt = self.ledger.commit_with_writer(
+            batch.events, self.writer, acknowledgement
+        )
+        acknowledged = self.deliver_pending_acknowledgement()
+        return EventConsumerResult(
+            source_identity=self.source.source_identity,
+            consumer_group=self.consumer_group,
+            receipt=receipt,
+            acknowledged_event_ids=acknowledged,
+        )

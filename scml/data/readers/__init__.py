@@ -7,9 +7,12 @@ from scml.data.readers.connectors import SourceConnector
 from scml.data.readers.connectors import StreamingObjectStoreConnector
 from scml.data.readers.connectors import WarehouseConnector
 from scml.data.readers.incremental import CommittedIncrementalState
+from scml.data.readers.incremental import EventAcknowledgement
 from scml.data.readers.incremental import EventBatch
 from scml.data.readers.incremental import EventCheckpoint
 from scml.data.readers.incremental import EventCommitReceipt
+from scml.data.readers.incremental import EventConsumer
+from scml.data.readers.incremental import EventConsumerResult
 from scml.data.readers.incremental import EventStreamSource
 from scml.data.readers.incremental import IncrementalEvent
 from scml.data.readers.incremental import IncrementalEventSource
@@ -24,9 +27,12 @@ from scml.data.readers.registry import SourceSnapshot
 __all__ = [
     "CommittedIncrementalState",
     "DbApiConnector",
+    "EventAcknowledgement",
     "EventBatch",
     "EventCheckpoint",
     "EventCommitReceipt",
+    "EventConsumer",
+    "EventConsumerResult",
     "EventStreamSource",
     "IncrementalEvent",
     "IncrementalEventSource",

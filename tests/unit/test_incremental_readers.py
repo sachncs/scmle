@@ -227,6 +227,74 @@ def test_idempotent_sink_keeps_state_unchanged_when_writer_fails(tmp_path):
     assert ledger.load().seen_event_ids == ()
 
 
+def test_event_consumer_commits_before_acknowledging(tmp_path):
+    """A broker ack is delivered only after the sink commit is durable."""
+    source = incremental.SequenceEventSource(
+        "memory://events", [event("a", 1, 0), event("b", 2, 1)]
+    )
+    ledger = incremental.IncrementalIngestionLedger(
+        tmp_path / "consumer.json", source.source_identity
+    )
+    written = []
+    acknowledgements = []
+
+    consumer = incremental.EventConsumer(
+        source,
+        ledger,
+        "orders-worker",
+        lambda values: written.extend(values),
+        acknowledgements.append,
+    )
+
+    result = consumer.consume(limit=2)
+
+    assert [item.event_id for item in written] == ["a", "b"]
+    assert result.receipt.accepted_event_ids == ("a", "b")
+    assert result.acknowledged_event_ids == ("a", "b")
+    assert acknowledgements[0].event_ids == ("a", "b")
+    assert not ledger.pending_acknowledgement_path.exists()
+
+
+def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
+    """An ack outage leaves durable evidence for a later idempotent retry."""
+    available = [event("a", 1, 0)]
+    source = incremental.SequenceEventSource(
+        "memory://events", lambda: tuple(available)
+    )
+    ledger = incremental.IncrementalIngestionLedger(
+        tmp_path / "consumer.json", source.source_identity
+    )
+    written = []
+    attempts = []
+
+    def first_ack_fails(acknowledgement):
+        attempts.append(acknowledgement.event_ids)
+        if len(attempts) == 1:
+            raise OSError("broker unavailable")
+        available.clear()
+
+    consumer = incremental.EventConsumer(
+        source,
+        ledger,
+        "orders-worker",
+        lambda values: written.extend(values),
+        first_ack_fails,
+    )
+
+    with pytest.raises(incremental.IncrementalError, match="acknowledgement"):
+        consumer.consume()
+    assert [item.event_id for item in written] == ["a"]
+    assert ledger.load().seen_event_ids == ("a",)
+    assert ledger.pending_acknowledgement_path.exists()
+
+    result = consumer.consume()
+
+    assert result.receipt.accepted_event_ids == ()
+    assert attempts == [("a",), ("a",)]
+    assert [item.event_id for item in written] == ["a"]
+    assert not ledger.pending_acknowledgement_path.exists()
+
+
 def test_event_contract_rejects_naive_timestamps_and_invalid_sequences():
     with pytest.raises(ValueError, match="timezone"):
         event_value = incremental.IncrementalEvent(
