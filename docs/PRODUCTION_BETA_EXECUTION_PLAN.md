@@ -1548,6 +1548,18 @@ Exact-SHA clean-clone rehearsal at `0d5affd` on 2026-10-21:
   packaged entry point resolves from the clean clone. This remains local
   reproduction evidence, not hosted Linux or independent reviewer evidence.
 
+Hosted release-gate observation at `e287642` on 2026-10-21:
+
+- Authenticated repository metadata reports `sachncs/magicml` is private, its
+  default branch is `feat/v0.1-foundation`, and no Pages site is configured.
+- The workflow-based Pages creation request was rejected with HTTP 422 because
+  the current GitHub plan does not support Pages for this private repository;
+  the public URL therefore remains unverified and returns HTTP 404.
+- The CI run for the pushed SHA created every job in a terminal failure before
+  any runner step. GitHub annotations identify the cause as failed recent
+  account payments or an insufficient spending limit. This is an account
+  billing/plan blocker, not a source or workflow test result.
+
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
