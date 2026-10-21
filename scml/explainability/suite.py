@@ -9,6 +9,7 @@ from scml.contracts import explanations
 from scml.evaluation import diagnostics
 from scml.explainability import dependence
 from scml.explainability import importance
+from scml.explainability import interaction
 
 
 class ExplanationEvidenceBuilder:
@@ -107,4 +108,5 @@ def default_suite() -> tuple[diagnostics.Diagnostic, ...]:
     return (
         importance.PermutationImportance(),
         dependence.PartialDependence(),
+        interaction.PairwiseInteraction(),
     )

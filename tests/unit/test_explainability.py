@@ -12,6 +12,7 @@ from scml.evaluation import diagnostics
 from scml.evaluation import suite as full_suite
 from scml.explainability import dependence
 from scml.explainability import importance
+from scml.explainability import interaction
 from scml.explainability import local
 
 
@@ -54,6 +55,32 @@ def test_partial_dependence_for_binary_is_a_probability_curve():
     curve = report["signal"]["mean_prediction"]
     assert all(0.0 <= value <= 1.0 for value in curve)
     assert curve[-1] > curve[0] + 0.3
+
+
+def test_pairwise_interaction_is_bounded_and_deterministic():
+    """Interaction evidence reports a stable second-order model effect."""
+    inputs = test_diagnostics.make_inputs(tasks.TaskType.REGRESSION)
+
+    first = interaction.PairwiseInteraction().compute(inputs)
+    second = interaction.PairwiseInteraction().compute(inputs)
+
+    assert first == second
+    assert first["features_considered"] == ["signal", "noise"]
+    assert first["features"]
+    assert first["features"][0]["features"] == ["signal", "noise"]
+    assert first["features"][0]["mean_absolute_interaction"] >= 0.0
+    assert first["truncated"] is False
+
+
+def test_pairwise_interaction_respects_the_shared_deadline():
+    """A spent diagnostic budget produces explicit partial evidence."""
+    inputs = test_diagnostics.make_inputs(tasks.TaskType.BINARY)
+    expired = dataclasses.replace(inputs, deadline=time.monotonic() - 1.0)
+
+    report = interaction.PairwiseInteraction().compute(expired)
+
+    assert report["truncated"] is True
+    assert report["features"] == []
 
 
 def test_importance_stops_at_its_deadline_and_says_it_was_partial():
