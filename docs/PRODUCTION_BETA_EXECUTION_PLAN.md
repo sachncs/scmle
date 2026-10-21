@@ -1666,3 +1666,18 @@ Resampling contract correction at `ca6ab97` on 2026-10-21:
   optional skip under `-W error::ResourceWarning`; Ruff, formatting, mypy, and
   `git diff --check` passed. The source and test change was pushed as one
   atomic commit.
+
+Spatial-dependence curation evidence at `992ee1c` on 2026-10-21:
+
+- Geospatial curation now records deterministic k-nearest-neighbor topology
+  and global Moran's I evidence for numeric labels, including a bounded
+  permutation p-value, seed, feature count, and edge count. The topology and
+  statistic are exposed as typed JSON-native contracts so the result can be
+  independently recomputed from the feature order and CRS coordinates.
+- Non-numeric labels, constant values, insufficient features, and missing CRS
+  produce explicit non-applicable, non-estimable, or blocked evidence rather
+  than an invented statistic. This detects spatial dependence; it does not
+  claim causality or replace a domain-specific spatial model.
+- The combined geospatial, modality-lifecycle, naming-convention, and
+  component-contract slice passed 920 tests with 5 optional skips under
+  `-W error::ResourceWarning`; Ruff, formatting, mypy, and diff checks passed.
