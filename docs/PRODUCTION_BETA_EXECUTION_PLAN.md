@@ -1237,3 +1237,14 @@ Clean-head release preflight evidence at `32f9fd2` on 2026-10-21:
   review/signature remain release blockers. The two SQLite warnings, 75
   unexplained-by-default skips, and surviving/timeout mutants also remain
   engineering follow-up rather than production-readiness evidence.
+
+Warning-strict bounded-suite evidence at `4c0d079` on 2026-10-21:
+
+- The same bounded release suite passed with `-W error::ResourceWarning`:
+  1,921 tests passed and 75 tests were skipped in 486.51 seconds. No
+  `ResourceWarning` was promoted to a failure.
+- This validates that the earlier two SQLite warnings are nondeterministic
+  full-run hygiene observations rather than a deterministic warning-strict
+  failure. They remain release debt until the source is identified and the
+  default preflight is clean; warning promotion is not being used to hide
+  them.
