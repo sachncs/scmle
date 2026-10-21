@@ -189,9 +189,7 @@ class EvidenceIndex:
 
     def sign(self, signing_key: str | bytes) -> str:
         """Sign the complete index and return its HMAC value."""
-        self.signature = signing.sign_payload(
-            self.unsigned_dict(), signing_key
-        )
+        self.signature = signing.sign_payload(self.unsigned_dict(), signing_key)
         return self.signature
 
     def verify(self, signing_key: str | bytes) -> bool:
@@ -224,10 +222,7 @@ class EvidenceIndex:
         if signature_record is not None:
             if not isinstance(signature_record, Mapping):
                 raise ValueError("evidence index signature must be an object")
-            if (
-                signature_record.get("algorithm")
-                != signing.SIGNATURE_ALGORITHM
-            ):
+            if signature_record.get("algorithm") != signing.SIGNATURE_ALGORITHM:
                 raise ValueError(
                     "unsupported evidence index signature algorithm"
                 )
