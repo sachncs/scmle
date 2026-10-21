@@ -1711,3 +1711,17 @@ Video synchronization evidence at `7e52e92` on 2026-10-21:
 - The focused media, modality-lifecycle, and naming-convention suite passed
   898 tests with 4 optional skips under `-W error::ResourceWarning`; Ruff,
   formatting, mypy, and diff checks passed.
+
+Document layout provenance evidence at `b3aca01` on 2026-10-21:
+
+- `DocumentLayout` and `DocumentElement` now preserve caller-owned OCR,
+  layout, heading, image, and table extraction evidence with provider/version,
+  page number, source offsets, confidence, and table dimensions. A sample
+  rejects any element whose offsets exceed decoded document content.
+- Document curation reports layout coverage, providers, element and table
+  counts, OCR confidence bounds, and an explicit warning when OCR confidence
+  is absent. This makes extraction provenance reviewable without claiming
+  that the core package owns OCR, PDF layout parsing, or table recognition.
+- The document, modality-lifecycle, and naming-convention suite passed 880
+  tests with 4 optional skips under `-W error::ResourceWarning`; Ruff,
+  formatting, mypy, and diff checks passed.
