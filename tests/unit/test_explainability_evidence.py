@@ -169,12 +169,13 @@ def test_builder_rejects_unnamed_diagnostics():
         )
 
 
-def test_default_suite_behavior_is_unchanged():
+def test_default_suite_includes_bounded_interaction_evidence():
     diagnostics_in_suite = suite.default_suite()
 
     assert tuple(diagnostic.name for diagnostic in diagnostics_in_suite) == (
         "permutation_importance",
         "partial_dependence",
+        "pairwise_interaction",
     )
     assert all(
         isinstance(diagnostic, diagnostics.Diagnostic)
