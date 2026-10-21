@@ -39,7 +39,7 @@ The project must retain explicit labels for:
 No release note, README, model card, or API response may use a stronger label
 than the evidence supports.
 
-### Current evidence ledger — 20 October 2026
+### Historical evidence ledger — 20 October 2026
 
 This is the implementation boundary at the time of writing. “Implemented”
 means the code path exists; it does not mean the capability is supported.
@@ -68,7 +68,12 @@ means the code path exists; it does not mean the capability is supported.
 | Security, provenance, SBOM, and release CI | Implemented / Tested | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, a deterministic runtime license inventory, CI artifact publication, immutable CI action pins, a canonical HMAC-signed release attestation, a versioned HMAC-signed release evidence index, an exact-SHA clean-clone rehearsal job, a durable review-artifact writer, an executable exact-commit review verifier, a signed `IndependentReleaseReview` contract, and a metadata-only `SigningKeyRegistry` for identity, expiry, retirement, replacement, and immediate revocation are implemented. The review contract requires an independent reviewer, exact source commit, clean-clone and environment digests, reproducible commands, recomputed metric/fairness/explanation claims, and signed artifact digests. Secret custody remains external, existing raw bundle signatures still require operator key-policy integration, and an external reviewer signature and a full clean-release execution remain incomplete. The all-extras audit gate passed locally on Python 3.13 at `c85118e`; the hosted Linux job remains the cross-platform authority. Evidence: `scripts/check_dependency_licenses.py`, `.github/workflows/ci.yml`, `scripts/verify_release_review.py`, `scml/contracts/evidence.py`, `scml/governance/keyring.py`, `scml/governance/review.py`, `tests/unit/test_keyring.py`, `tests/unit/test_evidence_contracts.py`, `tests/unit/test_independent_review.py`. |
 | Astro developer site | Partial | Standalone docs routes, base-path link resolution (including the generated 346-link gate), generated accessibility smoke checks, browser smoke coverage for all 16 public routes plus keyboard navigation, a capability matrix, a dedicated 15-stage modality-lifecycle guide, cards/explanations, security, recovery, migration guidance, pinned Pages artifact/deploy jobs, and post-deploy route smoke coverage build successfully. The requested public URL currently returns HTTP 404 because the GitHub repository is private; repository visibility/Pages configuration must be resolved by the owner before deployment can be verified. Hosted deployment, independent review, and exhaustive production modality claims remain incomplete. |
 
-### Verification snapshot — 20 October 2026
+### Historical verification snapshot — 20 October 2026
+
+The snapshot below is retained as an audit trail. The dated evidence records
+later in this document supersede it for the current release decision; the
+latest strict current-head result is recorded at `ae6b1f2` and the latest
+workflow-control changes at `e825655`.
 
 The last complete repository regression run completed with `1927 passed, 103
 skipped, 6 warnings` in 29 minutes 30 seconds using `uv run pytest -q` on the
