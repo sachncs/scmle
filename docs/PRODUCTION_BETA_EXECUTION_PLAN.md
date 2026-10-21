@@ -1614,6 +1614,16 @@ Python naming-convention evidence at `d88a9a9`, revalidated on 2026-10-21:
   formatting, and mypy passed. Ruff's configured Google docstring convention
   remains the source-level style gate for package code.
 
+Current-head coding-standard verification at `d007f7e` on 2026-10-22:
+
+- The repository-wide naming guard passed `851` tests under
+  `-W error::ResourceWarning`; no underscore-prefixed semi-private identifier
+  or non-dunder private filename was found in package or test Python files.
+- Ruff passed across `scml`, `tests`, `scripts`, and `benchmarks`; the format
+  check reported all 437 Python files already formatted. Mypy passed for 239
+  source files. These checks are evidence for the current head, not a waiver
+  for future additions.
+
 Full strict regression at `ae6b1f2` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
