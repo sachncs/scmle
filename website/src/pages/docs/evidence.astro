@@ -32,6 +32,17 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <li><strong>Promote or demote:</strong> accept the capability, block the release, or mark it extension-only. Never hide an incomplete stage.</li>
   </ol>
 
+  <h2>Read fairness evidence without overclaiming</h2>
+  <p>The fairness report evaluates each declared sensitive attribute and, when two or more are declared, the intersection of those attributes. It reports selection, error, and bias differences for cells that meet the minimum sample threshold. Cells below that threshold are not silently treated as evidence: their observed counts appear in <code>excluded_groups</code> and <code>power_warning</code> is set to <code>true</code>.</p>
+  <pre><code>{`fairness.json
+├── columns.group
+├── columns.region
+└── columns.intersectional
+    ├── groups: "group=a | region=north"
+    ├── excluded_groups: { ... }
+    └── power_warning: true | false`}</code></pre>
+  <p>A disparity flag is a decision-support signal, not a causal conclusion. Check the cell counts, label prevalence, uncertainty, measurement process, and domain policy before deciding whether to mitigate or block promotion.</p>
+
   <h2>What blocks a release</h2>
   <ul>
     <li>A supported modality is missing evidence for any of its 15 lifecycle stages.</li>
