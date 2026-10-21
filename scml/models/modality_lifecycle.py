@@ -53,6 +53,8 @@ from scml.governance import attestation
 from scml.models import documents as document_models
 from scml.models import images as image_models
 
+MAX_REPEATED_EXPLANATION_SAMPLES = 128
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class FeatureBatch:
@@ -2041,57 +2043,93 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             decision_values.astype(float).reshape(-1).tolist(),
             reference_values.astype(float).reshape(-1).tolist(),
         )
-        selected_class = 0
-        if model.coef_.shape[0] > 1:
-            selected_class = int(np.argmax(decision_values[0]))
-        row = batch.values[0]
-        coefficients = model.coef_[selected_class]
-        local_report = quality.linear_contribution_report(
-            batch.sample_ids[0],
-            batch.feature_names,
-            row.tolist(),
-            coefficients.tolist(),
-            top_k=min(10, len(batch.feature_names)),
-        )
-        nonzero = np.flatnonzero(np.abs(row * coefficients) > 1e-12)
-        if len(nonzero):
-            perturbed = np.repeat(row[None, :], len(nonzero), axis=0)
-            perturbed[np.arange(len(nonzero)), nonzero] = 0.0
-            perturbed_decisions = np.asarray(model.decision_function(perturbed))
-            if perturbed_decisions.ndim == 1:
-                observed_change = perturbed_decisions - decision_values[0]
-            else:
-                observed_change = (
-                    perturbed_decisions[:, selected_class]
-                    - decision_values[0, selected_class]
-                )
-            expected_change = -(row[nonzero] * coefficients[nonzero])
-            stability = float(
-                np.mean(np.sign(observed_change) == np.sign(expected_change))
-            )
-        else:
-            stability = 0.0
-        perturbation_reports = [local_report]
         train_values = context.feature_batches["train"].values
         feature_scales = np.maximum(np.std(train_values, axis=0), 1.0)
         perturbation_size = feature_scales * 1e-6
-        for index in range(len(batch.feature_names)):
-            for direction in (-1.0, 1.0):
-                perturbed_row = row.copy()
-                perturbed_row[index] += direction * perturbation_size[index]
-                perturbation_reports.append(
-                    quality.linear_contribution_report(
-                        batch.sample_ids[0],
-                        batch.feature_names,
-                        perturbed_row.tolist(),
-                        coefficients.tolist(),
-                        top_k=min(10, len(batch.feature_names)),
-                    )
-                )
-        perturbation_stability = quality.ranking_stability(
-            tuple(perturbation_reports),
-            top_k=min(10, len(batch.feature_names)),
+        repeated_stabilities: list[float] = []
+        local_report: dict[str, object] | None = None
+        perturbation_reports: list[dict[str, object]] = []
+        coefficients = model.coef_[0]
+        stability = 0.0
+        evaluated_sample_count = min(
+            len(batch.sample_ids), MAX_REPEATED_EXPLANATION_SAMPLES
         )
+        for sample_index in range(evaluated_sample_count):
+            sample_row = batch.values[sample_index]
+            sample_decision = np.asarray(
+                model.decision_function(sample_row[None])
+            )
+            sample_class = 0
+            if sample_decision.ndim > 1:
+                sample_class = int(np.argmax(sample_decision[0]))
+            sample_coefficients = model.coef_[sample_class]
+            sample_report = quality.linear_contribution_report(
+                batch.sample_ids[sample_index],
+                batch.feature_names,
+                sample_row.tolist(),
+                sample_coefficients.tolist(),
+                top_k=min(10, len(batch.feature_names)),
+            )
+            sample_reports = [sample_report]
+            for feature_index in range(len(batch.feature_names)):
+                for direction in (-1.0, 1.0):
+                    perturbed_row = sample_row.copy()
+                    perturbed_row[feature_index] += (
+                        direction * perturbation_size[feature_index]
+                    )
+                    sample_reports.append(
+                        quality.linear_contribution_report(
+                            batch.sample_ids[sample_index],
+                            batch.feature_names,
+                            perturbed_row.tolist(),
+                            sample_coefficients.tolist(),
+                            top_k=min(10, len(batch.feature_names)),
+                        )
+                    )
+            sample_stability = quality.ranking_stability(
+                tuple(sample_reports),
+                top_k=min(10, len(batch.feature_names)),
+            )
+            repeated_stabilities.append(sample_stability)
+            if sample_index == 0:
+                coefficients = sample_coefficients
+                local_report = sample_report
+                perturbation_reports = sample_reports
+                perturbation_stability = sample_stability
+                stability_decision = sample_decision
+                nonzero = np.flatnonzero(
+                    np.abs(sample_row * sample_coefficients) > 1e-12
+                )
+                if len(nonzero):
+                    perturbed = np.repeat(
+                        sample_row[None, :], len(nonzero), axis=0
+                    )
+                    perturbed[np.arange(len(nonzero)), nonzero] = 0.0
+                    perturbed_decisions = np.asarray(
+                        model.decision_function(perturbed)
+                    )
+                    if perturbed_decisions.ndim == 1:
+                        observed_change = (
+                            perturbed_decisions - stability_decision[0]
+                        )
+                    else:
+                        observed_change = (
+                            perturbed_decisions[:, sample_class]
+                            - stability_decision[0, sample_class]
+                        )
+                    expected_change = -(
+                        sample_row[nonzero] * sample_coefficients[nonzero]
+                    )
+                    stability = float(
+                        np.mean(
+                            np.sign(observed_change) == np.sign(expected_change)
+                        )
+                    )
+        if local_report is None or not perturbation_reports:
+            raise RuntimeError(
+                "repeated explanation evaluation produced no report"
+            )
+        repeated_stability = min(repeated_stabilities)
         quality_evaluation = quality.evaluate(
             method="linear_reference_zero_ablation_and_perturbation",
             sample_count=len(batch.sample_ids),
@@ -2099,7 +2137,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                 stability_minimum=0.9,
                 fidelity_minimum=0.999999,
             ),
-            stability=perturbation_stability,
+            stability=repeated_stability,
             fidelity=fidelity,
         )
         context.model_explanation = {
@@ -2116,6 +2154,21 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                 "report_count": len(perturbation_reports),
                 "relative_step": 1e-6,
                 "feature_space_only": True,
+            },
+            "repeated_perturbation": {
+                "score": repeated_stability,
+                "sample_count": len(batch.sample_ids),
+                "evaluated_sample_count": evaluated_sample_count,
+                "minimum_across_samples": repeated_stability,
+                "threshold": 0.9,
+                "feature_space_only": True,
+                "bounded_by": MAX_REPEATED_EXPLANATION_SAMPLES,
+                "limitations": [
+                    "The suite perturbs the declared feature representation; "
+                    "it does not establish raw-modality saliency.",
+                    "The sample bound is a lifecycle resource limit, not a "
+                    "production-scale stress guarantee.",
+                ],
             },
             "modality_specific": context.adapter.modality_specific_explanation(
                 partitions.test[0],

@@ -260,6 +260,15 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     ].evidence["perturbation_stability"]
     assert perturbation["feature_space_only"] is True
     assert perturbation["report_count"] > 1
+    repeated = evidence_by_stage[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ].evidence["repeated_perturbation"]
+    assert repeated["evaluated_sample_count"] == min(
+        repeated["sample_count"],
+        modality_lifecycle.MAX_REPEATED_EXPLANATION_SAMPLES,
+    )
+    assert repeated["score"] >= 0.9
+    assert repeated["feature_space_only"] is True
     data_explanation = evidence_by_stage[
         modalities.LifecycleStage.DATA_EXPLAINABILITY
     ].evidence
