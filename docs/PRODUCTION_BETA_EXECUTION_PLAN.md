@@ -66,7 +66,7 @@ means the code path exists; it does not mean the capability is supported.
 | Fault injection and recovery | Implemented / Tested (local boundary) | `LocalFaultExecutor` now executes all 15 declared scenarios through real bounded process, timeout, atomic-write, artifact, signature, checkpoint, snapshot, retry, duplicate-event, lineage, and approval boundaries; `FaultInjectionHarness` persists digest-bound evidence and fail-closed status transitions. Controlled disk and memory cases use deterministic local capacity guards, not physical disk exhaustion or host-wide OOM. Cloud transport, container, kernel-resource, dependency-installation, connector, and independent external-fault execution evidence remain incomplete. Evidence: `scml/governance/local_faults.py`, `tests/unit/test_local_faults.py`, `tests/unit/test_reliability_harness.py`. |
 | Test stability and quarantine policy | Implemented / Tested | `check_test_stability.py` runs pytest repeatedly, parses durable JUnit outcomes, compares test inventories, records runner return codes, and fails closed for unlisted failures, errors, skips, inventory changes, and expired quarantines. A quarantine entry requires an owner, reason, and expiry; active quarantines remain visible as `passed_with_quarantine`. The scheduled full-suite workflow exercises the policy three times against the API and reliability contract smoke set and uploads the JSON evidence. It does not replace the full test suite or prove that optional-dependency skips are supported. Evidence: `scripts/check_test_stability.py`, `tests/quarantine.json`, `tests/unit/test_test_stability.py`, `.github/workflows/full-suite.yml`; local three-run result at `65b0676`: 22 test cases per run, all passed. |
 | Security, provenance, SBOM, and release CI | Implemented / Tested | Bundle signing, run provenance artifacts, deterministic CycloneDX SBOM generation, a deterministic runtime license inventory, CI artifact publication, immutable CI action pins, a canonical HMAC-signed release attestation, a versioned HMAC-signed release evidence index, an exact-SHA clean-clone rehearsal job, a durable review-artifact writer, an executable exact-commit review verifier, a signed `IndependentReleaseReview` contract, and a metadata-only `SigningKeyRegistry` for identity, expiry, retirement, replacement, and immediate revocation are implemented. The review contract requires an independent reviewer, exact source commit, clean-clone and environment digests, reproducible commands, recomputed metric/fairness/explanation claims, and signed artifact digests. Secret custody remains external, existing raw bundle signatures still require operator key-policy integration, and an external reviewer signature and a full clean-release execution remain incomplete. The all-extras audit gate passed locally on Python 3.13 at `c85118e`; the hosted Linux job remains the cross-platform authority. Evidence: `scripts/check_dependency_licenses.py`, `.github/workflows/ci.yml`, `scripts/verify_release_review.py`, `scml/contracts/evidence.py`, `scml/governance/keyring.py`, `scml/governance/review.py`, `tests/unit/test_keyring.py`, `tests/unit/test_evidence_contracts.py`, `tests/unit/test_independent_review.py`. |
-| Astro developer site | Partial | Standalone docs routes, base-path link resolution (including the generated 310-link gate), generated accessibility smoke checks, browser smoke coverage for all 15 public routes plus keyboard navigation, a capability matrix, cards/explanations, security, recovery, migration guidance, pinned Pages artifact/deploy jobs, and post-deploy route smoke coverage build successfully. The requested public URL currently returns HTTP 404 because the GitHub repository is private; repository visibility/Pages configuration must be resolved by the owner before deployment can be verified. Exhaustive modality/operations content remains incomplete. |
+| Astro developer site | Partial | Standalone docs routes, base-path link resolution (including the generated 346-link gate), generated accessibility smoke checks, browser smoke coverage for all 16 public routes plus keyboard navigation, a capability matrix, a dedicated 15-stage modality-lifecycle guide, cards/explanations, security, recovery, migration guidance, pinned Pages artifact/deploy jobs, and post-deploy route smoke coverage build successfully. The requested public URL currently returns HTTP 404 because the GitHub repository is private; repository visibility/Pages configuration must be resolved by the owner before deployment can be verified. Hosted deployment, independent review, and exhaustive production modality claims remain incomplete. |
 
 ### Verification snapshot — 20 October 2026
 
@@ -1353,6 +1353,27 @@ Warning-strict bounded release suite at `a6dfc29` on 2026-10-21:
 - The complete bounded contract suite passed with `-W error::ResourceWarning`:
   1,933 tests passed and 75 optional tests were skipped in 8 minutes 8
   seconds.
+
+Standalone modality lifecycle guide evidence at `f0b13d7` on 2026-10-21:
+
+- The Astro site now publishes a dedicated `/docs/modalities/` route. It
+  explains the complete 15-stage modality contract, modality-specific raw
+  material and curation requirements for documents, images, audio, video,
+  graphs, and geospatial data, typed manifest hand-off, data/model/release
+  evidence boundaries, contributor checks, and the distinction between the
+  supported tabular beta path and experimental modality foundations.
+- The route is present in the standalone navigation, onboarding cards, browser
+  route inventory, and both local/Pages generated-route smoke loops. It does
+  not redirect readers to repository Markdown files.
+- The visual review passed at desktop and 390px mobile widths: hierarchy,
+  navigation wrapping, lifecycle diagrams, code block overflow, and the
+  experimental/support callout were visibly usable. The preview was inspected
+  at `http://127.0.0.1:4322/super-charge-ml/docs/modalities/`.
+- `npm run build`, `npm run check:links`, `npm run check:a11y`, and
+  `npm run test:e2e` passed: 16 pages generated, 346 same-site links passed,
+  all 16 HTML files passed the accessibility smoke gate, and both Playwright
+  tests passed. This is local artifact evidence; it does not prove the
+  currently unavailable public Pages URL or independent release review.
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
