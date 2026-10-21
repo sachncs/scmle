@@ -1906,6 +1906,41 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head curation-boundary verification at `beb4568` on 2026-10-22:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,326` tests with `88` explicit optional-dependency skips in 31 minutes 15
+  seconds. No failure, error, or promoted resource warning occurred. This run
+  includes the curation-only task boundary: a modality curation project does
+  not infer a modelling task when no manifest is supplied, and writes the
+  explicit `not_declared` task value into the dataset card.
+- `./scripts/release_preflight.sh` passed the local release gates. The bounded
+  suite passed `1,991` tests with `75` optional-dependency skips; every skip
+  had an explicit reason. Total coverage was `83.13%`; the declared core
+  scope was `86%`.
+- Mutation testing killed `1,503` of `2,057` mutants (`73%`), above the 70%
+  threshold. One mutation timed out and 553 survived; the surviving-mutant
+  inventory remains follow-up evidence rather than a hidden quality claim.
+- The five-seed offline benchmark regression checked breast cancer, wine,
+  digits, and diabetes progression with zero regressions and zero failed
+  repetitions. The verdicts were tie, tie, tie, and ahead. Peak memory was
+  0.3677, 0.3858, 0.4452, and 0.4513 GB respectively; elapsed seconds were
+  105, 77, 631, and 70. This is bounded benchmark evidence, not a claim of
+  universal model superiority.
+- Wheel and source-distribution checks passed; artifacts reproduced
+  byte-for-byte with wheel hash
+  `4a3722924474614c3e7e4948a3dc2a6587a75574926d62d0d5f442c635873897` and
+  sdist hash
+  `3abb8fd0eb98d4e94a6aa65cb19d167336f264b2cc5f3a4b4a8c50e962192d48`.
+  Network-isolated installation from both the wheel and rebuilt source
+  distribution passed.
+- The Astro site audit found 0 npm vulnerabilities, built all 17 static pages,
+  passed accessibility checks for all 17 HTML files, passed 384 internal-link
+  checks, and passed both Chromium Playwright smoke tests. This remains local
+  evidence; hosted Linux and Pages, external transport/resource-fault
+  execution, secret custody, and independent reviewer evidence remain
+  separate release gates.
+
 Extension dataset-family contract at `17a9417` on 2026-10-22:
 
 - `ExtensionModality` gives caller-defined dataset families a stable,
