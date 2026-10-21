@@ -27,6 +27,7 @@ CALIBRATION_BINS = 10
 MAX_SEGMENT_LEVELS = 12
 MAX_SEGMENT_FEATURES = 3
 SEGMENT_BANDS = 4
+MAX_ERROR_ROWS = 20
 THRESHOLDS = tuple(round(0.1 * step, 1) for step in range(1, 10))
 CLASSIFICATION = frozenset({tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS})
 BINARY_ONLY = frozenset({tasks.TaskType.BINARY})
@@ -282,6 +283,85 @@ class ResidualReport(Diagnostic):
         return report
 
 
+class ErrorAnalysis(Diagnostic):
+    """Identify the highest-risk held-out rows without exposing features."""
+
+    name = "error_analysis"
+    applies_to = CLASSIFICATION | REGRESSION_ONLY
+
+    def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
+        """Return bounded row-level error evidence and its limitations."""
+        predicted = np.asarray(inputs.estimator.predict(inputs.features))
+        row_ids = [str(value) for value in inputs.features.index]
+        if inputs.task in CLASSIFICATION:
+            probabilities = np.asarray(
+                inputs.estimator.predict_proba(inputs.features)
+            )
+            confidence = probabilities.max(axis=1)
+            incorrect = predicted != inputs.target.to_numpy()
+            positions = sorted(
+                range(len(predicted)),
+                key=lambda position: (
+                    not bool(incorrect[position]),
+                    float(confidence[position]),
+                    position,
+                ),
+            )[:MAX_ERROR_ROWS]
+            rows = [
+                {
+                    "row_id": row_ids[position],
+                    "actual": str(inputs.target.iloc[position]),
+                    "predicted": str(predicted[position]),
+                    "confidence": float(confidence[position]),
+                    "misclassified": bool(incorrect[position]),
+                }
+                for position in positions
+            ]
+            return {
+                "task": inputs.task.value,
+                "row_count": len(predicted),
+                "misclassified_count": int(incorrect.sum()),
+                "rows": rows,
+                "ranked_by": "misclassification_then_low_confidence",
+                "limitations": [
+                    "Rows are identified by their evaluation index only; raw "
+                    "feature values are not copied into the report.",
+                    "Confidence is model probability, not correctness "
+                    "certainty or causality.",
+                ],
+            }
+        actual = inputs.target.to_numpy(dtype=float)
+        numeric_prediction = predicted.astype(float)
+        residual = actual - numeric_prediction
+        absolute = np.abs(residual)
+        positions = sorted(
+            range(len(predicted)),
+            key=lambda position: (-float(absolute[position]), position),
+        )[:MAX_ERROR_ROWS]
+        return {
+            "task": inputs.task.value,
+            "row_count": len(predicted),
+            "mean_absolute_error": float(absolute.mean()),
+            "rows": [
+                {
+                    "row_id": row_ids[position],
+                    "actual": float(actual[position]),
+                    "predicted": float(numeric_prediction[position]),
+                    "residual": float(residual[position]),
+                    "absolute_error": float(absolute[position]),
+                }
+                for position in positions
+            ],
+            "ranked_by": "absolute_error",
+            "limitations": [
+                "Rows are identified by their evaluation index only; raw "
+                "feature values are not copied into the report.",
+                "Residuals diagnose model behaviour and do not establish "
+                "causal failure reasons.",
+            ],
+        }
+
+
 class CachedPredictions(base.BaseEstimator):
     """Replays a fitted model's predictions by row label.
 
@@ -447,6 +527,7 @@ def default_suite() -> tuple[Diagnostic, ...]:
         MulticlassCalibrationReport(),
         ThresholdReport(),
         ResidualReport(),
+        ErrorAnalysis(),
         MetricUncertainty(),
     )
 

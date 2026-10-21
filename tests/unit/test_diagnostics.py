@@ -101,6 +101,33 @@ def test_residual_report_segments_and_bias():
     )
 
 
+def test_error_analysis_ranks_misclassified_rows_without_feature_values():
+    """Classification errors are reviewable without copying raw features."""
+    report = diagnostics.ErrorAnalysis().compute(
+        make_inputs(tasks.TaskType.BINARY)
+    )
+
+    assert report["row_count"] == 300
+    assert report["misclassified_count"] > 0
+    assert len(report["rows"]) <= diagnostics.MAX_ERROR_ROWS
+    assert report["rows"][0]["misclassified"] is True
+    assert "signal" not in report["rows"][0]
+
+
+def test_error_analysis_ranks_regression_residuals():
+    """Regression errors carry bounded residual evidence."""
+    report = diagnostics.ErrorAnalysis().compute(
+        make_inputs(tasks.TaskType.REGRESSION)
+    )
+
+    assert report["task"] == "regression"
+    assert report["mean_absolute_error"] > 0
+    assert (
+        report["rows"][0]["absolute_error"]
+        >= report["rows"][-1]["absolute_error"]
+    )
+
+
 def test_suite_selects_by_task_and_isolates_failures():
     suite = full_suite.full_suite()
     binary = diagnostics.run_suite(make_inputs(tasks.TaskType.BINARY), suite)
@@ -108,6 +135,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         "classification_report",
         "calibration",
         "threshold_analysis",
+        "error_analysis",
         "permutation_importance",
         "partial_dependence",
         "pairwise_interaction",
@@ -122,6 +150,7 @@ def test_suite_selects_by_task_and_isolates_failures():
     )
     assert set(regression) == {
         "residuals",
+        "error_analysis",
         "permutation_importance",
         "partial_dependence",
         "pairwise_interaction",
