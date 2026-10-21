@@ -11,6 +11,7 @@ from collections.abc import Mapping
 import dataclasses
 import enum
 import json
+import re
 from typing import NoReturn
 
 from scml.contracts import capabilities
@@ -29,6 +30,61 @@ class Modality(enum.StrEnum):
     GRAPH = "graph"
     GEOSPATIAL = "geospatial"
     RASTER = "raster"
+
+
+@dataclasses.dataclass(frozen=True, slots=True, order=True)
+class ExtensionModality:
+    """Stable identity for a caller-defined dataset family.
+
+    Extension identities let a dataset family enter the same lifecycle
+    contract without pretending that the core package understands its raw
+    representation. They are deliberately namespaced and can never be
+    declared as production-supported by the built-in registry.
+    """
+
+    name: str
+
+    def __post_init__(self) -> None:
+        """Validate a stable, non-built-in dataset-family name."""
+        if not isinstance(self.name, str):
+            raise TypeError("extension modality name must be a string")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9./-]*[a-z0-9]", self.name):
+            raise ValueError(
+                "extension modality name must use lowercase namespaced "
+                "characters such as 'acme/point-cloud'"
+            )
+        if self.name in {item.value for item in Modality}:
+            raise ValueError(
+                "extension modality name conflicts with a built-in"
+            )
+
+    @property
+    def value(self) -> str:
+        """Return the serialized identity used in evidence artifacts."""
+        return f"extension:{self.name}"
+
+
+ModalityIdentity = Modality | ExtensionModality
+
+
+def modality_value(modality: ModalityIdentity) -> str:
+    """Return the stable serialized value for a modality identity."""
+    if not isinstance(modality, (Modality, ExtensionModality)):
+        raise TypeError("modality must be Modality or ExtensionModality")
+    return modality.value
+
+
+def modality_from_value(value: str) -> ModalityIdentity:
+    """Restore a built-in or extension modality from evidence text."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("modality value must be a non-empty string")
+    try:
+        return Modality(value)
+    except ValueError:
+        prefix = "extension:"
+        if not value.startswith(prefix):
+            raise ValueError(f"unknown modality value: {value}") from None
+        return ExtensionModality(value.removeprefix(prefix))
 
 
 class LifecycleStage(enum.StrEnum):
@@ -140,7 +196,7 @@ class ModalityDeclaration:
         limitations: User-visible boundaries of the declaration.
     """
 
-    modality: Modality
+    modality: ModalityIdentity
     status: ModalityStatus
     stage_evidence: tuple[StageEvidence, ...]
     required_extras: tuple[str, ...] = ()
@@ -152,8 +208,8 @@ class ModalityDeclaration:
 
     def __post_init__(self) -> None:
         """Validate declaration shape and supported-status evidence."""
-        if not isinstance(self.modality, Modality):
-            raise TypeError("modality must be Modality")
+        if not isinstance(self.modality, (Modality, ExtensionModality)):
+            raise TypeError("modality must be Modality or ExtensionModality")
         if not isinstance(self.status, ModalityStatus):
             raise TypeError("status must be ModalityStatus")
         if not isinstance(self.resources, capabilities.ResourceAssumptions):
@@ -181,6 +237,13 @@ class ModalityDeclaration:
                 raise ValueError(f"{field_name} must not contain empty values")
         if not self.failure_modes:
             raise ValueError("failure_modes must declare at least one value")
+        if (
+            isinstance(self.modality, ExtensionModality)
+            and self.status is not ModalityStatus.EXTENSION_ONLY
+        ):
+            raise ValueError(
+                "extension modalities must use extension-only status"
+            )
         if self.status is ModalityStatus.SUPPORTED and self.missing_stages:
             missing = ", ".join(stage.value for stage in self.missing_stages)
             raise ValueError(
@@ -207,7 +270,7 @@ class ModalityDeclaration:
         """Return a stable JSON-compatible declaration."""
         stage_records = {record.stage: record for record in self.stage_evidence}
         return {
-            "modality": self.modality.value,
+            "modality": modality_value(self.modality),
             "status": self.status.value,
             "stage_evidence": [
                 stage_records[stage].to_dict()
@@ -244,7 +307,7 @@ class ModalityRegistry:
         self, declarations: Iterable[ModalityDeclaration] = ()
     ) -> None:
         """Create a registry and register supplied declarations."""
-        self.records: dict[Modality, ModalityDeclaration] = {}
+        self.records: dict[ModalityIdentity, ModalityDeclaration] = {}
         for declaration in declarations:
             self.register(declaration)
 
@@ -261,19 +324,20 @@ class ModalityRegistry:
             raise TypeError("declaration must be ModalityDeclaration")
         if declaration.modality in self.records:
             raise errors.ConfigError(
-                f"modality already registered: {declaration.modality.value}"
+                "modality already registered: "
+                f"{modality_value(declaration.modality)}"
             )
         self.records[declaration.modality] = declaration
 
-    def find(self, modality: Modality) -> ModalityDeclaration | None:
+    def find(self, modality: ModalityIdentity) -> ModalityDeclaration | None:
         """Return a declaration or ``None`` when it is unregistered."""
-        if not isinstance(modality, Modality):
-            raise TypeError("modality must be Modality")
+        if not isinstance(modality, (Modality, ExtensionModality)):
+            raise TypeError("modality must be Modality or ExtensionModality")
         return self.records.get(modality)
 
     def require(
         self,
-        modality: Modality,
+        modality: ModalityIdentity,
         allowed_statuses: Collection[ModalityStatus] | None = None,
     ) -> ModalityDeclaration:
         """Require complete, status-eligible modality support.
@@ -344,7 +408,7 @@ class ModalityRegistry:
 
     def raise_unsupported(
         self,
-        modality: Modality,
+        modality: ModalityIdentity,
         reason: str,
         details: dict[str, object] | None = None,
     ) -> NoReturn:
@@ -352,15 +416,16 @@ class ModalityRegistry:
         diagnostic: dict[str, object] = {
             "status": "unsupported",
             "reason": reason,
-            "modality": modality.value,
+            "modality": modality_value(modality),
             "registered_modalities": [
-                item.modality.value for item in self.list_declarations()
+                modality_value(item.modality)
+                for item in self.list_declarations()
             ],
         }
         if details:
             diagnostic.update(details)
         raise UnsupportedModalityError(
             f"unsupported modality before execution: {reason}; "
-            f"modality={modality.value}",
+            f"modality={modality_value(modality)}",
             diagnostic,
         )

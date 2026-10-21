@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 
 from scml.contracts import errors
+from scml.contracts import modalities
 from scml.models import modality_lifecycle
 
 MAX_MODALITY_REQUEST_BYTES = 16 * 1024 * 1024
@@ -85,7 +86,9 @@ class ModalityHttpServing:
             predictions = self.predictor.predict(samples)
             probabilities = self.predictor.predict_proba(samples)
         return {
-            "modality": self.predictor.adapter.modality.value,
+            "modality": modalities.modality_value(
+                self.predictor.adapter.modality
+            ),
             "predictions": np.asarray(predictions).tolist(),
             "probabilities": np.asarray(probabilities).tolist(),
             "sample_count": len(samples),
@@ -124,7 +127,9 @@ class ModalityHttpServing:
                         200,
                         {
                             "modality": (
-                                adapter.predictor.adapter.modality.value
+                                modalities.modality_value(
+                                    adapter.predictor.adapter.modality
+                                )
                             ),
                             "decoder": adapter.decoder.schema(),
                             "feature_names": list(

@@ -27,7 +27,7 @@ def make_evidence(
 def make_declaration(
     status: modalities.ModalityStatus = modalities.ModalityStatus.SUPPORTED,
     stage_evidence: tuple[modalities.StageEvidence, ...] | None = None,
-    modality: modalities.Modality = modalities.Modality.TABULAR,
+    modality: modalities.ModalityIdentity = modalities.Modality.TABULAR,
 ) -> modalities.ModalityDeclaration:
     return modalities.ModalityDeclaration(
         modality=modality,
@@ -68,6 +68,39 @@ def test_enums_define_all_required_modalities_and_lifecycle_stages():
     assert modalities.LifecycleStage.RECOVERY_AND_RESOURCE_TESTS.value == (
         "recovery_and_resource_tests"
     )
+
+
+def test_extension_modality_has_stable_namespaced_identity():
+    """Caller-defined families serialize without colliding with built-ins."""
+    identity = modalities.ExtensionModality("acme/point-cloud")
+
+    assert identity.value == "extension:acme/point-cloud"
+    assert modalities.modality_from_value(identity.value) == identity
+    with pytest.raises(ValueError, match="lowercase namespaced"):
+        modalities.ExtensionModality("Acme point cloud")
+    with pytest.raises(ValueError, match="conflicts"):
+        modalities.ExtensionModality("image")
+
+
+def test_extension_declarations_are_never_promoted_to_supported():
+    """Complete extension evidence still requires an explicit extension gate."""
+    identity = modalities.ExtensionModality("acme/point-cloud")
+    declaration = make_declaration(
+        modality=identity,
+        status=modalities.ModalityStatus.EXTENSION_ONLY,
+    )
+    registry = modalities.ModalityRegistry((declaration,))
+
+    assert (
+        registry.require(identity, {modalities.ModalityStatus.EXTENSION_ONLY})
+        is declaration
+    )
+    assert declaration.to_dict()["modality"] == "extension:acme/point-cloud"
+    with pytest.raises(ValueError, match="extension-only status"):
+        make_declaration(
+            modality=identity,
+            status=modalities.ModalityStatus.SUPPORTED,
+        )
 
 
 def test_complete_declaration_serializes_evidence_in_required_stage_order():

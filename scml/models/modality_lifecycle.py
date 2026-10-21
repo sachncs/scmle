@@ -153,7 +153,9 @@ class ModalityPredictor:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if not isinstance(manifest, dict):
             raise ValueError("modality package manifest must be an object")
-        if manifest.get("modality") != adapter.modality.value:
+        if manifest.get("modality") != modalities.modality_value(
+            adapter.modality
+        ):
             raise ValueError("package modality does not match adapter")
         raw_features = manifest.get("feature_names")
         if not isinstance(raw_features, list) or not all(
@@ -211,7 +213,7 @@ class ModalityPredictor:
         """Return machine-readable package and inference readiness evidence."""
         return {
             "package_verified": True,
-            "modality": self.adapter.modality.value,
+            "modality": modalities.modality_value(self.adapter.modality),
             "training_dataset_hash": self.training_dataset_hash,
             "feature_names": list(self.feature_names),
             "model_sha256": self.package.model_sha256,
@@ -255,7 +257,7 @@ class LifecycleReport:
 class ModalityAdapter(abc.ABC):
     """Polymorphic boundary between a dataset family and the lifecycle."""
 
-    modality: ClassVar[modalities.Modality]
+    modality: ClassVar[modalities.ModalityIdentity]
 
     @property
     @abc.abstractmethod
@@ -312,7 +314,7 @@ class ModalityAdapter(abc.ABC):
         """
         return {
             "status": "not_available",
-            "modality": self.modality.value,
+            "modality": modalities.modality_value(self.modality),
             "reason": "the adapter has no modality-specific explanation policy",
             "limitations": [
                 "The lifecycle explanation remains in feature space.",
@@ -1913,7 +1915,7 @@ class RasterAdapter(ModalityAdapter):
         if self.decoder is None:
             return {
                 "status": "not_available",
-                "modality": self.modality.value,
+                "modality": modalities.modality_value(self.modality),
                 "reason": "an explicit named raster decoder is required",
                 "limitations": [
                     "Metadata-only rasters cannot produce pixel-region "
@@ -2589,7 +2591,7 @@ class PackagingStage(ModalityLifecycleStage):
             sync_file(model_path)
             unsigned = {
                 "schema_version": 1,
-                "modality": context.adapter.modality.value,
+                "modality": modalities.modality_value(context.adapter.modality),
                 "dataset_hash": context.adapter.dataset_hash,
                 "feature_names": list(
                     context.feature_batches["train"].feature_names
@@ -2687,14 +2689,20 @@ class DocumentationStage(ModalityLifecycleStage):
         if context.curation_report is None:
             raise RuntimeError("profiling must precede documentation")
         dataset_card = curation.ModalityDatasetCard.from_report(
-            context.adapter.modality.value,
+            modalities.modality_value(context.adapter.modality),
             context.curation_report.to_dict(),
             context.adapter.modality_notes(),
             manifest=context.manifest,
         )
         context.documentation = {
-            "modality": context.adapter.modality.value,
-            "status": "experimental",
+            "modality": modalities.modality_value(context.adapter.modality),
+            "status": (
+                "extension-only"
+                if isinstance(
+                    context.adapter.modality, modalities.ExtensionModality
+                )
+                else "experimental"
+            ),
             "intended_use": (
                 "bounded lifecycle validation and baseline comparison"
             ),
@@ -2790,12 +2798,12 @@ class ModalityLifecycle:
         to the exact modality content used by the lifecycle.
         """
         observed = observed_adapter or adapter
-        if observed.modality is not adapter.modality:
+        if observed.modality != adapter.modality:
             raise ValueError(
                 "observed adapter modality must match reference modality"
             )
         if manifest is not None:
-            if manifest.modality != adapter.modality.value:
+            if manifest.modality != modalities.modality_value(adapter.modality):
                 raise ValueError("manifest modality must match adapter")
             if manifest.content_hash != adapter.dataset_hash:
                 raise ValueError("manifest content_hash must match adapter")
@@ -2887,7 +2895,7 @@ class ModalityLifecycle:
             ),
         }
         report = LifecycleReport(
-            modality=adapter.modality.value,
+            modality=modalities.modality_value(adapter.modality),
             dataset_hash=adapter.dataset_hash,
             stage_evidence=records,
             evaluation=context.evaluation,
@@ -2927,8 +2935,12 @@ class ModalityLifecycle:
     ) -> modalities.ModalityDeclaration:
         """Convert a report into an explicit experimental declaration."""
         return modalities.ModalityDeclaration(
-            modality=modalities.Modality(report.modality),
-            status=modalities.ModalityStatus.EXPERIMENTAL,
+            modality=modalities.modality_from_value(report.modality),
+            status=(
+                modalities.ModalityStatus.EXTENSION_ONLY
+                if report.modality.startswith("extension:")
+                else modalities.ModalityStatus.EXPERIMENTAL
+            ),
             stage_evidence=report.stage_evidence,
             required_extras=("core",),
             failure_modes=(

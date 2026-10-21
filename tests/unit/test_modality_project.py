@@ -6,6 +6,7 @@ from typing import cast
 import pytest
 
 import scml
+from scml.contracts import modalities
 from scml.data.modalities import document
 from scml.models import modality_lifecycle
 
@@ -22,6 +23,12 @@ def text_adapter() -> modality_lifecycle.TextAdapter:
         for index in range(12)
     )
     return modality_lifecycle.TextAdapter(document.DocumentDataset(samples))
+
+
+class ExtensionTextAdapter(modality_lifecycle.TextAdapter):
+    """Test caller-owned adapter for a dataset family outside core enums."""
+
+    modality = modalities.ExtensionModality("acme/point-cloud")
 
 
 def test_modality_project_runs_and_persists_all_stages(tmp_path):
@@ -71,3 +78,22 @@ def test_modality_project_rejects_file_output(tmp_path):
 
     with pytest.raises(ValueError, match="output_dir"):
         project.run()
+
+
+def test_modality_project_preserves_extension_identity_and_status(tmp_path):
+    """Arbitrary dataset families use the lifecycle without support inflation."""
+    project = scml.ModalityProject(
+        ExtensionTextAdapter(text_adapter().dataset),
+        "test-signing-key",
+        output_dir=tmp_path / "extension-run",
+    )
+
+    report = project.run()
+    declaration = project.declaration()
+
+    assert report.modality == "extension:acme/point-cloud"
+    assert report.documentation["status"] == "extension-only"
+    assert declaration.modality == ExtensionTextAdapter.modality
+    assert declaration.status is modalities.ModalityStatus.EXTENSION_ONLY
+    assert declaration.complete
+    assert report.package.path.endswith("/model")
