@@ -53,6 +53,13 @@ uv run --python "$python_version" twine check dist/*
 scripts/verify_release_artifacts.sh
 
 echo "== marketing site =="
-(cd website && npm ci && npm audit --omit=dev --audit-level=high && npm run build)
+(cd website \
+  && npm ci \
+  && npm audit --omit=dev --audit-level=high \
+  && npm run build \
+  && npm run check:a11y \
+  && npm run check:links \
+  && npx playwright install chromium \
+  && npm run test:e2e)
 
 echo "preflight passed; benchmark evidence: $benchmark_output"
