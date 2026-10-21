@@ -1628,3 +1628,13 @@ Strict warning policy enforcement at `b65d931` on 2026-10-21:
 - `actionlint .github/workflows/*.yml`, YAML parsing, `bash -n
   scripts/release_preflight.sh`, and `git diff --check` passed before the
   workflow change was committed.
+
+Hosted blocker re-confirmed at `ef1ae56` on 2026-10-21:
+
+- The Pages workflow for the pushed head was created but its build job failed
+  before a runner step (`steps: []`, no runner assigned). GitHub's check-run
+  annotation states: “The job was not started because recent account payments
+  have failed or your spending limit needs to be increased.” Deploy and public
+  route verification were skipped.
+- This is the same account billing/plan blocker previously observed. No source
+  or workflow failure was observed, and repository visibility was not changed.
