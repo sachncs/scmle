@@ -2002,6 +2002,19 @@ Local file snapshot evidence at `6f5b520` on 2026-10-21:
   warehouse callbacks, broker transport semantics, and external snapshot
   authorities remain explicitly transport-owned.
 
+Current-head strict regression at `6f5b520` on 2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,313` tests with `88` explicit optional-dependency skips in 31 minutes 23
+  seconds. No failure, error, or resource warning was promoted to a failure.
+- This run includes local-file and object snapshot binding, changed-snapshot
+  rejection, the complete connector/checkpoint inventory, all modality
+  lifecycles, API compatibility, reliability contracts, and the full
+  repository test suite.
+- This is current local regression evidence. It does not replace the bounded
+  coverage and mutation gates, hosted Linux and Pages verification, external
+  transport/resource-fault execution, secret custody, or independent review.
+
 Current-head strict regression at `c71af80` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
