@@ -1248,3 +1248,15 @@ Warning-strict bounded-suite evidence at `4c0d079` on 2026-10-21:
   failure. They remain release debt until the source is identified and the
   default preflight is clean; warning promotion is not being used to hide
   them.
+
+Standalone diagnostic documentation evidence at `1904cc7` on 2026-10-21:
+
+- The Astro evidence guide now documents the bounded `error_analysis` and
+  `pairwise_interaction` diagnostics, including their output fields, row and
+  feature budgets, truncation interpretation, privacy boundary, and
+  associational—not causal—limitations.
+- The shared documentation layout adds responsive diagnostic evidence cards;
+  `npm run build && npm run check:a11y` passes all 15 static routes.
+- This closes the site explanation gap for the latest evaluation evidence. It
+  does not make either diagnostic a root-cause, fairness, or causal claim, and
+  it does not close the independent-review or hosted deployment gates.
