@@ -12,6 +12,7 @@ import math
 from numbers import Real
 import pathlib
 import random
+from types import MappingProxyType
 from typing import Any
 from typing import cast
 from typing import Self
@@ -239,9 +240,10 @@ class GeoFeature:
     label: str | int | float | bool | None = None
     observation_time: datetime | str | None = None
     geometry_hash: str = dataclasses.field(init=False)
+    content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate geometry and derive a canonical geometry hash."""
+        """Validate feature data and derive canonical content identities."""
         if not self.feature_id.strip():
             raise ValueError("feature_id must not be empty")
         if not isinstance(self.geometry, Mapping):
@@ -255,14 +257,54 @@ class GeoFeature:
                 "observation_time",
                 canonical_observation_time(self.observation_time),
             )
+        properties = dict(self.properties)
+        if any(not isinstance(key, str) for key in properties):
+            raise GeospatialValidationError(
+                "feature property names must be strings",
+                {"code": "invalid_property_name"},
+            )
+        try:
+            json.dumps(
+                {"label": self.label, "properties": properties},
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+        except (TypeError, ValueError) as error:
+            raise GeospatialValidationError(
+                "feature properties and label must be JSON-native",
+                {"code": "invalid_feature_metadata"},
+            ) from error
+        object.__setattr__(self, "properties", MappingProxyType(properties))
         payload = json.dumps(
             self.geometry,
             ensure_ascii=True,
             sort_keys=True,
             separators=(",", ":"),
+            allow_nan=False,
         ).encode("utf-8")
         object.__setattr__(
             self, "geometry_hash", hashlib.sha256(payload).hexdigest()
+        )
+        feature_payload = json.dumps(
+            {
+                "feature_id": self.feature_id,
+                "geometry_hash": self.geometry_hash,
+                "label": self.label,
+                "observation_time": self.observation_time,
+                "properties": properties,
+            },
+            default=lambda value: (
+                value.isoformat() if isinstance(value, datetime) else value
+            ),
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        object.__setattr__(
+            self, "content_hash", hashlib.sha256(feature_payload).hexdigest()
         )
 
     @property
@@ -532,8 +574,7 @@ class GeospatialDataset:
                 {"code": "duplicate_feature_id"},
             )
         feature_identities = sorted(
-            f"{feature.feature_id}\0{feature.geometry_hash}\0"
-            f"{feature.observation_time or ''}"
+            f"{feature.feature_id}\0{feature.content_hash}"
             for feature in normalized
         )
         identity_payload = f"crs:{canonical_crs_value}\n" + "\n".join(

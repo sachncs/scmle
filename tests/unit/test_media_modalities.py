@@ -536,6 +536,36 @@ def test_geospatial_identity_binds_crs_and_ignores_feature_order():
     assert first.content_hash != projected.content_hash
 
 
+def test_geospatial_identity_binds_labels_and_properties():
+    """Feature metadata changes produce a new immutable dataset identity."""
+    geometry = {"type": "Point", "coordinates": [0, 0]}
+    baseline = geospatial.GeospatialDataset(
+        (geospatial.GeoFeature("feature", geometry, {"kind": "park"}, "open"),),
+        crs="EPSG:4326",
+    )
+    changed_label = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "feature", geometry, {"kind": "park"}, "closed"
+            ),
+        ),
+        crs="EPSG:4326",
+    )
+    changed_property = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "feature", geometry, {"kind": "school"}, "open"
+            ),
+        ),
+        crs="EPSG:4326",
+    )
+
+    assert baseline.content_hash != changed_label.content_hash
+    assert baseline.content_hash != changed_property.content_hash
+    with pytest.raises(TypeError):
+        baseline.features[0].properties["kind"] = "mutated"
+
+
 def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
     """A caller predicate produces deterministic, hash-bound join evidence."""
     left = geospatial.GeospatialDataset(
