@@ -1942,6 +1942,15 @@ Security hardening at `43bf72e` on 2026-10-21:
 - The independent-review, evidence-contract, and keyring tests passed 18
   tests under `-W error::ResourceWarning`; Ruff, formatting, and mypy passed.
 
+Release-attestation hardening at `6532447` on 2026-10-21:
+
+- Release-attestation verification now compares the non-secret binding
+  separately and uses constant-time comparison for the HMAC value. Missing,
+  unsigned, wrong-key, and tampered attestations remain fail-closed.
+- The attestation, release-evaluation, and problem-spec integration tests
+  passed 23 tests under `-W error::ResourceWarning`; Ruff, formatting, and
+  mypy passed.
+
 Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
