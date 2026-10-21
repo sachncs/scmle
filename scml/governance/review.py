@@ -5,6 +5,7 @@ from collections.abc import Mapping
 import dataclasses
 import datetime
 import enum
+import hmac
 import json
 import os
 from pathlib import Path
@@ -229,7 +230,7 @@ class IndependentReleaseReview:
         if self.signature is None:
             return False
         expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
-        return self.signature == expected
+        return hmac.compare_digest(self.signature, expected)
 
     def write(self, path: str | Path) -> None:
         """Persist the review atomically and flush its directory entry."""
