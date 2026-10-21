@@ -1,5 +1,7 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <DocsLayout title="Python API" description="The supported top-level Python API for super-charge-ml." current="api">
@@ -35,7 +37,7 @@ predictions = predict(loaded, new_rows)</code></pre>
 )</code></pre>
 
   <h2>Run a non-tabular lifecycle explicitly</h2>
-  <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts a document, image, audio, video, graph, geospatial-vector, or raster dataset through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, and <code>ModalitySampleDecoder</code> are also exported for verified library inference and explicit reference serving.</p>
+  <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>ExtensionModality</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, and <code>ModalitySampleDecoder</code> are also exported for verified library inference and explicit reference serving.</p>
   <pre><code>from scml import ModalityProject
 from scml.data.modalities import DocumentDataset, DocumentSample
 from scml.models.modality_lifecycle import TextAdapter
@@ -58,6 +60,21 @@ project = ModalityProject(
 report = project.run()
 print(report.documentation["status"])  # experimental</code></pre>
   <p>This surface does not promote the modality to supported production status. The report says <code>experimental</code> until decoder ownership, modality-specific fidelity, external serving and fault evidence, and independent review are complete. For verified package inference, use the exported <code>ModalityPredictor</code> with the same typed adapter. Do not pass raw bytes to <code>MLProject</code> and expect a tabular estimator to infer their semantics.</p>
+
+  <h2>Bring a new dataset family</h2>
+  <p>Use <code>ExtensionModality</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
+  <pre><code>{`from scml.contracts import modalities
+from scml.models import modality_lifecycle
+
+class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
+    modality = modalities.ExtensionModality("acme/point-cloud")
+    # Implement the complete adapter contract for your raw source.
+
+report = ModalityProject(
+    PointCloudAdapter(...),
+    signing_key="load-this-from-your-secret-manager",
+).run()
+assert report.documentation["status"] == "extension-only"`}</code></pre>
 
   <h2>Connect a warehouse without hiding its boundary</h2>
   <p><code>WarehouseConnector</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>

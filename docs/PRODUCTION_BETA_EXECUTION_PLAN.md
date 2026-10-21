@@ -1906,6 +1906,25 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Extension dataset-family contract at `17a9417` on 2026-10-22:
+
+- `ExtensionModality` gives caller-defined dataset families a stable,
+  namespaced identity such as `extension:acme/point-cloud`. The identity is
+  accepted by modality declarations, registries, lifecycle adapters, signed
+  package manifests, verified inference, and reference serving without
+  changing the built-in modality enum.
+- A complete extension lifecycle is still declared `extension-only`; the
+  declaration rejects any attempt to promote an `ExtensionModality` directly
+  to `supported`. This preserves the curation-first and review boundary for
+  unfamiliar raw data rather than treating a generic adapter as domain proof.
+- The focused contract, project, lifecycle, and serving suite passed 49 tests
+  under `-W error::ResourceWarning`; Ruff, formatting, mypy, and diff checks
+  passed. The change was pushed as an atomic commit.
+- The standalone Astro extension-contract guide is the developer-facing
+  onboarding surface for raw fixtures, adapter responsibilities, governance,
+  lifecycle evidence, and promotion criteria. It does not redirect readers to
+  repository Markdown files.
+
 Current-head strict and release preflight evidence at `cd10719` on 2026-10-22:
 
 - `uv run pytest -q tests -W error::ResourceWarning` passed `2,321` tests with

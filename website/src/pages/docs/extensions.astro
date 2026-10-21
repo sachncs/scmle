@@ -1,0 +1,114 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Extension contracts" description="Bring a new dataset family into the evidence-first lifecycle without bypassing curation." current="extensions">
+  <p class="eyebrow"><span></span> For dataset owners</p>
+  <h1>Bring the raw data.<br /><em>Keep the proof.</em></h1>
+  <p class="lead">The core cannot know the semantics of every dataset on earth. An extension lets your team bring a new family—point clouds, medical records, telemetry, chemical structures, or something more specific—through the same lifecycle without calling it a supported modality before it has earned that label.</p>
+
+  <div class="callout"><p><strong>The contract is an admission boundary.</strong> You own decoding, representation, labels, and domain policy. super-charge-ml owns the shared evidence sequence: curation, leakage-aware splitting, packaging, inference parity, monitoring, documentation, and recovery checks.</p></div>
+
+  <h2>Start from the raw material</h2>
+  <p>Do not begin with a dataframe that someone has already cleaned for you. Begin with the bytes or records as they arrive, plus the facts that make those bytes interpretable. Preserve the source snapshot, acquisition time, source owner, license, schema or codec metadata, sample identity, label provenance, transformation lineage, privacy classification, and deletion policy.</p>
+  <p>Build fixtures that include valid, empty, malformed, truncated, duplicated, corrupted, oversized, and schema-evolved inputs. Add missing and conflicting labels, duplicate entities, leakage across partitions, shifted distributions, and sensitive fields. The curation report is the first product of the extension; the model is downstream of it.</p>
+
+  <figure class="diagram">
+    <figcaption class="diagram-caption"><span>EXTENSION FLOW</span><strong>Raw evidence stays visible through every boundary.</strong></figcaption>
+    <div class="flow-row">
+      <div class="flow-node active"><span>01</span><b>Raw source</b><small>bytes · records · metadata</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>02</span><b>Adapter</b><small>identity · curation · features</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>03</span><b>15 stages</b><small>evidence · limits · failures</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>04</span><b>Extension-only</b><small>review before promotion</small></div>
+    </div>
+    <div class="evidence-rail"><span>source snapshot</span><i></i><span>dataset card</span><i></i><span>model card</span><i></i><span>release decision</span></div>
+  </figure>
+
+  <h2>Give the family a stable identity</h2>
+  <p>Use <code>ExtensionModality</code> with a lowercase, namespaced name. The serialized identity is explicit—for example, <code>extension:acme/point-cloud</code>. It cannot collide with <code>image</code>, <code>audio</code>, or another built-in modality.</p>
+  <pre><code>{`from scml.contracts.modalities import ExtensionModality
+
+modality = ExtensionModality("acme/point-cloud")
+print(modality.value)
+# extension:acme/point-cloud`}</code></pre>
+  <p>Names are identifiers, not display labels. Keep the human explanation in your dataset card and documentation. Changing the identity is a new capability and should be reviewed as a migration, not treated as a cosmetic rename.</p>
+
+  <h2>Implement the polymorphic adapter</h2>
+  <p>An extension adapter implements the same narrow interface as the built-in adapters. Each method has one responsibility: source identity, canonical samples, data understanding, leakage-aware partitions, bounded representations, stable sample identity, labels, monitoring, and user-visible limitations. The optional explanation hook is where your domain-specific raw-data explanation belongs; the shared lifecycle never invents one.</p>
+  <pre><code>{`from scml.contracts import modalities
+from scml.models import modality_lifecycle
+
+
+class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
+    modality = modalities.ExtensionModality("acme/point-cloud")
+
+    @property
+    def dataset_hash(self) -> str:
+        ...  # hash the immutable source snapshot
+
+    @property
+    def samples(self) -> tuple[object, ...]:
+        ...  # canonical samples in source order
+
+    def curate(self):
+        ...  # structured findings before feature preparation
+
+    def split(self, seed: int):
+        ...  # group, time, or spatial policy—not a blind random split
+
+    def features(self, samples):
+        ...  # bounded, finite representation with named features
+
+    def sample_id(self, sample: object) -> str:
+        ...  # stable source identity
+
+    def label(self, sample: object) -> object | None:
+        ...  # preserve unlabeled state; do not invent labels
+
+    def monitor(self, observed):
+        ...  # compare the reference and observed source populations
+
+    def modality_notes(self) -> tuple[str, ...]:
+        ...  # representation and interpretation limits`}</code></pre>
+  <p>The ellipses above are a contract outline, not a compatibility shim. A real adapter must implement every abstract method and test its boundaries against raw fixtures. Keep domain code in the adapter; do not add a generic wrapper that hides missing semantics.</p>
+
+  <h2>Run the lifecycle with explicit governance</h2>
+  <pre><code>{`from scml import ModalityProject
+
+project = ModalityProject(
+    PointCloudAdapter(...),
+    signing_key="load-this-from-your-secret-manager",
+    output_dir="runs/point-cloud",
+)
+report = project.run()
+
+assert report.modality == "extension:acme/point-cloud"
+assert report.documentation["status"] == "extension-only"
+assert len(report.stage_evidence) == 15`}</code></pre>
+  <p>When source, lineage, privacy, and task metadata are available, pass a <code>ModalityManifest</code>. The lifecycle rejects a manifest whose content hash or sample count does not match the adapter before modelling begins. Missing governance metadata remains visible as a gap in the dataset card.</p>
+
+  <h2>What the lifecycle proves</h2>
+  <ol>
+    <li>Ingestion and validation identify the source and reject invalid or unsafe samples.</li>
+    <li>Profiling and curation produce structured evidence before fitting.</li>
+    <li>Splitting records the grouping or temporal policy that prevents leakage.</li>
+    <li>Feature preparation and modelling use a bounded, named representation.</li>
+    <li>Evaluation, data explanations, and model explanations record limitations and stability evidence.</li>
+    <li>Packaging, inference, monitoring, documentation, and recovery produce signed, reviewable artifacts.</li>
+  </ol>
+  <p>Completing the local lifecycle does not make a new family production-supported. The declaration is intentionally <code>extension-only</code>. That status is a useful result: it says the integration is real, the evidence is inspectable, and the remaining promotion work is explicit.</p>
+
+  <h2>Promotion checklist</h2>
+  <ul>
+    <li>Raw fixtures cover corruption, emptiness, oversize, duplication, leakage, drift, privacy, and schema evolution.</li>
+    <li>Every curation finding has severity, confidence, scope, evidence, remediation, owner, reviewer, disposition, and blocking state.</li>
+    <li>Representation quality, uncertainty, fairness, and explanation fidelity have independent reference checks where applicable.</li>
+    <li>Serving, connector, resource, cancellation, retry, artifact, signature, and recovery faults have evidence outside the developer workstation.</li>
+    <li>A clean-clone reviewer reproduces the package and recomputes critical metrics before the capability label changes.</li>
+  </ul>
+
+  <div class="callout"><p><strong>Rule of thumb:</strong> if the extension needs the framework to guess what a byte, label, split, or explanation means, stop at extension-only and make that policy explicit first.</p></div>
+</DocsLayout>
