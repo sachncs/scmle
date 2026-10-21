@@ -212,7 +212,15 @@ print(split.block_ids())</code></pre>
   <pre><code>features = places.prepare_features()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>
-  <p>Feature preparation refuses a missing CRS and preserves the source coordinate units. It does not reproject, join, rasterize, or calculate distances.</p>
+  <p>Feature preparation refuses a missing CRS and preserves the source coordinate units. A bounded join can be made explicit when both datasets share a CRS:</p>
+  <pre><code>{`join = places.spatial_join(
+    boundaries,
+    predicate=intersects_v1,
+    predicate_name="intersects/v1",
+    comparison_limit=100_000,
+)
+print(join.to_dict())`}</code></pre>
+  <p>The caller owns <code>intersects_v1</code> and its geometry dependency. The evidence records dataset identities and limits; the core does not reproject, choose a geometry engine, rasterize, or calculate distances. For different CRSs, reproject through an explicit versioned caller policy before joining.</p>
 
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>
