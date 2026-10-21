@@ -1844,3 +1844,14 @@ Evidence-artifact durability at `386201d` on 2026-10-21:
   `git diff --check` passed. This closes the local partial-report-write gap;
   physical filesystem failure and external storage semantics remain outside
   the local evidence boundary.
+
+Explicit text lifecycle evidence at `935b887` on 2026-10-21:
+
+- The exhaustive 15-stage modality contract now includes a distinct
+  `TextAdapter` fixture in addition to the document, image, audio, video,
+  graph, geospatial, and raster adapters. This prevents the text declaration
+  from inheriting coverage by assumption from the document subclass.
+- The focused lifecycle and naming-convention slice passed 870 tests under
+  `-W error::ResourceWarning`; Ruff, formatting, and `git diff --check`
+  passed. Text remains experimental and does not inherit supported status from
+  the test result alone.
