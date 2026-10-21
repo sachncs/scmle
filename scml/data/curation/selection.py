@@ -123,7 +123,7 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
         model: Any
         if self.classification:
             model = linear_model.LogisticRegression(
-                penalty="l1",
+                l1_ratio=1.0,
                 solver="liblinear",
                 C=self.strength,
                 random_state=self.random_state,
