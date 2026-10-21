@@ -1175,3 +1175,17 @@ Clean-head release preflight evidence at `f94a74a` on 2026-10-21:
   release proof. GitHub Pages remains HTTP 404, hosted Actions remain
   unavailable before job logs, and external key custody, external-fault
   execution, and independent review/signature remain release blockers.
+
+Reliability hygiene evidence at `1ebec45` on 2026-10-21:
+
+- `RunContext.close()` now owns cleanup for both executing and preview
+  contexts. `MLProject.plan()` and `MLProject.recommendations()` close the
+  prepared context in a `finally` block, so the sealed-test vault subprocess
+  cannot survive until garbage collection; executing runs use the same context
+  boundary in their finalizer.
+- The complete unit suite passed warning-strict with 1,826 tests passed and 73
+  optional tests skipped: `uv run pytest -q tests/unit
+  -W error::ResourceWarning`. The targeted curriculum preview and missingness
+  curation cases also passed under the same policy.
+- This closes the previously observed local subprocess-resource warning. It
+  does not replace a fresh full release preflight from this new head.
