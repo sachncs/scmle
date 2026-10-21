@@ -492,6 +492,41 @@ def test_geospatial_feature_preparation_preserves_crs_units():
     assert prepared.to_numpy()[1, 4:6].tolist() == [8.0, 6.0]
 
 
+def test_geospatial_raw_axis_mask_preserves_nested_geometry_structure():
+    """Raw-coordinate masking preserves geometry type and untouched axes."""
+    feature = geospatial.GeoFeature(
+        "collection",
+        {
+            "type": "GeometryCollection",
+            "geometries": [
+                {"type": "Point", "coordinates": [2, 1]},
+                {
+                    "type": "LineString",
+                    "coordinates": [[-3, 4], [5, -2]],
+                },
+            ],
+        },
+    )
+
+    masked = feature.masked_geometry_axis(0, 0.5)
+
+    assert masked.geometry["type"] == "GeometryCollection"
+    geometries = masked.geometry["geometries"]
+    assert geometries[0]["coordinates"] == [0.5, 1.0]
+    assert geometries[1]["coordinates"] == [[0.5, 4.0], [0.5, -2.0]]
+    assert masked.geometry_hash != feature.geometry_hash
+
+
+def test_geospatial_raw_axis_mask_rejects_invalid_axis():
+    """Only x and y axes may be perturbed by the raw evidence policy."""
+    feature = geospatial.GeoFeature(
+        "point", {"type": "Point", "coordinates": [2, 1]}
+    )
+
+    with pytest.raises(ValueError, match="axis"):
+        feature.masked_geometry_axis(2, 0.0)
+
+
 def test_geospatial_feature_preparation_rejects_missing_crs():
     """Coordinates cannot become model features without a reference CRS."""
     dataset = geospatial.GeospatialDataset(

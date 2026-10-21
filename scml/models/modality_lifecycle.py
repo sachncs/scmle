@@ -1370,11 +1370,18 @@ class GeospatialAdapter(ModalityAdapter):
             for index, item in enumerate(self.dataset.features)
             if item.feature_id == sample.feature_id
         )
+        prepared = self.dataset.prepare_features()
         values = np.asarray(
-            self.dataset.prepare_features().to_numpy()[feature_index],
-            dtype=np.float64,
+            prepared.to_numpy()[feature_index], dtype=np.float64
         )
         decision = np.asarray(model.decision_function(values[None]))
+        if decision.ndim == 1:
+            selected_class = 0
+            original_score = float(decision[0])
+        else:
+            predicted = model.predict(values[None])[0]
+            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            original_score = float(decision[0, selected_class])
         feature_terms = sorted(
             (
                 (name, float(values[index] * coefficients[index]))
@@ -1382,6 +1389,31 @@ class GeospatialAdapter(ModalityAdapter):
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:10]
+        minimum_x, minimum_y, maximum_x, maximum_y = sample.bounds
+        baselines = ("x", "y")
+        baseline_values = (
+            (minimum_x + maximum_x) / 2,
+            (minimum_y + maximum_y) / 2,
+        )
+        raw_axes: list[dict[str, object]] = []
+        for axis, axis_name, baseline in zip(
+            (0, 1), baselines, baseline_values, strict=True
+        ):
+            masked_sample = sample.masked_geometry_axis(axis, baseline)
+            masked_values = self.features((masked_sample,)).values
+            masked_decision = np.asarray(model.decision_function(masked_values))
+            if masked_decision.ndim == 1:
+                masked_score = float(masked_decision[0])
+            else:
+                masked_score = float(masked_decision[0, selected_class])
+            raw_axes.append(
+                {
+                    "axis": axis_name,
+                    "baseline_value": baseline,
+                    "score_delta_from_full": original_score - masked_score,
+                    "masked_geometry_hash": masked_sample.geometry_hash,
+                }
+            )
         return {
             "status": "available",
             "method": "crs_bound_geometry_and_feature_contribution",
@@ -1392,6 +1424,21 @@ class GeospatialAdapter(ModalityAdapter):
             "feature_terms": [[name, value] for name, value in feature_terms],
             "decision_score": float(decision.reshape(-1)[0]),
             "spatial_units_preserved": True,
+            "raw_input_occlusion": {
+                "status": "available",
+                "method": "raw_geospatial_coordinate_axis_occlusion",
+                "axes": raw_axes,
+                "crs": self.dataset.crs,
+                "baseline": "centroid replacement in source CRS units",
+                "feature_space_only": False,
+                "limitations": [
+                    "Axis masks are bounded geometry perturbations, not a map, "
+                    "region, or spatial-semantic attribution.",
+                    "Geometry validity beyond the declared source contract is "
+                    "not inferred from score changes.",
+                    "Score changes are associational and not causal.",
+                ],
+            },
             "limitations": [
                 "Coordinates remain in the declared CRS and are not "
                 "reprojected.",

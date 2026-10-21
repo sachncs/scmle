@@ -105,6 +105,57 @@ def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
     return validate_coordinates(geometry.get("coordinates"))
 
 
+def mask_geometry_axis(
+    geometry: Mapping[str, Any], axis: int, baseline: float
+) -> dict[str, Any]:
+    """Replace one coordinate axis while preserving geometry structure.
+
+    The replacement is performed in the source CRS and keeps the geometry
+    type, nesting, and non-masked coordinate dimensions intact. It is a
+    bounded perturbation primitive for raw-geometry evidence; it does not
+    validate domain-specific topology or spatial semantics.
+    """
+    if axis not in (0, 1):
+        raise ValueError("axis must be 0 for x or 1 for y")
+    if not math.isfinite(float(baseline)):
+        raise ValueError("baseline must be finite")
+
+    def masked_coordinates(value: Any) -> list[Any]:
+        if not isinstance(value, (list, tuple)) or not value:
+            raise GeospatialValidationError(
+                "coordinates must be non-empty nested arrays",
+                {"code": "invalid_coordinates"},
+            )
+        if all(
+            isinstance(item, (int, float)) and not isinstance(item, bool)
+            for item in value
+        ):
+            return [
+                float(baseline) if index == axis else float(item)
+                for index, item in enumerate(value)
+            ]
+        return [masked_coordinates(item) for item in value]
+
+    def masked_geometry(value: Mapping[str, Any]) -> dict[str, Any]:
+        geometry_type = value.get("type")
+        result = dict(value)
+        if geometry_type == "GeometryCollection":
+            geometries = value.get("geometries")
+            if not isinstance(geometries, list) or not geometries:
+                raise GeospatialValidationError(
+                    "geometry collection must contain geometries",
+                    {"code": "empty_geometry_collection"},
+                )
+            result["geometries"] = [
+                masked_geometry(item) for item in geometries
+            ]
+        else:
+            result["coordinates"] = masked_coordinates(value.get("coordinates"))
+        return result
+
+    return masked_geometry(geometry)
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeoFeature:
     """Validated GeoJSON feature with stable serialized identity."""
@@ -146,6 +197,13 @@ class GeoFeature:
         xs = coordinates[0::2]
         ys = coordinates[1::2]
         return min(xs), min(ys), max(xs), max(ys)
+
+    def masked_geometry_axis(self, axis: int, baseline: float) -> "GeoFeature":
+        """Return a copy with one source-coordinate axis replaced."""
+        return dataclasses.replace(
+            self,
+            geometry=mask_geometry_axis(self.geometry, axis, baseline),
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

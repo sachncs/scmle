@@ -512,6 +512,12 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
     assert local["crs"] == "EPSG:4326"
     assert local["spatial_units_preserved"] is True
     assert local["feature_terms"]
+    raw = local["raw_input_occlusion"]
+    assert raw["method"] == "raw_geospatial_coordinate_axis_occlusion"
+    assert raw["crs"] == "EPSG:4326"
+    assert {item["axis"] for item in raw["axes"]} == {"x", "y"}
+    assert all(item["masked_geometry_hash"] for item in raw["axes"])
+    assert raw["feature_space_only"] is False
 
 
 def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
