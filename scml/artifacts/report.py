@@ -53,6 +53,15 @@ class HtmlReport:
             else ""
         )
         reliability = self.reliability(result)
+        explanation_records = result.evaluation.get("explanation_evidence", {})
+        explanation_links = (
+            "".join(
+                f'<li><a href="explanations/{escape(name)}.html">'
+                f"{escape(name)}</a></li>"
+                for name in sorted(explanation_records)
+            )
+            or "<li>unavailable</li>"
+        )
         return (
             f"<!doctype html><meta charset=utf-8>"
             f"<title>{escape(result.run_id)}</title>"
@@ -63,6 +72,7 @@ class HtmlReport:
             f"<h2>Feature importance (permutation)</h2>{importance_html}"
             f"{calibration_html}"
             f"<h2>Reliability checks</h2>{reliability}"
+            f"<h2>Explanation evidence</h2><ul>{explanation_links}</ul>"
             f"<h2>Findings</h2><ul>{items}</ul>"
         )
 

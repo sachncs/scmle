@@ -75,6 +75,8 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     )
     assert explanation_html.exists()
     assert "Explanation output" in explanation_html.read_text()
+    run_report = (result.run_dir / "report.html").read_text()
+    assert 'href="explanations/permutation_importance.html"' in run_report
     assert (result.run_dir / "capability_registry.json").exists()
     assert (result.run_dir / "evaluation_policy.json").exists()
     assert (result.run_dir / "release_evidence.json").exists()
