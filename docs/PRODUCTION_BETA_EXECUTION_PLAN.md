@@ -1916,6 +1916,20 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head focused contract verification at `7c9850c` on 2026-10-22:
+
+- The modality lifecycle, public modality-project, and media-modality slice
+  passed 72 tests under `-W error::ResourceWarning`.
+- `uv run ruff check scml tests scripts benchmarks`,
+  `uv run ruff format --check scml tests scripts benchmarks`, and
+  `uv run mypy scml benchmarks` all passed; 437 files were already formatted
+  and mypy reported no issues in 239 source files.
+- The worktree and pushed branch are identical at `7c9850c`. This focused
+  evidence confirms the local experimental modality contract and coding
+  standards, but it does not replace the complete release preflight,
+  hosted Linux and Pages verification, external fault execution, secret
+  custody, or independent reviewer evidence.
+
 Current-head release preflight after source-backed document citations at
 `8f26bfe` on 2026-10-22:
 
