@@ -1957,6 +1957,17 @@ Geospatial identity hardening at `fa21d4c` on 2026-10-22:
   changed Python files. This closes a provenance correctness defect without
   changing the production support label.
 
+Geospatial feature identity hardening at `6b21fd6` on 2026-10-22:
+
+- `GeoFeature` now validates JSON-native properties and labels, freezes the
+  properties mapping, and derives a feature content hash from feature ID,
+  geometry, properties, label, and observation time. The dataset identity
+  incorporates those feature hashes and the canonical CRS.
+- The media-modality slice passed 43 tests under
+  `-W error::ResourceWarning`; Ruff, formatting, and mypy passed for the
+  changed Python files. A label or property correction therefore creates a
+  new curation identity instead of silently reusing an old snapshot.
+
 Current-head release preflight after source-backed document citations at
 `8f26bfe` on 2026-10-22:
 
