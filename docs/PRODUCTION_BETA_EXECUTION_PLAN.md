@@ -1906,6 +1906,36 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head release preflight after source-backed document citations at
+`8f26bfe` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed static checks, formatting, mypy over
+  239 source files, Bandit, pip-audit, public API compatibility, explicit JUnit
+  skip-reason auditing, the bounded suite, mutation testing, benchmarks,
+  packaging, reproducible builds, isolated installs, and the Astro site gate.
+- The bounded release suite passed `1,994` tests with `75` optional
+  dependency skips. Every skip had an explicit reason. Total coverage was
+  `83.12%`; the declared core scope was `86%`.
+- Mutation testing killed `1,504` of `2,057` mutants (`73%`), above the 70%
+  threshold. One mutation timed out and 552 survived for follow-up triage.
+- The five-seed offline benchmark regression checked breast cancer, wine,
+  digits, and diabetes progression with zero regressions and zero failed
+  repetitions. Verdicts were tie, tie, tie, and ahead; peak memory was
+  0.3661, 0.3828, 0.4405, and 0.4547 GB respectively, with elapsed seconds
+  of 119, 76, 634, and 70.
+- Wheel and source-distribution checks passed, artifacts reproduced
+  byte-for-byte with wheel hash
+  `a90c536a5e07b58fbb62b040d0371f8b3fa45aa8406a2b15e2b1fec8dc93f482` and
+  sdist hash
+  `8e1d21b49d648e52247e6386ab3947b82bfdc829c81a67d4d2785bc7c40b4db2`.
+  Both network-isolated installation paths passed.
+- The site audit found 0 npm vulnerabilities, built all 17 static pages,
+  passed accessibility checks for all 17 HTML files, passed 384 internal-link
+  checks, and passed both Chromium Playwright smoke tests. These are local
+  results; hosted Linux and Pages, external transport/resource-fault
+  execution, secret custody, and independent reviewer evidence remain
+  separate release gates.
+
 Document source-traceability hardening at `8c5b5ef` on 2026-10-22:
 
 - `DocumentReader` now records a SHA-256 digest of the raw source bytes before
