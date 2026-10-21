@@ -142,8 +142,13 @@ class ModalityDatasetCard:
         report: Mapping[str, Any],
         limitations: Iterable[str],
         manifest: data_contracts.ModalityManifest | None = None,
+        task: str = "classification",
     ) -> Self:
-        """Build a card without inventing missing governance decisions."""
+        """Build a card without inventing missing governance decisions.
+
+        ``task`` is explicit so curation-only callers can use
+        ``not_declared`` instead of implying a supervised learning task.
+        """
         dataset_hash_value = report.get("dataset_hash")
         sample_count_value = report.get("sample_count")
         if not isinstance(dataset_hash_value, str):
@@ -155,7 +160,7 @@ class ModalityDatasetCard:
                 dataset_id=f"{modality}-{dataset_hash_value[:16]}",
                 snapshot_id=dataset_hash_value,
                 modality=modality,
-                task="classification",
+                task=task,
                 sample_count=sample_count_value,
                 content_hash=dataset_hash_value,
                 findings=tuple(

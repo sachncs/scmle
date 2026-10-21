@@ -536,6 +536,7 @@ class ModalityCurationProject:
             curation_payload,
             self.adapter.modality_notes(),
             manifest=self.manifest,
+            task="not_declared",
         )
         unsigned: dict[str, object] = {
             "schema_version": 1,

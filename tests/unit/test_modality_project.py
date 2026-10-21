@@ -122,4 +122,5 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     assert result.sample_count == 3
     assert result.curation["sample_count"] == 3
     assert result.dataset_card["privacy"]["status"] == "not_assessed"
+    assert result.dataset_card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()
