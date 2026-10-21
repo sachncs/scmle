@@ -1392,6 +1392,18 @@ Post-change full regression evidence at `ddc73e1` on 2026-10-21:
 - This is strong local evidence for the current commit. The hosted Linux
   matrix, external fault execution, independent review, and external signing
   key custody remain separate release requirements.
+
+Explanation report discoverability evidence at `190a0a4` on 2026-10-21:
+
+- The generated `report.html` now links to every explanation HTML artifact
+  recorded in `evaluation.json`, so a reviewer can move from the run summary
+  to the detailed evidence without guessing a path. Names are escaped and
+  links remain relative to the run directory.
+- The problem-spec integration test asserts the link for
+  `explanations/permutation_importance.html`; the focused five-test slice,
+  Ruff, formatting, and mypy all passed. This closes the navigation gap for
+  the local HTML evidence package but does not change the raw-modality or
+  independent-review boundaries.
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
