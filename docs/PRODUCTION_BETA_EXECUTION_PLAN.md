@@ -1560,6 +1560,16 @@ Hosted release-gate observation at `e287642` on 2026-10-21:
   account payments or an insufficient spending limit. This is an account
   billing/plan blocker, not a source or workflow test result.
 
+Standalone metadata evidence at `61059af` on 2026-10-21:
+
+- Package metadata now points `Documentation` to
+  `https://sachncs.github.io/super-charge-ml/` rather than the repository's
+  Markdown `docs/` tree. A public-API contract test prevents that onboarding
+  link from regressing, and the built wheel contains the same URL.
+- The metadata test, Ruff, mypy, and wheel build passed. The URL is the
+  requested production destination, but remains externally unavailable until
+  the repository Pages and visibility constraints are resolved.
+
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
