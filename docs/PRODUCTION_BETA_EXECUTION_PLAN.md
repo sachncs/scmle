@@ -1783,3 +1783,19 @@ Raster nodata evidence at `5f5eb99` on 2026-10-21:
   with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
   mypy, and `git diff --check` passed. The source and test change was pushed as
   one atomic commit.
+
+Document sensitive-content evidence at `0ba2f38` on 2026-10-21:
+
+- Document curation now detects bounded email, phone, and SSN patterns without
+  copying matched values into evidence, reports only type counts and affected
+  document IDs, and emits a blocking sensitive-content finding. The public
+  redaction function replaces detected values with type-only placeholders for
+  caller-owned downstream handling.
+- This is a conservative detector, not a complete DLP or legal-compliance
+  system; organizations must add domain-specific patterns, review false
+  positives, and record consent, retention, and access policy in governance
+  metadata before promotion.
+- The document, modality-lifecycle, and naming-convention suite passed 882
+  tests with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
+  mypy, and `git diff --check` passed. The source and test change was pushed as
+  one atomic commit.
