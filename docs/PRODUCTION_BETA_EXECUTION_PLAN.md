@@ -1906,6 +1906,21 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head strict regression evidence at `fad7703` on 2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,311` tests with `88` explicit optional-dependency skips in 29 minutes 32
+  seconds. No failure, error, or resource warning was promoted to a failure.
+- This run includes the public `ModalityProject` entry point, its API snapshot
+  and focused tests, all current modality lifecycle contracts, the naming
+  convention guard, and the complete repository test inventory. The skips are
+  explicit optional-dependency boundaries and do not count as unexplained
+  failures.
+- This is current-head local regression evidence. It does not replace the
+  bounded coverage and mutation gates, hosted Linux and Pages verification,
+  external transport/resource-fault execution, secret custody, or independent
+  reviewer evidence required by the release criteria.
+
 Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
