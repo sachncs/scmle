@@ -36,6 +36,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
+from scml import durability
 from scml.contracts import data as data_contracts
 from scml.contracts import events
 from scml.contracts import modalities
@@ -2617,10 +2618,12 @@ class ModalityLifecycle:
         )
         if report_path is not None:
             path = Path(report_path)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(
-                json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
+            durability.write_atomically(
+                path,
+                (
+                    json.dumps(report.to_dict(), indent=2, sort_keys=True)
+                    + "\n"
+                ).encode("utf-8"),
             )
         if performance_result is not None and not performance_result.passed:
             raise ValueError(
