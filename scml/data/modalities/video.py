@@ -3,6 +3,7 @@
 from collections.abc import Callable
 import dataclasses
 import hashlib
+import math
 import pathlib
 import random
 from typing import Self
@@ -35,6 +36,9 @@ class VideoMetadata:
     frames_per_second: float
     codec: str
     audio_tracks: int = 0
+    audio_duration_seconds: float | None = None
+    sync_offset_seconds: float | None = None
+    sync_tolerance_seconds: float | None = None
 
     def __post_init__(self) -> None:
         """Validate dimensions, timing, and track counts."""
@@ -46,11 +50,51 @@ class VideoMetadata:
             raise ValueError("video frame timing must be positive")
         if self.audio_tracks < 0:
             raise ValueError("audio_tracks must not be negative")
+        if self.audio_tracks == 0 and any(
+            value is not None
+            for value in (
+                self.audio_duration_seconds,
+                self.sync_offset_seconds,
+                self.sync_tolerance_seconds,
+            )
+        ):
+            raise ValueError(
+                "synchronization metadata requires at least one audio track"
+            )
+        if self.audio_duration_seconds is not None and (
+            not math.isfinite(self.audio_duration_seconds)
+            or self.audio_duration_seconds <= 0
+        ):
+            raise ValueError("audio_duration_seconds must be positive")
+        if self.sync_offset_seconds is not None and not math.isfinite(
+            self.sync_offset_seconds
+        ):
+            raise ValueError("sync_offset_seconds must be finite")
+        if self.sync_tolerance_seconds is not None and (
+            not math.isfinite(self.sync_tolerance_seconds)
+            or self.sync_tolerance_seconds < 0
+        ):
+            raise ValueError("sync_tolerance_seconds must not be negative")
 
     @property
     def duration_seconds(self) -> float:
         """Return the duration implied by frame count and rate."""
         return self.frame_count / self.frames_per_second
+
+    @property
+    def synchronization_status(self) -> str:
+        """Return the measured audio/video synchronization state."""
+        if self.audio_tracks == 0:
+            return "not_applicable"
+        sync_offset = self.sync_offset_seconds
+        sync_tolerance = self.sync_tolerance_seconds
+        if self.audio_duration_seconds is None:
+            return "unknown"
+        if sync_offset is None or sync_tolerance is None:
+            return "unknown"
+        if abs(sync_offset) > sync_tolerance:
+            return "out_of_tolerance"
+        return "within_tolerance"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -67,6 +111,10 @@ class VideoProfile:
     duration_seconds: float
     audio_tracks: int
     byte_size: int
+    audio_duration_seconds: float | None = None
+    sync_offset_seconds: float | None = None
+    sync_tolerance_seconds: float | None = None
+    synchronization_status: str = "not_applicable"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -232,6 +280,10 @@ class VideoSample:
             duration_seconds=self.metadata.duration_seconds,
             audio_tracks=self.metadata.audio_tracks,
             byte_size=self.byte_size,
+            audio_duration_seconds=self.metadata.audio_duration_seconds,
+            sync_offset_seconds=self.metadata.sync_offset_seconds,
+            sync_tolerance_seconds=self.metadata.sync_tolerance_seconds,
+            synchronization_status=self.metadata.synchronization_status,
         )
 
 
@@ -544,6 +596,43 @@ class VideoDataset:
             for sample in self.samples
         )
         quality_findings = []
+        synchronization_statuses = sorted(
+            {sample.metadata.synchronization_status for sample in self.samples}
+        )
+        out_of_tolerance = [
+            sample.source
+            for sample in self.samples
+            if sample.metadata.synchronization_status == "out_of_tolerance"
+        ]
+        unknown_synchronization = [
+            sample.source
+            for sample in self.samples
+            if sample.metadata.synchronization_status == "unknown"
+        ]
+        if out_of_tolerance:
+            quality_findings.append(
+                build_finding(
+                    "quality.video-audio-sync-out-of-tolerance",
+                    data_contracts.FindingSeverity.ERROR,
+                    {"sources": out_of_tolerance},
+                    {"count": len(out_of_tolerance)},
+                    "Align audio and video or exclude synchronization-"
+                    "dependent tasks from the capability declaration.",
+                    True,
+                )
+            )
+        if unknown_synchronization:
+            quality_findings.append(
+                build_finding(
+                    "quality.video-audio-sync-unknown",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"sources": unknown_synchronization},
+                    {"count": len(unknown_synchronization)},
+                    "Supply measured audio duration, offset, and tolerance "
+                    "before making audio-video timing claims.",
+                    False,
+                )
+            )
         if len(formats) > 1 or len(codecs) > 1:
             quality_findings.append(
                 build_finding(
@@ -608,6 +697,7 @@ class VideoDataset:
                 "duration_max_seconds": max(durations),
                 "duration_mean_seconds": sum(durations) / len(durations),
                 "total_bytes": sum(profile.byte_size for profile in profiles),
+                "synchronization_statuses": synchronization_statuses,
                 "label_counts": labels,
                 "conflicting_label_groups": list(conflicts),
             },

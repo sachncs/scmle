@@ -253,6 +253,67 @@ def test_video_metadata_is_explicit_and_profiled():
     assert sample.source.endswith("/sample.mp4")
 
 
+def test_video_curation_records_explicit_audio_video_synchronization():
+    """Synchronization claims require measured timing and tolerance."""
+    metadata = video.VideoMetadata(
+        "mp4",
+        2,
+        2,
+        60,
+        30.0,
+        "h264",
+        1,
+        audio_duration_seconds=2.02,
+        sync_offset_seconds=0.05,
+        sync_tolerance_seconds=0.1,
+    )
+    sample = video.VideoSample.from_bytes(
+        b"synchronized-video", metadata, source="synced.mp4"
+    )
+
+    report = video.VideoDataset((sample,)).curate()
+
+    assert metadata.synchronization_status == "within_tolerance"
+    assert sample.profile().synchronization_status == "within_tolerance"
+    assert report.profile["synchronization_statuses"] == [
+        "within_tolerance",
+    ]
+    assert report.quality_findings == ()
+
+
+def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
+    """Sync drift blocks timing-dependent data while missing evidence is visible."""
+    drifted = video.VideoMetadata(
+        "mp4",
+        2,
+        2,
+        60,
+        30.0,
+        "h264",
+        1,
+        audio_duration_seconds=2.4,
+        sync_offset_seconds=0.4,
+        sync_tolerance_seconds=0.1,
+    )
+    unknown = video.VideoMetadata("mp4", 2, 2, 60, 30.0, "h264", 1)
+
+    drift_report = video.VideoDataset(
+        (video.VideoSample.from_bytes(b"drift", drifted, "drift.mp4"),)
+    ).curate()
+    unknown_report = video.VideoDataset(
+        (video.VideoSample.from_bytes(b"unknown", unknown, "unknown.mp4"),)
+    ).curate()
+
+    assert drift_report.release_ready is False
+    assert drift_report.quality_findings[0].finding_id == (
+        "quality.video-audio-sync-out-of-tolerance"
+    )
+    assert unknown_report.release_ready
+    assert unknown_report.quality_findings[0].finding_id == (
+        "quality.video-audio-sync-unknown"
+    )
+
+
 def test_video_rejects_hash_mismatch():
     """A persisted video cannot claim an identity different from its bytes."""
     metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "raw")
