@@ -1638,3 +1638,13 @@ Hosted blocker re-confirmed at `ef1ae56` on 2026-10-21:
   route verification were skipped.
 - This is the same account billing/plan blocker previously observed. No source
   or workflow failure was observed, and repository visibility was not changed.
+
+Strict stability-harness evidence at `34c0f26` on 2026-10-21:
+
+- `check_test_stability.py` now injects `-W error::ResourceWarning` into every
+  repeated pytest attempt instead of inheriting a weaker ambient warning
+  policy.
+- The three-run API, performance, and stability policy check passed all 26
+  collected test cases on each attempt with no inventory changes, skips,
+  quarantined failures, or unquarantined failures. Ruff, formatting, and mypy
+  passed for the changed files.
