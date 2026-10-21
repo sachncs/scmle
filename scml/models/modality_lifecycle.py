@@ -670,7 +670,9 @@ class ImageAdapter(ModalityAdapter):
         the exact image dimensions used to construct it.
         """
         source_pixels = sample.decode("RGB")
-        source_height, source_width, _ = source_pixels.shape
+        source_height, source_width, source_channels = source_pixels.shape
+        if source_channels != 3:
+            raise ValueError("decoded RGB image must have three channels")
         image_library = image.require_pillow("raw image explanation")
         row_step = max(1, int(np.ceil(source_height / 4)))
         column_step = max(1, int(np.ceil(source_width / 4)))
