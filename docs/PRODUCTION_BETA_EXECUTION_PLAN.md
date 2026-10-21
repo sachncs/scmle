@@ -1799,3 +1799,12 @@ Document sensitive-content evidence at `0ba2f38` on 2026-10-21:
   tests with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
   mypy, and `git diff --check` passed. The source and test change was pushed as
   one atomic commit.
+
+Current-head strict regression evidence at `1836d61` on 2026-10-21:
+
+- `uv run pytest -q tests -W error::ResourceWarning` passed with 2,263 tests
+  passed and 124 optional skips in 30 minutes. No failure, error, or warning
+  promoted to a failure by the strict warning policy.
+- This is current local regression evidence for the pushed source tree. It
+  does not replace the hosted Linux, coverage/mutation, clean-clone, public
+  Pages, external-fault, or independent-review gates defined above.
