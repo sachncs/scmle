@@ -1925,6 +1925,34 @@ Extension dataset-family contract at `17a9417` on 2026-10-22:
   lifecycle evidence, and promotion criteria. It does not redirect readers to
   repository Markdown files.
 
+Extension contract full verification at `18cddfd` on 2026-10-22:
+
+- `uv run pytest -q tests -W error::ResourceWarning` passed `2,324` tests
+  with `88` explicit optional-dependency skips in 32 minutes 43 seconds. No
+  failure, error, or resource warning was promoted to a failure.
+- `./scripts/release_preflight.sh` passed static checks, formatting, mypy over
+  239 source files, Bandit, pip-audit, API compatibility, and JUnit skip
+  auditing. The bounded release suite passed `1,989` tests with `75`
+  explicitly explained skips; total coverage was `83.15%` and the declared
+  core scope was `86%`.
+- Mutation testing killed `1,503/2,057` mutants (`73%`) against the configured
+  `70%` minimum. One mutation timed out and `553` survived; this meets the
+  configured gate and the survivor inventory remains follow-up evidence.
+- Five-seed offline regression passed for breast cancer, wine, digits, and
+  diabetes progression with zero failures and zero regressions. Peak memory
+  was `0.3635`, `0.3851`, `0.4400`, and `0.4537` GB respectively.
+- Reproducible wheel and source-distribution builds plus network-isolated
+  installs passed. The wheel hash was
+  `108076828c59b5c123ce64cceddf5724653d10c66af1d624bb2e2bb526e84e84` and the
+  source-distribution hash was
+  `f7f059e545fd1a9841935349d9dc5b5fce10bbd1f40a0994a81366b88fdf0df1`.
+- The updated marketing site dependency audit found zero vulnerabilities;
+  Astro built `17` pages, accessibility checks passed for `17` HTML files,
+  internal-link validation passed for `384` links, and both Playwright smoke
+  tests passed. Hosted Linux and Pages, external transport/resource-fault
+  execution, secret custody, and independent reviewer evidence remain
+  separate release gates.
+
 Current-head strict and release preflight evidence at `cd10719` on 2026-10-22:
 
 - `uv run pytest -q tests -W error::ResourceWarning` passed `2,321` tests with
