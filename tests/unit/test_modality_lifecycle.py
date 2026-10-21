@@ -429,6 +429,11 @@ def test_document_lifecycle_emits_span_provenance_evidence(tmp_path: Path):
     assert local["content_hash"]
     assert local["spans"]
     assert {span["kind"] for span in local["spans"]} == {"page"}
+    raw = local["raw_input_occlusion"]
+    assert raw["method"] == "raw_document_span_occlusion"
+    assert len(raw["spans"]) == len(local["spans"])
+    assert raw["spans"][0]["masked_content_hash"]
+    assert raw["feature_space_only"] is False
 
 
 def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):

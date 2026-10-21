@@ -402,6 +402,7 @@ class DocumentAdapter(ModalityAdapter):
         """Return page and section provenance for a document explanation."""
         if not isinstance(sample, document.DocumentSample):
             raise TypeError("sample must be a DocumentSample")
+        raw_occlusion = self.raw_span_occlusion_scores(sample, model)
         return {
             "status": "available",
             "method": "document_span_provenance",
@@ -419,11 +420,79 @@ class DocumentAdapter(ModalityAdapter):
                 }
                 for span in sample.provenance
             ],
+            "raw_input_occlusion": raw_occlusion,
             "limitations": [
-                "Span provenance identifies source context; it is not OCR "
-                "confidence or citation grounding.",
+                "Span provenance and occlusion identify source context; they "
+                "are not OCR confidence or citation grounding.",
                 "The lifecycle model uses bounded lexical counts.",
                 "No causal claim is made.",
+            ],
+        }
+
+    def raw_span_occlusion_scores(
+        self,
+        sample: document.DocumentSample,
+        model: LogisticRegression,
+    ) -> dict[str, object]:
+        """Score source-character masks while preserving span offsets."""
+        original_features = self.features((sample,)).values
+        original_decision = np.asarray(
+            model.decision_function(original_features)
+        )
+        if original_decision.ndim == 1:
+            selected_class = 0
+            original_score = float(original_decision[0])
+        else:
+            predicted = model.predict(original_features)[0]
+            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            original_score = float(original_decision[0, selected_class])
+        spans: list[dict[str, object]] = []
+        for provenance in sample.provenance:
+            characters = list(sample.content)
+            characters[provenance.start : provenance.end] = " " * (
+                provenance.end - provenance.start
+            )
+            masked_content = "".join(characters)
+            if not masked_content.strip():
+                masked_content = "."
+            masked_sample = document.DocumentSample(
+                document_id=sample.document_id,
+                content=masked_content,
+                format=sample.format,
+                source_uri=sample.source_uri,
+                encoding=sample.encoding,
+                label=sample.label,
+                provenance=sample.provenance,
+            )
+            masked_features = self.features((masked_sample,)).values
+            masked_decision = np.asarray(
+                model.decision_function(masked_features)
+            )
+            if masked_decision.ndim == 1:
+                masked_score = float(masked_decision[0])
+            else:
+                masked_score = float(masked_decision[0, selected_class])
+            spans.append(
+                {
+                    "kind": provenance.kind,
+                    "start": provenance.start,
+                    "end": provenance.end,
+                    "page_number": provenance.page_number,
+                    "score_delta_from_full": original_score - masked_score,
+                    "masked_content_hash": masked_sample.content_hash,
+                }
+            )
+        return {
+            "status": "available",
+            "method": "raw_document_span_occlusion",
+            "spans": spans,
+            "baseline": "space replacement in source character spans",
+            "feature_space_only": False,
+            "limitations": [
+                "The model consumes bounded character and token counts after "
+                "masking.",
+                "Span masks do not establish citation grounding, OCR "
+                "confidence, or semantic causality.",
             ],
         }
 
