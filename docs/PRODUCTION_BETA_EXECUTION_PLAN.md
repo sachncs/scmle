@@ -1952,6 +1952,32 @@ Bounded raster decoder evidence at `de52b77` on 2026-10-21:
   spatial joins, raw-pixel explanations, external faults, and independent
   review remain incomplete.
 
+Current-head release preflight after bounded raster decoding at `7c1f88d`
+on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed static checks, the public API gate,
+  the bounded suite, mutation testing, benchmark regression, package checks,
+  and marketing-site checks. The bounded suite passed 1,982 tests with 75
+  optional dependency skips; every skip had an explicit reason. Total
+  coverage was 83.17%; the declared core scope was 86%.
+- Mutation testing killed 1,504 of 2,057 mutants (73%), above the configured
+  70% threshold. One mutation timed out and 552 survived.
+- The five-seed offline benchmark regression completed for breast cancer,
+  wine, digits, and diabetes progression with zero regressions and zero failed
+  repetitions. The verdicts were tie, tie, tie, and ahead; peak memory was
+  0.3673, 0.3907, 0.4441, and 0.4538 GB respectively.
+- Reproducible wheel and source-distribution builds, network-isolated wheel
+  installation, and source-distribution rebuild and installation passed. The
+  preflight hashes were wheel
+  `e018f0c85a04d7232971bdc53900a7ee6d9cfb8ce308dfb0ab3e1d83c76cfeee` and
+  sdist
+  `83ab342a80acf77090c9b060bb4e0664cadc5e37fd54f605958d54101be06110`.
+- npm audit found 0 vulnerabilities; Astro built all 16 pages, accessibility
+  checks passed for 16 HTML files, internal link checks passed for 346 links,
+  and both Playwright smoke tests passed. Hosted Linux and Pages, external
+  transport/resource-fault execution, secret custody, and independent review
+  remain separate release gates.
+
 Raster capability identity at `dc6ef61` on 2026-10-21:
 
 - Raster is now a distinct value in the modality, capability, and dataset
