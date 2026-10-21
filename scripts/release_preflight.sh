@@ -21,6 +21,7 @@ uv run --python "$python_version" python scripts/check_api_compatibility.py \
 
 echo "== bounded contract suite =="
 uv run --python "$python_version" pytest -q \
+  -W error::ResourceWarning \
   --cov=scml --cov-report=xml --cov-fail-under=50 \
   tests/unit tests/property tests/leakage \
   tests/integration/test_cli.py \

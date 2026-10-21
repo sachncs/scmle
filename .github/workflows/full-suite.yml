@@ -22,7 +22,7 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
-      - run: uv run pytest -q --cov=scml --cov-report=xml --durations=25
+      - run: uv run pytest -q -W error::ResourceWarning --cov=scml --cov-report=xml --durations=25
       - name: Enforce core contract coverage
         run: >-
           uv run coverage report
@@ -59,6 +59,7 @@ jobs:
       - name: Run the clean-clone acceptance slice
         run: >-
           uv run --directory /tmp/super-charge-ml-clean-clone pytest -q
+          -W error::ResourceWarning
           tests/unit tests/property tests/leakage
           tests/integration/test_end_to_end.py
           tests/integration/test_deployment.py

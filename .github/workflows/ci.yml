@@ -31,6 +31,7 @@ jobs:
       # coverage for every integration and optional path.
       - run: >-
           uv run pytest -q --cov=scml --cov-report=xml
+          -W error::ResourceWarning
           --cov-fail-under=50
           tests/unit tests/property tests/leakage
           tests/integration/test_cli.py
@@ -59,7 +60,10 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install libomp
       - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization --extra multimodal
-      - run: uv run pytest -q tests/unit tests/property tests/leakage tests/integration/test_end_to_end.py
+      - run: >-
+          uv run pytest -q -W error::ResourceWarning
+          tests/unit tests/property tests/leakage
+          tests/integration/test_end_to_end.py
       - name: Smoke test the CLI
         run: uv run scml --help
 
@@ -72,7 +76,7 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python 3.11 --resolution lowest-direct --extra boosting --extra optimization --extra multimodal
-      - run: uv run pytest -q tests/unit tests/property tests/leakage
+      - run: uv run pytest -q -W error::ResourceWarning tests/unit tests/property tests/leakage
 
   deep-learning:
     name: PyTorch model families (CPU)
@@ -83,7 +87,7 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python 3.12 --extra deeplearning --extra boosting
-      - run: uv run pytest -q tests/unit/test_deeplearning.py tests/unit/test_training.py
+      - run: uv run pytest -q -W error::ResourceWarning tests/unit/test_deeplearning.py tests/unit/test_training.py
 
   integrations:
     name: MLflow and Ray integrations
@@ -93,7 +97,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: uv sync --python 3.14 --extra optimization --extra tracking --extra distributed
-      - run: uv run pytest -q tests/integration/test_integrations.py
+      - run: uv run pytest -q -W error::ResourceWarning tests/integration/test_integrations.py
         env:
           MLFLOW_DISABLE_AGENT_HINT: "1"
           RAY_ENABLE_UV_RUN_RUNTIME_ENV: "0"  # workers must use this venv
@@ -106,7 +110,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: uv sync --python 3.14
-      - run: uv run pytest -q tests/unit tests/property tests/integration/test_end_to_end.py
+      - run: uv run pytest -q -W error::ResourceWarning tests/unit tests/property tests/integration/test_end_to_end.py
 
   data-formats:
     name: dataset formats and optional curation dependencies
@@ -118,6 +122,7 @@ jobs:
       - run: uv sync --python 3.14 --extra spreadsheets
       - run: >-
           uv run pytest -q tests/unit/test_readers.py
+          -W error::ResourceWarning
           tests/unit/test_streaming.py
           tests/integration/test_interchange.py
 
