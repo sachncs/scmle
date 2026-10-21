@@ -1930,6 +1930,22 @@ Current-head focused contract verification at `7c9850c` on 2026-10-22:
   hosted Linux and Pages verification, external fault execution, secret
   custody, or independent reviewer evidence.
 
+Geospatial spatial-join boundary at `40c9ca5` with site documentation at
+`d38fe6e` on 2026-10-22:
+
+- `GeospatialDataset.spatial_join()` now records same-CRS dataset hashes,
+  versioned caller-predicate identity, comparison and match limits, matched
+  feature IDs, and unmatched counts. CRS mismatch, excessive Cartesian work,
+  excessive matches, predicate failures, and non-boolean results fail closed.
+- The geospatial/media/modality focused suite passed 75 tests under
+  `-W error::ResourceWarning`; Ruff, formatting, and mypy passed for the
+  changed Python files.
+- The standalone Astro site built 17 pages, passed 384 internal-link checks
+  and accessibility smoke checks, and passed both Playwright browser tests.
+  The join remains a bounded same-CRS evidence boundary; reprojection,
+  indexed production geometry engines, and semantic spatial inference remain
+  caller-owned or outside the experimental support claim.
+
 Current-head release preflight after source-backed document citations at
 `8f26bfe` on 2026-10-22:
 
