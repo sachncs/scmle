@@ -1598,3 +1598,12 @@ Caller-owned object decoder evidence at `9136e8e` on 2026-10-21:
 - This expands ingestion to arbitrary caller-defined bounded DataFrame
   representations without claiming that the library owns binary format
   decoding, streaming scale, or broker delivery semantics.
+
+Python naming-convention evidence at `dcbf3db` on 2026-10-21:
+
+- `tests/unit/test_code_conventions.py` parses every package module and fails
+  on single-underscore identifiers used as semi-private names. Python dunder
+  protocol names and the conventional bare `_` placeholder remain allowed.
+- The convention test passed under `-W error::ResourceWarning`; Ruff,
+  formatting, and mypy passed. Ruff's configured Google docstring convention
+  remains the source-level style gate for package code.
