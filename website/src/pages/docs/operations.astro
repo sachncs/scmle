@@ -138,5 +138,18 @@ manager.promote_challenger(approval, signing_key="release-key")</code></pre>
 
   <h2>Deployment boundary</h2>
   <p>The built-in HTTP adapter is a reference server. Put it behind an authenticating gateway with TLS, request policy, logs, and operational ownership.</p>
+  <p>For experimental modalities, <code>ModalityHttpServing</code> has the same deliberate boundary: it serves only a verified <code>ModalityPredictor</code> and a caller-owned <code>ModalitySampleDecoder</code>. The decoder is where transport-specific limits, privacy checks, codec policy, and raw-payload provenance belong.</p>
+  <pre><code>{`server = ModalityHttpServing(
+    predictor,
+    decoder,
+    max_request_bytes=16 * 1024 * 1024,
+    max_samples=10_000,
+)
+server.start()
+try:
+    wait_for_shutdown()
+finally:
+    server.stop()`}</code></pre>
+  <p><code>/health</code> reports the verified package and modality identity; <code>/schema</code> reports the decoder contract; <code>/predict</code> accepts <code>&#123;&quot;samples&quot;: ...&#125;</code>. This is not an implicit codec registry and it does not provide authentication or distributed serving by itself.</p>
   <div class="callout"><p><strong>Release rehearsal:</strong> before promotion, replay a known input, verify the signed bundle, confirm the serving schema, exercise resume from a checkpoint, inspect monitoring output, and record who reviewed the evidence. A green training run is not by itself a release decision.</p></div>
 </DocsLayout>
