@@ -292,6 +292,110 @@ class GeoFeature:
         )
 
 
+SpatialJoinPredicate = Callable[[GeoFeature, GeoFeature], bool]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SpatialJoinMatch:
+    """One deterministic pair emitted by a bounded spatial join."""
+
+    left_feature_id: str
+    right_feature_id: str
+
+    def __post_init__(self) -> None:
+        """Validate both feature identities before recording a match."""
+        if not self.left_feature_id.strip():
+            raise ValueError("left_feature_id must not be empty")
+        if not self.right_feature_id.strip():
+            raise ValueError("right_feature_id must not be empty")
+
+    def to_dict(self) -> dict[str, str]:
+        """Return JSON-native join-match evidence."""
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SpatialJoinReport:
+    """Bounded, same-CRS evidence from a caller-owned spatial predicate."""
+
+    left_dataset_hash: str
+    right_dataset_hash: str
+    crs: str
+    predicate_name: str
+    left_feature_count: int
+    right_feature_count: int
+    comparison_count: int
+    match_count: int
+    unmatched_left_count: int
+    unmatched_right_count: int
+    comparison_limit: int
+    match_limit: int
+    matches: tuple[SpatialJoinMatch, ...]
+
+    def __post_init__(self) -> None:
+        """Reject incomplete or internally inconsistent join evidence."""
+        for field_name, value in (
+            ("left_dataset_hash", self.left_dataset_hash),
+            ("right_dataset_hash", self.right_dataset_hash),
+        ):
+            if len(value) != 64 or any(
+                character not in "0123456789abcdef" for character in value
+            ):
+                raise ValueError(f"{field_name} must be a SHA-256 hex digest")
+        if not self.crs.strip():
+            raise ValueError("crs must not be empty")
+        if not self.predicate_name.strip():
+            raise ValueError("predicate_name must not be empty")
+        if min(self.left_feature_count, self.right_feature_count) < 1:
+            raise ValueError("join feature counts must be positive")
+        if (
+            min(
+                self.comparison_count,
+                self.match_count,
+                self.unmatched_left_count,
+                self.unmatched_right_count,
+            )
+            < 0
+        ):
+            raise ValueError("join counts must not be negative")
+        if self.comparison_count < self.match_count:
+            raise ValueError("comparison_count must cover every match")
+        if self.unmatched_left_count > self.left_feature_count:
+            raise ValueError("unmatched_left_count exceeds left feature count")
+        if self.unmatched_right_count > self.right_feature_count:
+            raise ValueError(
+                "unmatched_right_count exceeds right feature count"
+            )
+        if self.match_count != len(self.matches):
+            raise ValueError("match_count must match the recorded matches")
+        if self.comparison_limit < 1 or self.match_limit < 1:
+            raise ValueError("join limits must be positive")
+        identities = tuple(
+            (match.left_feature_id, match.right_feature_id)
+            for match in self.matches
+        )
+        if len(identities) != len(set(identities)):
+            raise ValueError("join matches must be unique")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native join evidence without raw geometry."""
+        return {
+            "left_dataset_hash": self.left_dataset_hash,
+            "right_dataset_hash": self.right_dataset_hash,
+            "crs": self.crs,
+            "predicate_name": self.predicate_name,
+            "left_feature_count": self.left_feature_count,
+            "right_feature_count": self.right_feature_count,
+            "comparison_count": self.comparison_count,
+            "match_count": self.match_count,
+            "unmatched_left_count": self.unmatched_left_count,
+            "unmatched_right_count": self.unmatched_right_count,
+            "comparison_limit": self.comparison_limit,
+            "match_limit": self.match_limit,
+            "matches": [match.to_dict() for match in self.matches],
+        }
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialProfile:
     """Bounded data-understanding summary for a vector dataset."""
@@ -641,6 +745,130 @@ class GeospatialDataset:
                     (first, second) if first < second else (second, first)
                 )
         return tuple(sorted(edges))
+
+    def spatial_join(
+        self,
+        other: "GeospatialDataset",
+        predicate: SpatialJoinPredicate,
+        predicate_name: str,
+        comparison_limit: int = 100_000,
+        match_limit: int = 100_000,
+    ) -> SpatialJoinReport:
+        """Join two same-CRS datasets through a bounded caller predicate.
+
+        The core package does not choose a geometry engine, infer CRS
+        transformations, or silently compare coordinates in different units.
+        A caller supplies a versioned predicate such as an ``intersects/v1``
+        implementation. This method owns the identity checks, bounded
+        execution, deterministic evidence, and fail-closed limits.
+
+        Args:
+            other: Right-hand dataset with the same declared CRS.
+            predicate: Caller-owned predicate receiving one left and one right
+                feature and returning a Python boolean.
+            predicate_name: Stable name and version of the predicate.
+            comparison_limit: Maximum Cartesian comparisons allowed.
+            match_limit: Maximum matches retained in the evidence report.
+
+        Returns:
+            Dataset identities, counts, and matched feature IDs.
+
+        Raises:
+            GeospatialValidationError: If CRS, predicate, or resource
+                boundaries are invalid.
+        """
+        if not isinstance(other, GeospatialDataset):
+            raise TypeError("other must be a GeospatialDataset")
+        if not callable(predicate):
+            raise TypeError("predicate must be callable")
+        if not predicate_name.strip():
+            raise ValueError("predicate_name must not be empty")
+        if comparison_limit < 1 or match_limit < 1:
+            raise ValueError("join limits must be positive")
+        if not self.crs.strip() or not other.crs.strip():
+            raise GeospatialValidationError(
+                "spatial joins require a declared CRS on both datasets",
+                {"code": "missing_crs"},
+            )
+        if self.crs.strip() != other.crs.strip():
+            raise GeospatialValidationError(
+                "spatial joins require matching CRS declarations; reproject "
+                "through an explicit caller-owned policy first",
+                {
+                    "code": "crs_mismatch",
+                    "left_crs": self.crs,
+                    "right_crs": other.crs,
+                },
+            )
+        total_comparisons = len(self.features) * len(other.features)
+        if total_comparisons > comparison_limit:
+            raise GeospatialValidationError(
+                "spatial join exceeds the comparison limit; provide a "
+                "bounded indexed policy",
+                {
+                    "code": "comparison_limit_exceeded",
+                    "comparison_count": total_comparisons,
+                    "comparison_limit": comparison_limit,
+                },
+            )
+        matches: list[SpatialJoinMatch] = []
+        for left in self.features:
+            for right in other.features:
+                try:
+                    result = predicate(left, right)
+                except Exception as error:
+                    raise GeospatialValidationError(
+                        "caller-owned spatial join predicate failed",
+                        {
+                            "code": "predicate_failure",
+                            "predicate_name": predicate_name,
+                            "exception": type(error).__name__,
+                        },
+                    ) from error
+                if not isinstance(result, (bool, np.bool_)):
+                    raise GeospatialValidationError(
+                        "spatial join predicate must return a boolean",
+                        {
+                            "code": "invalid_predicate_result",
+                            "predicate_name": predicate_name,
+                            "result_type": type(result).__name__,
+                        },
+                    )
+                if bool(result):
+                    matches.append(
+                        SpatialJoinMatch(left.feature_id, right.feature_id)
+                    )
+                    if len(matches) > match_limit:
+                        raise GeospatialValidationError(
+                            "spatial join exceeds the match limit; provide a "
+                            "bounded output policy",
+                            {
+                                "code": "match_limit_exceeded",
+                                "match_limit": match_limit,
+                            },
+                        )
+        matched_left = {match.left_feature_id for match in matches}
+        matched_right = {match.right_feature_id for match in matches}
+        return SpatialJoinReport(
+            left_dataset_hash=self.content_hash,
+            right_dataset_hash=other.content_hash,
+            crs=self.crs.strip(),
+            predicate_name=predicate_name.strip(),
+            left_feature_count=len(self.features),
+            right_feature_count=len(other.features),
+            comparison_count=total_comparisons,
+            match_count=len(matches),
+            unmatched_left_count=len(
+                {feature.feature_id for feature in self.features} - matched_left
+            ),
+            unmatched_right_count=len(
+                {feature.feature_id for feature in other.features}
+                - matched_right
+            ),
+            comparison_limit=comparison_limit,
+            match_limit=match_limit,
+            matches=tuple(matches),
+        )
 
     def spatial_autocorrelation(
         self,

@@ -513,6 +513,96 @@ def test_geospatial_feature_collection_preserves_bounds_and_crs():
     assert dataset.source.endswith("/features.geojson")
 
 
+def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
+    """A caller predicate produces deterministic, hash-bound join evidence."""
+    left = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "left-a", {"type": "Point", "coordinates": [0, 0]}
+            ),
+            geospatial.GeoFeature(
+                "left-b", {"type": "Point", "coordinates": [10, 0]}
+            ),
+        ),
+        crs="EPSG:3857",
+    )
+    right = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "right-a", {"type": "Point", "coordinates": [1, 0]}
+            ),
+            geospatial.GeoFeature(
+                "right-b", {"type": "Point", "coordinates": [20, 0]}
+            ),
+        ),
+        crs="EPSG:3857",
+    )
+
+    report = left.spatial_join(
+        right,
+        lambda first, second: abs(first.centroid[0] - second.centroid[0]) < 5,
+        "centroid_distance_lt_5/v1",
+    )
+
+    assert report.crs == "EPSG:3857"
+    assert report.comparison_count == 4
+    assert report.match_count == 1
+    assert report.unmatched_left_count == 1
+    assert report.unmatched_right_count == 1
+    assert report.matches == (geospatial.SpatialJoinMatch("left-a", "right-a"),)
+    assert report.left_dataset_hash == left.content_hash
+    assert report.right_dataset_hash == right.content_hash
+    assert report.to_dict()["predicate_name"] == "centroid_distance_lt_5/v1"
+
+
+def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
+    """Joins fail closed instead of comparing incompatible or huge inputs."""
+    feature = geospatial.GeoFeature(
+        "feature", {"type": "Point", "coordinates": [0, 0]}
+    )
+    left = geospatial.GeospatialDataset((feature,), crs="EPSG:4326")
+    right = geospatial.GeospatialDataset((feature,), crs="EPSG:3857")
+
+    with pytest.raises(
+        geospatial.GeospatialValidationError, match="matching CRS"
+    ):
+        left.spatial_join(right, lambda first, second: True, "always/v1")
+
+    with pytest.raises(
+        geospatial.GeospatialValidationError,
+        match="comparison limit",
+    ):
+        left.spatial_join(
+            geospatial.GeospatialDataset(
+                tuple(
+                    geospatial.GeoFeature(
+                        f"right-{index}",
+                        {"type": "Point", "coordinates": [index, 0]},
+                    )
+                    for index in range(3)
+                ),
+                crs="EPSG:4326",
+            ),
+            lambda first, second: True,
+            "always/v1",
+            comparison_limit=2,
+        )
+
+
+def test_geospatial_spatial_join_rejects_invalid_predicate_output():
+    """Join evidence cannot encode an ambiguous predicate result."""
+    feature = geospatial.GeoFeature(
+        "feature", {"type": "Point", "coordinates": [0, 0]}
+    )
+    dataset = geospatial.GeospatialDataset((feature,), crs="EPSG:4326")
+
+    with pytest.raises(
+        geospatial.GeospatialValidationError,
+        match="must return a boolean",
+    ):
+        dataset.spatial_join(dataset, lambda first, second: "yes", "bad/v1")
+
+
 def test_geospatial_rejects_invalid_geometry():
     """Malformed geometry is rejected before it reaches feature preparation."""
     with pytest.raises(geospatial.GeospatialValidationError):
