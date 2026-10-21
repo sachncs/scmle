@@ -1287,3 +1287,13 @@ Clean-head local release preflight at `d1c35f4` on 2026-10-21:
   vulnerabilities. This is clean local evidence for `d1c35f4`, not hosted or
   independent release proof. GitHub Pages, hosted Linux, external-fault,
   external key custody, and independent-review gates remain open.
+
+Standalone site smoke evidence at the post-preflight working head on
+2026-10-21:
+
+- `npm run check:a11y` passed for all 15 generated HTML files.
+- `npm run test:e2e` passed both Playwright checks: every public route rendered
+  under the `/super-charge-ml/` base path with no `.md` links, and the
+  documentation navigation exposed a keyboard focus path.
+- This verifies the local site acceptance surface. It does not verify the
+  unavailable public GitHub Pages URL or hosted deployment workflow.
