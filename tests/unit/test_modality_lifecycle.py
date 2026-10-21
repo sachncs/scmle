@@ -1,5 +1,6 @@
 """End-to-end evidence tests for the non-tabular baseline lifecycle."""
 
+import dataclasses
 import hashlib
 import io
 import json
@@ -196,6 +197,34 @@ def raster_adapter() -> modality_lifecycle.RasterAdapter:
         )
         labels[source] = "alpha" if index % 2 else "beta"
     return modality_lifecycle.RasterAdapter(samples, labels)
+
+
+def test_raster_curation_records_declared_and_unknown_nodata_state():
+    """Raster curation distinguishes measured metadata from unknown pixels."""
+    baseline = raster_adapter()
+    unknown_report = baseline.curate()
+    measured_sample = dataclasses.replace(
+        baseline.samples[0], nodata_value=-9999, nodata_fraction=0.25
+    )
+    measured_adapter = modality_lifecycle.RasterAdapter(
+        (measured_sample,),
+        {measured_sample.source: "beta"},
+    )
+    measured_report = measured_adapter.curate()
+
+    assert unknown_report.profile["nodata"]["statuses"] == ["unknown"]
+    assert [
+        finding.finding_id for finding in unknown_report.quality_findings
+    ] == [
+        "quality.raster-nodata-unknown",
+    ]
+    assert measured_report.profile["nodata"] == {
+        "statuses": ["measured"],
+        "declared_values": [-9999.0],
+        "fraction_min": 0.25,
+        "fraction_max": 0.25,
+    }
+    assert measured_report.quality_findings == ()
 
 
 @pytest.mark.parametrize(

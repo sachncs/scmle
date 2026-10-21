@@ -1553,7 +1553,9 @@ class RasterAdapter(ModalityAdapter):
     def dataset_hash(self) -> str:
         """Return the raster identity and label-sidecar digest."""
         identities = (
-            f"{sample.source}\0{sample.file_hash}\0{self.labels_by_source[sample.source]}"
+            f"{sample.source}\0{sample.file_hash}\0"
+            f"{sample.nodata_value}\0{sample.nodata_fraction}\0"
+            f"{self.labels_by_source[sample.source]}"
             for sample in self.dataset
         )
         return curation.dataset_hash(identities)
@@ -1573,6 +1575,34 @@ class RasterAdapter(ModalityAdapter):
         )
         crs_values = sorted({sample.crs for sample in self.dataset})
         dtypes = sorted({sample.dtype for sample in self.dataset})
+        nodata_profile: dict[str, object] = {
+            "statuses": sorted(
+                {sample.nodata_status for sample in self.dataset}
+            ),
+            "declared_values": sorted(
+                {
+                    sample.nodata_value
+                    for sample in self.dataset
+                    if sample.nodata_value is not None
+                }
+            ),
+            "fraction_min": min(
+                (
+                    sample.nodata_fraction
+                    for sample in self.dataset
+                    if sample.nodata_fraction is not None
+                ),
+                default=None,
+            ),
+            "fraction_max": max(
+                (
+                    sample.nodata_fraction
+                    for sample in self.dataset
+                    if sample.nodata_fraction is not None
+                ),
+                default=None,
+            ),
+        }
         profile = {
             "dimensions": [list(value) for value in dimensions],
             "crs": crs_values,
@@ -1581,13 +1611,14 @@ class RasterAdapter(ModalityAdapter):
                 {len(sample.transform) for sample in self.dataset}
             ),
             "total_bytes": sum(sample.byte_size for sample in self.dataset),
+            "nodata": nodata_profile,
             "label_counts": curation.label_counts(
                 self.labels_by_source.values()
             ),
         }
-        quality_findings: tuple[data_contracts.CurationFinding, ...] = ()
+        quality_findings: list[data_contracts.CurationFinding] = []
         if len(crs_values) > 1 or len(dimensions) > 1 or len(dtypes) > 1:
-            quality_findings = (
+            quality_findings.append(
                 curation.build_finding(
                     "quality.raster-shape-or-crs-drift",
                     data_contracts.FindingSeverity.WARNING,
@@ -1600,14 +1631,26 @@ class RasterAdapter(ModalityAdapter):
                     "Record an explicit raster normalization policy before "
                     "promotion.",
                     False,
-                ),
+                )
+            )
+        if any(sample.nodata_status == "unknown" for sample in self.dataset):
+            quality_findings.append(
+                curation.build_finding(
+                    "quality.raster-nodata-unknown",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": self.dataset_hash},
+                    {"statuses": nodata_profile["statuses"]},
+                    "Declare or measure nodata handling before interpreting "
+                    "raster values.",
+                    False,
+                )
             )
         return curation.ModalityCurationReport(
             modality="geospatial-raster",
             dataset_hash=self.dataset_hash,
             sample_count=len(self.dataset),
             profile=profile,
-            quality_findings=quality_findings,
+            quality_findings=tuple(quality_findings),
         )
 
     def split(self, seed: int) -> DatasetPartitions:
@@ -1704,8 +1747,9 @@ class RasterAdapter(ModalityAdapter):
         return (
             "The baseline uses raster metadata and a caller-owned label "
             "sidecar; it does not decode pixels.",
-            "Raster transforms, nodata, reprojection, window sampling, and "
-            "spatial joins require an explicit codec policy.",
+            "Raster transforms, reprojection, window sampling, and spatial "
+            "joins require an explicit codec policy; nodata metadata is "
+            "caller-owned and does not decode pixels.",
         )
 
 

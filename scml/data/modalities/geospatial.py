@@ -896,6 +896,8 @@ class RasterSample:
     dtype: str
     crs: str
     transform: tuple[float, ...]
+    nodata_value: float | int | None = None
+    nodata_fraction: float | None = None
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -912,6 +914,23 @@ class RasterSample:
             raise ValueError("raster dimensions and bands must be positive")
         if len(self.transform) not in {0, 6, 9}:
             raise ValueError("transform must be empty or an affine transform")
+        if self.nodata_value is not None:
+            if isinstance(self.nodata_value, bool) or not isinstance(
+                self.nodata_value, Real
+            ):
+                raise ValueError("nodata_value must be numeric")
+            if not math.isfinite(float(self.nodata_value)):
+                raise ValueError("nodata_value must be finite")
+            object.__setattr__(self, "nodata_value", float(self.nodata_value))
+        if (
+            self.nodata_fraction is not None
+            and not 0.0 <= float(self.nodata_fraction) <= 1.0
+        ):
+            raise ValueError("nodata_fraction must be in [0, 1]")
+        if self.nodata_fraction is not None and not math.isfinite(
+            float(self.nodata_fraction)
+        ):
+            raise ValueError("nodata_fraction must be finite")
         if not raw:
             raise GeospatialValidationError(
                 "raster payload is empty", {"code": "empty_payload"}
@@ -919,6 +938,15 @@ class RasterSample:
         if hashlib.sha256(raw).hexdigest() != self.file_hash:
             raise ValueError("file_hash does not match encoded_bytes")
         object.__setattr__(self, "byte_size", len(raw))
+
+    @property
+    def nodata_status(self) -> str:
+        """Return whether nodata is unknown, declared, or measured."""
+        if self.nodata_fraction is not None:
+            return "measured"
+        if self.nodata_value is not None:
+            return "declared"
+        return "unknown"
 
 
 __all__ = [
