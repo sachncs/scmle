@@ -22,6 +22,7 @@ from sklearn import base
 import scml
 from scml.api import results
 from scml.artifacts import bundle as bundle_module
+from scml.artifacts import explanation_report
 from scml.artifacts import report
 from scml.contracts import capabilities
 from scml.contracts import data as data_contracts
@@ -1883,6 +1884,12 @@ class PackageStage(Stage):
             )
             evidence[name] = record.to_dict()
             store.write_json(f"explanations/{name}.json", record.to_dict())
+            store.write_text(
+                f"explanations/{name}.html",
+                explanation_report.ExplanationHtmlReport().render(
+                    record, title=f"{name} explanation"
+                ),
+            )
         return evidence
 
     def provenance_record(
@@ -2607,6 +2614,9 @@ class PackageStage(Stage):
             "evaluation.json",
             f"model/{bundle_module.MANIFEST_FILE}",
             f"model/{bundle_module.MODEL_FILE}",
+            "explanations/permutation_importance.html",
+            "explanations/partial_dependence.html",
+            "explanations/pairwise_interaction.html",
         )
         return {
             name: bundle_module.file_sha256(store.path(name))

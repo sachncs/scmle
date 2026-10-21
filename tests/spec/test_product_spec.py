@@ -118,6 +118,7 @@ def test_l15_l17_user_states_objective_framework_plans_executes_validates_docume
         "validation_manifest.json",  # validated split
         "evaluation.json",
         "report.html",  # documented
+        "explanations/permutation_importance.html",  # explanation document
         "diagnostics/decision_log.json",
     ):
         assert (result.run_dir / artifact).exists(), artifact
@@ -916,6 +917,7 @@ def test_l443_l466_run_directory_layout(run):
         "model",
         "model/model_manifest.json",
         "model/schema.json",
+        "explanations/permutation_importance.html",
         "report.html",
     ):
         assert (result.run_dir / rel).exists(), rel

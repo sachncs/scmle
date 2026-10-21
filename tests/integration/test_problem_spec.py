@@ -70,6 +70,11 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     assert (
         result.run_dir / "explanations/permutation_importance.json"
     ).exists()
+    explanation_html = (
+        result.run_dir / "explanations/permutation_importance.html"
+    )
+    assert explanation_html.exists()
+    assert "Explanation output" in explanation_html.read_text()
     assert (result.run_dir / "capability_registry.json").exists()
     assert (result.run_dir / "evaluation_policy.json").exists()
     assert (result.run_dir / "release_evidence.json").exists()
