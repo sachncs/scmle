@@ -1918,6 +1918,30 @@ Post-hardening strict regression evidence at `2f1e63a` on 2026-10-21:
 - This is current local evidence and does not replace hosted CI/Pages,
   external fault execution, secret custody, or independent review.
 
+Current release preflight evidence at `c2504b9` on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
+  mypy over 239 source files, Bandit, pip-audit, public API compatibility,
+  and explicit JUnit skip-reason auditing. The bounded contract suite passed
+  `1,976` tests with `75` explicit optional-dependency skips; total coverage
+  was 83.17% and the declared core scope was 86%.
+- Mutation testing killed `1,503/2,057` mutants (73%), above the 70% gate;
+  one mutation timed out and 553 survived for follow-up triage.
+- The five-seed offline benchmark regression completed for breast cancer,
+  wine, digits, and diabetes progression with zero regressions and zero
+  failed repetitions. Verdicts were tie, tie, tie, and ahead; peak memory
+  was 0.3611, 0.3847, 0.4481, and 0.4547 GB respectively.
+- Wheel and source-distribution checks passed, builds were reproducible, and
+  network-isolated wheel and source-distribution installs passed. The
+  reproducible wheel hash was
+  `a35a6ee0ee98a730df562ee7f35f4541da8668f13648849653d657026640f176` and
+  the source-distribution hash was
+  `26f3d5f7fb890b7b62868df26f04a538669ccdb8493b554f085b95c2ac6304ba`.
+- The marketing-site dependency audit found 0 vulnerabilities and Astro
+  built all 16 static pages. This remains local evidence; hosted Linux and
+  Pages, external fault execution, secret custody, and independent reviewer
+  evidence remain separate release gates.
+
 Current-head strict regression evidence at `fad7703` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
