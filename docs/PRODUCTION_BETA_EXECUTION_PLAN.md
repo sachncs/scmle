@@ -1310,3 +1310,18 @@ Generated-site link-gate evidence at `9dfdfd6` on 2026-10-21:
 - This turns the internal-link acceptance criterion into an executable local
   and hosted-build check; it does not verify the currently unavailable public
   Pages deployment.
+
+Standalone data and operations documentation evidence at `faa9c2a` on
+2026-10-21:
+
+- The data guide now explains the raw-material hand-off for documents, images,
+  audio/video, graphs, and geospatial data, including what curation evidence
+  must survive into representation preparation and what each baseline does not
+  claim.
+- The operations guide now maps data, model, infrastructure, and policy
+  failures to distinct operator actions, preserving the rule that only a
+  verified digest-bound state may move forward.
+- `npm run build`, `npm run check:links`, `npm run check:a11y`, and the two
+  Playwright smoke tests passed after the content change. This improves the
+  standalone developer surface but does not close hosted deployment or
+  independent-review evidence.
