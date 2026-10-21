@@ -1084,3 +1084,28 @@ Hosted-state observation on 2026-10-21:
 - The public URL `https://sachncs.github.io/super-charge-ml/` still returns
   HTTP 404. This remains an external deployment gate, not evidence that the
   static site build is broken locally.
+
+Local preflight evidence captured on 2026-10-21:
+
+- The release preflight launched from `6bd4341` completed successfully through
+  the benchmark, package, artifact, and marketing-site gates. The bounded
+  contract suite passed with 1,916 tests and 75 skips, total coverage was
+  82.83% with 86% in the declared core scope, and the mutation gate killed
+  1,341 of 1,863 mutants (71%, against the 70% minimum).
+- The four offline, five-seed benchmark datasets completed with zero failed
+  repetitions. Breast cancer, wine, and digits were statistically tied with
+  their independent references; diabetes progression was ahead. Runtime,
+  peak-memory, failure-rate, and software identity were recorded for each
+  dataset.
+- Wheel and source-distribution checks, reproducible artifact hashes, and
+  network-isolated wheel and source-distribution installations passed. The
+  Astro build generated all 15 routes and npm audit reported zero
+  vulnerabilities.
+- Commit `e7edf2e` subsequently replaces the deprecated scikit-learn sparse
+  logistic parameter with the equivalent `l1_ratio=1.0` API. Its focused
+  warning-strict test slice passed 32 tests, with Ruff and mypy clean. This
+  focused change still needs a fresh clean-head full preflight before it can
+  be used as independent release evidence.
+- The preflight remains local evidence only. It does not close the hosted
+  Linux, public Pages, external secret custody, external-fault, or
+  independent-review gates listed above.
