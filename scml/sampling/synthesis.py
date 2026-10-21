@@ -147,12 +147,6 @@ class GeneratorOverSampler(resampling.Resampler):
     name = "generator_oversample"
     generator_class: type[SyntheticGenerator] = GaussianCopulaGenerator
 
-    def indices(
-        self, target: pd.Series, rng: np.random.Generator
-    ) -> np.ndarray:
-        """Not index-based: synthetic rows have no source position."""
-        raise NotImplementedError("generator sampling builds new rows")
-
     def resample(
         self, features: pd.DataFrame, target: pd.Series, seed: int
     ) -> tuple[pd.DataFrame, pd.Series]:

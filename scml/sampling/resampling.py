@@ -25,23 +25,10 @@ class Resampler(abc.ABC):
     name: ClassVar[str]
 
     @abc.abstractmethod
-    def indices(
-        self, target: pd.Series, rng: np.random.Generator
-    ) -> np.ndarray:
-        """Chooses the row positions of the resampled training set.
-
-        Args:
-            target: Training labels.
-            rng: Source of randomness.
-
-        Returns:
-            Positions (with repeats for oversampling) into the training rows.
-        """
-
     def resample(
         self, features: pd.DataFrame, target: pd.Series, seed: int
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Applies the resampling.
+        """Rebalances the training data for one fit operation.
 
         Args:
             features: Training features.
@@ -51,6 +38,30 @@ class Resampler(abc.ABC):
         Returns:
             Resampled features and labels with a fresh index.
         """
+        ...
+
+
+class IndexResampler(Resampler):
+    """Resampler whose output is selected from existing row positions."""
+
+    @abc.abstractmethod
+    def indices(
+        self, target: pd.Series, rng: np.random.Generator
+    ) -> np.ndarray:
+        """Choose row positions for a resampled training set.
+
+        Args:
+            target: Training labels.
+            rng: Source of randomness.
+
+        Returns:
+            Positions, with repeats for oversampling, into training rows.
+        """
+
+    def resample(
+        self, features: pd.DataFrame, target: pd.Series, seed: int
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        """Select rows from the input according to ``indices``."""
         chosen = self.indices(target, np.random.default_rng(seed))
         return (
             features.iloc[chosen].reset_index(drop=True),
@@ -58,7 +69,7 @@ class Resampler(abc.ABC):
         )
 
 
-class RandomOverSampler(Resampler):
+class RandomOverSampler(IndexResampler):
     """Duplicates minority-class rows until every class matches the largest."""
 
     name = "random_oversample"
@@ -80,7 +91,7 @@ class RandomOverSampler(Resampler):
         return rng.permutation(np.concatenate(chosen))
 
 
-class RandomUnderSampler(Resampler):
+class RandomUnderSampler(IndexResampler):
     """Drops majority-class rows until every class matches the smallest."""
 
     name = "random_undersample"
@@ -100,7 +111,7 @@ class RandomUnderSampler(Resampler):
         return rng.permutation(np.concatenate(chosen))
 
 
-class JitterOverSampler(Resampler):
+class JitterOverSampler(IndexResampler):
     """Experimental: oversamples with Gaussian-jittered copies of minority rows.
 
     Synthetic rows copy a real minority row and add noise (a fraction of the

@@ -115,3 +115,11 @@ def test_generators_are_pluggable():
     target = pd.Series([1] * 20 + [0] * 180)
     labels = ConstantOverSampler().resample(real, target, 0)[1]
     assert labels.value_counts().to_dict() == {0: 180, 1: 180}
+
+
+def test_generator_resampler_implements_the_resample_contract_directly():
+    """Synthetic rows use the general contract, not source row indices."""
+    assert issubclass(
+        synthesis.GeneratorOverSampler, synthesis.resampling.Resampler
+    )
+    assert not hasattr(synthesis.GeneratorOverSampler, "indices")

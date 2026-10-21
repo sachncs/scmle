@@ -59,6 +59,7 @@ def concrete_subclasses(base, *modules):
         (stages.Stage, [stages]),
         (policies.PolicyCheckpoint, [policies]),
         (resampling.Resampler, [resampling]),
+        (resampling.IndexResampler, [resampling]),
         (feature_graph.FeatureOp, [feature_graph]),
         (synthesis.SyntheticGenerator, [synthesis]),
         (thresholds.ThresholdObjective, [thresholds]),
@@ -115,6 +116,7 @@ def test_abstract_bases_cannot_be_instantiated():
         columns.ColumnKind,
         splitters.SplitStrategy,
         strategies.DataStrategy,
+        resampling.IndexResampler,
         model_contracts.ModelAdapter,
         stores.ExperimentStore,
     ):
