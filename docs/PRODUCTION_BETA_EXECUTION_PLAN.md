@@ -1942,6 +1942,17 @@ Current release preflight evidence at `c2504b9` on 2026-10-21:
   Pages, external fault execution, secret custody, and independent reviewer
   evidence remain separate release gates.
 
+Release-site gate enforcement at `5a8d5c9` on 2026-10-21:
+
+- `scripts/release_preflight.sh` now runs the complete local site contract:
+  dependency audit, Astro build, accessibility checks, internal-link checks,
+  Chromium provisioning, and Playwright smoke tests. This closes the gap where
+  the release command previously checked only build and dependency health.
+- The updated site portion passed with 16 built pages, 346 internal links,
+  accessibility checks, and 2 browser smoke tests. The full Python preflight
+  evidence immediately before this script-only change remains recorded at
+  `c2504b9` above.
+
 Current-head strict regression evidence at `fad7703` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
