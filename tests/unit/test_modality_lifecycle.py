@@ -36,6 +36,20 @@ def document_adapter() -> modality_lifecycle.DocumentAdapter:
     return modality_lifecycle.DocumentAdapter(document.DocumentDataset(samples))
 
 
+def text_adapter() -> modality_lifecycle.TextAdapter:
+    """Build a labelled text fixture with an explicit text modality."""
+    samples = tuple(
+        document.DocumentSample(
+            document_id=f"text-{index}",
+            content=("alpha signal " if index % 2 else "beta signal ")
+            * (index + 2),
+            label="alpha" if index % 2 else "beta",
+        )
+        for index in range(12)
+    )
+    return modality_lifecycle.TextAdapter(document.DocumentDataset(samples))
+
+
 def image_bytes(value: int) -> bytes:
     """Encode one deterministic RGB image."""
     pillow_image = pytest.importorskip("PIL.Image")
@@ -231,6 +245,7 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
     "factory",
     [
         document_adapter,
+        text_adapter,
         image_adapter,
         audio_adapter,
         video_adapter,
@@ -240,6 +255,7 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
     ],
     ids=[
         "document",
+        "text",
         "image",
         "audio",
         "video",
