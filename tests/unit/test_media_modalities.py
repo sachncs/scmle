@@ -79,6 +79,71 @@ def test_audio_curation_reports_metadata_and_label_composition():
     assert report.release_ready
 
 
+def test_audio_transcript_provenance_is_bounded_and_curated():
+    """Transcript metadata remains tied to the source audio and provider."""
+    transcript = audio.AudioTranscript(
+        text="hello world",
+        source="transcriber://run-7",
+        provider="acme-asr",
+        provider_version="2026.10",
+        language="en",
+        segments=(
+            audio.AudioTranscriptSegment(0.0, 0.5, "hello", 0.9),
+            audio.AudioTranscriptSegment(0.5, 1.0, "world", 0.8),
+        ),
+        confidence=0.85,
+    )
+    sample = audio.AudioSample.from_bytes(
+        wav_bytes(), source="spoken.wav", transcript=transcript
+    )
+
+    report = audio.AudioDataset((sample,)).curate()
+
+    assert sample.profile().transcript_present
+    assert sample.profile().transcript_segment_count == 2
+    assert transcript.to_dict()["provider_version"] == "2026.10"
+    assert report.profile["transcript_coverage"] == 1.0
+    assert report.profile["transcript_sources"] == ["transcriber://run-7"]
+    assert report.profile["transcript_segment_count"] == 2
+    assert report.profile["transcript_confidence_min"] == 0.8
+    assert report.quality_findings == ()
+
+
+def test_audio_transcript_confidence_and_timing_fail_closed():
+    """Missing confidence is visible and segments cannot exceed duration."""
+    uncertain = audio.AudioTranscript(
+        text="hello",
+        source="transcriber://run-8",
+        provider="acme-asr",
+        provider_version="2026.10",
+        language="en",
+        segments=(audio.AudioTranscriptSegment(0.0, 0.5, "hello"),),
+    )
+    report = audio.AudioDataset(
+        (
+            audio.AudioSample.from_bytes(
+                wav_bytes(), source="uncertain.wav", transcript=uncertain
+            ),
+        )
+    ).curate()
+
+    assert [finding.finding_id for finding in report.quality_findings] == [
+        "quality.audio-transcript-confidence-missing",
+    ]
+    out_of_range = audio.AudioTranscript(
+        text="too long",
+        source="transcriber://run-9",
+        provider="acme-asr",
+        provider_version="2026.10",
+        language="en",
+        segments=(audio.AudioTranscriptSegment(0.0, 2.0, "too long"),),
+    )
+    with pytest.raises(audio.AudioValidationError, match="exceeds audio"):
+        audio.AudioSample.from_bytes(
+            wav_bytes(), source="bad.wav", transcript=out_of_range
+        )
+
+
 def test_audio_curation_blocks_conflicting_duplicate_labels():
     """Duplicate audio bytes cannot silently carry incompatible labels."""
     dataset = audio.AudioDataset(

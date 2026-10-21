@@ -9,6 +9,7 @@ from collections.abc import Callable
 import dataclasses
 import hashlib
 import io
+import math
 import pathlib
 import random
 from typing import Self
@@ -67,6 +68,85 @@ class AudioMetadata:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class AudioTranscriptSegment:
+    """One time-local transcript segment with provenance and confidence."""
+
+    start_seconds: float
+    end_seconds: float
+    text: str
+    confidence: float | None = None
+
+    def __post_init__(self) -> None:
+        """Validate time bounds, text, and optional confidence."""
+        if (
+            not math.isfinite(self.start_seconds)
+            or not math.isfinite(self.end_seconds)
+            or self.start_seconds < 0
+            or self.end_seconds <= self.start_seconds
+        ):
+            raise ValueError("transcript segment time bounds are invalid")
+        if not self.text.strip():
+            raise ValueError("transcript segment text must not be empty")
+        if self.confidence is not None and (
+            isinstance(self.confidence, bool)
+            or not math.isfinite(self.confidence)
+            or not 0.0 <= self.confidence <= 1.0
+        ):
+            raise ValueError("transcript confidence must be in [0, 1]")
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class AudioTranscript:
+    """Immutable transcript output tied to its extraction provenance."""
+
+    text: str
+    source: str
+    provider: str
+    provider_version: str
+    language: str
+    segments: tuple[AudioTranscriptSegment, ...] = ()
+    confidence: float | None = None
+
+    def __post_init__(self) -> None:
+        """Validate provenance, ordering, and optional confidence."""
+        for field_name, value in (
+            ("text", self.text),
+            ("source", self.source),
+            ("provider", self.provider),
+            ("provider_version", self.provider_version),
+            ("language", self.language),
+        ):
+            if not value.strip():
+                raise ValueError(f"transcript {field_name} must not be empty")
+        if self.confidence is not None and (
+            isinstance(self.confidence, bool)
+            or not math.isfinite(self.confidence)
+            or not 0.0 <= self.confidence <= 1.0
+        ):
+            raise ValueError("transcript confidence must be in [0, 1]")
+        if not isinstance(self.segments, tuple):
+            raise TypeError("segments must be a tuple")
+        if not all(
+            isinstance(segment, AudioTranscriptSegment)
+            for segment in self.segments
+        ):
+            raise TypeError("segments must contain transcript segments")
+        if any(
+            current.start_seconds < previous.start_seconds
+            for previous, current in zip(
+                self.segments, self.segments[1:], strict=False
+            )
+        ):
+            raise ValueError(
+                "transcript segments must be ordered by start time"
+            )
+
+    def to_dict(self) -> dict[str, object]:
+        """Return JSON-native transcript provenance."""
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class AudioProfile:
     """Bounded data-understanding summary for one audio sample."""
 
@@ -77,6 +157,8 @@ class AudioProfile:
     frame_count: int
     duration_seconds: float
     byte_size: int
+    transcript_present: bool = False
+    transcript_segment_count: int = 0
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -261,6 +343,7 @@ class AudioSample:
     metadata: AudioMetadata
     label: str | int | float | bool | None = None
     group_id: str | None = None
+    transcript: AudioTranscript | None = None
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -271,6 +354,14 @@ class AudioSample:
             raise ValueError("source must not be empty")
         if self.group_id is not None and not self.group_id.strip():
             raise ValueError("group_id must not be empty when provided")
+        if self.transcript is not None and any(
+            segment.end_seconds > self.metadata.duration_seconds + 1e-9
+            for segment in self.transcript.segments
+        ):
+            raise AudioValidationError(
+                "transcript segment exceeds audio duration",
+                {"code": "transcript_out_of_range", "source": self.source},
+            )
         if not raw:
             raise AudioValidationError(
                 "audio payload is empty", {"code": "empty_payload"}
@@ -292,6 +383,7 @@ class AudioSample:
         max_bytes: int | None = 500 * 1024 * 1024,
         label: str | int | float | bool | None = None,
         group_id: str | None = None,
+        transcript: AudioTranscript | None = None,
     ) -> Self:
         """Create a sample from bytes and an explicit codec probe.
 
@@ -333,6 +425,7 @@ class AudioSample:
             metadata=metadata,
             label=label,
             group_id=group_id,
+            transcript=transcript,
         )
 
     def profile(self) -> AudioProfile:
@@ -345,6 +438,10 @@ class AudioSample:
             frame_count=self.metadata.frame_count,
             duration_seconds=self.metadata.duration_seconds,
             byte_size=self.byte_size,
+            transcript_present=self.transcript is not None,
+            transcript_segment_count=(
+                len(self.transcript.segments) if self.transcript else 0
+            ),
         )
 
 
@@ -523,6 +620,46 @@ class AudioDataset:
             for sample in self.samples
         )
         quality_findings = []
+        transcripts = [
+            sample.transcript
+            for sample in self.samples
+            if sample.transcript is not None
+        ]
+        transcript_confidences = [
+            confidence
+            for transcript in transcripts
+            for confidence in (
+                [transcript.confidence]
+                + [segment.confidence for segment in transcript.segments]
+            )
+            if confidence is not None
+        ]
+        missing_transcript_confidence = sum(
+            transcript.confidence is None
+            and all(
+                segment.confidence is None for segment in transcript.segments
+            )
+            for transcript in transcripts
+        )
+        if missing_transcript_confidence:
+            quality_findings.append(
+                build_finding(
+                    "quality.audio-transcript-confidence-missing",
+                    data_contracts.FindingSeverity.WARNING,
+                    {
+                        "sources": [
+                            sample.source
+                            for sample in self.samples
+                            if sample.transcript is not None
+                        ]
+                    },
+                    {"sample_count": missing_transcript_confidence},
+                    "Obtain confidence from the transcript provider or "
+                    "record why confidence is unavailable before using "
+                    "transcript-dependent claims.",
+                    False,
+                )
+            )
         if len(formats) > 1:
             quality_findings.append(
                 build_finding(
@@ -592,6 +729,29 @@ class AudioDataset:
                 "total_bytes": sum(profile.byte_size for profile in profiles),
                 "label_counts": labels,
                 "conflicting_label_groups": list(conflicts),
+                "transcript_coverage": len(transcripts) / len(self.samples),
+                "transcript_sources": sorted(
+                    {transcript.source for transcript in transcripts}
+                ),
+                "transcript_providers": sorted(
+                    {transcript.provider for transcript in transcripts}
+                ),
+                "transcript_languages": sorted(
+                    {transcript.language for transcript in transcripts}
+                ),
+                "transcript_confidence_min": (
+                    min(transcript_confidences)
+                    if transcript_confidences
+                    else None
+                ),
+                "transcript_confidence_max": (
+                    max(transcript_confidences)
+                    if transcript_confidences
+                    else None
+                ),
+                "transcript_segment_count": sum(
+                    len(transcript.segments) for transcript in transcripts
+                ),
             },
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),
@@ -607,6 +767,8 @@ __all__ = [
     "AudioProfile",
     "AudioSample",
     "AudioSplit",
+    "AudioTranscript",
+    "AudioTranscriptSegment",
     "AudioValidationError",
     "canonical_source",
     "wav_metadata",
