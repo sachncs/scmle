@@ -15,6 +15,8 @@ from scml.data.modalities.document import DocumentElement
 from scml.data.modalities.document import DocumentFormat
 from scml.data.modalities.document import DocumentLayout
 from scml.data.modalities.document import DocumentReader
+from scml.data.modalities.document import redact_sensitive_text
+from scml.data.modalities.document import sensitive_matches
 from scml.data.modalities.geospatial import canonical_observation_time
 from scml.data.modalities.geospatial import GeoFeature
 from scml.data.modalities.geospatial import GeospatialDataset
@@ -84,4 +86,6 @@ __all__ = [
     "canonical_event_time",
     "canonical_observation_time",
     "moran_statistic",
+    "redact_sensitive_text",
+    "sensitive_matches",
 ]

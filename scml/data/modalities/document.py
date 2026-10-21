@@ -71,6 +71,35 @@ class DocumentDependencyError(errors.DataError):
         super().__init__(message, context)
 
 
+SENSITIVE_PATTERNS: dict[str, re.Pattern[str]] = {
+    "email": re.compile(
+        r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE
+    ),
+    "phone": re.compile(
+        r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})"
+        r"[\s.-]\d{3}[\s.-]\d{4}(?!\d)"
+    ),
+    "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+}
+
+
+def sensitive_matches(content: str) -> dict[str, int]:
+    """Count supported sensitive-value patterns without returning values."""
+    return {
+        name: len(pattern.findall(content))
+        for name, pattern in sorted(SENSITIVE_PATTERNS.items())
+        if pattern.search(content) is not None
+    }
+
+
+def redact_sensitive_text(content: str) -> str:
+    """Replace supported sensitive values with type-only placeholders."""
+    redacted = content
+    for name, pattern in sorted(SENSITIVE_PATTERNS.items()):
+        redacted = pattern.sub(f"[REDACTED_{name.upper()}]", redacted)
+    return redacted
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentSpan:
     """A character range with simple document provenance."""
@@ -222,6 +251,9 @@ class DocumentCurationReport:
     table_element_count: int = 0
     ocr_confidence_min: float | None = None
     ocr_confidence_max: float | None = None
+    sensitive_match_counts: dict[str, int] = dataclasses.field(
+        default_factory=dict
+    )
 
     @property
     def unresolved_blocking_findings(
@@ -274,6 +306,7 @@ class DocumentCurationReport:
             "table_element_count": self.table_element_count,
             "ocr_confidence_min": self.ocr_confidence_min,
             "ocr_confidence_max": self.ocr_confidence_max,
+            "sensitive_match_counts": dict(self.sensitive_match_counts),
             "release_ready": self.release_ready,
             "unresolved_blocking_findings": [
                 finding.finding_id
@@ -493,6 +526,14 @@ class DocumentDataset:
         missing_ocr_confidence = sum(
             layout.ocr_confidence is None for layout in layouts
         )
+        sensitive_counts: defaultdict[str, int] = defaultdict(int)
+        sensitive_document_ids: list[str] = []
+        for sample in self.samples:
+            matches = sensitive_matches(sample.content)
+            if matches:
+                sensitive_document_ids.append(sample.document_id)
+                for name, count in matches.items():
+                    sensitive_counts[name] += count
 
         def create_finding(
             finding_id: str,
@@ -546,6 +587,19 @@ class DocumentDataset:
                     "Confirm duplicates are intentional or deduplicate "
                     "before training.",
                     False,
+                )
+            )
+
+        if sensitive_counts:
+            risk_findings.append(
+                create_finding(
+                    "risk.document-sensitive-content",
+                    data_contracts.FindingSeverity.ERROR,
+                    {"document_ids": sorted(sensitive_document_ids)},
+                    {"match_counts": dict(sorted(sensitive_counts.items()))},
+                    "Redact or explicitly govern detected sensitive content "
+                    "before training or promotion.",
+                    True,
                 )
             )
 
@@ -642,6 +696,7 @@ class DocumentDataset:
             ocr_confidence_max=(
                 max(ocr_confidences) if ocr_confidences else None
             ),
+            sensitive_match_counts=dict(sorted(sensitive_counts.items())),
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),
             max_characters=max_characters,

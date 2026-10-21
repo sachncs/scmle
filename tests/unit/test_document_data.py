@@ -145,6 +145,25 @@ def test_document_layout_confidence_and_offsets_fail_closed():
         document.DocumentSample("invalid", content, layout=invalid_layout)
 
 
+def test_document_sensitive_content_is_detected_without_leaking_values():
+    """Curation counts PII and redaction removes values from derived text."""
+    content = "Contact alice@example.com; SSN 123-45-6789."
+    sample = document.DocumentSample("sensitive", content)
+    report = document.DocumentDataset((sample,)).curate()
+
+    assert document.sensitive_matches(content) == {"email": 1, "ssn": 1}
+    assert document.redact_sensitive_text(content) == (
+        "Contact [REDACTED_EMAIL]; SSN [REDACTED_SSN]."
+    )
+    assert report.sensitive_match_counts == {"email": 1, "ssn": 1}
+    assert report.release_ready is False
+    assert [finding.finding_id for finding in report.risk_findings] == [
+        "risk.document-sensitive-content",
+    ]
+    assert "alice@example.com" not in str(report.to_dict())
+    assert "123-45-6789" not in str(report.to_dict())
+
+
 def test_empty_fixture_fails_with_structured_validation(empty_document: bytes):
     """Whitespace-only content cannot enter the immutable contract."""
     with pytest.raises(document.DocumentValidationError) as caught:
