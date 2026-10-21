@@ -1751,3 +1751,19 @@ Temporal graph evidence at `a302727` on 2026-10-21:
   with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
   mypy, and `git diff --check` passed. The source and test change was pushed as
   one atomic commit.
+
+Temporal geospatial evidence at `dd1e201` on 2026-10-21:
+
+- `GeoFeature` now preserves a timezone-aware observation time, normalizes it
+  to UTC, and binds it into dataset identity. `GeospatialDataset.split_temporal`
+  assigns features at the cutoff to training and later features to future
+  evaluation; missing observation times fail closed rather than inventing
+  temporal order.
+- Geospatial curation exposes absent, mixed, or complete temporal coverage with
+  time bounds and a deterministic warning for mixed state. This closes the
+  temporal data-integrity boundary; it does not claim a domain-specific
+  spatiotemporal model, reprojection policy, or streaming watermark guarantee.
+- The media, modality-lifecycle, and naming-convention suite passed 900 tests
+  with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
+  mypy, and `git diff --check` passed. The source and test change was pushed as
+  one atomic commit.
