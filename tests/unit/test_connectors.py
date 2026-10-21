@@ -1,5 +1,6 @@
 """Focused tests for dependency-free source connectors."""
 
+import contextlib
 import sqlite3
 from urllib.parse import urlsplit
 
@@ -184,7 +185,10 @@ def test_checkpoint_cannot_cross_source_boundaries(tmp_path):
 def test_dbapi_connector_retrieves_schema_and_resumes_by_cursor(tmp_path):
     """Injected SQLite connections exercise generic DB-API behavior."""
     database = tmp_path / "source.sqlite"
-    with sqlite3.connect(database) as connection:
+    with (
+        contextlib.closing(sqlite3.connect(database)) as connection,
+        connection,
+    ):
         connection.execute("CREATE TABLE records (id INTEGER, label TEXT)")
         connection.executemany(
             "INSERT INTO records VALUES (?, ?)",
@@ -280,7 +284,10 @@ def test_warehouse_connector_retries_and_rejects_invalid_callback_rows(frame):
 def test_dbapi_connector_retries_transient_factory_failure(tmp_path):
     """The retry budget counts retries after the initial operation."""
     database = tmp_path / "source.sqlite"
-    with sqlite3.connect(database) as connection:
+    with (
+        contextlib.closing(sqlite3.connect(database)) as connection,
+        connection,
+    ):
         connection.execute("CREATE TABLE records (id INTEGER)")
         connection.execute("INSERT INTO records VALUES (1)")
 
