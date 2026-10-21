@@ -68,7 +68,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/sachncs/magicml"
-Documentation = "https://github.com/sachncs/magicml/tree/main/docs"
+Documentation = "https://sachncs.github.io/super-charge-ml/"
 Issues = "https://github.com/sachncs/magicml/issues"
 Changelog = "https://github.com/sachncs/magicml/blob/main/CHANGELOG.md"
 

@@ -1,5 +1,7 @@
 """The supported top-level API does not disappear accidentally."""
 
+from importlib import metadata
+
 import pandas as pd
 
 import scml
@@ -26,6 +28,15 @@ def test_top_level_exports_are_the_documented_public_api():
 def test_version_is_a_nonempty_release_string():
     assert scml.__version__
     assert " " not in scml.__version__
+
+
+def test_package_documentation_points_to_standalone_site():
+    """Package metadata must lead developers to the standalone docs site."""
+    project_urls = metadata.metadata("super-charge-ml").get_all("Project-URL")
+
+    assert "Documentation, https://sachncs.github.io/super-charge-ml/" in (
+        project_urls or []
+    )
 
 
 def test_public_project_exposes_an_explicit_dataset_modality():
