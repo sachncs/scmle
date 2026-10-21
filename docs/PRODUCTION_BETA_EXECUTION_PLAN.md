@@ -1906,6 +1906,18 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Post-hardening strict regression evidence at `2f1e63a` on 2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,311` tests with `88` explicit optional-dependency skips in 31 minutes 06
+  seconds. No failure, error, or resource warning was promoted to a failure.
+- This rerun includes both constant-time signature-verification hardenings in
+  the independent-review and release-attestation paths, plus the complete
+  repository test inventory. The optional skips remain explicit dependency
+  boundaries rather than unexplained failures.
+- This is current local evidence and does not replace hosted CI/Pages,
+  external fault execution, secret custody, or independent review.
+
 Current-head strict regression evidence at `fad7703` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
