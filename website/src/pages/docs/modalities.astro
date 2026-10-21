@@ -1,0 +1,126 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout
+  title="Modality lifecycles"
+  description="A stage-by-stage guide to curating, modelling, explaining, packaging, and operating datasets beyond the supported tabular path."
+  current="modalities"
+>
+  <p class="eyebrow"><span></span> Dataset families</p>
+  <h1>One contract.<br /><em>Many modalities.</em></h1>
+  <p class="lead">A file extension is not a modelling capability. This guide shows how super-charge-ml handles documents, images, audio, video, graphs, and geospatial data without hiding the decisions that make their results trustworthy.</p>
+
+  <div class="callout"><p><strong>Read this before adding a modality.</strong> The experimental lifecycle is deliberately broader than the supported beta path. It can curate and exercise bounded baselines across several dataset families; only an explicitly gated capability may be advertised as supported production functionality.</p></div>
+
+  <h2>The 15-stage contract</h2>
+  <p>Every modality follows the same evidence order. The adapter owns what is specific to its data shape; the lifecycle owns the shared gates, package identity, recovery checks, and release evidence. A stage is complete only when it produces inspectable evidence and a deterministic fixture proves its failure behavior.</p>
+
+  <figure class="diagram">
+    <figcaption class="diagram-caption"><span>MODALITY LIFECYCLE</span><strong>Raw input becomes a bounded release decision.</strong></figcaption>
+    <div class="data-path">
+      <div class="path-step"><span>01–03</span><b>Ingest<br />validate<br />profile</b></div>
+      <div class="path-line"></div>
+      <div class="path-step highlighted"><span>04–06</span><b>Curate<br />deduplicate + split<br />represent</b></div>
+      <div class="path-line"></div>
+      <div class="path-step"><span>07–10</span><b>Model<br />evaluate<br />explain data + model</b></div>
+      <div class="path-line"></div>
+      <div class="path-step"><span>11–12</span><b>Sign package<br />verify inference</b></div>
+      <div class="path-line"></div>
+      <div class="path-step"><span>13–15</span><b>Monitor<br />document<br />recover</b></div>
+    </div>
+    <div class="evidence-rail"><span>evidence</span><i></i><b>manifest</b><i></i><b>curation report</b><i></i><b>evaluation</b><i></i><b>explanation</b><i></i><b>signed package</b></div>
+  </figure>
+
+  <div class="doc-cards">
+    <div class="doc-card"><small>01 / INGEST</small><h3>Identify the raw material</h3><p>Preserve source bytes or caller-owned references, content identity, acquisition metadata, and the declared modality. Do not infer semantics from a filename.</p></div>
+    <div class="doc-card"><small>02 / VALIDATE</small><h3>Reject unsafe shapes</h3><p>Check encoding, dimensions, geometry, codec or probe output, labels, limits, and required metadata. Empty, corrupt, oversized, and contradictory samples have defined outcomes.</p></div>
+    <div class="doc-card"><small>03 / PROFILE</small><h3>Measure what is present</h3><p>Produce bounded, JSON-native observations: composition, missingness, duplicates, label state, structure, resource use, and truncation flags.</p></div>
+    <div class="doc-card"><small>04 / CURATE</small><h3>Make a human decision</h3><p>Classify findings as blocking, review-required, or informational. A generated report is context; it is not approval.</p></div>
+    <div class="doc-card"><small>05 / SPLIT</small><h3>Protect independence</h3><p>Use groups, time, topology, or spatial blocks where identity or proximity can leak across partitions. Persist the policy and assignments.</p></div>
+    <div class="doc-card"><small>06 / REPRESENT</small><h3>Declare the boundary</h3><p>Record the feature or representation matrix, its limits, decoder or tokenizer policy, and whether the representation is raw, transformed, or metadata-only.</p></div>
+    <div class="doc-card"><small>07 / MODEL</small><h3>Fit a bounded baseline</h3><p>Model only after the data contract is accepted. Resource budgets, deterministic seeds, and the candidate policy travel with the run.</p></div>
+    <div class="doc-card"><small>08 / EVALUATE</small><h3>Test the stated use</h3><p>Evaluate on the locked split with task-aware metrics, uncertainty, calibration or abstention policy, and explicit shift limitations.</p></div>
+    <div class="doc-card"><small>09 / DATA EXPLANATION</small><h3>Explain the dataset</h3><p>Show composition, provenance, duplicate groups, label conflicts, selection decisions, and what was excluded or deferred.</p></div>
+    <div class="doc-card"><small>10 / MODEL EXPLANATION</small><h3>Explain the prediction</h3><p>Tie global, local, interaction, or perturbation evidence to the exact model, input, data snapshot, method, and known limitations.</p></div>
+    <div class="doc-card"><small>11 / PACKAGE</small><h3>Sign the complete record</h3><p>Write the manifest, model, evidence, environment, and digest into an atomic package. Signing does not make an unreviewed package approved.</p></div>
+    <div class="doc-card"><small>12 / INFERENCE</small><h3>Verify before predicting</h3><p>Check package identity, modality, feature schema, estimator dimensions, and signature before converting new samples.</p></div>
+    <div class="doc-card"><small>13 / MONITOR</small><h3>Observe the boundary</h3><p>Track input drift, output behavior, resource use, and evidence freshness. A monitor should identify the affected run, not just emit a score.</p></div>
+    <div class="doc-card"><small>14 / DOCUMENT</small><h3>Publish the honest claim</h3><p>Record intended use, exclusions, limitations, review state, support level, and the evidence links that justify the claim.</p></div>
+    <div class="doc-card"><small>15 / RECOVER</small><h3>Prove the failure path</h3><p>Exercise tampering, stale state, partial writes, resource limits, and interrupted work. Recovery is part of the lifecycle, not an afterthought.</p></div>
+  </div>
+
+  <h2>What each modality must preserve</h2>
+  <p>These are the minimum questions an adapter must answer before a representation can be treated as evidence. They are intentionally more specific than “the data loaded successfully.”</p>
+  <div class="doc-cards">
+    <div class="doc-card"><small>TEXT / DOCUMENTS</small><h3>Keep source spans attached</h3><p>Record document boundaries, encoding, language, page and section provenance, OCR confidence when OCR exists, layout and table limits, redaction decisions, chunking policy, label conflicts, and citation or source traceability. A TF-IDF score is not evidence about layout, tables, or citations.</p></div>
+    <div class="doc-card"><small>IMAGES</small><h3>Keep bytes and metadata together</h3><p>Record dimensions, channels, color space, corrupt-file behavior, EXIF and PII risk, duplicate groups, resize and augmentation provenance, and the boundary between pixel occlusion and raw-image saliency or localization.</p></div>
+    <div class="doc-card"><small>AUDIO</small><h3>Make decoding observable</h3><p>Record sample rate, channels, duration, clipping, silence, codec failures, speaker or session grouping, transcript provenance, bounded time windows, and background-noise limitations. WAV is the dependency-light core boundary; other codecs require a caller-owned probe.</p></div>
+    <div class="doc-card"><small>VIDEO</small><h3>Keep time and resources explicit</h3><p>Record container and codec validity, dimensions, frame rate, temporal sampling, audio tracks, synchronization limits, identity grouping, sampled-frame provenance, and pixel or decode budgets. Metadata-only evidence is not visual evidence.</p></div>
+    <div class="doc-card"><small>GRAPHS</small><h3>Protect topology</h3><p>Record node and edge identity, direction, self-loops, components, temporal edges, feature availability, inductive or transductive policy, and the subgraph boundary used for an explanation. A one-hop context is not a universal graph attribution.</p></div>
+    <div class="doc-card"><small>GEOSPATIAL</small><h3>Never detach the CRS</h3><p>Record geometry validity, CRS, units, spatial joins, autocorrelation risks, boundary leakage, spatial and temporal split rules, raster nodata, and transform metadata. A centroid block is a policy, not a proof that every spatial dependency is gone.</p></div>
+  </div>
+
+  <h2>Use the typed manifest as the hand-off</h2>
+  <p>The manifest is the boundary between raw material and an experimental lifecycle. It binds the exact snapshot to the modality, task, owner, label lineage, privacy policy, and content hash. It does not guess missing governance information.</p>
+  <pre><code>{`from scml.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
+
+manifest = ModalityManifest(
+    dataset_id="documents-2026-10-21",
+    snapshot_id="approved-export-17",
+    modality="document",
+    task="binary_classification",
+    sample_count=len(dataset.samples),
+    content_hash=dataset.content_hash,
+    source=SourceMetadata(
+        owner="records-team",
+        acquisition_method="approved export",
+        license="internal-use",
+    ),
+    privacy=PrivacyMetadata(
+        classification="restricted",
+        contains_pii=True,
+        consent_basis="employment-contract",
+        retention_period="90d",
+        deletion_policy="case-closure",
+    ),
+)
+
+report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)`}</code></pre>
+  <p>If the adapter, sample count, content hash, or declared modality does not agree with the manifest, the lifecycle fails before modelling. That failure is valuable: it prevents a valid-looking model from being attached to the wrong source.</p>
+
+  <h2>Read the evidence, not only the score</h2>
+  <figure class="diagram">
+    <figcaption class="diagram-caption"><span>RELEASE HAND-OFF</span><strong>Each gate answers a different question.</strong></figcaption>
+    <div class="planes">
+      <div class="plane plane-control"><span>DATA DECISION</span><strong>Are these samples fit for this use?</strong><p>manifest · profile · curation findings · split policy · reviewer dispositions</p></div>
+      <div class="plane-connector">↓ accepted data contract</div>
+      <div class="plane plane-execution"><span>MODEL DECISION</span><strong>Does this bounded representation work?</strong><p>features · candidates · evaluation · uncertainty · explanation quality · resource budgets</p></div>
+      <div class="plane-connector">↓ verified package</div>
+      <div class="plane plane-evidence"><span>RELEASE DECISION</span><strong>What exactly may we claim?</strong><p>signature · digest · support level · monitor · limitations · recovery evidence · approval</p></div>
+    </div>
+  </figure>
+  <p>A high metric cannot waive a blocking data finding. A signed package cannot upgrade an experimental modality to supported status. A successful prediction cannot prove the representation is faithful to the raw modality. Keep those decisions separate so a reviewer can challenge one without losing the rest of the evidence.</p>
+
+  <h2>Experimental versus supported</h2>
+  <div class="split-cards">
+    <div class="mini-card"><span class="mini-label">SUPPORTED BETA</span><h3>Tabular library path</h3><p>The release boundary is explicit: declared tabular inputs, stable project and bundle contracts, release evaluation, portable evidence, verification, and the local reliability gates recorded in the release plan.</p><p class="note">A supported claim needs the full gate set, not only a passing model test.</p></div>
+    <div class="mini-card"><span class="mini-label">EXPERIMENTAL</span><h3>Modality foundations</h3><p>Documents, images, audio, video, graphs, and geospatial data have bounded curation and baseline lifecycle evidence. They still require domain-specific representation, independent explanation fidelity, reference serving, external fault evidence, and review before production support.</p><p class="note">Experimental means useful for extension work, not safe to market as a supported feature.</p></div>
+  </div>
+
+  <h2>Contributor checklist</h2>
+  <ol>
+    <li>Start from the raw bytes, source records, geometry, topology, or probe output—not a pre-digested feature matrix.</li>
+    <li>Define the modality-specific adapter contract and failure behavior before adding a model.</li>
+    <li>Persist identity, curation, split, representation, and resource limits as machine-readable evidence.</li>
+    <li>Add deterministic fixtures for empty, malformed, oversized, duplicated, shifted, and adversarial inputs.</li>
+    <li>Keep decoders, credentials, cloud transports, and domain policies at explicit caller-owned boundaries.</li>
+    <li>Test explanations against the representation actually consumed, and state what the explanation cannot mean.</li>
+    <li>Update the capability matrix only when all 15 stages and the corresponding release evidence are present.</li>
+  </ol>
+
+  <div class="callout"><p><strong>Design principle:</strong> the model is the last consumer of a data decision. If the decision cannot be inspected, replayed, explained, and recovered, the modelling result is not ready to ship.</p></div>
+  <p class="meta">Lifecycle contract · 15 stages · experimental modality boundary · Last reviewed October 2026</p>
+</DocsLayout>
