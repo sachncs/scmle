@@ -129,6 +129,13 @@ explanation = model.local_explanation(sample)
 
 assert curation.source_traceability_coverage == 1.0
 assert explanation.to_dict()["citations"][0]["source_digest"] == sample.source_digest</code></pre>
+  <p>Layout, OCR, and table extraction stay an explicit dependency boundary. Supply a <code>layout_reader</code> callback when you own a parser; it receives the raw bytes, document ID, and resolved format. The reader validates the returned <code>DocumentLayout</code>, rejects malformed extraction results, and fails closed when the optional parser is unavailable.</p>
+  <pre><code>{`def extract_layout(raw_bytes, document_id, document_format):
+    # Call your pinned parser and return DocumentLayout(...).
+    return layout
+
+reader = DocumentReader(layout_reader=extract_layout)
+sample = reader.load("policy.pdf", document_id="policy-2026")`}</code></pre>
   <p>OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary. A source-backed locator proves where the decoded span came from; it does not prove that a generated answer is semantically grounded in that span.</p>
 
   <h2>Experimental image baseline</h2>

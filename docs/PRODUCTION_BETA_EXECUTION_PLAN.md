@@ -1988,6 +1988,25 @@ Current-head curation-boundary verification at `beb4568` on 2026-10-22:
   execution, secret custody, and independent reviewer evidence remain
   separate release gates.
 
+Document extraction boundary at `26bc8a0` on 2026-10-22:
+
+- `DocumentReader` now accepts an explicit caller-owned `LayoutReader` for
+  layout, OCR, and table extraction. The callback receives raw bytes, the
+  stable document ID, and the resolved format; its result is validated as a
+  `DocumentLayout` contract before it enters the sample.
+- Optional parser absence, invalid extractor results, parser failures, and a
+  layout/source SHA-256 mismatch fail closed with structured document errors.
+  Existing direct layout injection remains explicit and is not silently
+  replaced by a parser default.
+- The focused document, model, and modality-lifecycle suite passed 60 tests
+  under `-W error::ResourceWarning`; Ruff, formatting, and mypy passed. The
+  Astro site passed 17-page build, accessibility, 384-link, and 2-test
+  Playwright checks after the API guide was updated.
+- This is an optional extraction seam, not a claim that the core package ships
+  an OCR, layout, or table parser. Parser licensing, version pinning, raw
+  extraction quality, semantic citation grounding, and production-scale
+  recovery remain release evidence owned by the caller or deployment.
+
 Extension dataset-family contract at `17a9417` on 2026-10-22:
 
 - `ExtensionModality` gives caller-defined dataset families a stable,
