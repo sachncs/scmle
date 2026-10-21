@@ -563,15 +563,80 @@ class ImageAdapter(ModalityAdapter):
             terms,
             key=lambda item: (-abs(item[1]), item[0]),
         )[:10]
+        raw_terms = self.raw_pixel_occlusion_terms(
+            sample, model, selected_class, original_score
+        )
         return {
             "status": "available",
             "method": "transformed_pixel_region_occlusion",
             "terms": [[name, float(value)] for name, value in selected],
             "baseline": "zero-valued transformed RGB pixels",
             "feature_space_only": True,
+            "raw_input_occlusion": raw_terms,
             "limitations": [
                 "Occlusion occurs after resizing and RGB conversion.",
-                "Regions are not object localization or raw-image saliency.",
+                "Raw input occlusion is bounded pixel evidence, not object "
+                "localization or validated saliency.",
+                "Score changes are associational and not causal.",
+            ],
+        }
+
+    def raw_pixel_occlusion_terms(
+        self,
+        sample: image.ImageSample,
+        model: LogisticRegression,
+        selected_class: int,
+        original_score: float,
+    ) -> dict[str, object]:
+        """Score bounded source-pixel masks before the resize transform.
+
+        The model still consumes the declared 16x16 RGB representation. The
+        difference is that each mask is applied to the validated source
+        pixels first, so the evidence records a source-space perturbation and
+        the exact image dimensions used to construct it.
+        """
+        source_pixels = sample.decode("RGB")
+        source_height, source_width, _ = source_pixels.shape
+        image_library = image.require_pillow("raw image explanation")
+        row_step = max(1, int(np.ceil(source_height / 4)))
+        column_step = max(1, int(np.ceil(source_width / 4)))
+        terms: list[tuple[str, float]] = []
+        for row in range(0, source_height, row_step):
+            for column in range(0, source_width, column_step):
+                end_row = min(row + row_step, source_height)
+                end_column = min(column + column_step, source_width)
+                masked_pixels = source_pixels.copy()
+                masked_pixels[row:end_row, column:end_column, :] = 0
+                resized = image_library.fromarray(masked_pixels).resize(
+                    (16, 16), image_library.Resampling.BILINEAR
+                )
+                features = (
+                    np.asarray(resized, dtype=np.float32).reshape(1, -1) / 255.0
+                )
+                decision = np.asarray(model.decision_function(features))
+                if decision.ndim == 1:
+                    masked_score = float(decision[0])
+                else:
+                    masked_score = float(decision[0, selected_class])
+                terms.append(
+                    (
+                        f"source_region[{row}:{end_row},{column}:{end_column}]",
+                        original_score - masked_score,
+                    )
+                )
+        selected = sorted(
+            terms,
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:10]
+        return {
+            "method": "raw_pixel_region_occlusion",
+            "terms": [[name, float(value)] for name, value in selected],
+            "source_dimensions": [source_width, source_height],
+            "baseline": "zero-valued decoded RGB source pixels",
+            "feature_space_only": False,
+            "limitations": [
+                "Source regions are pixel masks, not semantic objects.",
+                "The model still consumes the resized RGB representation.",
                 "Score changes are associational and not causal.",
             ],
         }

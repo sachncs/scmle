@@ -405,6 +405,11 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
     assert local["baseline"] == "zero-valued transformed RGB pixels"
     assert len(local["terms"]) == 10
     assert local["feature_space_only"] is True
+    raw = local["raw_input_occlusion"]
+    assert raw["method"] == "raw_pixel_region_occlusion"
+    assert raw["source_dimensions"] == [4, 4]
+    assert len(raw["terms"]) == 10
+    assert raw["feature_space_only"] is False
 
 
 def test_document_lifecycle_emits_span_provenance_evidence(tmp_path: Path):
