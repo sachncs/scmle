@@ -1832,3 +1832,15 @@ Local release preflight evidence at `f713a5c` on 2026-10-21:
   built all 16 static pages. This is local release evidence; hosted Linux and
   Pages, external transport/resource-fault tests, secret custody, and
   independent reviewer evidence remain separate release gates.
+
+Evidence-artifact durability at `386201d` on 2026-10-21:
+
+- Modality lifecycle JSON reports now use the shared durable atomic writer:
+  complete bytes are flushed and synced before replacement, the containing
+  directory is synced after replacement, and temporary files are removed on
+  failure. A previous report remains intact when replacement fails.
+- The modality lifecycle, durability, and naming-convention slice passed 872
+  tests under `-W error::ResourceWarning`; Ruff, formatting, mypy, and
+  `git diff --check` passed. This closes the local partial-report-write gap;
+  physical filesystem failure and external storage semantics remain outside
+  the local evidence boundary.
