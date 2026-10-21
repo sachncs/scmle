@@ -10,12 +10,15 @@ from scml.api import results
 from scml.artifacts import reproducibility
 from scml.contracts import data as data_contracts
 from scml.contracts import experiments
+from scml.contracts import modalities
+from scml.contracts import performance
 from scml.contracts import tasks
 from scml.core import context as context_module
 from scml.core import orchestrator as orchestrator_module
 from scml.core import policies as checkpoints_module
 from scml.data.readers import interchange
 from scml.intelligence import recommendations as recommendations_module
+from scml.models import modality_lifecycle
 
 ValidationStrategy = Literal[
     "auto",
@@ -364,3 +367,88 @@ class MLProject:
     def cancel(self) -> None:
         """Requests cancellation of a running workflow."""
         self.orchestrator.cancel()
+
+
+class ModalityProject:
+    """Runs a typed non-tabular dataset through the shared lifecycle.
+
+    ``MLProject`` remains the supported tabular beta surface. This project
+    surface accepts a concrete ``ModalityAdapter`` for experimental text,
+    document, image, audio, video, graph, geospatial-vector, or raster data.
+    It gives those datasets the same curation, explainability, packaging,
+    inference, monitoring, documentation, and recovery evidence without
+    pretending that a tabular estimator can decode arbitrary raw bytes.
+    """
+
+    def __init__(
+        self,
+        adapter: modality_lifecycle.ModalityAdapter,
+        signing_key: str | bytes,
+        *,
+        output_dir: str | pathlib.Path = "runs",
+        seed: int = 42,
+        observed_adapter: modality_lifecycle.ModalityAdapter | None = None,
+        performance_budget: performance.PerformanceBudget | None = None,
+        performance_baseline: performance.PerformanceBaseline | None = None,
+        manifest: data_contracts.ModalityManifest | None = None,
+    ) -> None:
+        """Defines an experimental lifecycle run.
+
+        Args:
+            adapter: Typed adapter that owns modality validation and features.
+            signing_key: Non-empty key used to authenticate the package.
+            output_dir: New directory for the package and lifecycle report.
+            seed: Deterministic split and model seed.
+            observed_adapter: Optional shifted dataset for monitoring.
+            performance_budget: Optional declared performance budget.
+            performance_baseline: Optional comparable-run baseline.
+            manifest: Optional identity and governance contract.
+
+        Raises:
+            TypeError: If an object is not a modality adapter.
+            ValueError: If the signing key is empty or the output is invalid.
+        """
+        if not isinstance(adapter, modality_lifecycle.ModalityAdapter):
+            raise TypeError("adapter must be a ModalityAdapter")
+        if not signing_key:
+            raise ValueError("signing_key must not be empty")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise TypeError("seed must be an integer")
+        if observed_adapter is not None and not isinstance(
+            observed_adapter, modality_lifecycle.ModalityAdapter
+        ):
+            raise TypeError("observed_adapter must be a ModalityAdapter")
+        self.adapter = adapter
+        self.signing_key = signing_key
+        self.output_dir = pathlib.Path(output_dir)
+        self.seed = seed
+        self.observed_adapter = observed_adapter
+        self.performance_budget = performance_budget
+        self.performance_baseline = performance_baseline
+        self.manifest = manifest
+        self.lifecycle = modality_lifecycle.ModalityLifecycle()
+        self.report: modality_lifecycle.LifecycleReport | None = None
+
+    def run(self) -> modality_lifecycle.LifecycleReport:
+        """Run all fifteen stages and persist their evidence atomically."""
+        if self.output_dir.exists() and not self.output_dir.is_dir():
+            raise ValueError("output_dir must be a directory")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.report = self.lifecycle.run(
+            self.adapter,
+            self.output_dir / "model",
+            self.signing_key,
+            seed=self.seed,
+            observed_adapter=self.observed_adapter,
+            report_path=self.output_dir / "modality_lifecycle.json",
+            performance_budget=self.performance_budget,
+            performance_baseline=self.performance_baseline,
+            manifest=self.manifest,
+        )
+        return self.report
+
+    def declaration(self) -> modalities.ModalityDeclaration:
+        """Return the experimental capability declaration after a run."""
+        if self.report is None:
+            raise RuntimeError("run must complete before declaration")
+        return self.lifecycle.declaration(self.report)

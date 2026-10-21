@@ -4,6 +4,10 @@
       "kind": "class",
       "signature_sha256": "c83892514057660ad6a540fb8eb74bed1ae395a5850d64da0442d6deddcd2357"
     },
+    "ModalityProject": {
+      "kind": "class",
+      "signature_sha256": "a9566ba714de6db51c032ccde7d040381a1934dba0c7b0477e6291dc0948d3ee"
+    },
     "ModelBundle": {
       "kind": "class",
       "signature_sha256": "711014aeb1a77f78329141e9afb53c8d2343c01ff94c43df683a33cb1a6d9a37"
