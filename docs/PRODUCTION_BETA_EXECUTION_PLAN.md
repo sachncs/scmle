@@ -1607,3 +1607,14 @@ Python naming-convention evidence at `dcbf3db` on 2026-10-21:
 - The convention test passed under `-W error::ResourceWarning`; Ruff,
   formatting, and mypy passed. Ruff's configured Google docstring convention
   remains the source-level style gate for package code.
+
+Current-head strict regression at `ae6b1f2` on 2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,247` tests with `124` explicit optional-dependency skips in 27 minutes
+  52 seconds. No failure, error, or resource warning was promoted to a
+  failure.
+- This run includes the generic object-decoder contract, the package naming
+  convention guard, and the existing data, modality, reliability, governance,
+  and site-adjacent Python tests. The optional skips remain environment
+  capability boundaries and do not prove the corresponding integrations.
