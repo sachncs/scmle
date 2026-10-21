@@ -248,6 +248,48 @@ def test_raster_adapter_has_a_distinct_capability_identity():
     )
 
 
+def test_raster_adapter_accepts_a_named_bounded_decoder():
+    """Raster curation and features can use explicit decoded pixel evidence."""
+    baseline = raster_adapter()
+    decoded = modality_lifecycle.RasterAdapter(
+        baseline.samples,
+        {sample.source: baseline.label(sample) for sample in baseline.samples},
+        decoder=lambda payload: np.full(
+            (32, 32, 3), payload[0], dtype=np.uint8
+        ),
+        decoder_name="fixture-raster-v1",
+        max_pixels=32 * 32 * 3,
+    )
+
+    report = decoded.curate()
+    features = decoded.features(decoded.samples[:2])
+
+    assert report.profile["pixels"] == {
+        "status": "decoded",
+        "decoder": "fixture-raster-v1",
+        "max_pixels": 32 * 32 * 3,
+        "shapes": [[32, 32, 3]],
+        "minimum": 1.0,
+        "maximum": 12.0,
+        "measured_nodata_fraction": [],
+    }
+    assert features.feature_names == (
+        "pixel_band_0_mean",
+        "pixel_band_0_std",
+        "pixel_band_0_min",
+        "pixel_band_0_max",
+        "pixel_band_1_mean",
+        "pixel_band_1_std",
+        "pixel_band_1_min",
+        "pixel_band_1_max",
+        "pixel_band_2_mean",
+        "pixel_band_2_std",
+        "pixel_band_2_min",
+        "pixel_band_2_max",
+    )
+    assert features.values[:, 0].tolist() == [1.0, 2.0]
+
+
 @pytest.mark.parametrize(
     "factory",
     [

@@ -25,6 +25,7 @@ from scml.data.modalities.geospatial import GeospatialProfile
 from scml.data.modalities.geospatial import GeospatialTemporalError
 from scml.data.modalities.geospatial import GeospatialTemporalSplit
 from scml.data.modalities.geospatial import moran_statistic
+from scml.data.modalities.geospatial import RasterDecoder
 from scml.data.modalities.geospatial import RasterSample
 from scml.data.modalities.geospatial import SpatialAutocorrelation
 from scml.data.modalities.graph import canonical_event_time
@@ -73,6 +74,7 @@ __all__ = [
     "ImageSplit",
     "ModalityCurationReport",
     "ModalityDatasetCard",
+    "RasterDecoder",
     "RasterSample",
     "SpatialAutocorrelation",
     "TemporalGraphSplit",

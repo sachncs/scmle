@@ -1524,7 +1524,7 @@ class GeospatialAdapter(ModalityAdapter):
 
 
 class RasterAdapter(ModalityAdapter):
-    """Adapter for labelled raster metadata with an explicit label sidecar."""
+    """Adapter for labelled raster metadata or bounded decoded pixels."""
 
     modality = modalities.Modality.RASTER
 
@@ -1532,16 +1532,30 @@ class RasterAdapter(ModalityAdapter):
         self,
         samples: Sequence[geospatial.RasterSample],
         labels: Mapping[str, object],
+        decoder: geospatial.RasterDecoder | None = None,
+        decoder_name: str | None = None,
+        max_pixels: int = 4_000_000,
     ) -> None:
         """Bind raster identities and caller-owned labels.
 
-        Raster payload decoding is intentionally outside the core package.
-        The label sidecar is keyed by the canonical raster source and is part
-        of the caller's dataset evidence.
+        Raster payload decoding remains caller-owned. When supplied, the
+        decoder name and pixel budget become part of the representation
+        contract. The label sidecar is keyed by the canonical raster source
+        and is part of the caller's dataset evidence.
         """
         normalized = tuple(samples)
         if not normalized:
             raise ValueError("raster samples must not be empty")
+        if decoder is not None and not callable(decoder):
+            raise TypeError("decoder must be callable")
+        if decoder is None and decoder_name is not None:
+            raise ValueError("decoder_name requires a caller-owned decoder")
+        if decoder is not None and not decoder_name:
+            raise ValueError(
+                "decoder_name must identify a caller-owned decoder and version"
+            )
+        if max_pixels < 1:
+            raise ValueError("max_pixels must be positive")
         sources = tuple(sample.source for sample in normalized)
         if len(set(sources)) != len(sources):
             raise ValueError("raster sources must be unique")
@@ -1549,6 +1563,9 @@ class RasterAdapter(ModalityAdapter):
             raise ValueError("raster labels must cover every sample source")
         self.dataset = normalized
         self.labels_by_source = dict(labels)
+        self.decoder = decoder
+        self.decoder_name = decoder_name.strip() if decoder_name else None
+        self.max_pixels = max_pixels
 
     @property
     def dataset_hash(self) -> str:
@@ -1556,7 +1573,9 @@ class RasterAdapter(ModalityAdapter):
         identities = (
             f"{sample.source}\0{sample.file_hash}\0"
             f"{sample.nodata_value}\0{sample.nodata_fraction}\0"
-            f"{self.labels_by_source[sample.source]}"
+            f"{self.labels_by_source[sample.source]}\0"
+            f"decoder={self.decoder_name or 'metadata-only'}\0"
+            f"max_pixels={self.max_pixels}"
             for sample in self.dataset
         )
         return curation.dataset_hash(identities)
@@ -1617,6 +1636,41 @@ class RasterAdapter(ModalityAdapter):
                 self.labels_by_source.values()
             ),
         }
+        if self.decoder is None:
+            profile["pixels"] = {
+                "status": "metadata_only",
+                "decoder": None,
+                "max_pixels": self.max_pixels,
+            }
+        else:
+            decoded = [
+                sample.decode(self.decoder, max_pixels=self.max_pixels)
+                for sample in self.dataset
+            ]
+            profile["pixels"] = {
+                "status": "decoded",
+                "decoder": self.decoder_name,
+                "max_pixels": self.max_pixels,
+                "shapes": [
+                    list(shape)
+                    for shape in sorted(
+                        {tuple(values.shape) for values in decoded}
+                    )
+                ],
+                "minimum": min(float(values.min()) for values in decoded),
+                "maximum": max(float(values.max()) for values in decoded),
+                "measured_nodata_fraction": sorted(
+                    value
+                    for value in (
+                        sample.measured_nodata_fraction(
+                            self.decoder, max_pixels=self.max_pixels
+                        )
+                        for sample in self.dataset
+                        if sample.nodata_value is not None
+                    )
+                    if value is not None
+                ),
+            }
         quality_findings: list[data_contracts.CurationFinding] = []
         if len(crs_values) > 1 or len(dimensions) > 1 or len(dtypes) > 1:
             quality_findings.append(
@@ -1694,7 +1748,41 @@ class RasterAdapter(ModalityAdapter):
     def features(
         self, samples: Sequence[geospatial.RasterSample]
     ) -> FeatureBatch:
-        """Prepare raster metadata features without decoding payloads."""
+        """Prepare raster metadata or bounded decoded pixel features."""
+        if self.decoder is not None:
+            band_counts = {sample.bands for sample in samples}
+            if len(band_counts) != 1:
+                raise geospatial.GeospatialValidationError(
+                    "decoded raster features require a consistent band count",
+                    {"code": "pixel_band_mismatch"},
+                )
+            band_count = next(iter(band_counts))
+            names = tuple(
+                f"pixel_band_{band}_{statistic}"
+                for band in range(band_count)
+                for statistic in ("mean", "std", "min", "max")
+            )
+            rows = []
+            for sample in samples:
+                pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
+                channels = pixels[:, :, None] if pixels.ndim == 2 else pixels
+                rows.append(
+                    tuple(
+                        statistic_value
+                        for band in range(band_count)
+                        for statistic_value in (
+                            float(channels[:, :, band].mean()),
+                            float(channels[:, :, band].std()),
+                            float(channels[:, :, band].min()),
+                            float(channels[:, :, band].max()),
+                        )
+                    )
+                )
+            return FeatureBatch(
+                tuple(sample.source for sample in samples),
+                names,
+                np.asarray(rows, dtype=np.float64),
+            )
         names = (
             "width",
             "height",
@@ -1745,12 +1833,18 @@ class RasterAdapter(ModalityAdapter):
 
     def modality_notes(self) -> tuple[str, ...]:
         """Describe raster lifecycle limits."""
+        representation = (
+            "The baseline uses caller-decoded, bounded pixel summary "
+            "features with an explicit decoder policy."
+            if self.decoder is not None
+            else "The baseline uses raster metadata and a caller-owned label "
+            "sidecar; it does not decode pixels."
+        )
         return (
-            "The baseline uses raster metadata and a caller-owned label "
-            "sidecar; it does not decode pixels.",
+            representation,
             "Raster transforms, reprojection, window sampling, and spatial "
             "joins require an explicit codec policy; nodata metadata is "
-            "caller-owned and does not decode pixels.",
+            "caller-owned unless measured through the decoder.",
         )
 
 

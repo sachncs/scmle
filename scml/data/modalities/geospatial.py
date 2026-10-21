@@ -1,5 +1,6 @@
 """Dependency-light vector and raster geospatial data contracts."""
 
+from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
@@ -34,6 +35,8 @@ GEOMETRY_TYPES = frozenset(
         "GeometryCollection",
     }
 )
+
+RasterDecoder = Callable[[bytes], np.ndarray]
 
 
 class GeospatialValidationError(errors.DataError):
@@ -948,6 +951,101 @@ class RasterSample:
             return "declared"
         return "unknown"
 
+    def decode(
+        self,
+        decoder: RasterDecoder,
+        max_pixels: int = 4_000_000,
+    ) -> np.ndarray:
+        """Decode bounded numeric pixels through a caller-owned decoder.
+
+        The core package does not select a raster codec. The caller owns the
+        decoder and must return a grayscale ``(height, width)`` array or a
+        channel-last ``(height, width, bands)`` array. The decoded values are
+        copied into a read-only float matrix after shape, size, type, and
+        finiteness checks.
+
+        Args:
+            decoder: Caller-owned function that decodes the encoded payload.
+            max_pixels: Maximum decoded array elements allowed per sample.
+
+        Returns:
+            A read-only, finite, channel-last-compatible pixel matrix.
+
+        Raises:
+            TypeError: If the decoder is not callable.
+            ValueError: If the resource bound is invalid.
+            GeospatialValidationError: If decoding or validation fails.
+        """
+        if not callable(decoder):
+            raise TypeError("decoder must be callable")
+        if max_pixels < 1:
+            raise ValueError("max_pixels must be positive")
+        try:
+            decoded = np.asarray(decoder(self.encoded_bytes))
+        except Exception as error:
+            raise GeospatialValidationError(
+                "raster decoding failed",
+                {"code": "decode_failed", "source": self.source},
+            ) from error
+        if decoded.ndim not in {2, 3}:
+            raise GeospatialValidationError(
+                "decoded raster pixels must be grayscale or channel-last",
+                {
+                    "code": "invalid_pixel_shape",
+                    "source": self.source,
+                    "shape": list(decoded.shape),
+                },
+            )
+        if decoded.size < 1 or decoded.size > max_pixels:
+            raise GeospatialValidationError(
+                "decoded raster exceeds the configured pixel limit",
+                {
+                    "code": "pixel_limit",
+                    "source": self.source,
+                    "pixel_count": int(decoded.size),
+                    "max_pixels": max_pixels,
+                },
+            )
+        expected_shape = (self.height, self.width)
+        if self.bands == 1 and decoded.shape == expected_shape:
+            pass
+        elif decoded.shape != (self.height, self.width, self.bands):
+            raise GeospatialValidationError(
+                "decoded raster dimensions do not match metadata",
+                {
+                    "code": "pixel_dimension_mismatch",
+                    "source": self.source,
+                    "expected": [self.height, self.width, self.bands],
+                    "observed": list(decoded.shape),
+                },
+            )
+        if not np.issubdtype(decoded.dtype, np.number) or np.issubdtype(
+            decoded.dtype, np.complexfloating
+        ):
+            raise GeospatialValidationError(
+                "decoded raster pixels must be real numeric values",
+                {"code": "invalid_pixel_type", "source": self.source},
+            )
+        values = np.asarray(decoded, dtype=np.float64).copy()
+        if not np.isfinite(values).all():
+            raise GeospatialValidationError(
+                "decoded raster pixels must be finite",
+                {"code": "non_finite_pixels", "source": self.source},
+            )
+        values.setflags(write=False)
+        return values
+
+    def measured_nodata_fraction(
+        self,
+        decoder: RasterDecoder,
+        max_pixels: int = 4_000_000,
+    ) -> float | None:
+        """Measure the declared nodata sentinel in decoded pixels."""
+        if self.nodata_value is None:
+            return None
+        pixels = self.decode(decoder, max_pixels=max_pixels)
+        return float(np.equal(pixels, self.nodata_value).mean())
+
 
 __all__ = [
     "GEOMETRY_TYPES",
@@ -958,6 +1056,7 @@ __all__ = [
     "GeospatialTemporalError",
     "GeospatialTemporalSplit",
     "GeospatialValidationError",
+    "RasterDecoder",
     "RasterSample",
     "SpatialAutocorrelation",
     "SpatialSplit",

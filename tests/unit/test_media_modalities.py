@@ -804,3 +804,61 @@ def test_raster_identity_requires_spatial_metadata():
 
     assert raster.byte_size == len(payload)
     assert raster.crs == "EPSG:3857"
+
+
+def test_raster_decoder_is_bounded_and_shape_checked():
+    """Raster decoding preserves metadata and enforces the pixel budget."""
+    payload = b"raster"
+    raster = geospatial.RasterSample(
+        source="memory://raster",
+        encoded_bytes=payload,
+        file_hash=hashlib.sha256(payload).hexdigest(),
+        width=2,
+        height=3,
+        bands=2,
+        dtype="uint8",
+        crs="EPSG:3857",
+        transform=(1, 0, 0, 0, -1, 0),
+        nodata_value=0,
+    )
+
+    pixels = raster.decode(
+        lambda value: np.full((3, 2, 2), value[0], dtype=np.uint8),
+        max_pixels=12,
+    )
+
+    assert pixels.shape == (3, 2, 2)
+    assert not pixels.flags.writeable
+    assert (
+        raster.measured_nodata_fraction(
+            lambda value: np.full((3, 2, 2), value[0], dtype=np.uint8)
+        )
+        == 0.0
+    )
+
+    with pytest.raises(geospatial.GeospatialValidationError, match="limit"):
+        raster.decode(
+            lambda value: np.zeros((3, 2, 2), dtype=np.uint8),
+            max_pixels=11,
+        )
+
+
+def test_raster_decoder_rejects_metadata_mismatch():
+    """A caller-owned decoder cannot override declared raster dimensions."""
+    payload = b"raster"
+    raster = geospatial.RasterSample(
+        source="memory://raster",
+        encoded_bytes=payload,
+        file_hash=hashlib.sha256(payload).hexdigest(),
+        width=2,
+        height=3,
+        bands=1,
+        dtype="uint8",
+        crs="EPSG:3857",
+        transform=(1, 0, 0, 0, -1, 0),
+    )
+
+    with pytest.raises(
+        geospatial.GeospatialValidationError, match="dimensions"
+    ):
+        raster.decode(lambda value: np.zeros((2, 2), dtype=np.uint8))
