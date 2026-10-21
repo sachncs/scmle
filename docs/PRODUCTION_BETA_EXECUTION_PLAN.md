@@ -1614,7 +1614,7 @@ Python naming-convention evidence at `d88a9a9`, revalidated on 2026-10-21:
   formatting, and mypy passed. Ruff's configured Google docstring convention
   remains the source-level style gate for package code.
 
-Current-head strict regression at `ae6b1f2` on 2026-10-21:
+Full strict regression at `ae6b1f2` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
   `2,247` tests with `124` explicit optional-dependency skips in 27 minutes
@@ -1654,3 +1654,15 @@ Strict stability-harness evidence at `34c0f26` on 2026-10-21:
   collected test cases on each attempt with no inventory changes, skips,
   quarantined failures, or unquarantined failures. Ruff, formatting, and mypy
   passed for the changed files.
+
+Resampling contract correction at `ca6ab97` on 2026-10-21:
+
+- `Resampler` now owns the general polymorphic `resample()` contract, while
+  `IndexResampler` contains the shared row-index implementation used by
+  random and jitter samplers. Synthetic generator sampling therefore provides
+  a real `resample()` implementation without a fake index method that raises
+  at runtime.
+- The focused sampling and component-contract suite passed 40 tests with one
+  optional skip under `-W error::ResourceWarning`; Ruff, formatting, mypy, and
+  `git diff --check` passed. The source and test change was pushed as one
+  atomic commit.
