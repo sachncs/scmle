@@ -1474,7 +1474,37 @@ class GeospatialAdapter(ModalityAdapter):
 
     def curate(self) -> curation.ModalityCurationReport:
         """Return geometry, CRS, bounds, and label evidence."""
-        return self.dataset.curate()
+        report = self.dataset.curate()
+        profile = dict(report.profile)
+        quality_findings = list(report.quality_findings)
+        if not self.dataset.crs.strip():
+            profile["spatial_boundary_leakage"] = {
+                "status": "blocked_missing_crs",
+                "block_size": self.block_size,
+            }
+        else:
+            leakage = self.dataset.boundary_leakage(self.block_size)
+            profile["spatial_boundary_leakage"] = leakage.to_dict()
+            if leakage.crossing_feature_ids:
+                quality_findings.append(
+                    curation.build_finding(
+                        "quality.geospatial-boundary-leakage",
+                        data_contracts.FindingSeverity.WARNING,
+                        {
+                            "dataset": self.dataset_hash,
+                            "block_size": self.block_size,
+                        },
+                        leakage.to_dict(),
+                        "Review geometries crossing spatial block envelopes "
+                        "before using centroid-based evaluation.",
+                        False,
+                    )
+                )
+        return dataclasses.replace(
+            report,
+            profile=profile,
+            quality_findings=tuple(quality_findings),
+        )
 
     def split(self, seed: int) -> DatasetPartitions:
         """Split by spatial blocks in declared CRS units."""

@@ -478,6 +478,62 @@ class SpatialReprojectionReport:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class SpatialBoundaryLeakage:
+    """Potential envelope leakage across CRS-unit spatial blocks."""
+
+    block_size: float
+    feature_count: int
+    feature_block_counts: tuple[tuple[str, int], ...]
+    crossing_feature_ids: tuple[str, ...]
+    truncated_feature_ids: tuple[str, ...]
+    max_blocks_per_feature: int
+
+    def __post_init__(self) -> None:
+        """Validate bounded and internally consistent leakage evidence."""
+        if not math.isfinite(self.block_size) or self.block_size <= 0:
+            raise ValueError("block_size must be a positive finite number")
+        if self.feature_count < 1:
+            raise ValueError("feature_count must be positive")
+        if self.max_blocks_per_feature < 1:
+            raise ValueError("max_blocks_per_feature must be positive")
+        if len(self.feature_block_counts) != self.feature_count:
+            raise ValueError("feature block counts must match feature count")
+        feature_ids = tuple(item[0] for item in self.feature_block_counts)
+        if len(set(feature_ids)) != len(feature_ids):
+            raise ValueError("feature block counts must have unique IDs")
+        if any(count < 1 for _, count in self.feature_block_counts):
+            raise ValueError("feature block counts must be positive")
+        crossing = set(self.crossing_feature_ids)
+        truncated = set(self.truncated_feature_ids)
+        if not crossing.issubset(feature_ids):
+            raise ValueError("crossing feature IDs must belong to the report")
+        if not truncated.issubset(crossing):
+            raise ValueError(
+                "truncated feature IDs must cross block boundaries"
+            )
+
+    @property
+    def status(self) -> str:
+        """Return whether the envelope indicates potential leakage."""
+        return "potential_leakage" if self.crossing_feature_ids else "clear"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native boundary-leakage evidence."""
+        return {
+            "status": self.status,
+            "block_size": self.block_size,
+            "feature_count": self.feature_count,
+            "feature_block_counts": [
+                {"feature_id": feature_id, "block_count": block_count}
+                for feature_id, block_count in self.feature_block_counts
+            ],
+            "crossing_feature_ids": list(self.crossing_feature_ids),
+            "truncated_feature_ids": list(self.truncated_feature_ids),
+            "max_blocks_per_feature": self.max_blocks_per_feature,
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialProfile:
     """Bounded data-understanding summary for a vector dataset."""
 
@@ -1177,6 +1233,76 @@ class GeospatialDataset:
                 tuple(float(value) for value in row) for row in values
             ),
             crs=self.crs,
+        )
+
+    def spatial_block_envelopes(
+        self, block_size: float
+    ) -> dict[str, tuple[int, int, int, int]]:
+        """Return each feature envelope in CRS-unit block coordinates.
+
+        The envelope is conservative: a feature is considered to touch every
+        block intersected by its axis-aligned bounds. It is intended for
+        curation and leakage review, not as a replacement for a geometry
+        engine's exact intersection operation.
+        """
+        if not self.crs.strip():
+            raise GeospatialValidationError(
+                "spatial block envelopes require a declared CRS",
+                {"code": "missing_crs"},
+            )
+        if not math.isfinite(block_size) or block_size <= 0:
+            raise ValueError("block_size must be a positive finite number")
+        dataset_bounds = self.profile().bounds
+        origin_x, origin_y = dataset_bounds[:2]
+        envelopes: dict[str, tuple[int, int, int, int]] = {}
+        for feature in self.features:
+            minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
+            envelopes[feature.feature_id] = (
+                math.floor((minimum_x - origin_x) / block_size),
+                math.floor((minimum_y - origin_y) / block_size),
+                math.floor((maximum_x - origin_x) / block_size),
+                math.floor((maximum_y - origin_y) / block_size),
+            )
+        return envelopes
+
+    def boundary_leakage(
+        self,
+        block_size: float,
+        max_blocks_per_feature: int = 10_000,
+    ) -> SpatialBoundaryLeakage:
+        """Measure conservative envelope crossings for a spatial split.
+
+        A crossing feature is not automatically leaking: the geometry may not
+        occupy every block in its envelope. The evidence identifies the
+        feature for domain review before a centroid-based split is promoted.
+        Large envelopes are counted arithmetically and marked truncated rather
+        than expanded into an unbounded block list.
+        """
+        if max_blocks_per_feature < 1:
+            raise ValueError("max_blocks_per_feature must be positive")
+        envelopes = self.spatial_block_envelopes(block_size)
+        block_counts: list[tuple[str, int]] = []
+        crossing_feature_ids: list[str] = []
+        truncated_feature_ids: list[str] = []
+        for feature in self.features:
+            minimum_x, minimum_y, maximum_x, maximum_y = envelopes[
+                feature.feature_id
+            ]
+            block_count = (maximum_x - minimum_x + 1) * (
+                maximum_y - minimum_y + 1
+            )
+            block_counts.append((feature.feature_id, block_count))
+            if block_count > 1:
+                crossing_feature_ids.append(feature.feature_id)
+            if block_count > max_blocks_per_feature:
+                truncated_feature_ids.append(feature.feature_id)
+        return SpatialBoundaryLeakage(
+            block_size=block_size,
+            feature_count=len(self.features),
+            feature_block_counts=tuple(block_counts),
+            crossing_feature_ids=tuple(crossing_feature_ids),
+            truncated_feature_ids=tuple(truncated_feature_ids),
+            max_blocks_per_feature=max_blocks_per_feature,
         )
 
     def split_spatial(

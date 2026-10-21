@@ -865,6 +865,30 @@ def test_geospatial_spatial_split_keeps_blocks_together():
     assert first.block_size == 5
 
 
+def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
+    """Bounds crossing blocks are surfaced before centroid-based splitting."""
+    dataset = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "point", {"type": "Point", "coordinates": [0, 0]}
+            ),
+            geospatial.GeoFeature(
+                "line",
+                {"type": "LineString", "coordinates": [[0, 0], [2.2, 0]]},
+            ),
+        ),
+        crs="EPSG:3857",
+    )
+
+    evidence = dataset.boundary_leakage(block_size=1.0, max_blocks_per_feature=2)
+
+    assert evidence.status == "potential_leakage"
+    assert evidence.crossing_feature_ids == ("line",)
+    assert evidence.truncated_feature_ids == ("line",)
+    assert evidence.feature_block_counts == (("point", 1), ("line", 3))
+    assert evidence.to_dict()["max_blocks_per_feature"] == 2
+
+
 def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
     """Observation times support UTC-safe future evaluation evidence."""
     features = tuple(

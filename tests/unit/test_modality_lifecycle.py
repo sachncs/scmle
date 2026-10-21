@@ -725,6 +725,40 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
     assert raw["feature_space_only"] is False
 
 
+def test_geospatial_curation_records_boundary_leakage_warning():
+    """The adapter carries envelope-crossing evidence into curation."""
+    adapter = modality_lifecycle.GeospatialAdapter(
+        geospatial.GeospatialDataset(
+            (
+                geospatial.GeoFeature(
+                    "line",
+                    {
+                        "type": "LineString",
+                        "coordinates": [[0, 0], [2.2, 0]],
+                    },
+                    label="alpha",
+                ),
+                geospatial.GeoFeature(
+                    "point",
+                    {"type": "Point", "coordinates": [0, 0]},
+                    label="beta",
+                ),
+            ),
+            crs="EPSG:3857",
+        ),
+        block_size=1.0,
+    )
+
+    report = adapter.curate()
+
+    assert report.profile["spatial_boundary_leakage"]["status"] == (
+        "potential_leakage"
+    )
+    assert "quality.geospatial-boundary-leakage" in {
+        finding.finding_id for finding in report.quality_findings
+    }
+
+
 def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     """The audio adapter exposes bounded frame-window score evidence."""
     report = modality_lifecycle.ModalityLifecycle().run(
