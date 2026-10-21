@@ -1921,6 +1921,18 @@ Current-head strict regression evidence at `fad7703` on 2026-10-21:
   external transport/resource-fault execution, secret custody, or independent
   reviewer evidence required by the release criteria.
 
+Current external gate observation at `b05519a` on 2026-10-21:
+
+- GitHub Actions created the `ci` matrix and `Deploy documentation site` runs
+  for the pushed commit, but every job was rejected before a runner step. The
+  GitHub check annotations state that recent account payments failed or the
+  spending limit must be increased. These are unavailable hosted-runner
+  results, not source-test failures.
+- The requested public URL `https://sachncs.github.io/super-charge-ml/`
+  returned HTTP 404. The Pages deployment therefore remains unverified until
+  the account/plan and repository visibility or Pages configuration are
+  resolved by the owner.
+
 Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
