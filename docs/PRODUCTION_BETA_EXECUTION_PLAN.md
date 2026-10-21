@@ -1511,6 +1511,15 @@ Current-head complete release preflight at `c9ec4c9` on 2026-10-21:
   execution, public GitHub Pages verification, external fault rehearsal,
   secret-manager custody, or independent release review/signature.
 
+Strict full-suite evidence at `c22d294` on 2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  2,276 tests with 88 optional-dependency skips in 29 minutes. No warning was
+  promoted to a failure, and the worktree remained unchanged.
+- This is stronger current-head regression evidence than the bounded preflight
+  suite, but the skips still represent uninstalled optional capability paths;
+  they are not evidence for those optional integrations.
+
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
