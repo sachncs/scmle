@@ -951,6 +951,88 @@ class RasterSample:
             return "declared"
         return "unknown"
 
+    def pixel_window_bounds(
+        self,
+        row_start: int,
+        row_end: int,
+        column_start: int,
+        column_end: int,
+    ) -> tuple[float, float, float, float] | None:
+        """Return the CRS bounds of a validated pixel window.
+
+        Pixel boundaries are transformed rather than pixel centers so the
+        returned envelope describes the full window. Empty transforms have no
+        spatial reference and therefore return ``None``. Six-value transforms
+        use the conventional affine order ``a, b, c, d, e, f``; nine-value
+        transforms use a row-major homogeneous matrix.
+
+        Args:
+            row_start: Inclusive pixel-row boundary.
+            row_end: Exclusive pixel-row boundary.
+            column_start: Inclusive pixel-column boundary.
+            column_end: Exclusive pixel-column boundary.
+
+        Returns:
+            Minimum x, minimum y, maximum x, and maximum y in the source CRS,
+            or ``None`` when the sample has no transform.
+
+        Raises:
+            ValueError: If the window is outside the raster or empty.
+            GeospatialValidationError: If a homogeneous transform is
+                singular on a window boundary.
+        """
+        if not (
+            0 <= row_start < row_end <= self.height
+            and 0 <= column_start < column_end <= self.width
+        ):
+            raise ValueError("pixel window must be non-empty and in bounds")
+        if not self.transform:
+            return None
+        corners = (
+            (column_start, row_start),
+            (column_start, row_end),
+            (column_end, row_start),
+            (column_end, row_end),
+        )
+        if len(self.transform) == 6:
+            first, second, third, fourth, fifth, sixth = self.transform
+
+            def project(column: int, row: int) -> tuple[float, float]:
+                return (
+                    first * column + second * row + third,
+                    fourth * column + fifth * row + sixth,
+                )
+
+        else:
+            (
+                first,
+                second,
+                third,
+                fourth,
+                fifth,
+                sixth,
+                seventh,
+                eighth,
+                ninth,
+            ) = self.transform
+
+            def project(column: int, row: int) -> tuple[float, float]:
+                denominator = seventh * column + eighth * row + ninth
+                if denominator == 0:
+                    raise GeospatialValidationError(
+                        "raster transform is singular at a pixel boundary",
+                        {"code": "singular_transform"},
+                    )
+                return (
+                    (first * column + second * row + third) / denominator,
+                    (fourth * column + fifth * row + sixth) / denominator,
+                )
+
+        projected = tuple(project(column, row) for column, row in corners)
+        x_values = tuple(point[0] for point in projected)
+        y_values = tuple(point[1] for point in projected)
+        return (min(x_values), min(y_values), max(x_values), max(y_values))
+
     def decode(
         self,
         decoder: RasterDecoder,

@@ -1889,6 +1889,7 @@ class RasterAdapter(ModalityAdapter):
         row_step = max(1, int(np.ceil(height / 4)))
         column_step = max(1, int(np.ceil(width / 4)))
         terms: list[tuple[str, float]] = []
+        windows: list[dict[str, object]] = []
         for row in range(0, height, row_step):
             for column in range(0, width, column_step):
                 end_row = min(row + row_step, height)
@@ -1909,11 +1910,22 @@ class RasterAdapter(ModalityAdapter):
                     masked_score = float(masked_decision[0])
                 else:
                     masked_score = float(masked_decision[0, selected_class])
-                terms.append(
-                    (
-                        f"region[{row}:{end_row},{column}:{end_column}]",
-                        original_score - masked_score,
-                    )
+                region_name = f"region[{row}:{end_row},{column}:{end_column}]"
+                score_delta = original_score - masked_score
+                spatial_bounds = sample.pixel_window_bounds(
+                    row, end_row, column, end_column
+                )
+                terms.append((region_name, score_delta))
+                windows.append(
+                    {
+                        "pixel_window": [row, end_row, column, end_column],
+                        "spatial_bounds": (
+                            list(spatial_bounds)
+                            if spatial_bounds is not None
+                            else None
+                        ),
+                        "score_delta": float(score_delta),
+                    }
                 )
         selected = sorted(
             terms,
@@ -1922,10 +1934,13 @@ class RasterAdapter(ModalityAdapter):
         return {
             "status": "available",
             "method": "decoded_pixel_region_occlusion",
+            "source": sample.source,
             "decoder": self.decoder_name,
             "decoded_dimensions": [int(width), int(height), int(sample.bands)],
+            "crs": sample.crs,
             "window_count": len(terms),
             "terms": [[name, float(value)] for name, value in selected],
+            "windows": windows,
             "baseline": "zero-valued decoded raster pixels",
             "feature_space_only": False,
             "limitations": [

@@ -290,6 +290,21 @@ def test_raster_adapter_accepts_a_named_bounded_decoder():
     assert features.values[:, 0].tolist() == [1.0, 2.0]
 
 
+def test_raster_pixel_windows_preserve_affine_crs_bounds():
+    """Raster windows expose reviewable source-CRS envelopes."""
+    sample = raster_adapter().samples[0]
+
+    assert sample.pixel_window_bounds(0, 8, 0, 8) == (0.0, -8.0, 8.0, 0.0)
+    assert (
+        dataclasses.replace(sample, transform=()).pixel_window_bounds(
+            0, 8, 0, 8
+        )
+        is None
+    )
+    with pytest.raises(ValueError, match="pixel window"):
+        sample.pixel_window_bounds(0, 33, 0, 8)
+
+
 def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
     tmp_path: Path,
 ):
@@ -316,10 +331,17 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
     local = evidence["modality_specific"]
     assert local["status"] == "available"
     assert local["method"] == "decoded_pixel_region_occlusion"
+    assert local["source"] in {sample.source for sample in decoded.samples}
     assert local["decoder"] == "fixture-raster-v1"
     assert local["decoded_dimensions"] == [32, 32, 3]
+    assert local["crs"] == "EPSG:3857"
     assert local["window_count"] == 16
     assert len(local["terms"]) == 10
+    assert local["windows"][0]["pixel_window"] == [0, 8, 0, 8]
+    spatial_bounds = local["windows"][0]["spatial_bounds"]
+    assert spatial_bounds[2] - spatial_bounds[0] == 8.0
+    assert spatial_bounds[3] - spatial_bounds[1] == 8.0
+    assert isinstance(local["windows"][0]["score_delta"], float)
     assert local["baseline"] == "zero-valued decoded raster pixels"
     assert local["feature_space_only"] is False
 
