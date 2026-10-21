@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
+from datetime import datetime
+from datetime import UTC
 import hashlib
 import json
 import math
@@ -10,6 +12,7 @@ from numbers import Real
 import pathlib
 import random
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy as np
@@ -39,6 +42,10 @@ class GeospatialValidationError(errors.DataError):
     category = "geospatial_validation"
 
 
+class GeospatialTemporalError(GeospatialValidationError):
+    """Temporal geospatial evidence is incomplete or invalid."""
+
+
 def canonical_source(source: str | pathlib.Path) -> str:
     """Return a stable source identifier for a path or URI-like value."""
     value = str(source).strip()
@@ -47,6 +54,34 @@ def canonical_source(source: str | pathlib.Path) -> str:
     if "://" in value:
         return value
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
+
+
+def canonical_observation_time(value: datetime | str) -> datetime:
+    """Parse and normalize a timezone-aware observation time to UTC."""
+    if isinstance(value, str):
+        normalized = value.strip()
+        if normalized.endswith(("Z", "z")):
+            normalized = normalized[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError as error:
+            raise GeospatialTemporalError(
+                f"invalid observation time: {value!r}",
+                {"code": "invalid_observation_time"},
+            ) from error
+    elif isinstance(value, datetime):
+        parsed = value
+    else:
+        raise GeospatialTemporalError(
+            "observation time must be datetime or text",
+            {"code": "invalid_observation_time"},
+        )
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise GeospatialTemporalError(
+            "observation time must be timezone-aware",
+            {"code": "timezone_required"},
+        )
+    return parsed.astimezone(UTC)
 
 
 def validate_coordinates(value: Any) -> tuple[float, ...]:
@@ -199,6 +234,7 @@ class GeoFeature:
     geometry: Mapping[str, Any]
     properties: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     label: str | int | float | bool | None = None
+    observation_time: datetime | str | None = None
     geometry_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -210,6 +246,12 @@ class GeoFeature:
                 "geometry must be an object", {"code": "invalid_geometry"}
             )
         geometry_coordinates(self.geometry)
+        if self.observation_time is not None:
+            object.__setattr__(
+                self,
+                "observation_time",
+                canonical_observation_time(self.observation_time),
+            )
         payload = json.dumps(
             self.geometry,
             ensure_ascii=True,
@@ -275,6 +317,34 @@ class SpatialSplit:
     def block_ids(self) -> dict[str, tuple[str, ...]]:
         """Return the stable spatial blocks assigned to each partition."""
         return {name: tuple(values) for name, values in self.blocks.items()}
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class GeospatialTemporalSplit:
+    """Time-ordered geospatial features separated at a UTC cutoff."""
+
+    cutoff: datetime
+    train: tuple[GeoFeature, ...]
+    future: tuple[GeoFeature, ...]
+
+    def __post_init__(self) -> None:
+        """Validate the cutoff and timestamp completeness of each partition."""
+        if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
+            raise ValueError("cutoff must be timezone-aware")
+        object.__setattr__(self, "cutoff", self.cutoff.astimezone(UTC))
+        if any(feature.observation_time is None for feature in self.train):
+            raise ValueError("train features must contain observation times")
+        if any(feature.observation_time is None for feature in self.future):
+            raise ValueError("future features must contain observation times")
+
+    @property
+    def has_future_leakage(self) -> bool:
+        """Return whether a training feature occurs after the cutoff."""
+        return any(
+            isinstance(feature.observation_time, datetime)
+            and feature.observation_time > self.cutoff
+            for feature in self.train
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -353,7 +423,8 @@ class GeospatialDataset:
             )
         digest = hashlib.sha256(
             "\n".join(
-                f"{feature.feature_id}\0{feature.geometry_hash}"
+                f"{feature.feature_id}\0{feature.geometry_hash}\0"
+                f"{feature.observation_time or ''}"
                 for feature in normalized
             ).encode("utf-8")
         ).hexdigest()
@@ -429,8 +500,40 @@ class GeospatialDataset:
         labels = label_counts(feature.label for feature in self.features)
         profile_data = profile.to_dict()
         profile_data["label_counts"] = labels
+        observation_times = tuple(
+            cast(datetime, feature.observation_time)
+            for feature in self.features
+            if feature.observation_time is not None
+        )
+        if observation_times and len(observation_times) == len(self.features):
+            profile_data["temporal"] = {
+                "status": "complete",
+                "observation_time_min": min(observation_times).isoformat(),
+                "observation_time_max": max(observation_times).isoformat(),
+            }
+        elif observation_times:
+            profile_data["temporal"] = {
+                "status": "mixed",
+                "timed_feature_count": len(observation_times),
+                "untimed_feature_count": len(self.features)
+                - len(observation_times),
+            }
+        else:
+            profile_data["temporal"] = {"status": "absent"}
         quality_findings = []
         risk_findings = []
+        if observation_times and len(observation_times) != len(self.features):
+            quality_findings.append(
+                build_finding(
+                    "quality.geospatial-mixed-temporal-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"source": self.source},
+                    {"temporal": profile_data["temporal"]},
+                    "Supply observation times for every feature or explicitly "
+                    "use a non-temporal geospatial capability.",
+                    False,
+                )
+            )
         numeric_labels = [feature.label for feature in self.features]
         if not self.crs.strip():
             profile_data["spatial_autocorrelation"] = {
@@ -747,6 +850,38 @@ class GeospatialDataset:
             },
         )
 
+    def split_temporal(self, cutoff: datetime | str) -> GeospatialTemporalSplit:
+        """Split fully timestamped features into past and future partitions.
+
+        Features at the cutoff belong to training. Features after the cutoff
+        belong to future evaluation. Untimestamped features fail closed because
+        assigning them a temporal position would invent ordering evidence.
+        """
+        cutoff_time = canonical_observation_time(cutoff)
+        if any(feature.observation_time is None for feature in self.features):
+            raise GeospatialTemporalError(
+                "temporal splitting requires an observation time on every "
+                "feature",
+                {"code": "incomplete_observation_times"},
+            )
+        train = tuple(
+            feature
+            for feature in self.features
+            if isinstance(feature.observation_time, datetime)
+            and feature.observation_time <= cutoff_time
+        )
+        future = tuple(
+            feature
+            for feature in self.features
+            if isinstance(feature.observation_time, datetime)
+            and feature.observation_time > cutoff_time
+        )
+        return GeospatialTemporalSplit(
+            cutoff=cutoff_time,
+            train=train,
+            future=future,
+        )
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RasterSample:
@@ -792,10 +927,13 @@ __all__ = [
     "GeospatialDataset",
     "GeospatialFeatures",
     "GeospatialProfile",
+    "GeospatialTemporalError",
+    "GeospatialTemporalSplit",
     "GeospatialValidationError",
     "RasterSample",
     "SpatialAutocorrelation",
     "SpatialSplit",
+    "canonical_observation_time",
     "canonical_source",
     "geometry_coordinates",
     "moran_statistic",

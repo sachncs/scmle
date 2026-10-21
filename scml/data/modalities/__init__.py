@@ -15,10 +15,13 @@ from scml.data.modalities.document import DocumentElement
 from scml.data.modalities.document import DocumentFormat
 from scml.data.modalities.document import DocumentLayout
 from scml.data.modalities.document import DocumentReader
+from scml.data.modalities.geospatial import canonical_observation_time
 from scml.data.modalities.geospatial import GeoFeature
 from scml.data.modalities.geospatial import GeospatialDataset
 from scml.data.modalities.geospatial import GeospatialFeatures
 from scml.data.modalities.geospatial import GeospatialProfile
+from scml.data.modalities.geospatial import GeospatialTemporalError
+from scml.data.modalities.geospatial import GeospatialTemporalSplit
 from scml.data.modalities.geospatial import moran_statistic
 from scml.data.modalities.geospatial import RasterSample
 from scml.data.modalities.geospatial import SpatialAutocorrelation
@@ -57,6 +60,8 @@ __all__ = [
     "GeospatialDataset",
     "GeospatialFeatures",
     "GeospatialProfile",
+    "GeospatialTemporalError",
+    "GeospatialTemporalSplit",
     "GraphData",
     "GraphEdge",
     "GraphNode",
@@ -77,5 +82,6 @@ __all__ = [
     "VideoSample",
     "VideoSplit",
     "canonical_event_time",
+    "canonical_observation_time",
     "moran_statistic",
 ]

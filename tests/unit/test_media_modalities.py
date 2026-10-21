@@ -1,5 +1,7 @@
 """Tests for dependency-light audio, video, and geospatial foundations."""
 
+from datetime import datetime
+from datetime import UTC
 import hashlib
 import io
 import wave
@@ -647,6 +649,70 @@ def test_geospatial_spatial_split_keeps_blocks_together():
     assert len(set().union(*blocks)) == 6
     assert first == second
     assert first.block_size == 5
+
+
+def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
+    """Observation times support UTC-safe future evaluation evidence."""
+    features = tuple(
+        geospatial.GeoFeature(
+            f"feature-{index}",
+            {"type": "Point", "coordinates": [float(index), 0]},
+            observation_time=timestamp,
+        )
+        for index, timestamp in enumerate(
+            (
+                "2026-01-01T01:00:00+01:00",
+                "2026-01-02T00:00:00Z",
+                "2026-01-03T00:00:00+00:00",
+            )
+        )
+    )
+    dataset = geospatial.GeospatialDataset(features, crs="EPSG:3857")
+
+    split = dataset.split_temporal("2026-01-02T00:00:00+00:00")
+    report = dataset.curate()
+
+    assert dataset.features[0].observation_time == datetime(
+        2026, 1, 1, tzinfo=UTC
+    )
+    assert len(split.train) == 2
+    assert len(split.future) == 1
+    assert not split.has_future_leakage
+    assert split.cutoff.tzinfo == UTC
+    assert report.profile["temporal"]["status"] == "complete"
+
+
+def test_geospatial_temporal_state_fails_closed_when_incomplete():
+    """Missing or malformed observation times remain explicit before splitting."""
+    mixed = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "timed",
+                {"type": "Point", "coordinates": [0, 0]},
+                observation_time=datetime(2026, 1, 1, tzinfo=UTC),
+            ),
+            geospatial.GeoFeature(
+                "untimed", {"type": "Point", "coordinates": [1, 1]}
+            ),
+        ),
+        crs="EPSG:3857",
+    )
+
+    report = mixed.curate()
+    quality_ids = {finding.finding_id for finding in report.quality_findings}
+
+    assert report.profile["temporal"] == {
+        "status": "mixed",
+        "timed_feature_count": 1,
+        "untimed_feature_count": 1,
+    }
+    assert "quality.geospatial-mixed-temporal-state" in quality_ids
+    with pytest.raises(
+        geospatial.GeospatialTemporalError, match="every feature"
+    ):
+        mixed.split_temporal("2026-01-02T00:00:00Z")
+    with pytest.raises(geospatial.GeospatialTemporalError, match="timezone"):
+        geospatial.canonical_observation_time("2026-01-01T00:00:00")
 
 
 def test_geospatial_feature_preparation_preserves_crs_units():
