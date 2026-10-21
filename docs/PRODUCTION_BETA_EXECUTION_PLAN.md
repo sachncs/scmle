@@ -1530,6 +1530,14 @@ Standalone site verification at `2eb37a9` on 2026-10-21:
   `https://sachncs.github.io/super-charge-ml/` still returns HTTP 404 because
   hosted repository visibility and Pages state are unresolved.
 
+Current-head test-stability evidence at `f955873` on 2026-10-21:
+
+- `scripts/check_test_stability.py --runs 3` passed all 22 selected API,
+  performance, and stability cases on each of three attempts.
+- The JSON policy result reported no inventory changes, expired quarantines,
+  unquarantined failures, or quarantined failures. This is local repeatability
+  evidence; the scheduled hosted Linux job remains the cross-platform authority.
+
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
