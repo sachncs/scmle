@@ -199,6 +199,7 @@ class DocumentLayout:
     provider_version: str
     elements: tuple[DocumentElement, ...]
     ocr_confidence: float | None = None
+    source_digest: str | None = None
 
     def __post_init__(self) -> None:
         """Validate the extraction identity and optional OCR confidence."""
@@ -223,6 +224,10 @@ class DocumentLayout:
             or not 0.0 <= self.ocr_confidence <= 1.0
         ):
             raise ValueError("OCR confidence must be in [0, 1]")
+        if self.source_digest is not None and not re.fullmatch(
+            r"[0-9a-f]{64}", self.source_digest
+        ):
+            raise ValueError("source_digest must be a lowercase SHA-256 digest")
 
     @property
     def table_count(self) -> int:
@@ -406,6 +411,17 @@ class DocumentSample:
             raise DocumentValidationError(
                 "document layout element exceeds decoded content",
                 "layout_out_of_range",
+                {"document_id": self.document_id},
+            )
+        if (
+            self.layout is not None
+            and self.layout.source_digest is not None
+            and self.source_digest is not None
+            and self.layout.source_digest != self.source_digest
+        ):
+            raise DocumentValidationError(
+                "document layout source digest does not match the document",
+                "layout_source_mismatch",
                 {"document_id": self.document_id},
             )
         content_bytes = self.content.encode("utf-8")
@@ -872,6 +888,7 @@ class DocumentDataset:
 
 DocumentSource = bytes | str | pathlib.Path
 PdfPageReader = Callable[[bytes], Sequence[str]]
+LayoutReader = Callable[[bytes, str, DocumentFormat], DocumentLayout | None]
 
 
 class DocumentReader:
@@ -881,6 +898,7 @@ class DocumentReader:
         self,
         max_bytes: int = 10_000_000,
         pdf_reader: PdfPageReader | None = None,
+        layout_reader: LayoutReader | None = None,
     ) -> None:
         """Initializes a bounded document reader.
 
@@ -888,6 +906,9 @@ class DocumentReader:
             max_bytes: Maximum encoded source size accepted by the reader.
             pdf_reader: Optional callable supplied by a PDF extra. It receives
                 PDF bytes and returns page text in page order.
+            layout_reader: Optional caller-owned extractor. It receives raw
+                bytes, the stable document ID, and the resolved format, and
+                returns layout/OCR/table provenance or ``None``.
 
         Raises:
             ValueError: If ``max_bytes`` is not positive.
@@ -896,6 +917,7 @@ class DocumentReader:
             raise ValueError("max_bytes must be positive")
         self.max_bytes = max_bytes
         self.pdf_reader = pdf_reader
+        self.layout_reader = layout_reader
 
     def format_for(
         self,
@@ -986,6 +1008,11 @@ class DocumentReader:
             content = self.read_pdf(raw_bytes)
         else:
             content = self.decode_utf8(raw_bytes, resolved_id)
+        resolved_layout = layout
+        if resolved_layout is None and self.layout_reader is not None:
+            resolved_layout = self.read_layout(
+                raw_bytes, resolved_id, resolved_format
+            )
         return DocumentSample(
             document_id=resolved_id,
             content=content,
@@ -993,7 +1020,7 @@ class DocumentReader:
             source_uri=source_uri,
             source_digest=hashlib.sha256(raw_bytes).hexdigest(),
             label=label,
-            layout=layout,
+            layout=resolved_layout,
         )
 
     def decode_utf8(self, raw_bytes: bytes, document_id: str) -> str:
@@ -1044,6 +1071,38 @@ class DocumentReader:
                 {"page_count": len(pages)},
             )
         return "\f".join(pages)
+
+    def read_layout(
+        self,
+        raw_bytes: bytes,
+        document_id: str,
+        document_format: DocumentFormat,
+    ) -> DocumentLayout | None:
+        """Read optional layout, OCR, or table evidence through a callback."""
+        if self.layout_reader is None:
+            return None
+        try:
+            layout = self.layout_reader(raw_bytes, document_id, document_format)
+        except ImportError as error:
+            raise DocumentDependencyError(
+                "document layout extraction requires its optional parser extra",
+                dependency="document-layout-parser",
+                extra="documents",
+                details={"format": document_format.value},
+            ) from error
+        except Exception as error:
+            raise DocumentValidationError(
+                "document layout extractor could not decode the source",
+                "layout_parse_error",
+                {"document_id": document_id, "format": document_format.value},
+            ) from error
+        if layout is not None and not isinstance(layout, DocumentLayout):
+            raise DocumentValidationError(
+                "document layout extractor returned an invalid contract",
+                "layout_invalid_result",
+                {"document_id": document_id},
+            )
+        return layout
 
     def default_document_id(
         self, raw_bytes: bytes, path: pathlib.Path | None

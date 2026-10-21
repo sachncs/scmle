@@ -96,6 +96,90 @@ def test_plain_text_reader_infers_path_format(tmp_path):
     assert sample.source_digest == hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def test_reader_accepts_an_explicit_layout_extractor_contract():
+    """Optional layout extraction receives raw bytes and format identity."""
+    observed: dict[str, object] = {}
+
+    def layout_reader(
+        raw_bytes: bytes,
+        document_id: str,
+        document_format: document.DocumentFormat,
+    ) -> document.DocumentLayout:
+        observed.update(
+            {
+                "raw_bytes": raw_bytes,
+                "document_id": document_id,
+                "document_format": document_format,
+            }
+        )
+        return document.DocumentLayout(
+            source="layout://run-1",
+            provider="fixture-layout",
+            provider_version="1",
+            elements=(document.DocumentElement("heading", 0, 7, 1),),
+            source_digest=hashlib.sha256(raw_bytes).hexdigest(),
+        )
+
+    sample = document.DocumentReader(layout_reader=layout_reader).load(
+        b"Heading", document_id="doc-1"
+    )
+
+    assert observed == {
+        "raw_bytes": b"Heading",
+        "document_id": "doc-1",
+        "document_format": document.DocumentFormat.TEXT,
+    }
+    assert sample.layout is not None
+    assert sample.layout.source_digest == sample.source_digest
+
+
+@pytest.mark.parametrize(
+    ("reader", "expected_error", "code"),
+    (
+        (
+            document.DocumentReader(
+                layout_reader=lambda *arguments: (
+                    generator for generator in ()
+                ).throw(ImportError())
+            ),
+            document.DocumentDependencyError,
+            "missing_dependency",
+        ),
+        (
+            document.DocumentReader(
+                layout_reader=lambda *arguments: "invalid"  # type: ignore[return-value]
+            ),
+            document.DocumentValidationError,
+            "layout_invalid_result",
+        ),
+    ),
+)
+def test_layout_extractor_failures_are_structured(reader, expected_error, code):
+    """Optional extraction failures never become silent metadata loss."""
+    with pytest.raises(expected_error) as caught:
+        reader.load(b"content", document_id="doc-1")
+
+    assert caught.value.details["code"] == code
+
+
+def test_layout_source_digest_mismatch_fails_closed():
+    """Layout provenance cannot be attached to a different raw source."""
+    layout = document.DocumentLayout(
+        source="layout://run-2",
+        provider="fixture-layout",
+        provider_version="1",
+        elements=(document.DocumentElement("text", 0, 7, 1),),
+        source_digest="0" * 64,
+    )
+
+    with pytest.raises(
+        document.DocumentValidationError, match="does not match"
+    ):
+        document.DocumentReader().load(
+            b"Heading", document_id="doc-1", layout=layout
+        )
+
+
 def test_curation_reports_source_traceability_without_inventing_citations():
     """Curation exposes raw-source coverage and preserves missing identity."""
     sourced = document.DocumentReader().load(
