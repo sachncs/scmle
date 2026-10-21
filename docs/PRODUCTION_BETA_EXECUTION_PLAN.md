@@ -1618,3 +1618,13 @@ Current-head strict regression at `ae6b1f2` on 2026-10-21:
   convention guard, and the existing data, modality, reliability, governance,
   and site-adjacent Python tests. The optional skips remain environment
   capability boundaries and do not prove the corresponding integrations.
+
+Strict warning policy enforcement at `b65d931` on 2026-10-21:
+
+- The local release preflight, hosted CI matrix, scheduled full suite, and
+  exact-SHA clean-clone acceptance slice now all pass
+  `-W error::ResourceWarning` to pytest. Resource leaks therefore cannot be
+  downgraded when the same release gates run in another environment.
+- `actionlint .github/workflows/*.yml`, YAML parsing, `bash -n
+  scripts/release_preflight.sh`, and `git diff --check` passed before the
+  workflow change was committed.
