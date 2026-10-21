@@ -1336,3 +1336,14 @@ Current-head clean-clone rehearsal at `494a297` on 2026-10-21:
   `scml --help`.
 - This is reproducible local clean-clone evidence, not independent reviewer
   evidence or hosted Linux proof.
+
+SQLite warning cleanup at `b8e5653` on 2026-10-21:
+
+- Tracemalloc identified the two nondeterministic `ResourceWarning` instances
+  in connector test fixtures using `with sqlite3.connect(...)`; that context
+  commits or rolls back but does not close the connection.
+- The fixtures now compose `contextlib.closing` with the transaction context.
+  The combined connector and lifecycle-extras regression slice passes 29 tests
+  under `-W error::ResourceWarning`, with Ruff and formatting clean.
+- This removes a test-owned resource leak. External transport, container, and
+  kernel fault evidence remain separate reliability requirements.
