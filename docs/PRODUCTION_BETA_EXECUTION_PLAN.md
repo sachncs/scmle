@@ -1953,6 +1953,36 @@ Extension contract full verification at `18cddfd` on 2026-10-22:
   execution, secret custody, and independent reviewer evidence remain
   separate release gates.
 
+Curation-only modality path full verification at `021b13c` on 2026-10-22:
+
+- `ModalityCurationProject` now accepts unlabeled, unsupervised, and empty
+  modality snapshots without entering the classification lifecycle. It
+  validates source hash, sample count, modality manifest identity, and typed
+  curation-report output, then writes an atomic signed curation record and
+  dataset card. The modelling path remains strict and still rejects missing
+  labels rather than inventing a task.
+- `uv run pytest -q tests -W error::ResourceWarning` passed `2,326` tests with
+  `88` explicit optional-dependency skips in 32 minutes 32 seconds. No
+  failure, error, or resource warning was promoted to a failure.
+- `./scripts/release_preflight.sh` passed all local gates. The bounded suite
+  passed `1,991` tests with `75` explained skips; total coverage was `83.12%`
+  and declared core coverage was `86%`. The public API compatibility check
+  passed with `14` exports.
+- Mutation testing killed `1,506/2,057` mutants (`73%`) against the `70%`
+  minimum. One mutation timed out and `550` survived; the configured gate
+  passed and the survivor inventory remains follow-up evidence.
+- Five-seed offline benchmarks passed with zero regressions and zero failures.
+  Peak memory was `0.3625`, `0.3844`, `0.4286`, and `0.4341` GB for breast
+  cancer, wine, digits, and diabetes progression respectively.
+- Reproducible artifacts and network-isolated installs passed. The wheel hash
+  was `ead66f5d5f6420d03cddff61ec4f4521049f54ca60784fd09549c9ae62161a51` and
+  the source-distribution hash was
+  `4a6d6e0e2f674b90ebdde20bb7863b019e8ebebe242a2e9d6bb40542388f15d9`.
+- The Astro site audit found zero vulnerabilities; it built `17` pages,
+  passed accessibility checks for `17` files and `384` links, and passed both
+  Playwright smoke tests. Hosted Linux and Pages, external fault execution,
+  secret custody, and independent reviewer evidence remain separate gates.
+
 Current-head strict and release preflight evidence at `cd10719` on 2026-10-22:
 
 - `uv run pytest -q tests -W error::ResourceWarning` passed `2,321` tests with
