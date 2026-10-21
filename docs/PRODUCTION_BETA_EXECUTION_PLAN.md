@@ -1297,3 +1297,16 @@ Standalone site smoke evidence at the post-preflight working head on
   documentation navigation exposed a keyboard focus path.
 - This verifies the local site acceptance surface. It does not verify the
   unavailable public GitHub Pages URL or hosted deployment workflow.
+
+Generated-site link-gate evidence at `9dfdfd6` on 2026-10-21:
+
+- `website/scripts/check-links.mjs` now resolves same-site links against the
+  `/super-charge-ml/` base path, checks route and asset targets, and validates
+  same-page anchors without making external network calls. The gate is wired
+  into both the ordinary site workflow and the Pages build workflow.
+- `npm run build && npm run check:links` passed for all 15 generated pages and
+  310 same-site links. The same run also passed `npm run check:a11y` and both
+  Playwright smoke tests.
+- This turns the internal-link acceptance criterion into an executable local
+  and hosted-build check; it does not verify the currently unavailable public
+  Pages deployment.
