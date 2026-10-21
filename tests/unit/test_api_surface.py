@@ -9,6 +9,7 @@ from scml.governance import vault
 
 PUBLIC_API = {
     "MLProject",
+    "ModalityProject",
     "ModelBundle",
     "RunResult",
     "__version__",
