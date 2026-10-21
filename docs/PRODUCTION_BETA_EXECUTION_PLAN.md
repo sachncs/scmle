@@ -1260,3 +1260,30 @@ Standalone diagnostic documentation evidence at `1904cc7` on 2026-10-21:
 - This closes the site explanation gap for the latest evaluation evidence. It
   does not make either diagnostic a root-cause, fairness, or causal claim, and
   it does not close the independent-review or hosted deployment gates.
+
+Clean-head local release preflight at `d1c35f4` on 2026-10-21:
+
+- Static checks passed: Ruff, format, mypy, Bandit, pip-audit, and public API
+  compatibility. Bandit retained the existing comment-parser and documented
+  `B608` warnings only; no finding failed the gate.
+- The bounded contract suite passed with 1,933 tests and 75 optional skips.
+  Total coverage was 82.97%; the declared core scope reached 86%. The run
+  emitted the two existing SQLite `ResourceWarning` summaries in the
+  lifecycle-extras path; they remain hygiene debt rather than suppressed
+  release evidence.
+- The critical mutation gate killed 1,495 of 2,049 mutants, for a 72% score
+  against the configured 70% minimum. One timeout and surviving mutants remain
+  available for triage.
+- Five-seed offline benchmarks passed for breast cancer, wine, digits, and
+  diabetes progression with zero failed repetitions and zero regressions.
+  Runtime was 98/70/632/63 seconds, peak memory was 0.3734/0.3764/0.4431/
+  0.4469 GB, and failure rate was zero for each dataset. Independent-reference
+  verdicts were tie, tie, tie, and ahead.
+- Wheel and source-distribution checks passed, reproducible hashes were
+  `wheel: 1a4ea2a9edc921ee8e1a186d78c7816436debb5a980045df5fa1d57f1c72be38`
+  and `sdist: 12ece6887ca3a8574d342523ef6f3744c4309f1b01afff1f1dd405669c88134a`,
+  and network-isolated wheel and source-distribution installations passed.
+- The Astro marketing site built all 15 routes and `npm audit` reported zero
+  vulnerabilities. This is clean local evidence for `d1c35f4`, not hosted or
+  independent release proof. GitHub Pages, hosted Linux, external-fault,
+  external key custody, and independent-review gates remain open.
