@@ -6,6 +6,7 @@ set -euo pipefail
 python_version="${SCML_PYTHON_VERSION:-3.14}"
 benchmark_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-bench.XXXXXX")"
 benchmark_output="$benchmark_directory/results.json"
+preflight_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-preflight.XXXXXX")"
 
 uv sync --python "$python_version" \
   --extra boosting --extra optimization --extra multimodal
@@ -29,7 +30,10 @@ uv run --python "$python_version" pytest -q \
   tests/integration/test_predict_api.py \
   tests/integration/test_deployment.py \
   tests/integration/test_monitoring.py \
-  tests/integration/test_serve_and_export.py
+  tests/integration/test_serve_and_export.py \
+  --junitxml="$preflight_directory/bounded-suite.xml"
+uv run --python "$python_version" python scripts/check_pytest_skips.py \
+  "$preflight_directory/bounded-suite.xml"
 uv run --python "$python_version" coverage report \
   --include='scml/contracts/*,scml/data/*,scml/evaluation/*,scml/governance/*,scml/inference/*,scml/monitoring/*' \
   --fail-under=85
