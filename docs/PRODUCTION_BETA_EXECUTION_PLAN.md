@@ -1325,3 +1325,14 @@ Standalone data and operations documentation evidence at `faa9c2a` on
   Playwright smoke tests passed after the content change. This improves the
   standalone developer surface but does not close hosted deployment or
   independent-review evidence.
+
+Current-head clean-clone rehearsal at `494a297` on 2026-10-21:
+
+- A fresh detached clone of the exact pushed commit was clean before test
+  execution. All declared Python extras installed from the lockfile, and the
+  acceptance slice passed with 1,906 tests passed and 73 optional skips in
+  8 minutes 23 seconds.
+- The package entry point executed successfully from the clone with
+  `scml --help`.
+- This is reproducible local clean-clone evidence, not independent reviewer
+  evidence or hosted Linux proof.
