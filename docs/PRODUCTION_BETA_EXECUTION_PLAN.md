@@ -1949,6 +1949,30 @@ Current-head strict regression at `23c3975` on 2026-10-21:
   coverage and mutation gates, hosted Linux and Pages verification, external
   transport/resource-fault execution, secret custody, or independent review.
 
+Current release preflight at `c81a2b3` on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed static checks, formatting, mypy over
+  239 source files, Bandit, pip-audit, API compatibility, and explicit skip
+  auditing. The bounded contract suite passed `1,976` tests with `75`
+  optional-dependency skips, all with recorded reasons; total coverage was
+  83.18% and the declared core scope was 86%.
+- Mutation testing killed `1,503/2,057` mutants (73%), above the configured
+  70% gate; one mutation timed out and 553 survived for follow-up triage.
+- The five-seed offline benchmark regression checked breast cancer, wine,
+  digits, and diabetes progression with zero failures and zero regressions.
+  Verdicts were tie, tie, tie, and ahead; peak memory was 0.3612, 0.3840,
+  0.4429, and 0.4487 GB respectively, with 104, 76, 635, and 69 seconds.
+- Wheel and source-distribution checks passed, builds were reproducible with
+  wheel hash `5b480f812efb9ae9388f2af9f25eb4503898a71996700898915196a3b74937b`
+  and sdist hash
+  `bdd52fb079c047fffadc5b0b2a1ae12efe1e4c616dbf78a3372fa3dba10fef02`, and
+  both network-isolated installation paths passed.
+- The complete marketing-site gate passed: npm audit found 0 vulnerabilities,
+  Astro built 16 pages, accessibility and 346 internal-link checks passed, and
+  both Playwright browser smoke tests passed. This remains local evidence;
+  hosted Linux and Pages, external fault execution, secret custody, and
+  independent review remain separate release gates.
+
 Post-hardening strict regression evidence at `2f1e63a` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
