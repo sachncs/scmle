@@ -1878,3 +1878,29 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   built all 16 static pages. This remains local evidence; hosted Linux and
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
+
+Current-head release preflight evidence at `edf9d39` on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
+  mypy over 239 source files, Bandit, pip-audit, public API compatibility,
+  and explicit JUnit skip-reason auditing. The bounded release suite passed
+  1,971 tests with 75 optional dependency skips; all 75 skips had explicit
+  reasons. Total coverage was 83.15%; the declared core scope was 86%.
+- Mutation testing killed 1,495 of 2,049 mutants (72%), above the 70% release
+  threshold. One mutation timed out and 553 survived; the threshold is met,
+  but the surviving-mutant inventory remains useful follow-up evidence.
+- The five-seed offline benchmark regression completed for breast cancer,
+  wine, digits, and diabetes progression with zero regressions and zero failed
+  repetitions. The verdicts were tie, tie, tie, and ahead; peak memory was
+  0.3729, 0.3754, 0.4277, and 0.4313 GB respectively. This is benchmark
+  evidence, not a claim of universal model superiority.
+- Wheel and source-distribution checks passed, artifacts reproduced
+  byte-for-byte with wheel hash
+  `f586cf667580b996b5d2abea7b9ed7959cf6f9d36d8a0872b9e384b92084da9f` and
+  sdist hash
+  `9612e6910c46d44c445467f6df904c7d632201db4d0521d24d75456c4379df22`, and
+  both network-isolated installation paths passed.
+- The production site dependency audit found 0 vulnerabilities and Astro
+  built all 16 static pages. This remains local evidence; hosted Linux and
+  Pages, external transport/resource-fault execution, secret custody, and
+  independent reviewer evidence remain separate release gates.
