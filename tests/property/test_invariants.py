@@ -11,6 +11,7 @@ import pytest
 from scml.contracts import errors
 from scml.contracts import tasks
 from scml.data.curation import preprocessing
+from scml.data.modalities import document
 from scml.data.profiling import profiler
 from scml.data.readers import tabular
 from scml.data.splitting import splitters
@@ -80,6 +81,20 @@ def test_attestation_parser_fails_closed_on_arbitrary_json(payload):
     except (TypeError, ValueError):
         return
     assert parsed.to_dict()["run_id"] == parsed.run_id
+
+
+@SETTINGS
+@given(payload=st.binary(max_size=512))
+def test_document_reader_fails_closed_on_arbitrary_bytes(payload):
+    """Arbitrary document bytes become structured outcomes or valid samples."""
+    reader = document.DocumentReader(max_bytes=1024)
+    try:
+        sample = reader.load(payload, document_id="fuzzed")
+    except document.DocumentValidationError as error:
+        assert error.category == "document_validation"
+        return
+    assert sample.document_id == "fuzzed"
+    assert sample.content
 
 
 @SETTINGS
@@ -197,10 +212,14 @@ def test_group_splits_never_share_a_group(groups, rows, seed):
     except errors.BlockedError:
         return
     manifest = result.manifest
-    dev_groups = frame.g.iloc[list(manifest.train_ids)].to_numpy()
-    assert set(dev_groups).isdisjoint(frame.g.iloc[list(manifest.test_ids)])
+    train_ids = np.asarray(manifest.train_ids, dtype=np.int64)
+    test_ids = np.asarray(manifest.test_ids, dtype=np.int64)
+    dev_groups = frame.g.iloc[train_ids].to_numpy()
+    assert set(dev_groups).isdisjoint(frame.g.iloc[test_ids])
     for fit, validate in manifest.folds:
-        assert set(dev_groups[list(fit)]).isdisjoint(dev_groups[list(validate)])
+        fit_ids = np.asarray(fit, dtype=np.int64)
+        validate_ids = np.asarray(validate, dtype=np.int64)
+        assert set(dev_groups[fit_ids]).isdisjoint(dev_groups[validate_ids])
 
 
 @SETTINGS
@@ -226,13 +245,14 @@ def test_temporal_splits_never_train_on_the_future(rows, seed):
         return
     manifest = result.manifest
     t = frame.t
-    assert (
-        t.iloc[list(manifest.train_ids)].max()
-        <= t.iloc[list(manifest.test_ids)].min()
-    )
-    dev = t.iloc[list(manifest.train_ids)].to_numpy()
+    train_ids = np.asarray(manifest.train_ids, dtype=np.int64)
+    test_ids = np.asarray(manifest.test_ids, dtype=np.int64)
+    assert t.iloc[train_ids].max() <= t.iloc[test_ids].min()
+    dev = t.iloc[train_ids].to_numpy()
     for fit, validate in manifest.folds:
-        assert dev[list(fit)].max() <= dev[list(validate)].min()
+        fit_ids = np.asarray(fit, dtype=np.int64)
+        validate_ids = np.asarray(validate, dtype=np.int64)
+        assert dev[fit_ids].max() <= dev[validate_ids].min()
 
 
 @SETTINGS
