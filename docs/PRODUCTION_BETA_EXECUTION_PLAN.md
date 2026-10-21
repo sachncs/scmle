@@ -1906,6 +1906,31 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head release preflight evidence at `0c97ceb` on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
+  source files, Bandit, pip-audit, public API compatibility, and explicit
+  JUnit skip-reason auditing. The bounded release suite passed 1,985 tests
+  with 75 optional dependency skips; all skips had explicit reasons. Total
+  coverage was 83.15%; the declared core scope was 86%.
+- Mutation testing killed 1,504 of 2,057 mutants (73%), above the configured
+  70% release threshold. One timeout and 552 survivors remain visible in the
+  mutation inventory.
+- The five-seed offline benchmark regression completed for breast cancer,
+  wine, digits, and diabetes progression with zero regressions and zero
+  failed repetitions. Verdicts were tie, tie, tie, and ahead; peak memory
+  was 0.3673, 0.3911, 0.4433, and 0.4527 GB respectively.
+- Reproducible wheel and source-distribution builds, network-isolated wheel
+  installation, and source-distribution rebuild and installation passed.
+  The preflight hashes were wheel
+  `ba46067f1f4f2844e5aadf05e36847e4f1ac7ca8705e429b66bd9809e35ad9f2` and
+  sdist `664680f4ecbc57ab692f02ae4b70d891dfcd126bad53a95614f661c756358069`.
+- npm audit found 0 vulnerabilities; Astro built all 16 pages, accessibility
+  checks passed for 16 HTML files, internal link checks passed for 346 links,
+  and both Playwright smoke tests passed. Hosted Linux and Pages, external
+  transport/resource-fault execution, secret custody, and independent
+  reviewer evidence remain separate release gates.
+
 Current-head strict regression and release preflight at `af2f2ca` on
 2026-10-21:
 
