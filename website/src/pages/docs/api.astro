@@ -75,6 +75,7 @@ report = ModalityProject(
     signing_key="load-this-from-your-secret-manager",
 ).run()
 assert report.documentation["status"] == "extension-only"`}</code></pre>
+  <p>For raw or unlabeled data, start with <code>ModalityCurationProject</code>. It produces signed curation and dataset-card evidence without forcing a modelling stage; use <code>ModalityProject</code> only when the curation decision supports a supervised lifecycle.</p>
 
   <h2>Connect a warehouse without hiding its boundary</h2>
   <p><code>WarehouseConnector</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>

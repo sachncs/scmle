@@ -90,6 +90,21 @@ assert report.documentation["status"] == "extension-only"
 assert len(report.stage_evidence) == 15`}</code></pre>
   <p>When source, lineage, privacy, and task metadata are available, pass a <code>ModalityManifest</code>. The lifecycle rejects a manifest whose content hash or sample count does not match the adapter before modelling begins. Missing governance metadata remains visible as a gap in the dataset card.</p>
 
+  <h2>Curate without modelling</h2>
+  <p>Not every useful dataset is labelled, supervised, or ready for a classifier. Use <code>ModalityCurationProject</code> when the immediate job is to understand the raw snapshot. It writes an atomic, signed curation record and dataset card, accepts empty and unlabeled snapshots, and never invents labels, features, metrics, or a model.</p>
+  <pre><code>{`from scml import ModalityCurationProject
+
+curation = ModalityCurationProject(
+    PointCloudAdapter(...),
+    signing_key="load-this-from-your-secret-manager",
+    output_dir="runs/point-cloud-curation",
+).run()
+
+print(curation.dataset_card["curation"])
+print(curation.path)
+# No modelling stage was run.`}</code></pre>
+  <p>Move to <code>ModalityProject</code> only after labels, a task, a split policy, a bounded representation, and a modelling decision are justified by the curation evidence. A failed or incomplete curation decision should stop the hand-off.</p>
+
   <h2>What the lifecycle proves</h2>
   <ol>
     <li>Ingestion and validation identify the source and reject invalid or unsafe samples.</li>

@@ -89,7 +89,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
 }`}</code></pre>
 
   <h2>Bind non-tabular governance before modelling</h2>
-  <p>Non-tabular lifecycles accept a typed <code>ModalityManifest</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training.</p>
+  <p>Non-tabular lifecycles accept a typed <code>ModalityManifest</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training. For unlabeled or unsupervised snapshots, <code>ModalityCurationProject</code> persists the data-understanding evidence without entering modelling.</p>
   <pre><code>{`from scml.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
 
 manifest = ModalityManifest(
