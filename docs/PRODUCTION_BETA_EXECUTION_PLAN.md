@@ -1150,3 +1150,28 @@ Clean-head preflight evidence at `f691997` on 2026-10-21:
   documentation, including the evidence shape and the distinction between
   disparity flags, statistical power, and causal claims. The site build and
   accessibility smoke checks pass all 15 routes.
+
+Clean-head release preflight evidence at `f94a74a` on 2026-10-21:
+
+- Static checks passed: Ruff, format, mypy, Bandit, pip-audit, and public API
+  compatibility. Bandit emitted the existing comment-parser and documented
+  `B608` nosec warnings only; no finding failed the gate.
+- The bounded contract suite passed with 1,918 tests and 75 skips. Total
+  coverage was 82.85%; the declared core scope reached 86%. Two existing
+  SQLite `ResourceWarning` instances remain in the lifecycle extras path and
+  are recorded as hygiene debt rather than suppressed.
+- The mutation gate killed 1,340 of 1,863 mutants (71%, against the 70%
+  minimum), with one timeout and surviving mutants retained for triage.
+- Five-seed offline benchmarks passed for breast cancer, wine, digits, and
+  diabetes progression with zero failed repetitions and zero regressions.
+  The run recorded 91/66/633/60 seconds, peak memory of
+  0.3390/0.3469/0.4368/0.4405 GB, and zero failure rate respectively; the
+  independent-reference verdicts were tie, tie, tie, and ahead.
+- Wheel and source-distribution checks passed, both artifacts were
+  reproducible, and network-isolated wheel and source-distribution installs
+  passed. The Astro site built all 15 routes and npm audit reported zero
+  vulnerabilities.
+- This is clean local evidence for `f94a74a`, not hosted or independent
+  release proof. GitHub Pages remains HTTP 404, hosted Actions remain
+  unavailable before job logs, and external key custody, external-fault
+  execution, and independent review/signature remain release blockers.
