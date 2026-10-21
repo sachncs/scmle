@@ -1906,6 +1906,36 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head strict regression and release preflight at `af2f2ca` on
+2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,319 passed, 88 skipped` in 31 minutes 16 seconds. The added decoded
+  raster explanation lifecycle and metadata-only boundary tests are included
+  in this result.
+- `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
+  source files, Bandit, pip-audit, public API compatibility, and explicit
+  JUnit skip-reason auditing. The bounded release suite passed 1,984 tests
+  with 75 optional dependency skips; all skips had explicit reasons. Total
+  coverage was 83.16%; the declared core scope was 86%.
+- Mutation testing killed 1,503 of 2,057 mutants (73%), above the configured
+  70% release threshold. One timeout and 553 survivors remain visible in the
+  mutation inventory.
+- The five-seed offline benchmark regression completed for breast cancer,
+  wine, digits, and diabetes progression with zero regressions and zero
+  failed repetitions. Verdicts were tie, tie, tie, and ahead; peak memory
+  was 0.3680, 0.3852, 0.4415, and 0.4512 GB respectively.
+- Reproducible wheel and source-distribution builds, network-isolated wheel
+  installation, and source-distribution rebuild and installation passed.
+  The preflight hashes were wheel
+  `ff2ca81927ca8a09176d5436f14574ebcdf7fba3913b018d5c353a2646d2a849` and
+  sdist `33add11a155825acd0f9547a2b6dabf866c464a19e96da43d73deb27364f0c68`.
+- npm audit found 0 vulnerabilities; Astro built all 16 pages, accessibility
+  checks passed for 16 HTML files, internal link checks passed for 346 links,
+  and both Playwright smoke tests passed. Hosted Linux and Pages, external
+  transport/resource-fault execution, secret custody, and independent
+  reviewer evidence remain separate release gates.
+
 Decoded raster explanation evidence at the current working change on
 2026-10-21:
 
