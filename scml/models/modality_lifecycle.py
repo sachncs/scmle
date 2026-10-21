@@ -56,6 +56,8 @@ from scml.models import images as image_models
 
 MAX_REPEATED_EXPLANATION_SAMPLES = 128
 MAX_RAW_GRAPH_FEATURES = 64
+MAX_GRAPH_CONTEXT_NODES = 64
+MAX_GRAPH_CONTEXT_EDGES = 128
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1222,6 +1224,73 @@ class GraphAdapter(ModalityAdapter):
         """Return the node label."""
         return sample.label
 
+    def one_hop_subgraph(
+        self,
+        node_id: str,
+        max_nodes: int = MAX_GRAPH_CONTEXT_NODES,
+        max_edges: int = MAX_GRAPH_CONTEXT_EDGES,
+    ) -> dict[str, object]:
+        """Return bounded, deterministic one-hop topology evidence.
+
+        The result is review context for a node-feature baseline. It does not
+        claim that the model used topology or that edge removal is a faithful
+        graph-neural-network attribution method.
+        """
+        if not node_id.strip():
+            raise ValueError("node_id must not be empty")
+        if max_nodes < 1:
+            raise ValueError("max_nodes must be positive")
+        if max_edges < 1:
+            raise ValueError("max_edges must be positive")
+        if node_id not in self.dataset.node_ids:
+            raise ValueError(f"unknown graph node: {node_id}")
+
+        incident_edges = tuple(
+            edge
+            for edge in self.dataset.edges
+            if edge.source == node_id or edge.target == node_id
+        )
+        neighbor_ids = tuple(
+            sorted(
+                {
+                    edge.target if edge.source == node_id else edge.source
+                    for edge in incident_edges
+                }
+            )
+        )
+        selected_neighbors = neighbor_ids[: max_nodes - 1]
+        selected_node_ids = (node_id, *selected_neighbors)
+        selected_node_set = set(selected_node_ids)
+        candidate_edges = tuple(
+            edge
+            for edge in incident_edges
+            if edge.source in selected_node_set
+            and edge.target in selected_node_set
+        )
+        selected_edges = candidate_edges[:max_edges]
+        return {
+            "center_node_id": node_id,
+            "node_ids": list(selected_node_ids),
+            "edges": [
+                {
+                    "source": edge.source,
+                    "target": edge.target,
+                    "weight": edge.weight,
+                    "relation": edge.relation,
+                }
+                for edge in selected_edges
+            ],
+            "limits": {"max_nodes": max_nodes, "max_edges": max_edges},
+            "truncated": {
+                "nodes": len(neighbor_ids) > len(selected_neighbors),
+                "edges": len(candidate_edges) > len(selected_edges),
+            },
+            "observed_counts": {
+                "incident_edges": len(incident_edges),
+                "neighbors": len(neighbor_ids),
+            },
+        }
+
     def modality_specific_explanation(
         self,
         sample: Any,
@@ -1232,17 +1301,10 @@ class GraphAdapter(ModalityAdapter):
         """Return one-hop graph context and node-feature evidence."""
         if not isinstance(sample, graph.GraphNode):
             raise TypeError("sample must be a GraphNode")
-        incident_edges = tuple(
-            edge
-            for edge in self.dataset.edges
-            if edge.source == sample.node_id or edge.target == sample.node_id
-        )
-        neighbors = sorted(
-            {
-                edge.target if edge.source == sample.node_id else edge.source
-                for edge in incident_edges
-            }
-        )
+        subgraph = self.one_hop_subgraph(sample.node_id)
+        subgraph_node_ids = cast(list[str], subgraph["node_ids"])
+        neighbors = subgraph_node_ids[1:]
+        edges = cast(list[dict[str, object]], subgraph["edges"])
         values = np.asarray(sample.features, dtype=np.float64)
         decision = np.asarray(model.decision_function(values[None]))
         if decision.ndim == 1:
@@ -1289,15 +1351,8 @@ class GraphAdapter(ModalityAdapter):
             "method": "one_hop_graph_context_and_node_feature_contribution",
             "node_id": sample.node_id,
             "neighbors": neighbors,
-            "edges": [
-                {
-                    "source": edge.source,
-                    "target": edge.target,
-                    "weight": edge.weight,
-                    "relation": edge.relation,
-                }
-                for edge in incident_edges
-            ],
+            "edges": edges,
+            "subgraph": subgraph,
             "feature_terms": [[name, value] for name, value in feature_terms],
             "decision_score": float(decision.reshape(-1)[0]),
             "model_uses_topology": False,

@@ -650,12 +650,39 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
     )
     assert local["neighbors"]
     assert local["edges"]
+    assert local["subgraph"]["center_node_id"] == local["node_id"]
+    assert local["subgraph"]["truncated"] == {
+        "nodes": False,
+        "edges": False,
+    }
     assert local["model_uses_topology"] is False
     raw = local["raw_input_occlusion"]
     assert raw["method"] == "raw_graph_node_feature_occlusion"
     assert len(raw["features"]) == 2
     assert raw["features"][0]["feature"] in {"first", "second"}
     assert raw["feature_space_only"] is False
+
+
+def test_graph_subgraph_context_is_bounded_and_deterministic():
+    """Topology evidence has explicit node and edge limits."""
+    nodes = tuple(graph.GraphNode(f"node-{index}") for index in range(5))
+    edges = tuple(
+        graph.GraphEdge("center", f"node-{index}") for index in range(5)
+    )
+    adapter = modality_lifecycle.GraphAdapter(
+        graph.GraphData(nodes=(*nodes, graph.GraphNode("center")), edges=edges)
+    )
+
+    evidence = adapter.one_hop_subgraph("center", max_nodes=3, max_edges=1)
+
+    assert evidence["node_ids"] == ["center", "node-0", "node-1"]
+    assert len(evidence["edges"]) == 1
+    assert evidence["limits"] == {"max_nodes": 3, "max_edges": 1}
+    assert evidence["truncated"] == {"nodes": True, "edges": True}
+    assert evidence["observed_counts"] == {
+        "incident_edges": 5,
+        "neighbors": 5,
+    }
 
 
 def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
