@@ -221,6 +221,13 @@ print(features.to_numpy())</code></pre>
 )
 print(join.to_dict())`}</code></pre>
   <p>The caller owns <code>intersects_v1</code> and its geometry dependency. The evidence records dataset identities and limits; the core does not reproject, choose a geometry engine, rasterize, or calculate distances. For different CRSs, reproject through an explicit versioned caller policy before joining.</p>
+  <pre><code>{`projected = places.reproject(
+    target_crs="EPSG:3857",
+    transformer=project_coordinates_v1,
+    transformer_name="project_coordinates/v1",
+)
+print(projected.report.to_dict())`}</code></pre>
+  <p>The transformer must return the same feature IDs, properties, labels, and observation times with transformed geometry. The returned report binds the source and target dataset hashes. The core does not select a CRS database or silently transform coordinates.</p>
   <p>Dataset identity includes the canonical CRS and a sorted feature identity set. Reordering equivalent features therefore does not create a new snapshot, while changing the CRS always does.</p>
 
   <h2>Extending without forking</h2>
