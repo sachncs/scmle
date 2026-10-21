@@ -335,6 +335,7 @@ class GeoFeature:
 
 
 SpatialJoinPredicate = Callable[[GeoFeature, GeoFeature], bool]
+CoordinateTransformer = Callable[[GeoFeature, str, str], GeoFeature]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -436,6 +437,44 @@ class SpatialJoinReport:
             "match_limit": self.match_limit,
             "matches": [match.to_dict() for match in self.matches],
         }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SpatialReprojectionReport:
+    """Evidence binding a caller-owned coordinate transformation."""
+
+    source_dataset_hash: str
+    target_dataset_hash: str
+    source_crs: str
+    target_crs: str
+    transformer_name: str
+    feature_count: int
+
+    def __post_init__(self) -> None:
+        """Validate reprojection identity and scope."""
+        for field_name, value in (
+            ("source_dataset_hash", self.source_dataset_hash),
+            ("target_dataset_hash", self.target_dataset_hash),
+        ):
+            if len(value) != 64 or any(
+                character not in "0123456789abcdef" for character in value
+            ):
+                raise ValueError(f"{field_name} must be a SHA-256 hex digest")
+        for field_name, value in (
+            ("source_crs", self.source_crs),
+            ("target_crs", self.target_crs),
+            ("transformer_name", self.transformer_name),
+        ):
+            if not value.strip():
+                raise ValueError(f"{field_name} must not be empty")
+        if self.source_crs == self.target_crs:
+            raise ValueError("source_crs and target_crs must differ")
+        if self.feature_count < 1:
+            raise ValueError("feature_count must be positive")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native reprojection evidence."""
+        return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -917,6 +956,98 @@ class GeospatialDataset:
             matches=tuple(matches),
         )
 
+    def reproject(
+        self,
+        target_crs: str,
+        transformer: CoordinateTransformer,
+        transformer_name: str,
+    ) -> "GeospatialReprojection":
+        """Transform coordinates through an explicit caller-owned policy.
+
+        The core package does not select a CRS database or geometry engine.
+        The caller supplies a versioned transformer that changes geometry only;
+        feature IDs, properties, labels, and observation times must remain
+        stable. The returned report binds the source and target snapshots so a
+        transformed dataset cannot be mistaken for the original source.
+
+        Args:
+            target_crs: Non-empty target CRS identifier.
+            transformer: Caller-owned coordinate transformation.
+            transformer_name: Stable name and version of the transformer.
+
+        Returns:
+            A transformed dataset and its source/target evidence report.
+
+        Raises:
+            GeospatialValidationError: If source/target CRS or transformed
+                feature identities are invalid.
+        """
+        if not self.crs.strip():
+            raise GeospatialValidationError(
+                "reprojection requires a declared source CRS",
+                {"code": "missing_crs"},
+            )
+        if not isinstance(target_crs, str) or not target_crs.strip():
+            raise ValueError("target_crs must be a non-empty string")
+        canonical_target_crs = target_crs.strip()
+        if canonical_target_crs == self.crs:
+            raise ValueError("target_crs must differ from the source CRS")
+        if not callable(transformer):
+            raise TypeError("transformer must be callable")
+        if not transformer_name.strip():
+            raise ValueError("transformer_name must not be empty")
+        transformed_features: list[GeoFeature] = []
+        for feature in self.features:
+            try:
+                transformed = transformer(
+                    feature, self.crs, canonical_target_crs
+                )
+            except Exception as error:
+                raise GeospatialValidationError(
+                    "caller-owned coordinate transformer failed",
+                    {
+                        "code": "transformer_failure",
+                        "transformer_name": transformer_name,
+                        "exception": type(error).__name__,
+                    },
+                ) from error
+            if not isinstance(transformed, GeoFeature):
+                raise GeospatialValidationError(
+                    "coordinate transformer must return a GeoFeature",
+                    {
+                        "code": "invalid_transformer_result",
+                        "transformer_name": transformer_name,
+                    },
+                )
+            if (
+                transformed.feature_id != feature.feature_id
+                or dict(transformed.properties) != dict(feature.properties)
+                or transformed.label != feature.label
+                or transformed.observation_time != feature.observation_time
+            ):
+                raise GeospatialValidationError(
+                    "coordinate transformation changed feature metadata",
+                    {
+                        "code": "transformer_metadata_changed",
+                        "feature_id": feature.feature_id,
+                    },
+                )
+            transformed_features.append(transformed)
+        dataset = GeospatialDataset(
+            tuple(transformed_features),
+            crs=canonical_target_crs,
+            source=self.source,
+        )
+        report = SpatialReprojectionReport(
+            source_dataset_hash=self.content_hash,
+            target_dataset_hash=dataset.content_hash,
+            source_crs=self.crs,
+            target_crs=canonical_target_crs,
+            transformer_name=transformer_name.strip(),
+            feature_count=len(transformed_features),
+        )
+        return GeospatialReprojection(dataset=dataset, report=report)
+
     def spatial_autocorrelation(
         self,
         values: Sequence[Real] | None = None,
@@ -1159,6 +1290,31 @@ class GeospatialDataset:
             train=train,
             future=future,
         )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class GeospatialReprojection:
+    """A transformed dataset paired with its source-bound evidence."""
+
+    dataset: GeospatialDataset
+    report: SpatialReprojectionReport
+
+    def __post_init__(self) -> None:
+        """Ensure the report describes the returned transformed dataset."""
+        if self.report.target_dataset_hash != self.dataset.content_hash:
+            raise ValueError(
+                "reprojection report must match the transformed dataset"
+            )
+        if self.report.target_crs != self.dataset.crs:
+            raise ValueError("reprojection report CRS must match the dataset")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the transformed identity and its reprojection evidence."""
+        return {
+            "dataset_hash": self.dataset.content_hash,
+            "crs": self.dataset.crs,
+            "report": self.report.to_dict(),
+        }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

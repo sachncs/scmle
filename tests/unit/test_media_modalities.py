@@ -656,6 +656,77 @@ def test_geospatial_spatial_join_rejects_invalid_predicate_output():
         dataset.spatial_join(dataset, lambda first, second: "yes", "bad/v1")
 
 
+def test_geospatial_reprojection_records_source_and_target_identity():
+    """An explicit transformer preserves metadata and binds both snapshots."""
+    observation_time = datetime(2026, 1, 1, tzinfo=UTC)
+    dataset = geospatial.GeospatialDataset(
+        (
+            geospatial.GeoFeature(
+                "feature",
+                {"type": "Point", "coordinates": [1, 2]},
+                {"kind": "park"},
+                label="open",
+                observation_time=observation_time,
+            ),
+        ),
+        crs="EPSG:4326",
+    )
+
+    def transform(
+        feature: geospatial.GeoFeature, source_crs: str, target_crs: str
+    ) -> geospatial.GeoFeature:
+        assert source_crs == "EPSG:4326"
+        assert target_crs == "EPSG:3857"
+        return geospatial.GeoFeature(
+            feature.feature_id,
+            {
+                "type": "Point",
+                "coordinates": [
+                    feature.centroid[0] * 2,
+                    feature.centroid[1] * 2,
+                ],
+            },
+            dict(feature.properties),
+            feature.label,
+            feature.observation_time,
+        )
+
+    result = dataset.reproject("EPSG:3857", transform, "scale/v1")
+
+    assert result.dataset.crs == "EPSG:3857"
+    assert result.dataset.features[0].geometry["coordinates"] == [2.0, 4.0]
+    assert result.report.source_dataset_hash == dataset.content_hash
+    assert result.report.target_dataset_hash == result.dataset.content_hash
+    assert result.report.transformer_name == "scale/v1"
+    assert result.to_dict()["report"]["feature_count"] == 1
+
+
+def test_geospatial_reprojection_rejects_metadata_changes():
+    """A transformer cannot silently alter labels or feature ownership."""
+    feature = geospatial.GeoFeature(
+        "feature",
+        {"type": "Point", "coordinates": [0, 0]},
+        label="open",
+    )
+    dataset = geospatial.GeospatialDataset((feature,), crs="EPSG:4326")
+
+    def changes_label(
+        value: geospatial.GeoFeature, source_crs: str, target_crs: str
+    ) -> geospatial.GeoFeature:
+        return geospatial.GeoFeature(
+            value.feature_id,
+            value.geometry,
+            dict(value.properties),
+            label="closed",
+        )
+
+    with pytest.raises(
+        geospatial.GeospatialValidationError,
+        match="changed feature metadata",
+    ):
+        dataset.reproject("EPSG:3857", changes_label, "bad/v1")
+
+
 def test_geospatial_rejects_invalid_geometry():
     """Malformed geometry is rejected before it reaches feature preparation."""
     with pytest.raises(geospatial.GeospatialValidationError):
