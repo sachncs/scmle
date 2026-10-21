@@ -1906,6 +1906,32 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head release preflight evidence at `5a35c27` on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed static checks, the public API gate,
+  the bounded suite, mutation testing, benchmark regression, package checks,
+  and the marketing-site checks. The bounded suite passed 1,979 tests with 75
+  optional dependency skips; every skip had an explicit reason. Total
+  coverage was 83.19%; the declared core scope was 86%.
+- Mutation testing killed 1,504 of 2,057 mutants (73%), above the configured
+  70% threshold. One mutation timed out and 552 survived; the threshold is
+  met, but the survivor inventory remains follow-up work.
+- The five-seed offline benchmark regression completed for breast cancer,
+  wine, digits, and diabetes progression with zero regressions and zero failed
+  repetitions. The verdicts were tie, tie, tie, and ahead; peak memory was
+  0.3678, 0.3867, 0.4434, and 0.4549 GB respectively.
+- Reproducible wheel and source-distribution builds, network-isolated wheel
+  installation, and source-distribution rebuild and installation passed. The
+  generated artifacts were byte-identical within the preflight run, with
+  wheel hash `eafce738153f69866f136eea027a38f6f0087717872e2f846406bffbe45d45ea`
+  and sdist hash
+  `dfa0b8b766411f216fc089f4b3e57010825564e566bc2f5a27a111f37c36fd5f`.
+- npm audit found 0 vulnerabilities; Astro built all 16 pages, accessibility
+  checks passed for 16 HTML files, internal link checks passed for 346 links,
+  and both Playwright smoke tests passed. Hosted Linux and Pages, external
+  transport/resource-fault execution, secret custody, and independent review
+  remain separate release gates.
+
 Raster capability identity at `dc6ef61` on 2026-10-21:
 
 - Raster is now a distinct value in the modality, capability, and dataset
