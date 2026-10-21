@@ -6,6 +6,7 @@ import urllib.request
 
 import pytest
 
+import scml
 from scml.contracts import errors
 from scml.data.modalities import document
 from scml.inference import modality_serving
@@ -74,6 +75,8 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
     tmp_path,
 ):
     """A caller decoder can expose a signed modality package safely."""
+    assert scml.ModalityHttpServing is modality_serving.ModalityHttpServing
+    assert scml.ModalitySampleDecoder is modality_serving.ModalitySampleDecoder
     reference = adapter()
     report = modality_lifecycle.ModalityLifecycle().run(
         reference,

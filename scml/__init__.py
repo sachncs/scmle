@@ -9,14 +9,18 @@ from scml.api.project import ModalityProject
 from scml.api.results import RunResult
 from scml.artifacts.bundle import ModelBundle
 from scml.evaluation.metrics import register_metric
+from scml.inference.modality_serving import ModalityHttpServing
+from scml.inference.modality_serving import ModalitySampleDecoder
 from scml.models.custom import register_estimator
 from scml.models.custom import unregister_estimator
 from scml.models.modality_lifecycle import ModalityPredictor
 
 __all__ = [
     "MLProject",
+    "ModalityHttpServing",
     "ModalityPredictor",
     "ModalityProject",
+    "ModalitySampleDecoder",
     "ModelBundle",
     "RunResult",
     "__version__",

@@ -4,6 +4,10 @@
       "kind": "class",
       "signature_sha256": "c83892514057660ad6a540fb8eb74bed1ae395a5850d64da0442d6deddcd2357"
     },
+    "ModalityHttpServing": {
+      "kind": "class",
+      "signature_sha256": "2eefbf4fc75db85fd4490da5502a1de6f795a32e93231fcf9439a78da9a079a2"
+    },
     "ModalityPredictor": {
       "kind": "class",
       "signature_sha256": "1f3b26aaa2a6e873546c7d77c398965e9d5544e88009ed3dbeea6ca753937cd0"
@@ -11,6 +15,10 @@
     "ModalityProject": {
       "kind": "class",
       "signature_sha256": "a9566ba714de6db51c032ccde7d040381a1934dba0c7b0477e6291dc0948d3ee"
+    },
+    "ModalitySampleDecoder": {
+      "kind": "class",
+      "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
     },
     "ModelBundle": {
       "kind": "class",
