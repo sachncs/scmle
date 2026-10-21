@@ -1735,3 +1735,19 @@ Parser-fuzzing evidence at `7887e12` on 2026-10-21:
   gate rather than carrying pandas-index typing debt.
 - The property suite passed 10 tests under `-W error::ResourceWarning`; Ruff,
   formatting, mypy, and diff checks passed.
+
+Temporal graph evidence at `a302727` on 2026-10-21:
+
+- Graph edges now accept an explicit timezone-aware event time, normalize it to
+  UTC, preserve it in graph identity and duplicate detection, and ingest it
+  from CSV or JSONL through an explicit time column. A temporal split assigns
+  edges at the cutoff to training and later edges to future evaluation; mixed
+  or incomplete timestamp state fails closed instead of inventing ordering.
+- Graph curation exposes absent, mixed, or complete temporal state with bounds,
+  and emits a deterministic quality finding for mixed timestamp coverage. This
+  establishes temporal graph data evidence; it does not claim a temporal graph
+  model, dynamic topology semantics, or production stream watermark guarantees.
+- The graph, modality-lifecycle, and naming-convention suite passed 879 tests
+  with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
+  mypy, and `git diff --check` passed. The source and test change was pushed as
+  one atomic commit.
