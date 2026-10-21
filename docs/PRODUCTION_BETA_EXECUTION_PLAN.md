@@ -1855,3 +1855,26 @@ Explicit text lifecycle evidence at `935b887` on 2026-10-21:
   `-W error::ResourceWarning`; Ruff, formatting, and `git diff --check`
   passed. Text remains experimental and does not inherit supported status from
   the test result alone.
+
+Current-head release preflight evidence at `d1c3737` on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed on the source head after the atomic
+  report-write and explicit text-lifecycle changes. Static checks, formatting,
+  mypy over 239 source files, Bandit, pip-audit, and public API compatibility
+  all passed.
+- The bounded release suite passed 1,967 tests with 75 optional dependency
+  skips. Total coverage was 83.15%; the declared core scope was 86%. Mutation
+  testing killed 1,494 of 2,049 mutants (72%), above the 70% threshold.
+- The five-seed offline benchmark regression completed for breast cancer, wine,
+  digits, and diabetes progression with zero regressions and zero failed
+  repetitions. The verdicts were tie, tie, tie, and ahead; peak memory was
+  0.3746, 0.3776, 0.4329, and 0.4449 GB respectively.
+- Wheel and source-distribution checks passed, artifacts reproduced with wheel
+  hash `f586cf667580b996b5d2abea7b9ed7959cf6f9d36d8a0872b9e384b92084da9f`
+  and sdist hash
+  `4741e22cc39a138f88d9d5b10e89a3a7802d42c47fc67091686fd2d340f8427e`, and
+  both network-isolated installation paths passed.
+- The production site dependency audit found 0 vulnerabilities and Astro
+  built all 16 static pages. This remains local evidence; hosted Linux and
+  Pages, external transport/resource-fault execution, secret custody, and
+  independent reviewer evidence remain separate release gates.
