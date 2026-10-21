@@ -1757,27 +1757,11 @@ class RasterAdapter(ModalityAdapter):
                     {"code": "pixel_band_mismatch"},
                 )
             band_count = next(iter(band_counts))
-            names = tuple(
-                f"pixel_band_{band}_{statistic}"
-                for band in range(band_count)
-                for statistic in ("mean", "std", "min", "max")
-            )
+            names = self.pixel_feature_names(band_count)
             rows = []
             for sample in samples:
                 pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
-                channels = pixels[:, :, None] if pixels.ndim == 2 else pixels
-                rows.append(
-                    tuple(
-                        statistic_value
-                        for band in range(band_count)
-                        for statistic_value in (
-                            float(channels[:, :, band].mean()),
-                            float(channels[:, :, band].std()),
-                            float(channels[:, :, band].min()),
-                            float(channels[:, :, band].max()),
-                        )
-                    )
-                )
+                rows.append(self.pixel_feature_values(pixels, band_count))
             return FeatureBatch(
                 tuple(sample.source for sample in samples),
                 names,
@@ -1811,6 +1795,48 @@ class RasterAdapter(ModalityAdapter):
             tuple(sample.source for sample in samples), names, np.asarray(rows)
         )
 
+    @staticmethod
+    def pixel_feature_names(band_count: int) -> tuple[str, ...]:
+        """Return names for bounded decoded-pixel summary features."""
+        if band_count < 1:
+            raise ValueError("band_count must be positive")
+        return tuple(
+            f"pixel_band_{band}_{statistic}"
+            for band in range(band_count)
+            for statistic in ("mean", "std", "min", "max")
+        )
+
+    @staticmethod
+    def pixel_feature_values(
+        pixels: np.ndarray, band_count: int
+    ) -> tuple[float, ...]:
+        """Return finite per-band summary values for decoded pixels."""
+        values = np.asarray(pixels)
+        if values.ndim == 2:
+            if band_count != 1:
+                raise geospatial.GeospatialValidationError(
+                    "single-band decoded pixels must declare one band",
+                    {"code": "pixel_band_mismatch"},
+                )
+            channels = values[:, :, None]
+        elif values.ndim == 3 and values.shape[2] == band_count:
+            channels = values
+        else:
+            raise geospatial.GeospatialValidationError(
+                "decoded pixels do not match the declared band count",
+                {"code": "pixel_band_mismatch"},
+            )
+        return tuple(
+            statistic_value
+            for band in range(band_count)
+            for statistic_value in (
+                float(channels[:, :, band].mean()),
+                float(channels[:, :, band].std()),
+                float(channels[:, :, band].min()),
+                float(channels[:, :, band].max()),
+            )
+        )
+
     def sample_id(self, sample: geospatial.RasterSample) -> str:
         """Return the canonical raster source identity."""
         return sample.source
@@ -1818,6 +1844,98 @@ class RasterAdapter(ModalityAdapter):
     def label(self, sample: geospatial.RasterSample) -> object | None:
         """Return the caller-owned raster label."""
         return self.labels_by_source[sample.source]
+
+    def modality_specific_explanation(
+        self,
+        sample: Any,
+        model: LogisticRegression,
+        feature_names: Sequence[str],
+        coefficients: np.ndarray,
+    ) -> dict[str, object]:
+        """Return bounded occlusion evidence for decoded raster pixels."""
+        if not isinstance(sample, geospatial.RasterSample):
+            raise TypeError("sample must be a RasterSample")
+        if self.decoder is None:
+            return {
+                "status": "not_available",
+                "modality": self.modality.value,
+                "reason": "an explicit named raster decoder is required",
+                "limitations": [
+                    "Metadata-only rasters cannot produce pixel-region "
+                    "evidence.",
+                    "Raw encoded-payload occlusion is outside this contract.",
+                ],
+            }
+        pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
+        original_values = np.asarray(
+            self.pixel_feature_values(pixels, sample.bands), dtype=np.float64
+        )
+        if tuple(feature_names) != self.pixel_feature_names(sample.bands):
+            raise ValueError("raster explanation feature schema does not match")
+        if original_values.shape[0] != coefficients.shape[0]:
+            raise ValueError(
+                "raster explanation coefficients do not match features"
+            )
+        original_features = original_values.reshape(1, -1)
+        decision = np.asarray(model.decision_function(original_features))
+        if decision.ndim == 1:
+            selected_class = 0
+            original_score = float(decision[0])
+        else:
+            predicted = model.predict(original_features)[0]
+            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            original_score = float(decision[0, selected_class])
+        height, width = pixels.shape[:2]
+        row_step = max(1, int(np.ceil(height / 4)))
+        column_step = max(1, int(np.ceil(width / 4)))
+        terms: list[tuple[str, float]] = []
+        for row in range(0, height, row_step):
+            for column in range(0, width, column_step):
+                end_row = min(row + row_step, height)
+                end_column = min(column + column_step, width)
+                masked_pixels = pixels.copy()
+                if masked_pixels.ndim == 2:
+                    masked_pixels[row:end_row, column:end_column] = 0.0
+                else:
+                    masked_pixels[row:end_row, column:end_column, :] = 0.0
+                masked_features = np.asarray(
+                    self.pixel_feature_values(masked_pixels, sample.bands),
+                    dtype=np.float64,
+                ).reshape(1, -1)
+                masked_decision = np.asarray(
+                    model.decision_function(masked_features)
+                )
+                if masked_decision.ndim == 1:
+                    masked_score = float(masked_decision[0])
+                else:
+                    masked_score = float(masked_decision[0, selected_class])
+                terms.append(
+                    (
+                        f"region[{row}:{end_row},{column}:{end_column}]",
+                        original_score - masked_score,
+                    )
+                )
+        selected = sorted(
+            terms,
+            key=lambda item: (-abs(item[1]), item[0]),
+        )[:10]
+        return {
+            "status": "available",
+            "method": "decoded_pixel_region_occlusion",
+            "decoder": self.decoder_name,
+            "decoded_dimensions": [int(width), int(height), int(sample.bands)],
+            "window_count": len(terms),
+            "terms": [[name, float(value)] for name, value in selected],
+            "baseline": "zero-valued decoded raster pixels",
+            "feature_space_only": False,
+            "limitations": [
+                "Occlusion is applied after the caller-owned decoder and is "
+                "not evidence about encoded bytes or decoder failure modes.",
+                "Regions are pixel windows, not semantic objects or validated "
+                "geospatial causal explanations.",
+                "Score changes are associational and not causal.",
+            ],
+        }
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
         """Return raster profile drift evidence."""

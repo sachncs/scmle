@@ -290,6 +290,54 @@ def test_raster_adapter_accepts_a_named_bounded_decoder():
     assert features.values[:, 0].tolist() == [1.0, 2.0]
 
 
+def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
+    tmp_path: Path,
+):
+    """A named decoder enables bounded decoded-pixel explanations."""
+    baseline = raster_adapter()
+    decoded = modality_lifecycle.RasterAdapter(
+        baseline.samples,
+        {sample.source: baseline.label(sample) for sample in baseline.samples},
+        decoder=lambda payload: np.full(
+            (32, 32, 3), payload[0], dtype=np.uint8
+        ),
+        decoder_name="fixture-raster-v1",
+        max_pixels=32 * 32 * 3,
+    )
+    report = modality_lifecycle.ModalityLifecycle().run(
+        decoded,
+        tmp_path / "decoded-raster-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    local = evidence["modality_specific"]
+    assert local["status"] == "available"
+    assert local["method"] == "decoded_pixel_region_occlusion"
+    assert local["decoder"] == "fixture-raster-v1"
+    assert local["decoded_dimensions"] == [32, 32, 3]
+    assert local["window_count"] == 16
+    assert len(local["terms"]) == 10
+    assert local["baseline"] == "zero-valued decoded raster pixels"
+    assert local["feature_space_only"] is False
+
+
+def test_metadata_only_raster_explanation_is_explicitly_unavailable():
+    """Metadata-only raster packages never imply pixel evidence."""
+    adapter = raster_adapter()
+    result = adapter.modality_specific_explanation(
+        adapter.samples[0],
+        object(),
+        (),
+        np.asarray([], dtype=float),
+    )
+
+    assert result["status"] == "not_available"
+    assert result["reason"] == "an explicit named raster decoder is required"
+
+
 @pytest.mark.parametrize(
     "factory",
     [
