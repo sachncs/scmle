@@ -208,7 +208,7 @@ print(temporal.sampled_frame_indices)</code></pre>
     seed=7,
 )
 print(split.block_ids())</code></pre>
-  <p><code>block_size</code> is expressed in the declared CRS units. The implementation uses feature centroids and reports the assigned block IDs. Geometry that spans multiple blocks, spatial autocorrelation diagnostics, and map-based explanation remain domain-specific work.</p>
+  <p><code>block_size</code> is expressed in the declared CRS units. The implementation uses feature centroids and reports the assigned block IDs. Before the split, <code>GeospatialDataset.boundary_leakage(block_size)</code> counts the blocks touched by each feature envelope; the modality adapter carries crossings into curation as <code>quality.geospatial-boundary-leakage</code>. This is conservative review evidence, not proof that the exact geometry occupies every touched block. Spatial autocorrelation diagnostics and map-based explanation remain domain-specific work.</p>
   <pre><code>features = places.prepare_features()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>
