@@ -1,6 +1,8 @@
 """Tests for the dependency-free graph data foundation."""
 
 import dataclasses
+from datetime import datetime
+from datetime import UTC
 import json
 from pathlib import Path
 
@@ -13,6 +15,7 @@ from scml.data.modalities.graph import GraphData
 from scml.data.modalities.graph import GraphEdge
 from scml.data.modalities.graph import GraphInputError
 from scml.data.modalities.graph import GraphNode
+from scml.data.modalities.graph import GraphTemporalError
 from scml.data.modalities.graph import GraphValidationError
 from scml.data.modalities.graph import inductive_node_split
 from scml.data.modalities.graph import prepare_features
@@ -192,6 +195,93 @@ def test_graph_curation_reports_mixed_label_state():
     assert [finding.finding_id for finding in report.risk_findings] == [
         "risk.graph-mixed-label-state",
     ]
+
+
+def test_temporal_edges_are_normalized_split_and_curated() -> None:
+    """Timestamped edges support UTC-safe future evaluation evidence."""
+    edges = edges_from_records(
+        [
+            {
+                "source": "a",
+                "target": "b",
+                "event_time": "2026-01-01T01:00:00+01:00",
+            },
+            {
+                "source": "b",
+                "target": "c",
+                "event_time": "2026-01-02T00:00:00Z",
+            },
+            {
+                "source": "c",
+                "target": "a",
+                "event_time": "2026-01-03T00:00:00+00:00",
+            },
+        ],
+        time_column="event_time",
+    )
+    graph = GraphData.from_edges(edges, nodes=["a", "b", "c"])
+
+    assert edges[0].event_time == datetime(2026, 1, 1, tzinfo=UTC)
+    split = graph.temporal_split("2026-01-02T00:00:00+00:00")
+    assert len(split.train_edges) == 2
+    assert len(split.future_edges) == 1
+    assert not split.has_future_leakage
+    assert split.cutoff.tzinfo == UTC
+    assert graph.curate().profile["temporal"]["status"] == "complete"
+
+
+def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
+    """Missing and malformed event times remain visible before splitting."""
+    mixed_graph = GraphData.from_edges(
+        [
+            GraphEdge(
+                "a",
+                "b",
+                event_time=datetime(2026, 1, 1, tzinfo=UTC),
+            ),
+            GraphEdge("b", "c"),
+        ],
+        nodes=["a", "b", "c"],
+    )
+
+    report = mixed_graph.curate()
+
+    assert report.profile["temporal"] == {
+        "status": "mixed",
+        "timed_edge_count": 1,
+        "untimed_edge_count": 1,
+    }
+    quality_ids = {finding.finding_id for finding in report.quality_findings}
+    assert "quality.graph-mixed-temporal-state" in quality_ids
+    with pytest.raises(GraphTemporalError, match="every edge"):
+        mixed_graph.temporal_split("2026-01-02T00:00:00Z")
+    with pytest.raises(GraphInputError, match="invalid event time"):
+        edges_from_records(
+            [{"source": "a", "target": "b", "event_time": "no-zone"}],
+            time_column="event_time",
+        )
+
+
+def test_temporal_edge_identity_preserves_parallel_events() -> None:
+    """Events with distinct timestamps are not collapsed as duplicates."""
+    graph = GraphData.from_edges(
+        [
+            GraphEdge(
+                "a",
+                "b",
+                event_time=datetime(2026, 1, 1, tzinfo=UTC),
+            ),
+            GraphEdge(
+                "a",
+                "b",
+                event_time=datetime(2026, 1, 2, tzinfo=UTC),
+            ),
+        ],
+        nodes=["a", "b"],
+    )
+
+    assert graph.validate().is_valid
+    assert graph.profile().edge.duplicate_edge_count == 0
 
 
 def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(

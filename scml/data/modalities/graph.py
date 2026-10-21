@@ -10,6 +10,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
+from datetime import datetime
+from datetime import UTC
 import hashlib
 import json
 import math
@@ -31,6 +33,10 @@ class GraphError(ValueError):
 
 class GraphInputError(GraphError):
     """Raised when a graph input file cannot be parsed."""
+
+
+class GraphTemporalError(GraphError):
+    """Raised when temporal graph evidence is incomplete or invalid."""
 
 
 class GraphValidationError(GraphError):
@@ -73,6 +79,7 @@ class GraphEdge:
     target: str
     weight: float = 1.0
     relation: str = "default"
+    event_time: datetime | None = None
 
     def __post_init__(self) -> None:
         """Validates endpoint, relation, and weight values."""
@@ -86,7 +93,73 @@ class GraphEdge:
             raise ValueError("edge weight must be finite")
         if not isinstance(self.relation, str) or not self.relation.strip():
             raise ValueError("edge relation must be a non-empty string")
+        if self.event_time is not None:
+            if not isinstance(self.event_time, datetime):
+                raise TypeError("event_time must be a datetime")
+            if (
+                self.event_time.tzinfo is None
+                or self.event_time.utcoffset() is None
+            ):
+                raise ValueError("event_time must be timezone-aware")
+            object.__setattr__(
+                self,
+                "event_time",
+                self.event_time.astimezone(UTC),
+            )
         object.__setattr__(self, "weight", float(self.weight))
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class TemporalGraphSplit:
+    """Time-ordered graph edges separated at an explicit UTC cutoff."""
+
+    cutoff: datetime
+    train_edges: tuple[GraphEdge, ...]
+    future_edges: tuple[GraphEdge, ...]
+
+    def __post_init__(self) -> None:
+        """Validate the cutoff and timestamp completeness of both partitions."""
+        if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
+            raise ValueError("cutoff must be timezone-aware")
+        object.__setattr__(
+            self,
+            "cutoff",
+            self.cutoff.astimezone(UTC),
+        )
+        if any(edge.event_time is None for edge in self.train_edges):
+            raise ValueError("train_edges must contain event times")
+        if any(edge.event_time is None for edge in self.future_edges):
+            raise ValueError("future_edges must contain event times")
+
+    @property
+    def has_future_leakage(self) -> bool:
+        """Return whether a training edge occurs after the cutoff."""
+        cutoff = self.cutoff.astimezone(UTC)
+        return any(
+            edge.event_time is not None and edge.event_time > cutoff
+            for edge in self.train_edges
+        )
+
+
+def canonical_event_time(value: datetime | str) -> datetime:
+    """Parse and normalize a timezone-aware graph event timestamp to UTC."""
+    if isinstance(value, str):
+        normalized = value.strip()
+        if normalized.endswith(("Z", "z")):
+            normalized = normalized[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError as error:
+            raise GraphTemporalError(
+                f"invalid graph event time: {value!r}"
+            ) from error
+    elif isinstance(value, datetime):
+        parsed = value
+    else:
+        raise GraphTemporalError("graph event time must be datetime or text")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise GraphTemporalError("graph event time must be timezone-aware")
+    return parsed.astimezone(UTC)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -257,6 +330,7 @@ class GraphData:
                     edge.target,
                     edge.relation,
                     edge.weight,
+                    edge.event_time.isoformat() if edge.event_time else "",
                 ),
             )
         )
@@ -326,6 +400,7 @@ class GraphData:
         target_column: str = "target",
         weight_column: str = "weight",
         relation_column: str = "relation",
+        time_column: str | None = None,
     ) -> "GraphData":
         """Loads CSV or JSONL edges into a validated graph dataset."""
         edges = read_edges(
@@ -334,6 +409,7 @@ class GraphData:
             target_column=target_column,
             weight_column=weight_column,
             relation_column=relation_column,
+            time_column=time_column,
         )
         graph = cls.from_edges(
             edges,
@@ -363,8 +439,8 @@ class GraphData:
         """Finds missing endpoints, duplicates, self-loops, and bad weights."""
         node_ids = set(self.node_ids)
         issues: list[GraphValidationIssue] = []
-        duplicate_counts: defaultdict[tuple[str, str, str], int] = defaultdict(
-            int
+        duplicate_counts: defaultdict[tuple[str, str, str, str], int] = (
+            defaultdict(int)
         )
         for edge in self.edges:
             if edge.source not in node_ids:
@@ -420,12 +496,13 @@ class GraphData:
         if not report.is_valid:
             raise GraphValidationError(report)
 
-    def edge_key(self, edge: GraphEdge) -> tuple[str, str, str]:
+    def edge_key(self, edge: GraphEdge) -> tuple[str, str, str, str]:
         """Returns the canonical duplicate-detection key for an edge."""
         endpoints = (edge.source, edge.target)
         if not self.directed:
             endpoints = tuple(sorted(endpoints))  # type: ignore[assignment]
-        return (endpoints[0], endpoints[1], edge.relation)
+        event_time = edge.event_time.isoformat() if edge.event_time else ""
+        return (endpoints[0], endpoints[1], edge.relation, event_time)
 
     def connected_components(self) -> tuple[frozenset[str], ...]:
         """Returns deterministic weakly connected components."""
@@ -492,9 +569,9 @@ class GraphData:
             weight_mean=float(np.mean(weights)) if weights else None,
         )
 
-    def edge_key_counts(self) -> dict[tuple[str, str, str], int]:
+    def edge_key_counts(self) -> dict[tuple[str, str, str, str], int]:
         """Returns canonical edge multiplicities."""
-        counts: defaultdict[tuple[str, str, str], int] = defaultdict(int)
+        counts: defaultdict[tuple[str, str, str, str], int] = defaultdict(int)
         for edge in self.edges:
             counts[self.edge_key(edge)] += 1
         return dict(counts)
@@ -509,14 +586,76 @@ class GraphData:
             edge=self.profile_edges(),
         )
 
+    def temporal_split(self, cutoff: datetime | str) -> TemporalGraphSplit:
+        """Split fully timestamped edges into past and future partitions.
+
+        Edges at the cutoff belong to training; edges after the cutoff belong
+        to the future evaluation partition. Untimestamped edges fail closed
+        because they cannot be assigned without inventing temporal order.
+        """
+        cutoff_time = canonical_event_time(cutoff)
+        if any(edge.event_time is None for edge in self.edges):
+            raise GraphTemporalError(
+                "temporal splitting requires an event time on every edge"
+            )
+        train_edges = tuple(
+            edge
+            for edge in self.edges
+            if edge.event_time is not None and edge.event_time <= cutoff_time
+        )
+        future_edges = tuple(
+            edge
+            for edge in self.edges
+            if edge.event_time is not None and edge.event_time > cutoff_time
+        )
+        return TemporalGraphSplit(
+            cutoff=cutoff_time,
+            train_edges=train_edges,
+            future_edges=future_edges,
+        )
+
     def curate(self) -> ModalityCurationReport:
         """Build graph-structure evidence before choosing a graph model."""
         profile = self.profile()
         labels = label_counts(node.label for node in self.nodes)
         profile_data = profile.to_dict()
         profile_data["node"]["label_counts"] = labels
+        temporal_edges = [
+            edge for edge in self.edges if edge.event_time is not None
+        ]
+        event_times = tuple(
+            edge.event_time
+            for edge in temporal_edges
+            if edge.event_time is not None
+        )
+        if event_times and len(event_times) == len(self.edges):
+            profile_data["temporal"] = {
+                "status": "complete",
+                "event_time_min": min(event_times).isoformat(),
+                "event_time_max": max(event_times).isoformat(),
+            }
+        elif temporal_edges:
+            profile_data["temporal"] = {
+                "status": "mixed",
+                "timed_edge_count": len(temporal_edges),
+                "untimed_edge_count": len(self.edges) - len(temporal_edges),
+            }
+        else:
+            profile_data["temporal"] = {"status": "absent"}
         quality_findings = []
         risk_findings = []
+        if temporal_edges and len(temporal_edges) != len(self.edges):
+            quality_findings.append(
+                build_finding(
+                    "quality.graph-mixed-temporal-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"source": self.source_uri},
+                    {"temporal": profile_data["temporal"]},
+                    "Supply event times for every edge or explicitly use a "
+                    "non-temporal graph capability.",
+                    False,
+                )
+            )
         if profile.edge.duplicate_edge_count:
             quality_findings.append(
                 build_finding(
@@ -599,6 +738,9 @@ def graph_identity(
             "target": edge.target,
             "weight": edge.weight,
             "relation": edge.relation,
+            "event_time": (
+                edge.event_time.isoformat() if edge.event_time else None
+            ),
         }
         for edge in edges
     ]
@@ -620,6 +762,7 @@ def graph_identity(
                 str(record["target"]),
                 str(record["relation"]),
                 float(record["weight"]),
+                str(record["event_time"]),
             ),
         ),
     }
@@ -638,6 +781,7 @@ def read_edges(
     target_column: str = "target",
     weight_column: str = "weight",
     relation_column: str = "relation",
+    time_column: str | None = None,
 ) -> tuple[GraphEdge, ...]:
     """Reads CSV or JSONL edge records with bounded schema handling."""
     input_path = Path(path)
@@ -661,6 +805,7 @@ def read_edges(
             target_column=target_column,
             weight_column=weight_column,
             relation_column=relation_column,
+            time_column=time_column,
         )
     if suffix.endswith(".jsonl") or suffix.endswith(".ndjson"):
         records: list[dict[str, Any]] = []
@@ -692,6 +837,7 @@ def read_edges(
             target_column=target_column,
             weight_column=weight_column,
             relation_column=relation_column,
+            time_column=time_column,
         )
     raise GraphInputError(
         "graph edges must use a .csv, .jsonl, or .ndjson file"
@@ -704,6 +850,7 @@ def edges_from_records(
     target_column: str = "target",
     weight_column: str = "weight",
     relation_column: str = "relation",
+    time_column: str | None = None,
 ) -> tuple[GraphEdge, ...]:
     """Converts mappings into immutable edges with deterministic errors."""
     edges: list[GraphEdge] = []
@@ -729,6 +876,16 @@ def edges_from_records(
         relation_value = record.get(relation_column, "default")
         if pd.isna(relation_value):
             relation_value = "default"
+        event_time = None
+        if time_column is not None:
+            time_value = record.get(time_column)
+            if time_value is not None and not pd.isna(time_value):
+                try:
+                    event_time = canonical_event_time(time_value)
+                except GraphTemporalError as error:
+                    raise GraphInputError(
+                        f"edge record {index} has an invalid event time"
+                    ) from error
         try:
             edges.append(
                 GraphEdge(
@@ -736,6 +893,7 @@ def edges_from_records(
                     target=str(target),
                     weight=weight,
                     relation=str(relation_value),
+                    event_time=event_time,
                 )
             )
         except (TypeError, ValueError) as error:
@@ -890,9 +1048,15 @@ def load_graph(
     path: str | Path,
     nodes: Iterable[GraphNode | str] | None = None,
     directed: bool = True,
+    time_column: str | None = None,
 ) -> GraphData:
     """Loads a CSV or JSONL graph using the default edge column names."""
-    return GraphData.from_edge_file(path, nodes=nodes, directed=directed)
+    return GraphData.from_edge_file(
+        path,
+        nodes=nodes,
+        directed=directed,
+        time_column=time_column,
+    )
 
 
 __all__ = [
@@ -900,15 +1064,17 @@ __all__ = [
     "GraphData",
     "GraphEdge",
     "GraphError",
-    "GraphInputError",
     "GraphNode",
     "GraphProfile",
+    "GraphTemporalError",
     "GraphValidationError",
     "GraphValidationIssue",
     "GraphValidationReport",
     "InductiveNodeSplit",
     "NodeProfile",
     "PreparedFeatures",
+    "TemporalGraphSplit",
+    "canonical_event_time",
     "edges_from_records",
     "graph_identity",
     "inductive_node_split",

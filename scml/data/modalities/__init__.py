@@ -22,9 +22,12 @@ from scml.data.modalities.geospatial import GeospatialProfile
 from scml.data.modalities.geospatial import moran_statistic
 from scml.data.modalities.geospatial import RasterSample
 from scml.data.modalities.geospatial import SpatialAutocorrelation
+from scml.data.modalities.graph import canonical_event_time
 from scml.data.modalities.graph import GraphData
 from scml.data.modalities.graph import GraphEdge
 from scml.data.modalities.graph import GraphNode
+from scml.data.modalities.graph import GraphTemporalError
+from scml.data.modalities.graph import TemporalGraphSplit
 from scml.data.modalities.image import ImageDataset
 from scml.data.modalities.image import ImageSample
 from scml.data.modalities.image import ImageSplit
@@ -57,6 +60,7 @@ __all__ = [
     "GraphData",
     "GraphEdge",
     "GraphNode",
+    "GraphTemporalError",
     "ImageDataset",
     "ImageSample",
     "ImageSplit",
@@ -64,6 +68,7 @@ __all__ = [
     "ModalityDatasetCard",
     "RasterSample",
     "SpatialAutocorrelation",
+    "TemporalGraphSplit",
     "VideoDataset",
     "VideoFeatures",
     "VideoFrameDecoder",
@@ -71,5 +76,6 @@ __all__ = [
     "VideoProfile",
     "VideoSample",
     "VideoSplit",
+    "canonical_event_time",
     "moran_statistic",
 ]
