@@ -221,6 +221,7 @@ print(features.to_numpy())</code></pre>
 )
 print(join.to_dict())`}</code></pre>
   <p>The caller owns <code>intersects_v1</code> and its geometry dependency. The evidence records dataset identities and limits; the core does not reproject, choose a geometry engine, rasterize, or calculate distances. For different CRSs, reproject through an explicit versioned caller policy before joining.</p>
+  <p>Dataset identity includes the canonical CRS and a sorted feature identity set. Reordering equivalent features therefore does not create a new snapshot, while changing the CRS always does.</p>
 
   <h2>Extending without forking</h2>
   <p>Register an estimator or metric at application startup, give it a stable name, and cover the registration with a contract test. Keep extensions deterministic and record their package versions in the run evidence. Do not silently replace a metric used by an existing release.</p>

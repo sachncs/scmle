@@ -1946,6 +1946,17 @@ Geospatial spatial-join boundary at `40c9ca5` with site documentation at
   indexed production geometry engines, and semantic spatial inference remain
   caller-owned or outside the experimental support claim.
 
+Geospatial identity hardening at `fa21d4c` on 2026-10-22:
+
+- `GeospatialDataset.content_hash` now includes the canonical CRS and sorts
+  feature identities before hashing. Equivalent feature order is stable, but
+  identical coordinate bytes in different CRSs produce different dataset
+  identities.
+- The media-modality slice passed 42 tests under
+  `-W error::ResourceWarning`; Ruff, formatting, and mypy passed for the
+  changed Python files. This closes a provenance correctness defect without
+  changing the production support label.
+
 Current-head release preflight after source-backed document citations at
 `8f26bfe` on 2026-10-22:
 
