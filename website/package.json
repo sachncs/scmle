@@ -7,6 +7,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check:a11y": "node scripts/check-a11y.mjs",
+    "check:links": "node scripts/check-links.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

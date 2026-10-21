@@ -37,6 +37,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
       - run: npm run check:a11y
+      - run: npm run check:links
       - name: Smoke test generated routes
         run: |
           python3 -m http.server 4173 --directory dist > /tmp/super-charge-ml-site.log 2>&1 &

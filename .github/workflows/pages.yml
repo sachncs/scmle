@@ -44,6 +44,9 @@ jobs:
       - name: Check site accessibility
         run: npm run check:a11y
         working-directory: website
+      - name: Check internal links
+        run: npm run check:links
+        working-directory: website
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
         working-directory: website
