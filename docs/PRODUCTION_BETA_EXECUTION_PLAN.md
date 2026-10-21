@@ -1906,6 +1906,23 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Document source-traceability hardening at `8c5b5ef` on 2026-10-22:
+
+- `DocumentReader` now records a SHA-256 digest of the raw source bytes before
+  decoding. `DocumentSample.citations()` emits immutable page or section
+  locators only when both a source URI and raw-source digest are present; it
+  never substitutes the decoded-content digest for a source digest.
+- `DocumentCurationReport` records source-traceability coverage and citation
+  count, and emits a visible non-blocking finding when a sample supplies only
+  one half of its source identity. Document local explanations and raw-span
+  occlusion carry the same citation records into JSON evidence.
+- The document data, model, and modality-lifecycle focused suite passed 56
+  tests under `-W error::ResourceWarning`; Ruff, formatting, and mypy passed.
+- The Astro site build passed with 17 pages, 384 internal links, accessibility
+  checks, and 2 Playwright smoke tests. The site now documents the distinction
+  between source-backed locators and semantic citation grounding; the latter
+  remains outside the experimental baseline.
+
 Current-head curation-boundary verification at `beb4568` on 2026-10-22:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed

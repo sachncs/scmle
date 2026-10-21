@@ -100,6 +100,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
   <pre><code>from scml.data.modalities import DocumentDataset, DocumentSample
+from scml.data.modalities import DocumentReader
 from scml.models.documents import DocumentClassifier, DocumentModelConfig
 
 train = DocumentDataset((
@@ -118,7 +119,17 @@ evaluation = model.evaluate(split.test)
 ablation = model.term_ablation_explanation(split.test[0], top_k=5)
 artifact = model.save("artifacts/document-model")
 restored = DocumentClassifier.load(artifact.path, trusted=True)</code></pre>
-  <p>Term ablation removes lexical matches from the original text one at a time and measures the predicted-class score change; its candidate work is explicitly bounded by <code>max_terms</code>. This is perturbation evidence, not citation grounding or a causal claim. The path is not part of the supported <code>MLProject</code> workflow. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it. OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary.</p>
+  <p>Term ablation removes lexical matches from the original text one at a time and measures the predicted-class score change; its candidate work is explicitly bounded by <code>max_terms</code>. This is perturbation evidence, not semantic citation grounding or a causal claim. The path is not part of the supported <code>MLProject</code> workflow. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it.</p>
+  <h3>Attach source-backed citations</h3>
+  <p><code>DocumentReader</code> hashes the raw bytes before decoding them. A loaded sample carries the source URI, raw-source SHA-256 digest, and deterministic page or section locators. Local explanations and raw-span occlusion include those citations when the sample has a source identity. Manually created in-memory samples remain explicitly citation-free; the curation report exposes their traceability coverage instead of inventing a source.</p>
+  <pre><code>reader = DocumentReader()
+sample = reader.load("policy.txt", document_id="policy-2026")
+curation = DocumentDataset((sample,)).curate()
+explanation = model.local_explanation(sample)
+
+assert curation.source_traceability_coverage == 1.0
+assert explanation.to_dict()["citations"][0]["source_digest"] == sample.source_digest</code></pre>
+  <p>OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary. A source-backed locator proves where the decoded span came from; it does not prove that a generated answer is semantically grounded in that span.</p>
 
   <h2>Experimental image baseline</h2>
   <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for duplicate content and mixed label state, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
