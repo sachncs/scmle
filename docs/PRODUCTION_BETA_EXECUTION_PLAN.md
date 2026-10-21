@@ -1906,6 +1906,13 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head strict regression after bounded raster decoding at `bd7ad8c` on
+2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  2,317 tests with 88 explicit skips in 31 minutes 6 seconds. No failure or
+  warning was promoted to a failure.
+
 Current-head release preflight evidence at `5a35c27` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed static checks, the public API gate,
