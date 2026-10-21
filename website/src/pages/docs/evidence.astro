@@ -43,6 +43,32 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     └── power_warning: true | false`}</code></pre>
   <p>A disparity flag is a decision-support signal, not a causal conclusion. Check the cell counts, label prevalence, uncertainty, measurement process, and domain policy before deciding whether to mitigate or block promotion.</p>
 
+  <h2>Read diagnostics as evidence, not decoration</h2>
+  <p>The evaluation evidence includes two bounded diagnostics that answer different questions. <code>error_analysis</code> identifies the held-out rows the model handled least well. <code>pairwise_interaction</code> asks whether the model output changes differently when two numeric features move together than when each feature moves alone. Both are evidence attached to the exact evaluation input and model; neither is a causal explanation.</p>
+  <div class="split-cards">
+    <div class="mini-card">
+      <span class="mini-label">01 / Error analysis</span>
+      <h3>Where did this model fail?</h3>
+      <p>Classification returns bounded lists of row IDs for misclassified or low-confidence predictions, with actual and predicted labels, confidence, and the misclassification count. Regression returns the largest absolute residuals, actual and predicted values, residuals, and the evaluation MAE.</p>
+      <p class="note">Raw feature values are intentionally excluded. Join row IDs to an access-controlled source only when the privacy policy permits it.</p>
+    </div>
+    <div class="mini-card">
+      <span class="mini-label">02 / Pairwise interaction</span>
+      <h3>Does the model combine signals?</h3>
+      <p>The diagnostic computes a bounded second-order output difference around evaluation medians for numeric feature pairs. A non-zero value means the fitted model behaves non-additively in that local representation space; it does not establish mechanism, causation, or domain interaction.</p>
+      <p class="note">The default budget is at most 10 numeric features and 200 evaluation rows. Deadline or budget exhaustion is recorded as truncation rather than silently presented as complete coverage.</p>
+    </div>
+  </div>
+  <pre><code>{`run.diagnostics
+├── error_analysis
+│   ├── classification: {row_id, actual, predicted, confidence}
+│   └── regression: {row_id, actual, predicted, residual, absolute_error}
+└── pairwise_interaction
+    ├── feature_pair: [feature_a, feature_b]
+    ├── interaction_score
+    └── limitations: [feature_space, associational, numeric_only, bounded]`}</code></pre>
+  <p>Reviewers should inspect the row count, truncation state, evaluation split, model digest, and limitations before interpreting either diagnostic. An error list is not a root-cause analysis; an interaction score is not a fairness or causal finding. A release policy may require these records to exist, but their presence alone cannot turn a weak model into an approved one.</p>
+
   <h2>What blocks a release</h2>
   <ul>
     <li>A supported modality is missing evidence for any of its 15 lifecycle stages.</li>
