@@ -12,9 +12,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>FILES</small><h3>Open tabular formats</h3><p>CSV, TSV, TAB, JSON records, JSONL / NDJSON, Parquet, Feather, Arrow, XLSX, and XLSM.</p></div>
     <div class="doc-card"><small>IN MEMORY</small><h3>Table interchange</h3><p>pandas DataFrame, PyArrow Table, Polars DataFrame or LazyFrame, and Arrow stream protocol objects.</p></div>
     <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
-    <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. The sink exposes its crash window instead of claiming distributed exactly-once delivery. Broker-specific delivery remains caller-owned.</p></div>
+    <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. <code>EventConsumer</code> stages broker acknowledgements durably after the sink commit and retries them after a restart. It does not claim distributed exactly-once delivery.</p></div>
     <div class="doc-card"><small>WAREHOUSE</small><h3>Query engines</h3><p><code>WarehouseConnector</code> gives warehouse and lakehouse engines one bounded reader contract. Inject a schema callback and a paged batch callback; the connector owns query-bound identity, retries, row limits, schema validation, and resumable checkpoints without hiding a cloud SDK.</p></div>
-    <div class="doc-card"><small>EVENT STREAMS</small><h3>Bounded broker polling</h3><p><code>EventStreamSource</code> accepts a caller-owned poll callback for Kafka-, Pulsar-, Kinesis-, Pub/Sub-, Event Hubs-, NATS-, and Redpanda-style URI boundaries. It binds event IDs to ordered checkpoints, retries reads, rejects oversized batches, and leaves acknowledgements and distributed exactly-once delivery with the transport owner.</p></div>
+    <div class="doc-card"><small>EVENT STREAMS</small><h3>Bounded broker polling</h3><p><code>EventStreamSource</code> accepts a caller-owned poll callback for Kafka-, Pulsar-, Kinesis-, Pub/Sub-, Event Hubs-, NATS-, and Redpanda-style URI boundaries. Pair it with <code>EventConsumer</code> to bind a consumer group, retry reads, reject oversized batches, persist pending acknowledgements, and keep the broker SDK at the transport edge.</p></div>
     <div class="doc-card"><small>RANGE READS</small><h3>Bounded object scans</h3><p>Range-backed JSONL and NDJSON sources read only the requested byte windows and resume from byte checkpoints. Record-size limits, invalid JSON, and in-object schema changes fail with structured errors; arbitrary binary formats still require an explicit adapter.</p></div>
     <div class="doc-card"><small>DOCUMENTS</small><h3>Curate before NLP</h3><p>Document collections preserve content hashes, page and section provenance, bounded language profiles, duplicate groups, label composition, and conflicting-label findings before a tokenizer or model is chosen.</p></div>
     <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
@@ -35,6 +35,21 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <li><strong>Protect:</strong> detect leakage and choose a validation strategy that matches time, groups, treatment, or events.</li>
     <li><strong>Decide:</strong> record what was kept, repaired, excluded, or deferred in <code>curation_report.json</code>.</li>
   </ol>
+
+  <h2>Consume an event stream safely</h2>
+  <p>The consumer contract separates three responsibilities. The source polls a bounded batch. Your writer commits unseen events to the downstream sink with event IDs as idempotency keys. Your broker adapter acknowledges only after that commit is durable. If acknowledgement delivery fails, the ledger keeps a JSON sidecar and retries it before polling the next batch; the sink is not run again.</p>
+  <pre><code>{`source = EventStreamSource("kafka://cluster/orders", poll)
+ledger = IncrementalIngestionLedger("state/orders.json", source.source_identity)
+consumer = EventConsumer(
+    source,
+    ledger,
+    consumer_group="orders-worker",
+    writer=write_idempotently,
+    acknowledge=broker_acknowledge,
+)
+evidence = consumer.consume(limit=500)
+print(evidence.to_dict())`}</code></pre>
+  <div class="callout"><p><strong>Important boundary:</strong> the core package proves durable local ordering and retry semantics. A real Kafka/Pulsar/Kinesis adapter still owns leases, partition assignment, broker transactions, credentials, and the independent evidence needed for distributed exactly-once claims.</p></div>
 
   <h2>What to review before modelling</h2>
   <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, duplicate-content label conflicts, and dropped columns. A curation finding is an input to the modelling decision—not noise around it. Blocking findings stop the run until a reviewer resolves, waives, or marks them false-positive.</p>
@@ -117,7 +132,7 @@ audio_split = AudioDataset((audio,)).split(test_fraction=0)
 
 # These objects can be profiled and curated. They do not silently opt into
 # tabular modelling or a production support claim.`}</code></pre>
-  <p>Image, document, graph, audio, video, and geospatial foundations now have a complete experimental baseline lifecycle through <code>ModalityLifecycle</code>. That path attaches modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence to an explicit experimental declaration. It does not promote those modalities to supported status: the supported release boundary remains the explicitly gated tabular library path. Warehouse, lakehouse, and event-stream boundaries have tested callback contracts; broker acknowledgements and distributed exactly-once semantics remain caller-owned.</p>
+  <p>Image, document, graph, audio, video, and geospatial foundations now have a complete experimental baseline lifecycle through <code>ModalityLifecycle</code>. That path attaches modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence to an explicit experimental declaration. It does not promote those modalities to supported status: the supported release boundary remains the explicitly gated tabular library path. Warehouse, lakehouse, and event-stream boundaries have tested callback contracts; broker leases, transactions, and distributed exactly-once evidence remain transport-owner responsibilities.</p>
   <h2>Spatial split boundary</h2>
   <p><code>GeospatialDataset.prepare_features()</code> emits CRS-preserving bounds, widths, heights, centroids, and coordinate counts for a deterministic numeric hand-off. <code>GeospatialDataset.split_spatial(block_size=...)</code> requires a block size in the dataset CRS units and assigns each feature to one spatial block using its geometry centroid. Blocks, not individual features, are assigned to train, validation, and test. This prevents the common mistake of evaluating on points immediately adjacent to training points.</p>
   <p>Large polygons or lines that cross block boundaries need a domain-specific spatial join policy. The core contract does not pretend that centroid assignment solves every spatial leakage problem.</p>
