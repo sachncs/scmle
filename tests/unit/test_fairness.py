@@ -95,6 +95,7 @@ def test_numeric_sensitive_columns_are_banded_and_small_groups_skipped():
     assert all(
         g["rows"] >= fairness.MIN_GROUP_ROWS for g in body["groups"].values()
     )
+    assert body["power_warning"] and body["excluded_groups"]
 
 
 def test_intersectional_groups_are_reported_and_bounded():

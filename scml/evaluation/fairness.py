@@ -109,6 +109,7 @@ class FairnessReport(diagnostics.Diagnostic):
         actual = truth == positive
         chosen = predicted == positive
         stats = {}
+        excluded = self.small_groups(groups)
         for level in groups.dropna().unique():
             rows = (groups == level).to_numpy()
             if rows.sum() < MIN_GROUP_ROWS:
@@ -131,17 +132,33 @@ class FairnessReport(diagnostics.Diagnostic):
                 else None,
                 "accuracy": float((chosen[rows] == actual[rows]).mean()),
             }
-        return self.binary_summary(stats)
+        return self.binary_summary(stats, excluded)
+
+    def small_groups(self, groups: pd.Series) -> dict[str, int]:
+        """Returns groups excluded because their cell size is too small."""
+        return {
+            str(level): int((groups == level).sum())
+            for level in groups.dropna().unique()
+            if int((groups == level).sum()) < MIN_GROUP_ROWS
+        }
 
     def binary_summary(
-        self, stats: dict[str, dict[str, Any]]
+        self,
+        stats: dict[str, dict[str, Any]],
+        excluded: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         """Disparity measures and flags over the group statistics."""
+        excluded = excluded or {}
+        metadata = {
+            "excluded_groups": excluded,
+            "power_warning": bool(excluded),
+        }
         if len(stats) < 2:
             return {
                 "groups": stats,
                 "flags": [],
                 "note": "fewer than two groups",
+                **metadata,
             }
         selection = [g["selection_rate"] for g in stats.values()]
         true_positive = [
@@ -179,6 +196,7 @@ class FairnessReport(diagnostics.Diagnostic):
             "equalized_odds_difference": float(odds),
             "disparate_impact_ratio": float(ratio),
             "flags": flags,
+            **metadata,
         }
 
     def numeric(
@@ -187,6 +205,7 @@ class FairnessReport(diagnostics.Diagnostic):
         """Mean prediction, bias and RMSE per group (regression)."""
         error = predicted.astype(float) - truth.astype(float)
         stats = {}
+        excluded = self.small_groups(groups)
         for level in groups.dropna().unique():
             rows = (groups == level).to_numpy()
             if rows.sum() < MIN_GROUP_ROWS:
@@ -202,6 +221,8 @@ class FairnessReport(diagnostics.Diagnostic):
                 "groups": stats,
                 "flags": [],
                 "note": "fewer than two groups",
+                "excluded_groups": excluded,
+                "power_warning": bool(excluded),
             }
         spread = float(np.std(truth.astype(float))) or 1.0
         biases = [g["bias"] for g in stats.values()]
@@ -211,4 +232,10 @@ class FairnessReport(diagnostics.Diagnostic):
             if gap > PARITY_TOLERANCE
             else []
         )
-        return {"groups": stats, "bias_gap": float(gap), "flags": flags}
+        return {
+            "groups": stats,
+            "bias_gap": float(gap),
+            "flags": flags,
+            "excluded_groups": excluded,
+            "power_warning": bool(excluded),
+        }
