@@ -2,7 +2,7 @@
   "exports": {
     "MLProject": {
       "kind": "class",
-      "signature_sha256": "c83892514057660ad6a540fb8eb74bed1ae395a5850d64da0442d6deddcd2357"
+      "signature_sha256": "5cd04d6a6973827c331ea56f83f95fb6aa18d26b003280805c27c3b25903df64"
     },
     "ModalityHttpServing": {
       "kind": "class",
