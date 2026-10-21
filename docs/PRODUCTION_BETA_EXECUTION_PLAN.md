@@ -1808,3 +1808,27 @@ Current-head strict regression evidence at `1836d61` on 2026-10-21:
 - This is current local regression evidence for the pushed source tree. It
   does not replace the hosted Linux, coverage/mutation, clean-clone, public
   Pages, external-fault, or independent-review gates defined above.
+
+Local release preflight evidence at `f713a5c` on 2026-10-21:
+
+- `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
+  mypy over 239 source files, Bandit, pip-audit, and public API compatibility.
+- The bounded release suite passed 1,964 tests with 75 optional skips; total
+  coverage was 83.14% and the declared core scope was 86%, above the 85%
+  threshold. Mutation testing killed 1,494 of 2,049 mutants (72%), above the
+  70% release threshold.
+- The five-seed offline benchmark regression completed for breast cancer, wine,
+  digits, and diabetes progression with 0 regressions and 0% failure rate for
+  every dataset. Results were ties for the first three and ahead for diabetes
+  progression; this is benchmark evidence, not a claim of universal model
+  superiority.
+- Source and wheel artifacts passed `twine check`, reproduced byte-for-byte
+  with wheel hash
+  `40de2311132f88a63a490786e0f620605dc94faff775763d8c4642604fc506c7` and
+  sdist hash
+  `2e2dd5f370509adeb3b75b5d961364146451beb6f4dd31cb3e2bfb42cd7c8d1f`, and
+  installed successfully in network-isolated environments.
+- The production site dependency audit found 0 vulnerabilities and Astro
+  built all 16 static pages. This is local release evidence; hosted Linux and
+  Pages, external transport/resource-fault tests, secret custody, and
+  independent reviewer evidence remain separate release gates.
