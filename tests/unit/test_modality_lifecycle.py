@@ -526,6 +526,11 @@ def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     assert local["window_count"] == len(local["windows"])
     assert local["window_count"] > 1
     assert local["feature_space_only"] is True
+    raw = local["raw_input_occlusion"]
+    assert raw["method"] == "raw_wav_waveform_window_occlusion"
+    assert raw["frame_count"] == 80
+    assert len(raw["windows"]) == local["window_count"]
+    assert raw["feature_space_only"] is False
 
 
 def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):

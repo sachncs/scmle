@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -26,6 +27,7 @@ from typing import Any
 from typing import cast
 from typing import ClassVar
 from typing import Self
+import wave
 
 import joblib
 import numpy as np
@@ -775,17 +777,93 @@ class AudioAdapter(ModalityAdapter):
                     ),
                 }
             )
+        raw_windows = self.raw_waveform_window_scores(
+            sample, model, full_score, window_frames
+        )
         return {
             "status": "available",
             "method": "time_local_wav_window_score",
             "window_count": len(windows),
             "windows": windows,
             "feature_space_only": True,
+            "raw_input_occlusion": raw_windows,
             "limitations": [
-                "Windows summarize decoded WAV statistics rather than raw "
-                "waveform attribution.",
+                "Raw waveform windows are bounded occlusion evidence, not "
+                "validated waveform saliency.",
                 "The score is associational and does not establish a causal "
                 "audio event.",
+            ],
+        }
+
+    def raw_waveform_window_scores(
+        self,
+        sample: audio.AudioSample,
+        model: LogisticRegression,
+        original_score: float,
+        window_frames: int,
+    ) -> dict[str, object]:
+        """Score source PCM windows after replacing them with silence."""
+        if sample.metadata.sample_width is None:
+            return {
+                "status": "not_available",
+                "method": "raw_wav_waveform_window_occlusion",
+                "reason": "sample width is required to mask PCM frames",
+            }
+        with wave.open(io.BytesIO(sample.encoded_bytes), "rb") as opened:
+            parameters = opened.getparams()
+            raw_frames = bytearray(
+                opened.readframes(sample.metadata.frame_count)
+            )
+        frame_width = parameters.sampwidth * parameters.nchannels
+        silence_value = 128 if parameters.sampwidth == 1 else 0
+        silence_frame = bytes([silence_value]) * frame_width
+        windows: list[dict[str, object]] = []
+        for start_frame in range(0, sample.metadata.frame_count, window_frames):
+            end_frame = min(
+                sample.metadata.frame_count, start_frame + window_frames
+            )
+            masked_frames = raw_frames.copy()
+            start_byte = start_frame * frame_width
+            end_byte = end_frame * frame_width
+            masked_frames[start_byte:end_byte] = silence_frame * (
+                end_frame - start_frame
+            )
+            payload = io.BytesIO()
+            with wave.open(payload, "wb") as writer:
+                writer.setparams(parameters)
+                writer.writeframes(bytes(masked_frames))
+            masked_sample = audio.AudioSample.from_bytes(
+                payload.getvalue(),
+                source=sample.source,
+                label=sample.label,
+                group_id=sample.group_id,
+            )
+            features = self.features((masked_sample,)).values
+            score = float(
+                np.asarray(model.decision_function(features)).reshape(-1)[0]
+            )
+            windows.append(
+                {
+                    "start_frame": start_frame,
+                    "end_frame": end_frame,
+                    "start_seconds": start_frame / sample.metadata.sample_rate,
+                    "end_seconds": end_frame / sample.metadata.sample_rate,
+                    "score_delta_from_full": score - original_score,
+                }
+            )
+        return {
+            "status": "available",
+            "method": "raw_wav_waveform_window_occlusion",
+            "windows": windows,
+            "sample_rate": sample.metadata.sample_rate,
+            "frame_count": sample.metadata.frame_count,
+            "baseline": "silence replacement in source PCM frames",
+            "feature_space_only": False,
+            "limitations": [
+                "The model consumes bounded aggregate signal features after "
+                "masking.",
+                "This does not establish transcript, speaker, event, or "
+                "causal attribution.",
             ],
         }
 
