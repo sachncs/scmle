@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 import dataclasses
 import hashlib
+import hmac
 import json
 from typing import Any
 from typing import Self
@@ -159,4 +160,12 @@ class ReleaseAttestation:
             expected = type(self).from_records(provenance, sbom, signing_key)
         except (TypeError, ValueError):
             return False
-        return self == expected
+        if self.unsigned_dict() != expected.unsigned_dict():
+            return False
+        if self.attestation_signature is None:
+            return expected.attestation_signature is None
+        if expected.attestation_signature is None:
+            return False
+        return hmac.compare_digest(
+            self.attestation_signature, expected.attestation_signature
+        )
