@@ -142,3 +142,11 @@ def test_quarantine_entry_requires_valid_expiry():
     """Malformed policy records are rejected at the policy boundary."""
     with pytest.raises(ValueError, match="ISO-8601"):
         entry("tomorrow")
+
+
+def test_stability_attempts_enforce_strict_resource_warnings():
+    """Repeated runs use the same warning gate as release suites."""
+    assert check_test_stability.STRICT_PYTEST_ARGUMENTS == (
+        "-W",
+        "error::ResourceWarning",
+    )

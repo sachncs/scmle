@@ -36,6 +36,10 @@ class TestStatus(enum.StrEnum):
     SKIPPED = "skipped"
 
 
+STRICT_PYTEST_ARGUMENTS = ("-W", "error::ResourceWarning")
+"""Pytest options shared by every repeated stability attempt."""
+
+
 def parse_date(value: str) -> datetime.date:
     """Parse an ISO-8601 quarantine expiry date."""
     try:
@@ -259,6 +263,7 @@ def run_pytest(
         sys.executable,
         "-m",
         "pytest",
+        *STRICT_PYTEST_ARGUMENTS,
         *arguments,
         "--junitxml",
         str(report_path),
