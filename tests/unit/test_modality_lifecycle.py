@@ -241,6 +241,13 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
     assert measured_report.quality_findings == ()
 
 
+def test_raster_adapter_has_a_distinct_capability_identity():
+    """Raster packages do not masquerade as vector geospatial packages."""
+    assert (
+        modality_lifecycle.RasterAdapter.modality is modalities.Modality.RASTER
+    )
+
+
 @pytest.mark.parametrize(
     "factory",
     [

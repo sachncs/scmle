@@ -73,6 +73,7 @@ DatasetModality = Literal[
     "video",
     "graph",
     "geospatial",
+    "raster",
 ]
 """Dataset families accepted by the configuration contract.
 

@@ -62,6 +62,7 @@ def test_enums_define_all_required_modalities_and_lifecycle_stages():
         "video",
         "graph",
         "geospatial",
+        "raster",
     ]
     assert len(modalities.REQUIRED_LIFECYCLE_STAGES) == 15
     assert modalities.LifecycleStage.RECOVERY_AND_RESOURCE_TESTS.value == (

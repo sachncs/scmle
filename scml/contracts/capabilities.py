@@ -26,6 +26,7 @@ class Modality(enum.StrEnum):
     VIDEO = "video"
     GRAPH = "graph"
     GEOSPATIAL = "geospatial"
+    RASTER = "raster"
 
 
 class Evaluation(enum.StrEnum):

@@ -28,6 +28,7 @@ class Modality(enum.StrEnum):
     VIDEO = "video"
     GRAPH = "graph"
     GEOSPATIAL = "geospatial"
+    RASTER = "raster"
 
 
 class LifecycleStage(enum.StrEnum):

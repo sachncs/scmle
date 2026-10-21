@@ -1526,7 +1526,7 @@ class GeospatialAdapter(ModalityAdapter):
 class RasterAdapter(ModalityAdapter):
     """Adapter for labelled raster metadata with an explicit label sidecar."""
 
-    modality = modalities.Modality.GEOSPATIAL
+    modality = modalities.Modality.RASTER
 
     def __init__(
         self,
