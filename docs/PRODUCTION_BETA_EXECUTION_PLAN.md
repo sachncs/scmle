@@ -1140,3 +1140,9 @@ Clean-head preflight evidence at `f691997` on 2026-10-21:
   release proof. GitHub Pages remains HTTP 404, hosted Actions remain
   unavailable before job logs, and external key custody, external-fault
   execution, and independent review/signature remain release blockers.
+- `5601af9` makes small-cell fairness limitations explicit. Per-column and
+  intersectional reports now retain excluded group sizes and a machine-
+  readable power warning instead of silently presenting only the surviving
+  groups. The focused fairness and release-evaluation slice passes 20 tests
+  under `-W error::ResourceWarning`; this is a reporting safeguard, not a
+  substitute for a domain-specific power analysis.
