@@ -1767,3 +1767,19 @@ Temporal geospatial evidence at `dd1e201` on 2026-10-21:
   with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
   mypy, and `git diff --check` passed. The source and test change was pushed as
   one atomic commit.
+
+Raster nodata evidence at `5f5eb99` on 2026-10-21:
+
+- `RasterSample` now validates caller-owned nodata sentinel and measured
+  nodata-fraction metadata, exposes an explicit unknown/declared/measured
+  status, and binds those values into the raster dataset identity. `RasterAdapter`
+  persists the nodata profile and emits a visible warning when no nodata
+  evidence is supplied.
+- This closes the raster data-understanding and curation boundary without
+  pretending that encoded bytes have been decoded: pixel masking, window
+  sampling, reprojection, and raster-specific semantics still require an
+  explicit codec/decoder policy.
+- The media, modality-lifecycle, and naming-convention suite passed 901 tests
+  with 4 optional skips under `-W error::ResourceWarning`; Ruff, formatting,
+  mypy, and `git diff --check` passed. The source and test change was pushed as
+  one atomic commit.
