@@ -107,6 +107,23 @@ InferenceEvidenceLinker().link(
 )`}</code></pre>
   <p>The linker verifies the graph and bundle identities, writes the graph atomically, and makes exact event replay idempotent. It does not replace redaction, retention, access control, or independent release review.</p>
 
+  <h2>Classify the failure before you recover</h2>
+  <p>Use the first trustworthy signal to decide which boundary failed. This prevents an operator from retraining around an infrastructure outage or rolling back a model when the source snapshot changed.</p>
+  <div class="doc-cards">
+    <div class="doc-card"><small>DATA FAILURE</small><h3>Stop before fit</h3><p>Signals include schema mismatch, blocking curation findings, duplicate-event conflicts, late-data policy violations, or a changed snapshot hash. Preserve the source and curation evidence; do not discard the offending rows or silently continue.</p></div>
+    <div class="doc-card"><small>MODEL FAILURE</small><h3>Compare on locked data</h3><p>Signals include a metric regression, calibration or fairness breach, unstable explanation quality, or an error-budget breach tied to the bundle. Keep the champion, stage the challenger, and require an exact-bundle approval before promotion.</p></div>
+    <div class="doc-card"><small>INFRASTRUCTURE FAILURE</small><h3>Resume or quarantine</h3><p>Signals include worker loss, timeout, disk or memory guard, partial write, stale checkpoint, or dependency mismatch. Verify the terminal state and artifact digest; resume only from a matching checkpoint or quarantine the incomplete run.</p></div>
+    <div class="doc-card"><small>POLICY FAILURE</small><h3>Block the release</h3><p>Signals include missing signing evidence, expired approval, absent reviewer, unsupported capability, missing retention decision, or an unexecuted fault scenario. A policy failure is not fixed by a better score; it needs an explicit decision record.</p></div>
+  </div>
+  <pre><code>{`failure signal
+      ↓ classify
+data ───────→ preserve snapshot + curation evidence
+model ──────→ retain champion + review challenger
+infrastructure → verify terminal state + resume or quarantine
+policy ─────→ block promotion + record disposition
+      ↓
+only a verified, digest-bound state may move forward`}</code></pre>
+
   <h2>Run the local fault matrix</h2>
   <p>The repository includes a bounded local executor for all 15 declared fault scenarios. It exercises real child-process termination, timeout cancellation, atomic publication, artifact quarantine, signature rejection, checkpoint and snapshot mismatch, retry exhaustion, duplicate-event idempotency, incomplete lineage, and rejected approvals.</p>
   <pre><code>{`from pathlib import Path
