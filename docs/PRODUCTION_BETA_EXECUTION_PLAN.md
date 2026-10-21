@@ -1933,6 +1933,15 @@ Current external gate observation at `b05519a` on 2026-10-21:
   the account/plan and repository visibility or Pages configuration are
   resolved by the owner.
 
+Security hardening at `43bf72e` on 2026-10-21:
+
+- Independent release-review HMAC verification now uses constant-time
+  comparison, matching the bundle, registry, evidence-index, and keyring
+  verification paths. The review contract and public CLI behavior are
+  unchanged.
+- The independent-review, evidence-contract, and keyring tests passed 18
+  tests under `-W error::ResourceWarning`; Ruff, formatting, and mypy passed.
+
 Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
