@@ -277,8 +277,11 @@ class MLProject:
     def plan(self) -> experiments.ExperimentPlan:
         """Analyzes the data and proposes a workflow; trains nothing."""
         context = self.orchestrator.prepare()
-        self.profile = context.profile
-        return context_module.require(context.plan, "plan")
+        try:
+            self.profile = context.profile
+            return context_module.require(context.plan, "plan")
+        finally:
+            context.close()
 
     def recommendations(
         self,
@@ -289,7 +292,10 @@ class MLProject:
             Recommendations for the user (never applied automatically).
         """
         context = self.orchestrator.prepare()
-        return context.recommendations
+        try:
+            return context.recommendations
+        finally:
+            context.close()
 
     def run(
         self, plan: experiments.ExperimentPlan | None = None

@@ -361,6 +361,17 @@ class RunContext:
         """Run directory as a string, empty for previews."""
         return str(self.store.directory) if self.store else ""
 
+    def close(self) -> None:
+        """Release resources owned by a prepared or executing context.
+
+        A preview still creates a locked test-set boundary during profiling.
+        The context owns that boundary until the caller has opened it or the
+        preview is finished, so every public path can close it deterministically
+        instead of relying on process garbage collection.
+        """
+        if self.split is not None:
+            self.split.locked_test.close()
+
     def write_json(self, relative: str, payload: Any) -> None:
         """Writes a JSON artifact if the run is persisted."""
         if self.store is not None:

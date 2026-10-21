@@ -404,5 +404,4 @@ class Orchestrator:
                 },
             ) from error
         finally:
-            if context.split is not None:
-                context.split.locked_test.close()
+            context.close()

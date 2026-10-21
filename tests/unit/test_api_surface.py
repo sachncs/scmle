@@ -1,6 +1,9 @@
 """The supported top-level API does not disappear accidentally."""
 
+import pandas as pd
+
 import scml
+from scml.governance import vault
 
 PUBLIC_API = {
     "MLProject",
@@ -34,3 +37,24 @@ def test_public_project_exposes_an_explicit_dataset_modality():
     )
 
     assert project.spec.data.modality == "image"
+
+
+def test_plan_closes_the_preview_test_set(monkeypatch):
+    """A side-effect-free preview must not leave its vault subprocess alive."""
+    closed = []
+    close = vault.SealedTestSet.close
+
+    def record_close(instance):
+        closed.append(instance.process.pid)
+        close(instance)
+
+    monkeypatch.setattr(vault.SealedTestSet, "close", record_close)
+    project = scml.MLProject(
+        data=pd.DataFrame({"feature": list(range(80)), "y": [0, 1] * 40}),
+        target="y",
+        time_budget=30,
+    )
+
+    project.plan()
+
+    assert closed
