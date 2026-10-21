@@ -487,6 +487,11 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
     assert local["neighbors"]
     assert local["edges"]
     assert local["model_uses_topology"] is False
+    raw = local["raw_input_occlusion"]
+    assert raw["method"] == "raw_graph_node_feature_occlusion"
+    assert len(raw["features"]) == 2
+    assert raw["features"][0]["feature"] in {"first", "second"}
+    assert raw["feature_space_only"] is False
 
 
 def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):

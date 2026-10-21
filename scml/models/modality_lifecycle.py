@@ -54,6 +54,7 @@ from scml.models import documents as document_models
 from scml.models import images as image_models
 
 MAX_REPEATED_EXPLANATION_SAMPLES = 128
+MAX_RAW_GRAPH_FEATURES = 64
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1241,6 +1242,13 @@ class GraphAdapter(ModalityAdapter):
         )
         values = np.asarray(sample.features, dtype=np.float64)
         decision = np.asarray(model.decision_function(values[None]))
+        if decision.ndim == 1:
+            selected_class = 0
+            original_score = float(decision[0])
+        else:
+            predicted = model.predict(values[None])[0]
+            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            original_score = float(decision[0, selected_class])
         feature_terms = sorted(
             (
                 (name, float(values[index] * coefficients[index]))
@@ -1248,6 +1256,31 @@ class GraphAdapter(ModalityAdapter):
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:10]
+        raw_features: list[dict[str, object]] = []
+        feature_limit = min(len(feature_names), MAX_RAW_GRAPH_FEATURES)
+        for index in range(feature_limit):
+            masked_values = list(sample.features)
+            masked_values[index] = 0.0
+            masked_sample = graph.GraphNode(
+                node_id=sample.node_id,
+                features=tuple(masked_values),
+                label=sample.label,
+            )
+            masked_features = self.features((masked_sample,)).values
+            masked_decision = np.asarray(
+                model.decision_function(masked_features)
+            )
+            if masked_decision.ndim == 1:
+                masked_score = float(masked_decision[0])
+            else:
+                masked_score = float(masked_decision[0, selected_class])
+            raw_features.append(
+                {
+                    "feature": feature_names[index],
+                    "feature_index": index,
+                    "score_delta_from_full": original_score - masked_score,
+                }
+            )
         return {
             "status": "available",
             "method": "one_hop_graph_context_and_node_feature_contribution",
@@ -1265,6 +1298,21 @@ class GraphAdapter(ModalityAdapter):
             "feature_terms": [[name, value] for name, value in feature_terms],
             "decision_score": float(decision.reshape(-1)[0]),
             "model_uses_topology": False,
+            "raw_input_occlusion": {
+                "status": "available",
+                "method": "raw_graph_node_feature_occlusion",
+                "features": raw_features,
+                "baseline": "zero replacement in source node features",
+                "feature_space_only": False,
+                "bounded_by": MAX_RAW_GRAPH_FEATURES,
+                "limitations": [
+                    "The perturbation masks declared node features, not graph "
+                    "topology or neighbor identity.",
+                    "Topology remains review context because the baseline does "
+                    "not consume edges.",
+                    "Score changes are associational and not causal.",
+                ],
+            },
             "limitations": [
                 "The baseline uses declared node features, not graph topology.",
                 "One-hop context is evidence for review, not GNN attribution.",
