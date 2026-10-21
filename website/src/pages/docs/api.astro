@@ -57,7 +57,7 @@ project = ModalityProject(
 )
 report = project.run()
 print(report.documentation["status"])  # experimental</code></pre>
-  <p>This surface does not promote the modality to supported production status. The report says <code>experimental</code> until decoder ownership, modality-specific fidelity, external serving and fault evidence, and independent review are complete. Do not pass raw bytes to <code>MLProject</code> and expect a tabular estimator to infer their semantics.</p>
+  <p>This surface does not promote the modality to supported production status. The report says <code>experimental</code> until decoder ownership, modality-specific fidelity, external serving and fault evidence, and independent review are complete. For verified package inference, use the exported <code>ModalityPredictor</code> with the same typed adapter. Do not pass raw bytes to <code>MLProject</code> and expect a tabular estimator to infer their semantics.</p>
 
   <h2>Connect a warehouse without hiding its boundary</h2>
   <p><code>WarehouseConnector</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>
@@ -77,7 +77,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
   <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 
   <h2>What is safe to depend on</h2>
-  <p>The supported top-level exports are <code>MLProject</code>, <code>ModalityProject</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
+  <p>The supported top-level exports are <code>MLProject</code>, <code>ModalityProject</code>, <code>ModalityPredictor</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
 
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>

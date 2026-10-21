@@ -11,9 +11,11 @@ from scml.artifacts.bundle import ModelBundle
 from scml.evaluation.metrics import register_metric
 from scml.models.custom import register_estimator
 from scml.models.custom import unregister_estimator
+from scml.models.modality_lifecycle import ModalityPredictor
 
 __all__ = [
     "MLProject",
+    "ModalityPredictor",
     "ModalityProject",
     "ModelBundle",
     "RunResult",

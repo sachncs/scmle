@@ -37,6 +37,12 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
     assert project.declaration().status.value == "experimental"
     assert (tmp_path / "run" / "model" / "manifest.json").is_file()
     assert (tmp_path / "run" / "modality_lifecycle.json").is_file()
+    predictor = scml.ModalityPredictor.from_package(
+        project.adapter,
+        report.package.path,
+        "test-signing-key",
+    )
+    assert predictor.predict(project.adapter.samples[:2]).shape == (2,)
 
 
 def test_modality_project_rejects_invalid_configuration(tmp_path):
