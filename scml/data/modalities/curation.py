@@ -92,8 +92,8 @@ class ModalityDatasetCard:
             raise ValueError("modality must not be empty")
         if not self.dataset_hash.strip():
             raise ValueError("dataset_hash must not be empty")
-        if isinstance(self.sample_count, bool) or self.sample_count < 1:
-            raise ValueError("sample_count must be positive")
+        if isinstance(self.sample_count, bool) or self.sample_count < 0:
+            raise ValueError("sample_count must not be negative")
         if not self.intended_use.strip():
             raise ValueError("intended_use must not be empty")
         if not self.limitations or any(

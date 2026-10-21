@@ -1,11 +1,13 @@
 """Public API: `MLProject(...).plan()`, `.run()`, `result.predict()`."""
 
+import json
 import pathlib
 from typing import Any
 from typing import Literal
 
 import pandas as pd
 
+from scml import durability
 from scml.api import results
 from scml.artifacts import reproducibility
 from scml.contracts import data as data_contracts
@@ -17,6 +19,7 @@ from scml.core import context as context_module
 from scml.core import orchestrator as orchestrator_module
 from scml.core import policies as checkpoints_module
 from scml.data.readers import interchange
+from scml.governance import attestation
 from scml.intelligence import recommendations as recommendations_module
 from scml.models import modality_lifecycle
 
@@ -452,3 +455,121 @@ class ModalityProject:
         if self.report is None:
             raise RuntimeError("run must complete before declaration")
         return self.lifecycle.declaration(self.report)
+
+
+class ModalityCurationProject:
+    """Curate and document a modality without forcing a model fit.
+
+    This is the data-understanding entry point for unlabeled, unsupervised,
+    or domain-specific datasets. It persists signed curation and dataset-card
+    evidence, but it never invents labels, features, metrics, or a model.
+    """
+
+    def __init__(
+        self,
+        adapter: modality_lifecycle.ModalityAdapter,
+        signing_key: str | bytes,
+        *,
+        output_dir: str | pathlib.Path = "runs",
+        manifest: data_contracts.ModalityManifest | None = None,
+    ) -> None:
+        """Define a curation-only run over a typed modality adapter.
+
+        Args:
+            adapter: Adapter that owns source identity and curation policy.
+            signing_key: Non-empty key used to authenticate the evidence.
+            output_dir: Directory where curation evidence is written.
+            manifest: Optional source, lineage, privacy, and task contract.
+
+        Raises:
+            TypeError: If the adapter or manifest has the wrong type.
+            ValueError: If the signing key is empty or the output is invalid.
+        """
+        if not isinstance(adapter, modality_lifecycle.ModalityAdapter):
+            raise TypeError("adapter must be a ModalityAdapter")
+        if not signing_key:
+            raise ValueError("signing_key must not be empty")
+        if manifest is not None and not isinstance(
+            manifest, data_contracts.ModalityManifest
+        ):
+            raise TypeError("manifest must be ModalityManifest")
+        self.adapter = adapter
+        self.signing_key = signing_key
+        self.output_dir = pathlib.Path(output_dir)
+        self.manifest = manifest
+
+    def run(self) -> modality_lifecycle.ModalityCurationResult:
+        """Persist signed curation evidence without entering modelling."""
+        if self.output_dir.exists() and not self.output_dir.is_dir():
+            raise ValueError("output_dir must be a directory")
+        samples = self.adapter.samples
+        modality = modalities.modality_value(self.adapter.modality)
+        dataset_hash = self.adapter.dataset_hash
+        sample_count = len(samples)
+        if self.manifest is not None:
+            if self.manifest.modality != modality:
+                raise ValueError("manifest modality must match adapter")
+            if self.manifest.content_hash != dataset_hash:
+                raise ValueError("manifest content_hash must match adapter")
+            if self.manifest.sample_count != sample_count:
+                raise ValueError("manifest sample_count must match adapter")
+        report = self.adapter.curate()
+        if not isinstance(
+            report,
+            (
+                modality_lifecycle.curation.ModalityCurationReport,
+                modality_lifecycle.document.DocumentCurationReport,
+            ),
+        ):
+            raise TypeError(
+                "adapter curate() must return a modality curation report"
+            )
+        curation_payload = report.to_dict()
+        reported_dataset_hash = curation_payload.get("dataset_hash")
+        reported_sample_count = curation_payload.get("sample_count")
+        if reported_dataset_hash != dataset_hash:
+            raise ValueError("curation dataset_hash must match adapter")
+        if reported_sample_count != sample_count:
+            raise ValueError("curation sample_count must match adapter")
+        card = modality_lifecycle.curation.ModalityDatasetCard.from_report(
+            modality,
+            curation_payload,
+            self.adapter.modality_notes(),
+            manifest=self.manifest,
+        )
+        unsigned: dict[str, object] = {
+            "schema_version": 1,
+            "record_type": "modality_curation",
+            "modality": modality,
+            "dataset_hash": dataset_hash,
+            "sample_count": sample_count,
+            "curation": curation_payload,
+            "dataset_card": card.to_dict(),
+        }
+        signature = attestation.sign_payload(unsigned, self.signing_key)
+        payload = {
+            **unsigned,
+            "signature": {
+                "algorithm": attestation.SIGNATURE_ALGORITHM,
+                "value": signature,
+            },
+        }
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        path = self.output_dir / "modality_curation.json"
+        if path.exists():
+            raise FileExistsError(path)
+        durability.write_atomically(
+            path,
+            (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode(
+                "utf-8"
+            ),
+        )
+        return modality_lifecycle.ModalityCurationResult(
+            modality=modality,
+            dataset_hash=dataset_hash,
+            sample_count=sample_count,
+            curation=curation_payload,
+            dataset_card=card.to_dict(),
+            path=str(path),
+            signature=signature,
+        )

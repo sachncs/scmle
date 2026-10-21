@@ -173,6 +173,25 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
         )
 
 
+def test_modality_curation_card_can_describe_an_empty_snapshot():
+    """Empty raw inputs are evidence, not an invitation to invent samples."""
+    report = {
+        "dataset_hash": "c" * 64,
+        "sample_count": 0,
+        "release_ready": False,
+        "quality_findings": [],
+        "risk_findings": [],
+    }
+
+    card = curation.ModalityDatasetCard.from_report(
+        "extension:acme/empty-source", report, ("empty snapshot",)
+    )
+
+    assert card.sample_count == 0
+    assert card.manifest is not None
+    assert card.manifest.sample_count == 0
+
+
 def test_modality_manifest_round_trip_binds_governance_to_content():
     """A modality manifest preserves source and privacy evidence exactly."""
     manifest = data.ModalityManifest(

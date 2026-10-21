@@ -448,8 +448,8 @@ class ModalityManifest:
         ):
             if not value.strip():
                 raise ValueError(f"{name} must not be empty")
-        if isinstance(self.sample_count, bool) or self.sample_count < 1:
-            raise ValueError("sample_count must be positive")
+        if isinstance(self.sample_count, bool) or self.sample_count < 0:
+            raise ValueError("sample_count must not be negative")
         if self.schema_version < 1:
             raise ValueError("schema_version must be positive")
         if len(self.content_hash) != 64 or any(

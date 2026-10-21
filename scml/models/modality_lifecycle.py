@@ -254,6 +254,33 @@ class LifecycleReport:
         }
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class ModalityCurationResult:
+    """Signed curation evidence for a dataset without a model claim."""
+
+    modality: str
+    dataset_hash: str
+    sample_count: int
+    curation: Mapping[str, object]
+    dataset_card: Mapping[str, object]
+    path: str
+    signature: str
+
+    def to_dict(self) -> dict[str, object]:
+        """Return JSON-native curation result evidence."""
+        return {
+            "schema_version": 1,
+            "record_type": "modality_curation",
+            "modality": self.modality,
+            "dataset_hash": self.dataset_hash,
+            "sample_count": self.sample_count,
+            "curation": dict(self.curation),
+            "dataset_card": dict(self.dataset_card),
+            "path": self.path,
+            "signature": self.signature,
+        }
+
+
 class ModalityAdapter(abc.ABC):
     """Polymorphic boundary between a dataset family and the lifecycle."""
 

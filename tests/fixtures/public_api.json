@@ -4,6 +4,10 @@
       "kind": "class",
       "signature_sha256": "5cd04d6a6973827c331ea56f83f95fb6aa18d26b003280805c27c3b25903df64"
     },
+    "ModalityCurationProject": {
+      "kind": "class",
+      "signature_sha256": "76b4e900129575061cc431bdfae48a3818220e507a5e3bc20b01ff3f6c511167"
+    },
     "ModalityHttpServing": {
       "kind": "class",
       "signature_sha256": "2eefbf4fc75db85fd4490da5502a1de6f795a32e93231fcf9439a78da9a079a2"

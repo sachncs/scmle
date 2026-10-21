@@ -97,3 +97,29 @@ def test_modality_project_preserves_extension_identity_and_status(tmp_path):
     assert declaration.status is modalities.ModalityStatus.EXTENSION_ONLY
     assert declaration.complete
     assert report.package.path.endswith("/model")
+
+
+def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
+    tmp_path,
+):
+    """Curation remains available when a classification baseline is invalid."""
+    samples = tuple(
+        document.DocumentSample(
+            document_id=f"unlabelled-{index}",
+            content=f"raw record {index}",
+        )
+        for index in range(3)
+    )
+    adapter = modality_lifecycle.TextAdapter(document.DocumentDataset(samples))
+
+    result = scml.ModalityCurationProject(
+        adapter,
+        "test-signing-key",
+        output_dir=tmp_path / "curation",
+    ).run()
+
+    assert result.modality == "text"
+    assert result.sample_count == 3
+    assert result.curation["sample_count"] == 3
+    assert result.dataset_card["privacy"]["status"] == "not_assessed"
+    assert Path(result.path).is_file()

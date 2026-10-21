@@ -5,6 +5,7 @@ __version__ = "0.1.0b1"
 from scml.api.predict import load_model
 from scml.api.predict import predict
 from scml.api.project import MLProject
+from scml.api.project import ModalityCurationProject
 from scml.api.project import ModalityProject
 from scml.api.results import RunResult
 from scml.artifacts.bundle import ModelBundle
@@ -17,6 +18,7 @@ from scml.models.modality_lifecycle import ModalityPredictor
 
 __all__ = [
     "MLProject",
+    "ModalityCurationProject",
     "ModalityHttpServing",
     "ModalityPredictor",
     "ModalityProject",
