@@ -88,6 +88,63 @@ def test_plain_text_reader_infers_path_format(tmp_path):
     assert sample.source_uri == path.resolve().as_uri()
 
 
+def test_document_layout_records_ocr_and_table_provenance():
+    """Curation preserves caller-owned layout extraction evidence."""
+    content = "Heading\nrow one\nrow two"
+    layout = document.DocumentLayout(
+        source="ocr://run-4",
+        provider="layout-engine",
+        provider_version="3.2",
+        ocr_confidence=0.93,
+        elements=(
+            document.DocumentElement("heading", 0, 7, 1, 0.99),
+            document.DocumentElement(
+                "table", 8, len(content), 1, 0.88, table_rows=2, table_columns=1
+            ),
+        ),
+    )
+    sample = document.DocumentSample("structured", content, layout=layout)
+
+    report = document.DocumentDataset((sample,)).curate()
+
+    assert sample.layout is layout
+    assert layout.table_count == 1
+    assert layout.to_dict()["provider_version"] == "3.2"
+    assert report.layout_coverage == 1.0
+    assert report.layout_providers == ("layout-engine",)
+    assert report.layout_element_count == 2
+    assert report.table_element_count == 1
+    assert report.ocr_confidence_min == 0.93
+    assert report.ocr_confidence_max == 0.93
+    assert report.release_ready
+
+
+def test_document_layout_confidence_and_offsets_fail_closed():
+    """Missing OCR confidence is visible and offsets cannot escape content."""
+    content = "OCR text"
+    layout = document.DocumentLayout(
+        source="ocr://run-5",
+        provider="layout-engine",
+        provider_version="3.2",
+        elements=(document.DocumentElement("ocr", 0, len(content), 1),),
+    )
+    report = document.DocumentDataset(
+        (document.DocumentSample("uncertain", content, layout=layout),)
+    ).curate()
+
+    assert [finding.finding_id for finding in report.quality_findings] == [
+        "quality.document-ocr-confidence-missing",
+    ]
+    invalid_layout = document.DocumentLayout(
+        source="ocr://run-6",
+        provider="layout-engine",
+        provider_version="3.2",
+        elements=(document.DocumentElement("ocr", 0, 9, 1),),
+    )
+    with pytest.raises(document.DocumentValidationError, match="exceeds"):
+        document.DocumentSample("invalid", content, layout=invalid_layout)
+
+
 def test_empty_fixture_fails_with_structured_validation(empty_document: bytes):
     """Whitespace-only content cannot enter the immutable contract."""
     with pytest.raises(document.DocumentValidationError) as caught:

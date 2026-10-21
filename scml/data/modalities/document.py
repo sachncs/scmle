@@ -12,6 +12,7 @@ from collections.abc import Sequence
 import dataclasses
 import enum
 import hashlib
+import math
 import pathlib
 import random
 import re
@@ -93,6 +94,86 @@ class DocumentSpan:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class DocumentElement:
+    """One extracted layout, OCR, or table element with source offsets."""
+
+    kind: str
+    start: int
+    end: int
+    page_number: int
+    confidence: float | None = None
+    table_rows: int | None = None
+    table_columns: int | None = None
+
+    def __post_init__(self) -> None:
+        """Validate element type, offsets, page, confidence, and table shape."""
+        if self.kind not in {"text", "heading", "table", "image", "ocr"}:
+            raise ValueError("unsupported document element kind")
+        if self.start < 0 or self.end <= self.start:
+            raise ValueError("document element must have a positive range")
+        if self.page_number < 1:
+            raise ValueError("document elements require a positive page_number")
+        if self.confidence is not None and (
+            isinstance(self.confidence, bool)
+            or not math.isfinite(self.confidence)
+            or not 0.0 <= self.confidence <= 1.0
+        ):
+            raise ValueError("document element confidence must be in [0, 1]")
+        if self.kind == "table" and (
+            self.table_rows is None or self.table_columns is None
+        ):
+            raise ValueError("table elements require row and column counts")
+        if self.table_rows is not None and self.table_rows < 1:
+            raise ValueError("table_rows must be positive")
+        if self.table_columns is not None and self.table_columns < 1:
+            raise ValueError("table_columns must be positive")
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DocumentLayout:
+    """Caller-owned extraction provenance for OCR, layout, and tables."""
+
+    source: str
+    provider: str
+    provider_version: str
+    elements: tuple[DocumentElement, ...]
+    ocr_confidence: float | None = None
+
+    def __post_init__(self) -> None:
+        """Validate the extraction identity and optional OCR confidence."""
+        for field_name, value in (
+            ("source", self.source),
+            ("provider", self.provider),
+            ("provider_version", self.provider_version),
+        ):
+            if not value.strip():
+                raise ValueError(
+                    f"document layout {field_name} must not be empty"
+                )
+        if not isinstance(self.elements, tuple):
+            raise TypeError("document layout elements must be a tuple")
+        if not all(
+            isinstance(element, DocumentElement) for element in self.elements
+        ):
+            raise TypeError("elements must contain DocumentElement values")
+        if self.ocr_confidence is not None and (
+            isinstance(self.ocr_confidence, bool)
+            or not math.isfinite(self.ocr_confidence)
+            or not 0.0 <= self.ocr_confidence <= 1.0
+        ):
+            raise ValueError("OCR confidence must be in [0, 1]")
+
+    @property
+    def table_count(self) -> int:
+        """Return the number of extracted table elements."""
+        return sum(element.kind == "table" for element in self.elements)
+
+    def to_dict(self) -> dict[str, object]:
+        """Return JSON-native extraction evidence."""
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class DocumentProfile:
     """Bounded lexical profile for one document."""
 
@@ -135,6 +216,12 @@ class DocumentCurationReport:
     risk_findings: tuple[data_contracts.CurationFinding, ...]
     max_characters: int
     max_tokens: int
+    layout_coverage: float = 0.0
+    layout_providers: tuple[str, ...] = ()
+    layout_element_count: int = 0
+    table_element_count: int = 0
+    ocr_confidence_min: float | None = None
+    ocr_confidence_max: float | None = None
 
     @property
     def unresolved_blocking_findings(
@@ -181,6 +268,12 @@ class DocumentCurationReport:
             ],
             "max_characters": self.max_characters,
             "max_tokens": self.max_tokens,
+            "layout_coverage": self.layout_coverage,
+            "layout_providers": list(self.layout_providers),
+            "layout_element_count": self.layout_element_count,
+            "table_element_count": self.table_element_count,
+            "ocr_confidence_min": self.ocr_confidence_min,
+            "ocr_confidence_max": self.ocr_confidence_max,
             "release_ready": self.release_ready,
             "unresolved_blocking_findings": [
                 finding.finding_id
@@ -200,6 +293,7 @@ class DocumentSample:
     encoding: str = "utf-8"
     label: str | int | float | bool | None = None
     provenance: tuple[DocumentSpan, ...] = ()
+    layout: DocumentLayout | None = None
     content_hash: str = dataclasses.field(init=False)
     size_bytes: int = dataclasses.field(init=False)
 
@@ -228,6 +322,14 @@ class DocumentSample:
         if not normalized_provenance:
             normalized_provenance = provenance_for_content(self.content)
         object.__setattr__(self, "provenance", normalized_provenance)
+        if self.layout is not None and any(
+            element.end > len(self.content) for element in self.layout.elements
+        ):
+            raise DocumentValidationError(
+                "document layout element exceeds decoded content",
+                "layout_out_of_range",
+                {"document_id": self.document_id},
+            )
         content_bytes = self.content.encode("utf-8")
         object.__setattr__(
             self,
@@ -378,6 +480,19 @@ class DocumentDataset:
 
         quality_findings: list[data_contracts.CurationFinding] = []
         risk_findings: list[data_contracts.CurationFinding] = []
+        layouts = [
+            sample.layout
+            for sample in self.samples
+            if sample.layout is not None
+        ]
+        ocr_confidences = [
+            layout.ocr_confidence
+            for layout in layouts
+            if layout.ocr_confidence is not None
+        ]
+        missing_ocr_confidence = sum(
+            layout.ocr_confidence is None for layout in layouts
+        )
 
         def create_finding(
             finding_id: str,
@@ -400,6 +515,25 @@ class DocumentDataset:
                 reviewer=None,
                 disposition=data_contracts.FindingDisposition.OPEN,
                 blocking=blocking,
+            )
+
+        if missing_ocr_confidence:
+            quality_findings.append(
+                create_finding(
+                    "quality.document-ocr-confidence-missing",
+                    data_contracts.FindingSeverity.WARNING,
+                    {
+                        "document_ids": [
+                            sample.document_id
+                            for sample in self.samples
+                            if sample.layout is not None
+                        ]
+                    },
+                    {"sample_count": missing_ocr_confidence},
+                    "Record OCR confidence or an explicit reason it is "
+                    "unavailable before making extraction-quality claims.",
+                    False,
+                )
             )
 
         if duplicate_groups:
@@ -494,6 +628,20 @@ class DocumentDataset:
             language_counts=dict(sorted(language_counts.items())),
             format_counts=dict(sorted(format_counts.items())),
             label_counts=dict(sorted(label_counts.items())),
+            layout_coverage=len(layouts) / len(self.samples),
+            layout_providers=tuple(
+                sorted({layout.provider for layout in layouts})
+            ),
+            layout_element_count=sum(
+                len(layout.elements) for layout in layouts
+            ),
+            table_element_count=sum(layout.table_count for layout in layouts),
+            ocr_confidence_min=(
+                min(ocr_confidences) if ocr_confidences else None
+            ),
+            ocr_confidence_max=(
+                max(ocr_confidences) if ocr_confidences else None
+            ),
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),
             max_characters=max_characters,
@@ -619,6 +767,7 @@ class DocumentReader:
         document_id: str | None = None,
         document_format: DocumentFormat | str | None = None,
         label: str | int | float | bool | None = None,
+        layout: DocumentLayout | None = None,
     ) -> DocumentSample:
         """Loads one document and validates its source bytes and content.
 
@@ -629,6 +778,7 @@ class DocumentReader:
             document_format: Explicit format, required only when bytes are not
                 a PDF or text path with a recognizable suffix.
             label: Optional task label carried without interpretation.
+            layout: Optional caller-owned OCR, layout, and table evidence.
 
         Returns:
             An immutable decoded document sample.
@@ -685,6 +835,7 @@ class DocumentReader:
             format=resolved_format,
             source_uri=source_uri,
             label=label,
+            layout=layout,
         )
 
     def decode_utf8(self, raw_bytes: bytes, document_id: str) -> str:

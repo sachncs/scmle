@@ -11,7 +11,9 @@ from scml.data.modalities.curation import ModalityCurationReport
 from scml.data.modalities.curation import ModalityDatasetCard
 from scml.data.modalities.document import DocumentCurationReport
 from scml.data.modalities.document import DocumentDataset
+from scml.data.modalities.document import DocumentElement
 from scml.data.modalities.document import DocumentFormat
+from scml.data.modalities.document import DocumentLayout
 from scml.data.modalities.document import DocumentReader
 from scml.data.modalities.geospatial import GeoFeature
 from scml.data.modalities.geospatial import GeospatialDataset
@@ -44,7 +46,9 @@ __all__ = [
     "AudioTranscriptSegment",
     "DocumentCurationReport",
     "DocumentDataset",
+    "DocumentElement",
     "DocumentFormat",
+    "DocumentLayout",
     "DocumentReader",
     "GeoFeature",
     "GeospatialDataset",
