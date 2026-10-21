@@ -1109,3 +1109,10 @@ Local preflight evidence captured on 2026-10-21:
 - The preflight remains local evidence only. It does not close the hosted
   Linux, public Pages, external secret custody, external-fault, or
   independent-review gates listed above.
+- `8845e2d` adds an explicit intersectional fairness report across every
+  declared sensitive column. It reuses the deterministic numeric bands and
+  minimum-cell guard, keeps the existing per-column reports, and is covered
+  by classification and regression tests (28 diagnostics/release tests plus
+  7 focused fairness tests under `-W error::ResourceWarning`). This closes a
+  local reporting gap in Phase 3; it does not establish causal fairness or
+  statistical power for small groups.
