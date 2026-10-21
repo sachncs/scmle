@@ -588,6 +588,10 @@ def test_video_lifecycle_emits_temporal_frame_evidence(tmp_path: Path):
     assert local["feature_space_only"] is True
     assert len(local["terms"]) == 4
     assert len(local["sampled_frame_indices"]) == 4
+    raw = local["raw_input_occlusion"]
+    assert raw["method"] == "raw_video_frame_occlusion"
+    assert len(raw["windows"]) == 4
+    assert raw["feature_space_only"] is False
 
 
 def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):

@@ -1011,17 +1011,80 @@ class VideoAdapter(ModalityAdapter):
                 int(cast(int, item["frame_index"])),
             )
         )
+        raw_windows = self.raw_frame_occlusion_scores(sample, model, full_score)
         return {
             "status": "available",
             "method": "temporal_frame_statistics_occlusion",
             "terms": terms,
             "sampled_frame_indices": list(frame_indices),
             "feature_space_only": True,
+            "raw_input_occlusion": raw_windows,
             "limitations": [
-                "Occlusion removes decoded frame statistics, not raw pixels or "
-                "motion vectors.",
+                "Raw frame occlusion is bounded decoded-pixel evidence, not "
+                "validated motion or semantic saliency.",
                 "Audio-video synchronization and temporal event localization "
                 "are not established.",
+                "Score changes are associational and not causal.",
+            ],
+        }
+
+    def raw_frame_occlusion_scores(
+        self,
+        sample: video.VideoSample,
+        model: LogisticRegression,
+        original_score: float,
+    ) -> dict[str, object]:
+        """Score sampled decoded frames after replacing each with zeros."""
+        if self.frame_decoder is None:
+            return {
+                "status": "not_available",
+                "method": "raw_video_frame_occlusion",
+                "reason": "an explicit frame decoder is required",
+            }
+        decoder = self.frame_decoder
+        frame_indices = self.dataset.frame_indices_for(sample, self.max_frames)
+        windows: list[dict[str, object]] = []
+        for target_frame in frame_indices:
+
+            def masked_decoder(
+                payload: bytes,
+                frame_index: int,
+                target_frame_index: int = target_frame,
+            ) -> np.ndarray:
+                frame = np.asarray(decoder(payload, frame_index))
+                if frame_index == target_frame_index:
+                    return np.zeros_like(frame)
+                return frame
+
+            prepared = video.VideoDataset((sample,)).prepare_frame_features(
+                masked_decoder,
+                max_frames=self.max_frames,
+                max_frame_pixels=self.max_frame_pixels,
+            )
+            values = prepared.to_numpy()[0]
+            score = float(
+                np.asarray(model.decision_function(values[None])).reshape(-1)[0]
+            )
+            windows.append(
+                {
+                    "frame_index": target_frame,
+                    "time_seconds": target_frame
+                    / sample.metadata.frames_per_second,
+                    "score_delta_from_full": score - original_score,
+                }
+            )
+        return {
+            "status": "available",
+            "method": "raw_video_frame_occlusion",
+            "windows": windows,
+            "sampled_frame_indices": list(frame_indices),
+            "baseline": "zero-valued decoded source frames",
+            "feature_space_only": False,
+            "limitations": [
+                "The caller-owned decoder defines frame pixels and codec "
+                "semantics.",
+                "Frame masks do not establish motion, synchronization, or "
+                "semantic localization.",
                 "Score changes are associational and not causal.",
             ],
         }
