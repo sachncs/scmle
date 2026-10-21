@@ -1936,6 +1936,19 @@ Public modality serving boundary at `06775ea` on 2026-10-21:
   gateway policy, external resource-fault rehearsal, paging, and independent
   review remain release gates.
 
+Current-head strict regression at `23c3975` on 2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,311` tests with `88` explicit optional-dependency skips in 31 minutes 22
+  seconds. No failure, error, or resource warning was promoted to a failure.
+- The run includes the public modality predictor and serving exports, API
+  compatibility snapshot, reference HTTP serving contract, all modality
+  lifecycle tests, reliability contracts, naming-convention guard, and the
+  complete repository test inventory.
+- This is current local regression evidence. It does not replace bounded
+  coverage and mutation gates, hosted Linux and Pages verification, external
+  transport/resource-fault execution, secret custody, or independent review.
+
 Post-hardening strict regression evidence at `2f1e63a` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
