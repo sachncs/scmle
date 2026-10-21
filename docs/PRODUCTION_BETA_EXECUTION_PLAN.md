@@ -1697,3 +1697,17 @@ Audio transcript provenance evidence at `4aac37a` on 2026-10-21:
 - The focused media, modality-lifecycle, and naming-convention suite passed
   896 tests with 4 optional skips under `-W error::ResourceWarning`; Ruff,
   formatting, mypy, and diff checks passed.
+
+Video synchronization evidence at `7e52e92` on 2026-10-21:
+
+- `VideoMetadata` now carries optional measured audio duration, synchronization
+  offset, and tolerance. Its typed status distinguishes no audio, unknown
+  measurement, within-tolerance timing, and measured drift. Existing
+  metadata-only clips remain explicit rather than inheriting an assumption.
+- Video curation records synchronization states, warns when an audio track
+  lacks timing evidence, and blocks measured out-of-tolerance drift. This
+  validates an input-quality boundary; it does not decode codecs or claim
+  temporal event localization.
+- The focused media, modality-lifecycle, and naming-convention suite passed
+  898 tests with 4 optional skips under `-W error::ResourceWarning`; Ruff,
+  formatting, mypy, and diff checks passed.
