@@ -1,10 +1,12 @@
 """Dependency-light vector and raster geospatial data contracts."""
 
 from collections.abc import Mapping
+from collections.abc import Sequence
 import dataclasses
 import hashlib
 import json
 import math
+from numbers import Real
 import pathlib
 import random
 from typing import Any
@@ -105,6 +107,39 @@ def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
     return validate_coordinates(geometry.get("coordinates"))
 
 
+def moran_statistic(
+    values: np.ndarray, edges: Sequence[tuple[int, int]]
+) -> float:
+    """Calculate global Moran's I for an undirected binary graph.
+
+    Args:
+        values: Numeric values aligned with the feature order.
+        edges: Undirected feature-neighbor pairs.
+
+    Returns:
+        The global Moran's I statistic.
+
+    Raises:
+        ValueError: If values are not finite or have no variation.
+    """
+    numeric = np.asarray(values, dtype=np.float64)
+    if numeric.ndim != 1 or len(numeric) < 3:
+        raise ValueError("values must contain at least three observations")
+    if not np.isfinite(numeric).all():
+        raise ValueError("values must be finite")
+    centered = numeric - numeric.mean()
+    denominator = float(np.dot(centered, centered))
+    if denominator == 0.0:
+        raise ValueError("values must contain more than one unique value")
+    weight_total = 2 * len(edges)
+    if weight_total == 0:
+        raise ValueError("edges must contain at least one neighbor pair")
+    numerator = sum(
+        centered[first] * centered[second] * 2 for first, second in edges
+    )
+    return float(len(numeric) * numerator / (weight_total * denominator))
+
+
 def mask_geometry_axis(
     geometry: Mapping[str, Any], axis: int, baseline: float
 ) -> dict[str, Any]:
@@ -198,6 +233,12 @@ class GeoFeature:
         ys = coordinates[1::2]
         return min(xs), min(ys), max(xs), max(ys)
 
+    @property
+    def centroid(self) -> tuple[float, float]:
+        """Return the envelope centroid in the source CRS units."""
+        minimum_x, minimum_y, maximum_x, maximum_y = self.bounds
+        return (minimum_x + maximum_x) / 2, (minimum_y + maximum_y) / 2
+
     def masked_geometry_axis(self, axis: int, baseline: float) -> "GeoFeature":
         """Return a copy with one source-coordinate axis replaced."""
         return dataclasses.replace(
@@ -234,6 +275,38 @@ class SpatialSplit:
     def block_ids(self) -> dict[str, tuple[str, ...]]:
         """Return the stable spatial blocks assigned to each partition."""
         return {name: tuple(values) for name, values in self.blocks.items()}
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SpatialAutocorrelation:
+    """Bounded global Moran's I evidence for a numeric spatial variable."""
+
+    feature_count: int
+    neighbor_count: int
+    edge_count: int
+    statistic: float
+    permutation_count: int
+    p_value: float | None
+    seed: int
+
+    def __post_init__(self) -> None:
+        """Validate a finite and reproducible spatial statistic."""
+        if self.feature_count < 3:
+            raise ValueError("feature_count must be at least three")
+        if not 1 <= self.neighbor_count < self.feature_count:
+            raise ValueError("neighbor_count must be in [1, feature_count)")
+        if self.edge_count < 1:
+            raise ValueError("edge_count must contain at least one edge")
+        if not math.isfinite(self.statistic):
+            raise ValueError("statistic must be finite")
+        if self.permutation_count < 0:
+            raise ValueError("permutation_count must not be negative")
+        if self.p_value is not None and not 0.0 <= self.p_value <= 1.0:
+            raise ValueError("p_value must be in [0, 1]")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native autocorrelation evidence."""
+        return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -358,6 +431,28 @@ class GeospatialDataset:
         profile_data["label_counts"] = labels
         quality_findings = []
         risk_findings = []
+        numeric_labels = [feature.label for feature in self.features]
+        if not self.crs.strip():
+            profile_data["spatial_autocorrelation"] = {
+                "status": "blocked_missing_crs"
+            }
+        elif len(self.features) < 3:
+            profile_data["spatial_autocorrelation"] = {
+                "status": "not_estimable",
+                "reason": "at least three features are required",
+            }
+        elif any(
+            isinstance(value, bool) or not isinstance(value, Real)
+            for value in numeric_labels
+        ):
+            profile_data["spatial_autocorrelation"] = {
+                "status": "not_applicable",
+                "reason": "numeric values are required for every feature",
+            }
+        else:
+            profile_data["spatial_autocorrelation"] = (
+                self.spatial_autocorrelation().to_dict()
+            )
         if not self.crs.strip():
             quality_findings.append(
                 build_finding(
@@ -403,6 +498,120 @@ class GeospatialDataset:
             risk_findings=tuple(risk_findings),
         )
 
+    def spatial_neighbors(
+        self, neighbor_count: int = 4
+    ) -> tuple[tuple[int, int], ...]:
+        """Build deterministic symmetric k-nearest-neighbor edges.
+
+        Distances are measured between envelope centroids in the declared
+        source CRS. The method exposes the exact topology used by the
+        autocorrelation statistic so a reviewer can reproduce the evidence.
+        """
+        if not self.crs.strip():
+            raise GeospatialValidationError(
+                "spatial neighbors require a declared CRS",
+                {"code": "missing_crs"},
+            )
+        if not 1 <= neighbor_count < len(self.features):
+            raise ValueError("neighbor_count must be in [1, feature_count)")
+        centroids = np.asarray(
+            [feature.centroid for feature in self.features],
+            dtype=np.float64,
+        )
+        edges: set[tuple[int, int]] = set()
+        for first in range(len(centroids)):
+            distances = [
+                (
+                    float(np.sum((centroids[first] - centroids[second]) ** 2)),
+                    second,
+                )
+                for second in range(len(centroids))
+                if second != first
+            ]
+            nearest = sorted(distances)[:neighbor_count]
+            for distance_and_index in nearest:
+                second = distance_and_index[1]
+                edges.add(
+                    (first, second) if first < second else (second, first)
+                )
+        return tuple(sorted(edges))
+
+    def spatial_autocorrelation(
+        self,
+        values: Sequence[Real] | None = None,
+        neighbor_count: int = 4,
+        permutations: int = 99,
+        seed: int = 0,
+    ) -> SpatialAutocorrelation:
+        """Measure global Moran's I with optional deterministic permutations.
+
+        When ``values`` is omitted, numeric feature labels are used. This
+        method reports association in the observed spatial arrangement; it
+        does not establish causality or replace a domain-specific spatial
+        model.
+        """
+        if permutations < 0 or permutations > 10_000:
+            raise ValueError("permutations must be in [0, 10000]")
+        if len(self.features) < 3:
+            raise GeospatialValidationError(
+                "spatial autocorrelation requires at least three features",
+                {"code": "insufficient_features"},
+            )
+        if neighbor_count < 1:
+            raise ValueError("neighbor_count must be positive")
+        effective_neighbor_count = min(neighbor_count, len(self.features) - 1)
+        if values is None:
+            raw_values: list[Any] = [feature.label for feature in self.features]
+        else:
+            raw_values = list(values)
+        if len(raw_values) != len(self.features):
+            raise GeospatialValidationError(
+                "spatial values must match feature count",
+                {
+                    "code": "value_count_mismatch",
+                    "feature_count": len(self.features),
+                    "value_count": len(raw_values),
+                },
+            )
+        if any(
+            isinstance(value, bool) or not isinstance(value, Real)
+            for value in raw_values
+        ):
+            raise GeospatialValidationError(
+                "spatial autocorrelation requires numeric values",
+                {"code": "numeric_values_required"},
+            )
+        numeric = np.asarray(raw_values, dtype=np.float64)
+        edges = self.spatial_neighbors(effective_neighbor_count)
+        try:
+            statistic = moran_statistic(numeric, edges)
+        except ValueError as error:
+            raise GeospatialValidationError(
+                str(error), {"code": "statistic_not_estimable"}
+            ) from error
+
+        p_value: float | None = None
+        if permutations:
+            randomizer = np.random.default_rng(seed)
+            exceedances = 0
+            permutation_index = 0
+            while permutation_index < permutations:
+                shuffled = randomizer.permutation(numeric)
+                permuted_statistic = moran_statistic(shuffled, edges)
+                if abs(permuted_statistic) >= abs(statistic):
+                    exceedances += 1
+                permutation_index += 1
+            p_value = (exceedances + 1) / (permutations + 1)
+        return SpatialAutocorrelation(
+            feature_count=len(self.features),
+            neighbor_count=effective_neighbor_count,
+            edge_count=len(edges),
+            statistic=statistic,
+            permutation_count=permutations,
+            p_value=p_value,
+            seed=seed,
+        )
+
     def prepare_features(self) -> GeospatialFeatures:
         """Prepare bounded geometry features without changing CRS units.
 
@@ -438,8 +647,8 @@ class GeospatialDataset:
                     maximum_y,
                     maximum_x - minimum_x,
                     maximum_y - minimum_y,
-                    (minimum_x + maximum_x) / 2,
-                    (minimum_y + maximum_y) / 2,
+                    feature.centroid[0],
+                    feature.centroid[1],
                     float(len(coordinates)),
                 )
             )
@@ -585,8 +794,10 @@ __all__ = [
     "GeospatialProfile",
     "GeospatialValidationError",
     "RasterSample",
+    "SpatialAutocorrelation",
     "SpatialSplit",
     "canonical_source",
     "geometry_coordinates",
+    "moran_statistic",
     "validate_coordinates",
 ]

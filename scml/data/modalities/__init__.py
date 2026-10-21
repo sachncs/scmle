@@ -15,7 +15,9 @@ from scml.data.modalities.geospatial import GeoFeature
 from scml.data.modalities.geospatial import GeospatialDataset
 from scml.data.modalities.geospatial import GeospatialFeatures
 from scml.data.modalities.geospatial import GeospatialProfile
+from scml.data.modalities.geospatial import moran_statistic
 from scml.data.modalities.geospatial import RasterSample
+from scml.data.modalities.geospatial import SpatialAutocorrelation
 from scml.data.modalities.graph import GraphData
 from scml.data.modalities.graph import GraphEdge
 from scml.data.modalities.graph import GraphNode
@@ -53,6 +55,7 @@ __all__ = [
     "ModalityCurationReport",
     "ModalityDatasetCard",
     "RasterSample",
+    "SpatialAutocorrelation",
     "VideoDataset",
     "VideoFeatures",
     "VideoFrameDecoder",
@@ -60,4 +63,5 @@ __all__ = [
     "VideoProfile",
     "VideoSample",
     "VideoSplit",
+    "moran_statistic",
 ]

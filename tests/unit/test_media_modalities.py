@@ -443,6 +443,60 @@ def test_geospatial_curation_reports_mixed_label_state():
     ]
 
 
+def test_geospatial_curation_records_deterministic_spatial_autocorrelation():
+    """Numeric labels expose bounded spatial-dependence evidence."""
+    dataset = geospatial.GeospatialDataset(
+        tuple(
+            geospatial.GeoFeature(
+                f"feature-{index}",
+                {"type": "Point", "coordinates": [float(index), 0]},
+                label=float(index // 2),
+            )
+            for index in range(5)
+        ),
+        crs="EPSG:3857",
+    )
+
+    first = dataset.spatial_autocorrelation(
+        neighbor_count=1, permutations=19, seed=11
+    )
+    second = dataset.spatial_autocorrelation(
+        neighbor_count=1, permutations=19, seed=11
+    )
+    report = dataset.curate()
+
+    assert first == second
+    assert first.edge_count == 4
+    assert first.statistic > 0
+    assert 0.0 <= first.p_value <= 1.0
+    evidence = report.profile["spatial_autocorrelation"]
+    assert evidence["feature_count"] == 5
+    assert evidence["neighbor_count"] == 4
+    assert evidence["permutation_count"] == 99
+    assert evidence["p_value"] is not None
+
+
+def test_spatial_autocorrelation_rejects_non_numeric_and_constant_values():
+    """Spatial dependence requires an estimable numeric variable."""
+    features = tuple(
+        geospatial.GeoFeature(
+            f"feature-{index}",
+            {"type": "Point", "coordinates": [float(index), 0]},
+            label="same",
+        )
+        for index in range(3)
+    )
+    dataset = geospatial.GeospatialDataset(features, crs="EPSG:3857")
+
+    with pytest.raises(geospatial.GeospatialValidationError, match="numeric"):
+        dataset.spatial_autocorrelation()
+
+    with pytest.raises(
+        geospatial.GeospatialValidationError, match="more than one unique"
+    ):
+        dataset.spatial_autocorrelation(values=[1.0, 1.0, 1.0])
+
+
 def test_geospatial_spatial_split_keeps_blocks_together():
     """Spatial blocks remain isolated across train and evaluation data."""
     features = tuple(
