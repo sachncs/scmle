@@ -1906,6 +1906,36 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head strict and release preflight evidence at `cd10719` on 2026-10-22:
+
+- `uv run pytest -q tests -W error::ResourceWarning` passed `2,321` tests with
+  `88` explicit optional-dependency skips in 31 minutes 36 seconds. No test,
+  error, or resource warning was promoted to a failure. This run includes the
+  bounded graph subgraph explanation evidence and the complete repository
+  test inventory.
+- `./scripts/release_preflight.sh` passed the static, formatting, mypy,
+  Bandit, pip-audit, API-compatibility, and JUnit skip-audit gates. The bounded
+  release suite passed `1,986` tests with `75` explicitly explained skips;
+  total coverage was `83.15%` and the declared core scope was `86%`.
+- Mutation testing killed `1,504/2,057` mutants (`73%`) against the configured
+  `70%` minimum. One mutation timed out and `552` survived; the threshold was
+  met and the survivor inventory remains follow-up evidence.
+- Five-seed offline regression passed for breast cancer, wine, digits, and
+  diabetes progression with zero failures and zero regressions. Verdicts were
+  tie, tie, tie, and ahead; peak memory was `0.3657`, `0.3817`, `0.4372`, and
+  `0.4440` GB respectively.
+- Reproducible artifacts and network-isolated wheel/source installations
+  passed. The wheel hash was
+  `744172aca87f7329b6a07f05edd7a97d5a8862e4c9066468823691de285ec0ad` and
+  the source-distribution hash was
+  `6cc4b00195c8ed0218770c0a822731eba2afcb1b96d66d3031b6d19a1fa6e58f`.
+- The site dependency audit found zero vulnerabilities; Astro built `16`
+  pages, accessibility checks passed for `16` HTML files, internal-link
+  validation passed for `346` links, and both Playwright smoke tests passed.
+  This remains local evidence; hosted Linux and Pages, external
+  transport/resource-fault execution, secret custody, and independent
+  reviewer evidence remain separate release gates.
+
 Graph explanation boundary at `30d51df` on 2026-10-22:
 
 - `GraphAdapter.one_hop_subgraph` now emits deterministic, bounded topology
