@@ -53,6 +53,18 @@ class FairnessReport(diagnostics.Diagnostic):
                 )
             else:
                 report[column] = self.numeric(groups, truth, predicted)
+        intersections = self.intersectional(
+            inputs.features, inputs.sensitive_columns
+        )
+        if intersections is not None:
+            if inputs.task is tasks.TaskType.BINARY:
+                report["intersectional"] = self.binary(
+                    intersections, truth, predicted, inputs.positive_label
+                )
+            else:
+                report["intersectional"] = self.numeric(
+                    intersections, truth, predicted
+                )
         flagged = sorted(
             column for column, body in report.items() if body["flags"]
         )
@@ -67,6 +79,24 @@ class FairnessReport(diagnostics.Diagnostic):
             bands = pd.qcut(values, NUMERIC_BANDS, duplicates="drop")
             return bands.astype(str).where(values.notna())
         return values.astype(object).where(values.notna()).astype(str)
+
+    def intersectional(
+        self, features: pd.DataFrame, columns: tuple[str, ...]
+    ) -> pd.Series | None:
+        """Builds bounded intersectional groups from every sensitive column.
+
+        Numeric columns use the same deterministic bands as their standalone
+        report. Missing values remain missing so they cannot be mistaken for
+        a real group. A single sensitive column has no intersection to add.
+        """
+        if len(columns) < 2:
+            return None
+        grouped = [self.groups(features[column]) for column in columns]
+        frame = pd.concat(grouped, axis=1)
+        frame.columns = list(columns)
+        valid = frame.notna().all(axis=1)
+        labels = frame.astype(str).agg(" | ".join, axis=1)
+        return labels.where(valid)
 
     def binary(
         self,

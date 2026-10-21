@@ -97,6 +97,22 @@ def test_numeric_sensitive_columns_are_banded_and_small_groups_skipped():
     )
 
 
+def test_intersectional_groups_are_reported_and_bounded():
+    inputs = dataclasses.replace(
+        make_inputs(), sensitive_columns=("group", "score")
+    )
+
+    report = fairness.FairnessReport().compute(inputs)
+
+    body = report["columns"]["intersectional"]
+    assert len(body["groups"]) >= 2
+    assert all(
+        group["rows"] >= fairness.MIN_GROUP_ROWS
+        for group in body["groups"].values()
+    )
+    assert all(" | " in group for group in body["groups"])
+
+
 def test_regression_reports_bias_per_group():
     rng = np.random.default_rng(3)
     rows = 800
@@ -130,3 +146,40 @@ def test_regression_reports_bias_per_group():
         and abs(body["groups"]["a"]["bias"]) < 0.3
     )
     assert body["flags"] and body["bias_gap"] > 0.5
+
+
+def test_regression_intersectional_groups_use_the_same_small_cell_guard():
+    rng = np.random.default_rng(4)
+    rows = 800
+    frame = pd.DataFrame(
+        {"x": rng.normal(size=rows), "group": rng.choice(["a", "b"], rows)}
+    )
+    truth = pd.Series(frame.x * 2 + (frame.group == "b") * 3)
+
+    class Ignorant(base.RegressorMixin, base.BaseEstimator):
+        def fit(self, features, target):
+            return self
+
+        def predict(self, features):
+            return features["x"].to_numpy() * 2
+
+    inputs = diagnostics.DiagnosticInput(
+        Ignorant(),
+        frame,
+        truth,
+        tasks.TaskType.REGRESSION,
+        metrics.CATALOG.resolve("rmse", tasks.TaskType.REGRESSION),
+        data_contracts.FeaturePlan(("x",), ("group",)),
+        0,
+        sensitive_columns=("group", "x"),
+    )
+
+    body = fairness.FairnessReport().compute(inputs)["columns"][
+        "intersectional"
+    ]
+
+    assert body["groups"]
+    assert all(
+        group["rows"] >= fairness.MIN_GROUP_ROWS
+        for group in body["groups"].values()
+    )
