@@ -1921,6 +1921,21 @@ Public modality inference boundary at `ce9f747` on 2026-10-21:
   evidence, secret custody, hosted CI/Pages, and independent review gates are
   complete.
 
+Public modality serving boundary at `06775ea` on 2026-10-21:
+
+- `ModalityHttpServing` and `ModalitySampleDecoder` are now exported from the
+  package root alongside `ModalityPredictor`. The documented reference HTTP
+  path no longer requires callers to import an internal module; decoder,
+  transport, authentication, and TLS ownership remain explicit.
+- The focused API, compatibility, serving, and recovery slice passed 11 tests
+  under `-W error::ResourceWarning`; Ruff, formatting, mypy, and the API
+  compatibility check passed. The site built 16 pages, passed accessibility
+  checks, and passed 346 internal-link checks.
+- This makes the experimental serving contract publicly reachable and tested.
+  It does not claim production service readiness: authentication, TLS,
+  gateway policy, external resource-fault rehearsal, paging, and independent
+  review remain release gates.
+
 Post-hardening strict regression evidence at `2f1e63a` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
