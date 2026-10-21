@@ -1347,3 +1347,12 @@ SQLite warning cleanup at `b8e5653` on 2026-10-21:
   under `-W error::ResourceWarning`, with Ruff and formatting clean.
 - This removes a test-owned resource leak. External transport, container, and
   kernel fault evidence remain separate reliability requirements.
+
+Warning-strict bounded release suite at `a6dfc29` on 2026-10-21:
+
+- The complete bounded contract suite passed with `-W error::ResourceWarning`:
+  1,933 tests passed and 75 optional tests were skipped in 8 minutes 8
+  seconds.
+- No resource warning was promoted to a failure after the connector fixture
+  cleanup. This is current-head local evidence for the warning gate; it does
+  not replace hosted Linux execution or independent review.
