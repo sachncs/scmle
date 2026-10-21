@@ -1520,6 +1520,16 @@ Strict full-suite evidence at `c22d294` on 2026-10-21:
   suite, but the skips still represent uninstalled optional capability paths;
   they are not evidence for those optional integrations.
 
+Standalone site verification at `2eb37a9` on 2026-10-21:
+
+- `npm run check:links` passed for all 16 generated HTML pages and 346
+  internal links; no repository Markdown redirect was required.
+- `npm run check:a11y` passed for all 16 pages, and `npm run test:e2e` passed
+  both the public-route and keyboard-navigation browser checks.
+- The local build and route smoke remain green, but
+  `https://sachncs.github.io/super-charge-ml/` still returns HTTP 404 because
+  hosted repository visibility and Pages state are unresolved.
+
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
