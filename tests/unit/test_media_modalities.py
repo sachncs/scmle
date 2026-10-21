@@ -513,6 +513,29 @@ def test_geospatial_feature_collection_preserves_bounds_and_crs():
     assert dataset.source.endswith("/features.geojson")
 
 
+def test_geospatial_identity_binds_crs_and_ignores_feature_order():
+    """Equivalent features share identity only when their CRS also matches."""
+    first_feature = geospatial.GeoFeature(
+        "first", {"type": "Point", "coordinates": [0, 0]}
+    )
+    second_feature = geospatial.GeoFeature(
+        "second", {"type": "Point", "coordinates": [1, 1]}
+    )
+    first = geospatial.GeospatialDataset(
+        (first_feature, second_feature), crs=" EPSG:4326 "
+    )
+    reordered = geospatial.GeospatialDataset(
+        (second_feature, first_feature), crs="EPSG:4326"
+    )
+    projected = geospatial.GeospatialDataset(
+        (first_feature, second_feature), crs="EPSG:3857"
+    )
+
+    assert first.crs == "EPSG:4326"
+    assert first.content_hash == reordered.content_hash
+    assert first.content_hash != projected.content_hash
+
+
 def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
     """A caller predicate produces deterministic, hash-bound join evidence."""
     left = geospatial.GeospatialDataset(

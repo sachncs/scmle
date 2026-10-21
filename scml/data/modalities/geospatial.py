@@ -515,27 +515,33 @@ class GeospatialDataset:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Reject duplicate identities and derive order-independent content."""
+        """Reject duplicate identities and derive CRS-bound content."""
         normalized = tuple(self.features)
         if not normalized:
             raise GeospatialValidationError(
                 "geospatial dataset must contain at least one feature",
                 {"code": "empty_dataset"},
             )
+        if not isinstance(self.crs, str):
+            raise TypeError("crs must be a string")
+        canonical_crs_value = self.crs.strip()
         ids = [feature.feature_id for feature in normalized]
         if len(ids) != len(set(ids)):
             raise GeospatialValidationError(
                 "geospatial dataset contains duplicate feature IDs",
                 {"code": "duplicate_feature_id"},
             )
-        digest = hashlib.sha256(
-            "\n".join(
-                f"{feature.feature_id}\0{feature.geometry_hash}\0"
-                f"{feature.observation_time or ''}"
-                for feature in normalized
-            ).encode("utf-8")
-        ).hexdigest()
+        feature_identities = sorted(
+            f"{feature.feature_id}\0{feature.geometry_hash}\0"
+            f"{feature.observation_time or ''}"
+            for feature in normalized
+        )
+        identity_payload = f"crs:{canonical_crs_value}\n" + "\n".join(
+            feature_identities
+        )
+        digest = hashlib.sha256(identity_payload.encode("utf-8")).hexdigest()
         object.__setattr__(self, "features", normalized)
+        object.__setattr__(self, "crs", canonical_crs_value)
         object.__setattr__(self, "source", canonical_source(self.source))
         object.__setattr__(self, "content_hash", digest)
 
