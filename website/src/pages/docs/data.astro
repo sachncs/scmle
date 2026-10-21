@@ -75,7 +75,7 @@ connector = ObjectStoreConnector(
 )
 batch = connector.read_rows(limit=10_000)
 next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
-  <p>A custom decoder does not create a production capability by itself. Keep its dependency lock, license, parser limits, raw-byte identity, malformed-input tests, and resource evidence with the dataset run. This connector is bounded in-memory ingestion; use a format-specific range or streaming adapter when the object cannot safely fit in memory.</p>
+  <p>A custom decoder does not create a production capability by itself. Keep its dependency lock, license, parser limits, raw-byte identity, malformed-input tests, and resource evidence with the dataset run. Bounded object batches expose the raw payload SHA-256 and bind it into the resume checkpoint; if the object changes before the next batch, the connector fails closed instead of mixing snapshots. This connector is bounded in-memory ingestion; use a format-specific range or streaming adapter when the object cannot safely fit in memory.</p>
 
   <h2>What to review before modelling</h2>
   <p>Do not jump from a successful parse to a model score. Review source and profiled row counts, feature decisions, cleaning notes, quality findings, risk findings, duplicate-content label conflicts, and dropped columns. A curation finding is an input to the modelling decision—not noise around it. Blocking findings stop the run until a reviewer resolves, waives, or marks them false-positive.</p>

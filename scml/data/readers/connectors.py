@@ -38,6 +38,29 @@ SizeReader = Callable[[str], int]
 ObjectDecoder = Callable[[str, bytes], pd.DataFrame]
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class ObjectPayload:
+    """Bounded raw object bytes with a stable content identity."""
+
+    source_uri: str
+    payload: bytes = dataclasses.field(repr=False)
+    content_sha256: str = dataclasses.field(init=False)
+    byte_size: int = dataclasses.field(init=False)
+
+    def __post_init__(self) -> None:
+        """Freeze bytes and derive the digest used by checkpoints."""
+        if not self.source_uri.strip():
+            raise ValueError("source_uri must not be empty")
+        if not isinstance(self.payload, bytes):
+            raise TypeError("payload must be bytes")
+        object.__setattr__(
+            self,
+            "content_sha256",
+            hashlib.sha256(self.payload).hexdigest(),
+        )
+        object.__setattr__(self, "byte_size", len(self.payload))
+
+
 class ConnectorError(errors.DataError):
     """A connector failure with a stable code and structured details."""
 
@@ -231,11 +254,20 @@ class SourceCheckpoint:
     offset: int = 0
     cursor: str | None = None
     source_identity: str = ""
+    content_sha256: str | None = None
 
     def __post_init__(self) -> None:
         """Validates and normalizes cursor-derived checkpoint fields."""
         if self.offset < 0:
             raise ValueError("offset must be non-negative")
+        if self.content_sha256 is not None and (
+            len(self.content_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.content_sha256
+            )
+        ):
+            raise ValueError("content_sha256 must be a SHA-256 hex digest")
         if self.cursor is None:
             return
         cursor_identity, cursor_offset = decode_cursor(self.cursor)
@@ -256,6 +288,18 @@ class SourceCheckpoint:
             offset=self.offset,
             cursor=self.cursor or cursor_for(identity, self.offset),
             source_identity=identity,
+            content_sha256=self.content_sha256,
+        )
+
+    def bind_content(self, content_sha256: str) -> "SourceCheckpoint":
+        """Bind a checkpoint to an immutable source-content digest."""
+        if self.content_sha256 and self.content_sha256 != content_sha256:
+            raise ValueError("checkpoint content digest does not match source")
+        return SourceCheckpoint(
+            offset=self.offset,
+            cursor=self.cursor,
+            source_identity=self.source_identity,
+            content_sha256=content_sha256,
         )
 
     def advance(self, rows: int) -> "SourceCheckpoint":
@@ -270,6 +314,7 @@ class SourceCheckpoint:
             offset=next_offset,
             cursor=cursor_for(identity, next_offset),
             source_identity=identity,
+            content_sha256=self.content_sha256,
         )
 
 
@@ -324,12 +369,18 @@ class SourceSchema:
 
 @dataclasses.dataclass(frozen=True)
 class RowBatch:
-    """A bounded row result and its resume checkpoint."""
+    """A bounded row result and its resume checkpoint.
+
+    ``content_sha256`` is populated when the connector can observe the raw
+    source bytes without adding a second read. A resumed checkpoint can bind
+    to that digest and reject a changed source snapshot.
+    """
 
     schema: SourceSchema
     rows: tuple[Row, ...]
     checkpoint: SourceCheckpoint
     has_more: bool
+    content_sha256: str | None = None
 
 
 def execute_with_retries(
@@ -856,6 +907,10 @@ class ObjectStoreConnector(SourceConnector):
 
     def load_frame(self) -> pd.DataFrame:
         """Download and decode the bounded object once."""
+        return self.decode_object(self.read_object())
+
+    def read_object(self) -> ObjectPayload:
+        """Read bounded raw bytes and derive their content identity."""
         payload = execute_with_retries(
             lambda: self.read_bytes(self.source_uri),
             "read_object",
@@ -876,8 +931,12 @@ class ObjectStoreConnector(SourceConnector):
                 self.source_uri,
                 {"bytes": len(payload), "max_bytes": self.max_bytes},
             )
+        return ObjectPayload(self.source_uri, payload)
+
+    def decode_object(self, object_payload: ObjectPayload) -> pd.DataFrame:
+        """Decode one observed object while preserving its raw identity."""
         try:
-            frame = self.decoder(self.source_uri, payload)
+            frame = self.decoder(self.source_uri, object_payload.payload)
         except ConnectorError:
             raise
         except Exception as error:
@@ -912,7 +971,20 @@ class ObjectStoreConnector(SourceConnector):
         """Read a bounded row batch from an object checkpoint."""
         self.validate_limit(limit)
         value = self.validate_checkpoint(checkpoint)
-        frame = self.load_frame()
+        object_payload = self.read_object()
+        try:
+            value = value.bind_content(object_payload.content_sha256)
+        except ValueError as error:
+            raise ConnectorError(
+                "source_snapshot_changed",
+                "object content changed since the checkpoint was created",
+                self.source_uri,
+                {
+                    "checkpoint_content_sha256": value.content_sha256,
+                    "observed_content_sha256": object_payload.content_sha256,
+                },
+            ) from error
+        frame = self.decode_object(object_payload)
         schema = SourceSchema.from_frame(frame)
         selected = frame.iloc[value.offset : value.offset + limit]
         rows = tuple(selected.itertuples(index=False, name=None))
@@ -922,6 +994,7 @@ class ObjectStoreConnector(SourceConnector):
             rows=rows,
             checkpoint=next_checkpoint,
             has_more=value.offset + len(rows) < len(frame),
+            content_sha256=object_payload.content_sha256,
         )
 
 

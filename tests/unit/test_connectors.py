@@ -1,6 +1,7 @@
 """Focused tests for dependency-free source connectors."""
 
 import contextlib
+import hashlib
 import sqlite3
 from urllib.parse import urlsplit
 
@@ -82,6 +83,36 @@ def test_object_store_connector_reads_bounded_tabular_objects_and_resumes(
     assert first.rows == ((1, "a"), (2, "b"))
     assert second.rows == ((3, "c"), (4, "d"))
     assert not second.has_more
+    assert first.content_sha256 == hashlib.sha256(payload).hexdigest()
+    assert second.content_sha256 == first.content_sha256
+
+
+def test_object_store_checkpoint_rejects_changed_raw_snapshot(frame):
+    """A resumed object read cannot silently mix two raw snapshots."""
+    payloads = [
+        frame.to_csv(index=False).encode("utf-8"),
+        frame.assign(label=["changed"] * len(frame))
+        .to_csv(index=False)
+        .encode("utf-8"),
+    ]
+
+    def read_object(uri: str) -> bytes:
+        return payloads.pop(0)
+
+    connector = connectors.ObjectStoreConnector(
+        "s3://bucket/source.csv", read_object
+    )
+    first = connector.read_rows(limit=2)
+
+    with pytest.raises(
+        connectors.ConnectorError, match="content changed"
+    ) as raised:
+        connector.read_rows(first.checkpoint, limit=2)
+
+    assert raised.value.code == "source_snapshot_changed"
+    assert raised.value.details["checkpoint_content_sha256"] == (
+        first.content_sha256
+    )
 
 
 def test_object_store_connector_accepts_a_caller_owned_versioned_decoder():
