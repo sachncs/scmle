@@ -1681,3 +1681,19 @@ Spatial-dependence curation evidence at `992ee1c` on 2026-10-21:
 - The combined geospatial, modality-lifecycle, naming-convention, and
   component-contract slice passed 920 tests with 5 optional skips under
   `-W error::ResourceWarning`; Ruff, formatting, mypy, and diff checks passed.
+
+Audio transcript provenance evidence at `4aac37a` on 2026-10-21:
+
+- `AudioTranscript` and `AudioTranscriptSegment` now retain the transcript
+  source, provider and provider version, language, confidence, ordered
+  time-local segments, and JSON-native provenance. `AudioSample` rejects
+  segments outside the decoded audio duration, so transcript claims cannot
+  silently refer to nonexistent audio.
+- Audio curation reports transcript coverage, providers, languages, segment
+  counts, confidence bounds, and a visible non-blocking finding when a
+  transcript has no confidence evidence. This records transcript provenance;
+  it does not claim that the library owns speech recognition or codec
+  decoding.
+- The focused media, modality-lifecycle, and naming-convention suite passed
+  896 tests with 4 optional skips under `-W error::ResourceWarning`; Ruff,
+  formatting, mypy, and diff checks passed.
