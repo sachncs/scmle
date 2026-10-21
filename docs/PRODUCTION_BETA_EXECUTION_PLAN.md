@@ -1914,7 +1914,14 @@ Raster capability identity at `dc6ef61` on 2026-10-21:
   metadata-only and experimental.
 - The modality contract, lifecycle, and project tests passed 39 tests under
   `-W error::ResourceWarning`; Ruff, formatting, mypy, and `git diff --check`
-  passed. The full strict suite must still be rerun at this commit.
+  passed.
+
+Current-head strict regression at `d1a3294` on 2026-10-21:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  2,314 tests with 88 explicit skips in 31 minutes 9 seconds. No failure or
+  warning was promoted to a failure. The API compatibility fixture now records
+  the public `MLProject` signature after the raster modality contract change.
 
 Public modality inference boundary at `ce9f747` on 2026-10-21:
 
