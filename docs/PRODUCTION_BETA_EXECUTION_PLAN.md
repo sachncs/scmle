@@ -1725,3 +1725,13 @@ Document layout provenance evidence at `b3aca01` on 2026-10-21:
 - The document, modality-lifecycle, and naming-convention suite passed 880
   tests with 4 optional skips under `-W error::ResourceWarning`; Ruff,
   formatting, mypy, and diff checks passed.
+
+Parser-fuzzing evidence at `7887e12` on 2026-10-21:
+
+- The Hypothesis property tier now feeds bounded arbitrary byte payloads to
+  `DocumentReader`, accepting only a valid sample or a structured document
+  validation error. It also uses typed NumPy index arrays for the existing
+  split invariants, so the complete property module passes its static type
+  gate rather than carrying pandas-index typing debt.
+- The property suite passed 10 tests under `-W error::ResourceWarning`; Ruff,
+  formatting, mypy, and diff checks passed.
