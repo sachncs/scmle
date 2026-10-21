@@ -47,7 +47,7 @@ means the code path exists; it does not mean the capability is supported.
 | Area | Current label | Evidence and boundary |
 | --- | --- | --- |
 | Tabular ingestion, manifest, structured curation | Implemented / Tested | Unit and integration tests cover deterministic snapshots, local raw-byte hashes, findings, persisted manifests, machine-generated dataset cards, schema-evolution decisions, an atomic durable source registry that survives across runs, and fail-closed blocking-finding disposition before training. Broker delivery and distributed exactly-once semantics remain incomplete. |
-| Local, DB-API, bounded object, range-backed JSONL, and warehouse/lakehouse source connectors | Implemented / Tested | Connector contracts cover local files, injected DB-API factories, bounded injected object readers for CSV/JSONL/Parquet, range-backed JSONL/NDJSON reads with byte checkpoints, and `WarehouseConnector` callback boundaries with query-bound identity, retries, bounded rows, schema validation, and resumable checkpoints. Broker-specific transports and arbitrary binary/object formats remain extension work. Evidence: `tests/unit/test_connectors.py`. |
+| Local, DB-API, bounded object, range-backed JSONL, and warehouse/lakehouse source connectors | Implemented / Tested | Connector contracts cover local files, injected DB-API factories, bounded injected object readers for CSV/JSONL/Parquet, caller-owned versioned decoders for arbitrary bounded object payloads, range-backed JSONL/NDJSON reads with byte checkpoints, and `WarehouseConnector` callback boundaries with query-bound identity, retries, bounded rows, schema validation, and resumable checkpoints. Broker-specific transports and decoder-owned semantics remain extension work. Evidence: `tests/unit/test_connectors.py`. |
 | Incremental ingestion semantics | Implemented / Tested | Transport-neutral event contracts bind event IDs to ordered checkpoints and watermarks, classify duplicates, make late-data policy explicit, serialize multi-writer commits with durable atomic state, and provide an idempotent sink commit boundary. `EventStreamSource` adds bounded, retryable callback adapters for Kafka-, Pulsar-, Kinesis-, Pub/Sub-, Event Hubs-, NATS-, and Redpanda-style URI boundaries. `EventConsumer` binds a consumer group, stages acknowledgement evidence after the sink commit, retries a pending acknowledgement after restart, and never reruns the sink for that retry. Atomic state, run evidence, source registries, observability retention, fault evidence, and signing-key rotation flush both file contents and the containing directory after replacement (`b420ee3`). Broker SDK leases, acknowledgements, transactions, and distributed exactly-once guarantees remain transport-owner evidence. |
 | Tabular library training paths | Implemented / Tested | The pre-training capability gate admits only explicitly declared tabular library paths. Dataset manifests preserve the caller-declared modality, and non-tabular declarations fail closed before model fitting. This is the current beta boundary, not all-modality support. |
 | Non-tabular curation and data understanding | Implemented / Tested | `DocumentDataset.curate()` and the shared `ModalityCurationReport` emit JSON-native evidence for documents, images, audio, video, graphs, and geospatial vectors: bounded profiles, identities, composition, duplicate/shape/encoding/CRS/graph findings, label state, and blocking spatial or conflicting-label risks where applicable. The experimental lifecycle now persists a `ModalityDatasetCard` containing the complete curation report plus explicit provenance and privacy status; missing governance metadata is visible rather than inferred. These paths do not provide OCR, production-scale representation models, or a supported `MLProject` non-tabular training path. Evidence: `scml/data/modalities/curation.py`, `scml/models/modality_lifecycle.py`, `tests/unit/test_modality_lifecycle.py`. |
@@ -1585,3 +1585,16 @@ Optional-skip inventory at `ac1d68d` on 2026-10-21:
 - These are environment capability boundaries, not silently accepted failures;
   the corresponding optional tests remain outside the core release claim until
   their extras are installed and audited in the hosted matrix.
+
+Caller-owned object decoder evidence at `9136e8e` on 2026-10-21:
+
+- `ObjectStoreConnector` now accepts a caller-owned decoder for bounded object
+  payloads outside the built-in CSV, JSONL, and Parquet formats. A required
+  decoder name/version is included in the source identity, so checkpoints and
+  lineage cannot silently mix decoding semantics for the same object URI.
+- Decoder exceptions and invalid return types become structured connector
+  failures. The focused connector suite passed 21 tests under
+  `-W error::ResourceWarning`; Ruff, formatting, and mypy passed.
+- This expands ingestion to arbitrary caller-defined bounded DataFrame
+  representations without claiming that the library owns binary format
+  decoding, streaming scale, or broker delivery semantics.
