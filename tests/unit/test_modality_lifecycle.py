@@ -265,6 +265,20 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     ].evidence
     assert data_explanation["partition_counts"]["train"] > 0
     assert data_explanation["partition_counts"]["test"] > 0
+    sample_lineage = data_explanation["sample_lineage"]
+    assert len(sample_lineage) == len(adapter.samples)
+    assert {item["sample_id"] for item in sample_lineage} == {
+        adapter.sample_id(sample) for sample in adapter.samples
+    }
+    assert {item["partition"] for item in sample_lineage} == {
+        "train",
+        "validation",
+        "test",
+    }
+    assert all(
+        isinstance(item["sample_id"], str) and item["sample_id"]
+        for item in sample_lineage
+    )
     assert (
         data_explanation["label_distribution"]["sample_count"]
         == (data_explanation["partition_counts"]["train"])

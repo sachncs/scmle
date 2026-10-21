@@ -1638,9 +1638,23 @@ class DataExplainabilityStage(ModalityLifecycleStage):
                 "q95": float(np.quantile(values, 0.95)),
                 "nonfinite_count": int(np.count_nonzero(~np.isfinite(values))),
             }
+        partition_samples = {
+            "train": partitions.train,
+            "validation": partitions.validation,
+            "test": partitions.test,
+        }
+        sample_lineage = [
+            {
+                "sample_id": context.adapter.sample_id(sample),
+                "partition": partition,
+            }
+            for partition, samples in partition_samples.items()
+            for sample in samples
+        ]
         context.data_explanation = {
             "dataset_hash": context.adapter.dataset_hash,
             "sample_ids": list(batch.sample_ids),
+            "sample_lineage": sample_lineage,
             "feature_ranges": {
                 name: {
                     "min": float(batch.values[:, index].min()),
