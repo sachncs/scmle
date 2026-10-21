@@ -900,6 +900,14 @@ gate also passed on 2026-10-21:
 - no failure, error, or warning promoted to a failure by the strict warning
   policy after the modality manifest changes.
 
+At pushed commit `1e5ee03`, the current-head strict regression gate passed
+again after the verified modality predictor implementation:
+
+- `uv run pytest -q tests -W error::ResourceWarning`: 2,251 passed and 88
+  skipped in 28 minutes 4 seconds;
+- no failure, error, or warning promoted to a failure by the strict warning
+  policy.
+
 The latest complete local release preflight at pushed commit `2eb767e` passed
 on 2026-10-21:
 
