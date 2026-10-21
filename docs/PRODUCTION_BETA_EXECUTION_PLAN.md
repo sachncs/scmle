@@ -1492,6 +1492,25 @@ Repeated explanation evidence at `8957c65` on 2026-10-21:
   clean. This closes the single-sample quality gate; it does not claim
   unbounded production-scale repetition, raw-modality saliency, or causal
   explanation validity.
+
+Current-head complete release preflight at `c9ec4c9` on 2026-10-21:
+
+- Static, formatting, mypy, Bandit, dependency, and public-API checks passed.
+- The bounded release suite passed 1,941 tests with 75 explicit optional
+  dependency skips. Declared core coverage was 86% and whole-package coverage
+  was 83.09%.
+- The critical mutation gate killed 1,494 of 2,049 mutants (72%) against the
+  70% minimum.
+- All four five-seed offline benchmarks passed with zero regressions and zero
+  failures. Runtime, peak-memory, completed-trial, and failure-rate evidence
+  was present for every dataset.
+- Reproducible wheel and source-distribution builds, network-isolated installs,
+  and package verification passed. The Astro site built all 16 static pages
+  and `npm audit --omit=dev --audit-level=high` reported zero vulnerabilities.
+- This is current-host local evidence. It does not replace hosted Linux
+  execution, public GitHub Pages verification, external fault rehearsal,
+  secret-manager custody, or independent release review/signature.
+
 - No resource warning was promoted to a failure after the connector fixture
   cleanup. This is current-head local evidence for the warning gate; it does
   not replace hosted Linux execution or independent review.
