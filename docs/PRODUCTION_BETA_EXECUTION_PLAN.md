@@ -1906,6 +1906,21 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Public modality inference boundary at `ce9f747` on 2026-10-21:
+
+- `ModalityPredictor` is now exported from the package root, so callers can
+  load a verified modality package without importing an internal lifecycle
+  module. The public API snapshot, API-surface contract, project integration
+  test, and API documentation all cover the new boundary.
+- The focused API, compatibility, and modality-project slice passed 12 tests
+  under `-W error::ResourceWarning`; Ruff, formatting, mypy, and the API
+  compatibility check passed. The site built 16 pages, passed accessibility
+  checks, and passed 346 internal-link checks.
+- This closes the local public-entry-point gap. Modality support remains
+  experimental until modality-specific fidelity, external serving and fault
+  evidence, secret custody, hosted CI/Pages, and independent review gates are
+  complete.
+
 Post-hardening strict regression evidence at `2f1e63a` on 2026-10-21:
 
 - `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
