@@ -43,6 +43,28 @@ def test_local_file_connector_returns_schema_rows_and_resume_checkpoint(
     assert second.rows == ((3, "c"), (4, "d"))
     assert not second.has_more
     assert second.checkpoint.offset == 4
+    assert first.content_sha256 == connector.content_sha256()
+    assert second.content_sha256 == first.content_sha256
+
+
+def test_local_file_checkpoint_rejects_changed_raw_snapshot(tmp_path, frame):
+    """A local resume cannot silently mix two file snapshots."""
+    path = tmp_path / "source.csv"
+    frame.to_csv(path, index=False)
+    connector = connectors.LocalFileConnector(path)
+    first = connector.read_rows(limit=2)
+
+    frame.assign(label=["changed"] * len(frame)).to_csv(path, index=False)
+
+    with pytest.raises(
+        connectors.ConnectorError, match="content changed"
+    ) as raised:
+        connector.read_rows(first.checkpoint, limit=2)
+
+    assert raised.value.code == "source_snapshot_changed"
+    assert raised.value.details["checkpoint_content_sha256"] == (
+        first.content_sha256
+    )
 
 
 def test_local_file_identity_is_deterministic_for_path_and_file_uri(tmp_path):

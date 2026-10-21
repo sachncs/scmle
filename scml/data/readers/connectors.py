@@ -475,6 +475,19 @@ class SourceConnector(abc.ABC):
             raise ValueError("limit must be positive")
 
 
+def file_content_sha256(
+    path: pathlib.Path, chunk_bytes: int = 1024 * 1024
+) -> str:
+    """Hash a local source file without loading the whole file in memory."""
+    if chunk_bytes < 1:
+        raise ValueError("chunk_bytes must be positive")
+    digest = hashlib.sha256()
+    with path.open("rb") as opened:
+        while chunk := opened.read(chunk_bytes):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 class LocalFileConnector(SourceConnector):
     """Connector for tabular local paths and ``file://`` URIs."""
 
@@ -522,6 +535,10 @@ class LocalFileConnector(SourceConnector):
         )
         return SourceSchema.from_frame(frame)
 
+    def content_sha256(self) -> str:
+        """Return the current raw-byte digest of the local source file."""
+        return file_content_sha256(self.path)
+
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
     ) -> RowBatch:
@@ -530,17 +547,43 @@ class LocalFileConnector(SourceConnector):
         value = self.validate_checkpoint(checkpoint)
 
         def read() -> RowBatch:
+            initial_content_sha256 = self.content_sha256()
             frame = tabular.read_table(self.path)
+            observed_content_sha256 = self.content_sha256()
+            if initial_content_sha256 != observed_content_sha256:
+                raise ConnectorError(
+                    "source_snapshot_changed",
+                    "local file content changed while it was being read",
+                    self.source_uri,
+                    {
+                        "initial_content_sha256": initial_content_sha256,
+                        "observed_content_sha256": observed_content_sha256,
+                    },
+                )
+            try:
+                bound_value = value.bind_content(observed_content_sha256)
+            except ValueError as error:
+                raise ConnectorError(
+                    "source_snapshot_changed",
+                    "local file content changed since the checkpoint was "
+                    "created",
+                    self.source_uri,
+                    {
+                        "checkpoint_content_sha256": value.content_sha256,
+                        "observed_content_sha256": observed_content_sha256,
+                    },
+                ) from error
             schema = SourceSchema.from_frame(frame)
-            start = value.offset
+            start = bound_value.offset
             selected = frame.iloc[start : start + limit]
             rows = tuple(selected.itertuples(index=False, name=None))
-            next_checkpoint = value.advance(len(rows))
+            next_checkpoint = bound_value.advance(len(rows))
             return RowBatch(
                 schema=schema,
                 rows=rows,
                 checkpoint=next_checkpoint,
                 has_more=start + len(rows) < len(frame),
+                content_sha256=observed_content_sha256,
             )
 
         return execute_with_retries(

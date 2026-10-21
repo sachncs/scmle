@@ -9,7 +9,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Supported inputs</h2>
   <div class="doc-cards">
-    <div class="doc-card"><small>FILES</small><h3>Open tabular formats</h3><p>CSV, TSV, TAB, JSON records, JSONL / NDJSON, Parquet, Feather, Arrow, XLSX, and XLSM.</p></div>
+    <div class="doc-card"><small>FILES</small><h3>Open tabular formats</h3><p>CSV, TSV, TAB, JSON records, JSONL / NDJSON, Parquet, Feather, Arrow, XLSX, and XLSM. Local-file resume checkpoints bind to the raw-byte SHA-256 and reject a changed snapshot.</p></div>
     <div class="doc-card"><small>IN MEMORY</small><h3>Table interchange</h3><p>pandas DataFrame, PyArrow Table, Polars DataFrame or LazyFrame, and Arrow stream protocol objects.</p></div>
     <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
     <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. <code>EventConsumer</code> stages broker acknowledgements durably after the sink commit and retries them after a restart. It does not claim distributed exactly-once delivery.</p></div>
