@@ -1906,6 +1906,13 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head strict regression at `0c97ceb` on 2026-10-22:
+
+- `uv run --python 3.14 pytest -q tests -W error::ResourceWarning` passed
+  `2,320 passed, 88 skipped` in 31 minutes 20 seconds. No failure, error, or
+  warning was promoted to a failure. The run includes CRS-bound raster-window
+  evidence and the complete current test inventory.
+
 Current-head release preflight evidence at `0c97ceb` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
