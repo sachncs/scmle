@@ -1116,3 +1116,27 @@ Local preflight evidence captured on 2026-10-21:
   7 focused fairness tests under `-W error::ResourceWarning`). This closes a
   local reporting gap in Phase 3; it does not establish causal fairness or
   statistical power for small groups.
+
+Clean-head preflight evidence at `f691997` on 2026-10-21:
+
+- Static checks passed: Ruff, format, mypy, Bandit, pip-audit, and public API
+  compatibility. Bandit emitted existing comment-parser warnings only; no
+  finding failed the gate.
+- The bounded contract suite passed with 1,918 tests and 75 skips. Total
+  coverage was 82.84%; the declared core scope reached 86%. The run emitted
+  two existing SQLite `ResourceWarning` instances from the lifecycle extras
+  path; they remain hygiene debt and are not suppressed.
+- The mutation gate killed 1,340 of 1,863 mutants (71%, against the 70%
+  minimum), with one timeout and surviving mutants retained for triage.
+- Five-seed offline benchmarks passed for breast cancer, wine, digits, and
+  diabetes progression with zero failed repetitions and zero regressions.
+  Runtime, peak memory, failure rate, and independent-reference comparisons
+  were recorded in the benchmark evidence artifact.
+- Wheel and source-distribution checks passed, both artifacts were
+  reproducible, and network-isolated wheel and source-distribution installs
+  passed. The Astro site built all 15 routes and npm audit reported zero
+  vulnerabilities.
+- This is clean local evidence for `f691997`, not hosted or independent
+  release proof. GitHub Pages remains HTTP 404, hosted Actions remain
+  unavailable before job logs, and external key custody, external-fault
+  execution, and independent review/signature remain release blockers.
