@@ -35,6 +35,7 @@ T = TypeVar("T")
 Row = tuple[Any, ...]
 RangeReader = Callable[[str, int, int], bytes]
 SizeReader = Callable[[str], int]
+ObjectDecoder = Callable[[str, bytes], pd.DataFrame]
 
 
 class ConnectorError(errors.DataError):
@@ -792,7 +793,9 @@ class ObjectStoreConnector(SourceConnector):
     """Connector for bounded object-store reads through an injected reader.
 
     This adapter downloads one object into memory before decoding it and
-    rejects objects over max_bytes. It supports deterministic small-object
+    rejects objects over max_bytes. The default decoder handles common
+    tabular formats; a caller-owned decoder can admit any format that can be
+    represented as a bounded DataFrame. It supports deterministic small-object
     ingestion, but does not claim range reads or streaming-scale semantics.
     """
 
@@ -804,8 +807,23 @@ class ObjectStoreConnector(SourceConnector):
         read_bytes: Callable[[str], bytes],
         retry_budget: RetryBudget | None = None,
         max_bytes: int = 256 * 1024 * 1024,
+        decoder: ObjectDecoder | None = None,
+        decoder_name: str | None = None,
     ) -> None:
-        """Initialize an object connector with explicit transport injection."""
+        """Initialize an object connector with explicit boundaries.
+
+        Args:
+            source_uri: Object-store URI.
+            read_bytes: Caller-owned transport that returns the object bytes.
+            retry_budget: Per-operation retry policy.
+            max_bytes: Maximum object size loaded into memory.
+            decoder: Optional caller-owned decoder returning a DataFrame.
+            decoder_name: Stable decoder name and version for source identity.
+
+        Raises:
+            ValueError: If a custom decoder has no stable identity.
+            TypeError: If a decoder or transport is not callable.
+        """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
         if scheme not in self.supported_schemes:
@@ -816,9 +834,25 @@ class ObjectStoreConnector(SourceConnector):
             raise TypeError("read_bytes must be callable")
         if max_bytes < 1:
             raise ValueError("max_bytes must be positive")
+        if decoder is not None and not callable(decoder):
+            raise TypeError("decoder must be callable")
+        if decoder is None:
+            if decoder_name is not None:
+                raise ValueError("decoder_name requires a caller-owned decoder")
+            decoder = read_tabular_bytes
+            decoder_name = "tabular-auto-v1"
+        elif not decoder_name or not decoder_name.strip():
+            raise ValueError(
+                "decoder_name must identify a caller-owned decoder and version"
+            )
         self.read_bytes = read_bytes
         self.max_bytes = max_bytes
+        self.decoder = decoder
+        self.decoder_name = decoder_name.strip()
         super().__init__(value, retry_budget)
+        self.source_identity = source_identity(
+            f"{self.source_uri}|decoder={self.decoder_name}"
+        )
 
     def load_frame(self) -> pd.DataFrame:
         """Download and decode the bounded object once."""
@@ -842,7 +876,31 @@ class ObjectStoreConnector(SourceConnector):
                 self.source_uri,
                 {"bytes": len(payload), "max_bytes": self.max_bytes},
             )
-        return read_tabular_bytes(self.source_uri, payload)
+        try:
+            frame = self.decoder(self.source_uri, payload)
+        except ConnectorError:
+            raise
+        except Exception as error:
+            raise ConnectorError(
+                "decoder_failed",
+                f"object decoder failed: {error}",
+                self.source_uri,
+                {
+                    "decoder": self.decoder_name,
+                    "error_type": type(error).__name__,
+                },
+            ) from error
+        if not isinstance(frame, pd.DataFrame):
+            raise ConnectorError(
+                "invalid_decoded_object",
+                "object decoder must return a pandas DataFrame",
+                self.source_uri,
+                {
+                    "decoder": self.decoder_name,
+                    "result_type": type(frame).__name__,
+                },
+            )
+        return frame
 
     def schema(self) -> SourceSchema:
         """Read and return the bounded object's schema."""

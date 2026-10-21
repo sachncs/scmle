@@ -84,6 +84,71 @@ def test_object_store_connector_reads_bounded_tabular_objects_and_resumes(
     assert not second.has_more
 
 
+def test_object_store_connector_accepts_a_caller_owned_versioned_decoder():
+    """A custom decoder admits formats outside the built-in tabular set."""
+    calls = []
+
+    def decode(uri: str, payload: bytes) -> pd.DataFrame:
+        calls.append((uri, payload))
+        return pd.DataFrame({"payload_length": [len(payload)]})
+
+    connector = connectors.ObjectStoreConnector(
+        "s3://bucket/sample.custom",
+        lambda uri: b"custom-format",
+        decoder=decode,
+        decoder_name="custom-v2",
+    )
+
+    batch = connector.read_rows(limit=1)
+
+    assert batch.rows == ((13,),)
+    assert batch.schema.columns[0].name == "payload_length"
+    assert connector.source_identity == connectors.source_identity(
+        "s3://bucket/sample.custom|decoder=custom-v2"
+    )
+    assert calls == [(connector.source_uri, b"custom-format")]
+
+
+def test_object_store_connector_requires_decoder_identity_for_custom_formats():
+    """Custom decoding must be bound to a reproducible source identity."""
+    with pytest.raises(ValueError, match="decoder_name"):
+        connectors.ObjectStoreConnector(
+            "s3://bucket/sample.custom",
+            lambda uri: b"custom-format",
+            decoder=lambda uri, payload: pd.DataFrame({"value": [1]}),
+        )
+
+
+def test_object_store_connector_reports_decoder_contract_failures():
+    """Decoder errors are structured rather than leaked as implementation detail."""
+
+    def fail(uri: str, payload: bytes) -> pd.DataFrame:
+        raise RuntimeError("bad payload")
+
+    failing = connectors.ObjectStoreConnector(
+        "s3://bucket/sample.custom",
+        lambda uri: b"custom-format",
+        decoder=fail,
+        decoder_name="custom-v2",
+    )
+
+    with pytest.raises(connectors.ConnectorError) as raised:
+        failing.schema()
+
+    assert raised.value.code == "decoder_failed"
+    assert raised.value.details["decoder"] == "custom-v2"
+
+    invalid = connectors.ObjectStoreConnector(
+        "s3://bucket/sample.custom",
+        lambda uri: b"custom-format",
+        decoder=lambda uri, payload: {"value": 1},
+        decoder_name="custom-v2",
+    )
+    with pytest.raises(connectors.ConnectorError) as raised:
+        invalid.schema()
+    assert raised.value.code == "invalid_decoded_object"
+
+
 def test_object_store_connector_rejects_large_payloads_and_bad_formats():
     """Bounded object support fails closed instead of hiding memory risk."""
     with pytest.raises(connectors.ConnectorError, match="max_bytes"):
