@@ -1146,3 +1146,7 @@ Clean-head preflight evidence at `f691997` on 2026-10-21:
   groups. The focused fairness and release-evaluation slice passes 20 tests
   under `-W error::ResourceWarning`; this is a reporting safeguard, not a
   substitute for a domain-specific power analysis.
+- `f14f1a6` adds the same fairness interpretation to the standalone Astro
+  documentation, including the evidence shape and the distinction between
+  disparity flags, statistical power, and causal claims. The site build and
+  accessibility smoke checks pass all 15 routes.
