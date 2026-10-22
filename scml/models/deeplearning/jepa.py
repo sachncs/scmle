@@ -1,9 +1,14 @@
 """Public proxy for the optional tabular JEPA representation trainer."""
 
+import os
+import pathlib
+import tempfile
 from typing import Any
 
+import joblib
 import numpy as np
 from sklearn import base
+from sklearn import utils
 
 from scml.models.deeplearning import estimators
 
@@ -17,6 +22,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
     """
 
     engine_path = "scml.models.deeplearning.jepa_engine.JepaEngine"
+    CHECKPOINT_FORMAT = "scml.tabular-jepa.v1"
 
     def __init__(
         self,
@@ -65,6 +71,77 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
     def transform(self, features: Any) -> np.ndarray:
         """Return context-encoder embeddings for new rows."""
         return self.call("encode", features)
+
+    def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
+        """Save a fitted JEPA representation checkpoint.
+
+        The checkpoint contains the estimator configuration, training report,
+        and NumPy-only worker state. It is intended for trusted local storage;
+        loading it uses joblib's pickle-based format.
+
+        Args:
+            path: Destination file. Its parent directory must already exist.
+
+        Returns:
+            The checkpoint path.
+
+        Raises:
+            sklearn.exceptions.NotFittedError: If the estimator is unfitted.
+        """
+        utils.validation.check_is_fitted(self, attributes=["state_"])
+        destination = pathlib.Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary: pathlib.Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary = pathlib.Path(handle.name)
+            joblib.dump(
+                {"format": self.CHECKPOINT_FORMAT, "estimator": self},
+                temporary,
+            )
+            with temporary.open("rb") as handle:
+                os.fsync(handle.fileno())
+            os.replace(temporary, destination)
+            descriptor = os.open(destination.parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        except BaseException:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise
+        return destination
+
+    @classmethod
+    def load_checkpoint(cls, path: str | pathlib.Path) -> "JepaEstimator":
+        """Load a trusted fitted tabular JEPA checkpoint.
+
+        Args:
+            path: Checkpoint produced by :meth:`save_checkpoint`.
+
+        Returns:
+            A fitted estimator whose transform output matches the saved model.
+
+        Raises:
+            ValueError: If the checkpoint format or payload is invalid.
+        """
+        payload = joblib.load(path)
+        if (
+            not isinstance(payload, dict)
+            or payload.get("format") != cls.CHECKPOINT_FORMAT
+        ):
+            raise ValueError("unsupported tabular JEPA checkpoint format")
+        estimator = payload.get("estimator")
+        if not isinstance(estimator, cls):
+            raise ValueError("checkpoint does not contain a JepaEstimator")
+        utils.validation.check_is_fitted(estimator, attributes=["state_"])
+        return estimator
 
 
 __all__ = ["JepaEstimator"]
