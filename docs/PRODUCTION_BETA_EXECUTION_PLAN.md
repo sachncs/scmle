@@ -1989,6 +1989,18 @@ Structured cancellation taxonomy at `bedb671` on 2026-10-22:
   at `67` tests under strict resource warnings, with Ruff, formatting, mypy,
   API compatibility, and diff checks passing.
 
+Fail-closed performance publication at `38f6736` on 2026-10-22:
+
+- A modality run that violates its declared performance budget or repeated
+  baseline now rejects before lifecycle-report persistence and removes the
+  package created by that run. A failed performance gate can no longer leave
+  a signed-looking model package or report that an operator might mistake for
+  a releasable result.
+- The regression test verifies both package and report absence after a budget
+  failure. The focused modality lifecycle, project, and explanation slice
+  passed `58` tests under strict resource warnings; Ruff, formatting, mypy,
+  and diff checks passed.
+
 Signed lifecycle evidence at `7dc754f` on 2026-10-22:
 
 - Lifecycle reports are now schema version 2 artifacts signed over the exact
