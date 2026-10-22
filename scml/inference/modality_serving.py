@@ -146,13 +146,67 @@ class ModalityHttpServing:
                     self.send_json(404, {"error": "not found"})
                     return
                 try:
-                    length = int(self.headers.get("Content-Length", 0))
+                    content_type = self.headers.get("Content-Type", "")
+                    if content_type.split(";", 1)[0].strip().lower() != (
+                        "application/json"
+                    ):
+                        self.send_json(
+                            415,
+                            {
+                                "error": (
+                                    "Content-Type must be application/json"
+                                ),
+                                "category": "request",
+                            },
+                        )
+                        return
+                    raw_length = self.headers.get("Content-Length")
+                    if raw_length is None:
+                        self.send_json(
+                            411,
+                            {
+                                "error": "Content-Length is required",
+                                "category": "request",
+                            },
+                        )
+                        return
+                    try:
+                        length = int(raw_length)
+                    except ValueError:
+                        self.send_json(
+                            400,
+                            {
+                                "error": "Content-Length must be an integer",
+                                "category": "request",
+                            },
+                        )
+                        return
                     if length < 0 or length > adapter.max_request_bytes:
                         raise OverflowError(
                             "request body exceeds "
                             f"{adapter.max_request_bytes} bytes"
                         )
-                    payload = json.loads(self.rfile.read(length))
+                    body = self.rfile.read(length)
+                    if len(body) != length:
+                        self.send_json(
+                            400,
+                            {
+                                "error": "request body is incomplete",
+                                "category": "request",
+                            },
+                        )
+                        return
+                    try:
+                        payload = json.loads(body)
+                    except json.JSONDecodeError as error:
+                        self.send_json(
+                            400,
+                            {
+                                "error": f"invalid JSON request: {error.msg}",
+                                "category": "request",
+                            },
+                        )
+                        return
                     self.send_json(200, adapter.response(payload))
                 except OverflowError as error:
                     self.send_json(
@@ -168,6 +222,14 @@ class ModalityHttpServing:
                         {
                             "error": f"invalid modality samples: {error}",
                             "category": "samples",
+                        },
+                    )
+                except Exception:
+                    self.send_json(
+                        500,
+                        {
+                            "error": "internal modality serving failure",
+                            "category": "internal",
                         },
                     )
 

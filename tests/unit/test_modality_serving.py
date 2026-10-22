@@ -44,6 +44,14 @@ class DocumentDecoder(modality_serving.ModalitySampleDecoder):
         }
 
 
+class ExplodingDecoder(DocumentDecoder):
+    """Raise an unexpected decoder error for server-boundary testing."""
+
+    def decode(self, payload: object) -> tuple[document.DocumentSample, ...]:
+        """Raise a representative unexpected decoder failure."""
+        raise RuntimeError("decoder failed")
+
+
 def adapter() -> modality_lifecycle.DocumentAdapter:
     """Build a small, labelled document fixture."""
     samples = tuple(
@@ -57,18 +65,25 @@ def adapter() -> modality_lifecycle.DocumentAdapter:
     return modality_lifecycle.DocumentAdapter(document.DocumentDataset(samples))
 
 
-def post(url: str, payload: object) -> tuple[int, dict[str, object]]:
-    """Post JSON and return status plus decoded body."""
+def request(
+    url: str, body: bytes, content_type: str
+) -> tuple[int, dict[str, object]]:
+    """Send a request body and return status plus decoded JSON."""
     request = urllib.request.Request(
         url,
-        json.dumps(payload).encode(),
-        {"Content-Type": "application/json"},
+        body,
+        {"Content-Type": content_type},
     )
     try:
         with urllib.request.urlopen(request) as response:
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read())
+
+
+def post(url: str, payload: object) -> tuple[int, dict[str, object]]:
+    """Post JSON and return status plus decoded body."""
+    return request(url, json.dumps(payload).encode(), "application/json")
 
 
 def test_modality_http_serving_verifies_health_schema_and_predictions(
@@ -143,6 +158,18 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         status, body = post(f"{serving.address}/unknown", {})
         assert status == 404
         assert body["error"] == "not found"
+
+        status, body = request(
+            f"{serving.address}/predict", b"{}", "text/plain"
+        )
+        assert status == 415
+        assert body["category"] == "request"
+
+        status, body = request(
+            f"{serving.address}/predict", b"not-json", "application/json"
+        )
+        assert status == 400
+        assert body["category"] == "request"
     finally:
         serving.stop()
 
@@ -158,3 +185,35 @@ def test_modality_http_serving_rejects_invalid_request_bounds():
             decoder=DocumentDecoder(),
             max_request_bytes=0,
         )
+
+
+def test_modality_http_serving_classifies_unexpected_decoder_errors(tmp_path):
+    """Unexpected decoder errors become a bounded structured response."""
+    reference = adapter()
+    report = modality_lifecycle.ModalityLifecycle().run(
+        reference,
+        tmp_path / "package",
+        signing_key="serving-key",
+    )
+    predictor = modality_lifecycle.ModalityPredictor.from_package(
+        reference,
+        report.package.path,
+        "serving-key",
+    )
+    serving = modality_serving.ModalityHttpServing(
+        predictor,
+        ExplodingDecoder(),
+    )
+    serving.start()
+    try:
+        status, body = post(
+            f"{serving.address}/predict",
+            {"samples": [{"document_id": "request", "content": "alpha"}]},
+        )
+        assert status == 500
+        assert body == {
+            "error": "internal modality serving failure",
+            "category": "internal",
+        }
+    finally:
+        serving.stop()
