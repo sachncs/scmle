@@ -46,11 +46,11 @@
     },
     "ModalityHttpServing": {
       "kind": "class",
-      "signature_sha256": "2eefbf4fc75db85fd4490da5502a1de6f795a32e93231fcf9439a78da9a079a2"
+      "signature_sha256": "efcf178e802fc80359a68f6fd410738949a38c8b035bdfbfb9ccddaaf7213548"
     },
     "ModalityPredictor": {
       "kind": "class",
-      "signature_sha256": "1f3b26aaa2a6e873546c7d77c398965e9d5544e88009ed3dbeea6ca753937cd0"
+      "signature_sha256": "9dac74c09bd0957de2a73a29a827cb713f0281398b1802513f73953e61edbe52"
     },
     "ModalityProject": {
       "kind": "class",

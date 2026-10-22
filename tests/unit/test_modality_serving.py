@@ -177,6 +177,78 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         print(serving.address)
 
 
+def test_release_bound_serving_publishes_verified_lifecycle_identity(tmp_path):
+    """Serving can require the exact signed lifecycle report for its package."""
+    reference = adapter()
+    report_path = tmp_path / "modality_lifecycle.json"
+    report = modality_lifecycle.ModalityLifecycle().run(
+        reference,
+        tmp_path / "package",
+        signing_key="serving-key",
+        report_path=report_path,
+    )
+    predictor = modality_lifecycle.ModalityPredictor.from_package(
+        reference,
+        report.package.path,
+        "serving-key",
+        lifecycle_report_path=report_path,
+    )
+    serving = modality_serving.ModalityHttpServing(
+        predictor,
+        DocumentDecoder(),
+        require_lifecycle_report=True,
+    )
+
+    health = predictor.health()
+
+    assert health["lifecycle_report_verified"] is True
+    assert isinstance(health["lifecycle_report_digest"], str)
+    assert serving.require_lifecycle_report is True
+
+
+def test_release_bound_serving_rejects_unbound_predictor(tmp_path):
+    """The production-boundary mode must not accept package-only loading."""
+    reference = adapter()
+    report = modality_lifecycle.ModalityLifecycle().run(
+        reference,
+        tmp_path / "package",
+        signing_key="serving-key",
+    )
+    predictor = modality_lifecycle.ModalityPredictor.from_package(
+        reference, report.package.path, "serving-key"
+    )
+
+    with pytest.raises(ValueError, match="verified lifecycle report"):
+        modality_serving.ModalityHttpServing(
+            predictor,
+            DocumentDecoder(),
+            require_lifecycle_report=True,
+        )
+
+
+def test_report_binding_rejects_tampered_lifecycle_evidence(tmp_path):
+    """A changed lifecycle report cannot be used to authorize serving."""
+    reference = adapter()
+    report_path = tmp_path / "modality_lifecycle.json"
+    report = modality_lifecycle.ModalityLifecycle().run(
+        reference,
+        tmp_path / "package",
+        signing_key="serving-key",
+        report_path=report_path,
+    )
+    record = json.loads(report_path.read_text(encoding="utf-8"))
+    record["dataset_hash"] = "tampered"
+    report_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="signature does not verify"):
+        modality_lifecycle.ModalityPredictor.from_package(
+            reference,
+            report.package.path,
+            "serving-key",
+            lifecycle_report_path=report_path,
+        )
+
+
 def test_modality_http_serving_rejects_invalid_request_bounds():
     """The reference server refuses unsafe zero-sized request limits."""
     with pytest.raises(ValueError, match="request bounds"):

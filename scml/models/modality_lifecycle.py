@@ -186,6 +186,7 @@ class ModalityPredictor:
     package: LifecyclePackage
     feature_names: tuple[str, ...]
     training_dataset_hash: str
+    lifecycle_report_digest: str | None = None
 
     @classmethod
     def from_package(
@@ -193,8 +194,15 @@ class ModalityPredictor:
         adapter: ModalityAdapter,
         package_path: str | Path,
         signing_key: str | bytes,
+        lifecycle_report_path: str | Path | None = None,
     ) -> Self:
-        """Load and validate a signed package for one modality adapter."""
+        """Load and validate a signed package for one modality adapter.
+
+        When ``lifecycle_report_path`` is supplied, the signed report must
+        identify this exact modality, dataset, package path, model digest,
+        and package signature. This creates an auditable package-to-serving
+        boundary without changing the experimental modality status.
+        """
         model = load_package(package_path, signing_key)
         manifest_path = Path(package_path) / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -225,6 +233,29 @@ class ModalityPredictor:
             signature.get("value"), str
         ):
             raise ValueError("package signature is invalid")
+        report_digest: str | None = None
+        if lifecycle_report_path is not None:
+            report = LifecycleReport.read_verified(
+                lifecycle_report_path, signing_key
+            )
+            if report.modality != modalities.modality_value(adapter.modality):
+                raise ValueError("lifecycle report modality does not match")
+            if report.dataset_hash != dataset_hash:
+                raise ValueError(
+                    "lifecycle report dataset identity does not match"
+                )
+            if (
+                Path(report.package.path).resolve()
+                != Path(package_path).resolve()
+            ):
+                raise ValueError("lifecycle report package path does not match")
+            if report.package.model_sha256 != model_digest:
+                raise ValueError("lifecycle report model digest does not match")
+            if report.package.signature != signature["value"]:
+                raise ValueError(
+                    "lifecycle report package signature does not match"
+                )
+            report_digest = attestation.canonical_digest(report.unsigned_dict())
         package = LifecyclePackage(
             path=str(package_path),
             model_sha256=model_digest,
@@ -236,6 +267,7 @@ class ModalityPredictor:
             package=package,
             feature_names=feature_names,
             training_dataset_hash=dataset_hash,
+            lifecycle_report_digest=report_digest,
         )
 
     def features_for(self, samples: Sequence[Any]) -> FeatureBatch:
@@ -258,13 +290,21 @@ class ModalityPredictor:
 
     def health(self) -> dict[str, object]:
         """Return machine-readable package and inference readiness evidence."""
-        return {
+        health = {
             "package_verified": True,
             "modality": modalities.modality_value(self.adapter.modality),
             "training_dataset_hash": self.training_dataset_hash,
             "feature_names": list(self.feature_names),
             "model_sha256": self.package.model_sha256,
         }
+        if self.lifecycle_report_digest is not None:
+            health.update(
+                {
+                    "lifecycle_report_verified": True,
+                    "lifecycle_report_digest": self.lifecycle_report_digest,
+                }
+            )
+        return health
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

@@ -52,16 +52,29 @@ class ModalityHttpServing:
         port: int = 0,
         max_request_bytes: int = MAX_MODALITY_REQUEST_BYTES,
         max_samples: int = MAX_MODALITY_REQUEST_SAMPLES,
+        require_lifecycle_report: bool = False,
     ) -> None:
-        """Bind a verified predictor and an explicit sample decoder."""
+        """Bind a verified predictor and an explicit sample decoder.
+
+        ``require_lifecycle_report`` enables the production-boundary mode.
+        In that mode the predictor must have been loaded with a verified,
+        identity-matching signed lifecycle report.
+        """
         if max_request_bytes < 1 or max_samples < 1:
             raise ValueError("request bounds must be positive")
+        if require_lifecycle_report and (
+            predictor.lifecycle_report_digest is None
+        ):
+            raise ValueError(
+                "release-bound serving requires a verified lifecycle report"
+            )
         self.predictor = predictor
         self.decoder = decoder
         self.host = host
         self.port = port
         self.max_request_bytes = max_request_bytes
         self.max_samples = max_samples
+        self.require_lifecycle_report = require_lifecycle_report
         self.lock = threading.Lock()
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
@@ -93,6 +106,10 @@ class ModalityHttpServing:
             "probabilities": np.asarray(probabilities).tolist(),
             "sample_count": len(samples),
             "package_verified": True,
+            "lifecycle_report_verified": (
+                self.predictor.lifecycle_report_digest is not None
+            ),
+            "lifecycle_report_digest": self.predictor.lifecycle_report_digest,
         }
 
     def start(self) -> None:
