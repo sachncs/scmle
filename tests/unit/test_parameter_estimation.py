@@ -314,6 +314,43 @@ def test_ipw_ate_fails_closed_without_all_causal_assumptions():
         )
 
 
+def test_aipw_ate_reports_augmented_score_and_reference_evidence():
+    """AIPW combines propensity and outcome nuisance evidence."""
+    rng = np.random.default_rng(24)
+    rows = 600
+    age = rng.normal(size=rows)
+    risk_score = rng.normal(size=rows)
+    treatment_probability = 1.0 / (
+        1.0 + np.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
+    )
+    treatment = rng.binomial(1, treatment_probability)
+    outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
+    outcome += rng.normal(scale=0.8, size=rows)
+    features = np.column_stack((treatment, age, risk_score))
+    policy = EstimationPolicy(
+        estimator="aipw_ate",
+        covariance="iid",
+        treatment_position=0,
+        propensity_clip=0.02,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+
+    result = estimate_parameters(features, outcome, causal_estimand(), policy)
+
+    assert result.parameters[0].name == "ate"
+    assert result.parameters[0].estimate == pytest.approx(2.0, abs=0.35)
+    assert result.diagnostics["estimator_family"] == "causal_augmented_ipw"
+    assert result.diagnostics["method"] == "augmented_ipw"
+    assert result.diagnostics["cross_fitting"] == "not_implemented"
+    assert result.diagnostics["positivity"]["status"] == "diagnosed_not_proven"
+    assert result.reference["passed"] is True
+    json.dumps(result.to_dict())
+
+
 def test_hierarchical_linear_reports_random_intercept_variance():
     """Grouped GLS reports its variance components and reference evidence."""
     rng = np.random.default_rng(29)

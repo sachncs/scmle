@@ -384,11 +384,12 @@ class MLProject:
             frame = tabular.read_table(self.spec.data.uri)
         declared = [*self.estimand.feature_names, self.estimand.outcome]
         treatment_column = None
-        if self.estimation_policy.estimator == "ipw_ate":
+        if self.estimation_policy.estimator in {"ipw_ate", "aipw_ate"}:
             treatment_column = self.spec.data.treatment_column
             if treatment_column is None:
                 raise errors.ConfigError(
-                    "ipw_ate parameter estimation requires treatment_column"
+                    f"{self.estimation_policy.estimator} parameter estimation "
+                    "requires treatment_column"
                 )
             if treatment_column not in self.estimand.feature_names:
                 raise errors.ConfigError(

@@ -33,6 +33,7 @@ EstimatorKind = Literal[
     "logistic",
     "bayesian_linear",
     "ipw_ate",
+    "aipw_ate",
     "hierarchical_linear",
 ]
 CovarianceKind = Literal["iid", "hc3", "clustered"]
@@ -181,6 +182,7 @@ class EstimationPolicy:
             "logistic",
             "bayesian_linear",
             "ipw_ate",
+            "aipw_ate",
             "hierarchical_linear",
         ):
             raise ValueError(
@@ -207,12 +209,25 @@ class EstimationPolicy:
             raise ValueError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
-        if self.estimator != "ipw_ate" and self.treatment_position is not None:
-            raise ValueError("treatment_position is supported only by ipw_ate")
-        if self.estimator != "ipw_ate" and self.propensity_clip != 0.01:
-            raise ValueError("propensity_clip is supported only by ipw_ate")
-        if self.estimator != "ipw_ate" and self.causal_assumptions:
-            raise ValueError("causal assumptions are supported only by ipw_ate")
+        causal_estimators = {"ipw_ate", "aipw_ate"}
+        if (
+            self.estimator not in causal_estimators
+            and self.treatment_position is not None
+        ):
+            raise ValueError(
+                "treatment_position is supported only by ipw_ate or aipw_ate"
+            )
+        if (
+            self.estimator not in causal_estimators
+            and self.propensity_clip != 0.01
+        ):
+            raise ValueError(
+                "propensity_clip is supported only by ipw_ate or aipw_ate"
+            )
+        if self.estimator not in causal_estimators and self.causal_assumptions:
+            raise ValueError(
+                "causal assumptions are supported only by ipw_ate or aipw_ate"
+            )
         if (
             self.estimator != "hierarchical_linear"
             and self.hierarchical_assumptions
@@ -234,7 +249,7 @@ class EstimationPolicy:
                 raise ValueError(
                     "bayesian_linear bootstrap sensitivity is unsupported"
                 )
-        elif self.estimator == "ipw_ate":
+        elif self.estimator in causal_estimators:
             if self.prior is not None:
                 raise ValueError("a Bayesian prior is not valid for ipw_ate")
             if self.covariance != "iid":
@@ -252,7 +267,9 @@ class EstimationPolicy:
                     "and positivity assumptions"
                 )
             if self.bootstrap_replicates:
-                raise ValueError("ipw_ate bootstrap sensitivity is unsupported")
+                raise ValueError(
+                    f"{self.estimator} bootstrap sensitivity is unsupported"
+                )
         elif self.estimator == "hierarchical_linear":
             if self.prior is not None:
                 raise ValueError(
@@ -288,7 +305,7 @@ class EstimationPolicy:
         values = dataclasses.asdict(self)
         if self.prior is None:
             values.pop("prior")
-        if self.estimator != "ipw_ate":
+        if self.estimator not in {"ipw_ate", "aipw_ate"}:
             values.pop("treatment_position")
             values.pop("propensity_clip")
             values.pop("causal_assumptions")
@@ -566,13 +583,14 @@ def estimate_parameters(
         raise ValueError("clustered covariance needs cluster labels")
     if policy.estimator in ("hierarchical_linear",) and clusters is None:
         raise ValueError("hierarchical_linear requires cluster labels")
-    if policy.estimator == "ipw_ate" and clusters is not None:
-        raise ValueError("ipw_ate does not accept cluster labels")
+    if policy.estimator in {"ipw_ate", "aipw_ate"} and clusters is not None:
+        raise ValueError(f"{policy.estimator} does not accept cluster labels")
     expected_likelihood = {
         "linear": "gaussian",
         "logistic": "bernoulli",
         "bayesian_linear": "gaussian",
         "ipw_ate": "gaussian",
+        "aipw_ate": "gaussian",
         "hierarchical_linear": "gaussian",
     }[policy.estimator]
     if estimand.likelihood != expected_likelihood:
@@ -589,9 +607,9 @@ def estimate_parameters(
         raise ValueError("logistic outcome must contain only 0 and 1")
     if policy.estimator == "bayesian_linear" and clusters is not None:
         raise ValueError("bayesian_linear estimation does not accept clusters")
-    if policy.estimator == "ipw_ate":
+    if policy.estimator in {"ipw_ate", "aipw_ate"}:
         if policy.treatment_position is None:
-            raise ValueError("ipw_ate requires treatment_position")
+            raise ValueError(f"{policy.estimator} requires treatment_position")
         if not 0 <= policy.treatment_position < matrix.shape[1]:
             raise ValueError("treatment_position is outside the feature matrix")
     cluster_values = kept if clusters is not None else None
@@ -672,20 +690,41 @@ def estimate_parameters(
             "uncertainty": "posterior_credible_interval",
             "p_value_semantics": "two-sided posterior tail probability",
         }
-    elif policy.estimator == "ipw_ate":
-        coefficients, covariance, diagnostics, propensity_design = fit_ipw_ate(
-            matrix,
-            values,
-            policy.treatment_position,
-            policy,
-        )
-        reference = reference_ipw_ate(
-            propensity_design,
-            values,
-            matrix[:, policy.treatment_position],
-            coefficients,
-            policy,
-        )
+    elif policy.estimator in {"ipw_ate", "aipw_ate"}:
+        if policy.estimator == "ipw_ate":
+            coefficients, covariance, diagnostics, propensity_design = (
+                fit_ipw_ate(
+                    matrix,
+                    values,
+                    policy.treatment_position,
+                    policy,
+                )
+            )
+            reference = reference_ipw_ate(
+                propensity_design,
+                values,
+                matrix[:, policy.treatment_position],
+                coefficients,
+                policy,
+            )
+        else:
+            (
+                coefficients,
+                covariance,
+                diagnostics,
+                aipw_inputs,
+            ) = fit_aipw_ate(
+                matrix,
+                values,
+                policy.treatment_position,
+                policy,
+            )
+            reference = reference_aipw_ate(
+                aipw_inputs,
+                values,
+                coefficients,
+                policy,
+            )
         likelihood = "gaussian"
         names = ("ate",)
         pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
@@ -976,6 +1015,122 @@ def fit_ipw_ate(
         np.asarray([[variance]]),
         diagnostics,
         propensity_design,
+    )
+
+
+def fit_aipw_ate(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    treatment_position: int | None,
+    policy: EstimationPolicy,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any], dict[str, np.ndarray]]:
+    """Estimate a binary-treatment ATE with an augmented IPW score.
+
+    The propensity and outcome nuisance models are fitted on the same sample.
+    The result is deliberately reported as a bounded, non-cross-fitted
+    estimator: the influence variance is conditional on the fitted nuisance
+    functions and the diagnostics make that limitation explicit.
+    """
+    if treatment_position is None:
+        raise ValueError("aipw_ate requires treatment_position")
+    treatment = matrix[:, treatment_position]
+    if not set(np.unique(treatment)).issubset({0.0, 1.0}):
+        raise ValueError("aipw_ate treatment must contain only 0 and 1")
+    treated_count = int(np.sum(treatment == 1.0))
+    control_count = int(np.sum(treatment == 0.0))
+    if treated_count < 2 or control_count < 2:
+        raise ValueError("aipw_ate needs at least two rows per treatment arm")
+
+    confounders = np.delete(matrix, treatment_position, axis=1)
+    nuisance_design = np.column_stack(
+        (np.ones(confounders.shape[0]), confounders)
+    )
+    propensity_coefficients, raw_propensity, propensity_diagnostics = (
+        fit_logistic(
+            nuisance_design,
+            treatment,
+            policy.max_iterations,
+            policy.tolerance,
+        )
+    )
+    del propensity_coefficients
+    propensity = np.clip(
+        raw_propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
+    )
+
+    treated_design = nuisance_design[treatment == 1.0]
+    control_design = nuisance_design[treatment == 0.0]
+    treated_coefficients = np.linalg.lstsq(
+        treated_design, values[treatment == 1.0], rcond=None
+    )[0]
+    control_coefficients = np.linalg.lstsq(
+        control_design, values[treatment == 0.0], rcond=None
+    )[0]
+    if (
+        np.linalg.matrix_rank(treated_design) != treated_design.shape[1]
+        or np.linalg.matrix_rank(control_design) != control_design.shape[1]
+    ):
+        raise ValueError("aipw_ate outcome design is not identifiable")
+
+    outcome_control = nuisance_design @ control_coefficients
+    outcome_treated = nuisance_design @ treated_coefficients
+    score = (
+        outcome_treated
+        - outcome_control
+        + treatment * (values - outcome_treated) / propensity
+        - (1.0 - treatment) * (values - outcome_control) / (1.0 - propensity)
+    )
+    ate = float(np.mean(score))
+    influence = score - ate
+    variance = float(np.var(influence, ddof=1) / len(values))
+    clipped = np.abs(raw_propensity - propensity) > 1e-12
+    diagnostics = {
+        "converged": True,
+        "iterations": propensity_diagnostics["iterations"],
+        "estimator_family": "causal_augmented_ipw",
+        "method": "augmented_ipw",
+        "uncertainty_method": "influence_function_with_fitted_nuisance",
+        "cross_fitting": "not_implemented",
+        "propensity_estimation_uncertainty": "not_propagated",
+        "outcome_model_uncertainty": "not_propagated",
+        "treatment_position": treatment_position,
+        "treated_rows": treated_count,
+        "control_rows": control_count,
+        "propensity_model": {
+            "method": "logistic_mle",
+            "converged": propensity_diagnostics["converged"],
+            "iterations": propensity_diagnostics["iterations"],
+            "log_likelihood": propensity_diagnostics["log_likelihood"],
+        },
+        "outcome_models": {
+            "method": "separate_ordinary_least_squares",
+            "treated_rank": int(np.linalg.matrix_rank(treated_design)),
+            "control_rank": int(np.linalg.matrix_rank(control_design)),
+        },
+        "positivity": {
+            "status": "diagnosed_not_proven",
+            "raw_min": float(np.min(raw_propensity)),
+            "raw_max": float(np.max(raw_propensity)),
+            "clipped_min": float(np.min(propensity)),
+            "clipped_max": float(np.max(propensity)),
+            "clip_threshold": policy.propensity_clip,
+            "fraction_clipped": float(np.mean(clipped)),
+        },
+        "influence_function": {
+            "method": "centered_augmented_ipw_score",
+            "variance": variance,
+        },
+    }
+    return (
+        np.asarray([ate]),
+        np.asarray([[variance]]),
+        diagnostics,
+        {
+            "nuisance_design": nuisance_design,
+            "treatment": treatment,
+            "outcome_control": outcome_control,
+            "outcome_treated": outcome_treated,
+        },
     )
 
 
@@ -1352,6 +1507,67 @@ def reference_ipw_ate(
             result.success and difference <= policy.reference_tolerance * 10
         ),
         "message": str(result.message),
+    }
+
+
+def reference_aipw_ate(
+    inputs: Mapping[str, np.ndarray],
+    values: np.ndarray,
+    coefficients: np.ndarray,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Recompute the augmented IPW score with an independent reference."""
+    nuisance_design = inputs["nuisance_design"]
+    treatment = inputs["treatment"]
+    confounder_design = nuisance_design
+
+    def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
+        logits = confounder_design @ candidate
+        probabilities = special.expit(logits)
+        value = -float(np.sum(treatment * logits - np.logaddexp(0.0, logits)))
+        gradient = confounder_design.T @ (probabilities - treatment)
+        return value, gradient
+
+    propensity_fit = optimize.minimize(
+        lambda candidate: objective(candidate)[0],
+        np.zeros(confounder_design.shape[1]),
+        jac=lambda candidate: objective(candidate)[1],
+        method="BFGS",
+        options={"gtol": policy.reference_tolerance, "maxiter": 1000},
+    )
+    propensity = np.clip(
+        special.expit(confounder_design @ propensity_fit.x),
+        policy.propensity_clip,
+        1.0 - policy.propensity_clip,
+    )
+    treated = treatment == 1.0
+    control = ~treated
+    treated_coefficients = np.linalg.lstsq(
+        nuisance_design[treated], values[treated], rcond=None
+    )[0]
+    control_coefficients = np.linalg.lstsq(
+        nuisance_design[control], values[control], rcond=None
+    )[0]
+    outcome_treated = nuisance_design @ treated_coefficients
+    outcome_control = nuisance_design @ control_coefficients
+    score = (
+        outcome_treated
+        - outcome_control
+        + treatment * (values - outcome_treated) / propensity
+        - (1.0 - treatment) * (values - outcome_control) / (1.0 - propensity)
+    )
+    reference_ate = float(np.mean(score))
+    difference = float(abs(reference_ate - coefficients[0]))
+    return {
+        "method": "scipy.optimize.minimize:BFGS_plus_lstsq",
+        "converged": bool(propensity_fit.success),
+        "reference_ate": reference_ate,
+        "max_absolute_difference": difference,
+        "passed": bool(
+            propensity_fit.success
+            and difference <= policy.reference_tolerance * 10
+        ),
+        "message": str(propensity_fit.message),
     }
 
 
