@@ -1942,6 +1942,44 @@ Current-head release preflight at `8651c3a` on 2026-10-22:
   execution, secret custody, and independent reviewer evidence remain
   separate release gates.
 
+Reference-serving boundary hardening at `e53f9a0` on 2026-10-22:
+
+- `ModalityHttpServing` now requires JSON content, validates the declared
+  body length and complete read, classifies malformed JSON as a request error,
+  and converts unexpected decoder/model exceptions into a bounded structured
+  internal response. Authentication, TLS, tracing, and operational paging
+  remain deployment-owner responsibilities.
+- The focused serving suite passed 3 tests under
+  `-W error::ResourceWarning`; Ruff, formatting, and mypy passed. The change
+  preserves the reference-server boundary and does not claim production
+  service readiness.
+
+Current-head release preflight at `e53f9a0` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
+  source files, Bandit, pip-audit, public API compatibility, and explicit
+  JUnit skip auditing. The bounded suite passed `2,019` tests with `75`
+  explicitly explained optional-dependency skips; total coverage was `83.03%`
+  and the enforced core scope was `86%`.
+- Mutation testing killed `1,503/2,057` mutants (`73%`) against the configured
+  `70%` minimum. One mutation timed out and `553` survived; the threshold was
+  met and the survivor inventory remains follow-up evidence.
+- Five-seed offline regression completed with zero failures and zero
+  regressions. The four verdicts were tie, tie, tie, and ahead; peak memory
+  was `0.3692`, `0.3863`, `0.4541`, and `0.4595` GB respectively.
+- Wheel and source-distribution checks passed, both artifacts reproduced
+  byte-for-byte, and network-isolated wheel and source-distribution installs
+  passed. The reproducible wheel hash was
+  `0a992516c41a96a2f83db97257a358dca5bf8fe2dbea76e898e3333d8548f424` and
+  the source-distribution hash was
+  `03c441fd20b664e703a8f87dec65cfa052994ec8f5c71919a4dbe843eb5f6851`.
+- The marketing-site audit found zero npm vulnerabilities; Astro built `17`
+  pages, accessibility checks passed for `17` HTML files, internal-link
+  validation passed for `384` links, and both Playwright browser tests
+  passed. Hosted Linux and Pages, external transport/resource-fault
+  execution, secret custody, and independent reviewer evidence remain
+  separate release gates.
+
 Video temporal boundary at `e9e623d` on 2026-10-22:
 
 - Video samples now accept an explicit timezone-aware observation time,
