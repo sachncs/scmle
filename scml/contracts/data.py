@@ -490,7 +490,11 @@ class ModalityManifest:
         ):
             if not value.strip():
                 raise ValueError(f"{name} must not be empty")
-        if isinstance(self.sample_count, bool) or self.sample_count < 0:
+        if isinstance(self.sample_count, bool) or not isinstance(
+            self.sample_count, int
+        ):
+            raise TypeError("sample_count must be an integer")
+        if self.sample_count < 0:
             raise ValueError("sample_count must not be negative")
         if self.schema_version < 1:
             raise ValueError("schema_version must be positive")

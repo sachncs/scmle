@@ -225,6 +225,20 @@ def test_modality_manifest_round_trip_binds_governance_to_content():
     assert restored.privacy.contains_pii is True
 
 
+@pytest.mark.parametrize("sample_count", (True, 1.5))
+def test_modality_manifest_rejects_non_integer_sample_counts(sample_count):
+    """Lifecycle counts must remain exact integers in persisted evidence."""
+    with pytest.raises(TypeError, match="sample_count must be an integer"):
+        data.ModalityManifest(
+            dataset_id="image-dataset",
+            snapshot_id="snapshot-1",
+            modality="image",
+            task="binary_classification",
+            sample_count=sample_count,
+            content_hash="b" * 64,
+        )
+
+
 def test_declaration_is_immutable():
     declaration = make_declaration()
 
