@@ -110,6 +110,32 @@ jobs:
       - name: Reject unexplained skips and xfails
         run: uv run python scripts/check_pytest_skips.py deep-learning.xml
 
+  reliability:
+    name: bounded fault and recovery matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: uv sync --python 3.14
+      - name: Execute local fault matrix
+        run: >-
+          uv run pytest -q -W error::ResourceWarning
+          tests/unit/test_reliability_contracts.py
+          tests/unit/test_reliability_harness.py
+          tests/unit/test_local_faults.py
+          tests/unit/test_independent_review.py
+          tests/unit/test_incidents.py
+          --junitxml=reliability.xml
+      - name: Reject unexplained skips and xfails
+        run: uv run python scripts/check_pytest_skips.py reliability.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: reliability-matrix
+          path: reliability.xml
+          if-no-files-found: error
+
   optional-capabilities:
     name: all optional capability paths (Python 3.13)
     runs-on: ubuntu-latest
