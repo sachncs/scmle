@@ -11,6 +11,7 @@ PUBLIC_API = {
     "ExtensionCurationAdapter",
     "LifecycleCancellation",
     "LifecycleCancelledError",
+    "LifecycleCheckpoint",
     "MLProject",
     "ModalityCurationAdapter",
     "ModalityCurationProject",

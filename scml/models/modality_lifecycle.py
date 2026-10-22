@@ -31,6 +31,7 @@ import time
 from typing import Any
 from typing import cast
 from typing import ClassVar
+from typing import Literal
 from typing import Self
 import wave
 
@@ -441,6 +442,188 @@ class LifecycleReport:
             }
         )
         return record
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LifecycleCheckpoint:
+    """Signed durable boundary for one modality lifecycle replay.
+
+    A checkpoint records only JSON-native stage identity and evidence digests.
+    Resume reconstructs the in-memory context by replaying completed stages
+    against the caller-provided adapter, then verifies that every replayed
+    stage is byte-for-byte equivalent to the checkpoint. This avoids trusting
+    a serialized estimator or arbitrary adapter object as recovery state.
+    """
+
+    modality: str
+    dataset_hash: str
+    observed_dataset_hash: str
+    package_path: str
+    report_path: str
+    seed: int
+    completed_stages: tuple[str, ...]
+    stage_digests: tuple[str, ...]
+    require_independent_ground_truth: bool
+    manifest_digest: str | None = None
+    status: Literal["running", "completed"] = "running"
+    signature: str | None = None
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        """Reject incomplete, non-prefix, or unsigned-identity state."""
+        for field_name in (
+            "modality",
+            "dataset_hash",
+            "observed_dataset_hash",
+            "package_path",
+            "report_path",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must not be empty")
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int):
+            raise TypeError("seed must be an integer")
+        if not isinstance(self.require_independent_ground_truth, bool):
+            raise TypeError("require_independent_ground_truth must be bool")
+        if self.status not in ("running", "completed"):
+            raise ValueError("checkpoint status must be running or completed")
+        if self.manifest_digest is not None and not (
+            self.manifest_digest.strip()
+        ):
+            raise ValueError("manifest_digest must be non-empty when provided")
+        if self.signature is not None and not self.signature.strip():
+            raise ValueError("signature must be non-empty when provided")
+        expected_stages = tuple(
+            stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
+        )[: len(self.completed_stages)]
+        if tuple(self.completed_stages) != expected_stages:
+            raise ValueError(
+                "completed stages must be an ordered lifecycle prefix"
+            )
+        if len(self.stage_digests) != len(self.completed_stages):
+            raise ValueError("stage digests must match completed stages")
+        if any(not digest.strip() for digest in self.stage_digests):
+            raise ValueError("stage digests must not be empty")
+        if self.status == "completed" and len(self.completed_stages) != len(
+            modalities.REQUIRED_LIFECYCLE_STAGES
+        ):
+            raise ValueError(
+                "completed checkpoint must contain every lifecycle stage"
+            )
+
+    def unsigned_dict(self) -> dict[str, object]:
+        """Return the exact checkpoint content covered by its signature."""
+        return {
+            "schema_version": self.schema_version,
+            "record_type": "modality_lifecycle_checkpoint",
+            "modality": self.modality,
+            "dataset_hash": self.dataset_hash,
+            "observed_dataset_hash": self.observed_dataset_hash,
+            "package_path": self.package_path,
+            "report_path": self.report_path,
+            "seed": self.seed,
+            "completed_stages": list(self.completed_stages),
+            "stage_digests": list(self.stage_digests),
+            "require_independent_ground_truth": (
+                self.require_independent_ground_truth
+            ),
+            "manifest_digest": self.manifest_digest,
+            "status": self.status,
+        }
+
+    def sign(self, signing_key: str | bytes) -> Self:
+        """Return a checkpoint signed over its exact serialized identity."""
+        return dataclasses.replace(
+            self,
+            signature=attestation.sign_payload(
+                self.unsigned_dict(), signing_key
+            ),
+        )
+
+    def verify_signature(self, signing_key: str | bytes) -> bool:
+        """Return whether the persisted checkpoint signature is valid."""
+        if self.signature is None:
+            return False
+        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        return hmac.compare_digest(self.signature, expected)
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, object]) -> Self:
+        """Restore a checkpoint without trusting its serialized claims."""
+        if record.get("schema_version") != 1:
+            raise ValueError("unsupported lifecycle checkpoint schema version")
+        if record.get("record_type") != "modality_lifecycle_checkpoint":
+            raise ValueError("invalid lifecycle checkpoint record type")
+        completed = record.get("completed_stages")
+        digests = record.get("stage_digests")
+        if not isinstance(completed, list) or not all(
+            isinstance(stage, str) for stage in completed
+        ):
+            raise ValueError("checkpoint completed_stages must be a list")
+        if not isinstance(digests, list) or not all(
+            isinstance(digest, str) for digest in digests
+        ):
+            raise ValueError("checkpoint stage_digests must be a list")
+        seed = record.get("seed")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise ValueError("checkpoint seed is invalid")
+        require_ground_truth = record.get("require_independent_ground_truth")
+        if not isinstance(require_ground_truth, bool):
+            raise ValueError("checkpoint ground-truth requirement is invalid")
+        status = record.get("status")
+        if status not in ("running", "completed"):
+            raise ValueError("checkpoint status is invalid")
+        signature = record.get("signature")
+        if not isinstance(signature, Mapping):
+            raise ValueError("checkpoint signature is missing")
+        if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+            raise ValueError("unsupported lifecycle checkpoint signature")
+        signature_value = signature.get("value")
+        if not isinstance(signature_value, str) or not signature_value.strip():
+            raise ValueError("lifecycle checkpoint signature is invalid")
+        manifest_digest = record.get("manifest_digest")
+        if manifest_digest is not None and not isinstance(manifest_digest, str):
+            raise ValueError("checkpoint manifest_digest is invalid")
+        return cls(
+            modality=str(record.get("modality", "")),
+            dataset_hash=str(record.get("dataset_hash", "")),
+            observed_dataset_hash=str(record.get("observed_dataset_hash", "")),
+            package_path=str(record.get("package_path", "")),
+            report_path=str(record.get("report_path", "")),
+            seed=seed,
+            completed_stages=tuple(completed),
+            stage_digests=tuple(digests),
+            require_independent_ground_truth=require_ground_truth,
+            manifest_digest=manifest_digest,
+            status=cast(Literal["running", "completed"], status),
+            signature=signature_value,
+            schema_version=1,
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        """Return deterministic JSON-native checkpoint evidence."""
+        record = self.unsigned_dict()
+        record["signature"] = {
+            "algorithm": attestation.SIGNATURE_ALGORITHM,
+            "value": self.signature,
+        }
+        return record
+
+    @classmethod
+    def read(cls, path: str | Path) -> Self:
+        """Read a persisted lifecycle checkpoint."""
+        record = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(record, Mapping):
+            raise ValueError("lifecycle checkpoint must be a JSON object")
+        return cls.from_dict(record)
+
+    @classmethod
+    def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
+        """Read a checkpoint and reject it unless its signature verifies."""
+        checkpoint = cls.read(path)
+        if not checkpoint.verify_signature(signing_key):
+            raise ValueError("lifecycle checkpoint signature does not verify")
+        return checkpoint
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -2522,6 +2705,7 @@ class LifecycleContext:
     observed_adapter: ModalityAdapter
     manifest: data_contracts.ModalityManifest | None = None
     require_independent_ground_truth: bool = False
+    resume_replay: bool = False
     stage_records: dict[modalities.LifecycleStage, dict[str, object]] = (
         dataclasses.field(default_factory=dict)
     )
@@ -3088,6 +3272,33 @@ class PackagingStage(ModalityLifecycleStage):
         if model is None:
             raise RuntimeError("model is required before packaging")
         target = context.package_path
+        if context.resume_replay and target.exists():
+            predictor = ModalityPredictor.from_package(
+                context.adapter, target, context.signing_key
+            )
+            expected_features = context.feature_batches["train"].feature_names
+            if predictor.training_dataset_hash != context.adapter.dataset_hash:
+                raise ValueError(
+                    "checkpoint package dataset identity does not match "
+                    "the resumed adapter"
+                )
+            if predictor.feature_names != expected_features:
+                raise ValueError(
+                    "checkpoint package feature schema does not match "
+                    "the resumed adapter"
+                )
+            if not (
+                np.array_equal(predictor.model.classes_, model.classes_)
+                and np.array_equal(predictor.model.coef_, model.coef_)
+                and np.array_equal(predictor.model.intercept_, model.intercept_)
+            ):
+                raise ValueError(
+                    "checkpoint package model does not match deterministic "
+                    "stage replay"
+                )
+            context.package = predictor.package
+            context.record(self.stage, context.package.to_dict())
+            return
         if target.exists():
             raise FileExistsError(target)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -3301,6 +3512,8 @@ class ModalityLifecycle:
         manifest: data_contracts.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
         cancellation_check: Callable[[], bool] | None = None,
+        checkpoint_path: str | Path | None = None,
+        resume: bool = False,
     ) -> LifecycleReport:
         """Run every stage and optionally persist its evidence report.
 
@@ -3312,8 +3525,22 @@ class ModalityLifecycle:
             raise TypeError("require_independent_ground_truth must be bool")
         if cancellation_check is not None and not callable(cancellation_check):
             raise TypeError("cancellation_check must be callable")
+        if not isinstance(resume, bool):
+            raise TypeError("resume must be bool")
         package_target = Path(package_path)
         report_target = Path(report_path) if report_path is not None else None
+        checkpoint_target = (
+            Path(checkpoint_path) if checkpoint_path is not None else None
+        )
+        if resume and checkpoint_target is None:
+            raise ValueError("resume requires checkpoint_path")
+        if checkpoint_target is not None and report_target is None:
+            raise ValueError(
+                "checkpoint_path requires report_path so completion can be "
+                "verified"
+            )
+        if checkpoint_target is not None and checkpoint_target == report_target:
+            raise ValueError("checkpoint_path and report_path must differ")
         package_preexisting = package_target.exists()
         report_preexisting = (
             report_target.exists() if report_target is not None else False
@@ -3344,6 +3571,128 @@ class ModalityLifecycle:
                 raise ValueError("manifest content_hash must match adapter")
             if manifest.sample_count != len(adapter.samples):
                 raise ValueError("manifest sample_count must match adapter")
+        manifest_digest = (
+            attestation.canonical_digest(manifest.to_dict())
+            if manifest is not None
+            else None
+        )
+        stage_names = tuple(stage.stage.value for stage in self.stages)
+        required_stage_names = tuple(
+            stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
+        )
+        if stage_names != required_stage_names:
+            raise RuntimeError("modality lifecycle stage order is invalid")
+        resume_count = 0
+        resume_digests: tuple[str, ...] = ()
+        checkpoint: LifecycleCheckpoint | None = None
+
+        if checkpoint_target is not None:
+            if checkpoint_target.exists() and not resume:
+                raise FileExistsError(checkpoint_target)
+            if resume and not checkpoint_target.exists():
+                raise FileNotFoundError(checkpoint_target)
+            if resume:
+                checkpoint = LifecycleCheckpoint.read_verified(
+                    checkpoint_target, signing_key
+                )
+                expected_identity = {
+                    "modality": modalities.modality_value(adapter.modality),
+                    "dataset_hash": adapter.dataset_hash,
+                    "observed_dataset_hash": observed.dataset_hash,
+                    "package_path": str(package_target),
+                    "report_path": str(report_target),
+                    "seed": seed,
+                    "require_independent_ground_truth": (
+                        require_independent_ground_truth
+                    ),
+                    "manifest_digest": manifest_digest,
+                }
+                actual_identity = {
+                    "modality": checkpoint.modality,
+                    "dataset_hash": checkpoint.dataset_hash,
+                    "observed_dataset_hash": checkpoint.observed_dataset_hash,
+                    "package_path": checkpoint.package_path,
+                    "report_path": checkpoint.report_path,
+                    "seed": checkpoint.seed,
+                    "require_independent_ground_truth": (
+                        checkpoint.require_independent_ground_truth
+                    ),
+                    "manifest_digest": checkpoint.manifest_digest,
+                }
+                if actual_identity != expected_identity:
+                    raise ValueError(
+                        "lifecycle checkpoint identity does not match the "
+                        "requested resume"
+                    )
+                if (
+                    checkpoint.completed_stages
+                    != stage_names[: len(checkpoint.completed_stages)]
+                ):
+                    raise ValueError(
+                        "lifecycle checkpoint stage order does not match "
+                        "the current lifecycle"
+                    )
+                if checkpoint.status == "completed":
+                    if report_target is None or not report_target.is_file():
+                        raise ValueError(
+                            "completed lifecycle checkpoint has no report"
+                        )
+                    completed_report = LifecycleReport.read_verified(
+                        report_target, signing_key
+                    )
+                    if (
+                        completed_report.modality
+                        != modalities.modality_value(adapter.modality)
+                        or completed_report.dataset_hash != adapter.dataset_hash
+                        or Path(completed_report.package.path) != package_target
+                    ):
+                        raise ValueError(
+                            "completed lifecycle report does not match "
+                            "the requested resume"
+                        )
+                    load_package(completed_report.package.path, signing_key)
+                    return completed_report
+                resume_count = len(checkpoint.completed_stages)
+                resume_digests = checkpoint.stage_digests
+
+        def persist_checkpoint(
+            completed_stages: Sequence[str],
+            stage_digests: Sequence[str],
+            status: Literal["running", "completed"],
+        ) -> None:
+            """Atomically persist a signed stage boundary."""
+            if checkpoint_target is None:
+                return
+            record = LifecycleCheckpoint(
+                modality=modalities.modality_value(adapter.modality),
+                dataset_hash=adapter.dataset_hash,
+                observed_dataset_hash=observed.dataset_hash,
+                package_path=str(package_target),
+                report_path=str(report_target),
+                seed=seed,
+                completed_stages=tuple(completed_stages),
+                stage_digests=tuple(stage_digests),
+                require_independent_ground_truth=(
+                    require_independent_ground_truth
+                ),
+                manifest_digest=manifest_digest,
+                status=status,
+            ).sign(signing_key)
+            durability.write_atomically(
+                checkpoint_target,
+                (
+                    json.dumps(record.to_dict(), indent=2, sort_keys=True)
+                    + "\n"
+                ).encode("utf-8"),
+            )
+
+        completed_stages = list(
+            checkpoint.completed_stages if checkpoint is not None else ()
+        )
+        stage_digests = list(
+            checkpoint.stage_digests if checkpoint is not None else ()
+        )
+        persist_checkpoint(completed_stages, stage_digests, "running")
         context = LifecycleContext(
             adapter=adapter,
             package_path=package_target,
@@ -3353,8 +3702,9 @@ class ModalityLifecycle:
             manifest=manifest,
             require_independent_ground_truth=require_independent_ground_truth,
         )
-        for stage in self.stages:
+        for stage_index, stage in enumerate(self.stages):
             ensure_not_cancelled()
+            context.resume_replay = stage_index < resume_count
             started = time.perf_counter()
             stage.execute(context)
             operation = stage.performance_operation
@@ -3374,6 +3724,20 @@ class ModalityLifecycle:
                     time.perf_counter() - started,
                     sample_count,
                 )
+            stage_digest = attestation.canonical_digest(
+                context.stage_records[stage.stage]
+            )
+            if stage_index < resume_count:
+                if stage_digest != resume_digests[stage_index]:
+                    raise ValueError(
+                        "lifecycle checkpoint replay diverged at stage "
+                        f"{stage.stage.value}"
+                    )
+            else:
+                completed_stages.append(stage.stage.value)
+                stage_digests.append(stage_digest)
+                persist_checkpoint(completed_stages, stage_digests, "running")
+            context.resume_replay = False
             ensure_not_cancelled()
         ensure_not_cancelled()
         records = tuple(
@@ -3471,6 +3835,12 @@ class ModalityLifecycle:
                 ).encode("utf-8"),
             )
             ensure_not_cancelled()
+        if checkpoint_target is not None:
+            persist_checkpoint(
+                completed_stages,
+                stage_digests,
+                "completed",
+            )
         return report
 
     def declaration(
@@ -3569,6 +3939,7 @@ __all__ = [
     "InferenceStage",
     "LifecycleCancellation",
     "LifecycleCancelledError",
+    "LifecycleCheckpoint",
     "LifecyclePackage",
     "LifecycleReport",
     "ModalityAdapter",

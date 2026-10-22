@@ -67,6 +67,17 @@ class GroundTruthTextAdapter(modality_lifecycle.TextAdapter):
         )
 
 
+class FailingMonitorTextAdapter(modality_lifecycle.TextAdapter):
+    """Synthetic adapter that simulates worker loss after packaging."""
+
+    def monitor(
+        self, observed: modality_lifecycle.ModalityAdapter
+    ) -> dict[str, object]:
+        """Fail at the monitoring boundary on the first execution."""
+        del observed
+        raise RuntimeError("simulated worker loss")
+
+
 def image_bytes(value: int) -> bytes:
     """Encode one deterministic RGB image."""
     pillow_image = pytest.importorskip("PIL.Image")
@@ -575,6 +586,151 @@ def test_lifecycle_cancellation_cleans_artifacts_after_a_stage_boundary(
     assert raised.value.details == {"scope": "modality_lifecycle"}
     assert not package_path.exists()
     assert not report_path.exists()
+
+
+def test_lifecycle_checkpoint_resumes_after_a_post_package_failure(
+    tmp_path: Path,
+):
+    """A signed stage boundary resumes without republishing its package."""
+    dataset = text_adapter().dataset
+    package_path = tmp_path / "checkpoint-package"
+    report_path = tmp_path / "checkpoint-report.json"
+    checkpoint_path = tmp_path / "checkpoint.json"
+    failing = FailingMonitorTextAdapter(dataset)
+
+    with pytest.raises(RuntimeError, match="simulated worker loss"):
+        modality_lifecycle.ModalityLifecycle().run(
+            failing,
+            package_path,
+            signing_key="checkpoint-key",
+            report_path=report_path,
+            checkpoint_path=checkpoint_path,
+        )
+
+    checkpoint = modality_lifecycle.LifecycleCheckpoint.read_verified(
+        checkpoint_path, "checkpoint-key"
+    )
+    assert checkpoint.status == "running"
+    assert checkpoint.completed_stages[-1] == "inference"
+    package_digest = modality_lifecycle.file_digest(
+        package_path / "manifest.json"
+    )
+
+    resumed = modality_lifecycle.ModalityLifecycle().run(
+        modality_lifecycle.TextAdapter(dataset),
+        package_path,
+        signing_key="checkpoint-key",
+        report_path=report_path,
+        checkpoint_path=checkpoint_path,
+        resume=True,
+    )
+
+    assert resumed.verify_signature("checkpoint-key") is True
+    assert modality_lifecycle.file_digest(package_path / "manifest.json") == (
+        package_digest
+    )
+    completed = modality_lifecycle.LifecycleCheckpoint.read_verified(
+        checkpoint_path, "checkpoint-key"
+    )
+    assert completed.status == "completed"
+    assert completed.completed_stages == tuple(
+        stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
+    )
+
+
+def test_lifecycle_completed_checkpoint_resume_is_idempotent(tmp_path: Path):
+    """A completed signed checkpoint returns the verified report unchanged."""
+    adapter = text_adapter()
+    lifecycle = modality_lifecycle.ModalityLifecycle()
+    report_path = tmp_path / "report.json"
+    checkpoint_path = tmp_path / "checkpoint.json"
+    first = lifecycle.run(
+        adapter,
+        tmp_path / "package",
+        signing_key="checkpoint-key",
+        report_path=report_path,
+        checkpoint_path=checkpoint_path,
+    )
+
+    second = lifecycle.run(
+        modality_lifecycle.TextAdapter(adapter.dataset),
+        tmp_path / "package",
+        signing_key="checkpoint-key",
+        report_path=report_path,
+        checkpoint_path=checkpoint_path,
+        resume=True,
+    )
+
+    assert second == first
+
+
+def test_lifecycle_checkpoint_rejects_tampering_and_changed_identity(
+    tmp_path: Path,
+):
+    """Resume cannot trust altered checkpoint bytes or another snapshot."""
+    adapter = text_adapter()
+    checkpoint_path = tmp_path / "checkpoint.json"
+    lifecycle = modality_lifecycle.ModalityLifecycle()
+    lifecycle.run(
+        adapter,
+        tmp_path / "package",
+        signing_key="checkpoint-key",
+        report_path=tmp_path / "report.json",
+        checkpoint_path=checkpoint_path,
+    )
+
+    tampered = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    tampered["dataset_hash"] = "changed"
+    checkpoint_path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="signature does not verify"):
+        lifecycle.run(
+            adapter,
+            tmp_path / "package",
+            signing_key="checkpoint-key",
+            report_path=tmp_path / "report.json",
+            checkpoint_path=checkpoint_path,
+            resume=True,
+        )
+
+    checkpoint_path.write_text(
+        json.dumps(
+            modality_lifecycle.LifecycleCheckpoint(
+                modality="text",
+                dataset_hash=adapter.dataset_hash,
+                observed_dataset_hash=adapter.dataset_hash,
+                package_path=str(tmp_path / "package"),
+                report_path=str(tmp_path / "report.json"),
+                seed=0,
+                completed_stages=tuple(
+                    stage.value
+                    for stage in modalities.REQUIRED_LIFECYCLE_STAGES
+                ),
+                stage_digests=("digest",)
+                * len(modalities.REQUIRED_LIFECYCLE_STAGES),
+                require_independent_ground_truth=False,
+                status="completed",
+            )
+            .sign("checkpoint-key")
+            .to_dict()
+        ),
+        encoding="utf-8",
+    )
+    changed = text_adapter()
+    changed_dataset = document.DocumentDataset(
+        tuple(
+            dataclasses.replace(sample, content=sample.content + " changed")
+            for sample in changed.dataset.samples
+        )
+    )
+    with pytest.raises(ValueError, match="identity does not match"):
+        lifecycle.run(
+            modality_lifecycle.TextAdapter(changed_dataset),
+            tmp_path / "package",
+            signing_key="checkpoint-key",
+            report_path=tmp_path / "report.json",
+            checkpoint_path=checkpoint_path,
+            resume=True,
+        )
 
 
 def test_modality_predictor_verifies_package_and_predicts_new_samples(

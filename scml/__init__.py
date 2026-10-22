@@ -17,6 +17,7 @@ from scml.models.custom import unregister_estimator
 from scml.models.modality_lifecycle import ExtensionCurationAdapter
 from scml.models.modality_lifecycle import LifecycleCancellation
 from scml.models.modality_lifecycle import LifecycleCancelledError
+from scml.models.modality_lifecycle import LifecycleCheckpoint
 from scml.models.modality_lifecycle import ModalityCurationAdapter
 from scml.models.modality_lifecycle import ModalityPredictor
 
@@ -24,6 +25,7 @@ __all__ = [
     "ExtensionCurationAdapter",
     "LifecycleCancellation",
     "LifecycleCancelledError",
+    "LifecycleCheckpoint",
     "MLProject",
     "ModalityCurationAdapter",
     "ModalityCurationProject",

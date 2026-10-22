@@ -12,6 +12,10 @@
       "kind": "class",
       "signature_sha256": "5b78ac7b90bb70f10da35d4abb1167104119d557823caf5e7035c50104f25832"
     },
+    "LifecycleCheckpoint": {
+      "kind": "class",
+      "signature_sha256": "0cbe5c89435e77fffe1df59cf10f7c0799a5eccf0082b32260e538f899dabc53"
+    },
     "MLProject": {
       "kind": "class",
       "signature_sha256": "5cd04d6a6973827c331ea56f83f95fb6aa18d26b003280805c27c3b25903df64"
@@ -34,7 +38,7 @@
     },
     "ModalityProject": {
       "kind": "class",
-      "signature_sha256": "ca2687efa3e0daafa381009d4a77a3da71196e7f27f2a9f46cf384f46650a7b6"
+      "signature_sha256": "8bba27ffc502cd0ae27c28355f2ea68ab3655d01c742ac4c7b7bce4f29fbaf16"
     },
     "ModalitySampleDecoder": {
       "kind": "class",

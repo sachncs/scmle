@@ -396,6 +396,8 @@ class ModalityProject:
         manifest: data_contracts.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
         cancellation: modality_lifecycle.LifecycleCancellation | None = None,
+        checkpoint_path: str | pathlib.Path | None = None,
+        resume: bool = False,
     ) -> None:
         """Defines an experimental lifecycle run.
 
@@ -412,6 +414,11 @@ class ModalityProject:
                 explanation reference suite before packaging.
             cancellation: Optional thread-safe signal for cooperative
                 cancellation at lifecycle stage boundaries.
+            checkpoint_path: Optional signed, atomic stage checkpoint path for
+                durable modality recovery. Supplying this requires the
+                lifecycle report path managed by this project.
+            resume: Resume from ``checkpoint_path`` after verifying its
+                signature, identity, and deterministic completed-stage replay.
 
         Raises:
             TypeError: If an object is not a modality adapter.
@@ -425,6 +432,8 @@ class ModalityProject:
             raise TypeError("seed must be an integer")
         if not isinstance(require_independent_ground_truth, bool):
             raise TypeError("require_independent_ground_truth must be bool")
+        if not isinstance(resume, bool):
+            raise TypeError("resume must be bool")
         if cancellation is not None and not isinstance(
             cancellation, modality_lifecycle.LifecycleCancellation
         ):
@@ -442,6 +451,12 @@ class ModalityProject:
         self.performance_baseline = performance_baseline
         self.manifest = manifest
         self.require_independent_ground_truth = require_independent_ground_truth
+        self.checkpoint_path = (
+            pathlib.Path(checkpoint_path)
+            if checkpoint_path is not None
+            else None
+        )
+        self.resume = resume
         self.cancellation = (
             cancellation or modality_lifecycle.LifecycleCancellation()
         )
@@ -465,6 +480,8 @@ class ModalityProject:
             manifest=self.manifest,
             require_independent_ground_truth=self.require_independent_ground_truth,
             cancellation_check=self.cancellation.is_cancelled,
+            checkpoint_path=self.checkpoint_path,
+            resume=self.resume,
         )
         return self.report
 
