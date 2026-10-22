@@ -3235,6 +3235,22 @@ Release-attestation hardening at `6532447` on 2026-10-21:
   passed 23 tests under `-W error::ResourceWarning`; Ruff, formatting, and
   mypy passed.
 
+Independent explanation reference contract at `735d647` on 2026-10-22:
+
+- The explainability contract now accepts an adapter-owned, independently
+  authored reference ranking and evaluates transparent top-k overlap against
+  the persisted local explanation. A supplied reference is recorded as
+  passed or failed evidence; it cannot silently become a semantic-validity
+  claim.
+- Every built-in modality adapter now emits an explicit
+  `independent_ground_truth.status = not_available` result until a caller
+  provides an annotation, benchmark, or synthetic oracle. This makes the
+  remaining raw-modality validation gap visible in every lifecycle artifact.
+- The focused explanation and modality lifecycle slice passed `45` tests
+  with strict resource warnings; Ruff, formatting, mypy, and `git diff
+  --check` passed. Production modality annotations, independent human or
+  benchmark adjudication, and raw-modality causal validation remain open.
+
 Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
