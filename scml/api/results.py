@@ -14,6 +14,7 @@ from scml.contracts import data as data_contracts
 from scml.contracts import experiments
 from scml.data.readers import interchange
 from scml.evaluation import fit_health
+from scml.evaluation import parameter_estimation
 
 LEADERBOARD_DETAILS = (
     "fold_scores",
@@ -39,6 +40,8 @@ class RunResult:
         evaluation: Final evaluation record (also saved as JSON).
         bundle: The packaged inference pipeline.
         diagnostics: Post-selection diagnostic reports by name.
+        estimation: Separate parameter-estimation evidence, when explicitly
+            declared on the project; never used for model selection.
     """
 
     run_id: str
@@ -53,6 +56,7 @@ class RunResult:
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
         default_factory=dict
     )
+    estimation: parameter_estimation.EstimationResult | None = None
 
     def feature_importance(self) -> pd.DataFrame:
         """Returns permutation importance, most important feature first."""

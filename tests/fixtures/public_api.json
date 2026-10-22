@@ -30,7 +30,7 @@
     },
     "MLProject": {
       "kind": "class",
-      "signature_sha256": "5cd04d6a6973827c331ea56f83f95fb6aa18d26b003280805c27c3b25903df64"
+      "signature_sha256": "b63b80c9cb43ef5e595d3c6019bfa4adfa5027eebfd1cb8374e9ca7005f9d8a3"
     },
     "ModalityCurationAdapter": {
       "kind": "class",
@@ -70,7 +70,7 @@
     },
     "RunResult": {
       "kind": "class",
-      "signature_sha256": "3c579a130a5fc5c97e410bea14d15d5df1a494dd972b19b637f6099d0b60ee5f"
+      "signature_sha256": "7b8edb062fd073b5f1740ea0d720309b7df4eaa16724f0140450f12718d435c2"
     },
     "__version__": {
       "kind": "value",

@@ -11,6 +11,7 @@ from scml import durability
 from scml.api import results
 from scml.artifacts import reproducibility
 from scml.contracts import data as data_contracts
+from scml.contracts import errors
 from scml.contracts import experiments
 from scml.contracts import modalities
 from scml.contracts import performance
@@ -19,6 +20,8 @@ from scml.core import context as context_module
 from scml.core import orchestrator as orchestrator_module
 from scml.core import policies as checkpoints_module
 from scml.data.readers import interchange
+from scml.data.readers import tabular
+from scml.evaluation import parameter_estimation
 from scml.governance import attestation
 from scml.intelligence import recommendations as recommendations_module
 from scml.models import modality_lifecycle
@@ -96,6 +99,8 @@ class MLProject:
         decision: tasks.DecisionSpec | None = None,
         fairness: tasks.FairnessSpec | None = None,
         problem: tasks.ProblemSpec | None = None,
+        estimand: parameter_estimation.EstimandSpec | None = None,
+        estimation_policy: parameter_estimation.EstimationPolicy | None = None,
         leakage_policy: LeakagePolicy = "warn",
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
@@ -193,6 +198,11 @@ class MLProject:
             problem: The decision, the population and the scores the model
                 must reach on the locked rows (checked after the one test
                 release).
+            estimand: Explicit population quantity for a separate parameter
+                estimation evidence track. It does not affect model
+                selection.
+            estimation_policy: Explicit likelihood, covariance, missingness,
+                and uncertainty policy for parameter estimation.
             fairness: Optional group-threshold mitigation of outcome gaps
                 across a sensitive column (binary tasks).
             decision: Threshold optimization for binary tasks (objective
@@ -274,6 +284,13 @@ class MLProject:
             leakage_policy=leakage_policy,
         )
         self.output_dir = pathlib.Path(output_dir)
+        if (estimand is None) != (estimation_policy is None):
+            raise errors.ConfigError(
+                "parameter estimation requires both an explicit estimand "
+                "and an estimation policy"
+            )
+        self.estimand = estimand
+        self.estimation_policy = estimation_policy
         self.orchestrator = orchestrator_module.Orchestrator(
             self.spec, frame, checkpoints=checkpoints
         )
@@ -314,7 +331,76 @@ class MLProject:
         Returns:
             The completed run.
         """
-        return self.orchestrator.run(self.output_dir, plan)
+        estimation = None
+        if self.estimand is not None or self.estimation_policy is not None:
+            estimation = self.estimate_parameters()
+        result = self.orchestrator.run(self.output_dir, plan)
+        if estimation is not None:
+            estimation.write(result.run_dir / "parameter_estimation.json")
+            result.estimation = estimation
+        return result
+
+    def estimate_parameters(
+        self, artifact_directory: str | pathlib.Path | None = None
+    ) -> parameter_estimation.EstimationResult:
+        """Estimates declared parameters without changing model selection.
+
+        The estimation track is intentionally separate from the model
+        selection track. It only runs when both scientific declarations are
+        present, and it fails before fitting when the dataset or declaration
+        is incompatible.
+
+        Args:
+            artifact_directory: Optional directory in which to write
+                ``parameter_estimation.json``.
+
+        Returns:
+            The declared parameter estimates and uncertainty evidence.
+
+        Raises:
+            ConfigError: If the estimand, policy, or modality is undeclared
+                or incompatible with this tabular estimator.
+            DataError: If the declared columns are absent.
+        """
+        if self.estimand is None or self.estimation_policy is None:
+            raise errors.ConfigError(
+                "parameter estimation is disabled: declare both estimand "
+                "and estimation_policy explicitly"
+            )
+        if self.spec.data.modality != "tabular":
+            raise errors.ConfigError(
+                "parameter estimation is supported only for the declared "
+                "tabular modality"
+            )
+        frame = self.orchestrator.frame
+        if frame is None:
+            frame = tabular.read_table(self.spec.data.uri)
+        declared = [*self.estimand.feature_names, self.estimand.outcome]
+        if self.estimation_policy.cluster_name is not None:
+            declared.append(self.estimation_policy.cluster_name)
+        missing = sorted(set(declared) - set(frame.columns))
+        if missing:
+            raise errors.DataError(
+                f"parameter estimation columns are missing: {missing}"
+            )
+        features = frame.loc[:, list(self.estimand.feature_names)]
+        outcome = frame.loc[:, self.estimand.outcome]
+        clusters = None
+        if self.estimation_policy.cluster_name is not None:
+            clusters = frame.loc[:, self.estimation_policy.cluster_name]
+        cluster_values = None if clusters is None else clusters.tolist()
+        estimation = parameter_estimation.estimate_parameters(
+            features.to_numpy(),
+            outcome.to_numpy(),
+            self.estimand,
+            self.estimation_policy,
+            clusters=cluster_values,
+        )
+        if artifact_directory is not None:
+            estimation.write(
+                pathlib.Path(artifact_directory) / "parameter_estimation.json"
+            )
+        return estimation
 
     @classmethod
     def resume(
