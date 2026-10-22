@@ -114,7 +114,7 @@ report = estimate_parameters(
     EstimationPolicy(estimator="logistic", covariance="hc3"),
 )
 report.write("artifacts/parameter-estimation.json")`}</code></pre>
-  <p>That report is not automatically a causal conclusion. It is a reproducible estimate under the assumptions you declared. For a treatment effect, use <code>ipw_ate</code> with explicit consistency, conditional exchangeability, and positivity assumptions. For grouped observations, use <code>hierarchical_linear</code> with explicit random-intercept assumptions and cluster labels. These methods report what they did and what they did not prove; an independent domain review is still required.</p>
+  <p>That report is not automatically a causal conclusion. It is a reproducible estimate under the assumptions you declared. For a treatment effect, use <code>ipw_ate</code> or <code>aipw_ate</code> with explicit consistency, conditional exchangeability, and positivity assumptions. For grouped observations, use <code>hierarchical_linear</code> with explicit random-intercept assumptions and cluster labels. These methods report what they did and what they did not prove; an independent domain review is still required.</p>
 
   <h2>Choose the scientific estimator deliberately</h2>
   <div class="model-table" role="region" aria-label="Parameter estimation methods" tabindex="0">
@@ -124,6 +124,7 @@ report.write("artifacts/parameter-estimation.json")`}</code></pre>
         <tr><th scope="row"><code>linear</code> / <code>logistic</code></th><td>Declared Gaussian or Bernoulli associations.</td><td>IID, HC3, or clustered covariance; intervals, missingness and shift diagnostics, optional bootstrap sensitivity, and an independent reference calculation.</td></tr>
         <tr><th scope="row"><code>bayesian_linear</code></th><td>A Gaussian design with a declared conjugate normal-inverse-gamma prior.</td><td>Posterior covariance, credible intervals, prior-strength sensitivity, and an independent positive-definite solve. Robust, clustered, Bayesian logistic, and Bayesian bootstrap variants fail closed.</td></tr>
         <tr><th scope="row"><code>ipw_ate</code></th><td>A binary-treatment average treatment effect under a declared propensity model.</td><td>Hájek IPW, clipping and overlap diagnostics, effective sample sizes, influence-function variance, and an independent propensity reference. This does not prove exchangeability, positivity, or absence of unmeasured confounding.</td></tr>
+        <tr><th scope="row"><code>aipw_ate</code></th><td>A binary-treatment average treatment effect with propensity and outcome nuisance models.</td><td>Augmented IPW score, clipping and overlap diagnostics, influence-function variance, fitted-nuisance limitations, and an independent propensity-plus-outcome reference. Cross-fitting and nuisance-model uncertainty propagation are not implemented; this remains a bounded scientific estimator.</td></tr>
         <tr><th scope="row"><code>hierarchical_linear</code></th><td>Grouped Gaussian outcomes with a random-intercept assumption.</td><td>Two-stage moment variance components and GLS with cluster evidence. Variance-component uncertainty, random slopes, nested effects, REML/ML, and fully Bayesian multilevel inference remain out of scope.</td></tr>
       </tbody>
     </table>
