@@ -62,7 +62,7 @@ print(report.documentation["status"])  # experimental</code></pre>
   <p>This surface does not promote the modality to supported production status. The report says <code>experimental</code> until decoder ownership, modality-specific fidelity, external serving and fault evidence, and independent review are complete. For verified package inference, use the exported <code>ModalityPredictor</code> with the same typed adapter. Do not pass raw bytes to <code>MLProject</code> and expect a tabular estimator to infer their semantics.</p>
 
   <h2>Bring a new dataset family</h2>
-  <p>Use <code>ExtensionModality</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
+  <p>Use <code>ExtensionModality</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>ExtensionCurationAdapter</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
   <pre><code>{`from scml.contracts import modalities
 from scml.models import modality_lifecycle
 

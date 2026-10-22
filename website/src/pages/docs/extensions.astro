@@ -103,6 +103,29 @@ curation = ModalityCurationProject(
 print(curation.dataset_card["curation"])
 print(curation.path)
 # No modelling stage was run.`}</code></pre>
+  <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurationAdapter</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The callback must return a report bound to the extension identity, dataset hash, and sample count.</p>
+  <pre><code>{`from scml import ExtensionCurationAdapter, ModalityCurationProject
+from scml.contracts import modalities
+from scml.data.modalities.curation import ModalityCurationReport
+
+records = ({"x": 1, "y": 2}, {"x": 3, "y": 4})
+extension = modalities.ExtensionModality("acme/point-cloud")
+snapshot = "sha256-of-the-immutable-snapshot"
+
+adapter = ExtensionCurationAdapter(
+    extension=extension,
+    sample_values=records,
+    dataset_hash_value=snapshot,
+    curation_callback=lambda: ModalityCurationReport(
+        modality=extension.value,
+        dataset_hash=snapshot,
+        sample_count=len(records),
+        profile={"record_type": "point", "dimensions": 2},
+    ),
+    limitations=("The caller owns point-cloud validation.",),
+)
+ModalityCurationProject(adapter, signing_key="...", output_dir="runs/curation").run()`}</code></pre>
+  <p>This is the honest starting point for data curation: make the raw snapshot understandable first. Do not implement modelling methods merely to satisfy a curation-only workflow.</p>
   <p>Move to <code>ModalityProject</code> only after labels, a task, a split policy, a bounded representation, and a modelling decision are justified by the curation evidence. A failed or incomplete curation decision should stop the hand-off.</p>
 
   <h2>What the lifecycle proves</h2>
