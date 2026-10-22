@@ -1956,6 +1956,16 @@ Hosted-test skip enforcement at `fbeaca3` on 2026-10-22:
   behavior; hosted runner execution and public Pages deployment remain open
   external gates.
 
+Skip and xfail release enforcement at `ed3e3c5` on 2026-10-22:
+
+- `scripts/check_pytest_skips.py` now rejects both unexplained skips and any
+  xfail or xpass outcome in a JUnit report. This closes the gap between the
+  plan's no-unexplained-skips-or-xfails criterion and the executable gate.
+- The verifier's focused suite and the repository naming-convention suite
+  passed `854` tests under `-W error::ResourceWarning`; Ruff, formatting,
+  mypy, and `actionlint` were clean. A synthetic xfail report was rejected
+  fail-closed, while a report with an explicit skip reason remained accepted.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
