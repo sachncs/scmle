@@ -1916,6 +1916,29 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head release preflight at `a56492a` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed static analysis, formatting, mypy,
+  Bandit, pip-audit, API compatibility, the bounded contract suite, three-run
+  stability, mutation, benchmark regression, package validation,
+  reproducibility, and network-isolated installation gates. The bounded suite
+  passed `2,042` tests with `75` explicitly explained optional-dependency
+  skips; total coverage was `83.14%` and the declared core scope was `86%`.
+- Mutation testing killed `1,505/2,057` mutants (`73%`), above the `70%`
+  release threshold; one mutation timed out and `551` survived for follow-up
+  triage. The four five-seed offline benchmarks recorded zero regressions and
+  zero failed repetitions, with verdicts tie, tie, tie, and ahead.
+- Reproducible packages and network-isolated wheel/source installs passed.
+  The wheel hash was
+  `06fdb1dcbfaf7773ea331bed6234c13fd85bccfed1258432efd812728a0e64dc` and
+  the source-distribution hash was
+  `32e8cb1cb84530f9f5119d2798266752c79f8d718ba642a7c652ad01301a7c39`.
+- The site gate found `0` npm audit vulnerabilities, Astro built `17` static
+  pages, accessibility checks passed for all `17` HTML files, all `384`
+  internal links resolved, and both Playwright smoke tests passed. Hosted CI,
+  public Pages deployment, external transport/resource-fault execution, secret
+  custody, and independent reviewer evidence remain open release gates.
+
 Signed lifecycle evidence at `7dc754f` on 2026-10-22:
 
 - Lifecycle reports are now schema version 2 artifacts signed over the exact
