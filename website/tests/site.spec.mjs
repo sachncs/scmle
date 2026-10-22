@@ -7,6 +7,7 @@ const routes = [
   "./docs/data/",
   "./docs/modalities/",
   "./docs/capabilities/",
+  "./docs/modeling/",
   "./docs/evidence/",
   "./docs/workflows/",
   "./docs/api/",

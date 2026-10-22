@@ -1,0 +1,123 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout
+  title="Modelling & estimation"
+  description="A precise guide to the modelling paths, transformer integrations, uncertainty evidence, and parameter-estimation limits in super-charge-ml."
+  current="modeling"
+>
+  <p class="eyebrow"><span></span> Models, uncertainty, and limits</p>
+  <h1>Choose the model<br /><em>after the evidence.</em></h1>
+  <p class="lead">super-charge-ml can search and evaluate several model families, including an optional FT-Transformer path. It does not pretend that a model adapter is a complete modelling product, and it does not currently ship a JEPA implementation.</p>
+
+  <div class="callout"><p><strong>Read this page before installing extras.</strong> The supported beta is still the narrow tabular library workflow. Deep-learning and text-embedding integrations are available as explicit optional paths with separate evidence. JEPA and a first-class statistical parameter-estimation API are not implemented yet.</p></div>
+
+  <h2>The decision path</h2>
+  <figure class="diagram">
+    <figcaption class="diagram-caption"><span>MODEL SELECTION</span><strong>A larger model never repairs an untrusted dataset.</strong></figcaption>
+    <div class="flow-row">
+      <div class="flow-node"><span>01</span><b>Understand</b><small>identity · labels · leakage</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>02</span><b>Screen</b><small>baselines · constraints</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node active"><span>03</span><b>Compare</b><small>CV · calibration · cost</small></div>
+      <i class="flow-arrow">→</i>
+      <div class="flow-node"><span>04</span><b>Explain</b><small>limits · sensitivity · review</small></div>
+    </div>
+    <div class="evidence-rail"><span>release evidence</span><i></i><span>package · infer · monitor</span></div>
+  </figure>
+  <p>The planner owns the comparison: it screens model families against task, data shape, resource limits, and declared policy. A candidate is not a release because it has the highest point score. The run must retain the split identity, trial parameters, metrics, uncertainty, calibration diagnostics, explanation evidence, package verification, and known limitations.</p>
+
+  <h2>What modelling exists today</h2>
+  <div class="model-table" role="region" aria-label="Modeling support matrix" tabindex="0">
+    <table>
+      <thead><tr><th>Path</th><th>How to use it</th><th>Current claim</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Tabular beta</th><td>Use <code>MLProject</code> with a declared target and tabular input. The planner can compare the built-in linear, tree, and other candidate families under the supported workflow.</td><td><span class="status status-supported">Supported*</span></td></tr>
+        <tr><th scope="row">FT-Transformer</th><td>Install <code>super-charge-ml[deeplearning]</code>. The optional <code>torch_ft_transformer</code> adapter uses attention over feature tokens and participates in the model-family search when its dependency and resource checks pass.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">Other PyTorch families</th><td>The same optional extra exposes MLP, residual, TabM-style ensemble, and RealMLP-style families. They are explicit candidates, not silent dependencies.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">Text embeddings</th><td>Install <code>super-charge-ml[embeddings]</code> for the sentence-transformers integration. The text transformer runs in the isolated worker; if unavailable, the documented fallback is TF-IDF.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">TabPFN</th><td>The explicit adapter remains extension-only until the external package, model-weight license, token custody, and independent evidence are supplied.</td><td><span class="status status-extension">Extension-only</span></td></tr>
+        <tr><th scope="row">JEPA</th><td>There is no JEPA architecture, pretraining objective, checkpoint format, transfer contract, or evaluation path in this repository today.</td><td><span class="status status-missing">Not implemented</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">* “Supported” is intentionally narrow: it describes the explicitly gated tabular library path, not every dataset, model, accelerator, or deployment environment.</p>
+
+  <h2>Try an optional transformer path</h2>
+  <p>The extra is a deliberate boundary. It keeps the base install small and makes the dependency, worker process, resource cost, and failure mode visible in the run. Start with a small budget and compare the transformer against a simple baseline on the same split.</p>
+  <pre><code>{`# Optional PyTorch/Keras model families, including FT-Transformer
+pip install "super-charge-ml[deeplearning]"
+
+# Optional sentence-transformer text encoding
+pip install "super-charge-ml[embeddings]"`}</code></pre>
+  <p>Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. A successful import only proves that the code can start; it does not prove that the model learned the intended signal.</p>
+
+  <h2>JEPA is a named gap, not a hidden feature</h2>
+  <p>JEPA means more than adding a transformer class. A credible implementation needs a modality-specific encoder, context/target masking or view policy, an embedding-space prediction objective, collapse prevention, checkpoint and resume semantics, transfer or downstream-task evaluation, representation diagnostics, and a data card that explains what the learned representation means.</p>
+  <div class="split-cards">
+    <div class="mini-card"><span class="mini-label">Today</span><h3>What is honest</h3><p>The repository can curate experimental modalities and run bounded baselines. It does not train or evaluate JEPA representations.</p><p class="note">No JEPA claim should appear in a capability matrix, package metadata, or marketing copy.</p></div>
+    <div class="mini-card"><span class="mini-label">To add it</span><h3>What must be designed</h3><p>Define the pretraining contract, negative or anti-collapse evidence, transfer benchmark, resource policy, checkpoint schema, and explainability boundary before implementing the adapter.</p><p class="note">The first acceptance test is a reproducible representation benchmark—not a class that imports.</p></div>
+  </div>
+
+  <h2>Parameter estimation is not hyperparameter tuning</h2>
+  <p>This distinction matters. The current project has useful pieces, but they answer different questions:</p>
+  <div class="split-cards">
+    <div class="mini-card"><span class="mini-label">Implemented</span><h3>Choosing a model</h3><p>Hyperparameter search explores declared spaces. Bayesian model comparison evaluates repeated score differences. Calibration and conformal methods quantify predictive behaviour. Cross-validation can report intervals around metrics.</p></div>
+    <div class="mini-card"><span class="mini-label">Not yet a contract</span><h3>Estimating a parameter</h3><p>There is no first-class estimand object that records a parameter definition, identification assumptions, estimator, covariance estimator, standard errors, confidence or credible interval, sensitivity analysis, and exportable estimation report.</p></div>
+  </div>
+  <figure class="diagram">
+    <figcaption class="diagram-caption"><span>THREE DIFFERENT QUESTIONS</span><strong>Do not read one as another.</strong></figcaption>
+    <div class="planes">
+      <div class="plane"><span>Predictive uncertainty</span><strong>What might this model predict for a new case?</strong><p>Conformal intervals, prediction sets, calibration diagnostics.</p></div>
+      <div class="plane plane-execution"><span>Model selection uncertainty</span><strong>How stable is the comparison between candidates?</strong><p>Repeated folds, seed intervals, Bayesian score comparisons.</p></div>
+      <div class="plane plane-evidence"><span>Statistical parameter uncertainty</span><strong>What is the uncertainty around a defined population quantity?</strong><p>Estimand, identification, estimator, covariance, standard errors, sensitivity.</p></div>
+    </div>
+  </figure>
+
+  <h2>What you can inspect now</h2>
+  <ol>
+    <li><strong>Search decisions:</strong> the plan records the candidate family, parameter space, budget, pruning decisions, and failed or deferred trials.</li>
+    <li><strong>Predictive evidence:</strong> classification and regression runs can retain calibration diagnostics and conformal prediction intervals when the policy and data volume allow them.</li>
+    <li><strong>Comparison evidence:</strong> repeated evaluation can report score intervals and a decision instead of pretending a single split is certainty.</li>
+    <li><strong>Explanation evidence:</strong> linear contributions, permutation-style reports, and bounded perturbation checks are recorded with method parameters and known representation limits.</li>
+  </ol>
+  <p>These artifacts help you decide whether a model is useful. They do not turn a predictive score into a causal estimate, and they do not supply a treatment effect, coefficient standard error, Bayesian posterior, or identified population parameter.</p>
+
+  <h2>Parameter-estimation acceptance bar</h2>
+  <p>When this capability is added, accept it only if the API can answer these questions without reconstructing intent from logs:</p>
+  <ul>
+    <li>What exact estimand is being estimated, for which population and observation window?</li>
+    <li>What assumptions identify it, and which assumptions are testable versus declared?</li>
+    <li>Which estimator and optimization procedure ran, with the resolved parameters and convergence diagnostics?</li>
+    <li>How was uncertainty estimated: robust covariance, bootstrap, profile likelihood, or posterior—and why?</li>
+    <li>Can another evaluator reproduce the estimate from raw snapshot, split, seed, software lock, and artifact digest?</li>
+    <li>What sensitivity, subgroup, missing-data, and leakage checks would change the interpretation?</li>
+  </ul>
+  <div class="callout"><p><strong>Current answer:</strong> predictive modelling is real but bounded; statistical parameter estimation is a planned capability, not something the current API should imply.</p></div>
+
+  <h2>Use the right next page</h2>
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/data/`}><small>BEFORE MODELLING</small><h3>Data & curation</h3><p>Start with raw identity, label decisions, leakage, and the evidence the model is allowed to consume.</p></a>
+    <a class="doc-card" href={`${base}/docs/capabilities/`}><small>SUPPORT CLAIMS</small><h3>Capability matrix</h3><p>Check the exact boundary before treating an optional model or modality as supported.</p></a>
+    <a class="doc-card" href={`${base}/docs/evidence/`}><small>AFTER MODELLING</small><h3>Evidence & gates</h3><p>Learn what a release claim must prove and what keeps it below production status.</p></a>
+  </div>
+  <p class="meta">Modelling boundary · reviewed October 2026 · no JEPA claim</p>
+</DocsLayout>
+
+<style>
+  .model-table { border: 1px solid #d9ddd2; margin: 28px 0 10px; overflow-x: auto; }
+  table { border-collapse: collapse; min-width: 720px; width: 100%; }
+  th, td { border-bottom: 1px solid #d9ddd2; color: #52615a; font-size: 13px; line-height: 1.5; padding: 15px; text-align: left; vertical-align: top; }
+  thead th { background: #eef0e7; color: #18231f; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+  tbody th { color: #18231f; font-weight: 600; min-width: 145px; }
+  .status { display: inline-block; font: 10px 'DM Mono', monospace; padding: 5px 7px; text-transform: uppercase; white-space: nowrap; }
+  .status-supported { background: #dfe9a4; color: #31413a; }
+  .status-experimental { background: #f1edc5; color: #665f2a; }
+  .status-extension { background: #e8ebe2; color: #65716c; }
+  .status-missing { background: #f3d9d1; color: #7c392b; }
+  .note { color: #7e8e21 !important; font: 10px 'DM Mono', monospace !important; text-transform: uppercase; }
+</style>
