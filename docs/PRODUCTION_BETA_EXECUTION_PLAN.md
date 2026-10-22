@@ -1931,6 +1931,10 @@ Curation-only extension boundary at `d05bad1` on 2026-10-22:
   independent quality evidence, serving, external fault rehearsal, and
   production promotion remain intentionally extension-only.
 
+The empty extension-snapshot regression at `e190540` also passes: a
+curation-only adapter can publish a signed zero-sample snapshot with its
+identity and profile evidence, while modelling remains unavailable by design.
+
 Audio robustness evidence at `ab21c49` on 2026-10-22:
 
 - `AudioAdapter` now records a bounded, deterministic additive-background-noise
