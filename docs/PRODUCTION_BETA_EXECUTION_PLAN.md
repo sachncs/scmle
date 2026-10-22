@@ -1916,6 +1916,22 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Parameter-estimation evidence hardening at `48f7537` on 2026-10-23:
+
+- `ParameterEstimate` and `EstimationResult` now reject non-finite
+  coefficients, negative standard errors, invalid p-values, reversed
+  intervals, non-square or non-symmetric covariance, and unreconciled row
+  accounting before a report can be written or consumed.
+- Digest verification now occurs before semantic deserialization, and the
+  parsed result must reproduce the same canonical digest. A modified report
+  therefore fails as tampered evidence rather than being reinterpreted as a
+  different valid report.
+- The focused parameter-estimation suite passed 7 tests under
+  `-W error::ResourceWarning`; Ruff and mypy passed. This strengthens the
+  bounded frequentist artifact contract; it does not make the estimators
+  causal, Bayesian, modality-specific, or an integrated `MLProject` release
+  gate.
+
 Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
 
 - `FaultInjectionHarness` now validates duplicate and unexpected evidence
