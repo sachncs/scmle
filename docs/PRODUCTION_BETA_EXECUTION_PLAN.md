@@ -3836,3 +3836,17 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   status; exposing a contract does not promote it to supported production
   status.
 
+## Full regression correction at `9d7b993` on 2026-10-23
+
+- The first post-implementation full repository run completed
+  `2490 passed, 38 skipped` in `42m20s` and exposed one convention-only
+  failure in the new IPW reference calculation: two discard-variable names
+  violated the repository's no-leading-private-name rule.
+- `9d7b993` replaces those names with explicit evidence variables and keeps
+  the reference calculation unchanged. The focused convention, estimator,
+  project-integration, API-compatibility, and API-surface slice then passed
+  `893` tests; Ruff and formatting passed.
+- The full-suite gate must be rerun after this correction before release
+  approval. The prior `2490/38` result is not recorded as a passing full
+  suite because it predates this fix.
+
