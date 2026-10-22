@@ -781,6 +781,21 @@ def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     assert raw["frame_count"] == 80
     assert len(raw["windows"]) == local["window_count"]
     assert raw["feature_space_only"] is False
+    noise = local["background_noise_robustness"]
+    assert noise["status"] == "available"
+    assert noise["method"] == "deterministic_additive_background_noise"
+    assert noise["seed"] == 0
+    assert [item["requested_snr_db"] for item in noise["scenarios"]] == [
+        20.0,
+        10.0,
+        0.0,
+    ]
+    assert all(
+        item["observed_snr_db"]
+        == pytest.approx(item["requested_snr_db"], abs=1)
+        for item in noise["scenarios"]
+    )
+    assert noise["feature_space_only"] is False
 
 
 def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):

@@ -333,6 +333,108 @@ def wav_signal_features(
     return tuple(float(value) for value in frame_values), frame_count
 
 
+def wav_pcm_values(
+    encoded_bytes: bytes,
+) -> tuple[tuple[int, int, int, int, str, str], np.ndarray]:
+    """Decode WAV PCM values and retain the writer parameters.
+
+    Values are normalized to ``[-1, 1]`` and shaped as frames by channels.
+    This is a bounded dependency-light primitive for caller-owned perturbation
+    probes; it is not a general-purpose audio decoder.
+    """
+    try:
+        with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
+            parameters = (
+                opened.getnchannels(),
+                opened.getsampwidth(),
+                opened.getframerate(),
+                opened.getnframes(),
+                opened.getcomptype(),
+                opened.getcompname(),
+            )
+            raw = opened.readframes(opened.getnframes())
+    except (EOFError, wave.Error) as error:
+        raise AudioValidationError(
+            "audio payload is not a readable WAV file",
+            {"code": "invalid_wav"},
+        ) from error
+    channels = parameters[0]
+    sample_width = parameters[1]
+    frame_width = sample_width * channels
+    complete_bytes = len(raw) - (len(raw) % frame_width)
+    raw = raw[:complete_bytes]
+    if not raw:
+        raise AudioValidationError(
+            "WAV payload contains no complete audio frames",
+            {"code": "empty_audio_frames"},
+        )
+    if sample_width == 1:
+        samples = np.frombuffer(raw, dtype=np.uint8).astype(np.float64)
+        samples = (samples - 128.0) / 128.0
+    elif sample_width in (2, 4):
+        dtype = np.dtype("<i2" if sample_width == 2 else "<i4")
+        samples = np.frombuffer(raw, dtype=dtype).astype(np.float64)
+        samples /= float(2 ** (sample_width * 8 - 1))
+    elif sample_width == 3:
+        packed = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
+        unsigned = (
+            packed[:, 0].astype(np.int64)
+            | (packed[:, 1].astype(np.int64) << 8)
+            | (packed[:, 2].astype(np.int64) << 16)
+        )
+        signed = unsigned - ((unsigned & 0x800000) << 1)
+        samples = signed.astype(np.float64) / float(2**23)
+    else:
+        raise AudioValidationError(
+            "WAV sample width is unsupported",
+            {"code": "unsupported_sample_width", "sample_width": sample_width},
+        )
+    values = samples.reshape(-1, channels)
+    if not np.isfinite(values).all():
+        raise AudioValidationError(
+            "WAV PCM values must be finite",
+            {"code": "non_finite_pcm"},
+        )
+    return parameters, values
+
+
+def wav_payload_from_pcm(
+    parameters: tuple[int, int, int, int, str, str], values: np.ndarray
+) -> bytes:
+    """Encode normalized PCM values with the supplied WAV parameters."""
+    matrix = np.asarray(values, dtype=np.float64)
+    if matrix.ndim != 2 or not np.isfinite(matrix).all():
+        raise ValueError("PCM values must be a finite frame-by-channel matrix")
+    sample_width = parameters[1]
+    clipped = np.clip(matrix, -1.0, 1.0)
+    if sample_width == 1:
+        encoded = np.rint(clipped * 127.0 + 128.0).astype(np.uint8)
+    elif sample_width == 2:
+        encoded = np.rint(clipped * 32767.0).astype("<i2")
+    elif sample_width == 3:
+        integer = np.rint(clipped * (2**23 - 1)).astype(np.int32)
+        unsigned = integer.astype(np.int64) & 0xFFFFFF
+        encoded = np.empty((*integer.shape, 3), dtype=np.uint8)
+        encoded[..., 0] = unsigned & 0xFF
+        encoded[..., 1] = (unsigned >> 8) & 0xFF
+        encoded[..., 2] = (unsigned >> 16) & 0xFF
+        raw = encoded.tobytes()
+    elif sample_width == 4:
+        encoded = np.rint(clipped * (2**31 - 1)).astype("<i4")
+    else:
+        raise AudioValidationError(
+            "WAV sample width is unsupported",
+            {"code": "unsupported_sample_width", "sample_width": sample_width},
+        )
+    if sample_width != 3:
+        raw = encoded.tobytes()
+    payload = io.BytesIO()
+    with wave.open(payload, "wb") as writer:
+        writer.setparams(parameters)
+        writer.writeframes(raw)
+    return payload.getvalue()
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioSample:
     """Immutable encoded audio plus the metadata observed at ingestion."""

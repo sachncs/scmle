@@ -17,6 +17,7 @@ import dataclasses
 import hashlib
 import io
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -902,6 +903,9 @@ class AudioAdapter(ModalityAdapter):
         raw_windows = self.raw_waveform_window_scores(
             sample, model, full_score, window_frames
         )
+        noise_robustness = self.background_noise_robustness(
+            sample, model, full_score
+        )
         return {
             "status": "available",
             "method": "time_local_wav_window_score",
@@ -909,11 +913,96 @@ class AudioAdapter(ModalityAdapter):
             "windows": windows,
             "feature_space_only": True,
             "raw_input_occlusion": raw_windows,
+            "background_noise_robustness": noise_robustness,
             "limitations": [
                 "Raw waveform windows are bounded occlusion evidence, not "
                 "validated waveform saliency.",
                 "The score is associational and does not establish a causal "
                 "audio event.",
+            ],
+        }
+
+    def background_noise_robustness(
+        self,
+        sample: audio.AudioSample,
+        model: LogisticRegression,
+        original_score: float,
+        snr_db: tuple[float, ...] = (20.0, 10.0, 0.0),
+        seed: int = 0,
+    ) -> dict[str, object]:
+        """Measure bounded score changes under deterministic additive noise.
+
+        This is a reproducible perturbation probe for the current linear
+        baseline. It is not a perceptual speech-quality test, a denoising
+        system, or evidence that the model is robust to real recording noise.
+        """
+        if sample.metadata.format.lower() != "wav":
+            return {
+                "status": "not_available",
+                "method": "deterministic_additive_background_noise",
+                "reason": "an explicit WAV decoder is required",
+            }
+        if not snr_db or len(snr_db) > 8:
+            raise ValueError("snr_db must contain between one and eight values")
+        if any(
+            not np.isfinite(value) or value < 0.0 or value > 120.0
+            for value in snr_db
+        ):
+            raise ValueError("snr_db values must be finite and in [0, 120]")
+        parameters, values = audio.wav_pcm_values(sample.encoded_bytes)
+        signal_rms = float(np.sqrt(np.mean(np.square(values))))
+        if signal_rms <= 0.0:
+            return {
+                "status": "not_available",
+                "method": "deterministic_additive_background_noise",
+                "reason": "source signal is silent",
+            }
+        randomizer = np.random.default_rng(seed)
+        scenarios: list[dict[str, object]] = []
+        for requested_snr in snr_db:
+            noise_rms = signal_rms / (10.0 ** (requested_snr / 20.0))
+            noise = randomizer.normal(0.0, noise_rms, size=values.shape)
+            mixed = values + noise
+            clipping_fraction = float(np.mean(np.abs(mixed) > 1.0))
+            payload = audio.wav_payload_from_pcm(parameters, mixed)
+            perturbed = audio.AudioSample.from_bytes(
+                payload,
+                source=f"{sample.source}#noise-{requested_snr:g}",
+                label=sample.label,
+                group_id=sample.group_id,
+                transcript=sample.transcript,
+            )
+            features = self.features((perturbed,)).values
+            score = float(
+                np.asarray(model.decision_function(features)).reshape(-1)[0]
+            )
+            observed_noise = mixed - values
+            observed_noise_rms = float(
+                np.sqrt(np.mean(np.square(observed_noise)))
+            )
+            observed_snr = 20.0 * math.log10(signal_rms / observed_noise_rms)
+            scenarios.append(
+                {
+                    "requested_snr_db": requested_snr,
+                    "observed_snr_db": observed_snr,
+                    "score": score,
+                    "score_delta_from_clean": score - original_score,
+                    "clipping_fraction": clipping_fraction,
+                }
+            )
+        return {
+            "status": "available",
+            "method": "deterministic_additive_background_noise",
+            "seed": seed,
+            "scenarios": scenarios,
+            "feature_space_only": False,
+            "limitations": [
+                "Synthetic white noise is a repeatable stressor, not a model "
+                "of every recording environment.",
+                "Score changes do not establish perceptual quality or causal "
+                "robustness.",
+                "Clipping is measured after mixing and must be reviewed "
+                "before interpreting low-SNR results.",
             ],
         }
 
