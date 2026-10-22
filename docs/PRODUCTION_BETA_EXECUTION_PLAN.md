@@ -3669,3 +3669,20 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   built all 16 static pages. This remains local evidence; hosted Linux and
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
+# Package-boundary hardening at `f8cfea7` on 2026-10-23
+
+- The modality package loader now validates the signed manifest schema,
+  modality and dataset identity, non-empty unique feature names, canonical
+  model digest, evaluation object, and estimator/feature-shape agreement
+  before deserializing the joblib payload. `LifecyclePackage` applies the
+  same digest, signature, path, and schema checks to in-memory evidence.
+- The focused modality lifecycle and serving slice passed `43` tests under
+  `-W error::ResourceWarning`; Ruff, formatting, mypy, and `git diff --check`
+  passed. Regression coverage includes unsupported manifest versions,
+  duplicate feature names, and a correctly re-signed manifest whose feature
+  schema disagrees with the serialized estimator.
+- This closes a local package-structure and pre-deserialization validation
+  gap. It does not make non-tabular lifecycles production-supported, provide
+  external fault evidence, establish hosted CI or Pages deployment, or
+  replace independent release review and secret custody.
+
