@@ -1954,6 +1954,17 @@ Instance-scoped serving policy at `6cbecf7` on 2026-10-22:
   boundary; authentication, TLS, gateway policy, and external fault evidence
   remain deployment-owner gates.
 
+Empty-request serving boundary at `f704eeb` on 2026-10-22:
+
+- Tabular `HttpServing` now rejects an empty `records` list before model
+  scoring, returning the same structured malformed-request class used for
+  other invalid HTTP payloads. This prevents an empty batch from reaching a
+  model-specific scoring path with undefined operational meaning.
+- The tabular and modality serving slice passed `14` tests with `2` explicit
+  optional-dependency skips under `-W error::ResourceWarning`; Ruff,
+  formatting, and mypy passed. This is a local input-contract guarantee and
+  does not change the deployment-owner authentication, TLS, or paging gates.
+
 Current-head release preflight at `8651c3a` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
