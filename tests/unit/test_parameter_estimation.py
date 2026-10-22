@@ -1,0 +1,139 @@
+"""First-class parameter-estimation contracts and uncertainty evidence."""
+
+import json
+
+import numpy as np
+import pytest
+
+from scml.evaluation.parameter_estimation import EstimandSpec
+from scml.evaluation.parameter_estimation import estimate_parameters
+from scml.evaluation.parameter_estimation import EstimationPolicy
+
+
+def linear_estimand() -> EstimandSpec:
+    """Return a declared Gaussian estimand for test fixtures."""
+    return EstimandSpec(
+        name="mean_outcome_difference",
+        outcome="outcome",
+        population="eligible observations in the 2026 study window",
+        likelihood="gaussian",
+        feature_names=("treatment", "age"),
+        assumptions=(
+            "the observed covariates are sufficient for the declared model",
+            "the observation errors are independent across declared clusters",
+        ),
+    )
+
+
+def test_linear_estimation_records_robust_uncertainty_and_reference():
+    """A known linear relationship produces auditable coefficient evidence."""
+    rng = np.random.default_rng(7)
+    features = rng.normal(size=(180, 2))
+    outcome = 1.5 + 2.0 * features[:, 0] - 0.75 * features[:, 1]
+    outcome += rng.normal(scale=0.2, size=len(outcome))
+
+    result = estimate_parameters(
+        features,
+        outcome,
+        linear_estimand(),
+        EstimationPolicy(estimator="linear", covariance="hc3"),
+    )
+
+    assert result.parameters[0].name == "intercept"
+    assert result.parameters[1].estimate == pytest.approx(2.0, abs=0.08)
+    assert result.parameters[2].estimate == pytest.approx(-0.75, abs=0.08)
+    assert result.reference["passed"] is True
+    assert result.diagnostics["likelihood"] == "gaussian"
+    assert result.parameters[1].interval[0] < result.parameters[1].estimate
+
+
+def test_clustered_covariance_and_shift_diagnostics_are_explicit():
+    """Cluster and target-population policies cannot disappear into a score."""
+    rng = np.random.default_rng(11)
+    features = rng.normal(size=(120, 2))
+    clusters = np.repeat(np.arange(12), 10)
+    outcome = 0.5 + features[:, 0] + features[:, 1] + rng.normal(size=120)
+
+    result = estimate_parameters(
+        features,
+        outcome,
+        linear_estimand(),
+        EstimationPolicy(
+            estimator="linear",
+            covariance="clustered",
+            cluster_name="site_id",
+            bootstrap_replicates=8,
+            seed=3,
+        ),
+        clusters=clusters,
+        shift_reference=features + np.array([2.0, 0.0]),
+    )
+
+    assert result.sensitivity["sampling"]["status"] == "available"
+    assert result.sensitivity["distribution_shift"]["status"] == "evaluated"
+    assert (
+        result.sensitivity["distribution_shift"][
+            "max_standardized_mean_difference"
+        ]
+        > 1
+    )
+    json.dumps(result.to_dict())
+
+
+def test_logistic_estimation_has_independent_optimization_check():
+    """A Bernoulli likelihood reports convergence and a second calculation."""
+    rng = np.random.default_rng(4)
+    features = rng.normal(size=(500, 2))
+    logits = -0.3 + 1.1 * features[:, 0] - 0.8 * features[:, 1]
+    outcome = rng.binomial(1, 1.0 / (1.0 + np.exp(-logits)))
+    estimand = EstimandSpec(
+        name="conversion_log_odds",
+        outcome="converted",
+        population="eligible visitors in the observation window",
+        likelihood="bernoulli",
+        feature_names=("signal_a", "signal_b"),
+        assumptions=("rows are conditionally independent",),
+    )
+
+    result = estimate_parameters(
+        features,
+        outcome,
+        estimand,
+        EstimationPolicy(estimator="logistic", covariance="iid"),
+    )
+
+    assert result.diagnostics["converged"] is True
+    assert result.reference["passed"] is True
+    assert result.parameters[1].estimate == pytest.approx(1.1, abs=0.25)
+
+
+def test_complete_case_is_explicit_and_reject_is_fail_closed():
+    """Missingness must be a declared policy, never an accidental drop."""
+    features = np.array([[0.0], [1.0], [np.nan], [3.0], [4.0], [5.0]])
+    outcome = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+    estimand = EstimandSpec(
+        name="slope",
+        outcome="outcome",
+        population="all rows in the source snapshot",
+        likelihood="gaussian",
+        feature_names=("feature",),
+        assumptions=("linear conditional mean",),
+    )
+
+    with pytest.raises(ValueError, match="explicit policy"):
+        estimate_parameters(
+            features,
+            outcome,
+            estimand,
+            EstimationPolicy(estimator="linear"),
+        )
+
+    result = estimate_parameters(
+        features,
+        outcome,
+        estimand,
+        EstimationPolicy(estimator="linear", missing="complete_case"),
+    )
+    assert result.rows_input == 6
+    assert result.rows_used == 5
+    assert result.rows_dropped == 1

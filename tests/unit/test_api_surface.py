@@ -8,6 +8,9 @@ import scml
 from scml.governance import vault
 
 PUBLIC_API = {
+    "EstimandSpec",
+    "EstimationPolicy",
+    "EstimationResult",
     "ExtensionCurationAdapter",
     "LifecycleCancellation",
     "LifecycleCancelledError",
@@ -20,8 +23,10 @@ PUBLIC_API = {
     "ModalityPredictor",
     "ModalitySampleDecoder",
     "ModelBundle",
+    "ParameterEstimate",
     "RunResult",
     "__version__",
+    "estimate_parameters",
     "load_model",
     "predict",
     "register_estimator",

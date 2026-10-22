@@ -1,5 +1,17 @@
 {
   "exports": {
+    "EstimandSpec": {
+      "kind": "class",
+      "signature_sha256": "5d68c4d372445ce9fbc41ad257b83fd47a79037a8985d7a1435b374d038a2642"
+    },
+    "EstimationPolicy": {
+      "kind": "class",
+      "signature_sha256": "96ffb75f8486a6976f5f477bac45f6a01c18479dc5a01842596dc1bc98f47aaa"
+    },
+    "EstimationResult": {
+      "kind": "class",
+      "signature_sha256": "c5b61eea23a81223e9f46397477bb12687893520b6cff168ccde2f38329b93b2"
+    },
     "ExtensionCurationAdapter": {
       "kind": "class",
       "signature_sha256": "595da708df9edb17f8bed628e23457f3b4e3eec83871f3b1100d9340ab6abd68"
@@ -48,6 +60,10 @@
       "kind": "class",
       "signature_sha256": "711014aeb1a77f78329141e9afb53c8d2343c01ff94c43df683a33cb1a6d9a37"
     },
+    "ParameterEstimate": {
+      "kind": "class",
+      "signature_sha256": "a096737a63512c4b7c8ddbcf3a5506b1c42b6177ee6f581b9d39ecf7073ab6ff"
+    },
     "RunResult": {
       "kind": "class",
       "signature_sha256": "3c579a130a5fc5c97e410bea14d15d5df1a494dd972b19b637f6099d0b60ee5f"
@@ -55,6 +71,10 @@
     "__version__": {
       "kind": "value",
       "value": "0.1.0b1"
+    },
+    "estimate_parameters": {
+      "kind": "callable",
+      "signature_sha256": "5b838e0934528efb91ae7cc2bc9c2bd0e38dbf98a9686fc45fb18776976b0174"
     },
     "load_model": {
       "kind": "callable",
