@@ -1916,6 +1916,34 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
+  source files, Bandit, pip-audit, public API compatibility, and explicit
+  JUnit skip-reason auditing. The bounded suite passed `2,024` tests with
+  `75` explicitly explained optional-dependency skips; total coverage was
+  `83.02%` and the declared core scope was `86%`.
+- Mutation testing killed `1,504/2,057` mutants (`73%`), above the `70%`
+  release threshold. One mutation timed out and `552` survived for follow-up
+  triage; no survivor was converted into a hidden pass claim.
+- The five-seed offline benchmark gate completed for breast cancer, wine,
+  digits, and diabetes progression with zero regressions and zero failed
+  repetitions. Verdicts were tie, tie, tie, and ahead. The run recorded
+  runtime, peak memory, failure rate, seed/trial count, and hardware/software
+  identity for each dataset.
+- Wheel and source-distribution checks passed, artifacts reproduced
+  byte-for-byte with wheel hash
+  `3c345324bf11250193547afd58dafac5ec96e7468d3fb65848842a96039d9be2` and
+  source-distribution hash
+  `5268acac4f69dff0e65e80dc0c8123ac58c7544d191383af37f599c069369e6b`, and
+  both network-isolated installation paths passed.
+- The site dependency audit found `0` vulnerabilities; Astro built `17`
+  static pages, accessibility checks passed for all `17` HTML files, all
+  `384` internal links resolved, and both Playwright smoke tests passed.
+  This is current local evidence. Hosted Linux and Pages, external
+  transport/resource-fault execution, secret custody, and independent
+  reviewer evidence remain separate release gates.
+
 Current-head serving lifecycle preflight at `a27a3a8` on 2026-10-22:
 
 - `HttpServing.start()` now rejects a second start on the same adapter with a
