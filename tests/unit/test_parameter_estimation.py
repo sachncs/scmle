@@ -141,6 +141,26 @@ def test_complete_case_is_explicit_and_reject_is_fail_closed():
     assert result.rows_dropped == 1
 
 
+def test_declared_likelihood_must_match_estimation_method():
+    """A report cannot silently relabel the scientific likelihood."""
+    estimand = EstimandSpec(
+        name="conversion",
+        outcome="converted",
+        population="eligible visitors",
+        likelihood="gaussian",
+        feature_names=("signal",),
+        assumptions=("rows are conditionally independent",),
+    )
+
+    with pytest.raises(ValueError, match="expected bernoulli"):
+        estimate_parameters(
+            np.ones((12, 1)),
+            np.zeros(12),
+            estimand,
+            EstimationPolicy(estimator="logistic"),
+        )
+
+
 def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
     """A saved report can be reloaded and tampering fails closed."""
     rng = np.random.default_rng(12)

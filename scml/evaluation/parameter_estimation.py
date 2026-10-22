@@ -350,6 +350,15 @@ def estimate_parameters(
         raise ValueError("clusters must have the same row count as outcome")
     if policy.covariance == "clustered" and clusters is None:
         raise ValueError("clustered covariance needs cluster labels")
+    expected_likelihood = {
+        "linear": "gaussian",
+        "logistic": "bernoulli",
+    }[policy.estimator]
+    if estimand.likelihood != expected_likelihood:
+        raise ValueError(
+            "estimand likelihood does not match estimator: "
+            f"expected {expected_likelihood}, got {estimand.likelihood}"
+        )
     matrix, values, kept, dropped = prepare_rows(
         matrix, values, policy.missing, clusters
     )
