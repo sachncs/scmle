@@ -22,7 +22,12 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
-      - run: uv run pytest -q -W error::ResourceWarning --cov=scml --cov-report=xml --durations=25
+      - run: >-
+          uv run pytest -q -W error::ResourceWarning
+          --cov=scml --cov-report=xml --durations=25
+          --junitxml=full-suite.xml
+      - name: Reject unexplained test skips
+        run: uv run python scripts/check_pytest_skips.py full-suite.xml
       - name: Enforce core contract coverage
         run: >-
           uv run coverage report
@@ -36,7 +41,9 @@ jobs:
         if: always()
         with:
           name: full-suite-coverage
-          path: coverage.xml
+          path: |
+            coverage.xml
+            full-suite.xml
           if-no-files-found: ignore
 
   clean-clone:
@@ -63,6 +70,11 @@ jobs:
           tests/unit tests/property tests/leakage
           tests/integration/test_end_to_end.py
           tests/integration/test_deployment.py
+          --junitxml=/tmp/clean-clone-suite.xml
+      - name: Reject unexplained clean-clone skips
+        run: >-
+          uv run --directory /tmp/super-charge-ml-clean-clone
+          python scripts/check_pytest_skips.py /tmp/clean-clone-suite.xml
       - name: Verify the package entry point from the clean clone
         run: uv run --directory /tmp/super-charge-ml-clean-clone scml --help
 
