@@ -3761,3 +3761,20 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   causal, Bayesian, hierarchical, modality-specific, and resume/replay
   estimation contracts remain open and are not implied by this API.
 
+## Lifecycle-bound modality serving at `4cd16ce` on 2026-10-23
+
+- `ModalityPredictor.from_package()` can now require and verify the signed
+  lifecycle report for the exact modality, dataset identity, package path,
+  model digest, and package signature. `ModalityHttpServing` exposes an
+  explicit `require_lifecycle_report=True` release-bound mode and publishes
+  the verified report digest in health and prediction evidence.
+- Package-only predictors are rejected by release-bound serving, and tampered
+  lifecycle evidence is rejected before serving starts. The focused modality,
+  API, and compatibility slice passed `67` tests under
+  `-W error::ResourceWarning`; Ruff, formatting, mypy, and
+  `git diff --check` passed.
+- This closes the local package-to-serving evidence gap. It does not make
+  OCR/layout, image, audio/video, graph, geospatial, or other non-tabular
+  modalities production-supported, and it does not substitute for hosted,
+  cloud, broker, container, kernel, or independent-review evidence.
+
