@@ -1978,6 +1978,16 @@ All-extras CI capability matrix at `151bc4d` on 2026-10-22:
   unexplained-skip and xfail sets, and `actionlint` passed. Hosted execution
   remains the cross-platform authority because the local run is macOS.
 
+Tagged-release outcome enforcement at `5ce4f73` on 2026-10-22:
+
+- The release tag workflow now promotes `ResourceWarning` to a failure and
+  runs the same JUnit skip/xfail verifier for both its platform acceptance
+  slice and its full publish suite. A release cannot pass by silently
+  accepting a skipped or resource-leaking test path.
+- The release workflow passed `actionlint` and Ruby YAML parsing locally; the
+  actual tag workflow remains unverified because hosted GitHub runners are
+  currently unavailable for this repository.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
