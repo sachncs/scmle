@@ -3731,3 +3731,17 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   does not validate the scientific adequacy of the linked artifact or provide
   independent reviewer, hosted, cloud, broker, container, or kernel evidence.
 
+## Tabular JEPA checkpoint persistence at `8dd09df` on 2026-10-23
+
+- The tabular JEPA contract now has an atomic checkpoint writer and a
+  versioned loader for `scml.tabular-jepa.v1`. The writer flushes and syncs a
+  temporary file before replacement, and the loader rejects an unknown
+  checkpoint format before reconstruction.
+- Deterministic same-seed round trips and invalid-format rejection passed in
+  `5` focused tests with the deep-learning extra enabled; Ruff, formatting,
+  mypy, and `git diff --check` passed.
+- This is a reliable persistence boundary for the existing tabular JEPA
+  contract. It is not evidence for image, audio, video, graph, geospatial,
+  multimodal, or distributed JEPA production support; torch-enabled training
+  and end-to-end functional testing remain open.
+
