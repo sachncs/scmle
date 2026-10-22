@@ -1979,6 +1979,16 @@ Public cancellation API at `49ffa98` on 2026-10-22:
   project, explanation, and API slice passed `67` tests under strict resource
   warnings.
 
+Structured cancellation taxonomy at `bedb671` on 2026-10-22:
+
+- `LifecycleCancelledError` now derives from the framework's structured
+  `CancelledError` contract and carries `category="cancelled"` with a
+  machine-readable `scope="modality_lifecycle"`. Modality callers can handle
+  cancellation through the same error taxonomy as the tabular orchestrator.
+- The focused API, lifecycle, project, and explanation slice remained green
+  at `67` tests under strict resource warnings, with Ruff, formatting, mypy,
+  API compatibility, and diff checks passing.
+
 Signed lifecycle evidence at `7dc754f` on 2026-10-22:
 
 - Lifecycle reports are now schema version 2 artifacts signed over the exact
