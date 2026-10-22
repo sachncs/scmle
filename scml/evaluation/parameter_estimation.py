@@ -688,9 +688,7 @@ def sensitivity_report(
         while bootstrap_replicate < policy.bootstrap_replicates:
             sample = rng.integers(0, len(values), size=len(values))
             if policy.estimator == "linear":
-                linear_fit = fit_linear(
-                    design[sample], values[sample], 1, 1e-8
-                )
+                linear_fit = fit_linear(design[sample], values[sample], 1, 1e-8)
                 estimate = linear_fit[0]
             else:
                 logistic_fit = fit_logistic(

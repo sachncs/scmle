@@ -399,9 +399,7 @@ class DatasetManifest:
             ("privacy", self.privacy, PrivacyMetadata),
         ):
             if not isinstance(component, expected):
-                raise TypeError(
-                    f"{component_name} must be {expected.__name__}"
-                )
+                raise TypeError(f"{component_name} must be {expected.__name__}")
         object.__setattr__(self, "findings", tuple(self.findings))
         if any(
             not isinstance(finding, CurationFinding)
