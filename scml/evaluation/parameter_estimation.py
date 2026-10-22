@@ -2,10 +2,11 @@
 
 This module answers a different question from model selection: what is the
 estimated value of a declared population parameter, and how uncertain is that
-estimate under an explicit likelihood and covariance policy?  It intentionally
-starts with transparent linear and logistic likelihoods.  More specialised
-estimators can implement the same result contract without changing the
-artifact or review surface.
+estimate under an explicit likelihood and covariance policy?  It provides
+transparent frequentist linear and logistic likelihoods plus a bounded,
+conjugate Bayesian Gaussian estimator.  More specialised estimators can
+implement the same result contract without changing the artifact or review
+surface.
 """
 
 from collections.abc import Mapping
@@ -21,13 +22,43 @@ from typing import Any
 from typing import Literal
 
 import numpy as np
+from scipy import linalg
 from scipy import optimize
 from scipy import special
 from scipy import stats
 
-EstimatorKind = Literal["linear", "logistic"]
+EstimatorKind = Literal[
+    "linear",
+    "logistic",
+    "bayesian_linear",
+    "ipw_ate",
+    "hierarchical_linear",
+]
 CovarianceKind = Literal["iid", "hc3", "clustered"]
 MissingPolicy = Literal["reject", "complete_case"]
+CausalAssumption = Literal[
+    "consistency",
+    "conditional_exchangeability",
+    "positivity",
+]
+HierarchicalAssumption = Literal[
+    "random_intercept",
+    "cluster_independence",
+    "random_effect_exogeneity",
+    "constant_residual_variance",
+]
+
+REQUIRED_CAUSAL_ASSUMPTIONS = frozenset(
+    {"consistency", "conditional_exchangeability", "positivity"}
+)
+REQUIRED_HIERARCHICAL_ASSUMPTIONS = frozenset(
+    {
+        "random_intercept",
+        "cluster_independence",
+        "random_effect_exogeneity",
+        "constant_residual_variance",
+    }
+)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -75,6 +106,54 @@ class EstimandSpec:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class BayesianPrior:
+    """Conjugate normal-inverse-gamma prior for a Gaussian design.
+
+    The coefficient order is ``("intercept", *estimand.feature_names)``.
+    ``precision`` is the positive-definite prior precision matrix for the
+    coefficients conditional on the residual variance.  ``shape`` and
+    ``scale`` parameterize the inverse-gamma prior on that variance.
+    """
+
+    mean: tuple[float, ...]
+    precision: tuple[tuple[float, ...], ...]
+    shape: float = 2.0
+    scale: float = 1.0
+
+    def __post_init__(self) -> None:
+        """Reject a prior that cannot define a proper posterior."""
+        if not self.mean:
+            raise ValueError("Bayesian prior needs a coefficient mean")
+        if len(self.precision) != len(self.mean) or any(
+            len(row) != len(self.mean) for row in self.precision
+        ):
+            raise ValueError("Bayesian prior precision must be square")
+        prior_precision = np.asarray(self.precision, dtype=float)
+        if not np.isfinite(self.mean).all():
+            raise ValueError("Bayesian prior mean must be finite")
+        if not np.isfinite(prior_precision).all():
+            raise ValueError("Bayesian prior precision must be finite")
+        if not np.allclose(
+            prior_precision, prior_precision.T, rtol=1e-10, atol=1e-12
+        ):
+            raise ValueError("Bayesian prior precision must be symmetric")
+        try:
+            np.linalg.cholesky(prior_precision)
+        except np.linalg.LinAlgError as error:
+            raise ValueError(
+                "Bayesian prior precision must be positive definite"
+            ) from error
+        if not math.isfinite(self.shape) or self.shape <= 0.0:
+            raise ValueError("Bayesian prior shape must be positive")
+        if not math.isfinite(self.scale) or self.scale <= 0.0:
+            raise ValueError("Bayesian prior scale must be positive")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible prior metadata."""
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class EstimationPolicy:
     """Numerical and uncertainty policy for an estimation run."""
 
@@ -88,11 +167,25 @@ class EstimationPolicy:
     max_iterations: int = 100
     tolerance: float = 1e-8
     reference_tolerance: float = 1e-6
+    prior: BayesianPrior | None = None
+    treatment_position: int | None = None
+    propensity_clip: float = 0.01
+    causal_assumptions: tuple[CausalAssumption, ...] = ()
+    hierarchical_assumptions: tuple[HierarchicalAssumption, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate the policy before data is touched."""
-        if self.estimator not in ("linear", "logistic"):
-            raise ValueError("estimator must be linear or logistic")
+        if self.estimator not in (
+            "linear",
+            "logistic",
+            "bayesian_linear",
+            "ipw_ate",
+            "hierarchical_linear",
+        ):
+            raise ValueError(
+                "estimator must be linear, logistic, bayesian_linear, "
+                "ipw_ate, or hierarchical_linear"
+            )
         if self.covariance not in ("iid", "hc3", "clustered"):
             raise ValueError("covariance must be iid, hc3, or clustered")
         if self.missing not in ("reject", "complete_case"):
@@ -109,10 +202,100 @@ class EstimationPolicy:
             raise ValueError("max_iterations must be positive")
         if self.tolerance <= 0.0 or self.reference_tolerance <= 0.0:
             raise ValueError("estimation tolerances must be positive")
+        if not 0.0 < self.propensity_clip < 0.5:
+            raise ValueError(
+                "propensity_clip must lie strictly between 0 and 0.5"
+            )
+        if self.estimator != "ipw_ate" and self.treatment_position is not None:
+            raise ValueError("treatment_position is supported only by ipw_ate")
+        if self.estimator != "ipw_ate" and self.propensity_clip != 0.01:
+            raise ValueError("propensity_clip is supported only by ipw_ate")
+        if self.estimator != "ipw_ate" and self.causal_assumptions:
+            raise ValueError("causal assumptions are supported only by ipw_ate")
+        if (
+            self.estimator != "hierarchical_linear"
+            and self.hierarchical_assumptions
+        ):
+            raise ValueError(
+                "hierarchical assumptions are supported only by "
+                "hierarchical_linear"
+            )
+        if self.estimator == "bayesian_linear":
+            if self.prior is None:
+                raise ValueError(
+                    "bayesian_linear estimation requires an explicit prior"
+                )
+            if self.covariance != "iid":
+                raise ValueError(
+                    "bayesian_linear estimation supports only iid covariance"
+                )
+            if self.bootstrap_replicates:
+                raise ValueError(
+                    "bayesian_linear bootstrap sensitivity is unsupported"
+                )
+        elif self.estimator == "ipw_ate":
+            if self.prior is not None:
+                raise ValueError("a Bayesian prior is not valid for ipw_ate")
+            if self.covariance != "iid":
+                raise ValueError("ipw_ate supports only iid covariance")
+            if self.treatment_position is None:
+                raise ValueError("ipw_ate requires treatment_position")
+            if (
+                len(self.causal_assumptions)
+                != len(set(self.causal_assumptions))
+                or set(self.causal_assumptions) != REQUIRED_CAUSAL_ASSUMPTIONS
+            ):
+                raise ValueError(
+                    "ipw_ate requires consistency, "
+                    "conditional_exchangeability, "
+                    "and positivity assumptions"
+                )
+            if self.bootstrap_replicates:
+                raise ValueError("ipw_ate bootstrap sensitivity is unsupported")
+        elif self.estimator == "hierarchical_linear":
+            if self.prior is not None:
+                raise ValueError(
+                    "a Bayesian prior is not valid for hierarchical_linear"
+                )
+            if self.covariance != "iid":
+                raise ValueError(
+                    "hierarchical_linear supplies its own covariance model"
+                )
+            if not self.cluster_name:
+                raise ValueError("hierarchical_linear requires cluster_name")
+            if (
+                len(self.hierarchical_assumptions)
+                != len(set(self.hierarchical_assumptions))
+                or set(self.hierarchical_assumptions)
+                != REQUIRED_HIERARCHICAL_ASSUMPTIONS
+            ):
+                raise ValueError(
+                    "hierarchical_linear requires all random-intercept "
+                    "assumptions"
+                )
+            if self.bootstrap_replicates:
+                raise ValueError(
+                    "hierarchical_linear bootstrap sensitivity is unsupported"
+                )
+        elif self.prior is not None:
+            raise ValueError(
+                "a Bayesian prior is supported only by bayesian_linear"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-compatible policy metadata."""
-        return dataclasses.asdict(self)
+        values = dataclasses.asdict(self)
+        if self.prior is None:
+            values.pop("prior")
+        if self.estimator != "ipw_ate":
+            values.pop("treatment_position")
+            values.pop("propensity_clip")
+            values.pop("causal_assumptions")
+        if self.estimator != "hierarchical_linear":
+            values.pop("hierarchical_assumptions")
+        if self.prior is not None:
+            values["prior"] = self.prior.to_dict()
+        return values
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -300,9 +483,17 @@ class EstimationResult:
             estimand_record["feature_names"]
         )
         estimand_values["assumptions"] = tuple(estimand_record["assumptions"])
+        policy_values = dict(policy_record)
+        if policy_values.get("prior") is not None:
+            prior_values = dict(policy_values["prior"])
+            prior_values["mean"] = tuple(prior_values["mean"])
+            prior_values["precision"] = tuple(
+                tuple(row) for row in prior_values["precision"]
+            )
+            policy_values["prior"] = BayesianPrior(**prior_values)
         return cls(
             EstimandSpec(**estimand_values),
-            EstimationPolicy(**policy_record),
+            EstimationPolicy(**policy_values),
             parameters,
             tuple(
                 tuple(float(value) for value in row)
@@ -325,13 +516,15 @@ def estimate_parameters(
     clusters: Sequence[Any] | None = None,
     shift_reference: Any | None = None,
 ) -> EstimationResult:
-    """Estimate declared linear or logistic parameters with evidence.
+    """Estimate declared parameters with auditable uncertainty evidence.
 
     Args:
         features: Numeric matrix with one column per ``estimand.feature_names``.
         outcome: Numeric response, or binary labels for logistic estimation.
         estimand: Scientific definition and identification assumptions.
         policy: Estimator, covariance, missingness, and uncertainty policy.
+            ``bayesian_linear`` requires an explicit ``BayesianPrior`` and
+            reports posterior credible intervals.
         clusters: Optional cluster labels. Required for clustered covariance.
         shift_reference: Optional feature matrix from the target population for
             standardized mean-shift diagnostics.
@@ -353,9 +546,16 @@ def estimate_parameters(
         raise ValueError("clusters must have the same row count as outcome")
     if policy.covariance == "clustered" and clusters is None:
         raise ValueError("clustered covariance needs cluster labels")
+    if policy.estimator in ("hierarchical_linear",) and clusters is None:
+        raise ValueError("hierarchical_linear requires cluster labels")
+    if policy.estimator == "ipw_ate" and clusters is not None:
+        raise ValueError("ipw_ate does not accept cluster labels")
     expected_likelihood = {
         "linear": "gaussian",
         "logistic": "bernoulli",
+        "bayesian_linear": "gaussian",
+        "ipw_ate": "gaussian",
+        "hierarchical_linear": "gaussian",
     }[policy.estimator]
     if estimand.likelihood != expected_likelihood:
         raise ValueError(
@@ -369,6 +569,13 @@ def estimate_parameters(
         {0.0, 1.0}
     ):
         raise ValueError("logistic outcome must contain only 0 and 1")
+    if policy.estimator == "bayesian_linear" and clusters is not None:
+        raise ValueError("bayesian_linear estimation does not accept clusters")
+    if policy.estimator == "ipw_ate":
+        if policy.treatment_position is None:
+            raise ValueError("ipw_ate requires treatment_position")
+        if not 0 <= policy.treatment_position < matrix.shape[1]:
+            raise ValueError("treatment_position is outside the feature matrix")
     cluster_values = kept if clusters is not None else None
     design = np.column_stack((np.ones(matrix.shape[0]), matrix))
     names = ("intercept", *estimand.feature_names)
@@ -400,7 +607,7 @@ def estimate_parameters(
             "rmse": float(np.sqrt(np.mean(residuals**2))),
             "degrees_of_freedom": degrees_of_freedom,
         }
-    else:
+    elif policy.estimator == "logistic":
         coefficients, probabilities, diagnostics = fit_logistic(
             design, values, policy.max_iterations, policy.tolerance
         )
@@ -417,18 +624,122 @@ def estimate_parameters(
             )
         )
         diagnostics = {**diagnostics, "likelihood": likelihood}
+    elif policy.estimator == "bayesian_linear":
+        if policy.prior is None:
+            raise ValueError(
+                "bayesian_linear estimation requires an explicit prior"
+            )
+        coefficients, covariance, diagnostics = fit_bayesian_linear(
+            design, values, policy.prior
+        )
+        reference = reference_bayesian_linear(
+            design, values, policy.prior, coefficients, policy
+        )
+        likelihood = "gaussian"
+        posterior_scale = np.asarray(diagnostics["posterior_scale"])
+        posterior_degrees = diagnostics["posterior_degrees_of_freedom"]
+        pivot = stats.t.ppf(
+            0.5 + policy.confidence_level / 2.0, posterior_degrees
+        )
+        p_values = 2.0 * stats.t.sf(
+            np.abs(coefficients)
+            / np.maximum(np.sqrt(np.diag(posterior_scale)), 1e-15),
+            posterior_degrees,
+        )
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        interval_errors = np.sqrt(np.maximum(np.diag(posterior_scale), 0.0))
+        diagnostics = {
+            **diagnostics,
+            "likelihood": likelihood,
+            "uncertainty": "posterior_credible_interval",
+            "p_value_semantics": "two-sided posterior tail probability",
+        }
+    elif policy.estimator == "ipw_ate":
+        coefficients, covariance, diagnostics, propensity_design = fit_ipw_ate(
+            matrix,
+            values,
+            policy.treatment_position,
+            policy,
+        )
+        reference = reference_ipw_ate(
+            propensity_design,
+            values,
+            matrix[:, policy.treatment_position],
+            coefficients,
+            policy,
+        )
+        likelihood = "gaussian"
+        names = ("ate",)
+        pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
+        p_values = 2.0 * stats.norm.sf(
+            np.abs(coefficients)
+            / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+        )
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        interval_errors = standard_errors
+        diagnostics = {**diagnostics, "likelihood": likelihood}
+    elif policy.estimator == "hierarchical_linear":
+        if cluster_values is None:
+            raise ValueError("hierarchical_linear requires cluster labels")
+        (
+            coefficients,
+            covariance,
+            diagnostics,
+            residual_variance,
+            random_intercept_variance,
+        ) = fit_hierarchical_linear(design, values, cluster_values)
+        reference = reference_hierarchical_linear(
+            design,
+            values,
+            cluster_values,
+            residual_variance,
+            random_intercept_variance,
+            coefficients,
+            policy,
+        )
+        likelihood = "gaussian"
+        degrees_of_freedom = max(
+            len(dict.fromkeys(cluster_values.tolist())) - 1, 1
+        )
+        pivot = stats.t.ppf(
+            0.5 + policy.confidence_level / 2.0, degrees_of_freedom
+        )
+        p_values = 2.0 * stats.t.sf(
+            np.abs(
+                coefficients / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+            ),
+            degrees_of_freedom,
+        )
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        interval_errors = standard_errors
+        diagnostics = {
+            **diagnostics,
+            "likelihood": likelihood,
+            "degrees_of_freedom": degrees_of_freedom,
+        }
 
-    standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+    if policy.estimator != "bayesian_linear":
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        interval_errors = standard_errors
+
     parameters = tuple(
         ParameterEstimate(
             name,
             float(value),
             float(error),
-            (float(value - pivot * error), float(value + pivot * error)),
+            (
+                float(value - pivot * interval_error),
+                float(value + pivot * interval_error),
+            ),
             float(p_value),
         )
-        for name, value, error, p_value in zip(
-            names, coefficients, standard_errors, p_values, strict=True
+        for name, value, error, interval_error, p_value in zip(
+            names,
+            coefficients,
+            standard_errors,
+            interval_errors,
+            p_values,
+            strict=True,
         )
     )
     sensitivity = sensitivity_report(
@@ -438,6 +749,7 @@ def estimate_parameters(
         design,
         coefficients,
         shift_reference,
+        prior=policy.prior if policy.estimator == "bayesian_linear" else None,
     )
     return EstimationResult(
         estimand=dataclasses.replace(estimand, likelihood=likelihood),
@@ -498,6 +810,314 @@ def fit_linear(
         raise ValueError("linear design matrix is rank deficient")
     coefficients = np.linalg.solve(gram, design.T @ values)
     return coefficients, {"converged": True, "iterations": 1}
+
+
+def fit_ipw_ate(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    treatment_position: int | None,
+    policy: EstimationPolicy,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any], np.ndarray]:
+    """Estimate a binary-treatment Hájek inverse-probability ATE."""
+    if treatment_position is None:
+        raise ValueError("ipw_ate requires treatment_position")
+    treatment = matrix[:, treatment_position]
+    if not set(np.unique(treatment)).issubset({0.0, 1.0}):
+        raise ValueError("ipw_ate treatment must contain only 0 and 1")
+    treated_count = int(np.sum(treatment == 1.0))
+    control_count = int(np.sum(treatment == 0.0))
+    if treated_count < 2 or control_count < 2:
+        raise ValueError("ipw_ate needs at least two rows per treatment arm")
+    confounders = np.delete(matrix, treatment_position, axis=1)
+    propensity_design = np.column_stack(
+        (np.ones(confounders.shape[0]), confounders)
+    )
+    propensity_coefficients, raw_propensity, propensity_diagnostics = (
+        fit_logistic(
+            propensity_design,
+            treatment,
+            policy.max_iterations,
+            policy.tolerance,
+        )
+    )
+    del propensity_coefficients
+    propensity = np.clip(
+        raw_propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
+    )
+    ate, variance, evidence = hajek_ipw_statistics(
+        treatment, values, propensity
+    )
+    clipped = np.abs(raw_propensity - propensity) > 1e-12
+    diagnostics = {
+        "converged": True,
+        "iterations": propensity_diagnostics["iterations"],
+        "estimator_family": "causal_ipw",
+        "method": "hajek_ipw",
+        "uncertainty_method": ("influence_function_with_estimated_propensity"),
+        "propensity_estimation_uncertainty": "not_propagated",
+        "treatment_position": treatment_position,
+        "treated_rows": treated_count,
+        "control_rows": control_count,
+        "propensity_model": {
+            "method": "logistic_mle",
+            "converged": propensity_diagnostics["converged"],
+            "iterations": propensity_diagnostics["iterations"],
+            "log_likelihood": propensity_diagnostics["log_likelihood"],
+        },
+        "positivity": {
+            "status": "diagnosed_not_proven",
+            "raw_min": float(np.min(raw_propensity)),
+            "raw_max": float(np.max(raw_propensity)),
+            "clipped_min": float(np.min(propensity)),
+            "clipped_max": float(np.max(propensity)),
+            "clip_threshold": policy.propensity_clip,
+            "fraction_clipped": float(np.mean(clipped)),
+        },
+        "effective_sample_size": evidence["effective_sample_size"],
+        "treatment_means": evidence["treatment_means"],
+        "influence_function": {
+            "method": "centered_ipw_influence_function",
+            "variance": variance,
+        },
+    }
+    return (
+        np.asarray([ate]),
+        np.asarray([[variance]]),
+        diagnostics,
+        propensity_design,
+    )
+
+
+def hajek_ipw_statistics(
+    treatment: np.ndarray,
+    values: np.ndarray,
+    propensity: np.ndarray,
+) -> tuple[float, float, dict[str, Any]]:
+    """Compute normalized IPW means and an influence-function variance."""
+    treated_weights = treatment / propensity
+    control_weights = (1.0 - treatment) / (1.0 - propensity)
+    treated_denominator = float(np.sum(treated_weights))
+    control_denominator = float(np.sum(control_weights))
+    if treated_denominator <= 0.0 or control_denominator <= 0.0:
+        raise ValueError("ipw_ate treatment weights must have positive support")
+    treated_mean = float(np.sum(treated_weights * values) / treated_denominator)
+    control_mean = float(np.sum(control_weights * values) / control_denominator)
+    influence = treated_weights * (values - treated_mean) - control_weights * (
+        values - control_mean
+    )
+    variance = float(np.var(influence, ddof=1) / len(values))
+    effective_sample_size = {
+        "treated": float(treated_denominator**2 / np.sum(treated_weights**2)),
+        "control": float(control_denominator**2 / np.sum(control_weights**2)),
+    }
+    return (
+        treated_mean - control_mean,
+        variance,
+        {
+            "effective_sample_size": effective_sample_size,
+            "treatment_means": {
+                "treated": treated_mean,
+                "control": control_mean,
+            },
+        },
+    )
+
+
+def fit_bayesian_linear(
+    design: np.ndarray,
+    values: np.ndarray,
+    prior: BayesianPrior,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Compute a conjugate Gaussian posterior from an explicit prior."""
+    if len(prior.mean) != design.shape[1]:
+        raise ValueError(
+            "Bayesian prior dimension must match intercept and features"
+        )
+    prior_mean = np.asarray(prior.mean, dtype=float)
+    prior_precision = np.asarray(prior.precision, dtype=float)
+    posterior_precision = prior_precision + design.T @ design
+    try:
+        factor = linalg.cho_factor(posterior_precision, check_finite=True)
+        posterior_mean = linalg.cho_solve(
+            factor, prior_precision @ prior_mean + design.T @ values
+        )
+        posterior_precision_inverse = linalg.cho_solve(
+            factor, np.eye(design.shape[1])
+        )
+    except np.linalg.LinAlgError as error:
+        raise ValueError(
+            "Bayesian posterior precision is not identifiable"
+        ) from error
+    posterior_shape = prior.shape + len(values) / 2.0
+    posterior_scale = prior.scale + 0.5 * (
+        values @ values
+        + prior_mean @ prior_precision @ prior_mean
+        - posterior_mean @ posterior_precision @ posterior_mean
+    )
+    if not math.isfinite(posterior_scale) or posterior_scale <= 0.0:
+        raise ValueError("Bayesian posterior variance scale is invalid")
+    posterior_degrees = 2.0 * posterior_shape
+    if posterior_degrees <= 2.0:
+        raise ValueError(
+            "Bayesian posterior needs more than two degrees of freedom"
+        )
+    posterior_covariance = (
+        posterior_scale
+        / posterior_shape
+        * (posterior_degrees / (posterior_degrees - 2.0))
+        * posterior_precision_inverse
+    )
+    posterior_scale_matrix = (
+        posterior_scale / posterior_shape
+    ) * posterior_precision_inverse
+    return (
+        posterior_mean,
+        posterior_covariance,
+        {
+            "converged": True,
+            "iterations": 1,
+            "estimator_family": "bayesian_conjugate",
+            "prior_shape": prior.shape,
+            "prior_scale": prior.scale,
+            "posterior_shape": posterior_shape,
+            "posterior_scale": posterior_scale_matrix.tolist(),
+            "posterior_degrees_of_freedom": posterior_degrees,
+        },
+    )
+
+
+def fit_hierarchical_linear(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any], float, float]:
+    """Fit a bounded two-stage random-intercept linear model.
+
+    Variance components are estimated by moments from an initial fixed-effect
+    fit, then used in a generalized least-squares fixed-effect fit.  This is
+    intentionally not presented as REML or a fully Bayesian multilevel model.
+    """
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "hierarchical cluster labels must be hashable"
+        ) from error
+    if len(labels) < 2:
+        raise ValueError("hierarchical_linear needs at least two clusters")
+    if np.linalg.matrix_rank(design) != design.shape[1]:
+        raise ValueError("hierarchical design matrix is rank deficient")
+    initial_coefficients = np.linalg.lstsq(design, values, rcond=None)[0]
+    initial_residuals = values - design @ initial_coefficients
+    cluster_means = []
+    cluster_sizes = []
+    within_sum_of_squares = 0.0
+    for label in labels:
+        group = clusters == label
+        group_residuals = initial_residuals[group]
+        cluster_means.append(float(np.mean(group_residuals)))
+        cluster_sizes.append(int(np.sum(group)))
+        centered = group_residuals - np.mean(group_residuals)
+        within_sum_of_squares += float(np.sum(centered**2))
+    residual_variance = within_sum_of_squares / max(
+        len(values) - len(labels), 1
+    )
+    if not math.isfinite(residual_variance) or residual_variance <= 1e-12:
+        raise ValueError(
+            "hierarchical_linear needs positive within-cluster variance"
+        )
+    between_variance = float(np.var(cluster_means, ddof=1))
+    finite_sample_adjustment = residual_variance * float(
+        np.mean(1.0 / np.asarray(cluster_sizes, dtype=float))
+    )
+    random_intercept_variance = max(
+        0.0, between_variance - finite_sample_adjustment
+    )
+    information, right_hand_side = hierarchical_gls_system(
+        design,
+        values,
+        clusters,
+        labels,
+        residual_variance,
+        random_intercept_variance,
+    )
+    try:
+        coefficients = np.linalg.solve(information, right_hand_side)
+        covariance = np.linalg.solve(information, np.eye(design.shape[1]))
+    except np.linalg.LinAlgError as error:
+        raise ValueError(
+            "hierarchical GLS system is not identifiable"
+        ) from error
+    random_effects = []
+    fitted_residuals = values - design @ coefficients
+    for label in labels:
+        group = clusters == label
+        count = int(np.sum(group))
+        group_sum = float(np.sum(fitted_residuals[group]))
+        shrinkage = random_intercept_variance / (
+            residual_variance + count * random_intercept_variance
+        )
+        random_effects.append(shrinkage * group_sum)
+    total_variance = residual_variance + random_intercept_variance
+    diagnostics = {
+        "converged": True,
+        "iterations": 2,
+        "estimator_family": "hierarchical_random_intercept",
+        "method": "two_stage_moment_gls",
+        "cluster_count": len(labels),
+        "cluster_size_min": min(cluster_sizes),
+        "cluster_size_max": max(cluster_sizes),
+        "residual_variance": residual_variance,
+        "random_intercept_variance": random_intercept_variance,
+        "intraclass_correlation": random_intercept_variance / total_variance,
+        "random_intercept_status": (
+            "estimated" if random_intercept_variance > 0.0 else "boundary_zero"
+        ),
+        "random_intercept_effect": {
+            "mean_absolute_blup": float(np.mean(np.abs(random_effects))),
+            "max_absolute_blup": float(np.max(np.abs(random_effects))),
+        },
+        "variance_component_method": "moment_estimate_from_initial_ols",
+        "uncertainty_method": ("conditional_on_moment_variance_components"),
+        "variance_component_uncertainty": "not_propagated",
+    }
+    return (
+        coefficients,
+        covariance,
+        diagnostics,
+        residual_variance,
+        random_intercept_variance,
+    )
+
+
+def hierarchical_gls_system(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    labels: tuple[Any, ...],
+    residual_variance: float,
+    random_intercept_variance: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build the block-diagonal precision system for random intercepts."""
+    information = np.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = np.zeros(design.shape[1])
+    for label in labels:
+        group = clusters == label
+        group_design = design[group]
+        group_values = values[group]
+        count = group_design.shape[0]
+        precision = np.eye(count) / residual_variance
+        if random_intercept_variance > 0.0:
+            precision -= (
+                random_intercept_variance
+                / (
+                    residual_variance
+                    * (residual_variance + count * random_intercept_variance)
+                )
+            ) * np.ones((count, count))
+        information += group_design.T @ precision @ group_design
+        right_hand_side += group_design.T @ precision @ group_values
+    return information, right_hand_side
 
 
 def fit_logistic(
@@ -597,6 +1217,111 @@ def reference_linear(
     }
 
 
+def reference_ipw_ate(
+    propensity_design: np.ndarray,
+    values: np.ndarray,
+    treatment: np.ndarray,
+    coefficients: np.ndarray,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Recompute IPW propensities with an independent BFGS calculation."""
+
+    def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
+        logits = propensity_design @ candidate
+        probabilities = special.expit(logits)
+        value = -float(np.sum(treatment * logits - np.logaddexp(0.0, logits)))
+        gradient = propensity_design.T @ (probabilities - treatment)
+        return value, gradient
+
+    result = optimize.minimize(
+        lambda candidate: objective(candidate)[0],
+        np.zeros(propensity_design.shape[1]),
+        jac=lambda candidate: objective(candidate)[1],
+        method="BFGS",
+        options={"gtol": policy.reference_tolerance, "maxiter": 1000},
+    )
+    reference_propensity = np.clip(
+        special.expit(propensity_design @ result.x),
+        policy.propensity_clip,
+        1.0 - policy.propensity_clip,
+    )
+    reference_ate, _, _ = hajek_ipw_statistics(
+        treatment, values, reference_propensity
+    )
+    difference = float(abs(reference_ate - coefficients[0]))
+    return {
+        "method": "scipy.optimize.minimize:BFGS_propensity",
+        "converged": bool(result.success),
+        "reference_ate": reference_ate,
+        "max_absolute_difference": difference,
+        "passed": bool(
+            result.success and difference <= policy.reference_tolerance * 10
+        ),
+        "message": str(result.message),
+    }
+
+
+def reference_hierarchical_linear(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    residual_variance: float,
+    random_intercept_variance: float,
+    coefficients: np.ndarray,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Verify hierarchical GLS with explicit group covariance matrices."""
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "hierarchical cluster labels must be hashable"
+        ) from error
+    information = np.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = np.zeros(design.shape[1])
+    for label in labels:
+        group = clusters == label
+        count = int(np.sum(group))
+        covariance = residual_variance * np.eye(count) + (
+            random_intercept_variance * np.ones((count, count))
+        )
+        precision = linalg.solve(covariance, np.eye(count), assume_a="pos")
+        group_design = design[group]
+        information += group_design.T @ precision @ group_design
+        right_hand_side += group_design.T @ precision @ values[group]
+    reference = linalg.solve(information, right_hand_side, assume_a="pos")
+    difference = float(np.max(np.abs(reference - coefficients)))
+    return {
+        "method": "scipy.linalg.solve:explicit_random_intercept_covariance",
+        "max_absolute_difference": difference,
+        "passed": difference <= policy.reference_tolerance,
+    }
+
+
+def reference_bayesian_linear(
+    design: np.ndarray,
+    values: np.ndarray,
+    prior: BayesianPrior,
+    coefficients: np.ndarray,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Verify the conjugate posterior mean with an independent solver."""
+    prior_mean = np.asarray(prior.mean, dtype=float)
+    prior_precision = np.asarray(prior.precision, dtype=float)
+    posterior_precision = prior_precision + design.T @ design
+    reference = linalg.solve(
+        posterior_precision,
+        prior_precision @ prior_mean + design.T @ values,
+        assume_a="pos",
+    )
+    difference = float(np.max(np.abs(reference - coefficients)))
+    return {
+        "method": "scipy.linalg.solve:positive_definite",
+        "max_absolute_difference": difference,
+        "passed": difference <= policy.reference_tolerance,
+    }
+
+
 def reference_logistic(
     design: np.ndarray,
     values: np.ndarray,
@@ -646,6 +1371,7 @@ def sensitivity_report(
     design: np.ndarray,
     coefficients: np.ndarray,
     shift_reference: Any | None,
+    prior: BayesianPrior | None = None,
 ) -> dict[str, Any]:
     """Record declared sensitivity coverage without inventing causal claims."""
     report: dict[str, Any] = {
@@ -670,6 +1396,33 @@ def sensitivity_report(
             )
         },
     }
+    if prior is not None:
+        baseline = np.asarray(coefficients, dtype=float)
+        alternatives = []
+        prior_mean = np.asarray(prior.mean, dtype=float)
+        prior_precision = np.asarray(prior.precision, dtype=float)
+        for label, precision_factor in (
+            ("weakened_precision", 0.01),
+            ("strengthened_precision", 100.0),
+        ):
+            alternative_precision = prior_precision * precision_factor
+            alternative = np.linalg.solve(
+                alternative_precision + design.T @ design,
+                alternative_precision @ prior_mean + design.T @ values,
+            )
+            alternatives.append(
+                {
+                    "name": label,
+                    "max_absolute_coefficient_change": float(
+                        np.max(np.abs(alternative - baseline))
+                    ),
+                }
+            )
+        report["prior"] = {
+            "status": "evaluated",
+            "method": "precision_scale_sensitivity",
+            "alternatives": alternatives,
+        }
     if shift_reference is not None:
         reference = np.asarray(shift_reference, dtype=float)
         validate_matrix(reference, matrix.shape[1], "shift_reference")
@@ -716,11 +1469,14 @@ def sensitivity_report(
 
 
 __all__ = [
+    "BayesianPrior",
+    "CausalAssumption",
     "CovarianceKind",
     "EstimandSpec",
     "EstimationPolicy",
     "EstimationResult",
     "EstimatorKind",
+    "HierarchicalAssumption",
     "MissingPolicy",
     "ParameterEstimate",
     "estimate_parameters",
