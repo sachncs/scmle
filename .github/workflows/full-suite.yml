@@ -26,7 +26,7 @@ jobs:
           uv run pytest -q -W error::ResourceWarning
           --cov=scml --cov-report=xml --durations=25
           --junitxml=full-suite.xml
-      - name: Reject unexplained test skips
+      - name: Reject unexplained skips and xfails
         run: uv run python scripts/check_pytest_skips.py full-suite.xml
       - name: Enforce core contract coverage
         run: >-
@@ -71,7 +71,7 @@ jobs:
           tests/integration/test_end_to_end.py
           tests/integration/test_deployment.py
           --junitxml=/tmp/clean-clone-suite.xml
-      - name: Reject unexplained clean-clone skips
+      - name: Reject unexplained clean-clone skips and xfails
         run: >-
           uv run --directory /tmp/super-charge-ml-clean-clone
           python scripts/check_pytest_skips.py /tmp/clean-clone-suite.xml
