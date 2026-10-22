@@ -93,11 +93,11 @@ def observe_runtime_resources(
     declaration that requires that fact instead of treating the probe failure
     as proof that the resource exists.
     """
-    cpu_cores, cpu_source = _observe_cpu_cores()
-    memory_gb, memory_source = _observe_memory_gb()
+    cpu_cores, cpu_source = observe_cpu_cores()
+    memory_gb, memory_source = observe_memory_gb()
     selected_path = pathlib.Path(disk_path or pathlib.Path.cwd())
-    disk_gb, disk_source = _observe_disk_gb(selected_path)
-    extras, extra_observations, extra_sources = _observe_extras()
+    disk_gb, disk_source = observe_disk_gb(selected_path)
+    extras, extra_observations, extra_sources = observe_extras()
     environment = capabilities.CapabilityEnvironment(
         available_extras=extras,
         cpu_cores=cpu_cores,
@@ -122,7 +122,7 @@ def observe_runtime_resources(
     )
 
 
-def _observe_cpu_cores() -> tuple[int | None, str]:
+def observe_cpu_cores() -> tuple[int | None, str]:
     """Return CPUs available to this process, respecting affinity when able."""
     affinity_probe = getattr(os, "sched_getaffinity", None)
     try:
@@ -138,7 +138,7 @@ def _observe_cpu_cores() -> tuple[int | None, str]:
     return (count, "os.cpu_count") if count else (None, "unknown")
 
 
-def _observe_memory_gb() -> tuple[float | None, str]:
+def observe_memory_gb() -> tuple[float | None, str]:
     """Return physical memory capacity from portable ``sysconf`` probes."""
     try:
         pages = os.sysconf("SC_PHYS_PAGES")
@@ -152,7 +152,7 @@ def _observe_memory_gb() -> tuple[float | None, str]:
     return pages * page_size / BYTES_PER_GB, "os.sysconf(SC_PHYS_PAGES)"
 
 
-def _observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
+def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
     """Return free bytes on the filesystem containing ``path``."""
     try:
         free = shutil.disk_usage(path).free
@@ -161,17 +161,17 @@ def _observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
     return free / BYTES_PER_GB, f"shutil.disk_usage({path})"
 
 
-def _observe_extras() -> tuple[
+def observe_extras() -> tuple[
     frozenset[str], dict[str, bool | None], dict[str, str]
 ]:
     """Observe project extras by checking their declared distributions."""
-    core_available = importlib.util.find_spec("scml") is not None
+    core_available = True
     observations: dict[str, bool | None] = {CORE_EXTRA: core_available}
-    sources = {"extra:core": "importlib.util.find_spec(scml)"}
-    requirements = _project_extra_requirements()
+    sources = {"extra:core": "running scml package"}
+    requirements = project_extra_requirements()
     for extra, packages in requirements.items():
         observations[extra] = all(
-            _is_installed(package) for package in packages
+            is_installed(package) for package in packages
         )
         sources[f"extra:{extra}"] = "importlib.metadata"
     available = frozenset(
@@ -180,7 +180,7 @@ def _observe_extras() -> tuple[
     return available, observations, sources
 
 
-def _project_extra_requirements() -> dict[str, tuple[str, ...]]:
+def project_extra_requirements() -> dict[str, tuple[str, ...]]:
     """Read the installed distribution metadata without importing extras."""
     try:
         requirements: Iterable[str] = (
@@ -203,7 +203,7 @@ def _project_extra_requirements() -> dict[str, tuple[str, ...]]:
     }
 
 
-def _is_installed(package: str) -> bool:
+def is_installed(package: str) -> bool:
     """Return whether distribution metadata for ``package`` is available."""
     try:
         importlib.metadata.version(package)

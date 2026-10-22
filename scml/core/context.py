@@ -180,7 +180,7 @@ def extension_capability(
     return capabilities.Capability(
         key=key,
         status=capabilities.CapabilityStatus.EXTENSION_ONLY,
-        required_extras=("user-supplied-adapter",),
+        required_extras=(),
         resources=capabilities.ResourceAssumptions(memory_gb=1.0),
         failure_modes=(
             "adapter conformance or dependency failure",

@@ -91,22 +91,22 @@ def test_observation_captures_bounded_facts_and_unknowns(monkeypatch, tmp_path):
     """The probe serializes CPU, memory, disk, extras, and null unknowns."""
     monkeypatch.setattr(
         resource_observation,
-        "_observe_cpu_cores",
+        "observe_cpu_cores",
         lambda: (4, "test.cpu"),
     )
     monkeypatch.setattr(
         resource_observation,
-        "_observe_memory_gb",
+        "observe_memory_gb",
         lambda: (8.0, "test.memory"),
     )
     monkeypatch.setattr(
         resource_observation,
-        "_observe_disk_gb",
+        "observe_disk_gb",
         lambda path: (12.0, f"test.disk:{path}"),
     )
     monkeypatch.setattr(
         resource_observation,
-        "_observe_extras",
+        "observe_extras",
         lambda: (
             frozenset({"core", "deeplearning"}),
             {"core": True, "deeplearning": True},
