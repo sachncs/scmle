@@ -1,0 +1,37 @@
+{
+  "approved_categories": [
+    "dependency",
+    "environment",
+    "test-condition"
+  ],
+  "rules": [
+    {
+      "category": "dependency",
+      "pattern": "^could not import '[^']+'(?:: .+)?$"
+    },
+    {
+      "category": "dependency",
+      "pattern": "^(?:optional dependency is not installed|the onnx extra is not installed|onnxmltools, lightgbm and xgboost are not all installed|torch is not installed|torch and keras are not installed|ray is not installed|sentence-transformers is not installed)$"
+    },
+    {
+      "category": "dependency",
+      "pattern": "^Pillow-backed (?:image|image model) test requires the optional dependency$"
+    },
+    {
+      "category": "dependency",
+      "pattern": "^tabpfn is installed here$"
+    },
+    {
+      "category": "environment",
+      "pattern": "^(?:Accelerate is macOS only|Windows handles are not file descriptors)$"
+    },
+    {
+      "category": "environment",
+      "pattern": "^OpenML unavailable: .+$"
+    },
+    {
+      "category": "test-condition",
+      "pattern": "^final estimator hides the graph step$"
+    }
+  ]
+}

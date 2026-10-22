@@ -36,12 +36,46 @@ def test_skip_audit_accepts_an_explicit_reason(tmp_path: Path):
     )
 
 
+def test_skip_audit_reports_the_reason_category(tmp_path: Path, capsys):
+    """Approved dependency skips are machine-readable in the audit output."""
+    report = tmp_path / "results.xml"
+    write_report(report, "Skipped: torch is not installed")
+
+    assert check_pytest_skips.main([str(report)]) == 0
+
+    output = capsys.readouterr().out
+    assert '"categories": {"dependency": 1}' in output
+    assert '"category": "dependency"' in output
+    assert '"unapproved": []' in output
+
+
+def test_skip_audit_accepts_an_environment_reason(tmp_path: Path):
+    """Environment-dependent skips remain valid release evidence."""
+    report = tmp_path / "results.xml"
+    write_report(report, "Skipped: OpenML unavailable: network disabled")
+
+    assert check_pytest_skips.main([str(report)]) == 0
+
+
 def test_skip_audit_rejects_an_empty_reason(tmp_path: Path):
     """A skip without a reason fails closed."""
     report = tmp_path / "results.xml"
     write_report(report, None)
 
     assert check_pytest_skips.main([str(report)]) == 1
+
+
+def test_skip_audit_rejects_an_unapproved_reason(tmp_path: Path, capsys):
+    """A new skip category must be registered before it reaches release CI."""
+    report = tmp_path / "results.xml"
+    write_report(report, "Skipped: temporary workaround")
+
+    assert check_pytest_skips.main([str(report)]) == 1
+
+    assert (
+        '"unapproved": [{"reason": "temporary workaround", "test_id": "suite::case"}]'
+        in capsys.readouterr().out
+    )
 
 
 def test_skip_audit_rejects_xfail_outcomes(tmp_path: Path):
