@@ -2049,6 +2049,35 @@ Independent-review gate hardening at `d82bfc1` on 2026-10-22:
   were clean. A signed review missing reliability and security claims is now
   rejected by the default CLI gate.
 
+Exact-head release preflight at `3ef6f59` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed static analysis, formatting, mypy,
+  security, API compatibility, bounded tests, stability, mutation, benchmark,
+  packaging, reproducibility, and site gates. The bounded suite passed
+  `2,037` tests with `75` explicitly explained optional-dependency skips; the
+  JUnit outcome audit found zero unexplained skips and zero xfail/XPASS
+  outcomes. Total coverage was `83.19%` and the declared core scope was `86%`.
+- The three-attempt stability policy passed with no inventory changes,
+  quarantined failures, or expired entries. Mutation testing killed
+  `1,503/2,057` mutants (`73%`), above the `70%` threshold; one mutation
+  timed out and `553` survived for follow-up triage.
+- Five-seed offline benchmarks recorded zero regressions and zero failed
+  repetitions for breast cancer, wine, digits, and diabetes progression. The
+  verdicts were tie, tie, tie, and ahead; runtimes were `105`, `76`, `632`,
+  and `70` seconds, with peak memory of `0.3723`, `0.3757`, `0.4378`, and
+  `0.4443` GB respectively.
+- Reproducible packages and network-isolated wheel/source installs passed.
+  The wheel hash was
+  `57f15957aadbd3739617fbab4dfca707cf43e6cdae25b2ef7102da75d29cbad1` and
+  the source-distribution hash was
+  `368fcd6af5423114e85506578db5d0d924cc2c5d60a2d5b65aa7a12b8e2aba07`.
+- The site gate found `0` npm audit vulnerabilities, Astro built `17` static
+  pages, accessibility checks passed for all `17` HTML files, all `384`
+  internal links resolved, and both Playwright smoke tests passed. This is
+  local evidence; hosted Linux and Pages, external transport/resource-fault
+  execution, secret custody, and independent reviewer evidence remain open
+  release gates.
+
 Current hosted gate observation at `6c11cdc` on 2026-10-22:
 
 - The `ci` run `39730492994` and documentation deployment run `39730493042`
