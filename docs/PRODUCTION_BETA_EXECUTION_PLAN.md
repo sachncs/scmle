@@ -1965,6 +1965,17 @@ Modality-manifest count hardening at `ace10f9` on 2026-10-23:
   data contract only and does not promote experimental modality modelling to
   production support.
 
+Cross-phase regression at `a79d263` on 2026-10-23:
+
+- The combined data-evidence, modality contract/project/lifecycle,
+  parameter-estimation, local fault, reliability-harness, capability-gate,
+  and tabular end-to-end suites passed 155 tests in 2 minutes 1 second under
+  `-W error::ResourceWarning`.
+- This is current-head focused regression evidence for the changed contract
+  boundaries. It is not a substitute for the complete repository suite,
+  mutation gate, hosted CI, public Pages verification, external fault
+  execution, or independent release review.
+
 Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
 
 - `FaultInjectionHarness` now validates duplicate and unexpected evidence
