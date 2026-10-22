@@ -149,6 +149,18 @@ def test_health_reports_the_model_version_and_checksum(saved):
     assert headers["X-Content-Type-Options"] == "nosniff"
 
 
+def test_the_server_rejects_starting_twice(saved):
+    """The serving lifecycle cannot replace a running socket silently."""
+    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    adapter = serving.HttpServing(model)
+    adapter.start()
+    try:
+        with pytest.raises(errors.ScmlError, match="already running"):
+            adapter.start()
+    finally:
+        adapter.stop()
+
+
 def test_an_unsigned_bundle_is_not_served_unless_trusted(saved):
     root = saved[0]
 

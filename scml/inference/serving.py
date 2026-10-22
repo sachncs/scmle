@@ -134,6 +134,8 @@ class HttpServing(ServingAdapter):
 
     def start(self) -> None:
         """Binds the socket and serves in a daemon thread."""
+        if self.httpd is not None:
+            raise errors.ScmlError("server is already running")
         adapter = self
 
         class Handler(server.BaseHTTPRequestHandler):
