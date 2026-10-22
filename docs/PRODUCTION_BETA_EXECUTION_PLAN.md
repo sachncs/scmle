@@ -1944,6 +1944,32 @@ Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
   transport/resource-fault execution, secret custody, and independent
   reviewer evidence remain separate release gates.
 
+Current-head release preflight with stability enforcement at `ed02bf2` on
+2026-10-22:
+
+- `./scripts/release_preflight.sh` now runs the three-attempt stability and
+  quarantine policy as part of the release command. The complete preflight
+  passed `2,024` bounded tests with `75` explicitly explained optional
+  dependency skips; all three stability attempts passed the same `25` test
+  cases with no inventory changes, quarantined failures, or expired entries.
+  Total coverage was `83.02%` and the declared core scope was `86%`.
+- Mutation testing killed `1,503/2,057` mutants (`73%`), above the `70%`
+  threshold. One mutation timed out and `553` survived for follow-up triage.
+- The five-seed offline benchmark gate recorded zero regressions and zero
+  failed repetitions for breast cancer, wine, digits, and diabetes
+  progression. Verdicts were tie, tie, tie, and ahead, with peak memory of
+  `0.3665`, `0.3900`, `0.4526`, and `0.4577` GB respectively.
+- Package checks, byte-for-byte reproducible builds, and network-isolated
+  wheel/source installs passed. The wheel hash was
+  `3c345324bf11250193547afd58dafac5ec96e7468d3fb65848842a96039d9be2` and
+  the source-distribution hash was
+  `69493416d342f0d7f8e5a40cc6e8a2616f34bbeec1aaa1800805f68e5be64f20`.
+- The site audit found `0` vulnerabilities; Astro built `17` pages, the
+  accessibility checks passed for all pages, all `384` internal links
+  resolved, and both Playwright smoke tests passed. This remains local
+  release evidence; hosted CI and Pages, external fault execution, secret
+  custody, and independent review remain open gates.
+
 Current-head serving lifecycle preflight at `a27a3a8` on 2026-10-22:
 
 - `HttpServing.start()` now rejects a second start on the same adapter with a
