@@ -3924,3 +3924,14 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   custody, independent release review, public Pages deployment, and the
   documented non-tabular production boundaries remain release gates.
 
+## Pages route coverage at `ea0722a` on 2026-10-23
+
+- The GitHub Pages workflow now smoke-tests the standalone
+  `/docs/release-evidence/` route both before upload and after deployment.
+  This keeps the deployment contract aligned with the Astro route inventory
+  and prevents a newly added onboarding page from being locally green but
+  absent from the published-route check.
+- The workflow syntax is locally valid. Hosted execution remains unavailable
+  for this private repository: the latest CI and Pages runs failed before any
+  job step acquired a runner, so public deployment is not yet verified.
+
