@@ -34,6 +34,13 @@ uv run --python "$python_version" pytest -q \
   --junitxml="$preflight_directory/bounded-suite.xml"
 uv run --python "$python_version" python scripts/check_pytest_skips.py \
   "$preflight_directory/bounded-suite.xml"
+uv run --python "$python_version" python scripts/check_test_stability.py \
+  --runs 3 \
+  --quarantine tests/quarantine.json \
+  --output "$preflight_directory/test-stability.json" \
+  tests/unit/test_api_surface.py \
+  tests/unit/test_performance_contracts.py \
+  tests/unit/test_test_stability.py
 uv run --python "$python_version" coverage report \
   --include='scml/contracts/*,scml/data/*,scml/evaluation/*,scml/governance/*,scml/inference/*,scml/monitoring/*' \
   --fail-under=85
