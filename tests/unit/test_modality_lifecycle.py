@@ -584,6 +584,33 @@ def test_lifecycle_report_rejects_a_signed_incomplete_stage_record(
         )
 
 
+def test_lifecycle_report_rejects_a_stage_without_evidence_links(
+    tmp_path: Path,
+):
+    """A stage name alone cannot satisfy the lifecycle evidence contract."""
+    report_path = tmp_path / "report.json"
+    report = modality_lifecycle.ModalityLifecycle().run(
+        document_adapter(),
+        tmp_path / "package",
+        signing_key="report-key",
+        report_path=report_path,
+    )
+    record = report.to_dict()
+    record["stage_evidence"][0]["evidence_links"] = []
+    unsigned = dict(record)
+    unsigned.pop("signature")
+    record["signature"] = {
+        "algorithm": attestation.SIGNATURE_ALGORITHM,
+        "value": attestation.sign_payload(unsigned, "report-key"),
+    }
+    report_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="evidence links"):
+        modality_lifecycle.LifecycleReport.read_verified(
+            report_path, "report-key"
+        )
+
+
 def test_package_loader_rejects_an_unsupported_manifest_version(
     tmp_path: Path,
 ):

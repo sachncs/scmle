@@ -304,6 +304,10 @@ class LifecycleReport:
                 "lifecycle report stage evidence must contain every required "
                 "stage exactly once in order"
             )
+        if any(not evidence.evidenced for evidence in stages):
+            raise ValueError(
+                "lifecycle report stages must contain evidence links"
+            )
         object.__setattr__(self, "stage_evidence", stages)
         for field_name in (
             "evaluation",
