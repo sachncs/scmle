@@ -1245,9 +1245,12 @@ def reference_ipw_ate(
         policy.propensity_clip,
         1.0 - policy.propensity_clip,
     )
-    reference_ate, _, _ = hajek_ipw_statistics(
-        treatment, values, reference_propensity
-    )
+    (
+        reference_ate,
+        reference_variance,
+        reference_evidence,
+    ) = hajek_ipw_statistics(treatment, values, reference_propensity)
+    del reference_variance, reference_evidence
     difference = float(abs(reference_ate - coefficients[0]))
     return {
         "method": "scipy.optimize.minimize:BFGS_propensity",
