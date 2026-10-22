@@ -1943,6 +1943,17 @@ Parameter-estimand alignment at `4b41269` on 2026-10-23:
   correctness improvement within the bounded frequentist layer, not evidence
   for causal interpretation or broader model support.
 
+Dataset-manifest identity hardening at `7f9a7ed` on 2026-10-23:
+
+- `DatasetManifest` now validates non-empty dataset, schema, data, target,
+  and modality identities; non-negative row and column counts; positive schema
+  versions; typed provenance components; and typed curation findings before a
+  manifest can enter a run or artifact.
+- The focused data-evidence, source-registry, and capability-use slice passed
+  32 tests under `-W error::ResourceWarning`; Ruff and mypy passed. This
+  strengthens phase-1 data identity and curation evidence without claiming
+  that arbitrary external sources or distributed broker semantics are solved.
+
 Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
 
 - `FaultInjectionHarness` now validates duplicate and unexpected evidence
