@@ -68,6 +68,10 @@ MAX_GRAPH_CONTEXT_EDGES = 128
 class LifecycleCancelledError(RuntimeError):
     """Raised when a modality lifecycle receives a cancellation request."""
 
+    def __init__(self, message: str) -> None:
+        """Create a cancellation error with an actionable message."""
+        super().__init__(message)
+
 
 class LifecycleCancellation:
     """Thread-safe cooperative cancellation signal for one lifecycle run."""

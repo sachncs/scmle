@@ -9,6 +9,8 @@ from scml.governance import vault
 
 PUBLIC_API = {
     "ExtensionCurationAdapter",
+    "LifecycleCancellation",
+    "LifecycleCancelledError",
     "MLProject",
     "ModalityCurationAdapter",
     "ModalityCurationProject",

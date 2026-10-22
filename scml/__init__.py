@@ -15,11 +15,15 @@ from scml.inference.modality_serving import ModalitySampleDecoder
 from scml.models.custom import register_estimator
 from scml.models.custom import unregister_estimator
 from scml.models.modality_lifecycle import ExtensionCurationAdapter
+from scml.models.modality_lifecycle import LifecycleCancellation
+from scml.models.modality_lifecycle import LifecycleCancelledError
 from scml.models.modality_lifecycle import ModalityCurationAdapter
 from scml.models.modality_lifecycle import ModalityPredictor
 
 __all__ = [
     "ExtensionCurationAdapter",
+    "LifecycleCancellation",
+    "LifecycleCancelledError",
     "MLProject",
     "ModalityCurationAdapter",
     "ModalityCurationProject",

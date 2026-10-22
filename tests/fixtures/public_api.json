@@ -4,6 +4,14 @@
       "kind": "class",
       "signature_sha256": "595da708df9edb17f8bed628e23457f3b4e3eec83871f3b1100d9340ab6abd68"
     },
+    "LifecycleCancellation": {
+      "kind": "class",
+      "signature_sha256": "db8e35344392f513210cb6964ec5058b3f7659bccd52411ec4b50b0afda2ad81"
+    },
+    "LifecycleCancelledError": {
+      "kind": "class",
+      "signature_sha256": "5b78ac7b90bb70f10da35d4abb1167104119d557823caf5e7035c50104f25832"
+    },
     "MLProject": {
       "kind": "class",
       "signature_sha256": "5cd04d6a6973827c331ea56f83f95fb6aa18d26b003280805c27c3b25903df64"
