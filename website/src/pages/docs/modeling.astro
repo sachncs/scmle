@@ -78,6 +78,27 @@ pip install "super-charge-ml[embeddings]"`}</code></pre>
     </div>
   </figure>
 
+  <h2>Run a declared estimate</h2>
+  <p>The estimation API is intentionally explicit. You supply the design matrix, outcome, scientific declaration, and covariance policy; the result tells you what was estimated, how many rows were used, how uncertainty was computed, and whether the independent reference calculation agreed.</p>
+  <pre><code>{`from scml import EstimandSpec, EstimationPolicy, estimate_parameters
+
+estimand = EstimandSpec(
+    name="conversion_log_odds",
+    outcome="converted",
+    population="eligible visitors in the 2026 observation window",
+    likelihood="bernoulli",
+    feature_names=("treatment", "prior_visits"),
+    assumptions=("rows are conditionally independent",),
+)
+report = estimate_parameters(
+    features,
+    converted,
+    estimand,
+    EstimationPolicy(estimator="logistic", covariance="hc3"),
+)
+report.write("artifacts/parameter-estimation.json")`}</code></pre>
+  <p>That report is not a causal conclusion. It is a reproducible frequentist estimate under the assumptions you declared. If your claim is causal, treatment-effect, Bayesian, longitudinal, or hierarchical, the estimand and estimator need a domain-specific implementation and independent review.</p>
+
   <h2>What you can inspect now</h2>
   <ol>
     <li><strong>Search decisions:</strong> the plan records the candidate family, parameter space, budget, pruning decisions, and failed or deferred trials.</li>
