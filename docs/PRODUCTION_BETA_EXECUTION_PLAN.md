@@ -2032,6 +2032,16 @@ Capability-matrix alignment at `2325150` on 2026-10-22:
   Playwright browser checks passed. This is a documentation alignment change;
   it does not alter the capability labels or external Pages deployment status.
 
+Modality-package signature hardening at `09ca664` on 2026-10-22:
+
+- `load_package` now verifies the expected and recorded HMAC values with
+  constant-time comparison, matching the security posture of the bundle,
+  attestation, registry, keyring, and independent-review verifiers.
+- The valid-package and same-length wrong-key regression tests passed under
+  `-W error::ResourceWarning`; Ruff, formatting, and mypy passed for the
+  changed module. This closes a local verifier inconsistency but does not
+  provide external key custody or an independent release signature.
+
 Audio robustness evidence at `ab21c49` on 2026-10-22:
 
 - `AudioAdapter` now records a bounded, deterministic additive-background-noise
