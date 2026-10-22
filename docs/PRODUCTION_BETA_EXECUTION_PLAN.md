@@ -1942,6 +1942,18 @@ Current-head serving lifecycle preflight at `a27a3a8` on 2026-10-22:
   Hosted Linux and Pages, external fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Instance-scoped serving policy at `6cbecf7` on 2026-10-22:
+
+- `HttpServing` now accepts positive per-instance `max_request_bytes` and
+  `max_records` bounds, matching the modality reference server and removing
+  the need for process-global test or deployment mutation. Invalid bounds fail
+  at construction before a socket can be started.
+- The tabular and modality serving slice passed `13` tests with `2` explicit
+  optional-dependency skips under `-W error::ResourceWarning`; Ruff,
+  formatting, and mypy passed. This is a reference-server reliability
+  boundary; authentication, TLS, gateway policy, and external fault evidence
+  remain deployment-owner gates.
+
 Current-head release preflight at `8651c3a` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
