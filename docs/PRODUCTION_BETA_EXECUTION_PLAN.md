@@ -2001,6 +2001,15 @@ Fail-closed performance publication at `38f6736` on 2026-10-22:
   passed `58` tests under strict resource warnings; Ruff, formatting, mypy,
   and diff checks passed.
 
+Baseline failure regression evidence at `22fc083` on 2026-10-22:
+
+- A deterministic repeated-baseline fixture now exercises the failed baseline
+  branch as well as the failed budget branch. Both paths prove that the
+  package and lifecycle report are absent after rejection.
+- The focused modality lifecycle, project, and explanation slice passed `58`
+  tests under strict resource warnings; mypy, Ruff, formatting, and diff
+  checks remained clean.
+
 Signed lifecycle evidence at `7dc754f` on 2026-10-22:
 
 - Lifecycle reports are now schema version 2 artifacts signed over the exact
