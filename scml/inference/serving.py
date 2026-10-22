@@ -111,6 +111,8 @@ class HttpServing(ServingAdapter):
         bundle: bundle_module.ModelBundle,
         host: str = "127.0.0.1",
         port: int = 0,
+        max_request_bytes: int = MAX_REQUEST_BYTES,
+        max_records: int = MAX_REQUEST_RECORDS,
     ) -> None:
         """Initializes the adapter.
 
@@ -118,10 +120,19 @@ class HttpServing(ServingAdapter):
             bundle: Model to serve.
             host: Interface to bind (loopback by default).
             port: Port; 0 picks a free one.
+            max_request_bytes: Maximum JSON request body size.
+            max_records: Maximum records accepted by one prediction request.
+
+        Raises:
+            ValueError: If a request bound is not positive.
         """
+        if max_request_bytes < 1 or max_records < 1:
+            raise ValueError("request bounds must be positive")
         super().__init__(bundle)
         self.host = host
         self.port = port
+        self.max_request_bytes = max_request_bytes
+        self.max_records = max_records
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
 
@@ -215,12 +226,12 @@ class HttpServing(ServingAdapter):
                             },
                         )
                         return
-                    if length < 0 or length > MAX_REQUEST_BYTES:
+                    if length < 0 or length > adapter.max_request_bytes:
                         self.send_json(
                             413,
                             {
                                 "error": "request body exceeds "
-                                f"{MAX_REQUEST_BYTES} bytes",
+                                f"{adapter.max_request_bytes} bytes",
                                 "category": "request",
                             },
                         )
@@ -249,12 +260,12 @@ class HttpServing(ServingAdapter):
                     records = payload["records"]
                     if not isinstance(records, list):
                         raise TypeError("'records' must be a list")
-                    if len(records) > MAX_REQUEST_RECORDS:
+                    if len(records) > adapter.max_records:
                         self.send_json(
                             413,
                             {
                                 "error": "request contains more than "
-                                f"{MAX_REQUEST_RECORDS} records",
+                                f"{adapter.max_records} records",
                                 "category": "request",
                             },
                         )

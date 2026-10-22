@@ -64,10 +64,9 @@ def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
     assert status == 422 and "missing" in body["details"]
 
 
-def test_the_server_refuses_oversized_bodies_with_413(saved, monkeypatch):
+def test_the_server_refuses_oversized_bodies_with_413(saved):
     model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
-    monkeypatch.setattr(serving, "MAX_REQUEST_BYTES", 10)
-    adapter = serving.HttpServing(model)
+    adapter = serving.HttpServing(model, max_request_bytes=10)
     adapter.start()
     try:
         status, body = post(
@@ -79,10 +78,11 @@ def test_the_server_refuses_oversized_bodies_with_413(saved, monkeypatch):
     assert status == 413 and body["category"] == "request"
 
 
-def test_the_server_refuses_too_many_records_with_413(saved, monkeypatch):
+def test_the_server_accepts_instance_request_bounds(saved):
     model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
-    monkeypatch.setattr(serving, "MAX_REQUEST_RECORDS", 1)
-    adapter = serving.HttpServing(model)
+    adapter = serving.HttpServing(
+        model, max_request_bytes=10_000, max_records=1
+    )
     adapter.start()
     try:
         status, body = post(
@@ -93,6 +93,31 @@ def test_the_server_refuses_too_many_records_with_413(saved, monkeypatch):
         adapter.stop()
 
     assert status == 413 and body["category"] == "request"
+
+
+def test_the_server_refuses_too_many_records_with_413(saved):
+    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    adapter = serving.HttpServing(model, max_records=1)
+    adapter.start()
+    try:
+        status, body = post(
+            f"{adapter.address}/predict",
+            {"records": [{"a": 1.0, "b": 2.0}, {"a": 3.0, "b": 4.0}]},
+        )
+    finally:
+        adapter.stop()
+
+    assert status == 413 and body["category"] == "request"
+
+
+def test_the_server_rejects_invalid_request_bounds(saved):
+    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+
+    with pytest.raises(ValueError, match="request bounds"):
+        serving.HttpServing(model, max_request_bytes=0)
+
+    with pytest.raises(ValueError, match="request bounds"):
+        serving.HttpServing(model, max_records=0)
 
 
 def test_the_server_classifies_malformed_and_internal_requests(
