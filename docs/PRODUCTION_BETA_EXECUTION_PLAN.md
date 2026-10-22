@@ -1966,6 +1966,18 @@ Skip and xfail release enforcement at `ed3e3c5` on 2026-10-22:
   mypy, and `actionlint` were clean. A synthetic xfail report was rejected
   fail-closed, while a report with an explicit skip reason remained accepted.
 
+All-extras CI capability matrix at `151bc4d` on 2026-10-22:
+
+- CI now installs every declared optional extra on Python 3.13 and exercises
+  the optional boosting, ONNX, sampling, spreadsheet, deep-learning, Keras,
+  embedding, MLflow, Ray, text-embedding, reader, interchange, and curriculum
+  paths. The matrix is JUnit-backed and applies the skip/xfail release gate.
+- The same clean all-extras environment passed `124` tests with `0` skips and
+  one known upstream MLflow SQLAlchemy `SADeprecationWarning`; no
+  `ResourceWarning` was emitted. The JUnit verifier reported empty
+  unexplained-skip and xfail sets, and `actionlint` passed. Hosted execution
+  remains the cross-platform authority because the local run is macOS.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
