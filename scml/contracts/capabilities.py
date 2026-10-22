@@ -577,6 +577,7 @@ class CapabilityRegistry:
         """Create a registry from complete capability declarations."""
         self.records: dict[CapabilityKey, Capability] = {}
         self.model_families: dict[str, ModelFamilyDeclaration] = {}
+        self.runtime_environment: CapabilityEnvironment | None = None
         for capability in capabilities:
             self.register(capability)
         for declaration in model_families:
@@ -638,6 +639,14 @@ class CapabilityRegistry:
             raise TypeError("model_family must be a string")
         return self.model_families.get(model_family)
 
+    def bind_runtime_environment(
+        self, environment: CapabilityEnvironment
+    ) -> None:
+        """Bind observed facts used when a caller omits an environment."""
+        if not isinstance(environment, CapabilityEnvironment):
+            raise TypeError("environment must be CapabilityEnvironment")
+        self.runtime_environment = environment
+
     def diagnose(
         self,
         key: CapabilityKey,
@@ -658,6 +667,8 @@ class CapabilityRegistry:
             environment, CapabilityEnvironment
         ):
             raise TypeError("environment must be CapabilityEnvironment")
+        if environment is None:
+            environment = self.runtime_environment
         statuses = (
             frozenset({CapabilityStatus.SUPPORTED})
             if allowed_statuses is None
@@ -717,6 +728,8 @@ class CapabilityRegistry:
             environment, CapabilityEnvironment
         ):
             raise TypeError("environment must be CapabilityEnvironment")
+        if environment is None:
+            environment = self.runtime_environment
         diagnostics: list[CapabilityDiagnostic] = []
         if environment is not None:
             missing_extras = sorted(

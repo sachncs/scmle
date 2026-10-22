@@ -18,6 +18,7 @@ import pandas as pd
 
 from scml.api import results
 from scml.artifacts import store as store_module
+from scml.contracts import capabilities
 from scml.contracts import errors
 from scml.contracts import events
 from scml.contracts import experiments
@@ -26,6 +27,7 @@ from scml.core import compiler
 from scml.core import context as context_module
 from scml.core import limits
 from scml.core import policies as checkpoints_module
+from scml.core import resource_observation
 from scml.core import scheduler
 from scml.core import stages as stages_module
 from scml.core import state
@@ -55,6 +57,7 @@ class Orchestrator:
         stages: tuple[stages_module.Stage, ...] | None = None,
         tracker: tracking_stores.ExperimentStore | None = None,
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
+        capability_registry: capabilities.CapabilityRegistry | None = None,
     ) -> None:
         """Initializes the orchestrator.
 
@@ -69,6 +72,8 @@ class Orchestrator:
                 selection stages; any rejection blocks the run.
             tracker: Experiment store; defaults to a SQLite database next to
                 the run directories.
+            capability_registry: Explicit capability declarations; defaults
+                to the built-in tabular beta registry.
         """
         self.spec = spec
         self.frame = frame
@@ -82,6 +87,7 @@ class Orchestrator:
         )
         self.tracker = tracker
         self.checkpoints = checkpoints
+        self.capability_registry = capability_registry
         self.tracking_path: pathlib.Path | None = None
         self.cancel_event = threading.Event()
 
@@ -110,6 +116,14 @@ class Orchestrator:
             registry=self.registry,
             catalog=metrics.CATALOG,
             policy=self.policy,
+            capability_registry=(
+                self.capability_registry
+                if self.capability_registry is not None
+                else context_module.tabular_beta_capability_registry()
+            ),
+            capability_observation=resource_observation.observe_runtime_resources(
+                store.directory if store is not None else None
+            ),
             backend=scheduler.create_backend(
                 limits.ResourceGovernor(self.spec.resources).workers,
                 self.spec.resources.executor,
@@ -364,6 +378,8 @@ class Orchestrator:
             for stage in self.stages:
                 context.check_cancelled()
                 machine.transition(stage.state, stage.describe(context))
+                if stage.state is state.RunState.PLANNING:
+                    context.persist_capability_observation()
                 stage.execute(context)
                 self.consult_checkpoints(stage.state, context)
             machine.transition(

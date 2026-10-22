@@ -20,6 +20,7 @@ from scml.contracts import lineage
 from scml.contracts import metrics as metric_contracts
 from scml.contracts import tasks
 from scml.core import limits
+from scml.core import resource_observation
 from scml.core import scheduler
 from scml.data.readers import streaming
 from scml.data.splitting import splitters
@@ -229,6 +230,8 @@ class RunContext:
         policy: Model selection policy.
         store: Run directory, or None for previews.
         log: Event log, or None for previews.
+        capability_observation: Runtime resource facts captured before the
+            capability gate.
         tracker: Experiment tracking backend (no-op by default).
         checkpoints: Completed trials from an interrupted run, by trial id,
             reused instead of recomputed when resuming.
@@ -285,6 +288,9 @@ class RunContext:
     capability_registry: capabilities.CapabilityRegistry = dataclasses.field(
         default_factory=tabular_beta_capability_registry
     )
+    capability_observation: (
+        resource_observation.RuntimeResourceObservation | None
+    ) = None
     store: store_module.RunStore | None = None
     log: events.EventLog | None = None
     tracker: tracking_stores.ExperimentStore = dataclasses.field(
@@ -344,6 +350,13 @@ class RunContext:
     result: results.RunResult | None = None
     started_at: float = dataclasses.field(default_factory=time.monotonic)
 
+    def __post_init__(self) -> None:
+        """Bind the captured facts to the registry used by planning."""
+        if self.capability_observation is not None:
+            self.capability_registry.bind_runtime_environment(
+                self.capability_observation.environment
+            )
+
     @property
     def resource_governor(self) -> limits.ResourceGovernor:
         """The governor, created on first use from the specification."""
@@ -383,6 +396,20 @@ class RunContext:
         """Writes a JSON artifact if the run is persisted."""
         if self.store is not None:
             self.store.write_json(relative, payload)
+
+    def persist_capability_observation(self) -> None:
+        """Persist the runtime facts immediately before capability planning."""
+        observation = require(
+            self.capability_observation, "capability_observation"
+        )
+        path = "evidence/capability_resources.json"
+        self.write_json(path, observation.to_dict())
+        self.emit(
+            "capability.environment.observed",
+            "runtime facts captured for the capability gate",
+            (path,),
+            observation.to_dict()["environment"],
+        )
 
     def emit(
         self,
