@@ -91,6 +91,19 @@ def test_deep_learning_paths_declare_their_optional_extra():
         assert registry.require(key).required_extras == ("deeplearning",)
 
 
+def test_extension_only_foundation_adapter_cannot_break_auto_planning(
+    monkeypatch,
+):
+    """An installed extension-only model must not enter the beta plan."""
+    registry = registry_module.ModelRegistry.with_builtins()
+    adapter = registry.get("tabpfn")
+    monkeypatch.setattr(adapter, "is_available", lambda: True)
+
+    plan = stages.build_plan(make_context(model_registry=registry))
+
+    assert "tabpfn" not in plan.candidate_models
+
+
 def test_unimplemented_contract_dimensions_are_not_promoted():
     """Missing modality, uncertainty, and explanation paths fail closed."""
     registry = context_module.tabular_beta_capability_registry()
