@@ -1972,6 +1972,19 @@ Bounded tabular JEPA evidence at `57ac21c` on 2026-10-23:
   foundation-model coverage. Documents, images, audio, video, graphs,
   geospatial data, and raster JEPA encoders remain separate work.
 
+Estimation artifact reliability at `784a5a1` on 2026-10-23:
+
+- `EstimationResult.write()` now persists a schema-versioned report through an
+  atomic temporary-file replacement and binds the canonical report to a
+  SHA-256 digest. `EstimationResult.read()` reconstructs the typed result and
+  fails closed on schema or digest mismatch.
+- The policy now rejects unknown estimator, covariance, and missingness values
+  before data access. Clustered covariance uses cluster-level score sums with
+  finite-sample correction rather than silently reusing row-level HC3 scores.
+- The focused estimation suite passed `5` tests, including round-trip,
+  tamper, robust covariance, bootstrap, shift, logistic reference, and
+  missingness cases; Ruff and mypy passed.
+
 Signed modality checkpoint recovery at `3831565` on 2026-10-22:
 
 - The non-tabular lifecycle now supports an explicit, signed, atomically
