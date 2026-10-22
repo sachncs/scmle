@@ -583,6 +583,7 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
     assert raw["source_dimensions"] == [4, 4]
     assert len(raw["terms"]) == 10
     assert raw["feature_space_only"] is False
+    assert evidence["independent_ground_truth"]["status"] == "not_available"
 
 
 def test_image_adapter_curation_hash_matches_declared_identity():

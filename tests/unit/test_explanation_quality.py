@@ -96,6 +96,51 @@ def test_quality_evaluation_passes_declared_measures():
     }
 
 
+def test_independent_ground_truth_evaluation_is_explicit_and_deterministic():
+    """Reference rankings are compared without making causal claims."""
+    ground_truth = quality.ExplanationGroundTruth(
+        method="annotated_feature_reference",
+        reference="tests/fixtures/explanation-reference-v1.json",
+        expected_features=("signal", "age"),
+        minimum_overlap=1.0,
+        limitations=("The reference covers this synthetic fixture only.",),
+    )
+
+    result = quality.evaluate_ground_truth(
+        ground_truth,
+        report("signal", "age", "noise"),
+        "sample-1",
+    )
+
+    assert result.passed is True
+    assert result.overlap_score == 1.0
+    assert result.to_dict()["status"] == "available"
+    assert result.to_dict()["reference"] == (
+        "tests/fixtures/explanation-reference-v1.json"
+    )
+
+
+def test_independent_ground_truth_evaluation_fails_on_mismatched_ranking():
+    """A supplied reference cannot be silently treated as satisfied."""
+    ground_truth = quality.ExplanationGroundTruth(
+        method="annotated_feature_reference",
+        reference="fixture://reference",
+        expected_features=("signal", "age"),
+    )
+
+    result = quality.evaluate_ground_truth(
+        ground_truth,
+        report("noise", "age", "signal"),
+        "sample-1",
+    )
+
+    assert result.passed is False
+    assert result.overlap_score == 0.5
+    assert result.findings == (
+        "independent explanation reference overlap is below threshold",
+    )
+
+
 @pytest.mark.parametrize(
     "factory",
     (

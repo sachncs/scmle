@@ -79,6 +79,93 @@ class QualityEvaluation:
         }
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class ExplanationGroundTruth:
+    """Independent reference ranking for one explanation contract.
+
+    The reference is caller-owned evidence. This type deliberately stores a
+    ranking of declared feature names rather than pretending that a feature
+    ranking proves raw-modality causality.
+    """
+
+    method: str
+    reference: str
+    expected_features: tuple[str, ...]
+    minimum_overlap: float = 1.0
+    limitations: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Validate the independent reference declaration."""
+        if not self.method.strip():
+            raise ValueError("method must not be empty")
+        if not self.reference.strip():
+            raise ValueError("reference must not be empty")
+        if not self.expected_features:
+            raise ValueError("expected_features must not be empty")
+        if len(set(self.expected_features)) != len(self.expected_features):
+            raise ValueError("expected_features must be unique")
+        if any(not feature.strip() for feature in self.expected_features):
+            raise ValueError("expected_features must not contain empty values")
+        validate_score(self.minimum_overlap, "minimum_overlap")
+        if any(not limitation.strip() for limitation in self.limitations):
+            raise ValueError("limitations must not contain empty values")
+
+    def to_dict(self) -> dict[str, object]:
+        """Return the reference declaration as JSON-native evidence."""
+        return {
+            "method": self.method,
+            "reference": self.reference,
+            "expected_features": list(self.expected_features),
+            "minimum_overlap": self.minimum_overlap,
+            "limitations": list(self.limitations),
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class GroundTruthEvaluation:
+    """Reviewable comparison between an explanation and its reference."""
+
+    sample_id: str
+    method: str
+    reference: str
+    expected_features: tuple[str, ...]
+    observed_features: tuple[str, ...]
+    overlap_score: float
+    minimum_overlap: float
+    passed: bool
+    findings: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        """Validate the comparison before it is persisted."""
+        if not self.sample_id.strip():
+            raise ValueError("sample_id must not be empty")
+        if not self.method.strip():
+            raise ValueError("method must not be empty")
+        if not self.reference.strip():
+            raise ValueError("reference must not be empty")
+        validate_score(self.overlap_score, "overlap_score")
+        validate_score(self.minimum_overlap, "minimum_overlap")
+        if not isinstance(self.findings, tuple):
+            raise TypeError("findings must be a tuple")
+
+    def to_dict(self) -> dict[str, object]:
+        """Return the comparison as deterministic JSON-native evidence."""
+        return {
+            "status": "available",
+            "sample_id": self.sample_id,
+            "method": self.method,
+            "reference": self.reference,
+            "expected_features": list(self.expected_features),
+            "observed_features": list(self.observed_features),
+            "overlap_score": self.overlap_score,
+            "minimum_overlap": self.minimum_overlap,
+            "passed": self.passed,
+            "findings": list(self.findings),
+            "limitations": list(self.limitations),
+        }
+
+
 def explanation_ranking(report: Mapping[str, Any]) -> tuple[str, ...]:
     """Extract a validated feature ranking from one explanation report."""
     features = report.get("features")
@@ -95,6 +182,43 @@ def explanation_ranking(report: Mapping[str, Any]) -> tuple[str, ...]:
             raise ValueError("explanation feature names must be unique and set")
         ranking.append(feature)
     return tuple(ranking)
+
+
+def evaluate_ground_truth(
+    ground_truth: ExplanationGroundTruth,
+    report: Mapping[str, Any],
+    sample_id: str,
+) -> GroundTruthEvaluation:
+    """Compare an explanation ranking with an independent reference ranking.
+
+    The score is the fraction of expected features found in the observed
+    top-k ranking, where k is the number of expected features. It is a
+    transparent agreement measure, not a causal or semantic validity claim.
+    """
+    if not isinstance(ground_truth, ExplanationGroundTruth):
+        raise TypeError("ground_truth must be ExplanationGroundTruth")
+    ranking = explanation_ranking(report)
+    observed = ranking[: len(ground_truth.expected_features)]
+    expected = set(ground_truth.expected_features)
+    overlap = len(expected & set(observed)) / len(expected)
+    passed = overlap >= ground_truth.minimum_overlap
+    findings = (
+        ("independent explanation reference passed",)
+        if passed
+        else ("independent explanation reference overlap is below threshold",)
+    )
+    return GroundTruthEvaluation(
+        sample_id=sample_id,
+        method=ground_truth.method,
+        reference=ground_truth.reference,
+        expected_features=ground_truth.expected_features,
+        observed_features=observed,
+        overlap_score=overlap,
+        minimum_overlap=ground_truth.minimum_overlap,
+        passed=passed,
+        findings=findings,
+        limitations=ground_truth.limitations,
+    )
 
 
 def linear_contribution_report(

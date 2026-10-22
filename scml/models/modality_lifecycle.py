@@ -431,6 +431,21 @@ class ModalityAdapter(ModalityCurationAdapter):
             ],
         }
 
+    def explanation_ground_truth(
+        self,
+        sample: Any,
+        feature_names: Sequence[str],
+    ) -> quality.ExplanationGroundTruth | None:
+        """Return caller-owned independent explanation evidence, if known.
+
+        Built-in adapters return no reference by default because raw-modality
+        semantics cannot be inferred from a feature matrix. A domain adapter
+        may override this method when it carries an independently authored
+        annotation, benchmark, or synthetic oracle.
+        """
+        del sample, feature_names
+        return None
+
     def labels(self, samples: Sequence[Any]) -> tuple[object, ...]:
         """Return labels in sample order."""
         return tuple(self.label(sample) for sample in samples)
@@ -2781,6 +2796,29 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             raise RuntimeError(
                 "repeated explanation evaluation produced no report"
             )
+        ground_truth = context.adapter.explanation_ground_truth(
+            partitions.test[0], batch.feature_names
+        )
+        if ground_truth is None:
+            ground_truth_evidence: dict[str, object] = {
+                "status": "not_available",
+                "reason": (
+                    "the adapter did not provide an independent explanation "
+                    "reference"
+                ),
+                "feature_space_only": True,
+                "limitations": [
+                    "Feature-space stability and fidelity are not independent "
+                    "semantic validation.",
+                    "Raw-modality ground truth remains caller-owned evidence.",
+                ],
+            }
+        else:
+            ground_truth_evidence = quality.evaluate_ground_truth(
+                ground_truth,
+                local_report,
+                batch.sample_ids[0],
+            ).to_dict()
         repeated_stability = min(repeated_stabilities)
         quality_evaluation = quality.evaluate(
             method="linear_reference_zero_ablation_and_perturbation",
@@ -2822,6 +2860,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                     "production-scale stress guarantee.",
                 ],
             },
+            "independent_ground_truth": ground_truth_evidence,
             "modality_specific": context.adapter.modality_specific_explanation(
                 partitions.test[0],
                 model,
