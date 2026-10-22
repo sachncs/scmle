@@ -164,7 +164,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                         ),
                     )
                 )
-    return capabilities.CapabilityRegistry(records)
+    return capabilities.CapabilityRegistry.with_declared_model_families(records)
 
 
 def extension_capability(

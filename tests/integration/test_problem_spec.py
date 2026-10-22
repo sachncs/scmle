@@ -78,6 +78,15 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     run_report = (result.run_dir / "report.html").read_text()
     assert 'href="explanations/permutation_importance.html"' in run_report
     assert (result.run_dir / "capability_registry.json").exists()
+    capability_registry = json.loads(
+        (result.run_dir / "capability_registry.json").read_text()
+    )
+    assert capability_registry["schema_version"] == 1
+    assert any(
+        family["model_family"] == "jepa"
+        and family["status"] == "experimental"
+        for family in capability_registry["model_families"]
+    )
     assert (result.run_dir / "evaluation_policy.json").exists()
     assert (result.run_dir / "release_evidence.json").exists()
     assert "success criteria met" in result.summary()

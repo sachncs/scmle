@@ -67,6 +67,12 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     assert {declaration.key.inference for declaration in declarations} == {
         capabilities.Inference.LIBRARY
     }
+    family = context.capability_registry.find_model_family(
+        capabilities.ModelFamily.JEPA.value
+    )
+    assert family is not None
+    assert family.status is capabilities.CapabilityStatus.EXPERIMENTAL
+    assert family.modalities == (capabilities.Modality.TABULAR,)
 
 
 def test_deep_learning_paths_declare_their_optional_extra():
