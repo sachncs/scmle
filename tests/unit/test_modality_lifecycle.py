@@ -585,6 +585,16 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
     assert raw["feature_space_only"] is False
 
 
+def test_image_adapter_curation_hash_matches_declared_identity():
+    """Image curation remains attached to source-and-content identity."""
+    fixture = image_adapter()
+    adapter = modality_lifecycle.ImageAdapter(
+        image.ImageDataset(tuple(reversed(fixture.samples)))
+    )
+
+    assert adapter.curate().dataset_hash == adapter.dataset_hash
+
+
 def test_document_lifecycle_emits_span_provenance_evidence(tmp_path: Path):
     """The document adapter preserves page and section source context."""
     report = modality_lifecycle.ModalityLifecycle().run(
