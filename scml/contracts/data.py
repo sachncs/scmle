@@ -367,6 +367,48 @@ class DatasetManifest:
     )
     findings: tuple[CurationFinding, ...] = ()
 
+    def __post_init__(self) -> None:
+        """Validate dataset identity before it enters a run or artifact."""
+        for field_name, field_value in (
+            ("dataset_id", self.dataset_id),
+            ("schema_hash", self.schema_hash),
+            ("data_hash", self.data_hash),
+            ("target", self.target),
+            ("modality", self.modality),
+        ):
+            if not isinstance(field_value, str) or not field_value.strip():
+                raise ValueError(f"{field_name} must not be empty")
+        for count_name, count_value in (
+            ("row_count", self.row_count),
+            ("column_count", self.column_count),
+            ("schema_version", self.schema_version),
+        ):
+            if isinstance(count_value, bool) or not isinstance(
+                count_value, int
+            ):
+                raise TypeError(f"{count_name} must be an integer")
+        if self.row_count < 0:
+            raise ValueError("row_count must not be negative")
+        if self.column_count < 0:
+            raise ValueError("column_count must not be negative")
+        if self.schema_version < 1:
+            raise ValueError("schema_version must be positive")
+        for component_name, component, expected in (
+            ("source", self.source, SourceMetadata),
+            ("lineage", self.lineage, LineageMetadata),
+            ("privacy", self.privacy, PrivacyMetadata),
+        ):
+            if not isinstance(component, expected):
+                raise TypeError(
+                    f"{component_name} must be {expected.__name__}"
+                )
+        object.__setattr__(self, "findings", tuple(self.findings))
+        if any(
+            not isinstance(finding, CurationFinding)
+            for finding in self.findings
+        ):
+            raise TypeError("findings must contain CurationFinding records")
+
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
         return {

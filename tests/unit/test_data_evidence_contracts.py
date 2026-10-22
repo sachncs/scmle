@@ -156,6 +156,47 @@ def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
     assert data.DatasetManifest.from_dict(record) == manifest
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("dataset_id", "", "dataset_id"),
+        ("schema_hash", "", "schema_hash"),
+        ("data_hash", "", "data_hash"),
+        ("target", "", "target"),
+        ("row_count", -1, "row_count"),
+        ("column_count", -1, "column_count"),
+        ("schema_version", 0, "schema_version"),
+    ),
+)
+def test_dataset_manifest_rejects_invalid_identity(field, value, message):
+    """Dataset identity cannot be persisted with incomplete metadata."""
+    values = {
+        "dataset_id": "dataset",
+        "schema_hash": "schema",
+        "data_hash": "data",
+        "row_count": 1,
+        "column_count": 1,
+        "target": "label",
+        "schema_version": 1,
+    }
+    values[field] = value
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        data.DatasetManifest(**values)
+
+
+def test_dataset_manifest_rejects_untyped_evidence_components():
+    """Lineage, privacy, and findings remain typed contract components."""
+    with pytest.raises(TypeError, match="source"):
+        data.DatasetManifest(
+            "dataset", "schema", "data", 1, 1, "label", source={}
+        )
+    with pytest.raises(TypeError, match="findings"):
+        data.DatasetManifest(
+            "dataset", "schema", "data", 1, 1, "label", findings=(object(),)
+        )
+
+
 def test_curation_report_serializes_structured_quality_and_risk_findings():
     quality = make_finding()
     risk = make_finding(
