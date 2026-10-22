@@ -44,6 +44,7 @@ TABULAR_BETA_TASK_FAMILIES = (
             "neighbors",
             "neural",
             "bagging",
+            "deep_learning",
         ),
     ),
     (
@@ -57,6 +58,7 @@ TABULAR_BETA_TASK_FAMILIES = (
             "neighbors",
             "neural",
             "bagging",
+            "deep_learning",
         ),
     ),
     (
@@ -70,6 +72,7 @@ TABULAR_BETA_TASK_FAMILIES = (
             "neighbors",
             "neural",
             "bagging",
+            "deep_learning",
         ),
     ),
     (tasks.TaskType.SURVIVAL, ("baseline", "linear", "boosting")),
@@ -137,7 +140,11 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                             inference=capabilities.Inference.LIBRARY,
                         ),
                         status=capabilities.CapabilityStatus.SUPPORTED,
-                        required_extras=("core",),
+                        required_extras=(
+                            ("deeplearning",)
+                            if model_family == "deep_learning"
+                            else ("core",)
+                        ),
                         resources=capabilities.ResourceAssumptions(
                             memory_gb=1.0
                         ),

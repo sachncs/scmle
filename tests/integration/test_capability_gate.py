@@ -69,6 +69,28 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     }
 
 
+def test_deep_learning_paths_declare_their_optional_extra():
+    """Deep-learning capability declarations identify their installation gate."""
+    registry = context_module.tabular_beta_capability_registry()
+
+    for task in (
+        tasks.TaskType.BINARY,
+        tasks.TaskType.MULTICLASS,
+        tasks.TaskType.REGRESSION,
+    ):
+        key = capabilities.CapabilityKey(
+            modality=capabilities.Modality.TABULAR,
+            task=task,
+            model_family="deep_learning",
+            evaluation=capabilities.Evaluation.STANDARD,
+            uncertainty=capabilities.Uncertainty.NONE,
+            fairness=capabilities.Fairness.NONE,
+            explainability=capabilities.Explainability.NONE,
+            inference=capabilities.Inference.LIBRARY,
+        )
+        assert registry.require(key).required_extras == ("deeplearning",)
+
+
 def test_unimplemented_contract_dimensions_are_not_promoted():
     """Missing modality, uncertainty, and explanation paths fail closed."""
     registry = context_module.tabular_beta_capability_registry()
