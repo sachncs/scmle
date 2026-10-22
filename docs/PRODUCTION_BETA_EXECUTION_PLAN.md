@@ -1916,6 +1916,18 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head complete strict regression at `a2d973b` on 2026-10-23:
+
+- `uv run pytest -q tests -W error::ResourceWarning` passed `2,405` tests
+  with `89` declared optional-dependency skips in 27 minutes 24 seconds.
+  There were no failures, errors, or resource-warning failures. The run
+  passed after the no-semi-private-name repair and is the authoritative full
+  repository regression for this pushed head.
+- This closes the current local correctness regression gate. Coverage,
+  mutation, benchmark, package, security, hosted CI/Pages, external fault,
+  secret-custody, and independent-review gates remain separately scoped and
+  are not implied by this test result.
+
 Parameter-estimation evidence hardening at `48f7537` on 2026-10-23:
 
 - `ParameterEstimate` and `EstimationResult` now reject non-finite
