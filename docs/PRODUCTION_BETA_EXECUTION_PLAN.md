@@ -1988,6 +1988,34 @@ Tagged-release outcome enforcement at `5ce4f73` on 2026-10-22:
   actual tag workflow remains unverified because hosted GitHub runners are
   currently unavailable for this repository.
 
+Exact-head local release preflight at `6e37fa5` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed all local gates. The bounded suite
+  passed `2,026` tests with `75` explicitly explained optional-dependency
+  skips; the JUnit outcome audit found zero unexplained skips and zero
+  xfail/XPASS outcomes. Total coverage was `83.02%` and the declared core
+  scope was `86%`.
+- The three-attempt stability policy passed with no inventory changes,
+  quarantined failures, or expired entries. Mutation testing killed
+  `1,504/2,057` mutants (`73%`), above the `70%` threshold; one mutation
+  timed out and `552` survived for follow-up triage.
+- Five-seed offline benchmarks recorded zero regressions and zero failed
+  repetitions. Verdicts were tie, tie, tie, and ahead for breast cancer,
+  wine, digits, and diabetes progression. Peak memory was `0.3624`, `0.3837`,
+  `0.4512`, and `0.4552` GB; runtimes were `105`, `75`, `632`, and `70`
+  seconds respectively.
+- Reproducible packages and network-isolated wheel/source installs passed.
+  The wheel hash was
+  `57f15957aadbd3739617fbab4dfca707cf43e6cdae25b2ef7102da75d29cbad1` and
+  the source-distribution hash was
+  `0153d5c6f392cc00208f4d0c365f014bb25c49e442eb8e403e7f6f3bb5ff4d5c`.
+- The site gate found `0` npm audit vulnerabilities, Astro built `17` static
+  pages, accessibility checks passed for all `17` HTML files, all `384`
+  internal links resolved, and both Playwright smoke tests passed. This is
+  the strongest local evidence at the current head; hosted Linux and Pages,
+  external transport/resource-fault execution, secret custody, and
+  independent reviewer evidence remain open release gates.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
