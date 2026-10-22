@@ -21,6 +21,7 @@ from scml.data.modalities import graph
 from scml.data.modalities import image
 from scml.data.modalities import video
 from scml.explainability import quality
+from scml.governance import attestation
 from scml.models import modality_lifecycle
 
 
@@ -554,6 +555,66 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
 
     with pytest.raises(ValueError, match="signature"):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
+
+
+def test_package_loader_rejects_an_unsupported_manifest_version(
+    tmp_path: Path,
+):
+    """A malformed signed boundary is rejected before deserialization."""
+    report = modality_lifecycle.ModalityLifecycle().run(
+        document_adapter(),
+        tmp_path / "package",
+        signing_key="package-key",
+    )
+    manifest_path = Path(report.package.path) / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = 99
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="schema version"):
+        modality_lifecycle.load_package(report.package.path, "package-key")
+
+
+def test_package_loader_rejects_duplicate_feature_names(
+    tmp_path: Path,
+):
+    """A signed package cannot declare an ambiguous feature schema."""
+    report = modality_lifecycle.ModalityLifecycle().run(
+        document_adapter(),
+        tmp_path / "package",
+        signing_key="package-key",
+    )
+    manifest_path = Path(report.package.path) / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["feature_names"] = ["duplicate", "duplicate"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="feature_names"):
+        modality_lifecycle.load_package(report.package.path, "package-key")
+
+
+def test_package_loader_rejects_a_signed_model_schema_mismatch(
+    tmp_path: Path,
+):
+    """A trusted manifest still must agree with the serialized estimator."""
+    report = modality_lifecycle.ModalityLifecycle().run(
+        document_adapter(),
+        tmp_path / "package",
+        signing_key="package-key",
+    )
+    manifest_path = Path(report.package.path) / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    unsigned = dict(manifest)
+    unsigned.pop("signature")
+    unsigned["feature_names"] = [*unsigned["feature_names"], "unfitted-extra"]
+    unsigned["signature"] = {
+        "algorithm": attestation.SIGNATURE_ALGORITHM,
+        "value": attestation.sign_payload(unsigned, "package-key"),
+    }
+    manifest_path.write_text(json.dumps(unsigned), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="feature schema"):
+        modality_lifecycle.load_package(report.package.path, "package-key")
 
 
 def test_lifecycle_cancellation_cleans_artifacts_after_a_stage_boundary(

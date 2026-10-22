@@ -65,6 +65,8 @@ MAX_REPEATED_EXPLANATION_SAMPLES = 128
 MAX_RAW_GRAPH_FEATURES = 64
 MAX_GRAPH_CONTEXT_NODES = 64
 MAX_GRAPH_CONTEXT_EDGES = 128
+PACKAGE_SCHEMA_VERSION = 1
+SHA256_LENGTH = 64
 
 
 class LifecycleCancelledError(errors.CancelledError):
@@ -148,7 +150,20 @@ class LifecyclePackage:
     path: str
     model_sha256: str
     signature: str
-    schema_version: int = 1
+    schema_version: int = PACKAGE_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        """Validate package identity before it enters lifecycle evidence."""
+        if not isinstance(self.path, str) or not self.path.strip():
+            raise ValueError("package path must be non-empty")
+        if not isinstance(self.model_sha256, str) or not is_sha256(
+            self.model_sha256
+        ):
+            raise ValueError("package model_sha256 must be a SHA-256 digest")
+        if not isinstance(self.signature, str) or not self.signature.strip():
+            raise ValueError("package signature must be non-empty")
+        if self.schema_version != PACKAGE_SCHEMA_VERSION:
+            raise ValueError("unsupported modality package schema version")
 
     def to_dict(self) -> dict[str, object]:
         """Return JSON-native package evidence."""
@@ -3905,7 +3920,33 @@ def load_package(
     if not manifest_path.is_file() or not model_path.is_file():
         raise ValueError("modality package is incomplete")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    signature = manifest.pop("signature", None)
+    if not isinstance(manifest, Mapping):
+        raise ValueError("modality package manifest must be an object")
+    unsigned = dict(manifest)
+    signature = unsigned.pop("signature", None)
+    schema_version = unsigned.get("schema_version")
+    if isinstance(schema_version, bool) or schema_version != (
+        PACKAGE_SCHEMA_VERSION
+    ):
+        raise ValueError("unsupported modality package schema version")
+    modality = unsigned.get("modality")
+    if not isinstance(modality, str) or not modality.strip():
+        raise ValueError("modality package modality is invalid")
+    dataset_hash = unsigned.get("dataset_hash")
+    if not isinstance(dataset_hash, str) or not dataset_hash.strip():
+        raise ValueError("modality package dataset_hash is invalid")
+    feature_names = unsigned.get("feature_names")
+    if not isinstance(feature_names, list) or not feature_names:
+        raise ValueError("modality package feature_names are invalid")
+    if any(
+        not isinstance(name, str) or not name.strip() for name in feature_names
+    ) or len(set(feature_names)) != len(feature_names):
+        raise ValueError("modality package feature_names are invalid")
+    model_digest = unsigned.get("model_sha256")
+    if not isinstance(model_digest, str) or not is_sha256(model_digest):
+        raise ValueError("modality package model_sha256 is invalid")
+    if not isinstance(unsigned.get("evaluation"), Mapping):
+        raise ValueError("modality package evaluation is invalid")
     if (
         not isinstance(signature, dict)
         or signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM
@@ -3914,17 +3955,39 @@ def load_package(
     value = signature.get("value")
     if not isinstance(value, str) or not value.strip():
         raise ValueError("modality package signature is empty")
-    expected = attestation.sign_payload(manifest, signing_key)
+    expected = attestation.sign_payload(unsigned, signing_key)
     if not hmac.compare_digest(value, expected):
         raise ValueError("modality package signature does not verify")
-    if file_digest(model_path) != manifest.get("model_sha256"):
+    if file_digest(model_path) != model_digest:
         raise ValueError("modality package model digest does not verify")
     loaded = joblib.load(model_path)
     if not isinstance(loaded, LogisticRegression):
         raise TypeError(
             "modality package does not contain the expected classifier"
         )
+    if getattr(loaded, "n_features_in_", None) != len(feature_names):
+        raise ValueError(
+            "modality package model and feature schema do not match"
+        )
+    if len(getattr(loaded, "classes_", ())) < 2:
+        raise ValueError(
+            "modality package classifier has fewer than two classes"
+        )
+    if (
+        not np.isfinite(loaded.coef_).all()
+        or not np.isfinite(loaded.intercept_).all()
+    ):
+        raise ValueError(
+            "modality package classifier contains non-finite values"
+        )
     return loaded
+
+
+def is_sha256(value: str) -> bool:
+    """Return whether a value is a canonical lowercase SHA-256 digest."""
+    return len(value) == SHA256_LENGTH and all(
+        character in "0123456789abcdef" for character in value
+    )
 
 
 __all__ = [
@@ -3950,5 +4013,6 @@ __all__ = [
     "TextAdapter",
     "VideoAdapter",
     "file_digest",
+    "is_sha256",
     "load_package",
 ]
