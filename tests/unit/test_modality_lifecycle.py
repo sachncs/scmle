@@ -511,6 +511,24 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     assert declaration.status is modalities.ModalityStatus.EXPERIMENTAL
     assert declaration.complete
     assert json.loads(report_path.read_text()) == report.to_dict()
+    assert report.to_dict()["schema_version"] == 2
+    assert report.signature
+    assert report.verify_signature("test-signing-key") is True
+    assert report.verify_signature("wrong-key") is False
+    assert (
+        modality_lifecycle.LifecycleReport.read_verified(
+            report_path, "test-signing-key"
+        )
+        == report
+    )
+
+    tampered = json.loads(report_path.read_text())
+    tampered["dataset_hash"] = "tampered-dataset"
+    report_path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="signature does not verify"):
+        modality_lifecycle.LifecycleReport.read_verified(
+            report_path, "test-signing-key"
+        )
 
 
 def test_package_signature_rejects_a_wrong_key(tmp_path: Path):

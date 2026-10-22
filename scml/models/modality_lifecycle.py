@@ -238,11 +238,21 @@ class LifecycleReport:
     monitoring: dict[str, object]
     documentation: dict[str, object]
     recovery: dict[str, object]
+    signature: str | None = None
 
-    def to_dict(self) -> dict[str, object]:
-        """Return a deterministic JSON-compatible lifecycle record."""
+    def __post_init__(self) -> None:
+        """Validate the report identity and optional signature."""
+        for field_name in ("modality", "dataset_hash"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must not be empty")
+        if self.signature is not None and not self.signature.strip():
+            raise ValueError("signature must be non-empty when provided")
+
+    def unsigned_dict(self) -> dict[str, object]:
+        """Return the exact report content covered by the signature."""
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "modality": self.modality,
             "dataset_hash": self.dataset_hash,
             "stage_evidence": [
@@ -256,6 +266,155 @@ class LifecycleReport:
             "documentation": self.documentation,
             "recovery": self.recovery,
         }
+
+    def sign(self, signing_key: str | bytes) -> Self:
+        """Return a report signed over its exact serialized evidence."""
+        return dataclasses.replace(
+            self,
+            signature=attestation.sign_payload(
+                self.unsigned_dict(), signing_key
+            ),
+        )
+
+    def verify_signature(self, signing_key: str | bytes) -> bool:
+        """Return whether the report signature matches its current content."""
+        if self.signature is None:
+            return False
+        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        return hmac.compare_digest(self.signature, expected)
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, object]) -> Self:
+        """Restore a versioned report without trusting its evidence claims."""
+        if record.get("schema_version") != 2:
+            raise ValueError("unsupported lifecycle report schema version")
+
+        raw_stage_evidence = record.get("stage_evidence")
+        if not isinstance(raw_stage_evidence, list):
+            raise ValueError("lifecycle report stage_evidence must be a list")
+        stage_evidence: list[modalities.StageEvidence] = []
+        for item in raw_stage_evidence:
+            if not isinstance(item, Mapping):
+                raise ValueError("lifecycle report stage evidence is invalid")
+            stage = item.get("stage")
+            evidence_links = item.get("evidence_links")
+            evidence = item.get("evidence")
+            notes = item.get("notes")
+            if not isinstance(stage, str):
+                raise ValueError("lifecycle report stage is invalid")
+            if not isinstance(evidence_links, list) or not all(
+                isinstance(value, str) for value in evidence_links
+            ):
+                raise ValueError("lifecycle report evidence_links are invalid")
+            if not isinstance(evidence, Mapping):
+                raise ValueError("lifecycle report evidence is invalid")
+            if not isinstance(notes, list) or not all(
+                isinstance(value, str) for value in notes
+            ):
+                raise ValueError("lifecycle report notes are invalid")
+            stage_evidence.append(
+                modalities.StageEvidence(
+                    stage=modalities.LifecycleStage(stage),
+                    evidence_links=tuple(evidence_links),
+                    evidence=evidence,
+                    notes=tuple(notes),
+                )
+            )
+
+        raw_package = record.get("package")
+        if not isinstance(raw_package, Mapping):
+            raise ValueError("lifecycle report package is invalid")
+        package_values = {
+            "path": raw_package.get("path"),
+            "model_sha256": raw_package.get("model_sha256"),
+            "signature": raw_package.get("signature"),
+            "schema_version": raw_package.get("schema_version"),
+        }
+        if not all(
+            isinstance(package_values[field_name], str)
+            for field_name in ("path", "model_sha256", "signature")
+        ):
+            raise ValueError("lifecycle report package identity is invalid")
+        if not isinstance(package_values["schema_version"], int):
+            raise ValueError("lifecycle report package schema is invalid")
+
+        def mapping_field(name: str) -> dict[str, object]:
+            value = record.get(name)
+            if not isinstance(value, Mapping):
+                raise ValueError(f"lifecycle report {name} must be an object")
+            return dict(value)
+
+        raw_signature = record.get("signature")
+        signature: str | None
+        if raw_signature is None:
+            signature = None
+        elif isinstance(raw_signature, Mapping):
+            if (
+                raw_signature.get("algorithm")
+                != attestation.SIGNATURE_ALGORITHM
+            ):
+                raise ValueError("unsupported lifecycle report signature")
+            signature_value = raw_signature.get("value")
+            if (
+                not isinstance(signature_value, str)
+                or not signature_value.strip()
+            ):
+                raise ValueError("lifecycle report signature is invalid")
+            signature = signature_value
+        else:
+            raise ValueError("lifecycle report signature is invalid")
+
+        modality = record.get("modality")
+        dataset_hash = record.get("dataset_hash")
+        if not isinstance(modality, str) or not isinstance(dataset_hash, str):
+            raise ValueError("lifecycle report identity is invalid")
+        return cls(
+            modality=modality,
+            dataset_hash=dataset_hash,
+            stage_evidence=tuple(stage_evidence),
+            evaluation=mapping_field("evaluation"),
+            performance=mapping_field("performance"),
+            package=LifecyclePackage(
+                path=cast(str, package_values["path"]),
+                model_sha256=cast(str, package_values["model_sha256"]),
+                signature=cast(str, package_values["signature"]),
+                schema_version=cast(int, package_values["schema_version"]),
+            ),
+            inference=mapping_field("inference"),
+            monitoring=mapping_field("monitoring"),
+            documentation=mapping_field("documentation"),
+            recovery=mapping_field("recovery"),
+            signature=signature,
+        )
+
+    @classmethod
+    def read(cls, path: str | Path) -> Self:
+        """Read and parse a persisted lifecycle report."""
+        record = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(record, Mapping):
+            raise ValueError("lifecycle report must be a JSON object")
+        return cls.from_dict(record)
+
+    @classmethod
+    def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
+        """Read a report and reject it unless its content signature verifies."""
+        report = cls.read(path)
+        if not report.verify_signature(signing_key):
+            raise ValueError("lifecycle report signature does not verify")
+        return report
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a deterministic JSON-compatible lifecycle record."""
+        record = self.unsigned_dict()
+        record["signature"] = (
+            None
+            if self.signature is None
+            else {
+                "algorithm": attestation.SIGNATURE_ALGORITHM,
+                "value": self.signature,
+            }
+        )
+        return record
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -3233,7 +3392,7 @@ class ModalityLifecycle:
             monitoring=context.monitoring,
             documentation=context.documentation,
             recovery=context.recovery,
-        )
+        ).sign(signing_key)
         if report_path is not None:
             path = Path(report_path)
             durability.write_atomically(
