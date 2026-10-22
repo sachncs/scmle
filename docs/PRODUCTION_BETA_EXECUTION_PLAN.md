@@ -1916,6 +1916,32 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head release preflight at `8651c3a` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
+  source files, Bandit, pip-audit, public API compatibility, and explicit
+  JUnit skip auditing. The bounded suite passed `2,018` tests with `75`
+  explicitly explained optional-dependency skips; total coverage was `83.05%`
+  and the enforced core scope was `86%`.
+- Mutation testing killed `1,503/2,057` mutants (`73%`) against the configured
+  `70%` minimum. One mutation timed out and `553` survived; the threshold was
+  met and the survivor inventory remains follow-up evidence.
+- Five-seed offline regression completed with zero failures and zero
+  regressions. The four verdicts were tie, tie, tie, and ahead; peak memory
+  was `0.3674`, `0.3898`, `0.4520`, and `0.4571` GB respectively.
+- Wheel and source-distribution checks passed, both artifacts reproduced
+  byte-for-byte, and network-isolated wheel and source-distribution installs
+  passed. The reproducible wheel hash was
+  `c3a0b809f6c51b9d8479a4968b6d44436ff9b5aa30d9587751d66bc8d947fc38` and
+  the source-distribution hash was
+  `eccf15201725b486466f3ba77be2d85a1a8a19bfc9aa1e499383b5fcd700bec1`.
+- The marketing-site audit found zero npm vulnerabilities; Astro built `17`
+  pages, accessibility checks passed for `17` HTML files, internal-link
+  validation passed for `384` links, and both Playwright browser tests
+  passed. Hosted Linux and Pages, external transport/resource-fault
+  execution, secret custody, and independent reviewer evidence remain
+  separate release gates.
+
 Video temporal boundary at `e9e623d` on 2026-10-22:
 
 - Video samples now accept an explicit timezone-aware observation time,
