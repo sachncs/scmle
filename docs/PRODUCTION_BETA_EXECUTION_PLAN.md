@@ -3910,3 +3910,17 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   release conclusion; the earlier `2489/38/12` result is evidence of the
   defect, not a passing release gate.
 
+## Corrected full regression at `5719876` on 2026-10-23
+
+- The corrected repository-wide run completed `2501 passed, 38 skipped` in
+  `41m05s` with no failures. This is the first green full-suite result after
+  the runtime capability-observation implementation.
+- Global Ruff check, formatting, mypy over `scml` and `benchmarks`, and
+  `git diff --check` also passed. The Astro site separately built 19 pages,
+  passed accessibility and 469 internal-link checks, and passed 3 browser
+  smoke tests.
+- The green local regression is necessary evidence, not a production
+  declaration. Hosted Linux/CI execution, external fault evidence, secret
+  custody, independent release review, public Pages deployment, and the
+  documented non-tabular production boundaries remain release gates.
+
