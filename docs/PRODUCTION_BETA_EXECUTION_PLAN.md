@@ -3850,3 +3850,46 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   approval. The prior `2490/38` result is not recorded as a passing full
   suite because it predates this fix.
 
+## Capability evidence persistence at `0ba2d20` on 2026-10-23
+
+- The default tabular runtime registry now retains the explicit transformer
+  and JEPA family catalog instead of dropping family metadata when a run
+  context is created.
+- `capability_registry.json` now persists the versioned registry envelope,
+  including model-family declarations and complete capability records. A
+  persisted run can therefore be reviewed against the same boundary that
+  gated planning.
+- This records support metadata; it does not promote experimental transformer
+  or tabular-JEPA declarations to supported production capabilities.
+
+## Parameter-estimation API hardening at `ea920ed` on 2026-10-23
+
+- `MLProject` now binds IPW ATE estimation to the declared treatment column
+  and exact feature position, validates cluster and missingness columns before
+  estimation, records the selected columns and missingness policy in the
+  report, and exposes only the digest-verified artifact on `RunResult`.
+- Model selection remains independent from parameter estimation. A missing
+  treatment declaration, missing column, or rejected missing-value policy
+  fails before fitting rather than producing ambiguous scientific evidence.
+
+## Observed capability resources at `f363f2a` on 2026-10-23
+
+- The capability gate now captures bounded CPU, memory, filesystem capacity,
+  and installed-extra observations immediately before planning, persists the
+  observation under `evidence/capability_resources.json`, and binds it to
+  registry diagnostics.
+- Unknown required facts are rejected instead of being treated as available;
+  GPU and network remain intentionally unknown until an environment-specific
+  probe is supplied. The evidence is local-host evidence, not cloud,
+  container, kernel, or broker fault evidence.
+
+## Release evidence board at `25056c1` on 2026-10-23
+
+- The Astro site now has a standalone `/docs/release-evidence/` route with a
+  generated tabular-beta capability board, named checks and commands, the
+  fifteen-stage lifecycle checklist, an evidence-record template, and clear
+  experimental/extension-only boundaries.
+- The route is an onboarding and review aid. It does not claim that hosted
+  Pages deployment, independent review, external fault execution, or
+  non-tabular production modelling is complete.
+
