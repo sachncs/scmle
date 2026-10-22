@@ -1,6 +1,7 @@
 """Tests for the public non-tabular lifecycle project surface."""
 
 import hashlib
+import json
 from pathlib import Path
 from typing import cast
 
@@ -165,6 +166,22 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     assert result.dataset_card["privacy"]["status"] == "not_assessed"
     assert result.dataset_card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()
+
+    restored = scml.ModalityCurationResult.read_verified(
+        result.path, "test-signing-key"
+    )
+    assert restored == result
+    assert json.loads(Path(result.path).read_text(encoding="utf-8")) == (
+        result.to_dict()
+    )
+
+    tampered = json.loads(Path(result.path).read_text(encoding="utf-8"))
+    tampered["dataset_card"]["intended_use"] = "tampered"
+    Path(result.path).write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="signature does not verify"):
+        scml.ModalityCurationResult.read_verified(
+            result.path, "test-signing-key"
+        )
 
 
 def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hooks(

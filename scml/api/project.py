@@ -587,17 +587,18 @@ class ModalityCurationProject:
             "dataset_card": card.to_dict(),
         }
         signature = attestation.sign_payload(unsigned, self.signing_key)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        path = self.output_dir / "modality_curation.json"
+        if path.exists():
+            raise FileExistsError(path)
         payload = {
             **unsigned,
+            "path": str(path),
             "signature": {
                 "algorithm": attestation.SIGNATURE_ALGORITHM,
                 "value": signature,
             },
         }
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        path = self.output_dir / "modality_curation.json"
-        if path.exists():
-            raise FileExistsError(path)
         durability.write_atomically(
             path,
             (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode(

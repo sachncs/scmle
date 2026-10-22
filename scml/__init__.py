@@ -24,6 +24,7 @@ from scml.models.modality_lifecycle import LifecycleCancellation
 from scml.models.modality_lifecycle import LifecycleCancelledError
 from scml.models.modality_lifecycle import LifecycleCheckpoint
 from scml.models.modality_lifecycle import ModalityCurationAdapter
+from scml.models.modality_lifecycle import ModalityCurationResult
 from scml.models.modality_lifecycle import ModalityPredictor
 
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "MLProject",
     "ModalityCurationAdapter",
     "ModalityCurationProject",
+    "ModalityCurationResult",
     "ModalityHttpServing",
     "ModalityPredictor",
     "ModalityProject",

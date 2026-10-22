@@ -18,6 +18,7 @@ PUBLIC_API = {
     "MLProject",
     "ModalityCurationAdapter",
     "ModalityCurationProject",
+    "ModalityCurationResult",
     "ModalityHttpServing",
     "ModalityProject",
     "ModalityPredictor",

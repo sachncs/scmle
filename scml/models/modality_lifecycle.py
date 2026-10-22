@@ -66,6 +66,7 @@ MAX_RAW_GRAPH_FEATURES = 64
 MAX_GRAPH_CONTEXT_NODES = 64
 MAX_GRAPH_CONTEXT_EDGES = 128
 PACKAGE_SCHEMA_VERSION = 1
+CURATION_SCHEMA_VERSION = 1
 SHA256_LENGTH = 64
 
 
@@ -653,19 +654,123 @@ class ModalityCurationResult:
     path: str
     signature: str
 
-    def to_dict(self) -> dict[str, object]:
-        """Return JSON-native curation result evidence."""
+    def __post_init__(self) -> None:
+        """Validate curation evidence identity before it is published."""
+        for field_name in ("modality", "dataset_hash", "path"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be non-empty")
+        if (
+            isinstance(self.sample_count, bool)
+            or not isinstance(self.sample_count, int)
+            or self.sample_count < 0
+        ):
+            raise ValueError("sample_count must be a non-negative integer")
+        if not isinstance(self.signature, str) or not is_sha256(self.signature):
+            raise ValueError("signature must be a SHA-256 digest")
+        normalized_curation = normalize_json_object(self.curation, "curation")
+        normalized_card = normalize_json_object(
+            self.dataset_card, "dataset_card"
+        )
+        for name, record in (
+            ("curation", normalized_curation),
+            ("dataset_card", normalized_card),
+        ):
+            if "modality" in record and record.get("modality") != self.modality:
+                raise ValueError(f"{name} does not match modality")
+            if record.get("dataset_hash") != self.dataset_hash:
+                raise ValueError(f"{name} does not match dataset_hash")
+            if record.get("sample_count") != self.sample_count:
+                raise ValueError(f"{name} does not match sample_count")
+        object.__setattr__(self, "curation", normalized_curation)
+        object.__setattr__(self, "dataset_card", normalized_card)
+
+    def unsigned_dict(self) -> dict[str, object]:
+        """Return the exact curation content covered by the signature."""
         return {
-            "schema_version": 1,
+            "schema_version": CURATION_SCHEMA_VERSION,
             "record_type": "modality_curation",
             "modality": self.modality,
             "dataset_hash": self.dataset_hash,
             "sample_count": self.sample_count,
             "curation": dict(self.curation),
             "dataset_card": dict(self.dataset_card),
-            "path": self.path,
-            "signature": self.signature,
         }
+
+    def verify_signature(self, signing_key: str | bytes) -> bool:
+        """Return whether the persisted curation signature verifies."""
+        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        return hmac.compare_digest(self.signature, expected)
+
+    def to_dict(self) -> dict[str, object]:
+        """Return JSON-native curation result evidence."""
+        record = self.unsigned_dict()
+        record["path"] = self.path
+        record["signature"] = {
+            "algorithm": attestation.SIGNATURE_ALGORITHM,
+            "value": self.signature,
+        }
+        return record
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, object]) -> Self:
+        """Restore a curation result without trusting its signature claim."""
+        if record.get("schema_version") != CURATION_SCHEMA_VERSION:
+            raise ValueError("unsupported modality curation schema version")
+        if record.get("record_type") != "modality_curation":
+            raise ValueError("invalid modality curation record type")
+        modality = record.get("modality")
+        dataset_hash = record.get("dataset_hash")
+        path = record.get("path")
+        sample_count = record.get("sample_count")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (modality, dataset_hash, path)
+        ):
+            raise ValueError("modality curation identity is invalid")
+        if isinstance(sample_count, bool) or not isinstance(sample_count, int):
+            raise ValueError("modality curation sample_count is invalid")
+        curation = record.get("curation")
+        dataset_card = record.get("dataset_card")
+        if not isinstance(curation, Mapping) or not isinstance(
+            dataset_card, Mapping
+        ):
+            raise ValueError("modality curation evidence is invalid")
+        signature = record.get("signature")
+        if not isinstance(signature, Mapping):
+            raise ValueError("modality curation signature is missing")
+        if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+            raise ValueError("unsupported modality curation signature")
+        signature_value = signature.get("value")
+        if not isinstance(signature_value, str) or not is_sha256(
+            signature_value
+        ):
+            raise ValueError("modality curation signature is invalid")
+        return cls(
+            modality=cast(str, modality),
+            dataset_hash=cast(str, dataset_hash),
+            sample_count=sample_count,
+            curation=curation,
+            dataset_card=dataset_card,
+            path=cast(str, path),
+            signature=signature_value,
+        )
+
+    @classmethod
+    def read(cls, path: str | Path) -> Self:
+        """Read a persisted curation result."""
+        record = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(record, Mapping):
+            raise ValueError("modality curation record must be an object")
+        return cls.from_dict(record)
+
+    @classmethod
+    def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
+        """Read curation evidence and require a valid content signature."""
+        result = cls.read(path)
+        if not result.verify_signature(signing_key):
+            raise ValueError("modality curation signature does not verify")
+        return result
 
 
 class ModalityCurationAdapter(abc.ABC):
@@ -3990,6 +4095,23 @@ def is_sha256(value: str) -> bool:
     )
 
 
+def normalize_json_object(
+    value: Mapping[str, object], name: str
+) -> dict[str, object]:
+    """Return a finite JSON object or reject the evidence boundary."""
+    if not isinstance(value, Mapping):
+        raise TypeError(f"{name} must be a mapping")
+    try:
+        normalized = json.loads(
+            json.dumps(dict(value), allow_nan=False, sort_keys=True)
+        )
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} must be JSON-native") from error
+    if not isinstance(normalized, dict):
+        raise ValueError(f"{name} must serialize to an object")
+    return normalized
+
+
 __all__ = [
     "AudioAdapter",
     "DataExplainabilityStage",
@@ -4006,6 +4128,7 @@ __all__ = [
     "LifecyclePackage",
     "LifecycleReport",
     "ModalityAdapter",
+    "ModalityCurationResult",
     "ModalityLifecycle",
     "ModalityPredictor",
     "ModellingStage",
@@ -4015,4 +4138,5 @@ __all__ = [
     "file_digest",
     "is_sha256",
     "load_package",
+    "normalize_json_object",
 ]

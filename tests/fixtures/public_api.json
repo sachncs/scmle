@@ -40,6 +40,10 @@
       "kind": "class",
       "signature_sha256": "57fa1b75c7ee97f22c053b379c41e82112d8a197900690204a1aafa4580a66a5"
     },
+    "ModalityCurationResult": {
+      "kind": "class",
+      "signature_sha256": "17ae8b6274e913e2bcf36e240db6a9aa73e82a0299e4d3ed4f2969fc2f2d30bd"
+    },
     "ModalityHttpServing": {
       "kind": "class",
       "signature_sha256": "2eefbf4fc75db85fd4490da5502a1de6f795a32e93231fcf9439a78da9a079a2"
