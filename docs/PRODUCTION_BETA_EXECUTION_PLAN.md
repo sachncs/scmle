@@ -1916,6 +1916,19 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
+
+- `FaultInjectionHarness` now validates duplicate and unexpected evidence
+  types against the declared scenario contract before writing any artifact.
+  Invalid executor output therefore cannot overwrite an evidence file or
+  leave orphaned artifacts that look like a partial release record. Missing
+  evidence remains explicitly inconclusive, preserving the distinction
+  between incomplete coverage and an invalid contract.
+- The focused local fault and harness slice passed 24 tests under
+  `-W error::ResourceWarning`; Ruff and mypy passed. This strengthens the
+  local evidence boundary only. It does not provide external broker,
+  container, cloud, kernel, or independent-review evidence.
+
 Standalone modelling and estimation documentation at `80ea0eb` on 2026-10-23:
 
 - The Astro site now has a standalone `/docs/modeling/` page and navigation
