@@ -348,6 +348,7 @@ class EstimationResult:
     diagnostics: Mapping[str, Any]
     sensitivity: Mapping[str, Any]
     reference: Mapping[str, Any]
+    raw_input_fingerprint: str
 
     def __post_init__(self) -> None:
         """Validate the report shape before it can be persisted or used."""
@@ -386,6 +387,17 @@ class EstimationResult:
         ):
             if not isinstance(mapping_value, Mapping):
                 raise TypeError(f"{mapping_name} must be a mapping")
+        if (
+            not isinstance(self.raw_input_fingerprint, str)
+            or len(self.raw_input_fingerprint) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.raw_input_fingerprint
+            )
+        ):
+            raise ValueError(
+                "raw_input_fingerprint must be a lowercase SHA-256 digest"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible estimation report."""
@@ -400,6 +412,7 @@ class EstimationResult:
             "diagnostics": dict(self.diagnostics),
             "sensitivity": dict(self.sensitivity),
             "reference": dict(self.reference),
+            "raw_input_fingerprint": self.raw_input_fingerprint,
         }
 
     def digest(self) -> str:
@@ -506,6 +519,7 @@ class EstimationResult:
             dict(record["diagnostics"]),
             dict(record["sensitivity"]),
             dict(record["reference"]),
+            str(record["raw_input_fingerprint"]),
         )
 
 
@@ -540,6 +554,9 @@ def estimate_parameters(
     matrix = np.asarray(features, dtype=float)
     values = np.asarray(outcome, dtype=float).reshape(-1)
     validate_matrix(matrix, len(estimand.feature_names), "features")
+    raw_input_fingerprint_value = raw_input_fingerprint(
+        matrix, values, clusters
+    )
     input_rows = matrix.shape[0]
     if matrix.shape[0] != len(values):
         raise ValueError("features and outcome must have the same row count")
@@ -765,7 +782,71 @@ def estimate_parameters(
         diagnostics=diagnostics,
         sensitivity=sensitivity,
         reference=reference,
+        raw_input_fingerprint=raw_input_fingerprint_value,
     )
+
+
+def raw_input_fingerprint(
+    features: Any,
+    outcome: Any,
+    clusters: Sequence[Any] | None = None,
+) -> str:
+    """Return a deterministic fingerprint of the estimator's raw inputs.
+
+    Numeric values are hashed after the same float conversion used by the
+    estimator. Cluster labels retain their value types and row order. The
+    fingerprint covers inputs before missing-row filtering so it can identify
+    the complete evidence source independently of the fitted result.
+    """
+    matrix = np.asarray(features, dtype=float)
+    values = np.asarray(outcome, dtype=float).reshape(-1)
+    digest = hashlib.sha256()
+    update_input_digest(digest, "features", matrix)
+    update_input_digest(digest, "outcome", values)
+    if clusters is None:
+        digest.update(b"clusters:none")
+    else:
+        cluster_values = np.asarray(clusters, dtype=object)
+        update_input_digest(digest, "clusters", cluster_values)
+    return digest.hexdigest()
+
+
+def update_input_digest(digest: Any, name: str, values: np.ndarray) -> None:
+    """Add one shape-, dtype-, and value-bound input to a digest."""
+    array = np.asarray(values)
+    descriptor = json.dumps(
+        {
+            "name": name,
+            "shape": list(array.shape),
+            "dtype": str(array.dtype),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    digest.update(len(descriptor).to_bytes(8, "big"))
+    digest.update(descriptor)
+    if array.dtype.kind in "biufc":
+        canonical = np.ascontiguousarray(
+            array.astype(array.dtype.newbyteorder("<"), copy=False)
+        )
+        values_bytes = canonical.tobytes()
+    else:
+        value_hashes = pd.util.hash_pandas_object(
+            pd.Series(array.reshape(-1)), index=False
+        ).to_numpy(dtype="<u8")
+        type_names = [
+            f"{type(value).__module__}.{type(value).__qualname__}"
+            for value in array.reshape(-1).tolist()
+        ]
+        values_bytes = json.dumps(
+            {
+                "types": type_names,
+                "hashes": value_hashes.tolist(),
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+    digest.update(len(values_bytes).to_bytes(8, "big"))
+    digest.update(values_bytes)
 
 
 def validate_matrix(matrix: np.ndarray, columns: int, name: str) -> None:

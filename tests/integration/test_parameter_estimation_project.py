@@ -56,6 +56,9 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     assert restored.policy.covariance == "clustered"
     assert result.evaluation["selected_model"] == result.selected_model
     assert "parameter_estimation" not in result.evaluation
+    identity = result.estimation.diagnostics["data_identity"]
+    assert identity["source_identity"] is None
+    assert identity["snapshot_id"].startswith("snap_")
 
 
 def test_estimation_fails_closed_without_both_declarations(tmp_path):
@@ -193,3 +196,23 @@ def test_complete_case_binds_missingness_and_run_artifact_to_result(tmp_path):
     assert result.estimation.diagnostics["missingness"]["policy"] == (
         "complete_case"
     )
+
+
+def test_project_estimation_records_file_source_identity(tmp_path):
+    """File-backed estimation records source and snapshot identities."""
+    source = tmp_path / "estimation.csv"
+    frame = estimation_frame()
+    frame.to_csv(source, index=False)
+    project = scml.MLProject(
+        source,
+        "outcome",
+        estimand=declared_estimand(),
+        estimation_policy=EstimationPolicy(estimator="linear"),
+        output_dir=tmp_path / "runs",
+    )
+
+    result = project.estimate_parameters()
+
+    identity = result.diagnostics["data_identity"]
+    assert identity["source_identity"].startswith("src_")
+    assert identity["snapshot_id"].startswith("snap_")

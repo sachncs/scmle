@@ -80,6 +80,42 @@ def test_linear_estimation_records_robust_uncertainty_and_reference():
     assert result.parameters[1].interval[0] < result.parameters[1].estimate
 
 
+def test_estimation_fingerprint_binds_raw_feature_outcome_and_clusters():
+    """Raw inputs have stable fingerprints before missing-row filtering."""
+    values = np.arange(15, dtype=float)
+    features = np.column_stack((values, values**2))
+    outcome = 1.0 + features[:, 0] - 0.5 * features[:, 1]
+    clusters = np.repeat(("a", "b", "c"), 5)
+    policy = EstimationPolicy(
+        estimator="linear", covariance="clustered", cluster_name="site"
+    )
+
+    first = estimate_parameters(
+        features, outcome, linear_estimand(), policy, clusters=clusters
+    )
+    second = estimate_parameters(
+        features.copy(),
+        outcome.copy(),
+        linear_estimand(),
+        policy,
+        clusters=clusters.copy(),
+    )
+    changed = estimate_parameters(
+        features,
+        outcome,
+        linear_estimand(),
+        policy,
+        clusters=np.roll(clusters, 1),
+    )
+
+    assert first.raw_input_fingerprint == second.raw_input_fingerprint
+    assert first.raw_input_fingerprint != changed.raw_input_fingerprint
+    assert len(first.raw_input_fingerprint) == 64
+    assert first.to_dict()["raw_input_fingerprint"] == (
+        first.raw_input_fingerprint
+    )
+
+
 def test_clustered_covariance_and_shift_diagnostics_are_explicit():
     """Cluster and target-population policies cannot disappear into a score."""
     rng = np.random.default_rng(11)
@@ -478,6 +514,7 @@ def test_parameter_report_rejects_inconsistent_shape_and_row_accounting():
             {},
             {},
             {},
+            "0" * 64,
         )
 
     with pytest.raises(ValueError, match="row accounting"):
@@ -492,4 +529,5 @@ def test_parameter_report_rejects_inconsistent_shape_and_row_accounting():
             {},
             {},
             {},
+            "0" * 64,
         )

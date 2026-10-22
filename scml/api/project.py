@@ -20,6 +20,7 @@ from scml.contracts import tasks
 from scml.core import context as context_module
 from scml.core import orchestrator as orchestrator_module
 from scml.core import policies as checkpoints_module
+from scml.data.readers import connectors
 from scml.data.readers import interchange
 from scml.data.readers import tabular
 from scml.evaluation import parameter_estimation
@@ -426,6 +427,10 @@ class MLProject:
         if self.estimation_policy.cluster_name is not None:
             clusters = frame.loc[:, self.estimation_policy.cluster_name]
         cluster_values = None if clusters is None else clusters.tolist()
+        snapshot_id = tabular.snapshot_identity(frame, self.spec.data.uri)
+        source_identity = None
+        if self.spec.data.uri not in {"<memory>", "<in-memory>"}:
+            source_identity = connectors.source_identity(self.spec.data.uri)
         estimation = parameter_estimation.estimate_parameters(
             features.to_numpy(),
             outcome.to_numpy(),
@@ -447,6 +452,11 @@ class MLProject:
                     "policy": self.estimation_policy.missing,
                     "columns": declared,
                     "missing_counts": missing_values,
+                },
+                "data_identity": {
+                    "source_uri": self.spec.data.uri,
+                    "source_identity": source_identity,
+                    "snapshot_id": snapshot_id,
                 },
             },
         )
