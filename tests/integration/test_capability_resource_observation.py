@@ -44,7 +44,9 @@ def capability(resources: capabilities.ResourceAssumptions):
         required_extras=("core",),
         resources=resources,
         failure_modes=("resource observation unavailable",),
-        evidence_links=("tests/integration/test_capability_resource_observation.py",),
+        evidence_links=(
+            "tests/integration/test_capability_resource_observation.py",
+        ),
     )
 
 

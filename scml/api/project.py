@@ -413,9 +413,7 @@ class MLProject:
             )
         missing_counts = frame.loc[:, declared].isna().sum()
         missing_values = {
-            name: int(count)
-            for name, count in missing_counts.items()
-            if count
+            name: int(count) for name, count in missing_counts.items() if count
         }
         if missing_values and self.estimation_policy.missing == "reject":
             raise errors.DataError(

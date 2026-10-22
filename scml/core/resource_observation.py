@@ -41,9 +41,7 @@ class RuntimeResourceObservation:
         sources: dict[str, str],
     ) -> None:
         """Initialize an observation without retaining host-specific objects."""
-        if not isinstance(
-            environment, capabilities.CapabilityEnvironment
-        ):
+        if not isinstance(environment, capabilities.CapabilityEnvironment):
             raise TypeError("environment must be CapabilityEnvironment")
         self.environment = environment
         self.captured_at = captured_at
@@ -79,9 +77,7 @@ class RuntimeResourceObservation:
             "optional_extras": {
                 name: {
                     "available": available,
-                    "source": self.sources.get(
-                        f"extra:{name}", "unknown"
-                    ),
+                    "source": self.sources.get(f"extra:{name}", "unknown"),
                 }
                 for name, available in self.extra_observations.items()
             },
@@ -128,9 +124,10 @@ def observe_runtime_resources(
 
 def _observe_cpu_cores() -> tuple[int | None, str]:
     """Return CPUs available to this process, respecting affinity when able."""
+    affinity_probe = getattr(os, "sched_getaffinity", None)
     try:
-        affinity = os.sched_getaffinity(0)
-    except (AttributeError, OSError):
+        affinity = affinity_probe(0) if affinity_probe is not None else None
+    except OSError:
         affinity = None
     if affinity:
         return len(affinity), "os.sched_getaffinity"

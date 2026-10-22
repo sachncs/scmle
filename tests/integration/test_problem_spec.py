@@ -83,8 +83,7 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     )
     assert capability_registry["schema_version"] == 1
     assert any(
-        family["model_family"] == "jepa"
-        and family["status"] == "experimental"
+        family["model_family"] == "jepa" and family["status"] == "experimental"
         for family in capability_registry["model_families"]
     )
     assert (result.run_dir / "evaluation_policy.json").exists()
