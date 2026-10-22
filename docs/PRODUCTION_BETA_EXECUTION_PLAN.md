@@ -1935,6 +1935,16 @@ The empty extension-snapshot regression at `e190540` also passes: a
 curation-only adapter can publish a signed zero-sample snapshot with its
 identity and profile evidence, while modelling remains unavailable by design.
 
+Media curation identity correction at `ad179d9` on 2026-10-22:
+
+- Audio and video curation reports now reuse the dataset's source-order-bound
+  `content_hash` instead of recomputing a differently ordered digest. This
+  prevents a report from detaching from its adapter when source order is not
+  lexicographically sorted.
+- Reversed-order audio/video regression fixtures pass in the focused 78-test
+  media/lifecycle suite under `-W error::ResourceWarning`; Ruff, formatting,
+  and mypy remain clean.
+
 Audio robustness evidence at `ab21c49` on 2026-10-22:
 
 - `AudioAdapter` now records a bounded, deterministic additive-background-noise
