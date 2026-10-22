@@ -1,5 +1,6 @@
 """Tests for independent release review evidence."""
 
+import dataclasses
 import json
 import os
 from pathlib import Path
@@ -40,6 +41,8 @@ def make_review() -> review.IndependentReleaseReview:
             claim(review.ReviewClaimKind.METRIC, "metric.roc_auc"),
             claim(review.ReviewClaimKind.FAIRNESS, "fairness.equalized_odds"),
             claim(review.ReviewClaimKind.EXPLANATION, "explanation.fidelity"),
+            claim(review.ReviewClaimKind.RELIABILITY, "reliability.faults"),
+            claim(review.ReviewClaimKind.SECURITY, "security.provenance"),
         ),
         artifact_digests={"wheel": "sha256:wheel", "evidence": "sha256:index"},
         observed_at="2026-10-20T12:00:00+00:00",
@@ -134,6 +137,33 @@ def test_review_fails_closed_for_blocked_or_failed_claims():
     assert not failed.accepted(
         "abc1234", (review.ReviewClaimKind.METRIC,), "release-key"
     )
+
+
+def test_cli_requires_reliability_and_security_claims_by_default(
+    tmp_path: Path,
+):
+    """The default CLI gate covers every critical review claim kind."""
+    path = tmp_path / "incomplete-review.json"
+    complete = make_review()
+    incomplete = dataclasses.replace(complete, claims=complete.claims[:3])
+    incomplete.sign("release-key").write(path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/verify_release_review.py",
+            str(path),
+            "--source-commit",
+            "abc1234",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "SCML_REVIEW_SIGNING_KEY": "release-key"},
+    )
+
+    assert result.returncode == 1
+    assert "acceptance gate" in result.stderr
 
 
 def test_review_rejects_conflicted_identity_and_incomplete_evidence():

@@ -9,6 +9,8 @@ import sys
 
 from scml.governance import review
 
+DEFAULT_REQUIRED_KINDS = [kind.value for kind in review.ReviewClaimKind]
+
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     """Parse the review verification command line."""
@@ -22,11 +24,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
         action="append",
         dest="required_kinds",
         choices=[kind.value for kind in review.ReviewClaimKind],
-        default=[
-            review.ReviewClaimKind.METRIC.value,
-            review.ReviewClaimKind.FAIRNESS.value,
-            review.ReviewClaimKind.EXPLANATION.value,
-        ],
+        default=DEFAULT_REQUIRED_KINDS,
     )
     parser.add_argument(
         "--signing-key-env",
