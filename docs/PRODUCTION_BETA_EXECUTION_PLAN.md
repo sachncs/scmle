@@ -1981,6 +1981,23 @@ Optional integration matrix evidence on 2026-10-22:
   support evidence; the hosted optional matrix remains required for those
   integrations.
 
+Deep-learning capability declaration at `489c943` on 2026-10-22:
+
+- The tabular capability registry now declares `deep_learning` for binary,
+  multiclass, and regression paths and records the required `deeplearning`
+  extra. Previously, Torch candidates reached planning and were rejected
+  because their complete capability key was absent; the registry now makes
+  the optional installation boundary explicit before training.
+- In the isolated Python 3.13 optional environment, the Torch and Keras unit
+  suites passed `31` tests with 1 explicit skip; the remaining deep-learning,
+  embedding, MLflow, curriculum, and integration suite passed `52` tests with
+  1 explicit skip; and the Ray cluster suite passed `5` tests. All runs used
+  `-W error::ResourceWarning`. MLflow emitted one upstream SQLAlchemy
+  deprecation warning, which is not a resource-warning failure.
+- Together with the preceding optional matrix, `182` optional integration
+  tests now have local evidence. Hosted cross-platform execution and
+  heavyweight model/service environment review remain separate release gates.
+
 Current-head release preflight at `8651c3a` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
