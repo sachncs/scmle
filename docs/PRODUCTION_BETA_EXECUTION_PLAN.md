@@ -2049,6 +2049,36 @@ Current hosted gate observation at `6c11cdc` on 2026-10-22:
   unverified. Repository visibility, Pages activation, and the account
   runner/billing condition require owner-controlled external changes.
 
+Exact-head evidence-integration release preflight at `09d8e7e` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed the static, formatting, mypy,
+  security, API-compatibility, bounded-test, stability, mutation, benchmark,
+  packaging, reproducibility, and site gates. The bounded suite passed `2,036`
+  tests with `75` explicitly explained optional-dependency skips; the JUnit
+  outcome audit found zero unexplained skips and zero xfail/XPASS outcomes.
+  Total coverage was `83.19%` and the declared core scope was `86%`.
+- The three-attempt stability policy passed with no inventory changes,
+  quarantined failures, or expired entries. Mutation testing killed
+  `1,504/2,057` mutants (`73%`), above the `70%` threshold; one mutation
+  timed out and `552` survived for follow-up triage.
+- Five-seed offline benchmarks recorded zero regressions and zero failed
+  repetitions for breast cancer, wine, digits, and diabetes progression. The
+  verdicts were tie, tie, tie, and ahead; runtimes were `105`, `76`, `634`,
+  and `70` seconds, with peak memory of `0.3681`, `0.3918`, `0.4560`, and
+  `0.4618` GB respectively.
+- Reproducible packages and network-isolated wheel/source installs passed.
+  The wheel hash was
+  `57f15957aadbd3739617fbab4dfca707cf43e6cdae25b2ef7102da75d29cbad1` and
+  the source-distribution hash was
+  `f9e37ee8346eba2c41d3788e9681b2698c23f98a35b8ba03fa9e97bac9fa681a`.
+- The site gate found `0` npm audit vulnerabilities, Astro built `17` static
+  pages, accessibility checks passed for all `17` HTML files, all `384`
+  internal links resolved, and both Playwright smoke tests passed. This is
+  local evidence at the code commit; the documentation-only follow-up is
+  `d023ef2`. Hosted Linux and Pages, external transport/resource-fault
+  execution, secret custody, and independent reviewer evidence remain open
+  release gates.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
