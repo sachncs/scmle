@@ -1932,6 +1932,20 @@ Signed lifecycle evidence at `7dc754f` on 2026-10-22:
   does not provide external secret custody, independent reviewer signatures,
   hosted CI authority, or a production support claim for built-in modalities.
 
+Exact-head full-suite evidence at `9c10883` on 2026-10-22:
+
+- The complete repository suite passed `2,369` tests with `88` optional
+  dependency skips in `31m24s` under `-W error::ResourceWarning`. The explicit
+  JUnit skip/xfail audit reported `unexplained: []` and `xfails: []`; every
+  skip carried a concrete missing-dependency reason.
+- The API compatibility snapshot was refreshed for the already-public
+  `ModalityProject` constructor contract. The compatibility verifier and API
+  surface tests passed `9` tests before the full-suite rerun, and the full
+  suite passed at the fixed head.
+- This is stronger local correctness evidence, but it does not replace the
+  unavailable hosted CI runner, public Pages deployment, independent review,
+  external secret custody, or external transport/resource-fault evidence.
+
 Current-head optional-boundary release preflight evidence at `eb163a4` on
 2026-10-22:
 
