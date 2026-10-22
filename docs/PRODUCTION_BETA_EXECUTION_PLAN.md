@@ -1916,6 +1916,28 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Standalone modelling and estimation documentation at `80ea0eb` on 2026-10-23:
+
+- The Astro site now has a standalone `/docs/modeling/` page and navigation
+  entry. It explains the supported tabular boundary, optional FT-Transformer
+  and sentence-transformer paths, the extension-only TabPFN boundary, and the
+  fact that JEPA is not implemented. It also distinguishes hyperparameter
+  search, predictive uncertainty, model-selection uncertainty, and the still
+  missing first-class statistical parameter-estimation contract.
+- The page records the acceptance bar for future parameter estimation:
+  explicit estimand and population, identification assumptions, resolved
+  estimator and convergence evidence, a named uncertainty method,
+  reproducibility from raw snapshot to artifact digest, and sensitivity and
+  subgroup checks. It does not imply that current calibration or conformal
+  prediction is causal or statistical parameter estimation.
+- Route inventories and the public-route browser test include the new page.
+  Local Astro build produced `18` pages; internal-link checks passed for
+  `427` links, accessibility smoke checks passed for all `18` HTML files, and
+  both Playwright tests passed. The change was pushed to
+  `feat/v0.1-foundation`.
+- This improves onboarding and truthfulness; it does not add JEPA,
+  production multimodal modelling, or the missing parameter-estimation API.
+
 Signed modality checkpoint recovery at `3831565` on 2026-10-22:
 
 - The non-tabular lifecycle now supports an explicit, signed, atomically
