@@ -1943,6 +1943,18 @@ Image duplicate and augmentation evidence at `8cb5ae4` on 2026-10-22:
   localization, or saliency evidence. Production-scale image quality and
   independent review remain separate gates.
 
+Video lifecycle temporal policy at `03fe1ec` on 2026-10-22:
+
+- `VideoAdapter` now accepts an explicit `temporal_cutoff`. When supplied,
+  lifecycle partitioning uses the video dataset's UTC-normalized past/future
+  split, puts future clips in the test partition, leaves validation empty, and
+  does not let the random seed override the declared policy. Without the
+  cutoff, the existing group-aware split remains the explicit default.
+- The modality, media, API surface, and compatibility suites passed 91 tests
+  under `-W error::ResourceWarning`; Ruff, formatting, and mypy passed. This
+  closes lifecycle wiring for temporal boundaries but does not infer event
+  time, provide watermarks, or establish causal ordering.
+
 Image identity correction at `818dc34` on 2026-10-22:
 
 - The image adapter now derives its declared dataset identity from the same
