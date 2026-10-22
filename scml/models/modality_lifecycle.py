@@ -11,6 +11,7 @@ integrity, not for claiming state-of-the-art representation quality.
 from __future__ import annotations
 
 import abc
+from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
@@ -282,10 +283,13 @@ class ModalityCurationResult:
         }
 
 
-class ModalityAdapter(abc.ABC):
-    """Polymorphic boundary between a dataset family and the lifecycle."""
+class ModalityCurationAdapter(abc.ABC):
+    """Polymorphic boundary for source identity and data understanding."""
 
-    modality: ClassVar[modalities.ModalityIdentity]
+    @property
+    @abc.abstractmethod
+    def modality(self) -> modalities.ModalityIdentity:
+        """Return the declared dataset family."""
 
     @property
     @abc.abstractmethod
@@ -302,6 +306,87 @@ class ModalityAdapter(abc.ABC):
         self,
     ) -> curation.ModalityCurationReport | document.DocumentCurationReport:
         """Return reviewable data-understanding evidence."""
+
+    @abc.abstractmethod
+    def modality_notes(self) -> tuple[str, ...]:
+        """Return representation and curation limits."""
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ExtensionCurationAdapter(ModalityCurationAdapter):
+    """Adapt arbitrary caller-owned records to the curation-only contract.
+
+    The callback owns domain-specific profiling and validation. This adapter
+    binds its result to the extension identity, immutable dataset identity,
+    and sample count before the signed curation project can publish evidence.
+    It intentionally does not provide split, feature, label, or model hooks.
+    """
+
+    extension: modalities.ExtensionModality
+    sample_values: tuple[Any, ...]
+    dataset_hash_value: str
+    curation_callback: Callable[[], curation.ModalityCurationReport]
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        """Validate the caller-owned curation boundary."""
+        if not isinstance(self.extension, modalities.ExtensionModality):
+            raise TypeError("extension must be ExtensionModality")
+        if not self.sample_values:
+            raise ValueError("sample_values must not be empty")
+        if not self.dataset_hash_value.strip():
+            raise ValueError("dataset_hash_value must not be empty")
+        if not callable(self.curation_callback):
+            raise TypeError("curation_callback must be callable")
+        if not self.limitations or any(
+            not value.strip() for value in self.limitations
+        ):
+            raise ValueError("limitations must contain non-empty values")
+        object.__setattr__(self, "sample_values", tuple(self.sample_values))
+        object.__setattr__(self, "limitations", tuple(self.limitations))
+
+    @property
+    def modality(self) -> modalities.ExtensionModality:
+        """Return the namespaced extension identity."""
+        return self.extension
+
+    @property
+    def dataset_hash(self) -> str:
+        """Return the caller-owned immutable dataset identity."""
+        return self.dataset_hash_value
+
+    @property
+    def samples(self) -> tuple[Any, ...]:
+        """Return arbitrary records in caller-defined canonical order."""
+        return self.sample_values
+
+    def curate(
+        self,
+    ) -> curation.ModalityCurationReport:
+        """Run and validate the caller-owned curation callback."""
+        report = self.curation_callback()
+        if not isinstance(report, curation.ModalityCurationReport):
+            raise TypeError("curation_callback must return a curation report")
+        expected_modality = modalities.modality_value(self.extension)
+        if report.modality != expected_modality:
+            raise ValueError(
+                "curation report modality does not match extension"
+            )
+        if report.dataset_hash != self.dataset_hash_value:
+            raise ValueError("curation report hash does not match extension")
+        if report.sample_count != len(self.sample_values):
+            raise ValueError("curation report count does not match extension")
+        return report
+
+    def modality_notes(self) -> tuple[str, ...]:
+        """Return explicit caller-owned boundaries for the dataset card."""
+        return self.limitations
+
+
+class ModalityAdapter(ModalityCurationAdapter):
+    """Polymorphic boundary between a dataset family and the lifecycle."""
+
+    modality: ClassVar[modalities.ModalityIdentity]
 
     @abc.abstractmethod
     def split(self, seed: int) -> DatasetPartitions:
@@ -322,10 +407,6 @@ class ModalityAdapter(abc.ABC):
     @abc.abstractmethod
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
         """Compare this reference adapter with an observed adapter."""
-
-    @abc.abstractmethod
-    def modality_notes(self) -> tuple[str, ...]:
-        """Return representation limits that belong in the model card."""
 
     def modality_specific_explanation(
         self,

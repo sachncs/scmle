@@ -467,7 +467,7 @@ class ModalityCurationProject:
 
     def __init__(
         self,
-        adapter: modality_lifecycle.ModalityAdapter,
+        adapter: modality_lifecycle.ModalityCurationAdapter,
         signing_key: str | bytes,
         *,
         output_dir: str | pathlib.Path = "runs",
@@ -485,8 +485,8 @@ class ModalityCurationProject:
             TypeError: If the adapter or manifest has the wrong type.
             ValueError: If the signing key is empty or the output is invalid.
         """
-        if not isinstance(adapter, modality_lifecycle.ModalityAdapter):
-            raise TypeError("adapter must be a ModalityAdapter")
+        if not isinstance(adapter, modality_lifecycle.ModalityCurationAdapter):
+            raise TypeError("adapter must be a ModalityCurationAdapter")
         if not signing_key:
             raise ValueError("signing_key must not be empty")
         if manifest is not None and not isinstance(

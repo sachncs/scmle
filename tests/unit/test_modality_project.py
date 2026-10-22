@@ -1,5 +1,6 @@
 """Tests for the public non-tabular lifecycle project surface."""
 
+import hashlib
 from pathlib import Path
 from typing import cast
 
@@ -7,6 +8,7 @@ import pytest
 
 import scml
 from scml.contracts import modalities
+from scml.data.modalities import curation
 from scml.data.modalities import document
 from scml.models import modality_lifecycle
 
@@ -124,3 +126,57 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     assert result.dataset_card["privacy"]["status"] == "not_assessed"
     assert result.dataset_card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()
+
+
+def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hooks(
+    tmp_path,
+):
+    """Curation-only extensions do not implement unused modelling methods."""
+    extension = modalities.ExtensionModality("acme/point-cloud")
+    records = ({"x": 1, "y": 2}, {"x": 3, "y": 4})
+    dataset_hash = hashlib.sha256(b"point-cloud-snapshot-1").hexdigest()
+    report = curation.ModalityCurationReport(
+        modality=extension.value,
+        dataset_hash=dataset_hash,
+        sample_count=len(records),
+        profile={"record_type": "point", "dimensions": 2},
+    )
+    adapter = scml.ExtensionCurationAdapter(
+        extension=extension,
+        sample_values=records,
+        dataset_hash_value=dataset_hash,
+        curation_callback=lambda: report,
+        limitations=("The caller owns point-cloud decoding and validation.",),
+    )
+
+    assert not isinstance(adapter, modality_lifecycle.ModalityAdapter)
+    result = scml.ModalityCurationProject(
+        adapter,
+        "test-signing-key",
+        output_dir=tmp_path / "point-cloud-curation",
+    ).run()
+
+    assert result.modality == "extension:acme/point-cloud"
+    assert result.sample_count == 2
+    assert result.dataset_card["manifest"]["task"] == "not_declared"
+
+
+def test_extension_curation_adapter_rejects_detached_report():
+    """A curation callback cannot publish evidence for another snapshot."""
+    extension = modalities.ExtensionModality("acme/point-cloud")
+    report = curation.ModalityCurationReport(
+        modality=extension.value,
+        dataset_hash="different-snapshot",
+        sample_count=1,
+        profile={},
+    )
+    adapter = scml.ExtensionCurationAdapter(
+        extension=extension,
+        sample_values=({"x": 1},),
+        dataset_hash_value=hashlib.sha256(b"declared-snapshot").hexdigest(),
+        curation_callback=lambda: report,
+        limitations=("The caller owns validation.",),
+    )
+
+    with pytest.raises(ValueError, match="hash does not match"):
+        adapter.curate()
