@@ -1943,6 +1943,19 @@ Current-head optional-boundary release preflight evidence at `eb163a4` on
   fault execution, secret custody, and independent reviewer evidence remain
   open release gates.
 
+Hosted-test skip enforcement at `fbeaca3` on 2026-10-22:
+
+- The primary CI bounded suite, scheduled full suite, and exact-SHA clean-clone
+  rehearsal now publish JUnit results and run `scripts/check_pytest_skips.py`.
+  A hosted green run therefore fails closed when a collected test is skipped
+  without an explicit reason, instead of treating the skip as invisible.
+- The workflow YAML passed `actionlint` and Ruby YAML parsing locally. The
+  project stability policy still passed three attempts over `25` test cases,
+  and the focused JUnit skip-audit contract passed `10` tests with zero
+  unexplained skips. This verifies workflow structure and local policy
+  behavior; hosted runner execution and public Pages deployment remain open
+  external gates.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
