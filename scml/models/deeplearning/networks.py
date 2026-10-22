@@ -217,6 +217,25 @@ class TabPfnAdapter(models.ModelAdapter):
         memory_factor=6.0,
     )
 
+    def rejection_reason(
+        self, task: tasks.TaskType, row_count: int | None = None
+    ) -> str | None:
+        """Keeps TabPFN outside the automatic beta candidate set.
+
+        TabPFN requires an accepted third-party model-weight license, token
+        custody, and evidence that is not part of the current tabular beta
+        support boundary. It remains available through its explicit adapter
+        and foundation-engine contract, but installing the package alone
+        must not make ordinary projects depend on that external agreement.
+        """
+        missing = super().rejection_reason(task, row_count)
+        if missing is not None:
+            return missing
+        return (
+            "foundation model is extension-only until accepted weight "
+            "license, token custody, and complete release evidence exist"
+        )
+
     def gpu_usable(self) -> bool:
         """Whether PyTorch can see a CUDA device (asked of the worker)."""
         return self.is_available() and bool(

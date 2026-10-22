@@ -72,6 +72,18 @@ def test_the_adapter_is_rejected_without_the_package_and_explains_why():
     assert adapter.capabilities.max_rows == foundation.MAX_ROWS
 
 
+def test_the_adapter_stays_extension_only_when_its_package_is_available(
+    monkeypatch,
+):
+    """Installing TabPFN must not silently promote it into the beta."""
+    adapter = registry_module.ModelRegistry.with_builtins().get("tabpfn")
+    monkeypatch.setattr(adapter, "is_available", lambda: True)
+
+    reason = adapter.rejection_reason(tasks.TaskType.BINARY)
+
+    assert reason is not None and "extension-only" in reason
+
+
 def test_the_proxy_trains_and_predicts_through_the_worker(monkeypatch):
     existing = os.environ.get("PYTHONPATH", "")
     worker.client().shutdown()
