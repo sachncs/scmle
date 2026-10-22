@@ -1916,6 +1916,27 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Signed modality checkpoint recovery at `3831565` on 2026-10-22:
+
+- The non-tabular lifecycle now supports an explicit, signed, atomically
+  persisted checkpoint path. Each stage boundary records the ordered
+  lifecycle prefix and a digest of its JSON evidence; resume replays completed
+  stages against the caller-provided adapter and rejects any divergence,
+  changed dataset, changed manifest, wrong seed, tampered checkpoint, or
+  mismatched package identity before continuing.
+- Recovery does not deserialize an arbitrary adapter or estimator from the
+  checkpoint. A completed package is verified through its existing signature,
+  and a replayed packaging stage verifies the package model, feature schema,
+  dataset identity, and deterministic coefficients before reusing it.
+- A simulated worker failure after packaging resumed successfully without
+  republishing the package. Completed-checkpoint resume returned the signed
+  report idempotently; tampered and changed-snapshot checkpoints failed closed.
+- The modality lifecycle, public project, API compatibility, and API surface
+  slice passed `56` tests under strict resource warnings. Ruff, formatting,
+  mypy, and diff checks passed. This closes the local modality resume boundary;
+  external process/container/kernel fault execution and independent release
+  review remain separate gates.
+
 Current-head release preflight at `a56492a` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed static analysis, formatting, mypy,
