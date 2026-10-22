@@ -101,3 +101,95 @@ def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
         project.run()
 
     assert not list(tmp_path.glob("run_*/parameter_estimation.json"))
+
+
+def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
+    """IPW cannot infer or silently substitute a treatment column."""
+    frame = estimation_frame().assign(treatment=(np.arange(80) % 2))
+    estimand = EstimandSpec(
+        name="treatment_effect",
+        outcome="outcome",
+        population="the declared project dataset",
+        likelihood="gaussian",
+        feature_names=("treatment", "signal"),
+        assumptions=("the declared causal assumptions hold",),
+    )
+    policy = EstimationPolicy(
+        estimator="ipw_ate",
+        covariance="iid",
+        treatment_position=0,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+
+    project = scml.MLProject(
+        frame,
+        "outcome",
+        estimand=estimand,
+        estimation_policy=policy,
+        output_dir=tmp_path,
+    )
+
+    with pytest.raises(errors.ConfigError, match="treatment_column"):
+        project.estimate_parameters()
+
+
+def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
+    """Project declarations fail closed before estimation consumes rows."""
+    project = scml.MLProject(
+        estimation_frame(),
+        "outcome",
+        estimand=declared_estimand(),
+        estimation_policy=EstimationPolicy(
+            estimator="linear", covariance="clustered", cluster_name="missing"
+        ),
+        output_dir=tmp_path,
+    )
+    with pytest.raises(errors.DataError, match="columns are missing"):
+        project.estimate_parameters()
+
+    missing_frame = estimation_frame()
+    missing_frame.loc[0, "signal"] = np.nan
+    project = scml.MLProject(
+        missing_frame,
+        "outcome",
+        estimand=declared_estimand(),
+        estimation_policy=EstimationPolicy(estimator="linear"),
+        output_dir=tmp_path,
+    )
+    with pytest.raises(errors.DataError, match="missing values"):
+        project.estimate_parameters()
+
+
+def test_complete_case_binds_missingness_and_run_artifact_to_result(tmp_path):
+    """The result exposes the digest-verified, complete persisted report."""
+    frame = estimation_frame()
+    frame.loc[0, "signal"] = np.nan
+    project = scml.MLProject(
+        frame,
+        "outcome",
+        task="regression",
+        time_budget=30,
+        estimand=declared_estimand(),
+        estimation_policy=EstimationPolicy(
+            estimator="linear", missing="complete_case"
+        ),
+        output_dir=tmp_path,
+    )
+
+    result = project.run()
+
+    artifact = result.run_dir / "parameter_estimation.json"
+    restored = EstimationResult.read(artifact)
+    assert result.estimation is not None
+    assert result.estimation.digest() == restored.digest()
+    assert result.estimation.rows_dropped == 1
+    assert result.estimation.diagnostics["data_columns"]["outcome"] == (
+        "outcome"
+    )
+    assert result.estimation.diagnostics["missingness"]["policy"] == (
+        "complete_case"
+    )

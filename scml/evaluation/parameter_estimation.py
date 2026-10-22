@@ -22,6 +22,7 @@ from typing import Any
 from typing import Literal
 
 import numpy as np
+import pandas as pd
 from scipy import linalg
 from scipy import optimize
 from scipy import special
@@ -783,6 +784,16 @@ def prepare_rows(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, int]:
     """Apply the declared missingness policy and retain cluster labels."""
     valid = np.isfinite(matrix).all(axis=1) & np.isfinite(values)
+    if clusters is not None:
+        cluster_array = np.asarray(clusters, dtype=object)
+        cluster_missing = pd.isna(cluster_array)
+        if not isinstance(cluster_missing, np.ndarray):
+            cluster_missing = np.asarray(cluster_missing)
+        if cluster_missing.ndim != 1:
+            raise ValueError("cluster labels must be scalar values")
+        valid &= ~cluster_missing.astype(bool)
+    else:
+        cluster_array = None
     dropped = int((~valid).sum())
     if dropped and missing == "reject":
         raise ValueError(
@@ -791,8 +802,7 @@ def prepare_rows(
     if valid.sum() <= matrix.shape[1] + 1:
         raise ValueError("complete rows are insufficient for estimation")
     kept_clusters = None
-    if clusters is not None:
-        cluster_array = np.asarray(clusters, dtype=object)
+    if cluster_array is not None:
         kept_clusters = cluster_array[valid]
     return matrix[valid], values[valid], kept_clusters, dropped
 

@@ -1,5 +1,6 @@
 """Public API: `MLProject(...).plan()`, `.run()`, `result.predict()`."""
 
+import dataclasses
 import json
 import pathlib
 from typing import Any
@@ -336,8 +337,13 @@ class MLProject:
             estimation = self.estimate_parameters()
         result = self.orchestrator.run(self.output_dir, plan)
         if estimation is not None:
-            estimation.write(result.run_dir / "parameter_estimation.json")
-            result.estimation = estimation
+            artifact = result.run_dir / "parameter_estimation.json"
+            estimation.write(artifact)
+            # The result must expose the exact digest-verified artifact that
+            # was persisted, rather than an unverified in-memory equivalent.
+            result.estimation = parameter_estimation.EstimationResult.read(
+                artifact
+            )
         return result
 
     def estimate_parameters(
@@ -376,12 +382,45 @@ class MLProject:
         if frame is None:
             frame = tabular.read_table(self.spec.data.uri)
         declared = [*self.estimand.feature_names, self.estimand.outcome]
+        treatment_column = None
+        if self.estimation_policy.estimator == "ipw_ate":
+            treatment_column = self.spec.data.treatment_column
+            if treatment_column is None:
+                raise errors.ConfigError(
+                    "ipw_ate parameter estimation requires treatment_column"
+                )
+            if treatment_column not in self.estimand.feature_names:
+                raise errors.ConfigError(
+                    "treatment_column must be included in estimand "
+                    "feature_names"
+                )
+            treatment_position = self.estimand.feature_names.index(
+                treatment_column
+            )
+            if self.estimation_policy.treatment_position != treatment_position:
+                raise errors.ConfigError(
+                    "treatment_position must match treatment_column in "
+                    "estimand feature_names"
+                )
+            declared.append(treatment_column)
         if self.estimation_policy.cluster_name is not None:
             declared.append(self.estimation_policy.cluster_name)
+        declared = list(dict.fromkeys(declared))
         missing = sorted(set(declared) - set(frame.columns))
         if missing:
             raise errors.DataError(
                 f"parameter estimation columns are missing: {missing}"
+            )
+        missing_counts = frame.loc[:, declared].isna().sum()
+        missing_values = {
+            name: int(count)
+            for name, count in missing_counts.items()
+            if count
+        }
+        if missing_values and self.estimation_policy.missing == "reject":
+            raise errors.DataError(
+                "parameter estimation missing values require an explicit "
+                f"complete_case policy: {missing_values}"
             )
         features = frame.loc[:, list(self.estimand.feature_names)]
         outcome = frame.loc[:, self.estimand.outcome]
@@ -396,10 +435,29 @@ class MLProject:
             self.estimation_policy,
             clusters=cluster_values,
         )
+        estimation = dataclasses.replace(
+            estimation,
+            diagnostics={
+                **estimation.diagnostics,
+                "data_columns": {
+                    "features": list(self.estimand.feature_names),
+                    "outcome": self.estimand.outcome,
+                    "treatment": treatment_column,
+                    "cluster": self.estimation_policy.cluster_name,
+                },
+                "missingness": {
+                    "policy": self.estimation_policy.missing,
+                    "columns": declared,
+                    "missing_counts": missing_values,
+                },
+            },
+        )
         if artifact_directory is not None:
-            estimation.write(
+            artifact = (
                 pathlib.Path(artifact_directory) / "parameter_estimation.json"
             )
+            estimation.write(artifact)
+            estimation = parameter_estimation.EstimationResult.read(artifact)
         return estimation
 
     @classmethod
