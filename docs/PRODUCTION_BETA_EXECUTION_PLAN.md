@@ -3686,3 +3686,20 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   external fault evidence, establish hosted CI or Pages deployment, or
   replace independent release review and secret custody.
 
+## Curation evidence verification at `d74e04c` on 2026-10-23
+
+- `ModalityCurationResult` now has a versioned read/parse contract,
+  dataset/card identity checks, canonical JSON normalization, and
+  `read_verified()` signature verification. The curation artifact now records
+  its path and uses the same signature envelope as the in-memory result,
+  making the persisted data-understanding evidence independently consumable.
+- The result is available from the documented top-level `scml` API and is
+  covered by the versioned public API snapshot. The focused API, curation,
+  lifecycle, and package slice passed `59` tests under
+  `-W error::ResourceWarning`; Ruff, formatting, mypy, and
+  `git diff --check` passed.
+- This closes the local curation-artifact verification gap. It does not
+  claim that curation establishes consent, ownership, retention, semantic
+  quality, or production support; those remain explicit manifest and review
+  responsibilities.
+
