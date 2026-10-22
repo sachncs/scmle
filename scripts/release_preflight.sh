@@ -29,7 +29,9 @@ uv run --python "$python_version" pytest -q \
   tests/integration/test_end_to_end.py \
   tests/integration/test_predict_api.py \
   tests/integration/test_deployment.py \
+  tests/integration/test_governance.py \
   tests/integration/test_monitoring.py \
+  tests/integration/test_problem_spec.py \
   tests/integration/test_serve_and_export.py \
   --junitxml="$preflight_directory/bounded-suite.xml"
 uv run --python "$python_version" python scripts/check_pytest_skips.py \
