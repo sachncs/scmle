@@ -8,6 +8,8 @@ import pytest
 from scml.evaluation.parameter_estimation import EstimandSpec
 from scml.evaluation.parameter_estimation import estimate_parameters
 from scml.evaluation.parameter_estimation import EstimationPolicy
+from scml.evaluation.parameter_estimation import EstimationResult
+from scml.evaluation.parameter_estimation import ParameterEstimate
 
 
 def linear_estimand() -> EstimandSpec:
@@ -162,8 +164,6 @@ def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
 
     digest = result.write(path)
 
-    from scml.evaluation.parameter_estimation import EstimationResult
-
     restored = EstimationResult.read(path)
     assert digest == result.digest() == restored.digest()
     path.write_text(
@@ -171,3 +171,54 @@ def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
     )
     with pytest.raises(ValueError, match="digest mismatch"):
         EstimationResult.read(path)
+
+
+def test_parameter_report_rejects_invalid_scientific_evidence():
+    """Malformed estimates cannot enter the evidence contract."""
+    with pytest.raises(ValueError, match="standard_error"):
+        ParameterEstimate("slope", 1.0, -0.1, (0.5, 1.5), 0.01)
+
+    with pytest.raises(ValueError, match="interval must be ordered"):
+        ParameterEstimate("slope", 1.0, 0.1, (1.5, 0.5), 0.01)
+
+
+def test_parameter_report_rejects_inconsistent_shape_and_row_accounting():
+    """Covariance shape and complete-case accounting are release invariants."""
+    estimand = EstimandSpec(
+        name="slope",
+        outcome="outcome",
+        population="test rows",
+        likelihood="gaussian",
+        feature_names=("feature",),
+        assumptions=("linear conditional mean",),
+    )
+    policy = EstimationPolicy(estimator="linear")
+    parameter = ParameterEstimate("intercept", 1.0, 0.1, (0.8, 1.2), 0.01)
+
+    with pytest.raises(ValueError, match="covariance must be square"):
+        EstimationResult(
+            estimand,
+            policy,
+            (parameter,),
+            ((1.0, 0.0), (0.0, 1.0)),
+            2,
+            2,
+            0,
+            {},
+            {},
+            {},
+        )
+
+    with pytest.raises(ValueError, match="row accounting"):
+        EstimationResult(
+            estimand,
+            policy,
+            (parameter,),
+            ((1.0,),),
+            2,
+            1,
+            0,
+            {},
+            {},
+            {},
+        )

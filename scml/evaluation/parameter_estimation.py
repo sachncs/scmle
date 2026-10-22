@@ -13,6 +13,7 @@ from collections.abc import Sequence
 import dataclasses
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import tempfile
@@ -124,6 +125,26 @@ class ParameterEstimate:
     interval: tuple[float, float]
     p_value: float
 
+    def __post_init__(self) -> None:
+        """Reject coefficient evidence that cannot be interpreted safely."""
+        if not self.name.strip():
+            raise ValueError("parameter name must not be empty")
+        for name, value in (
+            ("estimate", self.estimate),
+            ("standard_error", self.standard_error),
+            ("p_value", self.p_value),
+            ("interval_lower", self.interval[0]),
+            ("interval_upper", self.interval[1]),
+        ):
+            if not math.isfinite(float(value)):
+                raise ValueError(f"{name} must be finite")
+        if self.standard_error < 0.0:
+            raise ValueError("standard_error must not be negative")
+        if not 0.0 <= self.p_value <= 1.0:
+            raise ValueError("p_value must lie between 0 and 1")
+        if self.interval[0] > self.interval[1]:
+            raise ValueError("parameter interval must be ordered")
+
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-compatible coefficient evidence."""
         return dataclasses.asdict(self)
@@ -143,6 +164,44 @@ class EstimationResult:
     diagnostics: Mapping[str, Any]
     sensitivity: Mapping[str, Any]
     reference: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        """Validate the report shape before it can be persisted or used."""
+        if not isinstance(self.estimand, EstimandSpec):
+            raise TypeError("estimand must be EstimandSpec")
+        if not isinstance(self.policy, EstimationPolicy):
+            raise TypeError("policy must be EstimationPolicy")
+        if not self.parameters:
+            raise ValueError("estimation result needs parameters")
+        names = tuple(item.name for item in self.parameters)
+        if len(set(names)) != len(names):
+            raise ValueError("parameter names must be unique")
+        expected = len(self.parameters)
+        if len(self.covariance) != expected or any(
+            len(row) != expected for row in self.covariance
+        ):
+            raise ValueError("covariance must be square over all parameters")
+        covariance = np.asarray(self.covariance, dtype=float)
+        if not np.isfinite(covariance).all():
+            raise ValueError("covariance must contain finite values")
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
+            raise ValueError("covariance must be symmetric")
+        for name, value in (
+            ("rows_input", self.rows_input),
+            ("rows_used", self.rows_used),
+            ("rows_dropped", self.rows_dropped),
+        ):
+            if not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if self.rows_used + self.rows_dropped != self.rows_input:
+            raise ValueError("row accounting must reconcile to rows_input")
+        for mapping_name, mapping_value in (
+            ("diagnostics", self.diagnostics),
+            ("sensitivity", self.sensitivity),
+            ("reference", self.reference),
+        ):
+            if not isinstance(mapping_value, Mapping):
+                raise TypeError(f"{mapping_name} must be a mapping")
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible estimation report."""
@@ -204,9 +263,18 @@ class EstimationResult:
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         if envelope.get("schema_version") != 1:
             raise ValueError("unsupported estimation report schema")
-        report = cls.from_dict(envelope["report"])
-        if envelope.get("digest") != report.digest():
+        record = envelope.get("report")
+        if not isinstance(record, Mapping):
+            raise ValueError("estimation report must contain a mapping")
+        canonical = json.dumps(
+            record, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        digest = hashlib.sha256(canonical).hexdigest()
+        if envelope.get("digest") != digest:
             raise ValueError("estimation report digest mismatch")
+        report = cls.from_dict(record)
+        if report.digest() != digest:
+            raise ValueError("estimation report canonicalization mismatch")
         return report
 
     @classmethod
