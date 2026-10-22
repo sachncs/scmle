@@ -1916,6 +1916,33 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Complete local release preflight at `b12fe54` on 2026-10-23:
+
+- Static checks, formatting, mypy over 242 source files, Bandit, pip-audit,
+  and public API compatibility passed. The bounded release suite passed
+  `2,078` tests with `76` explained optional-dependency skips; the skip audit
+  found no unexplained skips or xfails. Total coverage was 82.75%, while the
+  declared core contract scope reached 86%.
+- The three-run stability gate passed with no quarantined failures, inventory
+  changes, expired exceptions, or unlisted skips. Mutation testing killed
+  `1,503/2,057` mutants (73%) against the 70% minimum; one timeout and 553
+  survivors remain recorded engineering debt rather than being hidden.
+- Five-seed offline benchmarks reported zero regressions and zero failed
+  repetitions. Verdicts were tie, tie, tie, and ahead for breast cancer,
+  wine, digits, and diabetes progression; runtime, peak memory, failure rate,
+  and confidence intervals were retained in the benchmark artifact.
+- Wheel and source-distribution builds reproduced byte-for-byte with wheel
+  digest `c236f12dbe1a4ee8ab45af1102c5dd8becf9737ab56d43c35518f3f09342aa21`
+  and sdist digest
+  `23482efe278d178b805fbc7c6db82214f45a3f724674d318a9da1afa74af52d9`.
+  Network-isolated wheel installation and source-distribution rebuild and
+  installation both passed.
+- The standalone Astro site passed npm audit with zero vulnerabilities,
+  built 18 pages, passed accessibility checks for all 18 HTML files and 427
+  internal links, and passed both browser smoke tests. This is complete local
+  evidence; hosted GitHub Actions/Pages, external fault execution, secret
+  custody, and independent reviewer sign-off remain external release gates.
+
 Current-head complete strict regression at `a2d973b` on 2026-10-23:
 
 - `uv run pytest -q tests -W error::ResourceWarning` passed `2,405` tests
