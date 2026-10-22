@@ -1952,6 +1952,23 @@ Latest hosted gate observation at `009cb06` on 2026-10-22:
   Pages site is configured. Public deployment requires owner-controlled
   repository visibility, Pages activation, and runner/billing changes.
 
+Cooperative modality cancellation at `aed4d0b` on 2026-10-22:
+
+- `LifecycleCancellation` provides a thread-safe public signal and
+  `ModalityProject.cancel()` requests cancellation without introducing a
+  modality-specific implementation. `ModalityLifecycle` checks the signal at
+  stage boundaries and before/after report publication; a cancelled run
+  removes the package and lifecycle report created by that run, so partial
+  evidence cannot be mistaken for a completed lifecycle.
+- Pre-run cancellation and cancellation after the first completed stage are
+  covered by focused tests. The API, lifecycle, project, and explanation slice
+  passed `67` tests under `-W error::ResourceWarning`; Ruff, formatting, mypy,
+  API compatibility, and `git diff --check` passed.
+- This closes the cooperative local cancellation contract. Process death,
+  timeout, and external resource-fault scenarios remain covered by the local
+  fault harness; hosted transport and infrastructure failure evidence remain
+  external release gates.
+
 Signed lifecycle evidence at `7dc754f` on 2026-10-22:
 
 - Lifecycle reports are now schema version 2 artifacts signed over the exact
