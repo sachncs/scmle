@@ -3893,3 +3893,20 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   Pages deployment, independent review, external fault execution, or
   non-tabular production modelling is complete.
 
+## Regression correction at `c88c08a` on 2026-10-23
+
+- The first full regression after runtime resource observation completed with
+  `2489 passed, 38 skipped, 12 failed` in 40m49s. The failures were traced to
+  three implementation defects: extension-only adapters were incorrectly
+  checked against a synthetic install extra, a dependency-test monkeypatch
+  could hide the running core package, and resource-observation helpers
+  violated the repository's public-name convention.
+- `c88c08a` removes the synthetic extra requirement, makes the core observation
+  truthful and stable, and promotes the helper functions to public names.
+  The affected recovery, extension, resource-limit, resume, strategy,
+  convention, and observation slice then passed `913` tests with one expected
+  optional-dependency skip.
+- A complete repository regression on `c88c08a` is still required before any
+  release conclusion; the earlier `2489/38/12` result is evidence of the
+  defect, not a passing release gate.
+
