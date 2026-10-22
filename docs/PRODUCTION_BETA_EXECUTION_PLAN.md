@@ -3267,6 +3267,19 @@ Independent explanation reference contract at `735d647` on 2026-10-22:
   --check` passed. Production modality annotations, independent human or
   benchmark adjudication, and raw-modality causal validation remain open.
 
+Independent explanation reference suites at `bdb9b25` on 2026-10-22:
+
+- The lifecycle now evaluates an adapter-owned reference across every held-out
+  sample within the declared 128-sample explanation bound. A complete suite
+  reports per-sample overlap, minimum and mean scores, and a passing result;
+  missing or partial references fail closed as `not_available` or `partial`.
+- A synthetic adapter integration test proves the complete-reference path,
+  while built-in adapters continue to report unavailable until their domain
+  annotations or controlled oracles are supplied. The focused slice passed
+  `47` tests under strict resource warnings; Ruff, formatting, mypy, and
+  `git diff --check` passed. Production modality annotations and independent
+  human or benchmark adjudication remain open.
+
 Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
