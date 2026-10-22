@@ -3280,6 +3280,18 @@ Independent explanation reference suites at `bdb9b25` on 2026-10-22:
   `git diff --check` passed. Production modality annotations and independent
   human or benchmark adjudication remain open.
 
+Production explanation-evidence gate at `828e8c5` on 2026-10-22:
+
+- `ModalityProject` and `ModalityLifecycle` now expose an explicit
+  `require_independent_ground_truth=True` release setting. When enabled, a
+  missing, partial, or failed held-out reference suite stops before package
+  or lifecycle-report publication, so an experimental adapter cannot be
+  mistaken for a production-evidenced release.
+- The public project, lifecycle, and explanation-quality slice passed `56`
+  tests under strict resource warnings; Ruff, formatting, mypy, and
+  `git diff --check` passed. Built-in modality adapters intentionally remain
+  experimental until they supply domain annotations or controlled oracles.
+
 Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 
 - `./scripts/release_preflight.sh` passed all local gates: Ruff, formatting,
