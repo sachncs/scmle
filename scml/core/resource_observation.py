@@ -170,9 +170,7 @@ def observe_extras() -> tuple[
     sources = {"extra:core": "running scml package"}
     requirements = project_extra_requirements()
     for extra, packages in requirements.items():
-        observations[extra] = all(
-            is_installed(package) for package in packages
-        )
+        observations[extra] = all(is_installed(package) for package in packages)
         sources[f"extra:{extra}"] = "importlib.metadata"
     available = frozenset(
         extra for extra, observed in observations.items() if observed is True
