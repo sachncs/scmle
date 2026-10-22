@@ -1954,6 +1954,17 @@ Dataset-manifest identity hardening at `7f9a7ed` on 2026-10-23:
   strengthens phase-1 data identity and curation evidence without claiming
   that arbitrary external sources or distributed broker semantics are solved.
 
+Modality-manifest count hardening at `ace10f9` on 2026-10-23:
+
+- `ModalityManifest.sample_count` now accepts only non-negative integers,
+  rejecting booleans and fractional counts before lifecycle evidence is
+  persisted. This keeps dataset cards, split evidence, and resource budgets
+  numerically trustworthy across arbitrary modality adapters.
+- The focused modality contract, project, and lifecycle slice passed 64 tests
+  under `-W error::ResourceWarning`; Ruff and mypy passed. This improves the
+  data contract only and does not promote experimental modality modelling to
+  production support.
+
 Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
 
 - `FaultInjectionHarness` now validates duplicate and unexpected evidence
