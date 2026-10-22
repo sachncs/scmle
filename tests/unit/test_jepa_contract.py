@@ -21,6 +21,7 @@ def test_jepa_is_a_self_supervised_representation_contract():
     assert params["embedding_size"] == 16
     assert params["mask_probability"] == 0.25
     assert "architecture" not in params
+    assert hasattr(estimator, "fit_transform")
 
 
 @pytest.mark.skipif(

@@ -3,11 +3,12 @@
 from typing import Any
 
 import numpy as np
+from sklearn import base
 
 from scml.models.deeplearning import estimators
 
 
-class JepaEstimator(estimators.NetworkEstimator):
+class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
     """Worker-backed tabular JEPA representation estimator.
 
     This is a self-supervised numeric-tabular representation path. It is not a
