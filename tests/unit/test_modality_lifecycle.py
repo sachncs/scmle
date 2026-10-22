@@ -1060,6 +1060,37 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
     assert report.performance["comparison"]["passed"] is True
     assert report.performance["comparison"]["baseline_run_count"] == 2
 
+    fast_reference_runs = tuple(
+        performance.PerformanceRun(
+            run_id=f"fast-reference-{index}",
+            observations=tuple(
+                dataclasses.replace(
+                    observation,
+                    elapsed_seconds=1e-9,
+                    peak_memory_gb=1e-9,
+                )
+                for observation in reference_run.observations
+            ),
+        )
+        for index, reference_run in enumerate(reference_runs)
+    )
+    failing_baseline = performance.PerformanceBaseline(
+        fast_reference_runs, max_relative_regression=0.0
+    )
+    failing_package = tmp_path / "failing-baseline-package"
+    failing_report = tmp_path / "failing-baseline-report.json"
+    with pytest.raises(ValueError, match="performance baseline failed"):
+        modality_lifecycle.ModalityLifecycle().run(
+            adapter,
+            failing_package,
+            signing_key="test-signing-key",
+            report_path=failing_report,
+            seed=2,
+            performance_baseline=failing_baseline,
+        )
+    assert not failing_package.exists()
+    assert not failing_report.exists()
+
 
 def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
     """Missing CRS evidence blocks before a model or package is created."""
