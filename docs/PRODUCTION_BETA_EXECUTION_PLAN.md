@@ -1932,6 +1932,17 @@ Parameter-estimation evidence hardening at `48f7537` on 2026-10-23:
   causal, Bayesian, modality-specific, or an integrated `MLProject` release
   gate.
 
+Parameter-estimand alignment at `4b41269` on 2026-10-23:
+
+- The estimation boundary now fails before fitting when the declared
+  likelihood does not match the selected estimator (`gaussian` for linear or
+  `bernoulli` for logistic). The result no longer silently rewrites a
+  scientific declaration after the computation has started.
+- The focused parameter-estimation suite passed 8 tests under
+  `-W error::ResourceWarning`; Ruff and mypy passed. This is a contract
+  correctness improvement within the bounded frequentist layer, not evidence
+  for causal interpretation or broader model support.
+
 Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
 
 - `FaultInjectionHarness` now validates duplicate and unexpected evidence
