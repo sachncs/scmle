@@ -17,6 +17,7 @@ from collections.abc import Sequence
 import dataclasses
 from datetime import datetime
 import hashlib
+import hmac
 import io
 import json
 import math
@@ -3273,7 +3274,8 @@ def load_package(
     value = signature.get("value")
     if not isinstance(value, str) or not value.strip():
         raise ValueError("modality package signature is empty")
-    if not attestation.sign_payload(manifest, signing_key) == value:
+    expected = attestation.sign_payload(manifest, signing_key)
+    if not hmac.compare_digest(value, expected):
         raise ValueError("modality package signature does not verify")
     if file_digest(model_path) != manifest.get("model_sha256"):
         raise ValueError("modality package model digest does not verify")
