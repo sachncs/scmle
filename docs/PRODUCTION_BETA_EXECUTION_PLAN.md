@@ -2038,6 +2038,17 @@ Release-evidence integration coverage at `09d8e7e` on 2026-10-22:
   skips, zero xfail/XPASS outcomes, and strict resource warnings enabled;
   `bash -n`, `actionlint`, and diff checks were clean.
 
+Independent-review gate hardening at `d82bfc1` on 2026-10-22:
+
+- `scripts/verify_release_review.py` now requires every critical review claim
+  kind by default: metric, fairness, explanation, reliability, and security.
+  A caller may still request a narrower diagnostic subset explicitly, but the
+  production default cannot silently omit reliability or security claims.
+- The focused independent-review and convention suites passed `856` tests
+  under `-W error::ResourceWarning`; Ruff, formatting, mypy, and diff checks
+  were clean. A signed review missing reliability and security claims is now
+  rejected by the default CLI gate.
+
 Current hosted gate observation at `6c11cdc` on 2026-10-22:
 
 - The `ci` run `39730492994` and documentation deployment run `39730493042`
