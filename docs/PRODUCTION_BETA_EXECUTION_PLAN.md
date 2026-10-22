@@ -3935,3 +3935,27 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   for this private repository: the latest CI and Pages runs failed before any
   job step acquired a runner, so public deployment is not yet verified.
 
+## Parameter input identity at `9f75c9a` on 2026-10-23
+
+- Parameter-estimation reports now carry a deterministic SHA-256 fingerprint
+  over the exact feature, outcome, and cluster inputs before missing-row
+  filtering. The project integration also records source URI, source identity,
+  and tabular snapshot identity in the diagnostics.
+- The report digest includes this fingerprint, so changing the scientific
+  input boundary invalidates the persisted artifact rather than leaving a
+  plausible but unbound estimate.
+- The focused estimator and project slice passed `24` tests; the full local
+  regression remains the authoritative repository-wide result for the code
+  already covered at `5719876`.
+
+## Approved skip taxonomy at `baf57be` on 2026-10-23
+
+- `check_pytest_skips.py` now classifies every skip against a checked-in
+  dependency, environment, or test-condition taxonomy and rejects unknown
+  categories, empty reasons, and every xfail/xpass outcome.
+- A real optional-dependency slice passed `237` tests with `33` skips; all
+  skips were classified as approved dependency gaps, with zero unexplained or
+  unapproved outcomes. This does not turn uninstalled optional capabilities
+  into supported release evidence; the hosted all-extras matrix remains
+  required.
+
