@@ -180,3 +180,30 @@ def test_extension_curation_adapter_rejects_detached_report():
 
     with pytest.raises(ValueError, match="hash does not match"):
         adapter.curate()
+
+
+def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
+    """Empty snapshots remain valid curation evidence without modelling."""
+    extension = modalities.ExtensionModality("acme/empty-stream")
+    dataset_hash = hashlib.sha256(b"empty-snapshot").hexdigest()
+    adapter = scml.ExtensionCurationAdapter(
+        extension=extension,
+        sample_values=(),
+        dataset_hash_value=dataset_hash,
+        curation_callback=lambda: curation.ModalityCurationReport(
+            modality=extension.value,
+            dataset_hash=dataset_hash,
+            sample_count=0,
+            profile={"record_type": "event", "empty": True},
+        ),
+        limitations=("The caller owns source availability checks.",),
+    )
+
+    result = scml.ModalityCurationProject(
+        adapter,
+        "test-signing-key",
+        output_dir=tmp_path / "empty-curation",
+    ).run()
+
+    assert result.sample_count == 0
+    assert result.curation["profile"]["empty"] is True

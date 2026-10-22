@@ -332,8 +332,6 @@ class ExtensionCurationAdapter(ModalityCurationAdapter):
         """Validate the caller-owned curation boundary."""
         if not isinstance(self.extension, modalities.ExtensionModality):
             raise TypeError("extension must be ExtensionModality")
-        if not self.sample_values:
-            raise ValueError("sample_values must not be empty")
         if not self.dataset_hash_value.strip():
             raise ValueError("dataset_hash_value must not be empty")
         if not callable(self.curation_callback):
