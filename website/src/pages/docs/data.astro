@@ -132,16 +132,22 @@ print(predictor.health())`}</code></pre>
   <p>The repository now has dependency-light foundations for documents, images, graphs, audio, video, and geospatial vectors and rasters. These foundations preserve source identity, validate the data shape, and produce bounded profiles that can feed curation, typed modality manifests, and dataset cards. Every foundation now exposes a modality curation report; documents and media flag duplicate content with conflicting labels, mixed labeled/unlabeled state, unknown language, and truncated inspection, while other modalities surface shape, encoding, duplicate, graph-structure, and CRS findings. Geospatial feature identity includes validated geometry, properties, labels, and observation time; dataset identity additionally includes the canonical CRS and is stable across feature ordering. The same coordinate bytes in different CRSs, or with changed properties or labels, cannot share a run identity. Image ingestion also records EXIF tags and blocks release when camera, author, GPS, copyright, software, or capture-time metadata needs an explicit privacy decision. They are deliberately separate from modelling: a validated sample is not yet a supported training path.</p>
   <div class="doc-cards">
     <div class="doc-card"><small>AUDIO</small><h3>Probe before decode</h3><p>WAV metadata and bounded PCM signal statistics are read with the standard library. Other containers require an explicit caller-owned probe, so codec versions and optional dependencies remain visible in the run evidence.</p></div>
-    <div class="doc-card"><small>VIDEO</small><h3>Decoder policy is yours</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. Use the metadata matrix by default, or provide an audited decoder for bounded, evenly sampled frame statistics. The core package never guesses from a filename or imports a codec stack implicitly.</p></div>
+    <div class="doc-card"><small>VIDEO</small><h3>Decoder and time policy are yours</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. Use the metadata matrix by default, or provide an audited decoder for bounded, evenly sampled frame statistics. When observation times exist, <code>split_temporal</code> creates a UTC-normalized past/future boundary and refuses mixed timestamp coverage. The core package never guesses from a filename or imports a codec stack implicitly.</p></div>
     <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Spatial-block splitting keeps nearby features together in CRS units, and envelope crossings are surfaced as a review warning before modelling. Raster samples require dimensions, bands, dtype, CRS, and transform metadata; a caller-owned, named decoder may add bounded pixel summaries, measured nodata evidence, and decoded-pixel region occlusion with source-CRS window envelopes. That is pixel-window evidence, not reprojection, semantic localization, or encoded-byte attribution.</p></div>
   </div>
-  <pre><code>{`from scml.data.modalities import AudioSample, GeospatialDataset, VideoSample
+  <pre><code>{`from scml.data.modalities import AudioDataset, AudioSample, GeospatialDataset, VideoDataset
+from scml.data.modalities import VideoSample
 from scml.data.modalities import DocumentDataset, DocumentSample
 
 audio = AudioSample.from_bytes(
     wav_bytes, source="clip.wav", group_id="speaker-17"
 )
-video = VideoSample.from_bytes(encoded, video_metadata, source="clip.mp4")
+video = VideoSample.from_bytes(
+    encoded,
+    video_metadata,
+    source="clip.mp4",
+    observation_time="2026-01-01T00:00:00Z",
+)
 places = GeospatialDataset.from_geojson(
     feature_collection, source="places.geojson", crs="EPSG:4326"
 )
@@ -155,6 +161,10 @@ assert curation.dataset_hash == documents.content_hash
 audio_features = AudioDataset((audio,)).prepare_features(max_frames=100_000)
 assert audio_features.frames_truncated == (False,)
 audio_split = AudioDataset((audio,)).split(test_fraction=0)
+video_split = VideoDataset((video,)).split_temporal(
+    "2026-01-01T00:00:00Z"
+)
+assert not video_split.has_future_leakage
 
 # These objects can be profiled and curated. They do not silently opt into
 # tabular modelling or a production support claim.`}</code></pre>
@@ -177,7 +187,7 @@ audio_split = AudioDataset((audio,)).split(test_fraction=0)
   <p>The core implementation intentionally decodes WAV only. A sample accepted through an explicit FLAC, MP3, or other codec probe can be curated, but signal preparation stops until the caller supplies a versioned decoder adapter. There is no hidden resampling, speaker identification, transcript generation, spectrogram claim, or production audio model behind this API.</p>
   <h2>Video feature boundary</h2>
   <p><code>VideoDataset.prepare_metadata_features()</code> produces numeric evidence from the probe output: duration, dimensions, pixel count, aspect ratio, frame count and rate, audio-track count, byte size, and bytes per frame. It never decodes or samples frames, so it cannot silently choose a temporal windowing policy or claim that container metadata represents visual content.</p>
-  <p>A caller-owned decoder can now provide bounded frame sampling with a pixel budget, sampled-frame provenance, and temporal frame-statistics occlusion evidence in the experimental lifecycle. Audio/video synchronization, temporal leakage controls beyond group-aware splitting, raw saliency or motion attribution, reference serving, and production video modelling remain explicit extension work. The metadata and frame-statistics matrices are curation and baseline evidence, not a production video capability.</p>
+  <p>A caller-owned decoder can now provide bounded frame sampling with a pixel budget, sampled-frame provenance, and temporal frame-statistics occlusion evidence in the experimental lifecycle. If each clip has a timezone-aware <code>observation_time</code>, <code>VideoDataset.split_temporal(cutoff)</code> assigns clips at or before the UTC-normalized cutoff to training and later clips to future evaluation. Missing or mixed timestamps are surfaced by curation and rejected by the temporal split; the framework will not invent ordering from filenames or file modification times. Audio/video synchronization, raw saliency or motion attribution, reference serving, and production video modelling remain explicit extension work. The metadata, temporal boundary, and frame-statistics matrices are curation and baseline evidence, not a production video capability.</p>
   <h2>Image privacy boundary</h2>
   <p>Image samples preserve encoded bytes for lineage, so decoding pixels does not erase metadata risk. Ingestion records the EXIF tags observed in the source and normalizes sensitive tags such as GPS, artist, camera make/model, copyright, software, and original capture time. Curation emits <code>risk.image-sensitive-metadata</code> as a blocking finding; a reviewer must redact, approve, or otherwise document the disposition before training or distribution.</p>
   <h2>Leakage-aware splitting</h2>

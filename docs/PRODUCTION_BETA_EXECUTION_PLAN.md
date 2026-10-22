@@ -1916,6 +1916,20 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Video temporal boundary at `e9e623d` on 2026-10-22:
+
+- Video samples now accept an explicit timezone-aware observation time,
+  normalize it to UTC, bind it into dataset identity, and expose complete,
+  mixed, or absent temporal coverage in curation. `VideoDataset.split_temporal`
+  assigns clips at or before a UTC cutoff to training and later clips to future
+  evaluation, and fails closed when any clip is untimed. The new temporal
+  split/error contracts are exported from `scml.data.modalities`.
+- The media, lifecycle, API surface, and API compatibility suites passed 90
+  tests under `-W error::ResourceWarning`; Ruff, formatting, and mypy passed.
+  This closes the video temporal-boundary evidence gap but does not claim
+  temporal event semantics, watermark handling, causal ordering, production
+  video modelling, or external release proof.
+
 Image identity correction at `818dc34` on 2026-10-22:
 
 - The image adapter now derives its declared dataset identity from the same

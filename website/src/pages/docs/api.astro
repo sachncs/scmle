@@ -198,6 +198,21 @@ temporal = VideoDataset((clip,)).prepare_frame_features(
 )
 print(temporal.sampled_frame_indices)</code></pre>
   <p><code>prepare_frame_features</code> selects evenly spaced frames, records their indices, computes bounded pixel statistics, and rejects oversized, malformed, or non-finite decoder output. The lifecycle can use the same explicit decoder to emit frame-statistics occlusion evidence. This is not raw saliency, motion attribution, synchronization proof, or a production video model; those require a versioned decoder policy, temporal leakage review, independent evaluation, serving, and recovery evidence. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit.</p>
+  <h2>Video temporal boundaries</h2>
+  <p>A video clip may have an observation time independent of its encoded container timestamp. Pass a timezone-aware ISO-8601 value or <code>datetime</code> to <code>VideoSample.from_bytes</code>. The sample stores the canonical UTC value and binds it into the dataset identity. <code>VideoDataset.curate()</code> reports absent, mixed, or complete temporal coverage; <code>split_temporal</code> fails closed unless every clip is timed.</p>
+  <pre><code>{`from scml.data.modalities import VideoDataset, VideoSample
+
+clip = VideoSample.from_bytes(
+    encoded,
+    metadata,
+    source="clip.mp4",
+    observation_time="2026-01-03T00:00:00+00:00",
+)
+dataset = VideoDataset((clip,))
+future_boundary = dataset.split_temporal("2026-01-02T00:00:00Z")
+print(future_boundary.cutoff)
+print(future_boundary.future)`}</code></pre>
+  <p>This boundary prevents a random split from silently mixing past and future observations. It does not infer event time from a filename, prove causal ordering, or replace domain-specific watermark and late-arrival policy.</p>
 
   <h2>Experimental spatial splitting</h2>
   <p>Geospatial data uses a spatial-block split instead of pretending that random feature splits are independent.</p>
