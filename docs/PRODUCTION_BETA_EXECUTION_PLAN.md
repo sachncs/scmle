@@ -3745,3 +3745,19 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   multimodal, or distributed JEPA production support; torch-enabled training
   and end-to-end functional testing remain open.
 
+## Project parameter-estimation evidence at `596764b` on 2026-10-23
+
+- `MLProject` now accepts an explicit `EstimandSpec` and
+  `EstimationPolicy`, runs parameter estimation as a separate scientific
+  track, persists the signed `parameter_estimation.json` artifact inside the
+  run, and exposes the verified result on `RunResult.estimation`. Partial
+  declarations fail at configuration time; missing columns, unsupported
+  modalities, and incompatible likelihoods fail closed before model
+  selection.
+- The project integration, estimator, API surface, and compatibility slice
+  passed `17` tests under `-W error::ResourceWarning`; Ruff, formatting,
+  mypy, and `git diff --check` passed.
+- This establishes a reproducible linear/logistic frequentist evidence path;
+  causal, Bayesian, hierarchical, modality-specific, and resume/replay
+  estimation contracts remain open and are not implied by this API.
+
