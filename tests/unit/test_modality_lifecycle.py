@@ -1,5 +1,6 @@
 """End-to-end evidence tests for the non-tabular baseline lifecycle."""
 
+from collections.abc import Sequence
 import dataclasses
 import hashlib
 import io
@@ -19,6 +20,7 @@ from scml.data.modalities import geospatial
 from scml.data.modalities import graph
 from scml.data.modalities import image
 from scml.data.modalities import video
+from scml.explainability import quality
 from scml.models import modality_lifecycle
 
 
@@ -48,6 +50,21 @@ def text_adapter() -> modality_lifecycle.TextAdapter:
         for index in range(12)
     )
     return modality_lifecycle.TextAdapter(document.DocumentDataset(samples))
+
+
+class GroundTruthTextAdapter(modality_lifecycle.TextAdapter):
+    """Synthetic adapter with a complete feature-ranking reference."""
+
+    def explanation_ground_truth(
+        self, sample: object, feature_names: Sequence[str]
+    ) -> quality.ExplanationGroundTruth:
+        """Return an oracle covering every declared fixture feature."""
+        del sample
+        return quality.ExplanationGroundTruth(
+            method="synthetic_feature_oracle",
+            reference="fixture://text-feature-oracle-v1",
+            expected_features=tuple(feature_names),
+        )
 
 
 def image_bytes(value: int) -> bytes:
@@ -845,6 +862,27 @@ def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):
     assert card["provenance"]["status"] == "declared"
     assert card["privacy"]["status"] == "declared"
     assert card["manifest"]["privacy"]["contains_pii"] is True
+
+
+def test_lifecycle_evaluates_complete_independent_ground_truth_suite(
+    tmp_path: Path,
+):
+    """A domain adapter's reference is evaluated across held-out samples."""
+    adapter = GroundTruthTextAdapter(text_adapter().dataset)
+    report = modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        tmp_path / "ground-truth-package",
+        signing_key="test-signing-key",
+    )
+
+    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    ]
+    ground_truth = evidence["independent_ground_truth"]
+    assert ground_truth["status"] == "available"
+    assert ground_truth["passed"] is True
+    assert ground_truth["reference_count"] == ground_truth["sample_count"]
+    assert ground_truth["minimum_overlap_score"] == 1.0
 
 
 def test_video_lifecycle_emits_temporal_frame_evidence(tmp_path: Path):

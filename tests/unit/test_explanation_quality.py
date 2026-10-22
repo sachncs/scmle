@@ -141,6 +141,24 @@ def test_independent_ground_truth_evaluation_fails_on_mismatched_ranking():
     )
 
 
+def test_independent_ground_truth_suite_fails_closed_for_partial_references():
+    """A suite cannot pass when only part of the held-out set is referenced."""
+    ground_truth = quality.ExplanationGroundTruth(
+        method="synthetic_oracle",
+        reference="fixture://reference",
+        expected_features=("signal",),
+    )
+
+    result = quality.evaluate_ground_truth_suite(
+        sample_count=2,
+        references=((ground_truth, report("signal", "noise"), "sample-1"),),
+    )
+
+    assert result.status == "partial"
+    assert result.passed is False
+    assert result.to_dict()["minimum_overlap_score"] == 1.0
+
+
 @pytest.mark.parametrize(
     "factory",
     (

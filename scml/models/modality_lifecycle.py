@@ -2715,6 +2715,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
         perturbation_size = feature_scales * 1e-6
         repeated_stabilities: list[float] = []
         local_report: dict[str, object] | None = None
+        explanation_reports: list[dict[str, object]] = []
         perturbation_reports: list[dict[str, object]] = []
         coefficients = model.coef_[0]
         stability = 0.0
@@ -2753,6 +2754,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                             top_k=min(10, len(batch.feature_names)),
                         )
                     )
+            explanation_reports.append(sample_report)
             sample_stability = quality.ranking_stability(
                 tuple(sample_reports),
                 top_k=min(10, len(batch.feature_names)),
@@ -2796,29 +2798,30 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             raise RuntimeError(
                 "repeated explanation evaluation produced no report"
             )
-        ground_truth = context.adapter.explanation_ground_truth(
-            partitions.test[0], batch.feature_names
-        )
-        if ground_truth is None:
-            ground_truth_evidence: dict[str, object] = {
-                "status": "not_available",
-                "reason": (
-                    "the adapter did not provide an independent explanation "
-                    "reference"
-                ),
-                "feature_space_only": True,
-                "limitations": [
-                    "Feature-space stability and fidelity are not independent "
-                    "semantic validation.",
-                    "Raw-modality ground truth remains caller-owned evidence.",
-                ],
-            }
-        else:
-            ground_truth_evidence = quality.evaluate_ground_truth(
-                ground_truth,
-                local_report,
-                batch.sample_ids[0],
-            ).to_dict()
+        references = []
+        for sample_index in range(evaluated_sample_count):
+            ground_truth = context.adapter.explanation_ground_truth(
+                partitions.test[sample_index], batch.feature_names
+            )
+            if ground_truth is not None:
+                references.append(
+                    (
+                        ground_truth,
+                        explanation_reports[sample_index],
+                        batch.sample_ids[sample_index],
+                    )
+                )
+        ground_truth_evidence = {
+            **quality.evaluate_ground_truth_suite(
+                evaluated_sample_count, references
+            ).to_dict(),
+            "feature_space_only": True,
+            "limitations": [
+                "Feature-space stability and fidelity are not independent "
+                "semantic validation.",
+                "Raw-modality ground truth remains caller-owned evidence.",
+            ],
+        }
         repeated_stability = min(repeated_stabilities)
         quality_evaluation = quality.evaluate(
             method="linear_reference_zero_ablation_and_perturbation",

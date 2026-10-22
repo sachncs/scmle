@@ -166,6 +166,57 @@ class GroundTruthEvaluation:
         }
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class GroundTruthSuiteEvaluation:
+    """Bounded suite result for independent explanation references."""
+
+    sample_count: int
+    reference_count: int
+    evaluations: tuple[GroundTruthEvaluation, ...]
+    passed: bool
+    findings: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        """Validate suite cardinality and evaluation consistency."""
+        if self.sample_count < 1:
+            raise ValueError("sample_count must be at least 1")
+        if self.reference_count < 0 or self.reference_count > self.sample_count:
+            raise ValueError("reference_count must be within sample_count")
+        if self.reference_count != len(self.evaluations):
+            raise ValueError("reference_count must match evaluations")
+        if not isinstance(self.findings, tuple):
+            raise TypeError("findings must be a tuple")
+
+    @property
+    def status(self) -> str:
+        """Return whether the suite is unavailable, partial, or complete."""
+        if self.reference_count == 0:
+            return "not_available"
+        if self.reference_count < self.sample_count:
+            return "partial"
+        return "available"
+
+    def to_dict(self) -> dict[str, object]:
+        """Return deterministic suite evidence."""
+        overlaps = tuple(
+            evaluation.overlap_score for evaluation in self.evaluations
+        )
+        return {
+            "status": self.status,
+            "sample_count": self.sample_count,
+            "reference_count": self.reference_count,
+            "minimum_overlap_score": min(overlaps) if overlaps else None,
+            "mean_overlap_score": (
+                sum(overlaps) / len(overlaps) if overlaps else None
+            ),
+            "passed": self.passed,
+            "findings": list(self.findings),
+            "evaluations": [
+                evaluation.to_dict() for evaluation in self.evaluations
+            ],
+        }
+
+
 def explanation_ranking(report: Mapping[str, Any]) -> tuple[str, ...]:
     """Extract a validated feature ranking from one explanation report."""
     features = report.get("features")
@@ -218,6 +269,44 @@ def evaluate_ground_truth(
         passed=passed,
         findings=findings,
         limitations=ground_truth.limitations,
+    )
+
+
+def evaluate_ground_truth_suite(
+    sample_count: int,
+    references: Sequence[tuple[ExplanationGroundTruth, Mapping[str, Any], str]],
+) -> GroundTruthSuiteEvaluation:
+    """Evaluate independent references across a bounded held-out suite.
+
+    A partial reference set fails closed. This prevents a caller from
+    receiving a green suite result after annotating only convenient samples.
+    """
+    if sample_count < 1:
+        raise ValueError("sample_count must be at least 1")
+    if len(references) > sample_count:
+        raise ValueError("references cannot exceed sample_count")
+    evaluations = tuple(
+        evaluate_ground_truth(ground_truth, report, sample_id)
+        for ground_truth, report, sample_id in references
+    )
+    if not evaluations:
+        findings = ("independent explanation references are missing",)
+        passed = False
+    elif len(evaluations) < sample_count:
+        findings = ("independent explanation references are incomplete",)
+        passed = False
+    elif all(evaluation.passed for evaluation in evaluations):
+        findings = ("all independent explanation references passed",)
+        passed = True
+    else:
+        findings = ("one or more independent explanation references failed",)
+        passed = False
+    return GroundTruthSuiteEvaluation(
+        sample_count=sample_count,
+        reference_count=len(evaluations),
+        evaluations=evaluations,
+        passed=passed,
+        findings=findings,
     )
 
 
