@@ -1,5 +1,6 @@
 """Reading and splitting a table that is larger than the memory allowed."""
 
+import dataclasses
 import json
 import pathlib
 import subprocess
@@ -144,3 +145,145 @@ def test_sample_sizes_follow_the_memory_budget():
     large = streaming.sample_caps(10, 1.0, 0.2)
 
     assert large[0] > small[0] * 50 and small[0] >= streaming.MIN_SAMPLE_ROWS
+
+
+def write_stream_csv(path):
+    """Write a small timestamped source for durable streaming tests."""
+    frame = pd.DataFrame(
+        {
+            "event_id": ["a", "b", "c", "d"],
+            "event_time": [
+                "2026-10-20T10:00:00+00:00",
+                "2026-10-20T10:01:00+00:00",
+                "2026-10-20T10:02:00+00:00",
+                "2026-10-20T10:03:00+00:00",
+            ],
+            "value": [1, 2, 3, 4],
+        }
+    )
+    frame.to_csv(path, index=False)
+
+
+def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
+    path = tmp_path / "events.csv"
+    write_stream_csv(path)
+    source = streaming.CsvChunks(path)
+
+    first = source.read_batch(rows=2, watermark_column="event_time")
+    second = source.read_batch(
+        first.next_checkpoint, rows=2, watermark_column="event_time"
+    )
+
+    assert first.start_offset == 0
+    assert first.next_checkpoint.offset == 2
+    assert first.next_checkpoint.watermark_column == "event_time"
+    assert first.next_checkpoint.watermark.endswith("10:01:00+00:00")
+    assert first.has_more
+    assert second.start_offset == 2
+    assert second.next_checkpoint.offset == 4
+    assert second.next_checkpoint.watermark.endswith("10:03:00+00:00")
+    assert not second.has_more
+
+    changed = dataclasses.replace(
+        first.next_checkpoint, snapshot_sha256="0" * 64
+    )
+    with pytest.raises(
+        streaming.StreamingError, match="does not match the checkpoint"
+    ):
+        source.read_batch(changed, rows=2, watermark_column="event_time")
+
+    with pytest.raises(streaming.StreamingError, match="watermark column"):
+        source.read_batch(
+            first.next_checkpoint, rows=2, watermark_column="value"
+        )
+
+
+def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
+    path = tmp_path / "events.csv"
+    write_stream_csv(path)
+    source = streaming.CsvChunks(path)
+    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    batch = ledger.read_batch(rows=2, watermark_column="event_time")
+    written = []
+
+    first = ledger.commit_with_writer(
+        batch, lambda frame, key: written.append((frame.copy(), key))
+    )
+    second = ledger.commit_with_writer(
+        batch, lambda frame, key: written.append((frame.copy(), key))
+    )
+    reopened = streaming.StreamingLedger(ledger.path, source)
+
+    assert first.accepted and not first.duplicate
+    assert second.duplicate and not second.accepted
+    assert len(written) == 1
+    assert written[0][1] == batch.batch_id
+    assert reopened.load().checkpoint.offset == 2
+    assert batch.batch_id in reopened.load().committed_batch_ids
+
+
+def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
+    tmp_path,
+):
+    path = tmp_path / "events.csv"
+    write_stream_csv(path)
+    source = streaming.CsvChunks(path)
+    ledger_path = tmp_path / "state.json"
+    written = []
+    acknowledgements = []
+    failures = [True]
+
+    def writer(frame, key):
+        written.append((frame["event_id"].tolist(), key))
+
+    def flaky_ack(acknowledgement):
+        if failures and failures.pop(0):
+            raise OSError("transport unavailable")
+        acknowledgements.append(acknowledgement)
+
+    first_consumer = streaming.StreamingConsumer(
+        streaming.StreamingLedger(ledger_path, source),
+        "events-consumer",
+        writer,
+        flaky_ack,
+    )
+    with pytest.raises(streaming.StreamingError, match="retry is required"):
+        first_consumer.consume(rows=2, watermark_column="event_time")
+
+    assert len(written) == 1
+    assert first_consumer.ledger.pending_acknowledgement_path.exists()
+
+    restarted = streaming.StreamingConsumer(
+        streaming.StreamingLedger(ledger_path, source),
+        "events-consumer",
+        writer,
+        flaky_ack,
+    )
+    second = restarted.consume(rows=2, watermark_column="event_time")
+
+    assert second.accepted
+    assert len(written) == 2
+    assert [item.batch_id for item in acknowledgements] == [
+        written[0][1],
+        written[1][1],
+    ]
+    assert not restarted.ledger.pending_acknowledgement_path.exists()
+
+
+def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
+    path = tmp_path / "events.csv"
+    write_stream_csv(path)
+    source = streaming.CsvChunks(path)
+    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    batch = ledger.read_batch(rows=2)
+    ledger.commit_with_writer(batch, lambda frame, key: None)
+
+    changed = pd.read_csv(path)
+    changed.loc[0, "value"] = 99
+    changed.to_csv(path, index=False)
+
+    with pytest.raises(
+        streaming.StreamingError, match="another source snapshot"
+    ) as raised:
+        ledger.load()
+    assert raised.value.code == "source_snapshot_changed"
