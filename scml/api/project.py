@@ -395,6 +395,7 @@ class ModalityProject:
         performance_baseline: performance.PerformanceBaseline | None = None,
         manifest: data_contracts.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
+        cancellation: modality_lifecycle.LifecycleCancellation | None = None,
     ) -> None:
         """Defines an experimental lifecycle run.
 
@@ -409,6 +410,8 @@ class ModalityProject:
             manifest: Optional identity and governance contract.
             require_independent_ground_truth: Require a complete independent
                 explanation reference suite before packaging.
+            cancellation: Optional thread-safe signal for cooperative
+                cancellation at lifecycle stage boundaries.
 
         Raises:
             TypeError: If an object is not a modality adapter.
@@ -422,6 +425,10 @@ class ModalityProject:
             raise TypeError("seed must be an integer")
         if not isinstance(require_independent_ground_truth, bool):
             raise TypeError("require_independent_ground_truth must be bool")
+        if cancellation is not None and not isinstance(
+            cancellation, modality_lifecycle.LifecycleCancellation
+        ):
+            raise TypeError("cancellation must be a LifecycleCancellation")
         if observed_adapter is not None and not isinstance(
             observed_adapter, modality_lifecycle.ModalityAdapter
         ):
@@ -435,6 +442,9 @@ class ModalityProject:
         self.performance_baseline = performance_baseline
         self.manifest = manifest
         self.require_independent_ground_truth = require_independent_ground_truth
+        self.cancellation = (
+            cancellation or modality_lifecycle.LifecycleCancellation()
+        )
         self.lifecycle = modality_lifecycle.ModalityLifecycle()
         self.report: modality_lifecycle.LifecycleReport | None = None
 
@@ -454,8 +464,13 @@ class ModalityProject:
             performance_baseline=self.performance_baseline,
             manifest=self.manifest,
             require_independent_ground_truth=self.require_independent_ground_truth,
+            cancellation_check=self.cancellation.is_cancelled,
         )
         return self.report
+
+    def cancel(self) -> None:
+        """Request cooperative cancellation of the active lifecycle run."""
+        self.cancellation.cancel()
 
     def declaration(self) -> modalities.ModalityDeclaration:
         """Return the experimental capability declaration after a run."""

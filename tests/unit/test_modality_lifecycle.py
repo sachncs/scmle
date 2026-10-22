@@ -545,6 +545,36 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
 
 
+def test_lifecycle_cancellation_cleans_artifacts_after_a_stage_boundary(
+    tmp_path: Path,
+):
+    """A mid-run cancellation cannot leave a package or report behind."""
+    checks = 0
+
+    def cancel_after_ingestion() -> bool:
+        nonlocal checks
+        checks += 1
+        return checks >= 2
+
+    package_path = tmp_path / "cancelled-package"
+    report_path = tmp_path / "cancelled-report.json"
+    with pytest.raises(
+        modality_lifecycle.LifecycleCancelledError,
+        match="cancelled at a stage boundary",
+    ):
+        modality_lifecycle.ModalityLifecycle().run(
+            document_adapter(),
+            package_path,
+            signing_key="test-signing-key",
+            report_path=report_path,
+            cancellation_check=cancel_after_ingestion,
+        )
+
+    assert checks == 2
+    assert not package_path.exists()
+    assert not report_path.exists()
+
+
 def test_modality_predictor_verifies_package_and_predicts_new_samples(
     tmp_path: Path,
 ):

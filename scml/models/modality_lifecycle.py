@@ -26,6 +26,7 @@ from pathlib import Path
 import platform
 import shutil
 import tempfile
+import threading
 import time
 from typing import Any
 from typing import cast
@@ -62,6 +63,26 @@ MAX_REPEATED_EXPLANATION_SAMPLES = 128
 MAX_RAW_GRAPH_FEATURES = 64
 MAX_GRAPH_CONTEXT_NODES = 64
 MAX_GRAPH_CONTEXT_EDGES = 128
+
+
+class LifecycleCancelledError(RuntimeError):
+    """Raised when a modality lifecycle receives a cancellation request."""
+
+
+class LifecycleCancellation:
+    """Thread-safe cooperative cancellation signal for one lifecycle run."""
+
+    def __init__(self) -> None:
+        """Create a cancellation signal in the not-cancelled state."""
+        self.signal = threading.Event()
+
+    def cancel(self) -> None:
+        """Request cancellation at the next lifecycle stage boundary."""
+        self.signal.set()
+
+    def is_cancelled(self) -> bool:
+        """Return whether cancellation has been requested."""
+        return self.signal.is_set()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -3274,6 +3295,7 @@ class ModalityLifecycle:
         performance_baseline: performance.PerformanceBaseline | None = None,
         manifest: data_contracts.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
+        cancellation_check: Callable[[], bool] | None = None,
     ) -> LifecycleReport:
         """Run every stage and optionally persist its evidence report.
 
@@ -3283,6 +3305,28 @@ class ModalityLifecycle:
         """
         if not isinstance(require_independent_ground_truth, bool):
             raise TypeError("require_independent_ground_truth must be bool")
+        if cancellation_check is not None and not callable(cancellation_check):
+            raise TypeError("cancellation_check must be callable")
+        package_target = Path(package_path)
+        report_target = Path(report_path) if report_path is not None else None
+        package_preexisting = package_target.exists()
+        report_preexisting = (
+            report_target.exists() if report_target is not None else False
+        )
+
+        def ensure_not_cancelled() -> None:
+            """Stop before publication and remove this run's artifacts."""
+            if cancellation_check is None or not cancellation_check():
+                return
+            if not package_preexisting:
+                shutil.rmtree(package_target, ignore_errors=True)
+            if report_target is not None and not report_preexisting:
+                report_target.unlink(missing_ok=True)
+            raise LifecycleCancelledError(
+                "modality lifecycle cancelled at a stage boundary"
+            )
+
+        ensure_not_cancelled()
         observed = observed_adapter or adapter
         if observed.modality != adapter.modality:
             raise ValueError(
@@ -3297,7 +3341,7 @@ class ModalityLifecycle:
                 raise ValueError("manifest sample_count must match adapter")
         context = LifecycleContext(
             adapter=adapter,
-            package_path=Path(package_path),
+            package_path=package_target,
             signing_key=signing_key,
             seed=seed,
             observed_adapter=observed,
@@ -3305,6 +3349,7 @@ class ModalityLifecycle:
             require_independent_ground_truth=require_independent_ground_truth,
         )
         for stage in self.stages:
+            ensure_not_cancelled()
             started = time.perf_counter()
             stage.execute(context)
             operation = stage.performance_operation
@@ -3324,6 +3369,8 @@ class ModalityLifecycle:
                     time.perf_counter() - started,
                     sample_count,
                 )
+            ensure_not_cancelled()
+        ensure_not_cancelled()
         records = tuple(
             modalities.StageEvidence(
                 stage=stage,
@@ -3393,15 +3440,15 @@ class ModalityLifecycle:
             documentation=context.documentation,
             recovery=context.recovery,
         ).sign(signing_key)
-        if report_path is not None:
-            path = Path(report_path)
+        if report_target is not None:
             durability.write_atomically(
-                path,
+                report_target,
                 (
                     json.dumps(report.to_dict(), indent=2, sort_keys=True)
                     + "\n"
                 ).encode("utf-8"),
             )
+            ensure_not_cancelled()
         if performance_result is not None and not performance_result.passed:
             raise ValueError(
                 "performance budget failed: "
@@ -3511,6 +3558,8 @@ __all__ = [
     "GraphAdapter",
     "ImageAdapter",
     "InferenceStage",
+    "LifecycleCancellation",
+    "LifecycleCancelledError",
     "LifecyclePackage",
     "LifecycleReport",
     "ModalityAdapter",

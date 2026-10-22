@@ -72,6 +72,23 @@ def test_modality_project_rejects_invalid_configuration(tmp_path):
         project.declaration()
 
 
+def test_modality_project_can_cancel_before_publication(tmp_path):
+    """Cancellation prevents a modality package and report from appearing."""
+    project = scml.ModalityProject(
+        text_adapter(), "key", output_dir=tmp_path / "cancelled"
+    )
+
+    project.cancel()
+
+    with pytest.raises(
+        modality_lifecycle.LifecycleCancelledError,
+        match="cancelled at a stage boundary",
+    ):
+        project.run()
+    assert not (tmp_path / "cancelled" / "model").exists()
+    assert not (tmp_path / "cancelled" / "modality_lifecycle.json").exists()
+
+
 def test_modality_project_can_require_independent_explanation_ground_truth(
     tmp_path,
 ):
