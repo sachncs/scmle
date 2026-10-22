@@ -26,7 +26,7 @@
     },
     "ModalityProject": {
       "kind": "class",
-      "signature_sha256": "a9566ba714de6db51c032ccde7d040381a1934dba0c7b0477e6291dc0948d3ee"
+      "signature_sha256": "14ba030cf83b66798c05e6963c2cece362f876b4a3eae7cec2fe747e38204ce4"
     },
     "ModalitySampleDecoder": {
       "kind": "class",
