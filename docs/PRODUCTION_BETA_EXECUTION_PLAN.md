@@ -1916,6 +1916,22 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Signed lifecycle evidence at `7dc754f` on 2026-10-22:
+
+- Lifecycle reports are now schema version 2 artifacts signed over the exact
+  modality, dataset hash, stage evidence, performance evidence, package
+  identity, inference, monitoring, documentation, and recovery payload. The
+  report can be read and verified with the same signing key contract used by
+  the package manifest; wrong-key and post-write dataset tampering fail closed.
+- The lifecycle runner signs the report before atomic persistence and returns
+  the signed object to callers. Round-trip, wrong-key, and tamper-rejection
+  coverage passed in the 56-test public modality, lifecycle, and explanation
+  slice under `-W error::ResourceWarning`; Ruff, formatting, mypy, and
+  `git diff --check` passed.
+- This closes report-integrity at rest for the local lifecycle contract. It
+  does not provide external secret custody, independent reviewer signatures,
+  hosted CI authority, or a production support claim for built-in modalities.
+
 Current-head optional-boundary release preflight evidence at `eb163a4` on
 2026-10-22:
 
