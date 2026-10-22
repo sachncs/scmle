@@ -43,6 +43,7 @@ from sklearn.metrics import log_loss
 
 from scml import durability
 from scml.contracts import data as data_contracts
+from scml.contracts import errors
 from scml.contracts import events
 from scml.contracts import modalities
 from scml.contracts import performance
@@ -65,12 +66,12 @@ MAX_GRAPH_CONTEXT_NODES = 64
 MAX_GRAPH_CONTEXT_EDGES = 128
 
 
-class LifecycleCancelledError(RuntimeError):
+class LifecycleCancelledError(errors.CancelledError):
     """Raised when a modality lifecycle receives a cancellation request."""
 
     def __init__(self, message: str) -> None:
         """Create a cancellation error with an actionable message."""
-        super().__init__(message)
+        super().__init__(message, {"scope": "modality_lifecycle"})
 
 
 class LifecycleCancellation:

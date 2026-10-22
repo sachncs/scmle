@@ -561,7 +561,7 @@ def test_lifecycle_cancellation_cleans_artifacts_after_a_stage_boundary(
     with pytest.raises(
         modality_lifecycle.LifecycleCancelledError,
         match="cancelled at a stage boundary",
-    ):
+    ) as raised:
         modality_lifecycle.ModalityLifecycle().run(
             document_adapter(),
             package_path,
@@ -571,6 +571,8 @@ def test_lifecycle_cancellation_cleans_artifacts_after_a_stage_boundary(
         )
 
     assert checks == 2
+    assert raised.value.category == "cancelled"
+    assert raised.value.details == {"scope": "modality_lifecycle"}
     assert not package_path.exists()
     assert not report_path.exists()
 

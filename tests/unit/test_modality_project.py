@@ -85,6 +85,7 @@ def test_modality_project_can_cancel_before_publication(tmp_path):
         match="cancelled at a stage boundary",
     ):
         project.run()
+    assert project.cancellation.is_cancelled() is True
     assert not (tmp_path / "cancelled" / "model").exists()
     assert not (tmp_path / "cancelled" / "modality_lifecycle.json").exists()
 
