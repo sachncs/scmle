@@ -1916,6 +1916,32 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head serving lifecycle preflight at `a27a3a8` on 2026-10-22:
+
+- `HttpServing.start()` now rejects a second start on the same adapter with a
+  structured library error. The focused serving suite passed 11 tests with 2
+  explicit optional-dependency skips; Ruff, formatting, and mypy passed.
+- The bounded release suite passed `2,021` tests with `75` explicit optional
+  dependency skips. Total coverage was 83.01%; the declared core scope was
+  86%. Mutation testing killed `1,503/2,057` mutants (73%), above the 70%
+  gate; one mutation timed out and 553 survived for follow-up triage.
+- The five-seed offline benchmark regression completed with zero regressions
+  and zero failed repetitions. Verdicts were tie, tie, tie, and ahead for
+  breast cancer, wine, digits, and diabetes progression; peak memory was
+  0.3677, 0.3846, 0.4522, and 0.4560 GB respectively.
+- Wheel and source-distribution checks passed, including network-isolated
+  installation and source-distribution rebuild installation. Reproducible
+  hashes were wheel
+  `93121d3da9bc81f1bc698210f0f7040b850dc835a8904ae762ace73b638e52ea` and
+  sdist
+  `3d3608c778b74fbf2f812ee8ac4052efa90f4592ae40d1c6548992383b14be77`.
+- The site gate reached `npm audit` after dependency installation, but the
+  npm advisory endpoint timed out and returned an error. Astro build,
+  accessibility, link, and Playwright results are therefore not claimed for
+  this head; the last successful local site evidence remains recorded above.
+  Hosted Linux and Pages, external fault execution, secret custody, and
+  independent reviewer evidence remain separate release gates.
+
 Current-head release preflight at `8651c3a` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
