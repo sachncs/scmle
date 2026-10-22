@@ -3703,3 +3703,18 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   quality, or production support; those remain explicit manifest and review
   responsibilities.
 
+## Lifecycle-report completeness at `4cf3997` on 2026-10-23
+
+- `LifecycleReport` now validates its package identity, JSON-native evidence
+  sections, and exact ordered coverage of every required lifecycle stage. A
+  report with a valid signature but missing, duplicated, or reordered stage
+  evidence is rejected during parsing before it can be used as release
+  evidence.
+- The focused lifecycle, curation, API, and compatibility slice passed `60`
+  tests under `-W error::ResourceWarning`; Ruff, formatting, mypy, and
+  `git diff --check` passed. Regression coverage includes a correctly
+  re-signed report with an incomplete stage sequence.
+- This closes a local report-structure gap. It does not establish that the
+  evidence itself is scientifically sufficient, independent, externally
+  reproduced, or production support for non-tabular modalities.
+
