@@ -2027,6 +2027,17 @@ Workflow-wide test outcome enforcement at `2b75123` on 2026-10-22:
   stability and outcome-verifier tests passed `11` tests under strict resource
   warnings. Hosted execution remains unavailable for this repository.
 
+Release-evidence integration coverage at `09d8e7e` on 2026-10-22:
+
+- The bounded release preflight and primary CI quality job now include the
+  governance audit and problem-spec integration suites. These suites exercise
+  audit-event ordering, data-access verification, signed release attestations,
+  versioned evidence indexes, release-policy blocking, SBOM/provenance output,
+  and tamper detection before the release evidence gate is considered green.
+- The focused governance/problem-spec slice passed `10` tests with zero
+  skips, zero xfail/XPASS outcomes, and strict resource warnings enabled;
+  `bash -n`, `actionlint`, and diff checks were clean.
+
 Current hosted gate observation at `6c11cdc` on 2026-10-22:
 
 - The `ci` run `39730492994` and documentation deployment run `39730493042`
