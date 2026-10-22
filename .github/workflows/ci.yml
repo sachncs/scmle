@@ -104,7 +104,8 @@ jobs:
       - run: uv sync --python 3.12 --extra deeplearning --extra boosting
       - run: >-
           uv run pytest -q -W error::ResourceWarning
-          tests/unit/test_deeplearning.py tests/unit/test_training.py
+          tests/unit/test_deeplearning.py tests/unit/test_jepa_contract.py
+          tests/unit/test_training.py
           --junitxml=deep-learning.xml
       - name: Reject unexplained skips and xfails
         run: uv run python scripts/check_pytest_skips.py deep-learning.xml
