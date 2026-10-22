@@ -63,6 +63,42 @@ def test_harness_keeps_partial_executor_output_inconclusive(tmp_path):
     )
 
 
+def test_harness_rejects_duplicate_evidence_before_writing(tmp_path):
+    """Duplicate evidence cannot overwrite a previously emitted artifact."""
+    runner = harness(tmp_path)
+    scenario = reliability.FaultScenario.INVALID_SIGNATURE
+
+    with pytest.raises(ValueError, match="duplicate evidence types"):
+        runner.run(
+            scenario,
+            lambda current_scenario: (
+                artifact("signature_tampering"),
+                artifact("signature_tampering"),
+            ),
+        )
+
+    assert not list(tmp_path.iterdir())
+
+
+def test_harness_rejects_unexpected_evidence_before_writing(tmp_path):
+    """Evidence names outside the plan cannot leave orphaned artifacts."""
+    runner = harness(tmp_path)
+    scenario = reliability.FaultScenario.INVALID_SIGNATURE
+
+    with pytest.raises(ValueError, match="unexpected=unexpected"):
+        runner.run(
+            scenario,
+            lambda current_scenario: (
+                artifact("signature_tampering"),
+                artifact("verification_failure"),
+                artifact("quarantine_record"),
+                artifact("unexpected"),
+            ),
+        )
+
+    assert not list(tmp_path.iterdir())
+
+
 def test_harness_wraps_executor_failure_without_claiming_evidence(tmp_path):
     runner = harness(tmp_path)
 

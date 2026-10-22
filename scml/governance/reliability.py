@@ -99,6 +99,21 @@ class FaultInjectionHarness:
             isinstance(item, FaultArtifact) for item in artifacts
         ):
             raise TypeError("executor must return FaultArtifact values")
+        requirements = self.registry.plans[scenario].evidence_requirements
+        evidence_types = tuple(item.evidence_type for item in artifacts)
+        if len(evidence_types) != len(set(evidence_types)):
+            raise ValueError(
+                "executor returned duplicate evidence types; "
+                "no artifacts were published"
+            )
+        unexpected = sorted(set(evidence_types) - set(requirements))
+        if unexpected:
+            raise ValueError(
+                "executor evidence does not match the scenario contract; "
+                "no artifacts were published ("
+                + f"unexpected={','.join(unexpected)}"
+                + ")"
+            )
         evidence: list[reliability.FaultEvidence] = []
         for artifact in artifacts:
             path = self.artifact_root / (
