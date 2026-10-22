@@ -665,11 +665,7 @@ class ImageAdapter(ModalityAdapter):
     @property
     def dataset_hash(self) -> str:
         """Return the image corpus identity."""
-        identities = (
-            f"{sample.source}\0{sample.content_hash}"
-            for sample in self.dataset.samples
-        )
-        return curation.dataset_hash(identities)
+        return self.dataset.content_hash
 
     @property
     def samples(self) -> tuple[image.ImageSample, ...]:

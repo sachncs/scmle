@@ -6,11 +6,14 @@ it, while every operation that needs image decoding raises
 """
 
 from collections.abc import Iterable
+from collections.abc import Mapping
 import dataclasses
 import hashlib
 import io
+import json
 import pathlib
 import random
+from types import MappingProxyType
 from typing import Any
 from typing import Self
 
@@ -152,6 +155,59 @@ def image_content_hash(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class ImageAugmentation:
+    """Caller-declared provenance for a transformed image sample."""
+
+    parent_source: str
+    operation: str
+    parameters: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    tool: str = ""
+
+    def __post_init__(self) -> None:
+        """Validate and normalize transformation provenance."""
+        parent = canonical_source(self.parent_source)
+        operation = self.operation.strip()
+        tool = self.tool.strip()
+        if not operation:
+            raise ValueError("augmentation operation must not be empty")
+        if any(
+            not isinstance(key, str) or not key.strip()
+            for key in self.parameters
+        ):
+            raise ValueError(
+                "augmentation parameter keys must be non-empty text"
+            )
+        try:
+            normalized = json.loads(
+                json.dumps(
+                    dict(self.parameters), allow_nan=False, sort_keys=True
+                )
+            )
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "augmentation parameters must be JSON-native"
+            ) from error
+        object.__setattr__(self, "parent_source", parent)
+        object.__setattr__(self, "operation", operation)
+        object.__setattr__(self, "parameters", MappingProxyType(normalized))
+        object.__setattr__(self, "tool", tool)
+
+    @property
+    def identity(self) -> str:
+        """Return a deterministic identity for the transformation record."""
+        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native transformation provenance."""
+        return {
+            "parent_source": self.parent_source,
+            "operation": self.operation,
+            "parameters": dict(self.parameters),
+            "tool": self.tool,
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class ImageSample:
     """An immutable, validated image snapshot.
 
@@ -175,6 +231,7 @@ class ImageSample:
     group_id: str | None = None
     exif_tags: tuple[str, ...] = ()
     sensitive_metadata: tuple[str, ...] = ()
+    augmentation: ImageAugmentation | None = None
 
     def __post_init__(self) -> None:
         """Validates immutable identity and geometry metadata."""
@@ -187,6 +244,10 @@ class ImageSample:
         object.__setattr__(
             self, "sensitive_metadata", tuple(self.sensitive_metadata)
         )
+        if self.augmentation is not None and not isinstance(
+            self.augmentation, ImageAugmentation
+        ):
+            raise TypeError("augmentation must be ImageAugmentation or None")
         if len(self.encoded_bytes) != self.byte_size:
             raise ValueError("byte_size does not match encoded_bytes")
         if self.width <= 0 or self.height <= 0:
@@ -205,6 +266,7 @@ class ImageSample:
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
         label: str | int | float | bool | None = None,
         group_id: str | None = None,
+        augmentation: ImageAugmentation | None = None,
     ) -> Self:
         """Builds a validated image sample from encoded bytes.
 
@@ -215,6 +277,7 @@ class ImageSample:
             max_pixels: Maximum decoded pixel count, or ``None`` for no limit.
             label: Optional task label retained for curation evidence.
             group_id: Optional identity used to prevent split leakage.
+            augmentation: Optional caller-declared transformation provenance.
 
         Returns:
             A validated immutable image snapshot.
@@ -301,6 +364,7 @@ class ImageSample:
             group_id=group_id,
             exif_tags=exif_tags,
             sensitive_metadata=sensitive_metadata,
+            augmentation=augmentation,
         )
 
     @classmethod
@@ -311,6 +375,7 @@ class ImageSample:
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
         label: str | int | float | bool | None = None,
         group_id: str | None = None,
+        augmentation: ImageAugmentation | None = None,
     ) -> Self:
         """Builds a validated image sample from a local file."""
         file_path = pathlib.Path(path).expanduser()
@@ -351,7 +416,20 @@ class ImageSample:
             max_pixels,
             label,
             group_id,
+            augmentation,
         )
+
+    def perceptual_hash(self, hash_size: int = 8) -> str:
+        """Return a bounded luminance signature for near-duplicate review."""
+        if (
+            not isinstance(hash_size, int)
+            or isinstance(hash_size, bool)
+            or not 2 <= hash_size <= 32
+        ):
+            raise ValueError("hash_size must be an integer between 2 and 32")
+        pixels = self.decode("L", (hash_size, hash_size))[..., 0]
+        quantized = np.asarray(pixels, dtype=np.uint8) // 16
+        return "".join(f"{int(value):x}" for value in quantized.flat)
 
     @staticmethod
     def validate_limits(
@@ -427,6 +505,11 @@ class ImageSample:
             "group_id": self.group_id,
             "exif_tags": list(self.exif_tags),
             "sensitive_metadata": list(self.sensitive_metadata),
+            "augmentation": (
+                self.augmentation.to_dict()
+                if self.augmentation is not None
+                else None
+            ),
         }
 
 
@@ -483,6 +566,7 @@ class ImageDataset:
     """Immutable collection of validated image samples."""
 
     samples: tuple[ImageSample, ...] = ()
+    content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Normalizes samples to an immutable tuple and validates types."""
@@ -490,6 +574,16 @@ class ImageDataset:
         if any(not isinstance(sample, ImageSample) for sample in normalized):
             raise TypeError("samples must contain only ImageSample objects")
         object.__setattr__(self, "samples", normalized)
+        identities = (
+            f"{sample.source}\0{sample.content_hash}"
+            + (
+                f"\0augmentation={sample.augmentation.identity}"
+                if sample.augmentation is not None
+                else ""
+            )
+            for sample in normalized
+        )
+        object.__setattr__(self, "content_hash", dataset_hash(identities))
 
     @classmethod
     def from_paths(
@@ -539,6 +633,66 @@ class ImageDataset:
             )
         )
         return type(self)(ordered)
+
+    def near_duplicate_groups(
+        self,
+        max_samples: int = 1024,
+        hash_size: int = 8,
+        max_hamming_distance: int = 8,
+    ) -> tuple[tuple[str, ...], ...]:
+        """Return bounded groups of visually similar, distinct images.
+
+        The signature is a quantized, resized luminance representation. It is
+        review evidence for likely near duplicates, not a semantic similarity
+        model or a proof that two images depict the same object.
+        """
+        if not isinstance(max_samples, int) or isinstance(max_samples, bool):
+            raise ValueError("max_samples must be a positive integer")
+        if max_samples <= 0:
+            raise ValueError("max_samples must be a positive integer")
+        if (
+            not isinstance(max_hamming_distance, int)
+            or isinstance(max_hamming_distance, bool)
+            or max_hamming_distance < 0
+        ):
+            raise ValueError(
+                "max_hamming_distance must be a non-negative integer"
+            )
+        candidates = self.samples[:max_samples]
+        signatures = [
+            int(sample.perceptual_hash(hash_size), 16) for sample in candidates
+        ]
+        neighbors: dict[int, set[int]] = {
+            index: set() for index in range(len(candidates))
+        }
+        for left in range(len(candidates)):
+            for right in range(left + 1, len(candidates)):
+                if (
+                    signatures[left] ^ signatures[right]
+                ).bit_count() <= max_hamming_distance:
+                    neighbors[left].add(right)
+                    neighbors[right].add(left)
+        groups = []
+        visited: set[int] = set()
+        for start in range(len(candidates)):
+            if start in visited or not neighbors[start]:
+                continue
+            pending = [start]
+            component: set[int] = set()
+            while pending:
+                current = pending.pop()
+                if current in component:
+                    continue
+                component.add(current)
+                visited.add(current)
+                pending.extend(neighbors[current] - component)
+            if len({candidates[index].content_hash for index in component}) > 1:
+                groups.append(
+                    tuple(
+                        sorted(candidates[index].source for index in component)
+                    )
+                )
+        return tuple(sorted(groups))
 
     def profile(
         self,
@@ -637,6 +791,33 @@ class ImageDataset:
             }
         )
         profile_data["sensitive_metadata"] = sensitive_metadata
+        near_duplicate_groups = self.near_duplicate_groups(max_samples)
+        profile_data["near_duplicate_groups"] = [
+            list(group) for group in near_duplicate_groups
+        ]
+        augmented_samples = [
+            sample for sample in self.samples if sample.augmentation is not None
+        ]
+        source_names = {sample.source for sample in self.samples}
+        profile_data["augmentation"] = {
+            "status": "absent" if not augmented_samples else "declared",
+            "augmented_sample_count": len(augmented_samples),
+            "operations": sorted(
+                {
+                    sample.augmentation.operation
+                    for sample in augmented_samples
+                    if sample.augmentation is not None
+                }
+            ),
+            "external_parent_sources": sorted(
+                {
+                    sample.augmentation.parent_source
+                    for sample in augmented_samples
+                    if sample.augmentation is not None
+                    and sample.augmentation.parent_source not in source_names
+                }
+            ),
+        }
         quality_findings = []
         risk_findings = []
         if not self.samples:
@@ -658,6 +839,23 @@ class ImageDataset:
                     {"dataset": "profiled_samples"},
                     {"duplicate_count": profile.duplicate_count},
                     "Review duplicate content and prevent split contamination.",
+                    False,
+                )
+            )
+        if near_duplicate_groups:
+            quality_findings.append(
+                build_finding(
+                    "quality.image-near-duplicate-content",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": "profiled_samples"},
+                    {
+                        "group_count": len(near_duplicate_groups),
+                        "groups": [
+                            list(group) for group in near_duplicate_groups
+                        ],
+                    },
+                    "Review visually similar images and keep related content "
+                    "within one split before training.",
                     False,
                 )
             )
@@ -714,10 +912,7 @@ class ImageDataset:
             )
         return ModalityCurationReport(
             modality="image",
-            dataset_hash=dataset_hash(
-                f"{sample.source}\0{sample.content_hash}"
-                for sample in self.samples
-            ),
+            dataset_hash=self.content_hash,
             sample_count=len(self.samples),
             profile=profile_data,
             quality_findings=tuple(quality_findings),

@@ -35,6 +35,7 @@ from scml.data.modalities.graph import GraphEdge
 from scml.data.modalities.graph import GraphNode
 from scml.data.modalities.graph import GraphTemporalError
 from scml.data.modalities.graph import TemporalGraphSplit
+from scml.data.modalities.image import ImageAugmentation
 from scml.data.modalities.image import ImageDataset
 from scml.data.modalities.image import ImageSample
 from scml.data.modalities.image import ImageSplit
@@ -73,6 +74,7 @@ __all__ = [
     "GraphEdge",
     "GraphNode",
     "GraphTemporalError",
+    "ImageAugmentation",
     "ImageDataset",
     "ImageSample",
     "ImageSplit",

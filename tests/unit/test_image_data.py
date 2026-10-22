@@ -28,6 +28,17 @@ def png_bytes(color, size=(4, 3), mode="RGB"):
     return output.getvalue()
 
 
+def patterned_png(delta=0):
+    """Creates two distinct but visually near-identical fixtures."""
+    canvas = Image.new("RGB", (8, 8), (20, 40, 60))
+    for index in range(8):
+        value = 100 + delta
+        canvas.putpixel((index, index), (value, value + 20, value + 40))
+    output = io.BytesIO()
+    canvas.save(output, format="PNG")
+    return output.getvalue()
+
+
 def test_dependency_error_is_structured_when_dependency_is_disabled(
     monkeypatch,
 ):
@@ -159,6 +170,59 @@ def test_curation_reports_duplicate_and_sampling_findings():
         "quality.image-profile-truncated",
     ]
     assert report.profile["label_counts"] == {"unlabeled": 2}
+
+
+@PILLOW_SKIP
+def test_near_duplicate_and_augmentation_provenance_are_explicit():
+    """Curation records visual similarity and declared transformation lineage."""
+    original = image.ImageSample.from_bytes(patterned_png(), "original.png")
+    augmented = image.ImageSample.from_bytes(
+        patterned_png(1),
+        "augmented.png",
+        augmentation=image.ImageAugmentation(
+            parent_source="original.png",
+            operation="color_jitter",
+            parameters={"brightness": 0.1},
+            tool="fixture-transform/1",
+        ),
+    )
+    dataset = image.ImageDataset((original, augmented))
+
+    report = dataset.curate()
+
+    assert report.dataset_hash == dataset.content_hash
+    assert report.profile["near_duplicate_groups"] == [
+        sorted([original.source, augmented.source])
+    ]
+    assert report.profile["augmentation"] == {
+        "status": "declared",
+        "augmented_sample_count": 1,
+        "operations": ["color_jitter"],
+        "external_parent_sources": [],
+    }
+    assert "quality.image-near-duplicate-content" in {
+        finding.finding_id for finding in report.quality_findings
+    }
+
+
+@PILLOW_SKIP
+def test_augmentation_provenance_changes_dataset_identity():
+    """Transformation lineage is part of the image dataset identity."""
+    payload = patterned_png()
+    plain = image.ImageDataset(
+        (image.ImageSample.from_bytes(payload, "source.png"),)
+    )
+    transformed = image.ImageDataset(
+        (
+            image.ImageSample.from_bytes(
+                payload,
+                "source.png",
+                augmentation=image.ImageAugmentation("raw.png", "resize"),
+            ),
+        )
+    )
+
+    assert plain.content_hash != transformed.content_hash
 
 
 @PILLOW_SKIP
