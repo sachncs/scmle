@@ -501,7 +501,7 @@ class SpatialBoundaryLeakage:
         feature_ids = tuple(item[0] for item in self.feature_block_counts)
         if len(set(feature_ids)) != len(feature_ids):
             raise ValueError("feature block counts must have unique IDs")
-        if any(count < 1 for _, count in self.feature_block_counts):
+        if any(item[1] < 1 for item in self.feature_block_counts):
             raise ValueError("feature block counts must be positive")
         crossing = set(self.crossing_feature_ids)
         truncated = set(self.truncated_feature_ids)
