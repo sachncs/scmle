@@ -1,0 +1,225 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+
+const capabilityEvidence = [
+  {
+    name: "Tabular library path",
+    label: "beta claim",
+    className: "status-claim",
+    evidence: "The only training path this beta may describe as supported.",
+    openGate: "Independent clean-clone review and final signed release decision.",
+  },
+  {
+    name: "Documents, images, audio, video, graph, geospatial, raster",
+    label: "experimental",
+    className: "status-experimental",
+    evidence: "Bounded curation and modality lifecycle evidence exists for declared fixtures.",
+    openGate: "Representation, serving, external-fault, resource, and independent-review evidence.",
+  },
+  {
+    name: "Warehouse, event streams, caller-defined families",
+    label: "extension-only",
+    className: "status-extension",
+    evidence: "Callback and adapter contracts establish caller-owned integration seams.",
+    openGate: "Transport-owner semantics and a complete domain-specific lifecycle.",
+  },
+];
+
+const evidenceItems = [
+  {
+    id: "B-01",
+    gate: "Boundary",
+    claim: "The run declares the tabular beta scope before training.",
+    command: "uv run pytest -q tests/unit/test_capability_registry.py tests/integration/test_capability_gate.py",
+    artifact: "capability declaration + run config",
+    state: "local",
+    stateLabel: "local evidence",
+  },
+  {
+    id: "B-02",
+    gate: "Source",
+    claim: "The exact dataset snapshot, schema, findings, and manifest are recoverable.",
+    command: "uv run pytest -q tests/unit/test_data_evidence_contracts.py tests/integration/test_end_to_end.py",
+    artifact: "dataset_card.json + curation_report.json + manifest",
+    state: "local",
+    stateLabel: "local evidence",
+  },
+  {
+    id: "B-03",
+    gate: "Evaluation",
+    claim: "The declared task, split, metrics, uncertainty, fairness, and diagnostics are attached to the run.",
+    command: "uv run pytest -q tests/unit/test_release_evaluation.py tests/integration/test_problem_spec.py",
+    artifact: "evaluation.json + release_evidence.json",
+    state: "local",
+    stateLabel: "local evidence",
+  },
+  {
+    id: "B-04",
+    gate: "Explanation",
+    claim: "Explanations are bounded, privacy-aware, and tied to the exact evaluation and model identities.",
+    command: "uv run pytest -q tests/unit/test_explainability_evidence.py tests/integration/test_problem_spec.py",
+    artifact: "explanations.json + explanation report",
+    state: "local",
+    stateLabel: "local evidence",
+  },
+  {
+    id: "B-05",
+    gate: "Package",
+    claim: "The model bundle and lineage graph verify before inference and remain content-linked.",
+    command: "uv run pytest -q tests/unit/test_lineage_contract.py tests/unit/test_inference_evidence.py tests/integration/test_predict_api.py",
+    artifact: "model bundle + evidence_graph.json + provenance.json",
+    state: "local",
+    stateLabel: "local evidence",
+  },
+  {
+    id: "B-06",
+    gate: "Recovery",
+    claim: "Declared local fault scenarios fail safely and leave digest-bound recovery evidence.",
+    command: "uv run pytest -q tests/unit/test_local_faults.py tests/unit/test_reliability_harness.py",
+    artifact: "fault_injection_plan.json + fault evidence",
+    state: "local",
+    stateLabel: "local evidence",
+  },
+  {
+    id: "B-07",
+    gate: "Trust",
+    claim: "The release carries reproducible provenance, dependency, license, SBOM, and signature evidence.",
+    command: "bash scripts/release_preflight.sh",
+    artifact: "provenance.json + sbom.json + release_attestation.json",
+    state: "rehearse",
+    stateLabel: "release rehearsal",
+  },
+  {
+    id: "B-08",
+    gate: "Independent review",
+    claim: "A reviewer reproduces the exact commit from a clean clone and signs the decision.",
+    command: "python scripts/verify_release_review.py release/independent-review.json --source-commit <exact-release-sha>",
+    artifact: "independent-review.json",
+    state: "open",
+    stateLabel: "open gate",
+  },
+  {
+    id: "B-09",
+    gate: "Site",
+    claim: "The developer surface builds, resolves internal links, and exposes the same support boundary.",
+    command: "cd website && npm run build && npm run check:a11y && npm run check:links && npm run test:e2e",
+    artifact: "website/dist + route smoke output",
+    state: "site",
+    stateLabel: "site check",
+  },
+];
+
+const lifecycleStages = [
+  "ingestion", "validation", "profiling", "curation", "splitting",
+  "feature preparation", "modelling", "evaluation", "data explanations",
+  "model explanations", "packaging", "inference", "monitoring",
+  "documentation", "recovery and resources",
+];
+---
+
+<DocsLayout title="Release evidence" description="A generated tabular-beta release evidence board with reproducible checks, artifacts, and explicit experimental modality boundaries." current="release-evidence">
+  <p class="eyebrow"><span></span> Release handoff</p>
+  <h1>Make the beta<br /><em>reviewable.</em></h1>
+  <p class="lead">Use this page as the handoff board for a tabular production-beta claim. Every row has a named claim, a reproducible command, and an artifact a reviewer can inspect.</p>
+
+  <div class="callout"><p><strong>Scope lock:</strong> a green row is evidence for the explicitly gated tabular library path only. Non-tabular lifecycles remain experimental, and extension contracts remain extension-only; neither can be promoted by completing this board.</p></div>
+
+  <h2>Capability evidence view</h2>
+  <p>This view is generated from the declarations in this page so the support label and the missing proof stay adjacent. “Local evidence” is not “production-proven”; the independent-review row is intentionally still open.</p>
+  <div class="capability-table" role="region" aria-label="Capability evidence view" tabindex="0">
+    <table>
+      <thead><tr><th>Capability</th><th>Current label</th><th>Evidence available</th><th>Open gate</th></tr></thead>
+      <tbody>
+        {capabilityEvidence.map((row) => (
+          <tr>
+            <th scope="row">{row.name}</th>
+            <td><span class:list={["status", row.className]}>{row.label}</span></td>
+            <td>{row.evidence}</td>
+            <td>{row.openGate}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Tabular-beta evidence board</h2>
+  <p class="table-hint">Run the focused checks while developing. Run the full preflight only in the release rehearsal; it includes the bounded Python suite and benchmark gates.</p>
+  <div class="evidence-table" role="region" aria-label="Tabular beta evidence board" tabindex="0">
+    <table>
+      <thead><tr><th>ID / gate</th><th>Claim</th><th>Reproducible check</th><th>Expected artifact</th><th>State</th></tr></thead>
+      <tbody>
+        {evidenceItems.map((item) => (
+          <tr>
+            <th scope="row"><span>{item.id}</span><strong>{item.gate}</strong></th>
+            <td>{item.claim}</td>
+            <td><code>{item.command}</code></td>
+            <td>{item.artifact}</td>
+            <td><span class:list={["state", `state-${item.state}`]}>{item.stateLabel}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What the lifecycle claim includes</h2>
+  <p>The supported tabular declaration must account for all fifteen stages. A test that proves only model fitting is not a lifecycle claim.</p>
+  <ol class="stage-list">
+    {lifecycleStages.map((stage, index) => <li><span>{String(index + 1).padStart(2, "0")}</span>{stage}</li>)}
+  </ol>
+
+  <h2>Write the evidence record</h2>
+  <p>Copy one record per claim into the versioned release evidence index. Leave <code>result</code> as <code>fail</code> or <code>waived</code> when a check was not run; never turn an absent artifact into a green result.</p>
+  <pre><code>criterion_id: B-05
+claim: the exact bundle is linked to the run lineage
+scope: release=beta, modality=tabular, task=binary_classification
+raw_inputs: dataset=sha256:..., source_commit=...
+command_or_test: uv run pytest -q tests/unit/test_lineage_contract.py
+artifact: evidence_graph.json, digest=sha256:..., schema=v1
+result: pass | fail | waived
+reviewer: independent-reviewer-or-open
+observed_at: 2026-10-23T00:00:00+00:00
+limitations: [local fault boundary; external transport not covered]
+decision: accepted | blocked | waived-with-signed-reason</code></pre>
+
+  <h2>Handoff order</h2>
+  <div class="handoff" aria-label="Release handoff order">
+    <div><span>01</span><strong>Developer</strong><p>Runs focused rows and attaches artifacts to the exact source commit.</p></div>
+    <div><span>02</span><strong>Release owner</strong><p>Runs the bounded preflight, records limitations, and leaves open gates visible.</p></div>
+    <div><span>03</span><strong>Independent reviewer</strong><p>Uses a clean clone, recomputes critical claims, and signs or blocks the decision.</p></div>
+  </div>
+  <div class="callout warning"><p><strong>Stop condition:</strong> do not change an experimental modality to <code>supported</code> because its curation or baseline tests pass. Its missing representation, serving, resource, external-fault, and independent-review evidence are still release blockers for that claim.</p></div>
+
+  <p class="meta">Evidence board · tabular beta only · local evidence is not independent proof</p>
+</DocsLayout>
+
+<style>
+  .capability-table, .evidence-table { border: 1px solid #d9ddd2; margin: 28px 0 10px; overflow-x: auto; }
+  .evidence-table { margin-top: 12px; }
+  .table-hint { color: #7e8e21; font: 10px 'DM Mono', monospace !important; margin: 0 0 10px; text-transform: uppercase; }
+  table { border-collapse: collapse; min-width: 850px; width: 100%; }
+  th, td { border-bottom: 1px solid #d9ddd2; color: #52615a; font-size: 12px; line-height: 1.5; padding: 14px; text-align: left; vertical-align: top; }
+  thead th { background: #eef0e7; color: #18231f; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+  tbody th { color: #18231f; font-weight: 600; min-width: 145px; }
+  .evidence-table tbody th { display: grid; gap: 5px; min-width: 130px; }
+  .evidence-table tbody th span { color: #7e8e21; font: 10px 'DM Mono', monospace; }
+  .status, .state { display: inline-block; font: 10px 'DM Mono', monospace; padding: 5px 7px; text-transform: uppercase; white-space: nowrap; }
+  .status-claim, .state-site { background: #dfe9a4; color: #31413a; }
+  .status-experimental, .state-rehearse { background: #f1edc5; color: #665f2a; }
+  .status-extension, .state-open { background: #e8ebe2; color: #65716c; }
+  .state-local { background: #dce9e0; color: #2d5941; }
+  .evidence-table code { display: block; font-size: 10px; line-height: 1.6; min-width: 220px; }
+  .stage-list { display: grid; gap: 7px; grid-template-columns: repeat(3, 1fr); list-style: none; margin: 26px 0; padding: 0 !important; }
+  .stage-list li { background: #eef0e7; border: 1px solid #d9ddd2; color: #18231f !important; font-size: 13px !important; padding: 12px; }
+  .stage-list span { color: #7e8e21; display: block; font: 10px 'DM Mono', monospace; margin-bottom: 6px; }
+  .handoff { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); margin: 26px 0; }
+  .handoff > div { background: #eef0e7; border: 1px solid #d9ddd2; padding: 18px; }
+  .handoff span { color: #7e8e21; font: 10px 'DM Mono', monospace; }
+  .handoff strong { color: #18231f; display: block; font-size: 16px; margin-top: 13px; }
+  .handoff p { font-size: 13px !important; margin-bottom: 0; }
+  .warning { background: #f1edc5; border-left-color: #b58935; }
+  .warning p { color: #665f2a; }
+  @media (max-width: 760px) {
+    .stage-list, .handoff { grid-template-columns: 1fr; }
+  }
+</style>
