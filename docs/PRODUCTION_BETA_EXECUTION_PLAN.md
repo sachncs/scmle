@@ -3718,3 +3718,16 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   evidence itself is scientifically sufficient, independent, externally
   reproduced, or production support for non-tabular modalities.
 
+## Lifecycle evidence-link enforcement at `c652ef1` on 2026-10-23
+
+- A lifecycle report now rejects stages that have a valid stage name but no
+  evidence link. This prevents a signed record from presenting a complete
+  stage list while omitting the artifact or test reference that makes the
+  stage reviewable.
+- The focused lifecycle, curation, API, and compatibility slice passed `61`
+  tests under `-W error::ResourceWarning`; Ruff, formatting, mypy, and
+  `git diff --check` passed.
+- This strengthens evidence completeness at the local report boundary. It
+  does not validate the scientific adequacy of the linked artifact or provide
+  independent reviewer, hosted, cloud, broker, container, or kernel evidence.
+
