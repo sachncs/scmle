@@ -72,6 +72,27 @@ def test_modality_project_rejects_invalid_configuration(tmp_path):
         project.declaration()
 
 
+def test_modality_project_can_require_independent_explanation_ground_truth(
+    tmp_path,
+):
+    """Production-configured runs fail before publishing an unverified package."""
+    project = scml.ModalityProject(
+        text_adapter(),
+        "key",
+        output_dir=tmp_path / "run",
+        require_independent_ground_truth=True,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="independent explanation ground-truth suite is required",
+    ):
+        project.run()
+
+    assert not (tmp_path / "run" / "modality_lifecycle.json").exists()
+    assert not (tmp_path / "run" / "model" / "manifest.json").exists()
+
+
 def test_modality_project_rejects_file_output(tmp_path):
     """A file cannot be used as the lifecycle output directory."""
     output = Path(tmp_path) / "output"

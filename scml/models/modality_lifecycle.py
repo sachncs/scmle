@@ -2336,6 +2336,7 @@ class LifecycleContext:
     seed: int
     observed_adapter: ModalityAdapter
     manifest: data_contracts.ModalityManifest | None = None
+    require_independent_ground_truth: bool = False
     stage_records: dict[modalities.LifecycleStage, dict[str, object]] = (
         dataclasses.field(default_factory=dict)
     )
@@ -2822,6 +2823,14 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                 "Raw-modality ground truth remains caller-owned evidence.",
             ],
         }
+        if context.require_independent_ground_truth and (
+            ground_truth_evidence["status"] != "available"
+            or ground_truth_evidence["passed"] is not True
+        ):
+            raise ValueError(
+                "independent explanation ground-truth suite is required "
+                "before packaging"
+            )
         repeated_stability = min(repeated_stabilities)
         quality_evaluation = quality.evaluate(
             method="linear_reference_zero_ablation_and_perturbation",
@@ -3105,6 +3114,7 @@ class ModalityLifecycle:
         performance_budget: performance.PerformanceBudget | None = None,
         performance_baseline: performance.PerformanceBaseline | None = None,
         manifest: data_contracts.ModalityManifest | None = None,
+        require_independent_ground_truth: bool = False,
     ) -> LifecycleReport:
         """Run every stage and optionally persist its evidence report.
 
@@ -3112,6 +3122,8 @@ class ModalityLifecycle:
         executes. This keeps source, task, privacy, and lineage claims bound
         to the exact modality content used by the lifecycle.
         """
+        if not isinstance(require_independent_ground_truth, bool):
+            raise TypeError("require_independent_ground_truth must be bool")
         observed = observed_adapter or adapter
         if observed.modality != adapter.modality:
             raise ValueError(
@@ -3131,6 +3143,7 @@ class ModalityLifecycle:
             seed=seed,
             observed_adapter=observed,
             manifest=manifest,
+            require_independent_ground_truth=require_independent_ground_truth,
         )
         for stage in self.stages:
             started = time.perf_counter()

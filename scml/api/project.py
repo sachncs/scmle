@@ -394,6 +394,7 @@ class ModalityProject:
         performance_budget: performance.PerformanceBudget | None = None,
         performance_baseline: performance.PerformanceBaseline | None = None,
         manifest: data_contracts.ModalityManifest | None = None,
+        require_independent_ground_truth: bool = False,
     ) -> None:
         """Defines an experimental lifecycle run.
 
@@ -406,6 +407,8 @@ class ModalityProject:
             performance_budget: Optional declared performance budget.
             performance_baseline: Optional comparable-run baseline.
             manifest: Optional identity and governance contract.
+            require_independent_ground_truth: Require a complete independent
+                explanation reference suite before packaging.
 
         Raises:
             TypeError: If an object is not a modality adapter.
@@ -417,6 +420,8 @@ class ModalityProject:
             raise ValueError("signing_key must not be empty")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise TypeError("seed must be an integer")
+        if not isinstance(require_independent_ground_truth, bool):
+            raise TypeError("require_independent_ground_truth must be bool")
         if observed_adapter is not None and not isinstance(
             observed_adapter, modality_lifecycle.ModalityAdapter
         ):
@@ -429,6 +434,7 @@ class ModalityProject:
         self.performance_budget = performance_budget
         self.performance_baseline = performance_baseline
         self.manifest = manifest
+        self.require_independent_ground_truth = require_independent_ground_truth
         self.lifecycle = modality_lifecycle.ModalityLifecycle()
         self.report: modality_lifecycle.LifecycleReport | None = None
 
@@ -447,6 +453,7 @@ class ModalityProject:
             performance_budget=self.performance_budget,
             performance_baseline=self.performance_baseline,
             manifest=self.manifest,
+            require_independent_ground_truth=self.require_independent_ground_truth,
         )
         return self.report
 
