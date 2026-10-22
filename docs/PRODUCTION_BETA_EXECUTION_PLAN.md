@@ -2016,6 +2016,17 @@ Exact-head local release preflight at `6e37fa5` on 2026-10-22:
   external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain open release gates.
 
+Workflow-wide test outcome enforcement at `2b75123` on 2026-10-22:
+
+- The remaining CI matrix jobs for cross-platform, lowest-direct, deep
+  learning, integrations, base install, and data formats now emit JUnit
+  results and run the same skip/xfail verifier as the primary and all-extras
+  jobs. Every pytest job in the CI workflow therefore has an explicit outcome
+  audit rather than relying on a passing exit code alone.
+- The workflow passed `actionlint` and Ruby YAML parsing locally; the focused
+  stability and outcome-verifier tests passed `11` tests under strict resource
+  warnings. Hosted execution remains unavailable for this repository.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
