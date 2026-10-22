@@ -56,6 +56,23 @@ pip install "super-charge-ml[deeplearning]"
 pip install "super-charge-ml[embeddings]"`}</code></pre>
   <p>Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. A successful import only proves that the code can start; it does not prove that the model learned the intended signal.</p>
 
+  <h2>Pretrain a tabular JEPA representation</h2>
+  <p>JEPA is a transformer-adjacent self-supervised representation workflow, not a target-label model. The current implementation accepts a finite numeric matrix, masks feature values, predicts an EMA target representation, and exposes embeddings for a downstream model you choose. The downstream benchmark, split, and model card remain your responsibility.</p>
+  <pre><code>{`from scml.models.deeplearning import JepaEstimator
+
+encoder = JepaEstimator(
+    embedding_size=64,
+    mask_probability=0.3,
+    epochs=50,
+    random_state=42,
+)
+embeddings = encoder.fit_transform(numeric_features)
+
+# Evaluate the representation with a declared downstream split.
+downstream_model.fit(embeddings[train], labels[train])
+score = downstream_model.score(embeddings[test], labels[test])`}</code></pre>
+  <p>This is experimental. It does not decode raw documents, images, audio, video, graphs, or geospatial objects; it does not provide a universal pretrained checkpoint; and it is not automatically included in supervised model search.</p>
+
   <h2>JEPA is implemented narrowly, not implied broadly</h2>
   <p>The repository now has an explicit tabular JEPA path. It uses numeric feature masking, a context encoder, an EMA target encoder, an embedding-space prediction objective, and variance regularization to make collapse observable. It runs in the isolated PyTorch worker and returns a representation through <code>transform</code>.</p>
   <div class="split-cards">
