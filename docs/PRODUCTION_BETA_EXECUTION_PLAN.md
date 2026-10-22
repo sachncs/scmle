@@ -1998,6 +1998,18 @@ Deep-learning capability declaration at `489c943` on 2026-10-22:
   tests now have local evidence. Hosted cross-platform execution and
   heavyweight model/service environment review remain separate release gates.
 
+Optional deep-learning skip boundary at `3024892` on 2026-10-22:
+
+- A repeat of the remaining optional suite with `-rs` passed `52` tests and
+  reported one intentional skip at `tests/unit/test_deeplearning.py:221`:
+  `xgboost` was not installed in that isolated environment. The test is a
+  cross-framework process-sharing check, so the skip is an environment
+  boundary rather than evidence that the deep-learning adapter is broken.
+- The same run emitted one MLflow upstream `SADeprecationWarning` from
+  SQLAlchemy's `noload` loader strategy. It did not violate the configured
+  `ResourceWarning` policy, but remains a third-party dependency signal to
+  monitor in hosted dependency updates.
+
 Current-head release preflight at `8651c3a` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
