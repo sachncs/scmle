@@ -557,6 +557,33 @@ def test_package_signature_rejects_a_wrong_key(tmp_path: Path):
         modality_lifecycle.load_package(report.package.path, "wrong-key")
 
 
+def test_lifecycle_report_rejects_a_signed_incomplete_stage_record(
+    tmp_path: Path,
+):
+    """A valid HMAC cannot promote a partial lifecycle into a full report."""
+    report_path = tmp_path / "report.json"
+    report = modality_lifecycle.ModalityLifecycle().run(
+        document_adapter(),
+        tmp_path / "package",
+        signing_key="report-key",
+        report_path=report_path,
+    )
+    record = report.to_dict()
+    record["stage_evidence"] = record["stage_evidence"][:-1]
+    unsigned = dict(record)
+    unsigned.pop("signature")
+    record["signature"] = {
+        "algorithm": attestation.SIGNATURE_ALGORITHM,
+        "value": attestation.sign_payload(unsigned, "report-key"),
+    }
+    report_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="every required stage"):
+        modality_lifecycle.LifecycleReport.read_verified(
+            report_path, "report-key"
+        )
+
+
 def test_package_loader_rejects_an_unsupported_manifest_version(
     tmp_path: Path,
 ):

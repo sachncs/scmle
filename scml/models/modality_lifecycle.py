@@ -289,8 +289,37 @@ class LifecycleReport:
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{field_name} must not be empty")
-        if self.signature is not None and not self.signature.strip():
-            raise ValueError("signature must be non-empty when provided")
+        if not isinstance(self.package, LifecyclePackage):
+            raise TypeError("package must be LifecyclePackage")
+        stages = tuple(self.stage_evidence)
+        if any(
+            not isinstance(evidence, modalities.StageEvidence)
+            for evidence in stages
+        ):
+            raise TypeError("stage_evidence must contain StageEvidence records")
+        expected_stages = modalities.REQUIRED_LIFECYCLE_STAGES
+        actual_stages = tuple(evidence.stage for evidence in stages)
+        if actual_stages != expected_stages:
+            raise ValueError(
+                "lifecycle report stage evidence must contain every required "
+                "stage exactly once in order"
+            )
+        object.__setattr__(self, "stage_evidence", stages)
+        for field_name in (
+            "evaluation",
+            "performance",
+            "inference",
+            "monitoring",
+            "documentation",
+            "recovery",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                normalize_json_object(getattr(self, field_name), field_name),
+            )
+        if self.signature is not None and not is_sha256(self.signature):
+            raise ValueError("signature must be a SHA-256 digest")
 
     def unsigned_dict(self) -> dict[str, object]:
         """Return the exact report content covered by the signature."""
