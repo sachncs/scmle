@@ -1938,6 +1938,40 @@ Standalone modelling and estimation documentation at `80ea0eb` on 2026-10-23:
 - This improves onboarding and truthfulness; it does not add JEPA,
   production multimodal modelling, or the missing parameter-estimation API.
 
+Parameter-estimation evidence at `e8e32dd` on 2026-10-23:
+
+- The public API now exposes `EstimandSpec`, `EstimationPolicy`,
+  `ParameterEstimate`, `EstimationResult`, and `estimate_parameters`.
+  The initial estimators cover declared Gaussian linear and Bernoulli logistic
+  likelihoods with IID, HC3, or clustered covariance, confidence intervals,
+  explicit reject-or-complete-case missingness, bootstrap sampling
+  sensitivity, target-population standardized-mean-shift diagnostics, and a
+  second reference calculation (`numpy.linalg.lstsq` or SciPy BFGS).
+- Four focused tests cover known coefficients, robust and clustered
+  uncertainty, independent logistic verification, JSON serialization, target
+  shift, bootstrap evidence, and fail-closed missingness. The focused API and
+  estimation slice passed `13` tests with strict resource warnings; Ruff,
+  mypy, and `git diff --check` passed.
+- This is a bounded frequentist estimation layer. It does not claim causal
+  identification, Bayesian posterior inference, prior sensitivity, or
+  automatic integration into every `MLProject` release artifact yet.
+
+Bounded tabular JEPA evidence at `57ac21c` on 2026-10-23:
+
+- The optional PyTorch worker now contains a real tabular JEPA trainer:
+  numeric feature masking, context encoder, EMA target encoder,
+  embedding-space prediction, variance regularization, deterministic seed,
+  worker isolation, serialized NumPy weights, and a `transform` representation
+  surface. It is deliberately not registered as a supervised model-search
+  candidate.
+- The contract test passed locally; the optional functional test is skipped
+  because torch is not installed in the current environment. A torch-enabled
+  run is still required for performance, checkpoint replay, resource-fault,
+  representation-transfer, and independent benchmark evidence.
+- The site now calls this “tabular JEPA” and explicitly denies multimodal
+  foundation-model coverage. Documents, images, audio, video, graphs,
+  geospatial data, and raster JEPA encoders remain separate work.
+
 Signed modality checkpoint recovery at `3831565` on 2026-10-22:
 
 - The non-tabular lifecycle now supports an explicit, signed, atomically
