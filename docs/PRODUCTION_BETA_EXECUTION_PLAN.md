@@ -3959,3 +3959,21 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   into supported release evidence; the hosted all-extras matrix remains
   required.
 
+## Readiness summary and augmented causal estimation at `c3e5c10` on 2026-10-23
+
+- Release evaluations now expose a deterministic machine-readable readiness
+  summary with `ready` or `blocked` status, aggregate counts, and per-finding-
+  kind counts. The summary is derived from the detailed findings and fails
+  closed when its count relationships do not reconcile.
+- Parameter estimation now includes bounded `aipw_ate` support. It records
+  propensity overlap, fitted outcome nuisance models, an augmented influence
+  score, explicit non-cross-fitting limitations, and an independent reference
+  recomputation. It does not claim cross-fitting or nuisance-model uncertainty
+  propagation.
+- The standalone release-status page now explains the beta boundary and open
+  production gates without routing developers to repository Markdown files.
+  The site build produced 19 pages; the focused estimator/project slice passed
+  25 tests and the release-evaluation slice passed 18 tests. A new full
+  regression has intentionally not been run yet; it is the next release-gate
+  action after this implementation batch.
+
