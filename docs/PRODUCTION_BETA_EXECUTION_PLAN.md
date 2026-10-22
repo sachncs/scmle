@@ -1943,6 +1943,31 @@ Image duplicate and augmentation evidence at `8cb5ae4` on 2026-10-22:
   localization, or saliency evidence. Production-scale image quality and
   independent review remain separate gates.
 
+Current-head release preflight at `04c301f` on 2026-10-22:
+
+- `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
+  source files, Bandit, pip-audit, public API compatibility, and explicit
+  JUnit skip auditing. The bounded suite passed `2,018` tests with `75`
+  explicitly explained optional-dependency skips; total coverage was `83.04%`
+  and the enforced core scope was `86%`.
+- Mutation testing killed `1,503/2,057` mutants (`73%`) against the configured
+  `70%` minimum. One mutation timed out and `553` survived; the threshold was
+  met and the survivor inventory remains follow-up evidence.
+- Five-seed offline regression completed with zero failures and zero
+  regressions. The four verdicts were tie, tie, tie, and ahead; peak memory
+  was `0.3672`, `0.3849`, `0.4506`, and `0.4570` GB respectively.
+- Wheel and source-distribution checks passed, both artifacts reproduced
+  byte-for-byte, and network-isolated wheel and source-distribution installs
+  passed. The reproducible wheel hash was
+  `46fd2d177174d76e9305f5b1f5ddd3f55f8227a67930ef080b1ddd8ef27b1471` and
+  the source-distribution hash was
+  `877a82f98cc213f2fadf6160db15124a4079e3deafcdd5e24cf3a7dd0670bed2`.
+- The marketing-site audit found zero npm vulnerabilities; Astro built `17`
+  pages, accessibility checks passed for `17` HTML files, internal-link
+  validation passed for `384` links, and both Playwright browser tests passed.
+  Hosted Linux and Pages, external transport/resource-fault execution, secret
+  custody, and independent reviewer evidence remain separate release gates.
+
 Video lifecycle temporal policy at `03fe1ec` on 2026-10-22:
 
 - `VideoAdapter` now accepts an explicit `temporal_cutoff`. When supplied,
