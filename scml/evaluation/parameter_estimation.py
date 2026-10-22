@@ -684,20 +684,24 @@ def sensitivity_report(
     if policy.bootstrap_replicates:
         rng = np.random.default_rng(policy.seed)
         estimates: list[np.ndarray] = []
-        for _ in range(policy.bootstrap_replicates):
+        bootstrap_replicate = 0
+        while bootstrap_replicate < policy.bootstrap_replicates:
             sample = rng.integers(0, len(values), size=len(values))
             if policy.estimator == "linear":
-                estimate, _ = fit_linear(
+                linear_fit = fit_linear(
                     design[sample], values[sample], 1, 1e-8
                 )
+                estimate = linear_fit[0]
             else:
-                estimate, _, _ = fit_logistic(
+                logistic_fit = fit_logistic(
                     design[sample],
                     values[sample],
                     policy.max_iterations,
                     policy.tolerance,
                 )
+                estimate = logistic_fit[0]
             estimates.append(estimate)
+            bootstrap_replicate += 1
         bootstrap = np.asarray(estimates)
         alpha = (1.0 - policy.confidence_level) / 2.0
         report["sampling"]["bootstrap_intervals"] = [

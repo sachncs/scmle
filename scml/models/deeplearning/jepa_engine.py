@@ -130,7 +130,8 @@ class JepaEngine:
             self.random_state + 1
         )
         losses: list[float] = []
-        for _ in range(self.epochs):
+        epoch_number = 0
+        while epoch_number < self.epochs:
             order = torch.randperm(rows, generator=generator, device=device)
             epoch_losses: list[float] = []
             for start in range(0, rows, batch_rows):
@@ -166,6 +167,7 @@ class JepaEngine:
                         )
                 epoch_losses.append(float(loss.detach().cpu()))
             losses.append(float(np.mean(epoch_losses)))
+            epoch_number += 1
         network.module.eval().cpu()
         self.network_ = network
         self.n_iter_ = self.epochs
