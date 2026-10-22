@@ -1916,6 +1916,33 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Current-head optional-boundary release preflight evidence at `eb163a4` on
+2026-10-22:
+
+- `./scripts/release_preflight.sh` passed the local static, packaging, site,
+  and bounded-test gates. The bounded release suite passed `2,025` tests with
+  `75` explicitly explained optional-dependency skips. Total coverage was
+  `83.03%` and the declared core scope was `86%`.
+- The enforced stability gate passed three attempts over the same `25` test
+  cases with no inventory changes, quarantined failures, or expired entries.
+  Mutation testing killed `1,503/2,057` mutants (`73%`), above the `70%`
+  threshold; one mutation timed out and `553` survived for follow-up triage.
+- Five-seed offline benchmark regression completed with zero regressions and
+  zero failed repetitions. Verdicts were tie, tie, tie, and ahead for breast
+  cancer, wine, digits, and diabetes progression; peak memory was `0.3681`,
+  `0.3915`, `0.4530`, and `0.4577` GB respectively.
+- Reproducible package checks and network-isolated wheel/source installs
+  passed. The wheel hash was
+  `57f15957aadbd3739617fbab4dfca707cf43e6cdae25b2ef7102da75d29cbad1` and
+  the source-distribution hash was
+  `b70c135ec5bd8fc8c1071292dc9f19a25f7bb054de5ead1a72086e1b97546971`.
+- The site gate found `0` npm audit vulnerabilities, Astro built `17` static
+  pages, accessibility checks passed for all `17` HTML files, all `384`
+  internal links resolved, and both Playwright smoke tests passed. This is
+  local evidence only; hosted Linux and Pages, external transport/resource-
+  fault execution, secret custody, and independent reviewer evidence remain
+  open release gates.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
