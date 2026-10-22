@@ -179,7 +179,7 @@ split = dataset.split(test_fraction=0)
 print(features.feature_names)
 print(features.to_numpy())
 print(features.frames_truncated)</code></pre>
-  <p>For non-WAV inputs, provide an explicit codec probe for ingestion and a versioned decoder adapter before requesting signal features. The current implementation deliberately stops at bounded WAV statistics; it does not claim spectrogram quality, transcript provenance, speaker leakage controls, time-local explanations, audio modelling, serving, or release evidence.</p>
+  <p>For non-WAV inputs, provide an explicit codec probe for ingestion and a versioned decoder adapter before requesting signal features. The experimental lifecycle can also record bounded time-window occlusion and deterministic additive-noise score probes at declared signal-to-noise ratios. Those probes expose reproducible score changes and clipping, but they do not claim spectrogram quality, perceptual speech quality, transcript semantics, speaker leakage control, causal attribution, audio modelling, serving, or release evidence.</p>
 
   <h2>Experimental video metadata features</h2>
   <p>Video exposes metadata evidence by default. When you own a versioned decoder, you can opt into a bounded temporal baseline without hiding codec or resource decisions inside the core package.</p>
