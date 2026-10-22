@@ -33,7 +33,13 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install libomp
       - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
-      - run: uv run pytest -q tests/unit tests/property tests/leakage tests/integration/test_end_to_end.py
+      - run: >-
+          uv run pytest -q -W error::ResourceWarning
+          tests/unit tests/property tests/leakage
+          tests/integration/test_end_to_end.py
+          --junitxml=release-platform.xml
+      - name: Reject unexplained skips and xfails
+        run: uv run python scripts/check_pytest_skips.py release-platform.xml
 
   publish:
     needs: test
@@ -47,7 +53,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
-      - run: uv run pytest -q
+      - run: uv run pytest -q -W error::ResourceWarning --junitxml=release-full-suite.xml
+      - name: Reject unexplained skips and xfails
+        run: uv run python scripts/check_pytest_skips.py release-full-suite.xml
       - run: uv run python -m benchmarks.run_benchmarks --offline --seeds 5 --budget 120 --workers 2 --output results.json
       - run: uv run python -m benchmarks.check_regression results.json
       - run: uv build --python 3.14
