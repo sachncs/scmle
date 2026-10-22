@@ -10,9 +10,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 >
   <p class="eyebrow"><span></span> Models, uncertainty, and limits</p>
   <h1>Choose the model<br /><em>after the evidence.</em></h1>
-  <p class="lead">super-charge-ml can search and evaluate several model families, including an optional FT-Transformer path. It does not pretend that a model adapter is a complete modelling product, and it does not currently ship a JEPA implementation.</p>
+  <p class="lead">super-charge-ml can search and evaluate several model families, including an optional FT-Transformer path, and can pretrain a bounded tabular JEPA representation. It does not pretend that either adapter is a complete multimodal modelling product.</p>
 
-  <div class="callout"><p><strong>Read this page before installing extras.</strong> The supported beta is still the narrow tabular library workflow. Deep-learning and text-embedding integrations are available as explicit optional paths with separate evidence. JEPA and a first-class statistical parameter-estimation API are not implemented yet.</p></div>
+  <div class="callout"><p><strong>Read this page before installing extras.</strong> The supported beta is still the narrow tabular library workflow. Deep-learning and text-embedding integrations are available as explicit optional paths with separate evidence. JEPA is not implemented, and parameter estimation is available as a bounded standalone API rather than a production release gate inside <code>MLProject</code>.</p></div>
 
   <h2>The decision path</h2>
   <figure class="diagram">
@@ -40,7 +40,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         <tr><th scope="row">Other PyTorch families</th><td>The same optional extra exposes MLP, residual, TabM-style ensemble, and RealMLP-style families. They are explicit candidates, not silent dependencies.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">Text embeddings</th><td>Install <code>super-charge-ml[embeddings]</code> for the sentence-transformers integration. The text transformer runs in the isolated worker; if unavailable, the documented fallback is TF-IDF.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">TabPFN</th><td>The explicit adapter remains extension-only until the external package, model-weight license, token custody, and independent evidence are supplied.</td><td><span class="status status-extension">Extension-only</span></td></tr>
-        <tr><th scope="row">JEPA</th><td>There is no JEPA architecture, pretraining objective, checkpoint format, transfer contract, or evaluation path in this repository today.</td><td><span class="status status-missing">Not implemented</span></td></tr>
+        <tr><th scope="row">Tabular JEPA</th><td><code>JepaEstimator</code> learns numeric-tabular representations with masked context prediction, an EMA target encoder, variance regularization, worker isolation, checkpointable weights, and <code>transform</code> output. It is not a multimodal JEPA foundation model.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">Parameter estimation</th><td><code>estimate_parameters</code> supports declared linear and logistic likelihoods, IID/HC3/clustered covariance, intervals, explicit missingness, bootstrap sampling sensitivity, shift diagnostics, and an independent reference calculation.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -55,18 +56,18 @@ pip install "super-charge-ml[deeplearning]"
 pip install "super-charge-ml[embeddings]"`}</code></pre>
   <p>Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. A successful import only proves that the code can start; it does not prove that the model learned the intended signal.</p>
 
-  <h2>JEPA is a named gap, not a hidden feature</h2>
-  <p>JEPA means more than adding a transformer class. A credible implementation needs a modality-specific encoder, context/target masking or view policy, an embedding-space prediction objective, collapse prevention, checkpoint and resume semantics, transfer or downstream-task evaluation, representation diagnostics, and a data card that explains what the learned representation means.</p>
+  <h2>JEPA is implemented narrowly, not implied broadly</h2>
+  <p>The repository now has an explicit tabular JEPA path. It uses numeric feature masking, a context encoder, an EMA target encoder, an embedding-space prediction objective, and variance regularization to make collapse observable. It runs in the isolated PyTorch worker and returns a representation through <code>transform</code>.</p>
   <div class="split-cards">
-    <div class="mini-card"><span class="mini-label">Today</span><h3>What is honest</h3><p>The repository can curate experimental modalities and run bounded baselines. It does not train or evaluate JEPA representations.</p><p class="note">No JEPA claim should appear in a capability matrix, package metadata, or marketing copy.</p></div>
-    <div class="mini-card"><span class="mini-label">To add it</span><h3>What must be designed</h3><p>Define the pretraining contract, negative or anti-collapse evidence, transfer benchmark, resource policy, checkpoint schema, and explainability boundary before implementing the adapter.</p><p class="note">The first acceptance test is a reproducible representation benchmark—not a class that imports.</p></div>
+    <div class="mini-card"><span class="mini-label">Today</span><h3>What is honest</h3><p>Tabular numeric JEPA is an experimental representation trainer. It has a defined objective, serialized worker state, deterministic seed, and a contract test. It is not registered as a supervised model-search candidate.</p><p class="note">The representation still needs downstream transfer benchmarks and independent domain review.</p></div>
+    <div class="mini-card"><span class="mini-label">Still separate</span><h3>What is not included</h3><p>There is no document, image, audio, video, graph, or geospatial JEPA encoder; no universal pretrained checkpoint; and no claim that the embedding is semantically meaningful without a domain benchmark.</p><p class="note">A new modality needs its own encoder, masking policy, transfer test, and explanation boundary.</p></div>
   </div>
 
   <h2>Parameter estimation is not hyperparameter tuning</h2>
   <p>This distinction matters. The current project has useful pieces, but they answer different questions:</p>
   <div class="split-cards">
     <div class="mini-card"><span class="mini-label">Implemented</span><h3>Choosing a model</h3><p>Hyperparameter search explores declared spaces. Bayesian model comparison evaluates repeated score differences. Calibration and conformal methods quantify predictive behaviour. Cross-validation can report intervals around metrics.</p></div>
-    <div class="mini-card"><span class="mini-label">Not yet a contract</span><h3>Estimating a parameter</h3><p>There is no first-class estimand object that records a parameter definition, identification assumptions, estimator, covariance estimator, standard errors, confidence or credible interval, sensitivity analysis, and exportable estimation report.</p></div>
+    <div class="mini-card"><span class="mini-label">Implemented, bounded</span><h3>Estimating a parameter</h3><p><code>EstimandSpec</code>, <code>EstimationPolicy</code>, and <code>EstimationResult</code> record the parameter definition, likelihood, assumptions, covariance, intervals, sensitivity evidence, and reference calculation. The API does not claim causal identification or Bayesian posterior inference.</p></div>
   </div>
   <figure class="diagram">
     <figcaption class="diagram-caption"><span>THREE DIFFERENT QUESTIONS</span><strong>Do not read one as another.</strong></figcaption>
@@ -87,7 +88,7 @@ pip install "super-charge-ml[embeddings]"`}</code></pre>
   <p>These artifacts help you decide whether a model is useful. They do not turn a predictive score into a causal estimate, and they do not supply a treatment effect, coefficient standard error, Bayesian posterior, or identified population parameter.</p>
 
   <h2>Parameter-estimation acceptance bar</h2>
-  <p>When this capability is added, accept it only if the API can answer these questions without reconstructing intent from logs:</p>
+  <p>To promote this capability into a release workflow, the API must answer these questions without reconstructing intent from logs:</p>
   <ul>
     <li>What exact estimand is being estimated, for which population and observation window?</li>
     <li>What assumptions identify it, and which assumptions are testable versus declared?</li>
@@ -96,7 +97,7 @@ pip install "super-charge-ml[embeddings]"`}</code></pre>
     <li>Can another evaluator reproduce the estimate from raw snapshot, split, seed, software lock, and artifact digest?</li>
     <li>What sensitivity, subgroup, missing-data, and leakage checks would change the interpretation?</li>
   </ul>
-  <div class="callout"><p><strong>Current answer:</strong> predictive modelling is real but bounded; statistical parameter estimation is a planned capability, not something the current API should imply.</p></div>
+  <div class="callout"><p><strong>Current answer:</strong> predictive modelling and a bounded frequentist estimation API are real; production integration, causal estimands, Bayesian inference, and modality-specific estimators remain separate work.</p></div>
 
   <h2>Use the right next page</h2>
   <div class="doc-cards">
@@ -104,7 +105,7 @@ pip install "super-charge-ml[embeddings]"`}</code></pre>
     <a class="doc-card" href={`${base}/docs/capabilities/`}><small>SUPPORT CLAIMS</small><h3>Capability matrix</h3><p>Check the exact boundary before treating an optional model or modality as supported.</p></a>
     <a class="doc-card" href={`${base}/docs/evidence/`}><small>AFTER MODELLING</small><h3>Evidence & gates</h3><p>Learn what a release claim must prove and what keeps it below production status.</p></a>
   </div>
-  <p class="meta">Modelling boundary · reviewed October 2026 · no JEPA claim</p>
+  <p class="meta">Modelling boundary · reviewed October 2026 · tabular JEPA only</p>
 </DocsLayout>
 
 <style>
