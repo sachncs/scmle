@@ -397,6 +397,107 @@ def test_results_are_immutable_and_findings_are_sorted():
     )
 
 
+def test_readiness_summary_counts_findings_and_serializes_deterministically():
+    """A readiness summary exposes stable aggregate and per-kind counts."""
+    policy = make_policy(diagnostic_action=evaluation.DiagnosticAction.WARN)
+    result = release.evaluate_release(
+        policy,
+        {"roc_auc": 0.81},
+        {
+            "metric_uncertainty": {"error": "bootstrap failed"},
+            "robustness": {"scenarios": {}},
+        },
+        {},
+        make_index(policy),
+    )
+
+    summary = result.readiness_summary()
+
+    assert summary.status is release.ReleaseStatus.READY
+    assert summary.total_findings == 6
+    assert summary.passed_findings == 5
+    assert summary.failed_findings == 1
+    assert summary.blocking_findings == 5
+    assert summary.blocking_failures == 0
+    assert summary.non_blocking_failures == 1
+    assert summary.counts_by_kind["diagnostic"] == release.FindingCounts(
+        total=2, passed=1, failed=1, blocking=1, blocking_failures=0
+    )
+    assert set(summary.counts_by_kind) == {
+        kind.value for kind in release.FindingKind
+    }
+    assert json.loads(summary.canonical_json()) == summary.to_dict()
+    assert (
+        summary.canonical_json() == result.readiness_summary().canonical_json()
+    )
+
+
+def test_blocked_readiness_summary_distinguishes_blocking_failures():
+    """A failed blocking finding produces an explicit blocked status."""
+    policy = make_policy()
+    result = release.evaluate_release(
+        policy,
+        {"roc_auc": 0.70},
+        {"metric_uncertainty": {"estimate": 0.70}},
+        {},
+        make_index(policy),
+    )
+
+    summary = result.readiness_summary()
+
+    assert summary.status is release.ReleaseStatus.BLOCKED
+    assert summary.failed_findings == 1 + len(
+        [
+            item
+            for item in result.findings
+            if item.kind is release.FindingKind.EVIDENCE and not item.passed
+        ]
+    )
+    assert summary.blocking_failures == summary.failed_findings
+    assert summary.counts_by_kind["metric"].blocking_failures == 1
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("status", release.ReleaseStatus.READY, "status"),
+        ("total_findings", 2, "total_findings"),
+        ("counts_by_kind", {}, "counts_by_kind"),
+    ],
+)
+def test_readiness_summary_rejects_inconsistent_values(
+    field: str, value: object, message: str
+):
+    """Summary construction fails closed when its counts are inconsistent."""
+    values: dict[str, object] = {
+        "task": "binary_classification",
+        "policy_schema_version": 1,
+        "status": release.ReleaseStatus.BLOCKED,
+        "total_findings": 1,
+        "passed_findings": 0,
+        "failed_findings": 1,
+        "blocking_findings": 1,
+        "blocking_failures": 1,
+        "non_blocking_failures": 0,
+        "counts_by_kind": {
+            kind.value: release.FindingCounts(
+                total=1 if kind is release.FindingKind.METRIC else 0,
+                passed=0,
+                failed=1 if kind is release.FindingKind.METRIC else 0,
+                blocking=1 if kind is release.FindingKind.METRIC else 0,
+                blocking_failures=(
+                    1 if kind is release.FindingKind.METRIC else 0
+                ),
+            )
+            for kind in release.FindingKind
+        },
+    }
+    values[field] = value
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        release.ReleaseReadinessSummary(**values)  # type: ignore[arg-type]
+
+
 def test_attestation_gate_requires_a_signed_release_record():
     """A release record without an HMAC signature fails closed."""
     outcome = release.ReleaseEvaluation(

@@ -12,6 +12,7 @@ import enum
 import json
 import math
 from numbers import Real
+import types
 from typing import Any
 
 from scml.contracts import evaluation
@@ -29,6 +30,13 @@ class FindingKind(enum.StrEnum):
     METRIC = "metric"
     RELIABILITY = "reliability"
     SECURITY = "security"
+
+
+class ReleaseStatus(enum.StrEnum):
+    """Machine-readable release readiness status."""
+
+    READY = "ready"
+    BLOCKED = "blocked"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -108,6 +116,175 @@ class ReleaseFinding:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class FindingCounts:
+    """Validated aggregate counts for a set of release findings."""
+
+    total: int
+    passed: int
+    failed: int
+    blocking: int
+    blocking_failures: int
+
+    def __post_init__(self) -> None:
+        """Validate count relationships before exposing the aggregate."""
+        values = {
+            "total": self.total,
+            "passed": self.passed,
+            "failed": self.failed,
+            "blocking": self.blocking,
+            "blocking_failures": self.blocking_failures,
+        }
+        for name, value in values.items():
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{name} must be a non-negative integer")
+            if value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if self.total != self.passed + self.failed:
+            raise ValueError("total must equal passed plus failed")
+        if self.blocking > self.total:
+            raise ValueError("blocking must not exceed total")
+        if self.blocking_failures > self.failed:
+            raise ValueError("blocking_failures must not exceed failed")
+        if self.blocking_failures > self.blocking:
+            raise ValueError("blocking_failures must not exceed blocking")
+
+    def to_dict(self) -> dict[str, int]:
+        """Return deterministic JSON-compatible aggregate counts."""
+        return {
+            "total": self.total,
+            "passed": self.passed,
+            "failed": self.failed,
+            "blocking": self.blocking,
+            "blocking_failures": self.blocking_failures,
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ReleaseReadinessSummary:
+    """Machine-readable readiness summary derived from release findings.
+
+    The summary intentionally contains counts rather than duplicating the
+    findings. Callers can use it for release dashboards and automation, then
+    retain ``ReleaseEvaluation`` as the detailed evidence-backed record.
+    """
+
+    task: str
+    policy_schema_version: int
+    status: ReleaseStatus
+    total_findings: int
+    passed_findings: int
+    failed_findings: int
+    blocking_findings: int
+    blocking_failures: int
+    non_blocking_failures: int
+    counts_by_kind: Mapping[str, FindingCounts]
+
+    def __post_init__(self) -> None:
+        """Validate summary counts, status, and kind coverage."""
+        if not isinstance(self.task, str) or not self.task.strip():
+            raise ValueError("task must not be empty")
+        if (
+            isinstance(self.policy_schema_version, bool)
+            or not isinstance(self.policy_schema_version, int)
+            or self.policy_schema_version < 0
+        ):
+            raise ValueError("policy_schema_version must be non-negative")
+        if not isinstance(self.status, ReleaseStatus):
+            raise TypeError("status must be ReleaseStatus")
+        values = {
+            "total_findings": self.total_findings,
+            "passed_findings": self.passed_findings,
+            "failed_findings": self.failed_findings,
+            "blocking_findings": self.blocking_findings,
+            "blocking_failures": self.blocking_failures,
+            "non_blocking_failures": self.non_blocking_failures,
+        }
+        for name, value in values.items():
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{name} must be a non-negative integer")
+            if value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if self.total_findings != self.passed_findings + self.failed_findings:
+            raise ValueError("total_findings must equal passed plus failed")
+        if self.failed_findings != (
+            self.blocking_failures + self.non_blocking_failures
+        ):
+            raise ValueError(
+                "failed_findings must equal blocking plus non-blocking failures"
+            )
+        if self.blocking_failures > self.blocking_findings:
+            raise ValueError(
+                "blocking_failures must not exceed blocking_findings"
+            )
+        expected_status = (
+            ReleaseStatus.BLOCKED
+            if self.blocking_failures
+            else ReleaseStatus.READY
+        )
+        if self.status is not expected_status:
+            raise ValueError("status does not match blocking_failures")
+        if not isinstance(self.counts_by_kind, Mapping):
+            raise TypeError("counts_by_kind must be a mapping")
+        expected_kinds = {kind.value for kind in FindingKind}
+        if set(self.counts_by_kind) != expected_kinds:
+            raise ValueError("counts_by_kind must contain every finding kind")
+        if not all(
+            isinstance(kind, str) and isinstance(counts, FindingCounts)
+            for kind, counts in self.counts_by_kind.items()
+        ):
+            raise TypeError("counts_by_kind must map strings to FindingCounts")
+        object.__setattr__(
+            self,
+            "counts_by_kind",
+            types.MappingProxyType(dict(self.counts_by_kind)),
+        )
+        combined = FindingCounts(
+            total=self.total_findings,
+            passed=self.passed_findings,
+            failed=self.failed_findings,
+            blocking=self.blocking_findings,
+            blocking_failures=self.blocking_failures,
+        )
+        by_kind = list(self.counts_by_kind.values())
+        if combined != FindingCounts(
+            total=sum(item.total for item in by_kind),
+            passed=sum(item.passed for item in by_kind),
+            failed=sum(item.failed for item in by_kind),
+            blocking=sum(item.blocking for item in by_kind),
+            blocking_failures=sum(item.blocking_failures for item in by_kind),
+        ):
+            raise ValueError("aggregate counts do not match counts_by_kind")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return deterministic JSON-compatible readiness data."""
+        return {
+            "task": self.task,
+            "policy_schema_version": self.policy_schema_version,
+            "status": self.status.value,
+            "total_findings": self.total_findings,
+            "passed_findings": self.passed_findings,
+            "failed_findings": self.failed_findings,
+            "blocking_findings": self.blocking_findings,
+            "blocking_failures": self.blocking_failures,
+            "non_blocking_failures": self.non_blocking_failures,
+            "counts_by_kind": {
+                kind: self.counts_by_kind[kind].to_dict()
+                for kind in sorted(self.counts_by_kind)
+            },
+        }
+
+    def canonical_json(self) -> str:
+        """Return stable JSON suitable for release automation."""
+        return json.dumps(
+            self.to_dict(),
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class ReleaseEvaluation:
     """Immutable outcome of evaluating one policy and its supplied evidence."""
 
@@ -165,6 +342,45 @@ class ReleaseEvaluation:
             ensure_ascii=True,
             separators=(",", ":"),
             sort_keys=True,
+        )
+
+    def readiness_summary(self) -> ReleaseReadinessSummary:
+        """Return deterministic readiness counts derived from findings."""
+        counts: dict[str, FindingCounts] = {}
+        for kind in FindingKind:
+            matching = tuple(
+                item for item in self.findings if item.kind is kind
+            )
+            counts[kind.value] = FindingCounts(
+                total=len(matching),
+                passed=sum(item.passed for item in matching),
+                failed=sum(not item.passed for item in matching),
+                blocking=sum(item.blocking for item in matching),
+                blocking_failures=sum(
+                    not item.passed and item.blocking for item in matching
+                ),
+            )
+        passed = sum(item.passed for item in self.findings)
+        failed = len(self.findings) - passed
+        blocking = sum(item.blocking for item in self.findings)
+        blocking_failures = sum(
+            not item.passed and item.blocking for item in self.findings
+        )
+        return ReleaseReadinessSummary(
+            task=self.task,
+            policy_schema_version=self.policy_schema_version,
+            status=(
+                ReleaseStatus.BLOCKED
+                if blocking_failures
+                else ReleaseStatus.READY
+            ),
+            total_findings=len(self.findings),
+            passed_findings=passed,
+            failed_findings=failed,
+            blocking_findings=blocking,
+            blocking_failures=blocking_failures,
+            non_blocking_failures=failed - blocking_failures,
+            counts_by_kind=counts,
         )
 
 
