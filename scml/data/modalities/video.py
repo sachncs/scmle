@@ -14,7 +14,6 @@ from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.data.modalities.curation import build_finding
 from scml.data.modalities.curation import conflicting_label_groups
-from scml.data.modalities.curation import dataset_hash
 from scml.data.modalities.curation import label_counts
 from scml.data.modalities.curation import ModalityCurationReport
 
@@ -684,10 +683,7 @@ class VideoDataset:
             )
         return ModalityCurationReport(
             modality="video",
-            dataset_hash=dataset_hash(
-                f"{sample.source}\0{sample.file_hash}"
-                for sample in self.samples
-            ),
+            dataset_hash=self.content_hash,
             sample_count=len(self.samples),
             profile={
                 "formats": formats,

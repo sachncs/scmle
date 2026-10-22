@@ -81,6 +81,17 @@ def test_audio_curation_reports_metadata_and_label_composition():
     assert report.release_ready
 
 
+def test_audio_curation_hash_matches_source_order_identity():
+    """Audio curation remains attached when source order is non-sorted."""
+    samples = (
+        audio.AudioSample.from_bytes(wav_bytes(), source="z-last.wav"),
+        audio.AudioSample.from_bytes(wav_bytes(), source="a-first.wav"),
+    )
+    dataset = audio.AudioDataset(samples)
+
+    assert dataset.curate().dataset_hash == dataset.content_hash
+
+
 def test_audio_transcript_provenance_is_bounded_and_curated():
     """Transcript metadata remains tied to the source audio and provider."""
     transcript = audio.AudioTranscript(
@@ -281,6 +292,19 @@ def test_video_curation_records_explicit_audio_video_synchronization():
         "within_tolerance",
     ]
     assert report.quality_findings == ()
+
+
+def test_video_curation_hash_matches_source_order_identity():
+    """Video curation remains attached when source order is non-sorted."""
+    metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
+    dataset = video.VideoDataset(
+        (
+            video.VideoSample.from_bytes(b"z-video", metadata, "z-last.mp4"),
+            video.VideoSample.from_bytes(b"a-video", metadata, "a-first.mp4"),
+        )
+    )
+
+    assert dataset.curate().dataset_hash == dataset.content_hash
 
 
 def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
@@ -880,7 +904,9 @@ def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
         crs="EPSG:3857",
     )
 
-    evidence = dataset.boundary_leakage(block_size=1.0, max_blocks_per_feature=2)
+    evidence = dataset.boundary_leakage(
+        block_size=1.0, max_blocks_per_feature=2
+    )
 
     assert evidence.status == "potential_leakage"
     assert evidence.crossing_feature_ids == ("line",)
