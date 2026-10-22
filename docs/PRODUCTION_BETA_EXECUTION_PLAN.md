@@ -1939,6 +1939,19 @@ Current-head release preflight at `a56492a` on 2026-10-22:
   public Pages deployment, external transport/resource-fault execution, secret
   custody, and independent reviewer evidence remain open release gates.
 
+Latest hosted gate observation at `009cb06` on 2026-10-22:
+
+- CI run `39756648421` failed across its matrix before any job step executed;
+  every job reported an empty step list. Documentation deployment run
+  `39756648363` failed in its build job before any step executed, leaving its
+  deploy and post-deploy verification jobs skipped. These are hosted runner or
+  account failures, not source-test results; the same behavior has now been
+  observed across multiple pushed heads.
+- The repository remains private with default branch
+  `feat/v0.1-foundation`, and the Pages API still returns `404` because no
+  Pages site is configured. Public deployment requires owner-controlled
+  repository visibility, Pages activation, and runner/billing changes.
+
 Signed lifecycle evidence at `7dc754f` on 2026-10-22:
 
 - Lifecycle reports are now schema version 2 artifacts signed over the exact
