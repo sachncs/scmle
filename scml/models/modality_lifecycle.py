@@ -15,6 +15,7 @@ from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
+from datetime import datetime
 import hashlib
 import io
 import json
@@ -1168,14 +1169,20 @@ class VideoAdapter(ModalityAdapter):
         frame_decoder: video.VideoFrameDecoder | None = None,
         max_frames: int = 8,
         max_frame_pixels: int = 1_000_000,
+        temporal_cutoff: datetime | str | None = None,
     ) -> None:
-        """Bind a dataset and an optional bounded caller-owned decoder."""
+        """Bind a dataset, decoder, and optional explicit temporal policy."""
         if max_frames < 1 or max_frame_pixels < 1:
             raise ValueError("frame bounds must be positive")
         self.dataset = dataset
         self.frame_decoder = frame_decoder
         self.max_frames = max_frames
         self.max_frame_pixels = max_frame_pixels
+        self.temporal_cutoff = (
+            video.canonical_observation_time(temporal_cutoff)
+            if temporal_cutoff is not None
+            else None
+        )
 
     @property
     def dataset_hash(self) -> str:
@@ -1193,9 +1200,34 @@ class VideoAdapter(ModalityAdapter):
 
     def split(self, seed: int) -> DatasetPartitions:
         """Split by subject/session/camera group."""
-        result = self.dataset.split(seed=seed)
+        if self.temporal_cutoff is not None:
+            temporal_result = self.dataset.split_temporal(self.temporal_cutoff)
+
+            def group_ids(
+                samples: Sequence[video.VideoSample],
+            ) -> tuple[str, ...]:
+                return tuple(
+                    sorted(
+                        {sample.group_id or sample.source for sample in samples}
+                    )
+                )
+
+            return DatasetPartitions(
+                temporal_result.train,
+                (),
+                temporal_result.future,
+                {
+                    "train": group_ids(temporal_result.train),
+                    "validation": (),
+                    "test": group_ids(temporal_result.future),
+                },
+            )
+        group_result = self.dataset.split(seed=seed)
         return DatasetPartitions(
-            result.train, result.validation, result.test, result.group_ids()
+            group_result.train,
+            group_result.validation,
+            group_result.test,
+            group_result.group_ids(),
         )
 
     def features(self, samples: Sequence[video.VideoSample]) -> FeatureBatch:

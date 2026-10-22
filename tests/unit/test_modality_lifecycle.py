@@ -869,6 +869,35 @@ def test_video_lifecycle_emits_temporal_frame_evidence(tmp_path: Path):
     assert raw["feature_space_only"] is False
 
 
+def test_video_adapter_uses_explicit_temporal_cutoff_for_lifecycle_split():
+    """The lifecycle uses future clips only when a cutoff is declared."""
+    metadata = video.VideoMetadata("fixture", 2, 2, 1, 1.0, "codec")
+    samples = tuple(
+        video.VideoSample.from_bytes(
+            f"temporal-{index}".encode(),
+            metadata,
+            source=f"temporal-{index}.fixture",
+            label="alpha" if index % 2 else "beta",
+            observation_time=f"2026-01-0{index + 1}T00:00:00Z",
+        )
+        for index in range(4)
+    )
+    adapter = modality_lifecycle.VideoAdapter(
+        video.VideoDataset(samples),
+        temporal_cutoff="2026-01-02T00:00:00Z",
+    )
+
+    partitions = adapter.split(seed=99)
+
+    assert len(partitions.train) == 2
+    assert partitions.validation == ()
+    assert len(partitions.test) == 2
+    assert not (
+        {sample.source for sample in partitions.train}
+        & {sample.source for sample in partitions.test}
+    )
+
+
 def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
     """A lifecycle budget is emitted as evidence and fails closed."""
     adapter = document_adapter()
