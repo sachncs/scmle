@@ -1965,6 +1965,22 @@ Empty-request serving boundary at `f704eeb` on 2026-10-22:
   formatting, and mypy passed. This is a local input-contract guarantee and
   does not change the deployment-owner authentication, TLS, or paging gates.
 
+Optional integration matrix evidence on 2026-10-22:
+
+- A separate Python 3.13 environment installed the declared boosting,
+  CatBoost, ONNX, sampling, spreadsheet, and Polars extras from the lockfile.
+  Under `-W error::ResourceWarning`, the installable optional matrix passed
+  `122` tests with `2` intentionally isolated cases, and the isolated
+  CatBoost conformance, string-label, and end-to-end cases each passed. This
+  verifies `125` optional integration tests across boosting, ONNX export,
+  imbalanced sampling, spreadsheet and Polars interchange, and component
+  contracts.
+- Torch/Keras, sentence-transformers, MLflow, and Ray remain explicit
+  environment-bound optional skips because their heavyweight or platform/
+  service requirements were not installed. Their absence is not counted as
+  support evidence; the hosted optional matrix remains required for those
+  integrations.
+
 Current-head release preflight at `8651c3a` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
