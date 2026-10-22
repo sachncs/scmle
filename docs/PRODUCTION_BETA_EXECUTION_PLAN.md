@@ -2019,6 +2019,19 @@ Media curation identity correction at `ad179d9` on 2026-10-22:
   media/lifecycle suite under `-W error::ResourceWarning`; Ruff, formatting,
   and mypy remain clean.
 
+Capability-matrix alignment at `2325150` on 2026-10-22:
+
+- The standalone Astro capability matrix now names the implemented image
+  near-duplicate and caller-declared augmentation evidence, and the video
+  observation-time identity and fail-closed temporal split evidence. Its
+  limitations continue to state that these boundaries do not establish raw
+  saliency, semantic localization, temporal event understanding, or a
+  production modality claim.
+- The site rebuilt 17 static pages; internal-link validation passed for 384
+  links, accessibility smoke checks passed for 17 HTML files, and both
+  Playwright browser checks passed. This is a documentation alignment change;
+  it does not alter the capability labels or external Pages deployment status.
+
 Audio robustness evidence at `ab21c49` on 2026-10-22:
 
 - `AudioAdapter` now records a bounded, deterministic additive-background-noise
