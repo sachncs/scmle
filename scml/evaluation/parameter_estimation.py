@@ -249,7 +249,10 @@ class EstimationResult:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            assert temporary is not None  # for the type checker
+            if temporary is None:
+                raise RuntimeError(
+                    "temporary estimation report was not created"
+                )
             os.replace(temporary, destination)
         except BaseException:
             if temporary is not None:
