@@ -23,9 +23,20 @@ from scml.data.readers.registry import SchemaCompatibility
 from scml.data.readers.registry import SourceRegistry
 from scml.data.readers.registry import SourceRegistryStore
 from scml.data.readers.registry import SourceSnapshot
+from scml.data.readers.streaming import CsvChunks
+from scml.data.readers.streaming import JsonLinesChunks
+from scml.data.readers.streaming import ParquetChunks
+from scml.data.readers.streaming import StreamAcknowledgement
+from scml.data.readers.streaming import StreamBatch
+from scml.data.readers.streaming import StreamCheckpoint
+from scml.data.readers.streaming import StreamCommitReceipt
+from scml.data.readers.streaming import StreamingConsumer
+from scml.data.readers.streaming import StreamingError
+from scml.data.readers.streaming import StreamingLedger
 
 __all__ = [
     "CommittedIncrementalState",
+    "CsvChunks",
     "DbApiConnector",
     "EventAcknowledgement",
     "EventBatch",
@@ -37,15 +48,24 @@ __all__ = [
     "IncrementalEvent",
     "IncrementalEventSource",
     "IncrementalIngestionLedger",
+    "JsonLinesChunks",
     "LateDataPolicy",
     "LocalFileConnector",
     "ObjectStoreConnector",
+    "ParquetChunks",
     "SchemaCompatibility",
     "SequenceEventSource",
     "SourceConnector",
     "SourceRegistry",
     "SourceRegistryStore",
     "SourceSnapshot",
+    "StreamAcknowledgement",
+    "StreamBatch",
+    "StreamCheckpoint",
+    "StreamCommitReceipt",
+    "StreamingConsumer",
+    "StreamingError",
+    "StreamingLedger",
     "StreamingObjectStoreConnector",
     "WarehouseConnector",
 ]

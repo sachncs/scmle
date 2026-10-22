@@ -1,12 +1,16 @@
 {
   "exports": {
+    "BayesianPrior": {
+      "kind": "class",
+      "signature_sha256": "52317b4cf7f1ac6ee768286f568e44426cb799e032457dbb32e5d8c018e29b04"
+    },
     "EstimandSpec": {
       "kind": "class",
       "signature_sha256": "5d68c4d372445ce9fbc41ad257b83fd47a79037a8985d7a1435b374d038a2642"
     },
     "EstimationPolicy": {
       "kind": "class",
-      "signature_sha256": "96ffb75f8486a6976f5f477bac45f6a01c18479dc5a01842596dc1bc98f47aaa"
+      "signature_sha256": "03986b14a39c82020f7ccdd041516597446112b6b4fa4fba35af2788f164b745"
     },
     "EstimationResult": {
       "kind": "class",

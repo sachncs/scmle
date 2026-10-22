@@ -10,6 +10,7 @@ from scml.api.project import ModalityProject
 from scml.api.results import RunResult
 from scml.artifacts.bundle import ModelBundle
 from scml.evaluation.metrics import register_metric
+from scml.evaluation.parameter_estimation import BayesianPrior
 from scml.evaluation.parameter_estimation import EstimandSpec
 from scml.evaluation.parameter_estimation import estimate_parameters
 from scml.evaluation.parameter_estimation import EstimationPolicy
@@ -28,6 +29,7 @@ from scml.models.modality_lifecycle import ModalityCurationResult
 from scml.models.modality_lifecycle import ModalityPredictor
 
 __all__ = [
+    "BayesianPrior",
     "EstimandSpec",
     "EstimationPolicy",
     "EstimationResult",
