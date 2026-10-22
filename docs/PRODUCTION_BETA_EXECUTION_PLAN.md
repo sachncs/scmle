@@ -1916,6 +1916,16 @@ Current-head release preflight evidence at `d1c3737` on 2026-10-21:
   Pages, external transport/resource-fault execution, secret custody, and
   independent reviewer evidence remain separate release gates.
 
+Image identity correction at `818dc34` on 2026-10-22:
+
+- The image adapter now derives its declared dataset identity from the same
+  source-and-content tuple used by image curation. A reversed-source-order
+  regression test verifies that the persisted curation hash and lifecycle
+  dataset hash remain identical. The modality lifecycle and media suites pass
+  79 tests under `-W error::ResourceWarning`; Ruff, formatting, and mypy pass.
+  This closes a local evidence-binding defect but does not change the
+  experimental image support boundary or the external production gates.
+
 Curation-only extension boundary at `d05bad1` on 2026-10-22:
 
 - `ModalityCurationProject` now depends on a curation-specific polymorphic
