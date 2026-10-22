@@ -8,6 +8,7 @@ import scml
 from scml.governance import vault
 
 PUBLIC_API = {
+    "BayesianPrior",
     "EstimandSpec",
     "EstimationPolicy",
     "EstimationResult",
