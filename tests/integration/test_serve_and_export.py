@@ -64,6 +64,22 @@ def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
     assert status == 422 and "missing" in body["details"]
 
 
+def test_the_server_rejects_empty_prediction_requests(saved):
+    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    adapter = serving.HttpServing(model)
+    adapter.start()
+    try:
+        status, body = post(f"{adapter.address}/predict", {"records": []})
+    finally:
+        adapter.stop()
+
+    assert status == 400
+    assert body == {
+        "error": "malformed request: records must not be empty",
+        "category": "request",
+    }
+
+
 def test_the_server_refuses_oversized_bodies_with_413(saved):
     model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
     adapter = serving.HttpServing(model, max_request_bytes=10)

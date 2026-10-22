@@ -45,7 +45,10 @@ class ServingAdapter(abc.ABC):
 
         Raises:
             SchemaError: If the records do not satisfy the model's schema.
+            ValueError: If no records were supplied.
         """
+        if not records:
+            raise ValueError("records must not be empty")
         with self.lock:
             return self.respond_locked(records)
 
