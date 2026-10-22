@@ -1976,6 +1976,19 @@ Cross-phase regression at `a79d263` on 2026-10-23:
   mutation gate, hosted CI, public Pages verification, external fault
   execution, or independent release review.
 
+Reliability CI evidence plumbing at `a76d232` on 2026-10-23:
+
+- `.github/workflows/ci.yml` now has a dedicated pinned-action reliability
+  job for the fault contracts, local fault matrix, independent-review
+  verifier, and incident workflow. It emits a JUnit artifact and rejects
+  unexplained skips and xfails independently of the broad quality suite.
+- `actionlint` passed, and the exact CI-shaped command passed locally with 52
+  tests, zero skips, and zero xfails under `-W error::ResourceWarning`.
+- This makes the reliability gate observable when hosted CI is available. It
+  does not count as hosted execution until GitHub Actions produces a real
+  run, and it does not replace cloud, container, kernel, broker, or external
+  reviewer evidence.
+
 Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
 
 - `FaultInjectionHarness` now validates duplicate and unexpected evidence
