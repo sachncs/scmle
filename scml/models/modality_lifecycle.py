@@ -3433,6 +3433,23 @@ class ModalityLifecycle:
                 else None
             ),
         }
+        if performance_result is not None and not performance_result.passed:
+            if not package_preexisting:
+                shutil.rmtree(package_target, ignore_errors=True)
+            raise ValueError(
+                "performance budget failed: "
+                + "; ".join(performance_result.violations)
+            )
+        if (
+            performance_comparison is not None
+            and not performance_comparison.passed
+        ):
+            if not package_preexisting:
+                shutil.rmtree(package_target, ignore_errors=True)
+            raise ValueError(
+                "performance baseline failed: "
+                + "; ".join(performance_comparison.violations)
+            )
         report = LifecycleReport(
             modality=modalities.modality_value(adapter.modality),
             dataset_hash=adapter.dataset_hash,
@@ -3454,19 +3471,6 @@ class ModalityLifecycle:
                 ).encode("utf-8"),
             )
             ensure_not_cancelled()
-        if performance_result is not None and not performance_result.passed:
-            raise ValueError(
-                "performance budget failed: "
-                + "; ".join(performance_result.violations)
-            )
-        if (
-            performance_comparison is not None
-            and not performance_comparison.passed
-        ):
-            raise ValueError(
-                "performance baseline failed: "
-                + "; ".join(performance_comparison.violations)
-            )
         return report
 
     def declaration(

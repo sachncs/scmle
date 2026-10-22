@@ -1004,17 +1004,22 @@ def test_lifecycle_enforces_declared_performance_budget(tmp_path: Path):
     assert report.performance["budget"] == budget.to_dict()
     assert report.performance["result"]["passed"] is True
 
+    failing_package = tmp_path / "failing-package"
+    failing_report = tmp_path / "failing-report.json"
     with pytest.raises(ValueError, match="performance budget failed"):
         modality_lifecycle.ModalityLifecycle().run(
             adapter,
-            tmp_path / "failing-package",
+            failing_package,
             signing_key="test-signing-key",
+            report_path=failing_report,
             performance_budget=performance.PerformanceBudget(
                 {
                     performance.PerformanceOperation.INGEST: 1e-12,
                 }
             ),
         )
+    assert not failing_package.exists()
+    assert not failing_report.exists()
 
 
 def test_lifecycle_compares_against_a_repeated_performance_baseline(
