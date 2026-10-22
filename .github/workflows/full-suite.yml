@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
       - run: >-
@@ -60,7 +60,7 @@ jobs:
             /tmp/super-charge-ml-clean-clone
           git -C /tmp/super-charge-ml-clean-clone checkout --detach "${GITHUB_SHA}"
           test -z "$(git -C /tmp/super-charge-ml-clean-clone status --porcelain)"
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --directory /tmp/super-charge-ml-clean-clone --python 3.14 --extra boosting --extra optimization --extra multimodal
       - name: Run the clean-clone acceptance slice
@@ -84,7 +84,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - run: uv sync --python 3.14
       - run: >-
           uv run python scripts/check_test_stability.py
