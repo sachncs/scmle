@@ -1970,6 +1970,25 @@ Current-head release preflight with stability enforcement at `ed02bf2` on
   release evidence; hosted CI and Pages, external fault execution, secret
   custody, and independent review remain open gates.
 
+All-extras capability boundary evidence at `9b4b6f3` on 2026-10-22:
+
+- A clean Python 3.13 environment installed every declared optional extra.
+  The all-extras `pip-audit` found no known vulnerabilities and the license
+  inventory resolved `149` packages. The editable project itself is excluded
+  from PyPI vulnerability lookup, as expected for a local checkout.
+- The all-extras optional matrix initially exposed that installing TabPFN
+  made the planner select its `foundation` family even though that family has
+  no supported beta capability declaration. The adapter now rejects automatic
+  planning as extension-only until accepted weight licensing, token custody,
+  and complete release evidence exist; missing-package diagnostics remain
+  unchanged. Its focused foundation/capability tests passed `14` tests, and
+  the all-extras deep-learning suite passed `26` tests.
+- The complete all-extras optional matrix then passed `124` tests under
+  `-W error::ResourceWarning`. MLflow emitted the known upstream SQLAlchemy
+  `SADeprecationWarning`; no project resource warning failed the run. This
+  closes the discovered optional-planner defect without changing the honest
+  supported boundary.
+
 Current-head serving lifecycle preflight at `a27a3a8` on 2026-10-22:
 
 - `HttpServing.start()` now rejects a second start on the same adapter with a
