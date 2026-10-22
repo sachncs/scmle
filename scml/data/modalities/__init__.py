@@ -45,6 +45,8 @@ from scml.data.modalities.video import VideoMetadata
 from scml.data.modalities.video import VideoProfile
 from scml.data.modalities.video import VideoSample
 from scml.data.modalities.video import VideoSplit
+from scml.data.modalities.video import VideoTemporalError
+from scml.data.modalities.video import VideoTemporalSplit
 
 __all__ = [
     "AudioDataset",
@@ -87,6 +89,8 @@ __all__ = [
     "VideoProfile",
     "VideoSample",
     "VideoSplit",
+    "VideoTemporalError",
+    "VideoTemporalSplit",
     "canonical_event_time",
     "canonical_observation_time",
     "moran_statistic",

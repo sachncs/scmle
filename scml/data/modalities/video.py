@@ -2,10 +2,13 @@
 
 from collections.abc import Callable
 import dataclasses
+from datetime import datetime
+from datetime import UTC
 import hashlib
 import math
 import pathlib
 import random
+from typing import Any
 from typing import Self
 
 import numpy as np
@@ -22,6 +25,10 @@ class VideoValidationError(errors.DataError):
     """A video sample violates an ingestion or metadata invariant."""
 
     category = "video_validation"
+
+
+class VideoTemporalError(VideoValidationError):
+    """Temporal video evidence is incomplete or invalid."""
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -114,6 +121,7 @@ class VideoProfile:
     sync_offset_seconds: float | None = None
     sync_tolerance_seconds: float | None = None
     synchronization_status: str = "not_applicable"
+    observation_time: datetime | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -182,6 +190,34 @@ class VideoSplit:
         }
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class VideoTemporalSplit:
+    """Time-ordered video clips separated at a UTC cutoff."""
+
+    cutoff: datetime
+    train: tuple["VideoSample", ...]
+    future: tuple["VideoSample", ...]
+
+    def __post_init__(self) -> None:
+        """Validate the cutoff and timestamp completeness of each partition."""
+        if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
+            raise ValueError("cutoff must be timezone-aware")
+        object.__setattr__(self, "cutoff", self.cutoff.astimezone(UTC))
+        if any(sample.observation_time is None for sample in self.train):
+            raise ValueError("train videos must contain observation times")
+        if any(sample.observation_time is None for sample in self.future):
+            raise ValueError("future videos must contain observation times")
+
+    @property
+    def has_future_leakage(self) -> bool:
+        """Return whether a training clip occurs after the cutoff."""
+        return any(
+            isinstance(sample.observation_time, datetime)
+            and sample.observation_time > self.cutoff
+            for sample in self.train
+        )
+
+
 VideoProbe = Callable[[bytes], VideoMetadata]
 VideoFrameDecoder = Callable[[bytes, int], np.ndarray]
 
@@ -196,6 +232,34 @@ def canonical_source(source: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
+def canonical_observation_time(value: datetime | str) -> datetime:
+    """Parse and normalize a timezone-aware observation time to UTC."""
+    if isinstance(value, str):
+        normalized = value.strip()
+        if normalized.endswith(("Z", "z")):
+            normalized = normalized[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError as error:
+            raise VideoTemporalError(
+                f"invalid observation time: {value!r}",
+                {"code": "invalid_observation_time"},
+            ) from error
+    elif isinstance(value, datetime):
+        parsed = value
+    else:
+        raise VideoTemporalError(
+            "observation time must be datetime or text",
+            {"code": "invalid_observation_time"},
+        )
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise VideoTemporalError(
+            "observation time must be timezone-aware",
+            {"code": "timezone_required"},
+        )
+    return parsed.astimezone(UTC)
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class VideoSample:
     """Immutable encoded video tied to metadata observed by a probe."""
@@ -206,6 +270,7 @@ class VideoSample:
     metadata: VideoMetadata
     label: str | int | float | bool | None = None
     group_id: str | None = None
+    observation_time: datetime | None = None
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -216,6 +281,12 @@ class VideoSample:
             raise ValueError("source must not be empty")
         if self.group_id is not None and not self.group_id.strip():
             raise ValueError("group_id must not be empty when provided")
+        if self.observation_time is not None:
+            object.__setattr__(
+                self,
+                "observation_time",
+                canonical_observation_time(self.observation_time),
+            )
         if not raw:
             raise VideoValidationError(
                 "video payload is empty", {"code": "empty_payload"}
@@ -237,6 +308,7 @@ class VideoSample:
         max_bytes: int | None = 2 * 1024 * 1024 * 1024,
         label: str | int | float | bool | None = None,
         group_id: str | None = None,
+        observation_time: datetime | str | None = None,
     ) -> Self:
         """Create a sample from bytes and explicit probe output.
 
@@ -264,6 +336,11 @@ class VideoSample:
             metadata=metadata,
             label=label,
             group_id=group_id,
+            observation_time=(
+                canonical_observation_time(observation_time)
+                if observation_time is not None
+                else None
+            ),
         )
 
     def profile(self) -> VideoProfile:
@@ -283,6 +360,7 @@ class VideoSample:
             sync_offset_seconds=self.metadata.sync_offset_seconds,
             sync_tolerance_seconds=self.metadata.sync_tolerance_seconds,
             synchronization_status=self.metadata.synchronization_status,
+            observation_time=self.observation_time,
         )
 
 
@@ -309,7 +387,13 @@ class VideoDataset:
             )
         digest = hashlib.sha256(
             "\n".join(
-                f"{sample.source}\0{sample.file_hash}" for sample in normalized
+                f"{sample.source}\0{sample.file_hash}"
+                + (
+                    f"\0{sample.observation_time.isoformat()}"
+                    if sample.observation_time is not None
+                    else ""
+                )
+                for sample in normalized
             ).encode("utf-8")
         ).hexdigest()
         object.__setattr__(self, "samples", normalized)
@@ -580,6 +664,38 @@ class VideoDataset:
             test=test,
         )
 
+    def split_temporal(self, cutoff: datetime | str) -> VideoTemporalSplit:
+        """Split fully timestamped videos into past and future partitions.
+
+        Videos at the cutoff belong to training. Videos after the cutoff
+        belong to future evaluation. Untimestamped videos fail closed because
+        assigning them a temporal position would invent ordering evidence.
+        """
+        cutoff_time = canonical_observation_time(cutoff)
+        if any(sample.observation_time is None for sample in self.samples):
+            raise VideoTemporalError(
+                "temporal splitting requires an observation time on every "
+                "video",
+                {"code": "incomplete_observation_times"},
+            )
+        train = tuple(
+            sample
+            for sample in self.samples
+            if isinstance(sample.observation_time, datetime)
+            and sample.observation_time <= cutoff_time
+        )
+        future = tuple(
+            sample
+            for sample in self.samples
+            if isinstance(sample.observation_time, datetime)
+            and sample.observation_time > cutoff_time
+        )
+        return VideoTemporalSplit(
+            cutoff=cutoff_time,
+            train=train,
+            future=future,
+        )
+
     def curate(self) -> ModalityCurationReport:
         """Build reviewable metadata and compatibility findings."""
         profiles = self.profiles()
@@ -657,6 +773,52 @@ class VideoDataset:
                 )
             )
         risk_findings = []
+        profile = {
+            "formats": formats,
+            "codecs": codecs,
+            "dimensions": [list(value) for value in dimensions],
+            "duration_min_seconds": min(durations),
+            "duration_max_seconds": max(durations),
+            "duration_mean_seconds": sum(durations) / len(durations),
+            "total_bytes": sum(profile.byte_size for profile in profiles),
+            "synchronization_statuses": synchronization_statuses,
+            "label_counts": labels,
+            "conflicting_label_groups": list(conflicts),
+        }
+        observation_times = tuple(
+            sample.observation_time
+            for sample in self.samples
+            if sample.observation_time is not None
+        )
+        temporal_evidence: dict[str, Any]
+        if not observation_times:
+            temporal_evidence = {"status": "absent"}
+        elif len(observation_times) == len(self.samples):
+            temporal_evidence = {
+                "status": "complete",
+                "observation_time_min": min(observation_times).isoformat(),
+                "observation_time_max": max(observation_times).isoformat(),
+            }
+        else:
+            temporal_evidence = {
+                "status": "mixed",
+                "timed_video_count": len(observation_times),
+                "untimed_video_count": len(self.samples)
+                - len(observation_times),
+            }
+        profile["temporal"] = temporal_evidence
+        if temporal_evidence["status"] == "mixed":
+            quality_findings.append(
+                build_finding(
+                    "quality.video-mixed-temporal-state",
+                    data_contracts.FindingSeverity.WARNING,
+                    {"dataset": self.content_hash},
+                    temporal_evidence,
+                    "Supply observation times for every clip before using "
+                    "temporal evaluation or declare the untimed subset.",
+                    False,
+                )
+            )
         if "unlabeled" in labels and len(labels) > 1:
             risk_findings.append(
                 build_finding(
@@ -685,18 +847,7 @@ class VideoDataset:
             modality="video",
             dataset_hash=self.content_hash,
             sample_count=len(self.samples),
-            profile={
-                "formats": formats,
-                "codecs": codecs,
-                "dimensions": [list(value) for value in dimensions],
-                "duration_min_seconds": min(durations),
-                "duration_max_seconds": max(durations),
-                "duration_mean_seconds": sum(durations) / len(durations),
-                "total_bytes": sum(profile.byte_size for profile in profiles),
-                "synchronization_statuses": synchronization_statuses,
-                "label_counts": labels,
-                "conflicting_label_groups": list(conflicts),
-            },
+            profile=profile,
             quality_findings=tuple(quality_findings),
             risk_findings=tuple(risk_findings),
         )
@@ -711,6 +862,9 @@ __all__ = [
     "VideoProfile",
     "VideoSample",
     "VideoSplit",
+    "VideoTemporalError",
+    "VideoTemporalSplit",
     "VideoValidationError",
+    "canonical_observation_time",
     "canonical_source",
 ]
