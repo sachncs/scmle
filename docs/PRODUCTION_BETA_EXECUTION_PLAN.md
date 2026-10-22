@@ -2027,6 +2027,17 @@ Workflow-wide test outcome enforcement at `2b75123` on 2026-10-22:
   stability and outcome-verifier tests passed `11` tests under strict resource
   warnings. Hosted execution remains unavailable for this repository.
 
+Current hosted gate observation at `6c11cdc` on 2026-10-22:
+
+- The `ci` run `39730492994` and documentation deployment run `39730493042`
+  both completed as failures before any job step executed. This is consistent
+  with the account/runner availability failure observed on earlier pushes, not
+  a source-test result.
+- GitHub reports `private: true` and `has_pages: false` for
+  `sachncs/magicml`; the requested public Pages URL therefore remains
+  unverified. Repository visibility, Pages activation, and the account
+  runner/billing condition require owner-controlled external changes.
+
 Current-head release preflight evidence at `9a6e82e` on 2026-10-22:
 
 - `./scripts/release_preflight.sh` passed Ruff, formatting, mypy over 239
