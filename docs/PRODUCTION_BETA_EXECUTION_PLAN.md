@@ -1930,6 +1930,19 @@ Video temporal boundary at `e9e623d` on 2026-10-22:
   temporal event semantics, watermark handling, causal ordering, production
   video modelling, or external release proof.
 
+Image duplicate and augmentation evidence at `8cb5ae4` on 2026-10-22:
+
+- Image curation now computes bounded quantized-luminance signatures and
+  reports likely near-duplicate groups separately from exact decoded-content
+  duplicates. It also accepts immutable caller-declared `ImageAugmentation`
+  provenance containing parent source, operation, parameters, and tool; the
+  provenance is part of image dataset identity and the curation profile.
+- The image, lifecycle, public API, and compatibility suites passed 55 tests
+  under `-W error::ResourceWarning`; Ruff, formatting, and mypy passed. The
+  signature is review evidence, not semantic similarity, object identity,
+  localization, or saliency evidence. Production-scale image quality and
+  independent review remain separate gates.
+
 Image identity correction at `818dc34` on 2026-10-22:
 
 - The image adapter now derives its declared dataset identity from the same

@@ -139,8 +139,9 @@ sample = reader.load("policy.pdf", document_id="policy-2026")`}</code></pre>
   <p>OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary. A source-backed locator proves where the decoded span came from; it does not prove that a generated answer is semantically grounded in that span.</p>
 
   <h2>Experimental image baseline</h2>
-  <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for duplicate content and mixed label state, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
-  <pre><code>from scml.data.modalities import ImageDataset, ImageSample
+  <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for exact and near-duplicate content, mixed label state, augmentation lineage, and sensitive metadata, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
+  <pre><code>from scml.data.modalities import ImageAugmentation, ImageDataset
+from scml.data.modalities import ImageSample
 from scml.models.images import ImageClassifier, ImageModelConfig
 
 train = ImageDataset((
@@ -156,6 +157,21 @@ occlusion = model.occlusion_explanation(
 artifact = model.save("artifacts/image-model")
 restored = ImageClassifier.load(artifact.path, trusted=True)</code></pre>
   <p>The occlusion report replaces transformed pixels with a zero-valued black baseline and reports the predicted-class score change for each region. It is perturbation evidence, not raw-image saliency or object localization. This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>ModelBundle</code> integration, HTTP serving, or full release recovery evidence.</p>
+  <p><code>ImageDataset.near_duplicate_groups()</code> computes a bounded quantized-luminance signature for likely visually similar samples. This is review evidence, not a semantic similarity model. If a caller creates a transformed sample, <code>ImageAugmentation</code> records the parent source, operation, parameters, and tool; that provenance is included in dataset identity and curation.</p>
+  <pre><code>{`augmented = ImageSample.from_bytes(
+    transformed_bytes,
+    source="augmented.png",
+    augmentation=ImageAugmentation(
+        parent_source="original.png",
+        operation="horizontal_flip",
+        parameters={"axis": "x"},
+        tool="transformer/1",
+    ),
+)
+dataset = ImageDataset((original, augmented))
+print(dataset.curate().profile["near_duplicate_groups"])
+print(dataset.curate().profile["augmentation"])`}</code></pre>
+  <p>Near-duplicate findings should be reviewed before splitting. The framework does not infer augmentation from pixels, repair missing lineage, or claim object identity, localization, or saliency.</p>
 
   <h2>Image metadata review</h2>
   <p><code>ImageSample.from_bytes()</code> keeps source bytes and records EXIF tags as lineage evidence. Use the curation report to find metadata that can identify a person, device, location, or capture event.</p>
