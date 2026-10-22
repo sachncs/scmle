@@ -1989,6 +1989,19 @@ Reliability CI evidence plumbing at `a76d232` on 2026-10-23:
   run, and it does not replace cloud, container, kernel, broker, or external
   reviewer evidence.
 
+Convention-gate regression repair at `20d2950` on 2026-10-23:
+
+- The first complete strict run at the preceding head reached 2,403 passed
+  tests and 89 declared skips, then exposed two failures in the repository's
+  no-semi-private-name convention gate: placeholder loop identifiers in the
+  parameter-estimation bootstrap path and tabular JEPA engine.
+- Both placeholders were replaced with explicit public loop state while
+  preserving deterministic iteration. The convention gate plus the affected
+  parameter-estimation and JEPA contract tests then passed 870 tests with one
+  explained optional skip, and Ruff passed.
+- A fresh complete strict run at the corrected head is still required before
+  this entry can be treated as final full-suite evidence.
+
 Fault-evidence publication hardening at `32ecfc2` on 2026-10-23:
 
 - `FaultInjectionHarness` now validates duplicate and unexpected evidence
