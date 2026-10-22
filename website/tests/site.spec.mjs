@@ -30,16 +30,21 @@ test("every public route renders a standalone page", async ({ page }) => {
   }
 });
 
-test("release evidence page keeps the beta boundary and generated checks visible", async ({
+test("release status page keeps the beta boundary and generated checks visible", async ({
   page,
 }) => {
   await page.goto("./docs/release-evidence/");
-  await expect(page.getByRole("heading", { name: /Make the beta/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Know the boundary/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Release status/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Current release status" })).toBeVisible();
+  await expect(page.getByText("Tabular MLProject", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Production boundary summary" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Capability evidence view" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Tabular beta evidence board" })).toBeVisible();
   await expect(page.getByText("Independent review", { exact: true })).toBeVisible();
   await expect(page.getByText("experimental", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("non-tabular lifecycles remain experimental", { exact: false })).toBeVisible();
+  await expect(page.getByText("You cannot honestly treat the current library as a production-ready platform", { exact: false })).toBeVisible();
 });
 
 test("documentation navigation exposes a keyboard focus path", async ({
