@@ -94,6 +94,45 @@ jobs:
       - run: uv sync --python 3.12 --extra deeplearning --extra boosting
       - run: uv run pytest -q -W error::ResourceWarning tests/unit/test_deeplearning.py tests/unit/test_training.py
 
+  optional-capabilities:
+    name: all optional capability paths (Python 3.13)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - name: Install every declared optional extra
+        run: uv sync --python 3.13 --all-extras
+      - name: Exercise optional capability matrix
+        run: >-
+          uv run pytest -q -W error::ResourceWarning
+          tests/unit/test_boosting.py
+          tests/unit/test_early_stopping.py
+          tests/unit/test_onnx_export.py
+          tests/unit/test_resampling.py
+          tests/unit/test_readers.py
+          tests/integration/test_interchange.py
+          tests/unit/test_deeplearning.py
+          tests/unit/test_keras.py
+          tests/unit/test_embeddings.py
+          tests/integration/test_integrations.py
+          tests/integration/test_ray_cluster.py
+          tests/integration/test_text_embedding_run.py
+          tests/unit/test_curriculum.py
+          --junitxml=optional-capabilities.xml
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV: "0"
+      - name: Reject unexplained skips and xfails
+        run: uv run python scripts/check_pytest_skips.py optional-capabilities.xml
+      - uses: actions/upload-artifact@ea165f8f65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: optional-capabilities
+          path: optional-capabilities.xml
+          if-no-files-found: error
+
   integrations:
     name: MLflow and Ray integrations
     runs-on: ubuntu-latest
