@@ -137,3 +137,37 @@ def test_complete_case_is_explicit_and_reject_is_fail_closed():
     assert result.rows_input == 6
     assert result.rows_used == 5
     assert result.rows_dropped == 1
+
+
+def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
+    """A saved report can be reloaded and tampering fails closed."""
+    rng = np.random.default_rng(12)
+    features = rng.normal(size=(40, 1))
+    outcome = 2.0 + features[:, 0]
+    estimand = EstimandSpec(
+        name="slope",
+        outcome="outcome",
+        population="test rows",
+        likelihood="gaussian",
+        feature_names=("feature",),
+        assumptions=("linear conditional mean",),
+    )
+    result = estimate_parameters(
+        features,
+        outcome,
+        estimand,
+        EstimationPolicy(estimator="linear"),
+    )
+    path = tmp_path / "estimation.json"
+
+    digest = result.write(path)
+
+    from scml.evaluation.parameter_estimation import EstimationResult
+
+    restored = EstimationResult.read(path)
+    assert digest == result.digest() == restored.digest()
+    path.write_text(
+        path.read_text().replace('"rows_used": 40', '"rows_used": 39')
+    )
+    with pytest.raises(ValueError, match="digest mismatch"):
+        EstimationResult.read(path)

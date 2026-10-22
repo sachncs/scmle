@@ -11,6 +11,11 @@ artifact or review surface.
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
+import hashlib
+import json
+import os
+from pathlib import Path
+import tempfile
 from typing import Any
 from typing import Literal
 
@@ -85,6 +90,12 @@ class EstimationPolicy:
 
     def __post_init__(self) -> None:
         """Validate the policy before data is touched."""
+        if self.estimator not in ("linear", "logistic"):
+            raise ValueError("estimator must be linear or logistic")
+        if self.covariance not in ("iid", "hc3", "clustered"):
+            raise ValueError("covariance must be iid, hc3, or clustered")
+        if self.missing not in ("reject", "complete_case"):
+            raise ValueError("missing must be reject or complete_case")
         if not 0.0 < self.confidence_level < 1.0:
             raise ValueError(
                 "confidence_level must lie strictly between 0 and 1"
@@ -147,6 +158,92 @@ class EstimationResult:
             "sensitivity": dict(self.sensitivity),
             "reference": dict(self.reference),
         }
+
+    def digest(self) -> str:
+        """Return the content digest of the canonical estimation report."""
+        content = json.dumps(
+            self.to_dict(), sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        return hashlib.sha256(content).hexdigest()
+
+    def write(self, path: str | Path) -> str:
+        """Atomically write and return a digest-bound estimation report."""
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        envelope = {
+            "schema_version": 1,
+            "report": self.to_dict(),
+            "digest": self.digest(),
+        }
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary = Path(handle.name)
+                json.dump(envelope, handle, indent=2, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            assert temporary is not None  # for the type checker
+            os.replace(temporary, destination)
+        except BaseException:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise
+        return self.digest()
+
+    @classmethod
+    def read(cls, path: str | Path) -> "EstimationResult":
+        """Read a report and reject a modified or malformed envelope."""
+        envelope = json.loads(Path(path).read_text(encoding="utf-8"))
+        if envelope.get("schema_version") != 1:
+            raise ValueError("unsupported estimation report schema")
+        report = cls.from_dict(envelope["report"])
+        if envelope.get("digest") != report.digest():
+            raise ValueError("estimation report digest mismatch")
+        return report
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> "EstimationResult":
+        """Rebuild a result from its JSON-compatible report."""
+        estimand_record = record["estimand"]
+        policy_record = record["policy"]
+        parameters = tuple(
+            ParameterEstimate(
+                item["name"],
+                float(item["estimate"]),
+                float(item["standard_error"]),
+                (float(item["interval"][0]), float(item["interval"][1])),
+                float(item["p_value"]),
+            )
+            for item in record["parameters"]
+        )
+        estimand_values = dict(estimand_record)
+        estimand_values["feature_names"] = tuple(
+            estimand_record["feature_names"]
+        )
+        estimand_values["assumptions"] = tuple(estimand_record["assumptions"])
+        return cls(
+            EstimandSpec(**estimand_values),
+            EstimationPolicy(**policy_record),
+            parameters,
+            tuple(
+                tuple(float(value) for value in row)
+                for row in record["covariance"]
+            ),
+            int(record["rows_input"]),
+            int(record["rows_used"]),
+            int(record["rows_dropped"]),
+            dict(record["diagnostics"]),
+            dict(record["sensitivity"]),
+            dict(record["reference"]),
+        )
 
 
 def estimate_parameters(
@@ -390,6 +487,7 @@ def covariance_matrix(
         return bread @ (scores.T @ scores) @ bread
     if clusters is None:
         raise ValueError("cluster labels are required")
+    adjusted = residuals
     groups = []
     for label in dict.fromkeys(clusters.tolist()):
         group = clusters == label
