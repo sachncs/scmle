@@ -3778,3 +3778,61 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   modalities production-supported, and it does not substitute for hosted,
   cloud, broker, container, kernel, or independent-review evidence.
 
+## Scientific estimator expansion at `16bb2f9` on 2026-10-23
+
+- The parameter-estimation contract now includes explicit Bayesian Gaussian,
+  binary-treatment Hájek IPW ATE, and grouped random-intercept estimators in
+  addition to linear and logistic estimation. Each new path requires its
+  prior or identification assumptions, records method-specific diagnostics,
+  and runs an independent reference calculation before its report is valid.
+- Bayesian evidence includes posterior covariance, credible intervals, and
+  prior-strength sensitivity. IPW evidence includes treatment counts,
+  propensity clipping and overlap diagnostics, effective sample sizes, and an
+  influence-function variance. Hierarchical evidence includes moment-based
+  variance components, ICC, cluster sizes, and the explicit fact that
+  variance-component uncertainty is not propagated.
+- The focused estimator suite passed `15` tests during implementation review;
+  syntax compilation, Ruff, formatting, mypy, and `git diff --check` passed.
+  AIPW/cross-fitting, time-varying causal effects, REML/ML, random slopes,
+  nested effects, and fully Bayesian multilevel inference remain unsupported.
+
+## Durable local streaming boundary at `b063658` on 2026-10-23
+
+- Chunked CSV, JSONL, and Parquet sources now expose snapshot-bound
+  checkpoints, watermark policy, bounded batches, deterministic batch
+  idempotency keys, an atomic local ledger, and durable acknowledgement retry
+  state. The sink receives the batch key so a caller-owned sink can deduplicate
+  retries.
+- Source changes, malformed state, mismatched checkpoints, mismatched
+  consumer groups, invalid watermark values, and acknowledgement failures
+  fail closed. The transport seam remains explicitly at-least-once: broker
+  leases, partition ownership, transactions, and distributed exactly-once
+  semantics remain the external transport owner's responsibility.
+- The focused streaming contract passed `11` tests during implementation
+  review; Ruff, formatting, mypy, syntax compilation, and `git diff --check`
+  passed.
+
+## Capability registry hardening at `d59d53a` on 2026-10-23
+
+- The capability registry now serializes deterministic versioned evidence,
+  catalogs transformer-family boundaries, and declares JEPA as experimental
+  and tabular-only. A complete capability still requires all eight dimensions
+  rather than a model-family name alone.
+- Pre-training diagnostics now report missing declarations, disallowed status,
+  missing extras, unknown or insufficient CPU/memory/disk/GPU/network facts,
+  and row-limit violations without starting model work. This keeps partial
+  transformer and multimodal paths from being represented as production
+  support.
+- The focused capability suite passed `21` tests during implementation
+  review; Ruff, mypy, and `git diff --check` passed. Runtime facts remain
+  caller-supplied and no transformer or JEPA family is promoted by the catalog.
+
+## Public contract exposure at `811d7b7` on 2026-10-23
+
+- `BayesianPrior` is now available from the top-level `scml` API, and the
+  durable streaming contracts are available from `scml.data.readers`.
+  The versioned public API fixture records the intentional estimator change.
+- The public surface remains honest about optional extras and experimental
+  status; exposing a contract does not promote it to supported production
+  status.
+

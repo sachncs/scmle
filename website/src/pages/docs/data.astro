@@ -52,6 +52,23 @@ evidence = consumer.consume(limit=500)
 print(evidence.to_dict())`}</code></pre>
   <div class="callout"><p><strong>Important boundary:</strong> the core package proves durable local ordering and retry semantics. A real Kafka/Pulsar/Kinesis adapter still owns leases, partition assignment, broker transactions, credentials, and the independent evidence needed for distributed exactly-once claims.</p></div>
 
+  <h2>Read a large local snapshot with a durable ledger</h2>
+  <p>For CSV, JSONL, and Parquet files, <code>StreamingLedger</code> binds each bounded batch to the raw snapshot digest, row offset, watermark column, and deterministic batch id. The sink receives that id as its idempotency key. A changed file, malformed state file, checkpoint from another source, or acknowledgement from another consumer group fails closed before the next commit.</p>
+  <pre><code>{`from pathlib import Path
+from scml.data.readers import StreamingConsumer, StreamingLedger, source_for
+
+source = source_for(Path("events.csv"))
+ledger = StreamingLedger(Path("state/events.json"), source)
+consumer = StreamingConsumer(
+    ledger,
+    consumer_group="events-worker",
+    writer=write_batch_idempotently,
+    acknowledge=acknowledge_external_delivery,
+)
+receipt = consumer.consume(rows=500, watermark_column="event_time")
+print(receipt.batch_id, receipt.duplicate, receipt.checkpoint.to_dict())`}</code></pre>
+  <p>This proves a durable local idempotency and acknowledgement-retry boundary. It remains an at-least-once seam for external sinks: the sink must deduplicate the batch id, and a broker owner must provide the leases, transactions, and distributed exactly-once evidence.</p>
+
   <h2>Decode an object format you own</h2>
   <p>The built-in object decoder handles CSV, JSONL, and Parquet. For a domain-specific format, inject the transport and the decoder together. The decoder is deliberately required to return a bounded <code>pandas.DataFrame</code>; it owns parsing, schema interpretation, decompression, validation, and any format-specific security policy.</p>
   <pre><code>{`from io import BytesIO

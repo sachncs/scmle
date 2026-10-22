@@ -21,11 +21,24 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
         <tr><th scope="row">Audio and video</th><td><span class="status status-experimental">Experimental</span></td><td>Validated encoded samples, explicit codec/probe boundaries, group-aware splits, WAV signal or caller-decoded video-frame baselines, bounded WAV time-window occlusion, deterministic additive-noise score probes with declared SNRs, video temporal frame-statistics occlusion evidence, canonical observation-time identity, fail-closed temporal splits, signed packages, inference parity, caller-decoder reference HTTP serving, drift evidence, and tamper recovery.</td><td>Non-WAV decoder governance, real-environment noise evaluation, perceptual audio quality, raw waveform/pixel attribution, motion modelling, audio-video synchronization, raw temporal explanations, external resource faults, and independent review. Temporal ordering is an integrity boundary, not temporal event understanding or a production video model.</td></tr>
         <tr><th scope="row">Graph and geospatial vectors</th><td><span class="status status-experimental">Experimental</span></td><td>Graph structures, inductive node splits, declared node-feature baselines, bounded deterministic one-hop subgraph context with truncation evidence, GeoJSON geometry validation, CRS-aware spatial blocks with envelope-boundary leakage warnings, explicit caller-owned reprojection with metadata-preserving hash evidence, bounded same-CRS caller-predicate joins with hash-bound evidence, CRS-bound geometry/feature evidence, signed packages, inference parity, caller-decoder reference HTTP serving, drift evidence, and tamper recovery.</td><td>Graph-neural-network attribution, indexed geometry engines, production reprojection policy, raster support, external resource faults, and independent review.</td></tr>
         <tr><th scope="row">Rasters</th><td><span class="status status-experimental">Experimental</span></td><td>Metadata-only baselines or caller-decoded, bounded pixel summaries with dimensions, bands, dtype, CRS, transform, named decoder provenance, label sidecars, nodata status, decoded-pixel region occlusion with CRS-bound window envelopes when a decoder is supplied, signed packages, inference parity, reference serving boundaries, drift evidence, and recovery checks.</td><td>Production codec governance, reprojection, window sampling, spatial joins, encoded-payload explanations, semantic localization, external resource faults, and independent review.</td></tr>
-        <tr><th scope="row">Warehouse and event streams</th><td><span class="status status-extension">Extension-only</span></td><td>Warehouse/lakehouse query callbacks and bounded event-stream callbacks establish transport seams with source identity, retries, schema or event validation, watermarks, late-data policy, deduplication, and resumable checkpoints.</td><td>Cloud SDK adapters, broker acknowledgements, consumer-group coordination, distributed exactly-once recovery, and transport-specific external evidence.</td></tr>
+        <tr><th scope="row">Warehouse and event streams</th><td><span class="status status-extension">Extension-only</span></td><td>Warehouse/lakehouse query callbacks and bounded event-stream callbacks establish transport seams with source identity, retries, schema or event validation, watermarks, late-data policy, deduplication, and resumable checkpoints. File-backed streams additionally have durable batch idempotency keys and acknowledgement retry state.</td><td>Cloud SDK adapters, broker leases and transactions, consumer-group coordination, distributed exactly-once recovery, and transport-specific external evidence.</td></tr>
         <tr><th scope="row">Caller-defined dataset families</th><td><span class="status status-extension">Extension-only</span></td><td><code>ExtensionModality</code> gives namespaced families a stable identity and lets a polymorphic adapter run the same 15-stage curation-first lifecycle with signed evidence.</td><td>Domain decoder and representation policy, independent quality and explanation evidence, external fault rehearsal, serving ownership, and review before any supported claim.</td></tr>
       </tbody>
     </table>
   </div>
+
+  <h2>Model-family declarations are not support claims</h2>
+  <p>The capability registry separates a known model family from a complete end-to-end capability. Transformer families are catalogued with their modality, extra, resource, and failure boundaries; JEPA is explicitly declared as <strong>tabular-only and experimental</strong>. A caller still needs a full eight-dimensional declaration—modality, task, model family, evaluation, uncertainty, fairness, explainability, and inference—before a run can cross the support gate.</p>
+  <pre><code>{`from scml.contracts.capabilities import CapabilityRegistry
+
+registry = CapabilityRegistry.with_declared_model_families()
+family = registry.find_model_family("jepa")
+assert family.status.value == "experimental"
+assert family.modalities == (Modality.TABULAR,)
+
+# Missing complete declarations fail before training with diagnostics.
+registry.require(requested_capability, environment=runtime_facts)`}</code></pre>
+  <p class="note">The registry does not guess whether an optional extra, GPU, memory budget, or evidence artifact exists. Supply those facts explicitly.</p>
 
   <section class="doc-section">
     <p class="eyebrow">Experimental lifecycle baseline</p>
@@ -49,7 +62,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
 serving = ModalityHttpServing(predictor, DocumentDecoder())
 serving.start()`}</code></pre>
-    <p>The server bounds body size and sample count, verifies the package before prediction, and returns structured request errors. It is a reference transport: put it behind authentication, TLS, request tracing, redaction, and an owned operational gateway before claiming production service coverage.</p>
+    <p>The server bounds body size and sample count, verifies the package before prediction, and returns structured request errors. For a release-bound serving process, load the predictor with the signed lifecycle report and set <code>require_lifecycle_report=True</code>; health and prediction evidence then include the report digest. It is still a reference transport: put it behind authentication, TLS, request tracing, redaction, and an owned operational gateway before claiming production service coverage.</p>
   </section>
   <p class="meta">* The supported claim is intentionally narrow: the explicitly gated tabular library workflow, not every possible tabular source or model.</p>
 
