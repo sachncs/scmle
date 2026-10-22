@@ -36,15 +36,17 @@ def saved(tmp_path_factory):
     return root, result
 
 
-def post(url, body):
-    request = urllib.request.Request(
-        url, json.dumps(body).encode(), {"Content-Type": "application/json"}
-    )
+def request(url, body, content_type):
+    request = urllib.request.Request(url, body, {"Content-Type": content_type})
     try:
         with urllib.request.urlopen(request) as response:
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read())
+
+
+def post(url, body):
+    return request(url, json.dumps(body).encode(), "application/json")
 
 
 def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
@@ -91,6 +93,41 @@ def test_the_server_refuses_too_many_records_with_413(saved, monkeypatch):
         adapter.stop()
 
     assert status == 413 and body["category"] == "request"
+
+
+def test_the_server_classifies_malformed_and_internal_requests(
+    saved, monkeypatch
+):
+    """The HTTP boundary emits stable classes for malformed failures."""
+    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    adapter = serving.HttpServing(model)
+    adapter.start()
+
+    def fail(records):
+        raise RuntimeError("model failed")
+
+    try:
+        status, body = request(
+            f"{adapter.address}/predict", b"{}", "text/plain"
+        )
+        assert status == 415 and body["category"] == "request"
+
+        status, body = request(
+            f"{adapter.address}/predict", b"not-json", "application/json"
+        )
+        assert status == 400 and body["category"] == "request"
+
+        monkeypatch.setattr(adapter, "respond", fail)
+        status, body = post(
+            f"{adapter.address}/predict", {"records": [{"a": 1.0, "b": 2.0}]}
+        )
+        assert status == 500
+        assert body == {
+            "error": "internal serving failure",
+            "category": "internal",
+        }
+    finally:
+        adapter.stop()
 
 
 def test_health_reports_the_model_version_and_checksum(saved):

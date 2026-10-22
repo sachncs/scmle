@@ -178,7 +178,41 @@ class HttpServing(ServingAdapter):
                     self.send_json(404, {"error": "not found"})
                     return
                 try:
-                    length = int(self.headers.get("Content-Length", 0))
+                    content_type = self.headers.get("Content-Type", "")
+                    if content_type.split(";", 1)[0].strip().lower() != (
+                        "application/json"
+                    ):
+                        self.send_json(
+                            415,
+                            {
+                                "error": (
+                                    "Content-Type must be application/json"
+                                ),
+                                "category": "request",
+                            },
+                        )
+                        return
+                    raw_length = self.headers.get("Content-Length")
+                    if raw_length is None:
+                        self.send_json(
+                            411,
+                            {
+                                "error": "Content-Length is required",
+                                "category": "request",
+                            },
+                        )
+                        return
+                    try:
+                        length = int(raw_length)
+                    except ValueError:
+                        self.send_json(
+                            400,
+                            {
+                                "error": "Content-Length must be an integer",
+                                "category": "request",
+                            },
+                        )
+                        return
                     if length < 0 or length > MAX_REQUEST_BYTES:
                         self.send_json(
                             413,
@@ -189,7 +223,28 @@ class HttpServing(ServingAdapter):
                             },
                         )
                         return
-                    records = json.loads(self.rfile.read(length))["records"]
+                    body = self.rfile.read(length)
+                    if len(body) != length:
+                        self.send_json(
+                            400,
+                            {
+                                "error": "request body is incomplete",
+                                "category": "request",
+                            },
+                        )
+                        return
+                    try:
+                        payload = json.loads(body)
+                    except json.JSONDecodeError as error:
+                        self.send_json(
+                            400,
+                            {
+                                "error": f"invalid JSON request: {error.msg}",
+                                "category": "request",
+                            },
+                        )
+                        return
+                    records = payload["records"]
                     if not isinstance(records, list):
                         raise TypeError("'records' must be a list")
                     if len(records) > MAX_REQUEST_RECORDS:
@@ -222,6 +277,14 @@ class HttpServing(ServingAdapter):
                         {
                             "error": f"malformed request: {error}",
                             "category": "request",
+                        },
+                    )
+                except Exception:
+                    self.send_json(
+                        500,
+                        {
+                            "error": "internal serving failure",
+                            "category": "internal",
                         },
                     )
 
