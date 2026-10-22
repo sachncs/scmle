@@ -1969,6 +1969,16 @@ Cooperative modality cancellation at `aed4d0b` on 2026-10-22:
   fault harness; hosted transport and infrastructure failure evidence remain
   external release gates.
 
+Public cancellation API at `49ffa98` on 2026-10-22:
+
+- `LifecycleCancellation` and `LifecycleCancelledError` are now exported from
+  the top-level `scml` API, so callers do not need to depend on an internal
+  module path to control or handle a modality run. The versioned public API
+  snapshot and surface contract include both symbols.
+- API compatibility, Ruff, formatting, mypy, and the focused lifecycle,
+  project, explanation, and API slice passed `67` tests under strict resource
+  warnings.
+
 Signed lifecycle evidence at `7dc754f` on 2026-10-22:
 
 - Lifecycle reports are now schema version 2 artifacts signed over the exact
