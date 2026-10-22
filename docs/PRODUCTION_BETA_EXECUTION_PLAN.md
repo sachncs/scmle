@@ -3235,6 +3235,22 @@ Release-attestation hardening at `6532447` on 2026-10-21:
   passed 23 tests under `-W error::ResourceWarning`; Ruff, formatting, and
   mypy passed.
 
+Current-head release preflight at `8ee7c87` on 2026-10-22:
+
+- Static analysis, formatting, mypy, security, API compatibility, the bounded
+  suite, three-run stability, mutation, four-dataset benchmark regression,
+  reproducible package builds, and network-isolated wheel/source installs
+  passed. The bounded suite passed `2,039` tests with `75` explicitly
+  explained optional-dependency skips; total coverage was `83.17%`, and the
+  declared core scope was `86%`. Mutation testing killed `1,504/2,057`
+  mutants (`73%`); the benchmark gate recorded zero regressions and zero
+  failed repetitions.
+- The site gate did not complete because `npm audit` timed out against the
+  npm security-advisory endpoint. This is an external network failure, not a
+  reported vulnerability or Astro build failure; the audit/build/accessibility
+  and browser checks require a network-available rerun before this head has a
+  complete local preflight record.
+
 Independent explanation reference contract at `735d647` on 2026-10-22:
 
 - The explainability contract now accepts an adapter-owned, independently
