@@ -26,6 +26,7 @@ class EvidenceNodeKind(enum.StrEnum):
     SPLIT = "split"
     MODEL = "model"
     EVALUATION = "evaluation"
+    PARAMETER_ESTIMATION = "parameter_estimation"
     EXPLANATION = "explanation"
     BUNDLE = "bundle"
     INFERENCE = "inference"

@@ -2605,6 +2605,7 @@ class PackageStage(Stage):
             "sbom.json",
             "release_attestation.json",
             "release_evidence.json",
+            "parameter_estimation.json",
             "evidence_graph.json",
             "evaluation.json",
             f"model/{bundle_module.MANIFEST_FILE}",

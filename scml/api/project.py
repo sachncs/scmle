@@ -10,10 +10,12 @@ import pandas as pd
 
 from scml import durability
 from scml.api import results
+from scml.artifacts import bundle as bundle_module
 from scml.artifacts import reproducibility
 from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.contracts import experiments
+from scml.contracts import lineage
 from scml.contracts import modalities
 from scml.contracts import performance
 from scml.contracts import tasks
@@ -25,6 +27,7 @@ from scml.data.readers import interchange
 from scml.data.readers import tabular
 from scml.evaluation import parameter_estimation
 from scml.governance import attestation
+from scml.inference import evidence as inference_evidence
 from scml.intelligence import recommendations as recommendations_module
 from scml.models import modality_lifecycle
 
@@ -40,6 +43,67 @@ ValidationStrategy = Literal[
     "rolling",
 ]
 LeakagePolicy = Literal["warn", "block"]
+
+
+def bind_parameter_estimation_evidence(
+    run_directory: pathlib.Path,
+    artifact: pathlib.Path,
+    estimation: parameter_estimation.EstimationResult,
+) -> None:
+    """Bind a verified parameter report into the run evidence graph.
+
+    The graph is rebuilt from its validated content so the evaluation node's
+    digest reflects the evaluation file after it gains the parameter-report
+    reference. The parameter report remains a scientific sibling of model
+    evaluation: the snapshot supplies its input, but model selection does not
+    consume its estimates.
+    """
+    graph_path = run_directory / "evidence_graph.json"
+    graph = inference_evidence.InferenceEvidenceLinker.load(graph_path)
+    evaluation_node = graph.nodes.get("evaluation")
+    snapshot_node = graph.nodes.get("snapshot")
+    if evaluation_node is None or snapshot_node is None:
+        raise errors.ArtifactError(
+            "parameter estimation cannot bind to an incomplete evidence graph",
+            {"artifact": artifact.name, "graph": graph_path.name},
+        )
+    nodes = [
+        node for node_id, node in graph.nodes.items() if node_id != "evaluation"
+    ]
+    updated = lineage.EvidenceGraph(nodes)
+    updated.add_node(
+        lineage.EvidenceNode(
+            "evaluation",
+            lineage.EvidenceNodeKind.EVALUATION,
+            bundle_module.file_sha256(run_directory / "evaluation.json"),
+            {"artifact": "evaluation.json"},
+        )
+    )
+    updated.add_node(
+        lineage.EvidenceNode(
+            "parameter-estimation",
+            lineage.EvidenceNodeKind.PARAMETER_ESTIMATION,
+            estimation.digest(),
+            {
+                "artifact": artifact.name,
+                "estimator": estimation.policy.estimator,
+                "estimand": estimation.estimand.name,
+            },
+        )
+    )
+    for edge in graph.edges:
+        updated.add_edge(edge)
+    updated.add_edge(
+        lineage.EvidenceEdge("snapshot", "parameter-estimation", "estimates")
+    )
+    updated.add_edge(
+        lineage.EvidenceEdge("evaluation", "parameter-estimation", "records")
+    )
+    record = updated.to_dict()
+    record["graph_digest"] = updated.digest()
+    inference_evidence.InferenceEvidenceLinker.write_atomically(
+        graph_path, record
+    )
 
 
 class MLProject:
@@ -378,6 +442,9 @@ class MLProject:
                     )
                     + "\n"
                 ).encode("utf-8"),
+            )
+            bind_parameter_estimation_evidence(
+                result.run_dir, artifact, verified
             )
             result.evaluation.clear()
             result.evaluation.update(evaluation)

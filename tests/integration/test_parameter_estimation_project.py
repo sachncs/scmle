@@ -8,10 +8,12 @@ import pandas as pd
 import pytest
 
 import scml
+from scml.artifacts import bundle as bundle_module
 from scml.contracts import errors
 from scml.evaluation.parameter_estimation import EstimandSpec
 from scml.evaluation.parameter_estimation import EstimationPolicy
 from scml.evaluation.parameter_estimation import EstimationResult
+from scml.inference.evidence import InferenceEvidenceLinker
 
 
 def estimation_frame() -> pd.DataFrame:
@@ -82,6 +84,15 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
         persisted_evaluation["parameter_estimation"]
         == result.evaluation["parameter_estimation"]
     )
+    graph = InferenceEvidenceLinker.load(result.run_dir / "evidence_graph.json")
+    parameter_node = graph.nodes["parameter-estimation"]
+    assert parameter_node.digest == restored.digest()
+    assert parameter_node.attributes["artifact"] == "parameter_estimation.json"
+    assert graph.nodes["evaluation"].digest == bundle_module.file_sha256(
+        result.run_dir / "evaluation.json"
+    )
+    assert graph.path_exists("snapshot", "parameter-estimation")
+    assert graph.path_exists("evaluation", "parameter-estimation")
     identity = result.estimation.diagnostics["data_identity"]
     assert identity["source_identity"] is None
     assert identity["snapshot_id"].startswith("snap_")
