@@ -24,16 +24,16 @@ local tests.
 
 ## Findings register
 
-| ID | Location | Severity | Evidence and impact | Status | Verification |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | `scml/models/deeplearning/networks.py` | P2 | A split string literal after `return` made the JEPA small-dataset rejection message incomplete. This reduced actionable diagnostics. | Fixed | `tests/unit/test_deeplearning_contracts.py::test_jepa_rejection_reason_includes_both_training_boundaries` passed. |
-| F-002 | Repository root, `docs/`, and `benchmarks/` | P2 | Orphaned planning/release evidence and two unreferenced benchmark result snapshots increased maintenance and stale-information risk. | Fixed | Deleted files have no remaining repository references; package artifact inspection found none of them. |
-| F-003 | `pyproject.toml` project URLs | P3 | The changelog URL referenced the retired `main` branch while the repository uses `master`. | Fixed | Stale-branch reference scan is clean. |
-| F-006 | `scml/inference/serving.py:BatchServing.score_file` | P1 | Batch prediction output was written directly to its destination, so interruption could leave a partial CSV visible to downstream consumers. | Fixed | Output now uses the existing fsync-and-replace durability primitive; the batch-serving regression test verifies the atomic writer path. |
-| F-007 | `scml/cli.py:PredictCommand.execute` | P1 | The public `scml predict --output` path had the same direct-write hazard as batch serving. | Fixed | CLI output now uses the atomic writer; `test_predict_with_explicit_renames` verifies the writer path and output. |
-| F-008 | `scml/inference/onnx_export.py:export` | P1 | ONNX graph export wrote serialized model bytes directly to the destination, so interruption could expose a partial artifact. | Fixed | Export now uses the existing atomic writer; the durability failure-preservation tests pass. The ONNX-specific suite remains dependency-gated in this environment. |
-| F-004 | `.github/workflows/` and GitHub account configuration | P1 | Current hosted CI and Pages runs fail before executing steps because of the account billing/spending-limit condition. Hosted platform coverage and publication cannot be verified locally. | Unresolved external blocker | Current runs `40019762196` and `40019762190` failed at hosted startup; all 20 CI jobs and the Pages build had zero executed steps. The live verifier also received HTTP 404 for all 18 configured public routes. |
-| F-005 | Release governance and operations | P1 | Independent signed review, external transport/container/kernel fault evidence, external secret custody, and an approved release decision are not present. Local tests cannot manufacture these witnesses. | Unresolved external blocker | Required by the repository's release boundary and the engineering brief; no independent signed records are available in the checkout. |
+| ID | Location | Severity | Evidence | Impact | Recommendation | Status | Verification |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F-001 | `scml/models/deeplearning/networks.py` | P2 | A split string literal after `return` made the JEPA small-dataset rejection message incomplete. | Reduced actionable diagnostics for rejected training configurations. | Preserve the complete boundary explanation and lock it with a regression test. | Fixed | `tests/unit/test_deeplearning_contracts.py::test_jepa_rejection_reason_includes_both_training_boundaries` passed. |
+| F-002 | Repository root, `docs/`, and `benchmarks/` | P2 | Orphaned planning/release evidence and unreferenced benchmark result snapshots were present outside the maintained artifact set. | Increased maintenance burden and stale-information risk. | Remove obsolete artifacts and scan code, docs, and package outputs for operational references. | Fixed | Operational-reference scan and package artifact inspection passed; the assessment itself records the deletion. |
+| F-003 | `pyproject.toml` project URLs | P3 | The changelog URL referenced the retired `main` branch while the repository uses `master`. | Documentation link could lead users to a missing or incorrect page. | Keep repository URLs aligned with the canonical branch. | Fixed | Targeted stale-URL scan is clean. |
+| F-006 | `scml/inference/serving.py:BatchServing.score_file` | P1 | Batch prediction output was written directly to its destination. | Interruption could leave a partial CSV visible to downstream consumers. | Publish output through the existing fsync-and-replace durability primitive. | Fixed | Serving regression test verifies the atomic writer path; durability failure tests pass. |
+| F-007 | `scml/cli.py:PredictCommand.execute` | P1 | The public `scml predict --output` path had the same direct-write hazard as batch serving. | A failed CLI process could expose incomplete prediction output. | Use the atomic writer for CLI-produced artifacts. | Fixed | `test_predict_with_explicit_renames` verifies the writer path and output. |
+| F-008 | `scml/inference/onnx_export.py:export` | P1 | ONNX graph export wrote serialized model bytes directly to the destination. | Interruption could expose a partial model artifact. | Use the atomic writer for exported graphs and retain failure-preservation coverage. | Fixed | Export uses the atomic writer; durability failure-preservation tests pass. The ONNX-specific suite remains dependency-gated in this environment. |
+| F-004 | `.github/workflows/` and GitHub account configuration | P1 | Current hosted CI and Pages runs fail before executing steps because of the account billing/spending-limit condition. | Hosted platform coverage and public documentation publication cannot be verified locally. | Repair the account/repository billing condition, rerun hosted CI and Pages, and record successful job-level evidence. | Unresolved external blocker | Runs `40019762196` and `40019762190` failed at hosted startup; all 20 CI jobs and the Pages build had zero executed steps. The live verifier received HTTP 404 for all 18 configured public routes. |
+| F-005 | Release governance and operations | P1 | Independent signed review, external transport/container/kernel fault evidence, external secret custody, and an approved release decision are absent. | Local tests cannot establish the required operational and governance evidence for a production release. | Obtain and retain the required independent signed reviews, external fault evidence, secret-custody proof, and release approval. | Unresolved external blocker | Required by the release boundary and engineering brief; no independent signed records are available in the checkout. |
 
 The Vulture findings for `Estimator.get_params(deep=...)` and
 `AsinhTarget.fit(..., unused=...)` are intentional sklearn-compatible
@@ -59,12 +59,20 @@ Executed on 2026-10-24:
   expected.
 - Package build: wheel and source distribution built successfully.
 - Twine metadata validation: both artifacts passed.
+- Clean installation: a fresh Python 3.11 virtual environment installed the
+  wheel with declared runtime dependencies; `import scml`, `import scml.cli`,
+  and `scml --help` all succeeded.
+- Runtime coverage: Python 3.11 was verified locally; Python 3.12 through
+  3.14 remain dependent on the blocked hosted matrix.
 - Wheel/sdist artifact inspection: removed planning artifacts were absent.
 - Website verification: npm audit found zero vulnerabilities; Astro built 19
   pages; accessibility checks passed for all 19 pages; 479 internal links
   passed; and Playwright passed all 4 Chromium smoke tests.
 - Hosted-control static verification: all 5 workflow files passed with 59
   pinned action references and no static-control failures.
+- Vulture: not executable in the current environment because the optional
+  tool is not installed; the earlier scan found only intentional sklearn
+  protocol parameters plus the JEPA unreachable literal, which is fixed.
 - Live Pages verification: the configured HTTPS URL returned HTTP 404 for all
   18 required routes, so public documentation deployment is not verified.
 - Stale-reference and diff checks: passed.
@@ -76,6 +84,11 @@ review remain unverified.
 
 ## Implementation summary
 
+- Files modified or removed: the five workflow files under
+  `.github/workflows/`, `pyproject.toml`, the JEPA network and its unit test,
+  the serving and CLI output paths with their integration tests, the ONNX
+  export path, and this assessment; obsolete planning/readiness documents and
+  unreferenced benchmark snapshots were removed.
 - Removed obsolete `plan.md`, production planning/readiness documents, and
   unreferenced benchmark snapshots.
 - Removed stale references to those files and corrected the changelog URL to
