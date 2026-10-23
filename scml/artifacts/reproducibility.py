@@ -52,6 +52,14 @@ def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
     evaluation = json.loads(
         (root / "evaluation.json").read_text(encoding="utf-8")
     )
+    parameter_path = root / "parameter_estimation.json"
+    parameter_digest = None
+    if parameter_path.exists():
+        from scml.evaluation import parameter_estimation
+
+        parameter_digest = parameter_estimation.EstimationResult.read(
+            parameter_path
+        ).digest()
     return {
         "config": json.loads(
             (root / "config.json").read_text(encoding="utf-8")
@@ -69,6 +77,7 @@ def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
         "environment": (root / "environment.lock").read_text(encoding="utf-8")
         if (root / "environment.lock").exists()
         else "",
+        "parameter_estimation": parameter_digest,
     }
 
 
@@ -98,6 +107,8 @@ def compare_runs(
         reasons.append("datasets differ")
     if first["split"] != second["split"]:
         reasons.append("splits differ")
+    if first.get("parameter_estimation") != second.get("parameter_estimation"):
+        reasons.append("parameter-estimation evidence differs")
     a, b = first["trials"], second["trials"]
     identity = [
         (

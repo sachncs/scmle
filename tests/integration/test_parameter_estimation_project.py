@@ -385,3 +385,18 @@ def test_project_estimation_records_file_source_identity(tmp_path):
     identity = result.diagnostics["data_identity"]
     assert identity["source_identity"].startswith("src_")
     assert identity["snapshot_id"].startswith("snap_")
+
+
+def test_verify_replay_preserves_parameter_estimation_evidence(tmp_path):
+    """Replay compares the scientific report as well as model evidence."""
+    project = project_with_estimation(tmp_path)
+    original = project.run()
+
+    verdict = scml.MLProject.verify_replay(
+        original.run_dir,
+        data=estimation_frame(),
+        output_dir=tmp_path / "replay",
+    )
+
+    assert verdict.level == "exact"
+    assert (tmp_path / "replay").exists()

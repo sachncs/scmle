@@ -816,7 +816,22 @@ class MLProject:
         orchestrator = orchestrator_module.Orchestrator.for_run_directory(
             original, frame=data
         )
-        rerun = orchestrator.run(output_dir or original.parent)
+        estimand, policy = restore_parameter_estimation_declaration(
+            original,
+            orchestrator.spec.config_hash(),
+        )
+        estimation = None
+        declaration = build_parameter_estimation_declaration(estimand, policy)
+        if estimand is not None and policy is not None:
+            estimation = estimate_parameters_for_project(
+                orchestrator, estimand, policy
+            )
+        rerun = orchestrator.run(
+            output_dir or original.parent,
+            parameter_estimation_declaration=declaration,
+        )
+        if estimation is not None:
+            persist_parameter_estimation_evidence(rerun, estimation)
         return reproducibility.compare_runs(
             reproducibility.load_run(original),
             reproducibility.load_run(rerun.run_dir),
