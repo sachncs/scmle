@@ -4626,3 +4626,21 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   restarted or treated as evidence here because its terminal result was not
   available in this execution context.
 
+## Reference HTTP boundary hardening at `2980096` on 2026-10-23
+
+- The reference `HttpServing` boundary now applies a positive per-connection
+  request I/O timeout, daemonizes request workers, allows safe socket reuse,
+  and emits a stable minimal server fingerprint. Existing body-size,
+  record-count, content-type, cache, and content-sniffing controls remain in
+  force. The adapter remains loopback-default and gateway-only; it does not
+  provide authentication or TLS.
+- Python package builds completed with `uv build --out-dir <temporary-dir>`
+  for both the source distribution and wheel. The Astro site build completed
+  with `npm run build` and produced 19 static pages.
+- After the build phase, the focused serving command
+  `uv run pytest -q tests/integration/test_serve_and_export.py -W
+  error::ResourceWarning` passed `11` tests with `2` declared optional skips.
+- This is focused evidence only. End-to-end, integration, and repository-wide
+  regression evidence for the final release candidate remain pending and must
+  follow the ordering in `plan.md`.
+
