@@ -214,8 +214,10 @@ class TorchJepaAdapter(TorchAdapter):
         if reason is not None:
             return reason
         if row_count is not None and row_count < 16:
-            return "tabular JEPA requires at least 16 rows for its training "
-            "and validation boundaries"
+            return (
+                "tabular JEPA requires at least 16 rows for its training "
+                "and validation boundaries"
+            )
         return None
 
     def build(
