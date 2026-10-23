@@ -4662,3 +4662,14 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   before the release-candidate regression gate. No repository-wide regression
   was run for this repair.
 
+## Completed integration phase at `8c0c861` on 2026-10-23
+
+- After the Keras architecture repair and its package build, the complete
+  integration command `uv run pytest -q tests/integration -W
+  error::ResourceWarning` passed `384` tests with `14` declared optional
+  skips in 52 minutes 50 seconds.
+- The prior Keras failure is therefore closed for the current implementation
+  state. This is integration evidence, not repository-wide regression
+  evidence; the regression phase remains intentionally deferred until the
+  remaining implementation and external release gates are complete.
+
