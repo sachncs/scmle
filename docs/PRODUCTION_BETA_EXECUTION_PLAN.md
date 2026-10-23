@@ -4644,3 +4644,21 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   regression evidence for the final release candidate remain pending and must
   follow the ordering in `plan.md`.
 
+## End-to-end and integration phase evidence at `0b2f668` on 2026-10-23
+
+- After the build phase, the supported tabular end-to-end slice passed `32`
+  tests in 2 minutes 9 seconds under `-W error::ResourceWarning`.
+- The first complete integration phase reached `383 passed, 14 skipped, 1
+  failed` after 39 minutes 3 seconds. The failure was
+  `test_hard_enforcement_supervises_trials_end_to_end`: the optional Keras
+  trial failed because `KerasClassifier` inherited the worker contract but
+  did not declare its dense `mlp` architecture.
+- Commit `0b2f668` declares that architecture contract and adds a focused
+  regression assertion. The affected verification then passed: package build,
+  `tests/unit/test_keras.py` plus the failing integration test (`8 passed`),
+  and the complete `tests/integration/test_resource_limits.py` module (`9
+  passed` in 2 minutes 33 seconds).
+- The full integration phase must be rerun on the completed implementation
+  before the release-candidate regression gate. No repository-wide regression
+  was run for this repair.
+
