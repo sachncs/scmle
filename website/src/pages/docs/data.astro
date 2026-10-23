@@ -37,6 +37,25 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <li><strong>Decide:</strong> record what was kept, repaired, excluded, or deferred in <code>curation_report.json</code>.</li>
   </ol>
 
+  <h2 id="catalog-any-data">Catalog any dataset before modelling</h2>
+  <p><code>DatasetCatalog</code> is the model-agnostic entry point for data that is not yet ready for a task or a model. It observes common Python forms—tables, arrays, column mappings, record sequences, scalars, and raw bytes—and records what was actually observed. For an opaque domain object, provide an adapter-owned observation and a caller-supplied SHA-256 identity; the catalog will not invent a process-dependent hash.</p>
+  <pre><code>{`from scml import DatasetCatalog
+
+catalog = DatasetCatalog.from_data(
+    records,
+    source="s3://warehouse/orders?versionId=17",
+    label_column="outcome",
+)
+catalog.write("artifacts/orders-catalog.json")
+
+verified = DatasetCatalog.read_verified(
+    "artifacts/orders-catalog.json"
+)
+print(verified.content_identity)
+print(verified.release_blockers)
+`}</code></pre>
+  <p>The catalog reports shape, ordered schema, sample count, missingness, duplicate rows, explicitly named label state, source governance, limitations, and release blockers. It does not impute, infer a task, decode a modality, choose a split, or claim that the data can be modelled. Treat blockers as review work: missingness and duplicate policy, undeclared labels, source ownership, privacy classification, and modality-specific decoders must be resolved before promotion.</p>
+
   <h2>Consume an event stream safely</h2>
   <p>The consumer contract separates three responsibilities. The source polls a bounded batch. Your writer commits unseen events to the downstream sink with event IDs as idempotency keys. Your broker adapter acknowledges only after that commit is durable. If acknowledgement delivery fails, the ledger keeps a JSON sidecar and retries it before polling the next batch; the sink is not run again.</p>
   <pre><code>{`source = EventStreamSource("kafka://cluster/orders", poll)

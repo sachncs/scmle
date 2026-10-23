@@ -53,6 +53,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         <tr><th scope="row">Tabular JEPA</th><td>Install <code>super-charge-ml[deeplearning]</code> and explicitly opt in with <code>ModelSpec(experimental_models=["torch_jepa"])</code>. The project adapter composes the self-supervised <code>JepaEstimator</code> with a supervised head, so the same representation is evaluated, packaged, loaded, and used by <code>RunResult.predict</code>.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">Parameter estimation</th><td><code>estimate_parameters</code> supports declared linear, logistic, Bayesian Gaussian, Bayesian ATE, IPW/AIPW ATE, and grouped random-intercept or one-random-slope estimators, with explicit assumptions, uncertainty, sensitivity, and independent reference evidence. The project API persists the result as <code>parameter_estimation.json</code>.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
         <tr><th scope="row">Longitudinal causal estimation</th><td><code>LongitudinalIPWEstimator</code> accepts validated subject/time rows and estimates period-specific binary-treatment Hájek IPW effects with overlap, effective sample size, subject-aligned covariance, and digest-bound reports.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
+        <tr><th scope="row">Sequential causal estimation</th><td><code>SequentialIPWEstimator</code> estimates a static always-treated versus always-control contrast over two or more periods using stabilized treatment-history weights and declared pre-treatment time-varying covariates.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -241,6 +242,38 @@ report = LongitudinalIPWEstimator(
 report.write("artifacts/longitudinal-ate.json")`}</code></pre>
   <p>This is deliberately not a sequential g-formula or marginal structural model. It refits a period-specific propensity model and reports the boundary in <code>limitations</code>. If treatment history, time-varying covariates, or sequential interventions matter, the current contract is insufficient and the capability must remain extension-only.</p>
 
+  <h2 id="sequential">Estimate a sustained treatment-history contrast</h2>
+  <p>Use <code>SequentialIPWEstimator</code> when the scientific question is a static regime contrast—every period treated versus every period untreated—and the data contains one complete, ordered row per subject and period. At each period, the denominator model conditions on observed treatment history, baseline covariates, and declared pre-treatment time-varying covariates. A numerator model conditions on treatment history to stabilize the cumulative weights.</p>
+  <pre><code>{`from scml import SequentialEstimand
+from scml import SequentialEstimationPolicy
+from scml import SequentialIPWEstimator
+
+sequential_estimand = SequentialEstimand(
+    name="sustained_treatment_effect",
+    subject_identity="subject_id",
+    time_column="period",
+    treatment_column="treated",
+    outcome="outcome",
+    baseline_covariates=("baseline_score",),
+    time_varying_covariates=("current_risk",),
+    population="subjects with complete follow-up",
+    assumptions=(
+        "consistency",
+        "positivity",
+        "sequential_exchangeability",
+        "no_unmeasured_time_varying_confounding",
+        "time_varying_covariates_are_pre_treatment",
+        "complete_follow_up",
+    ),
+)
+report = SequentialIPWEstimator(
+    sequential_estimand,
+    SequentialEstimationPolicy(maximum_weight=20.0, seed=17),
+).fit(long_frame)
+report.write("artifacts/sequential-ate.json")
+`}</code></pre>
+  <p>The report retains per-period propensity support, cumulative-weight truncation, effective sample size, regime estimates, uncertainty, subject/row accounting, a raw-input fingerprint, and an independent normalized-weight reference. This is not a dynamic treatment-regime estimator, g-computation, or marginal structural model. Intermittent follow-up, continuous treatment, and propagated propensity-model uncertainty remain outside the contract.</p>
+
   <h2 id="estimator-matrix">Choose the scientific estimator deliberately</h2>
   <div class="model-table" role="region" aria-label="Parameter estimation methods" tabindex="0">
     <table>
@@ -252,6 +285,7 @@ report.write("artifacts/longitudinal-ate.json")`}</code></pre>
         <tr><th scope="row"><code>ipw_ate</code></th><td>A binary-treatment average treatment effect under a declared propensity model.</td><td>Hájek IPW, clipping and overlap diagnostics, effective sample sizes, influence-function variance, and an independent propensity reference. This does not prove exchangeability, positivity, or absence of unmeasured confounding.</td></tr>
         <tr><th scope="row"><code>aipw_ate</code></th><td>A binary-treatment average treatment effect with propensity and outcome nuisance models.</td><td>Augmented IPW score, clipping and overlap diagnostics, influence-function variance, fitted-nuisance limitations, and an independent propensity-plus-outcome reference. Cross-fitting and nuisance-model uncertainty propagation are not implemented; this remains a bounded scientific estimator.</td></tr>
         <tr><th scope="row"><code>LongitudinalIPWEstimator</code></th><td>Separate period-specific binary-treatment effects from long-format subject/time observations.</td><td>Requires unique ordered subject-time rows, baseline covariates, overlap, effective sample-size bounds, and explicit longitudinal assumptions. It is not a sequential g-formula or marginal structural model; treatment-history effects and time-varying covariates remain unsupported.</td></tr>
+        <tr><th scope="row"><code>SequentialIPWEstimator</code></th><td>A static always-treated versus always-control contrast over a complete treatment history.</td><td>Uses stabilized history weights and explicit pre-treatment time-varying covariates. Dynamic regimes, intermittent follow-up, continuous treatment, g-computation, marginal structural models, and propensity-model uncertainty propagation remain unsupported.</td></tr>
         <tr><th scope="row"><code>hierarchical_linear</code></th><td>Grouped Gaussian outcomes with a random-intercept assumption, optionally plus one declared random slope.</td><td>Choose bounded <code>moment_gls</code> or explicit <code>reml</code> variance-component estimation. Inspect covariance, cluster evidence, optimizer/reference diagnostics, and stated uncertainty limits. Multiple slopes, nested/crossed effects, fully Bayesian multilevel inference, and variance-component uncertainty propagation remain out of scope.</td></tr>
       </tbody>
     </table>
