@@ -78,6 +78,10 @@ def test_linear_estimation_records_robust_uncertainty_and_reference():
     assert result.parameters[2].estimate == pytest.approx(-0.75, abs=0.08)
     assert result.reference["passed"] is True
     assert result.diagnostics["likelihood"] == "gaussian"
+    covariance_conditioning = result.diagnostics["covariance_conditioning"]
+    assert covariance_conditioning["status"] == "identified"
+    assert covariance_conditioning["rank"] == 3
+    assert covariance_conditioning["condition_number"] < 1e12
     assert result.parameters[1].interval[0] < result.parameters[1].estimate
 
 
@@ -702,6 +706,71 @@ def test_complete_case_is_explicit_and_reject_is_fail_closed():
     assert result.rows_input == 6
     assert result.rows_used == 5
     assert result.rows_dropped == 1
+
+
+def test_estimation_validates_vector_and_cluster_shapes_before_fitting():
+    """Malformed row shapes fail before a model can consume ambiguous data."""
+    signal = np.arange(6, dtype=float)
+    features = np.column_stack((signal, signal**2))
+    outcome = np.arange(6, dtype=float)
+    policy = EstimationPolicy(estimator="linear")
+
+    with pytest.raises(ValueError, match=r"outcome must have shape \(rows,\)"):
+        estimate_parameters(
+            features,
+            outcome.reshape(-1, 1),
+            linear_estimand(),
+            policy,
+        )
+
+    with pytest.raises(ValueError, match=r"clusters must have shape \(rows,\)"):
+        estimate_parameters(
+            features,
+            outcome,
+            linear_estimand(),
+            policy,
+            clusters=np.zeros((6, 1)),
+        )
+
+
+def test_covariance_conditioning_is_reported_and_nonfinite_shift_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Release evidence records covariance identifiability and finite shifts."""
+    signal = np.arange(6, dtype=float)
+    features = np.column_stack((signal, signal**2))
+    outcome = 1.0 + features[:, 0] - 0.5 * features[:, 1]
+
+    def return_zero_covariance(
+        *arguments: object, **keywords: object
+    ) -> np.ndarray:
+        del arguments, keywords
+        return np.zeros((3, 3))
+
+    monkeypatch.setattr(
+        "scml.evaluation.parameter_estimation.covariance_matrix",
+        return_zero_covariance,
+    )
+    result = estimate_parameters(
+        features,
+        outcome,
+        linear_estimand(),
+        EstimationPolicy(estimator="linear"),
+    )
+
+    covariance_conditioning = result.diagnostics["covariance_conditioning"]
+    assert covariance_conditioning["status"] == "rank_deficient"
+    assert covariance_conditioning["rank"] == 0
+    assert covariance_conditioning["condition_number"] is None
+
+    with pytest.raises(ValueError, match="shift_reference must contain only"):
+        estimate_parameters(
+            features,
+            outcome,
+            linear_estimand(),
+            EstimationPolicy(estimator="linear"),
+            shift_reference=np.array([[0.0, 1.0], [np.nan, 2.0], [2.0, 3.0]]),
+        )
 
 
 def test_declared_likelihood_must_match_estimation_method():

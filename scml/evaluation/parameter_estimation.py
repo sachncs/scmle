@@ -52,6 +52,7 @@ HierarchicalAssumption = Literal[
 HierarchicalMethod = Literal["moment_gls", "reml"]
 
 DEFAULT_REML_VARIANCE_BOUNDS = (1e-12, 1e12)
+COVARIANCE_CONDITION_THRESHOLD = 1e12
 
 REQUIRED_CAUSAL_ASSUMPTIONS = frozenset(
     {"consistency", "conditional_exchangeability", "positivity"}
@@ -637,21 +638,24 @@ def estimate_parameters(
         ValueError: If the data, policy, or estimator assumptions are invalid.
     """
     matrix = np.asarray(features, dtype=float)
-    values = np.asarray(outcome, dtype=float).reshape(-1)
+    values = np.asarray(outcome, dtype=float)
     validate_matrix(matrix, len(estimand.feature_names), "features")
+    validate_vector(values, "outcome")
+    input_clusters = validate_clusters(clusters, len(values))
     raw_input_fingerprint_value = raw_input_fingerprint(
-        matrix, values, clusters
+        matrix, values, input_clusters
     )
     input_rows = matrix.shape[0]
     if matrix.shape[0] != len(values):
         raise ValueError("features and outcome must have the same row count")
-    if clusters is not None and len(clusters) != len(values):
-        raise ValueError("clusters must have the same row count as outcome")
-    if policy.covariance == "clustered" and clusters is None:
+    if policy.covariance == "clustered" and input_clusters is None:
         raise ValueError("clustered covariance needs cluster labels")
-    if policy.estimator in ("hierarchical_linear",) and clusters is None:
+    if policy.estimator in ("hierarchical_linear",) and input_clusters is None:
         raise ValueError("hierarchical_linear requires cluster labels")
-    if policy.estimator in {"ipw_ate", "aipw_ate"} and clusters is not None:
+    if (
+        policy.estimator in {"ipw_ate", "aipw_ate"}
+        and input_clusters is not None
+    ):
         raise ValueError(f"{policy.estimator} does not accept cluster labels")
     expected_likelihood = {
         "linear": "gaussian",
@@ -667,7 +671,7 @@ def estimate_parameters(
             f"expected {expected_likelihood}, got {estimand.likelihood}"
         )
     matrix, values, kept, dropped = prepare_rows(
-        matrix, values, policy.missing, clusters
+        matrix, values, policy.missing, input_clusters
     )
     if policy.estimator == "logistic" and not set(np.unique(values)).issubset(
         {0.0, 1.0}
@@ -680,7 +684,7 @@ def estimate_parameters(
             raise ValueError(f"{policy.estimator} requires treatment_position")
         if not 0 <= policy.treatment_position < matrix.shape[1]:
             raise ValueError("treatment_position is outside the feature matrix")
-    cluster_values = kept if clusters is not None else None
+    cluster_values = kept if input_clusters is not None else None
     design = np.column_stack((np.ones(matrix.shape[0]), matrix))
     names = ("intercept", *estimand.feature_names)
     if policy.estimator == "linear":
@@ -855,6 +859,12 @@ def estimate_parameters(
             "degrees_of_freedom": degrees_of_freedom,
         }
 
+    covariance_conditioning = validate_covariance(covariance, len(names))
+    diagnostics = {
+        **diagnostics,
+        "covariance_conditioning": covariance_conditioning,
+    }
+
     if policy.estimator != "bayesian_linear":
         standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
         interval_errors = standard_errors
@@ -908,7 +918,7 @@ def estimate_parameters(
 def raw_input_fingerprint(
     features: Any,
     outcome: Any,
-    clusters: Sequence[Any] | None = None,
+    clusters: Any | None = None,
 ) -> str:
     """Return a deterministic fingerprint of the estimator's raw inputs.
 
@@ -976,11 +986,75 @@ def validate_matrix(matrix: np.ndarray, columns: int, name: str) -> None:
         raise ValueError("estimation needs more rows than parameters")
 
 
+def validate_vector(values: np.ndarray, name: str) -> None:
+    """Validate a numeric one-dimensional vector without dropping values."""
+    if values.ndim != 1:
+        raise ValueError(f"{name} must have shape (rows,)")
+
+
+def validate_clusters(
+    clusters: Sequence[Any] | None, rows: int
+) -> np.ndarray | None:
+    """Validate cluster-label shape before missingness processing."""
+    if clusters is None:
+        return None
+    cluster_values = np.asarray(clusters, dtype=object)
+    if cluster_values.ndim != 1:
+        raise ValueError("clusters must have shape (rows,)")
+    if len(cluster_values) != rows:
+        raise ValueError("clusters must have the same row count as outcome")
+    return cluster_values
+
+
+def validate_covariance(
+    covariance: np.ndarray, dimension: int
+) -> dict[str, Any]:
+    """Validate covariance shape and report rank and numerical conditioning."""
+    matrix = np.asarray(covariance, dtype=float)
+    expected_shape = (dimension, dimension)
+    if matrix.shape != expected_shape:
+        raise ValueError(
+            f"covariance must have shape ({dimension}, {dimension})"
+        )
+    if not np.isfinite(matrix).all():
+        raise ValueError("covariance must contain finite values")
+    if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12):
+        raise ValueError("covariance must be symmetric")
+    singular_values = np.linalg.svd(matrix, compute_uv=False)
+    scale = float(singular_values[0]) if singular_values.size else 0.0
+    rank_tolerance = np.finfo(float).eps * max(expected_shape) * scale
+    rank = int(np.sum(singular_values > rank_tolerance))
+    smallest_singular_value = (
+        float(singular_values[-1]) if singular_values.size else 0.0
+    )
+    condition_number = (
+        float(scale / smallest_singular_value)
+        if smallest_singular_value > 0.0
+        else None
+    )
+    if rank < dimension:
+        status = "rank_deficient"
+    elif (
+        condition_number is None
+        or condition_number > COVARIANCE_CONDITION_THRESHOLD
+    ):
+        status = "ill_conditioned"
+    else:
+        status = "identified"
+    return {
+        "status": status,
+        "dimension": dimension,
+        "rank": rank,
+        "condition_number": condition_number,
+        "condition_number_threshold": COVARIANCE_CONDITION_THRESHOLD,
+    }
+
+
 def prepare_rows(
     matrix: np.ndarray,
     values: np.ndarray,
     missing: MissingPolicy,
-    clusters: Sequence[Any] | None,
+    clusters: Any | None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, int]:
     """Apply the declared missingness policy and retain cluster labels."""
     valid = np.isfinite(matrix).all(axis=1) & np.isfinite(values)
@@ -2409,6 +2483,8 @@ def sensitivity_report(
     if shift_reference is not None:
         reference = np.asarray(shift_reference, dtype=float)
         validate_matrix(reference, matrix.shape[1], "shift_reference")
+        if not np.isfinite(reference).all():
+            raise ValueError("shift_reference must contain only finite values")
         pooled = np.sqrt((matrix.var(axis=0) + reference.var(axis=0)) / 2.0)
         difference = np.abs(reference.mean(axis=0) - matrix.mean(axis=0)) / (
             np.maximum(pooled, 1e-12)
