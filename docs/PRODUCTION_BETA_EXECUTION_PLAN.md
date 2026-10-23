@@ -4189,6 +4189,38 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   hosted CI/Pages, external fault evidence, secret custody, and independent
   release review remain open release gates.
 
+## Causal Bayesian estimation and transactional streaming at `a078d6f` on 2026-10-23
+
+- Parameter estimation now includes a bounded `bayesian_ate` path. It fits a
+  conjugate Gaussian outcome model with a binary treatment and covariate
+  adjustment, requires explicit linearity, consistency, conditional
+  exchangeability, and positivity assumptions, and identifies the treatment
+  coefficient as the ATE only under those assumptions. Posterior covariance,
+  Student-t credible intervals, prior-strength sensitivity, treatment-arm
+  counts, and an independent SciPy reference calculation are persisted. The
+  estimator is integrated into `MLProject` declarations, resume/replay
+  reconstruction, and the versioned API contract.
+- `StreamingLedger` now exposes a transport-neutral `TransactionalSink`
+  boundary. A caller-owned sink returns a source-, batch-, and
+  checkpoint-bound receipt; the ledger atomically persists that receipt with
+  acknowledgement evidence and deduplicates matching retries after restart.
+  Mismatched receipts fail closed. This remains a local idempotency and
+  evidence boundary, not a broker transaction or distributed exactly-once
+  guarantee.
+- During review, a regression test caught and fixed preservation of prior
+  transaction evidence when the legacy writer advances a later batch. The
+  combined estimation, project, and streaming suite passed `71` tests; the
+  streaming/API slice passed `25`; the repository naming gate passed `948`;
+  Ruff, formatting, mypy, and diff checks were clean. The one deferred
+  repository regression completed `2573 passed, 38 skipped` in 41m48s with no
+  failures.
+- Time-varying causal effects, nuisance-model uncertainty propagation,
+  clustered Bayesian covariance, fully Bayesian multilevel inference, and
+  external broker/cloud transaction evidence remain open. Non-tabular
+  production modelling, multimodal transformers/JEPA, hosted CI/Pages,
+  secret custody, and independent release review remain separate release
+  gates.
+
 ## Hierarchical uncertainty and modality recovery at `1523bfa` on 2026-10-23
 
 - Hierarchical random-intercept linear estimation now supports deterministic
