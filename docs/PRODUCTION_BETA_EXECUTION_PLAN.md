@@ -4069,3 +4069,33 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   evidence, independent review, and the explicitly experimental or incomplete
   modality/modeling boundaries remain unreleased gates.
 
+## Scientific resume, capability boundaries, and documentation at `d3da5bb` on 2026-10-23
+
+- Resume now persists a digest-locked scientific declaration beside every run,
+  reconstructs the estimand and estimation policy from that declaration, and
+  fails closed when the declaration is missing, malformed, or tampered. A
+  resumed parameter report is verified, bound into evaluation, and reattached
+  to the evidence graph just like a fresh run.
+- Parameter estimation now validates outcome and cluster shapes before fitting,
+  rejects non-finite shift-reference inputs, and records covariance shape,
+  symmetry, rank, and conditioning diagnostics. This is diagnostic evidence;
+  it does not turn an ill-conditioned design into an identified estimand.
+- Capability declarations now reject unsupported model-family/modalities before
+  training. Transformer families are experimental or extension-only according
+  to their evidence boundary, and JEPA remains explicitly tabular-only
+  experimental rather than a multimodal production claim.
+- The standalone modeling guide now explains estimands versus model selection,
+  likelihood and identifiability, covariance and intervals, sensitivity,
+  independent references, parameter lineage, current estimator coverage, and
+  the transformer/JEPA/non-tabular boundaries with runnable examples. The site
+  build produced 19 pages, accessibility passed for 19 pages, internal-link
+  checks passed 479 links, and Playwright passed 4 browser checks.
+- Focused project, estimation, capability, API, lineage, and modality tests
+  passed `87` tests. Ruff lint, Ruff formatting, and mypy over `scml` and
+  `benchmarks` passed. The one consolidated repository regression after the
+  implementation batch completed `2530 passed, 38 skipped` in 42m28s.
+- This closes the local resume and boundary gaps only. Non-tabular production
+  modelling, multimodal JEPA, production OCR/layout and foundation-model
+  paths, external fault evidence, hosted CI/Pages, secret custody, and
+  independent release review remain separate release gates.
+
