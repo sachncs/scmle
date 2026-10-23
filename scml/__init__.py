@@ -15,12 +15,6 @@ from scml.evaluation.longitudinal import LongitudinalEstimationPolicy
 from scml.evaluation.longitudinal import LongitudinalEstimationResult
 from scml.evaluation.longitudinal import LongitudinalIPWEstimator
 from scml.evaluation.longitudinal import PeriodATE
-from scml.evaluation.sequential import SequentialEstimand
-from scml.evaluation.sequential import SequentialEstimationPolicy
-from scml.evaluation.sequential import SequentialEstimationResult
-from scml.evaluation.sequential import SequentialIPWEstimator
-from scml.evaluation.sequential import SequentialPeriodDiagnostics
-from scml.evaluation.sequential import SequentialRegimeEstimate
 from scml.evaluation.metrics import register_metric
 from scml.evaluation.parameter_estimation import BayesianPrior
 from scml.evaluation.parameter_estimation import EstimandSpec
@@ -28,6 +22,12 @@ from scml.evaluation.parameter_estimation import estimate_parameters
 from scml.evaluation.parameter_estimation import EstimationPolicy
 from scml.evaluation.parameter_estimation import EstimationResult
 from scml.evaluation.parameter_estimation import ParameterEstimate
+from scml.evaluation.sequential import SequentialEstimand
+from scml.evaluation.sequential import SequentialEstimationPolicy
+from scml.evaluation.sequential import SequentialEstimationResult
+from scml.evaluation.sequential import SequentialIPWEstimator
+from scml.evaluation.sequential import SequentialPeriodDiagnostics
+from scml.evaluation.sequential import SequentialRegimeEstimate
 from scml.inference.modality_serving import ModalityHttpServing
 from scml.inference.modality_serving import ModalitySampleDecoder
 from scml.models.custom import register_estimator
