@@ -9,6 +9,9 @@ must not be described as production-ready until every required gate is green.
 - [x] Scheduled/manual CI retains the complete test suite.
 - [x] Release CI verifies tags, changelog, wheel metadata, wheel installation,
   and source-distribution installation.
+- [x] Release publication is gated on the staged release preflight: build,
+  focused tests, end-to-end tests, integration tests, final regression, and
+  release artifact checks.
 - [x] Ruff, mypy, Bandit, and pip-audit run in CI.
 - [x] Model bundles require authenticated or explicitly trusted loading.
 - [x] Bundle format 2 checksums `schema.json` before deserialization.

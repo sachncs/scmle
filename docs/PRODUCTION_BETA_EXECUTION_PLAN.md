@@ -4692,3 +4692,12 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   public documentation deployment therefore remains unverified until the
   owner resolves repository visibility, Pages configuration, and billing.
 
+## Release publication gate at `2f8e580` on 2026-10-23
+
+- The tag-based release workflow now requires the staged
+  `scripts/release_preflight.sh` evidence job in addition to the
+  cross-platform release matrix before `publish` can run. The workflow YAML
+  and shell syntax validate locally.
+- This closes the code-level publication-order gap. Hosted execution remains
+  unverified until the GitHub billing and Pages blockers are resolved.
+
