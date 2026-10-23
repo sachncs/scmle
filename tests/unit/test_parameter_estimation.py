@@ -890,6 +890,125 @@ def test_hierarchical_linear_reml_is_deterministic():
     assert first.to_dict() == second.to_dict()
 
 
+@pytest.mark.parametrize("method", ["moment_gls", "reml"])
+def test_hierarchical_bootstrap_is_deterministic_and_reference_checked(
+    method: Literal["moment_gls", "reml"],
+):
+    """Grouped bootstrap preserves the declared method and evidence contract."""
+    features, outcome, clusters = make_hierarchical_reml_fixture()
+    base_policy = make_hierarchical_reml_policy()
+    policy = EstimationPolicy(
+        **{
+            **base_policy.to_dict(),
+            "hierarchical_method": method,
+            "bootstrap_replicates": 4,
+            "seed": 107,
+        }
+    )
+
+    first = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        policy,
+        clusters=clusters,
+    )
+    second = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        policy,
+        clusters=clusters,
+    )
+    sampling = first.sensitivity["sampling"]
+
+    assert first.to_dict() == second.to_dict()
+    assert sampling["status"] == "available"
+    assert sampling["method"] == "nonparametric_percentile_bootstrap"
+    assert sampling["resampling_unit"] == "cluster"
+    assert sampling["estimator_method"] == method
+    assert sampling["source_unit_count"] == 8
+    assert sampling["source_row_count"] == len(outcome)
+    assert sampling["cluster_identity_policy"] == (
+        "fresh_identity_per_selected_cluster"
+    )
+    assert sampling["successful_replicates"] == 4
+    assert sampling["failed_replicates"] == 0
+    assert sampling["reference_checks"] == {
+        "successful": 4,
+        "failed": 0,
+        "requirement": "every accepted replicate passes its independent "
+        "point-estimate reference check",
+    }
+    assert all(draw["sampled_units"] == 8 for draw in sampling["draws"])
+    assert all(len(draw["sample_digest"]) == 64 for draw in sampling["draws"])
+    assert all(
+        len(draw["fresh_cluster_identity_digest"]) == 64
+        for draw in sampling["draws"]
+    )
+    assert all(draw["estimator_method"] == method for draw in sampling["draws"])
+    assert len(sampling["bootstrap_intervals"]) == 2
+    assert all(
+        len(interval) == len(first.parameters)
+        for interval in sampling["bootstrap_intervals"]
+    )
+    assert (
+        sampling["bootstrap_intervals"][0] <= sampling["bootstrap_intervals"][1]
+    )
+    assert sampling["limitations"] == [
+        "variance-component uncertainty is not propagated",
+        "random slopes are unsupported",
+        "nested effects are unsupported",
+        "crossed effects are unsupported",
+    ]
+
+
+def test_hierarchical_bootstrap_records_failed_replicates(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Invalid grouped draws are recorded and excluded from intervals."""
+    features, outcome, clusters = make_hierarchical_reml_fixture()
+    policy = EstimationPolicy(
+        **{
+            **make_hierarchical_reml_policy().to_dict(),
+            "bootstrap_replicates": 4,
+            "seed": 109,
+        }
+    )
+    original_fit = estimation_module.fit_hierarchical_linear
+    calls = 0
+
+    def fail_one_replicate(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ValueError("forced invalid hierarchical bootstrap replicate")
+        return original_fit(*args, **kwargs)
+
+    monkeypatch.setattr(
+        estimation_module, "fit_hierarchical_linear", fail_one_replicate
+    )
+    result = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        policy,
+        clusters=clusters,
+    )
+    sampling = result.sensitivity["sampling"]
+
+    assert sampling["status"] == "partial"
+    assert sampling["successful_replicates"] == 3
+    assert sampling["failed_replicates"] == 1
+    assert sampling["failures"][0]["replicate"] == 0
+    assert sampling["failures"][0]["error_type"] == "ValueError"
+    assert sampling["failures"][0]["message"] == (
+        "forced invalid hierarchical bootstrap replicate"
+    )
+    assert sampling["reference_checks"]["successful"] == 3
+    assert sampling["reference_checks"]["failed"] == 1
+
+
 def test_hierarchical_linear_rejects_invalid_reml_optimizer_state(
     monkeypatch: pytest.MonkeyPatch,
 ):

@@ -332,10 +332,6 @@ class EstimationPolicy:
                     "hierarchical_linear requires all random-intercept "
                     "assumptions"
                 )
-            if self.bootstrap_replicates:
-                raise ValueError(
-                    "hierarchical_linear bootstrap sensitivity is unsupported"
-                )
         elif self.prior is not None:
             raise ValueError(
                 "a Bayesian prior is supported only by bayesian_linear"
@@ -2652,6 +2648,20 @@ def sensitivity_report(
             coefficients,
             clusters,
         )
+    elif (
+        policy.bootstrap_replicates
+        and policy.estimator == "hierarchical_linear"
+    ):
+        if clusters is None:
+            raise ValueError("hierarchical_linear requires cluster labels")
+        report["sampling"] = hierarchical_bootstrap_sensitivity(
+            matrix,
+            values,
+            estimand,
+            policy,
+            coefficients,
+            clusters,
+        )
     elif policy.bootstrap_replicates:
         rng = np.random.default_rng(policy.seed)
         estimates: list[np.ndarray] = []
@@ -2681,6 +2691,198 @@ def sensitivity_report(
             ],
         ]
     return report
+
+
+def hierarchical_bootstrap_sensitivity(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    estimand: EstimandSpec,
+    policy: EstimationPolicy,
+    coefficients: np.ndarray,
+    clusters: np.ndarray,
+) -> dict[str, Any]:
+    """Estimate grouped-parameter sensitivity by resampling whole clusters.
+
+    Each bootstrap draw samples the source clusters with replacement and
+    gives every selected copy a fresh identity. The declared moment-GLS or
+    bounded-REML policy is then rerun on that draw. A replicate is accepted
+    only when its independent reference calculation passes, so percentile
+    intervals never combine estimates that failed the scientific check.
+
+    Args:
+        matrix: Complete feature rows used by the point estimate.
+        values: Complete outcomes used by the point estimate.
+        estimand: Scientific estimand and its explicit assumptions.
+        policy: Hierarchical estimator policy with a positive replicate count.
+        coefficients: Point-estimate coefficient vector for shape checking.
+        clusters: Complete source cluster labels.
+
+    Returns:
+        Serializable bootstrap evidence with draw digests, replicate status,
+        percentile intervals, independent reference counts, and limitations.
+
+    Raises:
+        ValueError: If fewer than two reference-checked replicates succeed.
+    """
+    rng = np.random.default_rng(policy.seed)
+    bootstrap_policy = dataclasses.replace(policy, bootstrap_replicates=0)
+    estimates: list[np.ndarray] = []
+    failures: list[dict[str, Any]] = []
+    draws: list[dict[str, Any]] = []
+    limitations = [
+        "variance-component uncertainty is not propagated",
+        "random slopes are unsupported",
+        "nested effects are unsupported",
+        "crossed effects are unsupported",
+    ]
+    source_labels = tuple(dict.fromkeys(clusters.tolist()))
+    source_unit_count = len(source_labels)
+
+    for replicate in range(policy.bootstrap_replicates):
+        sampled_matrix, sampled_values, sampled_clusters, draw = (
+            draw_hierarchical_bootstrap_sample(matrix, values, clusters, rng)
+        )
+        draws.append(
+            {
+                "replicate": replicate,
+                "resampling_unit": "cluster",
+                "estimator_method": policy.hierarchical_method,
+                **draw,
+            }
+        )
+        try:
+            result = estimate_parameters(
+                sampled_matrix,
+                sampled_values,
+                estimand,
+                bootstrap_policy,
+                clusters=sampled_clusters.tolist(),
+            )
+            estimate = np.asarray(
+                [parameter.estimate for parameter in result.parameters],
+                dtype=float,
+            )
+            if estimate.shape != np.asarray(coefficients).shape:
+                raise ValueError(
+                    "bootstrap replicate returned an unexpected parameter shape"
+                )
+            if not np.isfinite(estimate).all():
+                raise ValueError(
+                    "bootstrap replicate returned non-finite estimates"
+                )
+            if result.reference.get("passed") is not True:
+                raise ValueError(
+                    "bootstrap replicate independent reference check failed"
+                )
+            estimates.append(estimate)
+        except (
+            FloatingPointError,
+            np.linalg.LinAlgError,
+            OverflowError,
+            ValueError,
+        ) as error:
+            failures.append(
+                {
+                    "replicate": replicate,
+                    "resampling_unit": "cluster",
+                    "error_type": type(error).__name__,
+                    "message": str(error),
+                }
+            )
+
+    if len(estimates) < 2:
+        raise ValueError(
+            "hierarchical bootstrap needs at least two successful replicates; "
+            f"received {len(estimates)} of {policy.bootstrap_replicates}"
+        )
+
+    bootstrap = np.asarray(estimates)
+    alpha = (1.0 - policy.confidence_level) / 2.0
+    return {
+        "status": "partial" if failures else "available",
+        "method": "nonparametric_percentile_bootstrap",
+        "bootstrap_replicates": policy.bootstrap_replicates,
+        "successful_replicates": len(estimates),
+        "failed_replicates": len(failures),
+        "confidence_level": policy.confidence_level,
+        "seed": policy.seed,
+        "resampling_unit": "cluster",
+        "estimator_method": policy.hierarchical_method,
+        "source_unit_count": source_unit_count,
+        "source_row_count": len(values),
+        "cluster_identity_policy": "fresh_identity_per_selected_cluster",
+        "draws": draws,
+        "failures": failures,
+        "reference_checks": {
+            "successful": len(estimates),
+            "failed": len(failures),
+            "requirement": "every accepted replicate passes its independent "
+            "point-estimate reference check",
+        },
+        "limitations": limitations,
+        "bootstrap_intervals": [
+            [float(item) for item in np.quantile(bootstrap, alpha, axis=0)],
+            [
+                float(item)
+                for item in np.quantile(bootstrap, 1.0 - alpha, axis=0)
+            ],
+        ],
+    }
+
+
+def draw_hierarchical_bootstrap_sample(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
+    """Draw whole clusters and assign fresh identities to selected copies.
+
+    Args:
+        matrix: Complete feature rows from the source estimate.
+        values: Complete outcomes from the source estimate.
+        clusters: Source cluster labels.
+        rng: Seeded random generator owned by the sensitivity report.
+
+    Returns:
+        Resampled rows, outcomes, fresh cluster labels, and digest evidence.
+
+    Raises:
+        ValueError: If the source data contains fewer than two clusters.
+    """
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "hierarchical cluster labels must be hashable for bootstrap"
+        ) from error
+    if len(labels) < 2:
+        raise ValueError(
+            "hierarchical bootstrap needs at least two source clusters"
+        )
+    source_indices = rng.integers(0, len(labels), size=len(labels))
+    row_groups = [
+        np.flatnonzero(clusters == labels[index]) for index in source_indices
+    ]
+    indices = np.concatenate(row_groups)
+    sampled_clusters = np.repeat(
+        np.arange(len(row_groups), dtype=object),
+        [len(group) for group in row_groups],
+    )
+    return (
+        matrix[indices],
+        values[indices],
+        sampled_clusters,
+        {
+            "sampled_rows": len(indices),
+            "sampled_units": len(row_groups),
+            "source_unit_count": len(labels),
+            "sample_digest": bootstrap_sample_digest(source_indices),
+            "fresh_cluster_identity_digest": bootstrap_sample_digest(
+                np.arange(len(row_groups), dtype=np.int64)
+            ),
+        },
+    )
 
 
 def causal_bootstrap_sensitivity(
