@@ -70,7 +70,7 @@ all = [
 Homepage = "https://github.com/sachncs/magicml"
 Documentation = "https://sachncs.github.io/super-charge-ml/"
 Issues = "https://github.com/sachncs/magicml/issues"
-Changelog = "https://github.com/sachncs/magicml/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/sachncs/magicml/blob/master/CHANGELOG.md"
 
 [project.scripts]
 scml = "scml.cli:main"

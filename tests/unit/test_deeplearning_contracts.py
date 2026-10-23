@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from scml.contracts import capabilities
+from scml.contracts import tasks
 from scml.models.deeplearning import contracts
 from scml.models.deeplearning import estimators
 from scml.models.deeplearning import jepa
@@ -151,3 +152,15 @@ def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
     assert jepa_adapter.family_contract is contracts.TABULAR_JEPA_CONTRACT
     with pytest.raises(ValueError, match="supports only tabular modality"):
         jepa_adapter.require_modality("audio")
+
+
+def test_jepa_rejection_reason_includes_both_training_boundaries():
+    """Small JEPA datasets report the complete actionable boundary."""
+    reason = networks.TorchJepaAdapter().rejection_reason(
+        tasks.TaskType.BINARY, row_count=15
+    )
+
+    assert reason == (
+        "tabular JEPA requires at least 16 rows for its training and "
+        "validation boundaries"
+    )
