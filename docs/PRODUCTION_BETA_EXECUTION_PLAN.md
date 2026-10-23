@@ -4020,3 +4020,23 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   completed regression, not a replacement full-suite claim. A fresh full run
   is still required before calling the current head repository-wide green.
 
+## REML and optional deep-learning verification at `9f4143f` on 2026-10-23
+
+- Hierarchical parameter estimation now has an explicit `hierarchical_method`
+  policy: the existing `moment_gls` path remains the default, while bounded
+  random-intercept `reml` uses deterministic L-BFGS-B variance-component
+  profiling, GLS fixed effects, optimizer-state validation, and an independent
+  dense-covariance reference. Variance-component uncertainty, random slopes,
+  nested/crossed effects, and fully Bayesian multilevel inference remain
+  explicitly unsupported.
+- The current torch-enabled environment ran 31 focused deep-learning and JEPA
+  tests, including FT-style model-family training/package/prediction and JEPA
+  checkpoint/representation tests. A separate environment without installed
+  project-extra metadata correctly failed closed at the capability gate; that
+  is environment evidence, not a promotion of the optional paths.
+- The REML/estimator/convention slice passed 869 tests, API compatibility
+  passed 9 tests, and the Astro site built 19 pages. The last full regression
+  was at the pre-naming-fix head and found one convention failure; the naming
+  repair passed its targeted slice. A fresh full regression is still required
+  at the current head before repository-wide green status can be claimed.
+
