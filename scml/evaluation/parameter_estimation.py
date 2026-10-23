@@ -311,10 +311,6 @@ class EstimationPolicy:
                     "conditional_exchangeability, "
                     "and positivity assumptions"
                 )
-            if self.bootstrap_replicates:
-                raise ValueError(
-                    f"{self.estimator} bootstrap sensitivity is unsupported"
-                )
         elif self.estimator == "hierarchical_linear":
             if self.prior is not None:
                 raise ValueError(
@@ -904,6 +900,8 @@ def estimate_parameters(
         design,
         coefficients,
         shift_reference,
+        estimand,
+        cluster_values,
         prior=policy.prior if policy.estimator == "bayesian_linear" else None,
     )
     return EstimationResult(
@@ -2572,6 +2570,8 @@ def sensitivity_report(
     design: np.ndarray,
     coefficients: np.ndarray,
     shift_reference: Any | None,
+    estimand: EstimandSpec,
+    clusters: np.ndarray | None,
     prior: BayesianPrior | None = None,
 ) -> dict[str, Any]:
     """Record declared sensitivity coverage without inventing causal claims."""
@@ -2640,7 +2640,19 @@ def sensitivity_report(
             ],
             "max_standardized_mean_difference": float(np.max(difference)),
         }
-    if policy.bootstrap_replicates:
+    if policy.bootstrap_replicates and policy.estimator in {
+        "ipw_ate",
+        "aipw_ate",
+    }:
+        report["sampling"] = causal_bootstrap_sensitivity(
+            matrix,
+            values,
+            estimand,
+            policy,
+            coefficients,
+            clusters,
+        )
+    elif policy.bootstrap_replicates:
         rng = np.random.default_rng(policy.seed)
         estimates: list[np.ndarray] = []
         bootstrap_replicate = 0
@@ -2669,6 +2681,199 @@ def sensitivity_report(
             ],
         ]
     return report
+
+
+def causal_bootstrap_sensitivity(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    estimand: EstimandSpec,
+    policy: EstimationPolicy,
+    coefficients: np.ndarray,
+    clusters: np.ndarray | None,
+) -> dict[str, Any]:
+    """Estimate causal sampling sensitivity with nonparametric bootstrap.
+
+    Row-level causal policies resample observations independently. Clustered
+    causal policies resample complete declared clusters, preserving each
+    cluster as a sampling unit and assigning every selected copy a distinct
+    bootstrap cluster label for the influence-function covariance.
+
+    Args:
+        matrix: Complete rows used by the point estimate.
+        values: Complete outcomes used by the point estimate.
+        estimand: Scientific estimand and its explicit causal assumptions.
+        policy: Causal estimator policy with a positive replicate count.
+        coefficients: Point-estimate coefficient vector for shape checking.
+        clusters: Cluster labels for a clustered policy, otherwise ``None``.
+
+    Returns:
+        Serializable sampling-sensitivity evidence, including percentile
+        intervals, resampling-unit evidence, and every failed replicate.
+
+    Raises:
+        ValueError: If the bootstrap cannot produce at least two valid,
+            independently reference-checked replicates.
+    """
+    rng = np.random.default_rng(policy.seed)
+    bootstrap_policy = dataclasses.replace(policy, bootstrap_replicates=0)
+    estimates: list[np.ndarray] = []
+    failures: list[dict[str, Any]] = []
+    draws: list[dict[str, Any]] = []
+    resampling_unit = "cluster" if clusters is not None else "row"
+    source_unit_count = (
+        len(tuple(dict.fromkeys(clusters.tolist())))
+        if clusters is not None
+        else len(values)
+    )
+    source_row_count = len(values)
+
+    for replicate in range(policy.bootstrap_replicates):
+        sampled_matrix, sampled_values, sampled_clusters, draw = (
+            draw_causal_bootstrap_sample(matrix, values, clusters, rng)
+        )
+        bootstrap_clusters: Sequence[Any] | None = (
+            sampled_clusters.tolist() if sampled_clusters is not None else None
+        )
+        draw_record = {
+            "replicate": replicate,
+            "resampling_unit": resampling_unit,
+            **draw,
+        }
+        draws.append(draw_record)
+        try:
+            result = estimate_parameters(
+                sampled_matrix,
+                sampled_values,
+                estimand,
+                bootstrap_policy,
+                clusters=bootstrap_clusters,
+            )
+            estimate = np.asarray(
+                [parameter.estimate for parameter in result.parameters],
+                dtype=float,
+            )
+            if estimate.shape != np.asarray(coefficients).shape:
+                raise ValueError(
+                    "bootstrap replicate returned an unexpected parameter shape"
+                )
+            if not np.isfinite(estimate).all():
+                raise ValueError(
+                    "bootstrap replicate returned non-finite estimates"
+                )
+            if result.reference.get("passed") is not True:
+                raise ValueError(
+                    "bootstrap replicate independent reference check failed"
+                )
+            estimates.append(estimate)
+        except (
+            FloatingPointError,
+            np.linalg.LinAlgError,
+            OverflowError,
+            ValueError,
+        ) as error:
+            failures.append(
+                {
+                    "replicate": replicate,
+                    "resampling_unit": resampling_unit,
+                    "error_type": type(error).__name__,
+                    "message": str(error),
+                }
+            )
+
+    if len(estimates) < 2:
+        raise ValueError(
+            "causal bootstrap needs at least two successful replicates; "
+            f"received {len(estimates)} of {policy.bootstrap_replicates}"
+        )
+
+    bootstrap = np.asarray(estimates)
+    alpha = (1.0 - policy.confidence_level) / 2.0
+    status = "partial" if failures else "available"
+    return {
+        "status": status,
+        "method": "nonparametric_percentile_bootstrap",
+        "bootstrap_replicates": policy.bootstrap_replicates,
+        "successful_replicates": len(estimates),
+        "failed_replicates": len(failures),
+        "confidence_level": policy.confidence_level,
+        "seed": policy.seed,
+        "resampling_unit": resampling_unit,
+        "source_unit_count": source_unit_count,
+        "source_row_count": source_row_count,
+        "draws": draws,
+        "failures": failures,
+        "reference_checks": {
+            "successful": len(estimates),
+            "failed": len(failures),
+            "requirement": "every accepted replicate passes its independent "
+            "point-estimate reference check",
+        },
+        "bootstrap_intervals": [
+            [float(item) for item in np.quantile(bootstrap, alpha, axis=0)],
+            [
+                float(item)
+                for item in np.quantile(bootstrap, 1.0 - alpha, axis=0)
+            ],
+        ],
+    }
+
+
+def draw_causal_bootstrap_sample(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray | None,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict[str, Any]]:
+    """Draw one causal bootstrap sample and its auditable unit evidence."""
+    if clusters is None:
+        indices = rng.integers(0, len(values), size=len(values))
+        return (
+            matrix[indices],
+            values[indices],
+            None,
+            {
+                "sampled_rows": len(indices),
+                "source_unit_count": len(values),
+                "sample_digest": bootstrap_sample_digest(indices),
+            },
+        )
+
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "cluster labels must be hashable for clustered bootstrap"
+        ) from error
+    if len(labels) < 2:
+        raise ValueError(
+            "clustered bootstrap needs at least two source clusters"
+        )
+    source_indices = rng.integers(0, len(labels), size=len(labels))
+    row_groups = [
+        np.flatnonzero(clusters == labels[index]) for index in source_indices
+    ]
+    indices = np.concatenate(row_groups)
+    sampled_clusters = np.repeat(
+        np.arange(len(row_groups), dtype=object),
+        [len(group) for group in row_groups],
+    )
+    return (
+        matrix[indices],
+        values[indices],
+        sampled_clusters,
+        {
+            "sampled_rows": len(indices),
+            "sampled_units": len(row_groups),
+            "source_unit_count": len(labels),
+            "sample_digest": bootstrap_sample_digest(source_indices),
+        },
+    )
+
+
+def bootstrap_sample_digest(indices: np.ndarray) -> str:
+    """Return a digest of bootstrap draw indices without exposing raw rows."""
+    canonical = np.asarray(indices, dtype="<i8").tobytes()
+    return hashlib.sha256(canonical).hexdigest()
 
 
 __all__ = [

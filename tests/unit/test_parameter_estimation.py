@@ -2,11 +2,13 @@
 
 import json
 from types import SimpleNamespace
+from typing import Any
 from typing import Literal
 
 import numpy as np
 import pytest
 
+from scml.evaluation import parameter_estimation as estimation_module
 from scml.evaluation.parameter_estimation import BayesianPrior
 from scml.evaluation.parameter_estimation import EstimandSpec
 from scml.evaluation.parameter_estimation import estimate_parameters
@@ -546,6 +548,181 @@ def test_aipw_ate_cross_fitting_is_deterministic_and_auditable():
     )
     assert first.to_dict()["policy"]["cross_fitting_folds"] == 5
     json.dumps(first.to_dict())
+
+
+@pytest.mark.parametrize("estimator", ["ipw_ate", "aipw_ate"])
+def test_causal_row_bootstrap_is_reproducible_and_reports_intervals(
+    estimator: Literal["ipw_ate", "aipw_ate"],
+):
+    """Causal row bootstrap retains assumptions and reference evidence."""
+    fixture = clustered_causal_fixture()
+    features, outcome = fixture[0], fixture[1]
+    policy = EstimationPolicy(
+        estimator=estimator,
+        covariance="iid",
+        treatment_position=0,
+        propensity_clip=0.02,
+        bootstrap_replicates=4,
+        seed=31,
+        cross_fitting_folds=3 if estimator == "aipw_ate" else 1,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+
+    first = estimate_parameters(features, outcome, causal_estimand(), policy)
+    second = estimate_parameters(features, outcome, causal_estimand(), policy)
+    sampling = first.sensitivity["sampling"]
+
+    assert first.to_dict() == second.to_dict()
+    assert sampling["status"] == "available"
+    assert sampling["method"] == "nonparametric_percentile_bootstrap"
+    assert sampling["resampling_unit"] == "row"
+    assert sampling["source_unit_count"] == len(outcome)
+    assert sampling["successful_replicates"] == 4
+    assert sampling["failed_replicates"] == 0
+    assert sampling["reference_checks"]["successful"] == 4
+    assert len(sampling["draws"]) == 4
+    assert all(
+        len(interval) == 1 for interval in sampling["bootstrap_intervals"]
+    )
+    assert (
+        sampling["bootstrap_intervals"][0][0]
+        <= sampling["bootstrap_intervals"][1][0]
+    )
+    assert first.policy.causal_assumptions == (
+        "consistency",
+        "conditional_exchangeability",
+        "positivity",
+    )
+
+
+@pytest.mark.parametrize("estimator", ["ipw_ate", "aipw_ate"])
+def test_causal_cluster_bootstrap_resamples_whole_clusters(
+    estimator: Literal["ipw_ate", "aipw_ate"],
+):
+    """Clustered causal bootstrap records cluster-unit and covariance evidence."""
+    features, outcome, clusters = clustered_causal_fixture()
+    policy = clustered_causal_policy(estimator)
+    policy = EstimationPolicy(
+        **{
+            **policy.to_dict(),
+            "bootstrap_replicates": 4,
+            "seed": 47,
+        }
+    )
+
+    result = estimate_parameters(
+        features,
+        outcome,
+        causal_estimand(),
+        policy,
+        clusters=clusters,
+    )
+    sampling = result.sensitivity["sampling"]
+
+    assert sampling["status"] == "available"
+    assert sampling["resampling_unit"] == "cluster"
+    assert sampling["source_unit_count"] == 20
+    assert sampling["source_row_count"] == len(outcome)
+    assert sampling["successful_replicates"] == 4
+    assert sampling["failed_replicates"] == 0
+    assert all(draw["sampled_units"] == 20 for draw in sampling["draws"])
+    assert result.diagnostics["uncertainty_method"] == (
+        "clustered_centered_influence_function"
+    )
+    assert result.reference["passed"] is True
+
+
+def test_causal_bootstrap_records_failed_replicates(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """An invalid replicate is recorded and excluded from intervals."""
+    fixture = clustered_causal_fixture()
+    features, outcome = fixture[0], fixture[1]
+    policy = EstimationPolicy(
+        estimator="ipw_ate",
+        covariance="iid",
+        treatment_position=0,
+        propensity_clip=0.02,
+        bootstrap_replicates=4,
+        seed=53,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+    original_fit = estimation_module.fit_ipw_ate
+    calls = 0
+
+    def fail_one_replicate(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ValueError("forced invalid bootstrap replicate")
+        return original_fit(*args, **kwargs)
+
+    monkeypatch.setattr(estimation_module, "fit_ipw_ate", fail_one_replicate)
+    result = estimate_parameters(features, outcome, causal_estimand(), policy)
+    sampling = result.sensitivity["sampling"]
+
+    assert sampling["status"] == "partial"
+    assert sampling["successful_replicates"] == 3
+    assert sampling["failed_replicates"] == 1
+    assert sampling["failures"] == [
+        {
+            "replicate": 0,
+            "resampling_unit": "row",
+            "error_type": "ValueError",
+            "message": "forced invalid bootstrap replicate",
+        }
+    ]
+    assert sampling["reference_checks"] == {
+        "successful": 3,
+        "failed": 1,
+        "requirement": "every accepted replicate passes its independent "
+        "point-estimate reference check",
+    }
+
+
+def test_causal_bootstrap_fails_closed_when_too_few_replicates_succeed(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Bootstrap intervals are not emitted when evidence is insufficient."""
+    fixture = clustered_causal_fixture()
+    features, outcome = fixture[0], fixture[1]
+    policy = EstimationPolicy(
+        estimator="aipw_ate",
+        covariance="iid",
+        treatment_position=0,
+        propensity_clip=0.02,
+        bootstrap_replicates=3,
+        seed=59,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+    original_fit = estimation_module.fit_aipw_ate
+    calls = 0
+
+    def fail_bootstrap(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise ValueError("forced bootstrap failure")
+        return original_fit(*args, **kwargs)
+
+    monkeypatch.setattr(estimation_module, "fit_aipw_ate", fail_bootstrap)
+    with pytest.raises(
+        ValueError,
+        match="at least two successful replicates; received 0 of 3",
+    ):
+        estimate_parameters(features, outcome, causal_estimand(), policy)
 
 
 def test_aipw_cross_fitting_validates_policy_and_fold_support():
