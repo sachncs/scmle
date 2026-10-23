@@ -36,8 +36,10 @@ must not be described as production-ready until every required gate is green.
 - [ ] Run the [operational rehearsal](OPERATIONS_REHEARSAL.md) covering
   interruption, resume, rollback, signing-key rotation, and monitoring
   handoff.
-- [ ] Review the reference HTTP adapter against the deployment threat model;
-  it remains gateway-only and does not provide authentication or TLS.
+- [x] Review the reference HTTP adapter against the deployment threat model;
+  bounded bodies, request I/O timeouts, daemonized workers, minimal response
+  fingerprinting, and security headers are enforced. It remains gateway-only
+  and does not provide authentication or TLS.
 - [ ] Promote the package version and classifier only after the above gates are
   green and the changelog contains the release decision.
 

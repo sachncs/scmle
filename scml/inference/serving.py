@@ -116,6 +116,7 @@ class HttpServing(ServingAdapter):
         port: int = 0,
         max_request_bytes: int = MAX_REQUEST_BYTES,
         max_records: int = MAX_REQUEST_RECORDS,
+        request_timeout_seconds: float = 10.0,
     ) -> None:
         """Initializes the adapter.
 
@@ -125,17 +126,23 @@ class HttpServing(ServingAdapter):
             port: Port; 0 picks a free one.
             max_request_bytes: Maximum JSON request body size.
             max_records: Maximum records accepted by one prediction request.
+            request_timeout_seconds: Maximum time allowed for request I/O.
 
         Raises:
-            ValueError: If a request bound is not positive.
+            ValueError: If a request bound or timeout is not positive.
         """
-        if max_request_bytes < 1 or max_records < 1:
-            raise ValueError("request bounds must be positive")
+        if (
+            max_request_bytes < 1
+            or max_records < 1
+            or request_timeout_seconds <= 0
+        ):
+            raise ValueError("request bounds and timeout must be positive")
         super().__init__(bundle)
         self.host = host
         self.port = port
         self.max_request_bytes = max_request_bytes
         self.max_records = max_records
+        self.request_timeout_seconds = request_timeout_seconds
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
 
@@ -152,7 +159,18 @@ class HttpServing(ServingAdapter):
             raise errors.ScmlError("server is already running")
         adapter = self
 
+        class ReferenceServer(server.ThreadingHTTPServer):
+            daemon_threads = True
+            allow_reuse_address = True
+
         class Handler(server.BaseHTTPRequestHandler):
+            def setup(self) -> None:
+                super().setup()
+                self.connection.settimeout(adapter.request_timeout_seconds)
+
+            def version_string(self) -> str:
+                return "scml-reference"
+
             def send_json(self, status: int, payload: dict[str, Any]) -> None:
                 body = json.dumps(payload).encode()
                 self.send_response(status)
@@ -307,7 +325,7 @@ class HttpServing(ServingAdapter):
             def log_message(self, format: str, *args: Any) -> None:
                 """Silences per-request logging."""
 
-        self.httpd = server.ThreadingHTTPServer((self.host, self.port), Handler)
+        self.httpd = ReferenceServer((self.host, self.port), Handler)
         self.thread = threading.Thread(
             target=self.httpd.serve_forever, daemon=True
         )

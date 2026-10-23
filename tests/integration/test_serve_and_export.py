@@ -135,6 +135,9 @@ def test_the_server_rejects_invalid_request_bounds(saved):
     with pytest.raises(ValueError, match="request bounds"):
         serving.HttpServing(model, max_records=0)
 
+    with pytest.raises(ValueError, match="timeout"):
+        serving.HttpServing(model, request_timeout_seconds=0)
+
 
 def test_the_server_classifies_malformed_and_internal_requests(
     saved, monkeypatch
@@ -188,6 +191,7 @@ def test_health_reports_the_model_version_and_checksum(saved):
     assert len(health["model_sha256"]) == 64
     assert headers["Cache-Control"] == "no-store"
     assert headers["X-Content-Type-Options"] == "nosniff"
+    assert headers["Server"] == "scml-reference"
 
 
 def test_the_server_rejects_starting_twice(saved):

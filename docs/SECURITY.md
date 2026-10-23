@@ -25,6 +25,8 @@ file-write path, plus `bandit -r scml` and `pip-audit` (both run in CI).
 | SQL injection | Tracking SQL binds every value; dynamic column names come from a fixed whitelist | `tests/unit/test_tracking.py` |
 | Resource leaks | SQLite connections are closed on every call | leak test with `ResourceWarning` as error |
 | Oversized request bodies | The HTTP adapter answers 413 above 16 MiB instead of reading the body | `tests/integration/test_serve_and_export.py` |
+| Slow or abandoned HTTP clients | Each connection has a positive I/O timeout and worker threads are daemonized; the adapter remains gateway-only | `tests/integration/test_serve_and_export.py` |
+| Server fingerprint disclosure | The reference handler emits a stable minimal `Server` header without the Python runtime version | `tests/integration/test_serve_and_export.py` |
 | Secrets | No credentials are read, stored or logged; the signing key lives only in the environment | review |
 | Supply chain | Releases use PyPI trusted publishing (OIDC), no stored token; `pip-audit` gates CI | `.github/workflows` |
 | Signing-key lifecycle | Public key metadata records identity, owner, expiry, retirement, replacement, and emergency revocation without storing secret material | `tests/unit/test_keyring.py` |
