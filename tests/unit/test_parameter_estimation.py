@@ -1036,6 +1036,131 @@ def test_hierarchical_linear_selects_bounded_reml_method():
     assert result.reference["passed"] is True
 
 
+def make_hierarchical_random_slope_fixture() -> tuple[
+    np.ndarray, np.ndarray, np.ndarray
+]:
+    """Return deterministic data with a declared random signal slope."""
+    rng = np.random.default_rng(151)
+    clusters = np.repeat(np.arange(14), 20)
+    signal = rng.normal(size=len(clusters))
+    random_intercepts = rng.normal(scale=0.75, size=14)
+    random_slopes = rng.normal(scale=0.35, size=14)
+    outcome = (
+        1.1
+        + 0.7 * signal
+        + random_intercepts[clusters]
+        + random_slopes[clusters] * signal
+        + rng.normal(scale=0.3, size=len(clusters))
+    )
+    return signal.reshape(-1, 1), outcome, clusters
+
+
+def make_hierarchical_random_slope_policy(
+    method: Literal["moment_gls", "reml"] = "moment_gls",
+) -> EstimationPolicy:
+    """Return a policy declaring one random slope for the signal feature."""
+    return EstimationPolicy(
+        estimator="hierarchical_linear",
+        covariance="iid",
+        cluster_name="site_id",
+        hierarchical_assumptions=(
+            "random_intercept",
+            "random_slope",
+            "cluster_independence",
+            "random_effect_exogeneity",
+            "constant_residual_variance",
+        ),
+        hierarchical_method=method,
+        random_slope_position=0,
+    )
+
+
+def test_hierarchical_linear_supports_one_declared_random_slope():
+    """Moment GLS records the declared slope covariance and limitations."""
+    features, outcome, clusters = make_hierarchical_random_slope_fixture()
+    result = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        make_hierarchical_random_slope_policy(),
+        clusters=clusters,
+    )
+
+    assert result.parameters[1].estimate == pytest.approx(0.7, abs=0.15)
+    assert result.policy.random_slope_position == 0
+    assert result.diagnostics["estimator_family"] == (
+        "hierarchical_random_intercept_slope"
+    )
+    assert result.diagnostics["random_slope_position"] == 0
+    assert result.diagnostics["random_slope_variance"] >= 0.0
+    assert len(result.diagnostics["random_effect_covariance"]) == 2
+    assert result.diagnostics["variance_component_uncertainty"] == (
+        "not_propagated"
+    )
+    assert (
+        "only one random slope is supported"
+        in result.diagnostics["limitations"]
+    )
+    assert (
+        "fully Bayesian multilevel inference is unsupported"
+        in result.diagnostics["limitations"]
+    )
+    assert result.reference["method"].endswith(
+        "dense_random_intercept_slope_covariance"
+    )
+    assert result.reference["passed"] is True
+    serialized = json.loads(json.dumps(result.to_dict()))
+    restored = EstimationResult.from_dict(serialized)
+    assert restored.to_dict() == result.to_dict()
+
+
+def test_hierarchical_linear_random_slope_supports_bounded_reml():
+    """Bounded REML handles the one-slope covariance block independently."""
+    features, outcome, clusters = make_hierarchical_random_slope_fixture()
+    result = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        make_hierarchical_random_slope_policy("reml"),
+        clusters=clusters,
+    )
+
+    assert result.diagnostics["method"] == "bounded_reml_gls"
+    assert result.diagnostics["optimizer"]["success"] is True
+    assert result.diagnostics["optimizer"]["correlation_bounds"] == [
+        -0.999999,
+        0.999999,
+    ]
+    assert result.reference["passed"] is True
+    assert result.reference["objective_difference"] < 1e-5
+
+
+def test_hierarchical_random_slope_policy_is_strictly_declared():
+    """Slope position cannot be silently broadened or left out of bounds."""
+    with pytest.raises(ValueError, match="non-negative integer"):
+        EstimationPolicy(
+            estimator="hierarchical_linear",
+            cluster_name="site_id",
+            random_slope_position=True,
+        )
+    with pytest.raises(ValueError, match="only by hierarchical_linear"):
+        EstimationPolicy(estimator="linear", random_slope_position=0)
+    features, outcome, clusters = make_hierarchical_random_slope_fixture()
+    with pytest.raises(ValueError, match="outside the feature matrix"):
+        estimate_parameters(
+            features,
+            outcome,
+            hierarchical_estimand(),
+            EstimationPolicy(
+                **{
+                    **make_hierarchical_random_slope_policy().to_dict(),
+                    "random_slope_position": 1,
+                }
+            ),
+            clusters=clusters,
+        )
+
+
 def test_hierarchical_linear_reml_is_deterministic():
     """Identical inputs and policy produce identical REML evidence."""
     features, outcome, clusters = make_hierarchical_reml_fixture()

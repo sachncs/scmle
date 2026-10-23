@@ -48,6 +48,7 @@ CausalAssumption = Literal[
 ]
 HierarchicalAssumption = Literal[
     "random_intercept",
+    "random_slope",
     "cluster_independence",
     "random_effect_exogeneity",
     "constant_residual_variance",
@@ -70,6 +71,9 @@ REQUIRED_HIERARCHICAL_ASSUMPTIONS = frozenset(
         "random_effect_exogeneity",
         "constant_residual_variance",
     }
+)
+REQUIRED_HIERARCHICAL_RANDOM_SLOPE_ASSUMPTIONS = frozenset(
+    {*REQUIRED_HIERARCHICAL_ASSUMPTIONS, "random_slope"}
 )
 
 
@@ -188,6 +192,7 @@ class EstimationPolicy:
     cross_fitting_folds: int = 1
     hierarchical_method: HierarchicalMethod = "moment_gls"
     reml_variance_bounds: tuple[float, float] = DEFAULT_REML_VARIANCE_BOUNDS
+    random_slope_position: int | None = None
 
     def __post_init__(self) -> None:
         """Validate the policy before data is touched."""
@@ -232,6 +237,14 @@ class EstimationPolicy:
             raise ValueError("cross_fitting_folds must be a positive integer")
         if self.hierarchical_method not in ("moment_gls", "reml"):
             raise ValueError("hierarchical_method must be moment_gls or reml")
+        if self.random_slope_position is not None and (
+            isinstance(self.random_slope_position, bool)
+            or not isinstance(self.random_slope_position, int)
+            or self.random_slope_position < 0
+        ):
+            raise ValueError(
+                "random_slope_position must be a non-negative integer or None"
+            )
         try:
             lower_variance_bound, upper_variance_bound = (
                 float(value) for value in self.reml_variance_bounds
@@ -351,15 +364,20 @@ class EstimationPolicy:
                 )
             if not self.cluster_name:
                 raise ValueError("hierarchical_linear requires cluster_name")
+            required_hierarchical_assumptions = (
+                REQUIRED_HIERARCHICAL_RANDOM_SLOPE_ASSUMPTIONS
+                if self.random_slope_position is not None
+                else REQUIRED_HIERARCHICAL_ASSUMPTIONS
+            )
             if (
                 len(self.hierarchical_assumptions)
                 != len(set(self.hierarchical_assumptions))
                 or set(self.hierarchical_assumptions)
-                != REQUIRED_HIERARCHICAL_ASSUMPTIONS
+                != required_hierarchical_assumptions
             ):
                 raise ValueError(
-                    "hierarchical_linear requires all random-intercept "
-                    "assumptions"
+                    "hierarchical_linear requires all assumptions for its "
+                    "declared random-effects structure"
                 )
         elif self.prior is not None:
             raise ValueError(
@@ -367,6 +385,11 @@ class EstimationPolicy:
                 "bayesian_ate"
             )
         if self.estimator != "hierarchical_linear":
+            if self.random_slope_position is not None:
+                raise ValueError(
+                    "random_slope_position is supported only by "
+                    "hierarchical_linear"
+                )
             if self.hierarchical_method != "moment_gls":
                 raise ValueError(
                     "hierarchical_method is supported only by "
@@ -394,6 +417,7 @@ class EstimationPolicy:
             values.pop("hierarchical_assumptions")
             values.pop("hierarchical_method")
             values.pop("reml_variance_bounds")
+            values.pop("random_slope_position")
         if self.prior is not None:
             values["prior"] = self.prior.to_dict()
         return values
@@ -677,6 +701,11 @@ def estimate_parameters(
     if policy.estimator in ("hierarchical_linear",) and input_clusters is None:
         raise ValueError("hierarchical_linear requires cluster labels")
     if (
+        policy.random_slope_position is not None
+        and policy.random_slope_position >= matrix.shape[1]
+    ):
+        raise ValueError("random_slope_position is outside the feature matrix")
+    if (
         policy.estimator in {"ipw_ate", "aipw_ate"}
         and input_clusters is not None
         and policy.covariance != "clustered"
@@ -908,8 +937,33 @@ def estimate_parameters(
             diagnostics,
             residual_variance,
             random_intercept_variance,
+            random_effect_covariance,
         ) = fit_hierarchical_linear(design, values, cluster_values, policy)
-        if policy.hierarchical_method == "reml":
+        if policy.random_slope_position is not None:
+            if policy.hierarchical_method == "reml":
+                reference = reference_hierarchical_random_slope_reml(
+                    design,
+                    values,
+                    cluster_values,
+                    policy.random_slope_position,
+                    residual_variance,
+                    random_effect_covariance,
+                    coefficients,
+                    diagnostics["reml_objective"],
+                    policy,
+                )
+            else:
+                reference = reference_hierarchical_random_slope(
+                    design,
+                    values,
+                    cluster_values,
+                    policy.random_slope_position,
+                    residual_variance,
+                    random_effect_covariance,
+                    coefficients,
+                    policy,
+                )
+        elif policy.hierarchical_method == "reml":
             reference = reference_hierarchical_reml(
                 design,
                 values,
@@ -1806,14 +1860,24 @@ def fit_hierarchical_linear(
     values: np.ndarray,
     clusters: np.ndarray,
     policy: EstimationPolicy,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any], float, float]:
-    """Fit a bounded two-stage random-intercept linear model.
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    dict[str, Any],
+    float,
+    float,
+    np.ndarray,
+]:
+    """Fit a bounded two-stage hierarchical linear model.
 
     The default estimates variance components by moments from an initial
     fixed-effect fit.  The bounded REML policy uses a deterministic profile
     likelihood over the residual and random-intercept variances, followed by
-    generalized least squares for the fixed effects.
+    generalized least squares for the fixed effects.  When a random slope is
+    declared, the same methods use one random-intercept/random-slope block.
     """
+    if policy.random_slope_position is not None:
+        return fit_hierarchical_random_slope(design, values, clusters, policy)
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
@@ -1914,6 +1978,469 @@ def fit_hierarchical_linear(
         diagnostics,
         residual_variance,
         random_intercept_variance,
+        np.array([[random_intercept_variance, 0.0], [0.0, 0.0]], dtype=float),
+    )
+
+
+def fit_hierarchical_random_slope(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    policy: EstimationPolicy,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    dict[str, Any],
+    float,
+    float,
+    np.ndarray,
+]:
+    """Fit one random slope with a random intercept by moments or REML."""
+    random_slope_position = policy.random_slope_position
+    if random_slope_position is None:
+        raise ValueError("random slope position must be declared")
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "hierarchical cluster labels must be hashable"
+        ) from error
+    if len(labels) < 2:
+        raise ValueError("hierarchical_linear needs at least two clusters")
+    if np.linalg.matrix_rank(design) != design.shape[1]:
+        raise ValueError("hierarchical design matrix is rank deficient")
+    initial_coefficients = np.linalg.lstsq(design, values, rcond=None)[0]
+    initial_residuals = values - design @ initial_coefficients
+    random_effect_estimates = []
+    random_effect_inverse_matrices = []
+    cluster_sizes = []
+    within_sum_of_squares = 0.0
+    for label in labels:
+        group = clusters == label
+        group_design = design[group]
+        random_effect_design = np.column_stack(
+            (
+                np.ones(int(np.sum(group))),
+                group_design[:, random_slope_position + 1],
+            )
+        )
+        if np.linalg.matrix_rank(random_effect_design) != 2:
+            raise ValueError(
+                "each hierarchical cluster needs within-cluster variation "
+                "for the declared random slope"
+            )
+        inverse_matrix = np.linalg.solve(
+            random_effect_design.T @ random_effect_design,
+            np.eye(2),
+        )
+        group_residuals = initial_residuals[group]
+        random_effect_estimates.append(
+            inverse_matrix @ random_effect_design.T @ group_residuals
+        )
+        random_effect_inverse_matrices.append(inverse_matrix)
+        cluster_sizes.append(int(np.sum(group)))
+        centered = group_residuals - np.mean(group_residuals)
+        within_sum_of_squares += float(np.sum(centered**2))
+    residual_variance = within_sum_of_squares / max(
+        len(values) - len(labels), 1
+    )
+    if not math.isfinite(residual_variance) or residual_variance <= 1e-12:
+        raise ValueError(
+            "hierarchical_linear needs positive within-cluster variance"
+        )
+    effects = np.asarray(random_effect_estimates, dtype=float)
+    centered_effects = effects - effects.mean(axis=0)
+    effect_covariance = (
+        centered_effects.T @ centered_effects / (len(labels) - 1)
+    )
+    effect_covariance -= residual_variance * np.mean(
+        np.asarray(random_effect_inverse_matrices), axis=0
+    )
+    random_effect_covariance = project_random_effect_covariance(
+        effect_covariance
+    )
+    if policy.hierarchical_method == "reml":
+        return fit_hierarchical_random_slope_reml(
+            design,
+            values,
+            clusters,
+            labels,
+            random_slope_position,
+            residual_variance,
+            random_effect_covariance,
+            cluster_sizes,
+            policy,
+        )
+    information, right_hand_side = hierarchical_random_slope_gls_system(
+        design,
+        values,
+        clusters,
+        labels,
+        random_slope_position,
+        residual_variance,
+        random_effect_covariance,
+    )
+    try:
+        coefficients = np.linalg.solve(information, right_hand_side)
+        covariance = np.linalg.solve(information, np.eye(design.shape[1]))
+    except np.linalg.LinAlgError as error:
+        raise ValueError(
+            "hierarchical GLS system is not identifiable"
+        ) from error
+    diagnostics = hierarchical_random_slope_diagnostics(
+        labels,
+        random_slope_position,
+        residual_variance,
+        random_effect_covariance,
+        cluster_sizes,
+        method="two_stage_moment_gls",
+    )
+    return (
+        coefficients,
+        covariance,
+        diagnostics,
+        residual_variance,
+        float(random_effect_covariance[0, 0]),
+        random_effect_covariance,
+    )
+
+
+def project_random_effect_covariance(covariance: np.ndarray) -> np.ndarray:
+    """Project a moment covariance to the positive-semidefinite cone."""
+    symmetric = (covariance + covariance.T) / 2.0
+    eigenvalues, eigenvectors = np.linalg.eigh(symmetric)
+    projected = eigenvectors @ np.diag(np.maximum(eigenvalues, 0.0))
+    projected = projected @ eigenvectors.T
+    return (projected + projected.T) / 2.0
+
+
+def hierarchical_random_slope_gls_system(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    labels: tuple[Any, ...],
+    random_slope_position: int,
+    residual_variance: float,
+    random_effect_covariance: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build the GLS system for one random slope and intercept."""
+    information = np.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = np.zeros(design.shape[1])
+    for label in labels:
+        group = clusters == label
+        group_design = design[group]
+        random_effect_design = np.column_stack(
+            (
+                np.ones(group_design.shape[0]),
+                group_design[:, random_slope_position + 1],
+            )
+        )
+        precision = hierarchical_random_effect_precision(
+            random_effect_design,
+            residual_variance,
+            random_effect_covariance,
+        )
+        information += group_design.T @ precision @ group_design
+        right_hand_side += group_design.T @ precision @ values[group]
+    return information, right_hand_side
+
+
+def hierarchical_random_effect_precision(
+    random_effect_design: np.ndarray,
+    residual_variance: float,
+    random_effect_covariance: np.ndarray,
+) -> np.ndarray:
+    """Return dense precision for one random-effect covariance block."""
+    count = random_effect_design.shape[0]
+    covariance = (
+        residual_variance * np.eye(count)
+        + random_effect_design
+        @ random_effect_covariance
+        @ random_effect_design.T
+    )
+    try:
+        return linalg.solve(covariance, np.eye(count), assume_a="pos")
+    except np.linalg.LinAlgError as error:
+        raise ValueError(
+            "hierarchical random-effect covariance is not positive definite"
+        ) from error
+
+
+def hierarchical_random_slope_diagnostics(
+    labels: tuple[Any, ...],
+    random_slope_position: int,
+    residual_variance: float,
+    random_effect_covariance: np.ndarray,
+    cluster_sizes: list[int],
+    method: str,
+) -> dict[str, Any]:
+    """Build auditable diagnostics for the one-random-slope model."""
+    random_intercept_variance = float(random_effect_covariance[0, 0])
+    random_slope_variance = float(random_effect_covariance[1, 1])
+    covariance = float(random_effect_covariance[0, 1])
+    denominator = math.sqrt(
+        max(random_intercept_variance * random_slope_variance, 0.0)
+    )
+    correlation = covariance / denominator if denominator > 0.0 else 0.0
+    total_variance = residual_variance + random_intercept_variance
+    return {
+        "converged": True,
+        "iterations": 2,
+        "estimator_family": "hierarchical_random_intercept_slope",
+        "method": method,
+        "cluster_count": len(labels),
+        "cluster_size_min": min(cluster_sizes),
+        "cluster_size_max": max(cluster_sizes),
+        "random_slope_position": random_slope_position,
+        "residual_variance": residual_variance,
+        "random_intercept_variance": random_intercept_variance,
+        "random_slope_variance": random_slope_variance,
+        "random_intercept_slope_covariance": covariance,
+        "random_effect_correlation": correlation,
+        "random_effect_covariance": random_effect_covariance.tolist(),
+        "intraclass_correlation": random_intercept_variance / total_variance,
+        "random_intercept_status": (
+            "estimated" if random_intercept_variance > 0.0 else "boundary_zero"
+        ),
+        "random_slope_status": (
+            "estimated" if random_slope_variance > 0.0 else "boundary_zero"
+        ),
+        "variance_component_method": (
+            "moment_estimate_from_initial_ols_random_effects"
+            if method == "two_stage_moment_gls"
+            else "profile_reml_with_l_bfgs_b"
+        ),
+        "uncertainty_method": "conditional_on_variance_components",
+        "variance_component_uncertainty": "not_propagated",
+        "limitations": [
+            "only one random slope is supported",
+            "nested effects are unsupported",
+            "crossed effects are unsupported",
+            "fully Bayesian multilevel inference is unsupported",
+            "variance-component uncertainty is not propagated",
+        ],
+        "observed_random_effect_structure": "intercept_and_declared_slope",
+        "random_effect_covariance_evidence": {
+            "positive_semidefinite_projection": True,
+            "covariance_is_conditional": True,
+        },
+    }
+
+
+def fit_hierarchical_random_slope_reml(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    labels: tuple[Any, ...],
+    random_slope_position: int,
+    initial_residual_variance: float,
+    initial_random_effect_covariance: np.ndarray,
+    cluster_sizes: list[int],
+    policy: EstimationPolicy,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    dict[str, Any],
+    float,
+    float,
+    np.ndarray,
+]:
+    """Fit the one-random-slope model with bounded profile REML."""
+    lower_bound, upper_bound = policy.reml_variance_bounds
+    intercept_variance = max(float(initial_random_effect_covariance[0, 0]), 0.0)
+    slope_variance = max(float(initial_random_effect_covariance[1, 1]), 0.0)
+    if intercept_variance <= 0.0:
+        intercept_variance = initial_residual_variance
+    if slope_variance <= 0.0:
+        slope_variance = initial_residual_variance
+    initial_variances = np.clip(
+        np.asarray(
+            [
+                initial_residual_variance,
+                intercept_variance,
+                slope_variance,
+            ],
+            dtype=float,
+        ),
+        lower_bound,
+        upper_bound,
+    )
+    scale = math.sqrt(intercept_variance * slope_variance)
+    initial_correlation = (
+        float(initial_random_effect_covariance[0, 1]) / scale
+        if scale > 0.0
+        else 0.0
+    )
+    initial_correlation = float(np.clip(initial_correlation, -0.999, 0.999))
+    initial_parameters = np.concatenate(
+        (np.log(initial_variances), [np.arctanh(initial_correlation)])
+    )
+    log_bounds = (
+        (math.log(lower_bound), math.log(upper_bound)),
+        (math.log(lower_bound), math.log(upper_bound)),
+        (math.log(lower_bound), math.log(upper_bound)),
+        (-8.0, 8.0),
+    )
+    optimizer_result = optimize.minimize(
+        random_slope_reml_profile_objective,
+        initial_parameters,
+        args=(design, values, clusters, labels, random_slope_position),
+        method="L-BFGS-B",
+        bounds=log_bounds,
+        options={
+            "maxiter": policy.max_iterations,
+            "ftol": policy.tolerance,
+            "gtol": policy.tolerance,
+        },
+    )
+    validate_reml_optimizer_result(optimizer_result, log_bounds, dimension=4)
+    point = np.asarray(optimizer_result.x, dtype=float)
+    variance_components = np.exp(point[:3])
+    residual_variance = float(variance_components[0])
+    random_effect_covariance = random_slope_covariance_from_reml_point(
+        variance_components, float(point[3])
+    )
+    information, right_hand_side = hierarchical_random_slope_gls_system(
+        design,
+        values,
+        clusters,
+        labels,
+        random_slope_position,
+        residual_variance,
+        random_effect_covariance,
+    )
+    try:
+        coefficients = np.linalg.solve(information, right_hand_side)
+        covariance = np.linalg.solve(information, np.eye(design.shape[1]))
+    except np.linalg.LinAlgError as error:
+        raise ValueError(
+            "hierarchical REML GLS system is not identifiable"
+        ) from error
+    diagnostics = hierarchical_random_slope_diagnostics(
+        labels,
+        random_slope_position,
+        residual_variance,
+        random_effect_covariance,
+        cluster_sizes,
+        method="bounded_reml_gls",
+    )
+    jacobian = np.asarray(optimizer_result.jac, dtype=float)
+    diagnostics.update(
+        {
+            "reml_objective": float(optimizer_result.fun),
+            "optimizer": {
+                "method": "L-BFGS-B",
+                "success": bool(optimizer_result.success),
+                "status": int(optimizer_result.status),
+                "message": str(optimizer_result.message),
+                "function_evaluations": int(optimizer_result.nfev),
+                "gradient_norm": float(np.linalg.norm(jacobian)),
+                "variance_bounds": [lower_bound, upper_bound],
+                "correlation_bounds": [-0.999999, 0.999999],
+            },
+        }
+    )
+    return (
+        coefficients,
+        covariance,
+        diagnostics,
+        residual_variance,
+        float(random_effect_covariance[0, 0]),
+        random_effect_covariance,
+    )
+
+
+def random_slope_covariance_from_reml_point(
+    variance_components: np.ndarray,
+    correlation_parameter: float,
+) -> np.ndarray:
+    """Construct a positive-definite random-effect covariance from REML."""
+    correlation = 0.999999 * math.tanh(correlation_parameter)
+    intercept_variance, slope_variance = variance_components[1:]
+    covariance = correlation * math.sqrt(intercept_variance * slope_variance)
+    return np.asarray(
+        [
+            [intercept_variance, covariance],
+            [covariance, slope_variance],
+        ],
+        dtype=float,
+    )
+
+
+def random_slope_reml_profile_objective(
+    parameters: np.ndarray,
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    labels: tuple[Any, ...],
+    random_slope_position: int,
+) -> float:
+    """Return the negative profile REML objective for one random slope."""
+    point = np.asarray(parameters, dtype=float)
+    if point.shape != (4,):
+        raise ValueError(
+            "random-slope REML needs four bounded covariance parameters"
+        )
+    variance_components = np.exp(point[:3])
+    if not np.isfinite(variance_components).all() or np.any(
+        variance_components <= 0.0
+    ):
+        return float("inf")
+    random_effect_covariance = random_slope_covariance_from_reml_point(
+        variance_components, float(point[3])
+    )
+    residual_variance = float(variance_components[0])
+    information, right_hand_side = hierarchical_random_slope_gls_system(
+        design,
+        values,
+        clusters,
+        labels,
+        random_slope_position,
+        residual_variance,
+        random_effect_covariance,
+    )
+    sign, logdet_information = np.linalg.slogdet(information)
+    if sign <= 0.0 or not math.isfinite(float(logdet_information)):
+        return float("inf")
+    try:
+        coefficients = np.linalg.solve(information, right_hand_side)
+    except np.linalg.LinAlgError:
+        return float("inf")
+    residuals = values - design @ coefficients
+    quadratic = 0.0
+    logdet_covariance = 0.0
+    for label in labels:
+        group = clusters == label
+        group_design = design[group]
+        random_effect_design = np.column_stack(
+            (
+                np.ones(group_design.shape[0]),
+                group_design[:, random_slope_position + 1],
+            )
+        )
+        covariance = (
+            residual_variance * np.eye(int(np.sum(group)))
+            + random_effect_design
+            @ random_effect_covariance
+            @ random_effect_design.T
+        )
+        sign_covariance, logdet = np.linalg.slogdet(covariance)
+        if sign_covariance <= 0.0:
+            return float("inf")
+        precision = linalg.solve(covariance, np.eye(covariance.shape[0]))
+        group_residuals = residuals[group]
+        quadratic += float(group_residuals @ precision @ group_residuals)
+        logdet_covariance += float(logdet)
+    observations = len(values)
+    parameters_count = design.shape[1]
+    return float(
+        0.5
+        * (
+            logdet_covariance
+            + logdet_information
+            + quadratic
+            + (observations - parameters_count) * math.log(2.0 * math.pi)
+        )
     )
 
 
@@ -1925,7 +2452,14 @@ def fit_hierarchical_reml(
     initial_residual_variance: float,
     initial_random_intercept_variance: float,
     policy: EstimationPolicy,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any], float, float]:
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    dict[str, Any],
+    float,
+    float,
+    np.ndarray,
+]:
     """Fit a bounded random-intercept model with profile REML."""
     lower_bound, upper_bound = policy.reml_variance_bounds
     initial_variances = np.clip(
@@ -2028,6 +2562,7 @@ def fit_hierarchical_reml(
         diagnostics,
         residual_variance,
         random_intercept_variance,
+        np.array([[random_intercept_variance, 0.0], [0.0, 0.0]], dtype=float),
     )
 
 
@@ -2095,7 +2630,8 @@ def reml_profile_objective(
 
 def validate_reml_optimizer_result(
     optimizer_result: optimize.OptimizeResult,
-    log_bounds: tuple[tuple[float, float], tuple[float, float]],
+    log_bounds: tuple[tuple[float, float], ...],
+    dimension: int = 2,
 ) -> None:
     """Reject an optimizer result that cannot support a release artifact."""
     if not bool(getattr(optimizer_result, "success", False)):
@@ -2120,7 +2656,7 @@ def validate_reml_optimizer_result(
             "REML optimizer returned invalid iteration diagnostics"
         )
     point = np.asarray(getattr(optimizer_result, "x", ()), dtype=float)
-    if point.shape != (2,) or not np.isfinite(point).all():
+    if point.shape != (dimension,) or not np.isfinite(point).all():
         raise ValueError("REML optimizer returned invalid variance components")
     for value, bounds in zip(point, log_bounds, strict=True):
         if value < bounds[0] or value > bounds[1]:
@@ -2129,7 +2665,7 @@ def validate_reml_optimizer_result(
     if not math.isfinite(objective):
         raise ValueError("REML optimizer returned an invalid objective")
     gradient = np.asarray(getattr(optimizer_result, "jac", ()), dtype=float)
-    if gradient.shape != (2,) or not np.isfinite(gradient).all():
+    if gradient.shape != (dimension,) or not np.isfinite(gradient).all():
         raise ValueError("REML optimizer returned invalid gradient diagnostics")
 
 
@@ -2597,6 +3133,122 @@ def reference_hierarchical_reml(
     }
 
 
+def reference_hierarchical_random_slope(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    random_slope_position: int,
+    residual_variance: float,
+    random_effect_covariance: np.ndarray,
+    coefficients: np.ndarray,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Verify one-random-slope GLS with an independent dense calculation."""
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "hierarchical cluster labels must be hashable"
+        ) from error
+    information = np.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = np.zeros(design.shape[1])
+    for label in labels:
+        group = clusters == label
+        group_design = design[group]
+        count = group_design.shape[0]
+        random_effect_design = np.column_stack(
+            (
+                np.ones(count),
+                group_design[:, random_slope_position + 1],
+            )
+        )
+        covariance = (
+            residual_variance * np.eye(count)
+            + random_effect_design
+            @ random_effect_covariance
+            @ random_effect_design.T
+        )
+        precision = linalg.solve(covariance, np.eye(count), assume_a="pos")
+        information += group_design.T @ precision @ group_design
+        right_hand_side += group_design.T @ precision @ values[group]
+    reference = linalg.solve(information, right_hand_side, assume_a="pos")
+    difference = float(np.max(np.abs(reference - coefficients)))
+    return {
+        "method": "scipy.linalg.solve:dense_random_intercept_slope_covariance",
+        "random_slope_position": random_slope_position,
+        "max_absolute_difference": difference,
+        "random_effect_covariance": random_effect_covariance.tolist(),
+        "passed": difference <= policy.reference_tolerance,
+    }
+
+
+def reference_hierarchical_random_slope_reml(
+    design: np.ndarray,
+    values: np.ndarray,
+    clusters: np.ndarray,
+    random_slope_position: int,
+    residual_variance: float,
+    random_effect_covariance: np.ndarray,
+    coefficients: np.ndarray,
+    objective: float,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Verify random-slope REML with independent dense block algebra."""
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "hierarchical cluster labels must be hashable"
+        ) from error
+    covariance_blocks = []
+    for label in labels:
+        group = clusters == label
+        group_design = design[group]
+        count = group_design.shape[0]
+        random_effect_design = np.column_stack(
+            (np.ones(count), group_design[:, random_slope_position + 1])
+        )
+        covariance_blocks.append(
+            residual_variance * np.eye(count)
+            + random_effect_design
+            @ random_effect_covariance
+            @ random_effect_design.T
+        )
+    covariance = linalg.block_diag(*covariance_blocks)
+    precision = linalg.solve(covariance, np.eye(len(values)), assume_a="pos")
+    information = design.T @ precision @ design
+    right_hand_side = design.T @ precision @ values
+    reference_coefficients = linalg.solve(
+        information, right_hand_side, assume_a="pos"
+    )
+    residuals = values - design @ reference_coefficients
+    sign_covariance, logdet_covariance = np.linalg.slogdet(covariance)
+    sign_information, logdet_information = np.linalg.slogdet(information)
+    if sign_covariance <= 0.0 or sign_information <= 0.0:
+        raise ValueError("reference REML covariance is not positive definite")
+    reference_objective = 0.5 * (
+        logdet_covariance
+        + logdet_information
+        + float(residuals @ precision @ residuals)
+        + (len(values) - design.shape[1]) * math.log(2.0 * math.pi)
+    )
+    coefficient_difference = float(
+        np.max(np.abs(reference_coefficients - coefficients))
+    )
+    objective_difference = float(abs(reference_objective - objective))
+    return {
+        "method": "scipy.linalg.solve:dense_random_intercept_slope_covariance",
+        "random_slope_position": random_slope_position,
+        "max_absolute_difference": coefficient_difference,
+        "objective_difference": objective_difference,
+        "random_effect_covariance": random_effect_covariance.tolist(),
+        "passed": bool(
+            coefficient_difference <= policy.reference_tolerance
+            and objective_difference <= policy.reference_tolerance * 10
+        ),
+    }
+
+
 def reference_bayesian_linear(
     design: np.ndarray,
     values: np.ndarray,
@@ -2871,12 +3523,21 @@ def hierarchical_bootstrap_sensitivity(
     estimates: list[np.ndarray] = []
     failures: list[dict[str, Any]] = []
     draws: list[dict[str, Any]] = []
-    limitations = [
-        "variance-component uncertainty is not propagated",
-        "random slopes are unsupported",
-        "nested effects are unsupported",
-        "crossed effects are unsupported",
-    ]
+    if policy.random_slope_position is None:
+        limitations = [
+            "variance-component uncertainty is not propagated",
+            "random slopes are unsupported",
+            "nested effects are unsupported",
+            "crossed effects are unsupported",
+        ]
+    else:
+        limitations = [
+            "variance-component uncertainty is not propagated",
+            "only one random slope is supported",
+            "nested effects are unsupported",
+            "crossed effects are unsupported",
+            "fully Bayesian multilevel inference is unsupported",
+        ]
     source_labels = tuple(dict.fromkeys(clusters.tolist()))
     source_unit_count = len(source_labels)
 
