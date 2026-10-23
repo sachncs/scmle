@@ -292,9 +292,10 @@ class EstimationPolicy:
                 raise ValueError(
                     f"a Bayesian prior is not valid for {self.estimator}"
                 )
-            if self.covariance != "iid":
+            if self.covariance == "hc3":
                 raise ValueError(
-                    f"{self.estimator} supports only iid covariance"
+                    f"{self.estimator} supports only iid or clustered "
+                    "covariance; hc3 is unsupported"
                 )
             if self.treatment_position is None:
                 raise ValueError(
@@ -655,8 +656,11 @@ def estimate_parameters(
     if (
         policy.estimator in {"ipw_ate", "aipw_ate"}
         and input_clusters is not None
+        and policy.covariance != "clustered"
     ):
-        raise ValueError(f"{policy.estimator} does not accept cluster labels")
+        raise ValueError(
+            f"{policy.estimator} cluster labels require covariance='clustered'"
+        )
     expected_likelihood = {
         "linear": "gaussian",
         "logistic": "bernoulli",
@@ -770,6 +774,7 @@ def estimate_parameters(
                     values,
                     policy.treatment_position,
                     policy,
+                    cluster_values,
                 )
             )
             reference = reference_ipw_ate(
@@ -778,6 +783,7 @@ def estimate_parameters(
                 matrix[:, policy.treatment_position],
                 coefficients,
                 policy,
+                cluster_values,
             )
         else:
             (
@@ -790,12 +796,14 @@ def estimate_parameters(
                 values,
                 policy.treatment_position,
                 policy,
+                cluster_values,
             )
             reference = reference_aipw_ate(
                 aipw_inputs,
                 values,
                 coefficients,
                 policy,
+                cluster_values,
             )
         likelihood = "gaussian"
         names = ("ate",)
@@ -1101,6 +1109,7 @@ def fit_ipw_ate(
     values: np.ndarray,
     treatment_position: int | None,
     policy: EstimationPolicy,
+    clusters: np.ndarray | None,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], np.ndarray]:
     """Estimate a binary-treatment Hájek inverse-probability ATE."""
     if treatment_position is None:
@@ -1129,7 +1138,11 @@ def fit_ipw_ate(
         raw_propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
     )
     ate, variance, evidence = hajek_ipw_statistics(
-        treatment, values, propensity
+        treatment,
+        values,
+        propensity,
+        clusters,
+        policy.covariance,
     )
     clipped = np.abs(raw_propensity - propensity) > 1e-12
     diagnostics = {
@@ -1137,7 +1150,11 @@ def fit_ipw_ate(
         "iterations": propensity_diagnostics["iterations"],
         "estimator_family": "causal_ipw",
         "method": "hajek_ipw",
-        "uncertainty_method": ("influence_function_with_estimated_propensity"),
+        "uncertainty_method": (
+            "influence_function_with_estimated_propensity"
+            if policy.covariance == "iid"
+            else evidence["uncertainty_method"]
+        ),
         "propensity_estimation_uncertainty": "not_propagated",
         "treatment_position": treatment_position,
         "treated_rows": treated_count,
@@ -1162,8 +1179,11 @@ def fit_ipw_ate(
         "influence_function": {
             "method": "centered_ipw_influence_function",
             "variance": variance,
+            "variance_method": evidence["uncertainty_method"],
         },
     }
+    if policy.covariance == "clustered":
+        diagnostics.update(evidence["uncertainty"]["cluster_diagnostics"])
     return (
         np.asarray([ate]),
         np.asarray([[variance]]),
@@ -1177,6 +1197,7 @@ def fit_aipw_ate(
     values: np.ndarray,
     treatment_position: int | None,
     policy: EstimationPolicy,
+    clusters: np.ndarray | None,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], dict[str, np.ndarray]]:
     """Estimate a binary-treatment ATE with an augmented IPW score.
 
@@ -1299,7 +1320,9 @@ def fit_aipw_ate(
     )
     ate = float(np.mean(score))
     influence = score - ate
-    variance = float(np.var(influence, ddof=1) / len(values))
+    variance, uncertainty = influence_variance(
+        influence, policy.covariance, clusters
+    )
     clipped = np.abs(raw_propensity - propensity) > 1e-12
     diagnostics = {
         "converged": True,
@@ -1307,9 +1330,13 @@ def fit_aipw_ate(
         "estimator_family": "causal_augmented_ipw",
         "method": "augmented_ipw",
         "uncertainty_method": (
-            "influence_function_with_cross_fitted_nuisance"
-            if fold_count > 1
-            else "influence_function_with_fitted_nuisance"
+            (
+                "influence_function_with_cross_fitted_nuisance"
+                if fold_count > 1
+                else "influence_function_with_fitted_nuisance"
+            )
+            if policy.covariance == "iid"
+            else uncertainty["method"]
         ),
         "cross_fitting": cross_fitting,
         "propensity_estimation_uncertainty": "not_propagated",
@@ -1346,8 +1373,11 @@ def fit_aipw_ate(
         "influence_function": {
             "method": "centered_augmented_ipw_score",
             "variance": variance,
+            "variance_method": uncertainty["method"],
         },
     }
+    if policy.covariance == "clustered":
+        diagnostics.update(uncertainty["cluster_diagnostics"])
     return (
         np.asarray([ate]),
         np.asarray([[variance]]),
@@ -1494,10 +1524,89 @@ def aipw_limitations(cross_fitted: bool) -> list[str]:
     return limitations
 
 
+def influence_variance(
+    influence: np.ndarray,
+    covariance: CovarianceKind,
+    clusters: np.ndarray | None,
+) -> tuple[float, dict[str, Any]]:
+    """Compute IID or finite-sample clustered influence uncertainty.
+
+    The clustered calculation treats each declared cluster as an independent
+    sampling unit. It centers the observation-level influence scores before
+    summing them within clusters and applies the finite-sample correction
+    ``G / (G - 1) * (n - 1) / n``. This is intentionally separate from the
+    HC3 and regression sandwich paths: causal ATE uncertainty is defined over
+    an influence function, not over a model residual score.
+    """
+    centered_influence = np.asarray(influence, dtype=float)
+    if centered_influence.ndim != 1:
+        raise ValueError("influence scores must have shape (rows,)")
+    if len(centered_influence) < 2:
+        raise ValueError("influence uncertainty needs at least two rows")
+    if not np.isfinite(centered_influence).all():
+        raise ValueError("influence scores must contain only finite values")
+    centered_influence = centered_influence - np.mean(centered_influence)
+    if covariance == "iid":
+        variance = float(
+            np.sum(centered_influence**2)
+            / (len(centered_influence) - 1)
+            / len(centered_influence)
+        )
+        return variance, {
+            "method": "iid_centered_influence_function",
+            "centered": True,
+        }
+    if covariance != "clustered":
+        raise ValueError(
+            "causal influence uncertainty supports only iid or clustered "
+            "covariance"
+        )
+    if clusters is None:
+        raise ValueError("clustered covariance needs cluster labels")
+    cluster_values = validate_clusters(
+        clusters.tolist(), len(centered_influence)
+    )
+    if cluster_values is None:
+        raise ValueError("clustered covariance needs cluster labels")
+    try:
+        labels = tuple(dict.fromkeys(cluster_values.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "cluster labels must be hashable scalar values"
+        ) from error
+    if len(labels) < 2:
+        raise ValueError("clustered covariance needs at least two clusters")
+    cluster_sums = []
+    cluster_sizes = []
+    for label in labels:
+        membership = cluster_values == label
+        cluster_sums.append(float(np.sum(centered_influence[membership])))
+        cluster_sizes.append(int(np.sum(membership)))
+    cluster_sum_array = np.asarray(cluster_sums, dtype=float)
+    row_count = len(centered_influence)
+    correction = (len(labels) / (len(labels) - 1)) * (
+        (row_count - 1) / row_count
+    )
+    variance = float(correction * np.sum(cluster_sum_array**2) / row_count**2)
+    if not math.isfinite(variance) or variance < 0.0:
+        raise ValueError("clustered influence variance must be finite")
+    return variance, {
+        "method": "clustered_centered_influence_function",
+        "centered": True,
+        "cluster_diagnostics": {
+            "cluster_count": len(labels),
+            "cluster_sizes": cluster_sizes,
+            "uncertainty_method": "clustered_centered_influence_function",
+        },
+    }
+
+
 def hajek_ipw_statistics(
     treatment: np.ndarray,
     values: np.ndarray,
     propensity: np.ndarray,
+    clusters: np.ndarray | None = None,
+    covariance: CovarianceKind = "iid",
 ) -> tuple[float, float, dict[str, Any]]:
     """Compute normalized IPW means and an influence-function variance."""
     treated_weights = treatment / propensity
@@ -1511,7 +1620,7 @@ def hajek_ipw_statistics(
     influence = treated_weights * (values - treated_mean) - control_weights * (
         values - control_mean
     )
-    variance = float(np.var(influence, ddof=1) / len(values))
+    variance, uncertainty = influence_variance(influence, covariance, clusters)
     effective_sample_size = {
         "treated": float(treated_denominator**2 / np.sum(treated_weights**2)),
         "control": float(control_denominator**2 / np.sum(control_weights**2)),
@@ -1525,6 +1634,8 @@ def hajek_ipw_statistics(
                 "treated": treated_mean,
                 "control": control_mean,
             },
+            "uncertainty_method": uncertainty["method"],
+            "uncertainty": uncertainty,
         },
     )
 
@@ -2057,6 +2168,7 @@ def reference_ipw_ate(
     treatment: np.ndarray,
     coefficients: np.ndarray,
     policy: EstimationPolicy,
+    clusters: np.ndarray | None,
 ) -> dict[str, Any]:
     """Recompute IPW propensities with an independent BFGS calculation."""
 
@@ -2083,14 +2195,24 @@ def reference_ipw_ate(
         reference_ate,
         reference_variance,
         reference_evidence,
-    ) = hajek_ipw_statistics(treatment, values, reference_propensity)
-    del reference_variance, reference_evidence
+    ) = hajek_ipw_statistics(
+        treatment,
+        values,
+        reference_propensity,
+        clusters,
+        policy.covariance,
+    )
     difference = float(abs(reference_ate - coefficients[0]))
     return {
         "method": "scipy.optimize.minimize:BFGS_propensity",
         "converged": bool(result.success),
         "reference_ate": reference_ate,
         "max_absolute_difference": difference,
+        "variance": reference_variance,
+        "variance_method": reference_evidence["uncertainty_method"],
+        "variance_status": (
+            "declared_influence_calculation_not_independently_verified"
+        ),
         "passed": bool(
             result.success and difference <= policy.reference_tolerance * 10
         ),
@@ -2103,11 +2225,12 @@ def reference_aipw_ate(
     values: np.ndarray,
     coefficients: np.ndarray,
     policy: EstimationPolicy,
+    clusters: np.ndarray | None,
 ) -> dict[str, Any]:
     """Recompute the augmented IPW score with an independent reference."""
     if policy.cross_fitting_folds > 1:
         return reference_cross_fitted_aipw_ate(
-            inputs, values, coefficients, policy
+            inputs, values, coefficients, policy, clusters
         )
     nuisance_design = inputs["nuisance_design"]
     treatment = inputs["treatment"]
@@ -2149,12 +2272,22 @@ def reference_aipw_ate(
         - (1.0 - treatment) * (values - outcome_control) / (1.0 - propensity)
     )
     reference_ate = float(np.mean(score))
+    reference_variance, reference_uncertainty = influence_variance(
+        score - reference_ate,
+        policy.covariance,
+        clusters,
+    )
     difference = float(abs(reference_ate - coefficients[0]))
     return {
         "method": "scipy.optimize.minimize:BFGS_plus_lstsq",
         "converged": bool(propensity_fit.success),
         "reference_ate": reference_ate,
         "max_absolute_difference": difference,
+        "variance": reference_variance,
+        "variance_method": reference_uncertainty["method"],
+        "variance_status": (
+            "declared_influence_calculation_not_independently_verified"
+        ),
         "passed": bool(
             propensity_fit.success
             and difference <= policy.reference_tolerance * 10
@@ -2168,6 +2301,7 @@ def reference_cross_fitted_aipw_ate(
     values: np.ndarray,
     coefficients: np.ndarray,
     policy: EstimationPolicy,
+    clusters: np.ndarray | None,
 ) -> dict[str, Any]:
     """Independently recompute each cross-fitted AIPW validation score."""
     nuisance_design = inputs["nuisance_design"]
@@ -2247,6 +2381,11 @@ def reference_cross_fitted_aipw_ate(
             }
         )
     reference_ate = float(np.mean(reference_scores))
+    reference_variance, reference_uncertainty = influence_variance(
+        reference_scores - reference_ate,
+        policy.covariance,
+        clusters,
+    )
     difference = float(abs(reference_ate - coefficients[0]))
     converged = all(record["converged"] for record in fold_records)
     return {
@@ -2254,6 +2393,11 @@ def reference_cross_fitted_aipw_ate(
         "converged": converged,
         "reference_ate": reference_ate,
         "max_absolute_difference": difference,
+        "variance": reference_variance,
+        "variance_method": reference_uncertainty["method"],
+        "variance_status": (
+            "declared_influence_calculation_not_independently_verified"
+        ),
         "folds": fold_records,
         "passed": bool(
             converged and difference <= policy.reference_tolerance * 10

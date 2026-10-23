@@ -2,6 +2,7 @@
 
 import json
 from types import SimpleNamespace
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -40,6 +41,46 @@ def causal_estimand() -> EstimandSpec:
         assumptions=(
             "the treatment and outcome are measured in the same observation",
             "the declared covariates precede treatment assignment",
+        ),
+    )
+
+
+def clustered_causal_fixture() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return fixed clustered observations for causal uncertainty tests."""
+    rng = np.random.default_rng(303)
+    cluster_count = 20
+    rows_per_cluster = 12
+    clusters = np.repeat(np.arange(cluster_count), rows_per_cluster)
+    age = rng.normal(size=len(clusters))
+    risk_score = rng.normal(size=len(clusters))
+    treatment_probability = 1.0 / (
+        1.0 + np.exp(-(-0.25 + 0.65 * age - 0.35 * risk_score))
+    )
+    treatment = rng.binomial(1, treatment_probability)
+    outcome = (
+        0.75
+        + 1.8 * treatment
+        + 0.4 * age
+        - 0.2 * risk_score
+        + rng.normal(scale=0.7, size=len(clusters))
+    )
+    return np.column_stack((treatment, age, risk_score)), outcome, clusters
+
+
+def clustered_causal_policy(
+    estimator: Literal["ipw_ate", "aipw_ate"],
+) -> EstimationPolicy:
+    """Return a project-serializable clustered causal policy."""
+    return EstimationPolicy(
+        estimator=estimator,
+        covariance="clustered",
+        cluster_name="site_id",
+        treatment_position=0,
+        propensity_clip=0.02,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
         ),
     )
 
@@ -359,6 +400,92 @@ def test_aipw_ate_reports_augmented_score_and_reference_evidence():
     assert result.diagnostics["positivity"]["status"] == "diagnosed_not_proven"
     assert result.reference["passed"] is True
     json.dumps(result.to_dict())
+
+
+def test_ipw_ate_clustered_influence_uncertainty_is_deterministic():
+    """IPW uses centered cluster sums and records finite-sample evidence."""
+    features, outcome, clusters = clustered_causal_fixture()
+    policy = clustered_causal_policy("ipw_ate")
+
+    first = estimate_parameters(
+        features, outcome, causal_estimand(), policy, clusters=clusters
+    )
+    second = estimate_parameters(
+        features, outcome, causal_estimand(), policy, clusters=clusters
+    )
+    iid_policy_values = policy.to_dict()
+    iid_policy_values["covariance"] = "iid"
+    iid = estimate_parameters(
+        features,
+        outcome,
+        causal_estimand(),
+        EstimationPolicy(**iid_policy_values),
+    )
+
+    assert first.to_dict() == second.to_dict()
+    assert first.parameters[0].estimate == pytest.approx(1.8, abs=0.35)
+    assert first.diagnostics["uncertainty_method"] == (
+        "clustered_centered_influence_function"
+    )
+    assert first.diagnostics["cluster_count"] == 20
+    assert first.diagnostics["cluster_sizes"] == [12] * 20
+    assert first.covariance[0][0] != pytest.approx(iid.covariance[0][0])
+    assert first.reference["passed"] is True
+    assert first.reference["variance_method"] == (
+        "clustered_centered_influence_function"
+    )
+    assert first.reference["variance_status"].startswith("declared_")
+
+
+def test_aipw_ate_clustered_influence_uncertainty_is_serializable(tmp_path):
+    """AIPW persists clustered uncertainty and project policy fields."""
+    features, outcome, clusters = clustered_causal_fixture()
+    policy = clustered_causal_policy("aipw_ate")
+    result = estimate_parameters(
+        features, outcome, causal_estimand(), policy, clusters=clusters
+    )
+
+    restored_policy = EstimationPolicy(**policy.to_dict())
+    assert restored_policy == policy
+    assert result.diagnostics["uncertainty_method"] == (
+        "clustered_centered_influence_function"
+    )
+    assert result.diagnostics["cluster_count"] == 20
+    assert result.diagnostics["cluster_sizes"] == [12] * 20
+    assert result.reference["passed"] is True
+    assert result.reference["variance_method"] == (
+        "clustered_centered_influence_function"
+    )
+    json.dumps(result.to_dict())
+    path = tmp_path / "clustered-aipw.json"
+    result.write(path)
+    restored = EstimationResult.read(path)
+    assert restored.to_dict() == result.to_dict()
+
+
+def test_causal_clustered_uncertainty_rejects_hc3_and_one_cluster():
+    """Causal uncertainty fails clearly for unsupported covariance claims."""
+    with pytest.raises(ValueError, match="hc3 is unsupported"):
+        EstimationPolicy(
+            estimator="ipw_ate",
+            covariance="hc3",
+            treatment_position=0,
+            causal_assumptions=(
+                "consistency",
+                "conditional_exchangeability",
+                "positivity",
+            ),
+        )
+
+    features, outcome, clusters = clustered_causal_fixture()
+    with pytest.raises(ValueError, match="at least two clusters"):
+        estimate_parameters(
+            features,
+            outcome,
+            causal_estimand(),
+            clustered_causal_policy("aipw_ate"),
+            clusters=np.zeros(len(clusters), dtype=int),
+        )
 
 
 def test_aipw_ate_cross_fitting_is_deterministic_and_auditable():
