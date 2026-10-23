@@ -4454,3 +4454,24 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   authoritative repository result remains the `2,656 passed, 38 skipped`
   run recorded at `92e4544`.
 
+## Dataset catalog CLI at `5a9d8b9` on 2026-10-23
+
+- `scml catalog` now exposes the public `DatasetCatalog` contract through the
+  existing polymorphic `DatasetLoader` boundary for supported local tabular
+  files. It accepts an explicit `--label-column`, an optional `--source-uri`,
+  and an optional `--output` path for the catalog's durable, digest-bound JSON
+  artifact. The same machine-readable evidence is emitted on standard output.
+- Raw bytes are accepted only through an explicit `--raw-bytes PATH` input or
+  `-`/standard input. They remain opaque: the command does not decode unknown
+  formats or infer labels. Unsupported tabular suffixes and input/output
+  failures use the existing `data`, `config`, and `artifact` CLI exit/error
+  conventions.
+- The focused CLI/catalog/reader/API/convention gate passed `937` tests with
+  `1` optional test skipped. Ruff lint, Ruff formatting, mypy for
+  `scml/cli.py`, and diff checks passed. CLI integration coverage was `85%`
+  under `uv run coverage run -m pytest -q tests/integration/test_cli.py`.
+- README and tutorial command inventories now include `scml catalog`. No full
+  repository regression was run for this focused CLI implementation batch by
+  design; the prior authoritative full regression remains the result recorded
+  at `92e4544`.
+
