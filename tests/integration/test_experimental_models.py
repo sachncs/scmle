@@ -36,10 +36,12 @@ def test_unknown_experimental_model_fails_closed():
         )
 
 
-def test_unavailable_explicit_experimental_model_fails_closed():
+def test_unavailable_explicit_experimental_model_fails_closed(monkeypatch):
     """An explicit model cannot silently fall back when its extra is absent."""
+    representation = networks.TorchJepaAdapter()
+    monkeypatch.setattr(representation, "is_available", lambda: False)
     registry = registry_module.ModelRegistry(
-        (classical.DummyAdapter(), networks.TorchJepaAdapter())
+        (classical.DummyAdapter(), representation)
     )
 
     with pytest.raises(
