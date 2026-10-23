@@ -3,9 +3,7 @@ name: Deploy documentation site
 on:
   push:
     branches:
-      - main
-      # The repository currently uses feat/v0.1-foundation as its default branch.
-      - feat/v0.1-foundation
+      - master
   workflow_dispatch:
 
 permissions:
@@ -70,7 +68,7 @@ jobs:
           path: website/dist
 
   deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/v0.1-foundation')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -88,7 +86,7 @@ jobs:
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   verify:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/v0.1-foundation')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 5
