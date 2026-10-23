@@ -10,11 +10,11 @@
     },
     "EstimationPolicy": {
       "kind": "class",
-      "signature_sha256": "03986b14a39c82020f7ccdd041516597446112b6b4fa4fba35af2788f164b745"
+      "signature_sha256": "b8525b62e3fa2658ef59c0e06ba521a8ea7d5d11778fe8c9203b0008ed439e7e"
     },
     "EstimationResult": {
       "kind": "class",
-      "signature_sha256": "c5b61eea23a81223e9f46397477bb12687893520b6cff168ccde2f38329b93b2"
+      "signature_sha256": "0254daa21cc76f6052afa2e537e354b5b16750611a4bf28e3cd711071d79287a"
     },
     "ExtensionCurationAdapter": {
       "kind": "class",
