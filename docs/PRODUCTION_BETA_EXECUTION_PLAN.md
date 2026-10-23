@@ -4349,3 +4349,31 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   hosted CI/Pages, external fault evidence, secret custody, and independent
   release review remain open release gates.
 
+## General dataset catalog contract at `4b72c29` on 2026-10-23
+
+- `DatasetCatalog` is now the public, model-agnostic entry point for a
+  caller-owned dataset snapshot. `from_data()` observes pandas frames and
+  series, NumPy arrays, column mappings, record sequences, scalar values, and
+  raw bytes. `from_observation()` gives an adapter-owned path for formats the
+  core observer cannot inspect without inventing semantics.
+- Each catalog records source identity and declared governance context,
+  sample count, shape, ordered schema, deterministic content identity,
+  missingness accounting, duplicate-row state, explicit label state,
+  machine-readable limitations, and release blockers. Opaque observations
+  cannot receive a process-dependent hash; they require a caller-supplied
+  SHA-256 identity and remain visibly blocked until a schema adapter is
+  declared.
+- Catalog JSON is written through the durable atomic writer and
+  `read_verified()` validates the schema, nested source identity, content
+  identity, and catalog digest before returning evidence. The top-level
+  export and versioned API snapshot are covered by focused tests.
+- The catalog deliberately does not infer a task, fit a model, decode a
+  modality, establish consent or ownership, or claim arbitrary modelling
+  support. Missingness, duplicates, undeclared labels, incomplete source
+  governance, and absent modality/schema adapters remain explicit review
+  gates rather than silent preprocessing.
+- The catalog/API/convention slice passed `905` tests; the new module passed
+  `19` focused tests at `93%` coverage. Ruff, mypy for `scml/data/catalog.py`,
+  and diff checks were clean. No full repository regression was run for this
+  focused implementation batch by design.
+
