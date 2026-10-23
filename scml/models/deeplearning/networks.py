@@ -12,6 +12,7 @@ from scml.contracts import errors
 from scml.contracts import models
 from scml.contracts import search
 from scml.contracts import tasks
+from scml.models.deeplearning import contracts
 from scml.models.deeplearning import estimators
 from scml.models.deeplearning import foundation
 from scml.models.deeplearning import jepa
@@ -37,6 +38,9 @@ class TorchAdapter(models.ModelAdapter):
     family = "deep_learning"
     requires: ClassVar[tuple[str, ...]] = ("torch",)
     architecture: ClassVar[str]
+    family_contract: ClassVar[contracts.ModelFamilyContract] = (
+        contracts.TABULAR_TORCH_CONTRACT
+    )
     capabilities = models.Capabilities(
         ALL_TASKS,
         probabilities=True,
@@ -53,6 +57,14 @@ class TorchAdapter(models.ModelAdapter):
         return self.is_available() and bool(
             worker.client().request("probe", ())
         )
+
+    def supports_modality(self, modality: str) -> bool:
+        """Return whether this adapter has a declared modality boundary."""
+        return self.family_contract.supports_modality(modality)
+
+    def require_modality(self, modality: str) -> None:
+        """Fail closed when an adapter is asked to model another modality."""
+        self.family_contract.require_modality(modality)
 
     def build(
         self,
@@ -144,6 +156,7 @@ class TorchTransformerAdapter(TorchAdapter):
     name = "torch_ft_transformer"
     architecture = "ft_transformer"
     capability_family = "transformer"
+    family_contract = contracts.TABULAR_TRANSFORMER_CONTRACT
     auto_candidate = False
     capabilities = dataclasses.replace(
         TorchAdapter.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
@@ -170,6 +183,7 @@ class TorchJepaAdapter(TorchAdapter):
     name = "torch_jepa"
     family = "deep_learning"
     capability_family = "jepa"
+    family_contract = contracts.TABULAR_JEPA_CONTRACT
     auto_candidate = False
     requires: ClassVar[tuple[str, ...]] = ("torch",)
     capabilities = dataclasses.replace(

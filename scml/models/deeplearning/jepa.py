@@ -13,6 +13,7 @@ import numpy as np
 from sklearn import base
 from sklearn import utils
 
+from scml.models.deeplearning import contracts
 from scml.models.deeplearning import estimators
 
 
@@ -80,6 +81,48 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         """Return context-encoder embeddings for new rows."""
         return self.call("encode", features)
 
+    def model_contract(self) -> contracts.ModelFamilyContract:
+        """Return the explicit tabular JEPA family boundary."""
+        return contracts.TABULAR_JEPA_CONTRACT
+
+    def inference_contract(self) -> contracts.InferenceContract:
+        """Return the embedding inference contract."""
+        return self.model_contract().inference
+
+    def explanation_contract(self) -> contracts.ExplanationContract:
+        """Return the embedding-sensitivity explanation contract."""
+        explanation = self.model_contract().explanation
+        if explanation is None:
+            raise ValueError("tabular JEPA has no explanation contract")
+        return explanation
+
+    def explain(self, features: Any) -> contracts.FeatureExplanation:
+        """Explain local sensitivity of the learned embedding."""
+        values = self.call("explain", features)
+        return contracts.FeatureExplanation(
+            values=values,
+            method=self.explanation_contract().method,
+            target="embedding_energy",
+            feature_count=self.state_["input_width_"],
+        )
+
+    def checkpoint_manifest(self) -> dict[str, object]:
+        """Return the explicit fitted-checkpoint contract metadata."""
+        utils.validation.check_is_fitted(self, attributes=["state_"])
+        family = self.model_contract()
+        return {
+            "format": self.CHECKPOINT_FORMAT,
+            "schema_version": self.CHECKPOINT_SCHEMA_VERSION,
+            "model_family": family.model_family,
+            "scope": "tabular_numeric_representation",
+            "input_width": self.state_["input_width_"],
+            "embedding_size": self.embedding_size,
+            "inference": family.inference.to_dict(),
+            "explanation": family.explanation.to_dict()
+            if family.explanation is not None
+            else None,
+        }
+
     def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
         """Save a fitted JEPA representation checkpoint.
 
@@ -119,14 +162,10 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
             serialized_payload = serialized.getvalue()
             joblib.dump(
                 {
-                    "format": self.CHECKPOINT_FORMAT,
-                    "schema_version": self.CHECKPOINT_SCHEMA_VERSION,
-                    "scope": "tabular_numeric_representation",
+                    **self.checkpoint_manifest(),
                     "payload_sha256": hashlib.sha256(
                         serialized_payload
                     ).hexdigest(),
-                    "input_width": self.state_["input_width_"],
-                    "embedding_size": self.embedding_size,
                     "payload": serialized_payload,
                 },
                 temporary,
@@ -172,6 +211,9 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         required = {
             "schema_version",
             "scope",
+            "model_family",
+            "inference",
+            "explanation",
             "payload_sha256",
             "input_width",
             "embedding_size",
@@ -181,9 +223,17 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
             raise ValueError("tabular JEPA checkpoint metadata is incomplete")
         serialized_payload = payload["payload"]
         digest = payload["payload_sha256"]
+        explanation = contracts.TABULAR_JEPA_CONTRACT.explanation
+        if explanation is None:
+            raise ValueError("tabular JEPA explanation contract is missing")
         if (
             payload["schema_version"] != cls.CHECKPOINT_SCHEMA_VERSION
             or payload["scope"] != "tabular_numeric_representation"
+            or payload["model_family"]
+            != contracts.TABULAR_JEPA_CONTRACT.model_family
+            or payload["inference"]
+            != contracts.TABULAR_JEPA_CONTRACT.inference.to_dict()
+            or payload["explanation"] != explanation.to_dict()
             or not isinstance(serialized_payload, bytes)
             or not isinstance(digest, str)
             or not hmac.compare_digest(

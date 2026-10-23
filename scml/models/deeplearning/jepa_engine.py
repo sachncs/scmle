@@ -258,6 +258,34 @@ class JepaEngine:
                 torch.from_numpy(matrix)
             ).numpy()
 
+    def explain(self, features: Any) -> np.ndarray:
+        """Return embedding-energy gradient-times-input attributions.
+
+        This explains local sensitivity of the learned representation. It is
+        intentionally not presented as a label explanation or causal effect.
+        """
+        torch = importlib.import_module("torch")
+        try:
+            matrix = np.asarray(features, dtype=np.float32)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "tabular JEPA requires a numeric 2-D feature matrix"
+            ) from error
+        if (
+            matrix.ndim != 2
+            or matrix.shape[1] != self.input_width_
+            or not np.isfinite(matrix).all()
+        ):
+            raise ValueError(
+                "features must be finite and have shape "
+                f"(rows, {self.input_width_})"
+            )
+        tensor = torch.from_numpy(matrix).requires_grad_(True)
+        embedding = self.network_.module.context_encoder(tensor)
+        energy = embedding.pow(2).mean(dim=1)
+        gradient = torch.autograd.grad(energy.sum(), tensor)[0]
+        return (gradient * tensor).detach().numpy()
+
     def __getstate__(self) -> dict[str, Any]:
         """Serialize weights as NumPy arrays for the parent process."""
         state = dict(self.__dict__)

@@ -405,6 +405,30 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
                 outputs = outputs.unsqueeze(1)
             return outputs.numpy()
 
+    def explain(self, features: Any) -> np.ndarray:
+        """Return local gradient-times-input attributions.
+
+        Classification selects the predicted class logit for each row.
+        Regression selects the ensemble-mean output. The worker returns one
+        signed attribution per numeric input feature, preserving the model's
+        actual input space rather than inventing raw-column semantics.
+        """
+        torch = importlib.import_module("torch")
+        matrix = self.dense(features)
+        tensor = torch.from_numpy(matrix).requires_grad_(True)
+        outputs = self.network_(tensor)
+        if outputs.dim() == 2:
+            outputs = outputs.unsqueeze(1)
+        scores = outputs.mean(dim=1)
+        if scores.shape[1] == 1:
+            selected = scores[:, 0]
+        else:
+            selected = scores.gather(
+                1, scores.argmax(dim=1, keepdim=True)
+            ).squeeze(1)
+        gradient = torch.autograd.grad(selected.sum(), tensor)[0]
+        return (gradient * tensor).detach().numpy()
+
 
 class ClassifierEngine(base.ClassifierMixin, TabularEngine):
     """Classifier: softmax over class scores, optional class balancing."""

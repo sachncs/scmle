@@ -6,13 +6,22 @@ matrix to the worker and keeps the returned weights as plain numpy arrays;
 and caches them. Pickling therefore stores only numpy data.
 """
 
+import hashlib
+import hmac
+import io
+import os
+import pathlib
+import tempfile
 from typing import Any
 import uuid
 
+import joblib
 import numpy as np
 from scipy import sparse
 from sklearn import base
+from sklearn import utils
 
+from scml.models.deeplearning import contracts
 from scml.models.deeplearning import worker
 
 NEED_STATE = worker.NEED_STATE
@@ -46,6 +55,7 @@ class NetworkEstimator(base.BaseEstimator):
     """
 
     engine_path = ""
+    CHECKPOINT_SCHEMA_VERSION = 1
 
     def __init__(
         self,
@@ -101,6 +111,43 @@ class NetworkEstimator(base.BaseEstimator):
             features = features.toarray()
         return np.asarray(features, dtype=np.float32)
 
+    def model_contract(self) -> contracts.ModelFamilyContract:
+        """Return the explicit model-family boundary for this estimator."""
+        return contracts.model_family_contract(self.architecture)
+
+    def inference_contract(self) -> contracts.InferenceContract:
+        """Return the input, output, and inference-method contract."""
+        return self.model_contract().inference
+
+    def explanation_contract(self) -> contracts.ExplanationContract:
+        """Return the local feature-attribution contract."""
+        explanation = self.model_contract().explanation
+        if explanation is None:
+            raise ValueError(
+                f"{self.model_contract().model_family} has no explanation "
+                "contract"
+            )
+        return explanation
+
+    def checkpoint_manifest(self) -> dict[str, object]:
+        """Return the fitted checkpoint metadata without serializing weights."""
+        utils.validation.check_is_fitted(self, attributes=["state_"])
+        family = self.model_contract()
+        return {
+            "format": family.checkpoint.format,
+            "schema_version": self.CHECKPOINT_SCHEMA_VERSION,
+            "model_family": family.model_family,
+            "architecture": self.architecture,
+            "modality": family.inference.modality.value,
+            "input_width": self.state_["input_width_"],
+            "inference": family.inference.to_dict(),
+            "explanation": (
+                None
+                if family.explanation is None
+                else family.explanation.to_dict()
+            ),
+        }
+
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
     ) -> "NetworkEstimator":
@@ -119,12 +166,13 @@ class NetworkEstimator(base.BaseEstimator):
             if sample_weight is None
             else np.asarray(sample_weight, dtype=np.float32)
         )
+        matrix = self.model_contract().validate_features(features)
         state = worker.client().request(
             "fit",
             (
                 self.engine_path,
                 self.get_params(),
-                self.dense(features),
+                matrix,
                 np.asarray(target),
                 weights,
             ),
@@ -141,7 +189,10 @@ class NetworkEstimator(base.BaseEstimator):
 
     def call(self, method: str, features: Any) -> np.ndarray:
         """Runs an engine method in the worker on new rows."""
-        matrix = self.dense(features)
+        utils.validation.check_is_fitted(self, attributes=["state_"])
+        matrix = self.model_contract().validate_features(
+            features, expected_width=self.state_["input_width_"]
+        )
         client = worker.client()
         for state in (None, self.state_):
             reply = client.request(
@@ -151,6 +202,126 @@ class NetworkEstimator(base.BaseEstimator):
             if not (isinstance(reply, str) and reply == NEED_STATE):
                 return np.asarray(reply)
         raise worker.WorkerError("the worker could not load the model state")
+
+    def explain(self, features: Any) -> contracts.FeatureExplanation:
+        """Return local gradient-times-input feature attributions.
+
+        The result explains the model output selected by the fitted worker:
+        the predicted class logit for classification, the averaged ensemble
+        value for regression, or the embedding energy for a representation
+        estimator. These are sensitivity scores, not causal effects.
+        """
+        values = self.call("explain", features)
+        return contracts.FeatureExplanation(
+            values=values,
+            method=self.explanation_contract().method,
+            target="predicted_output",
+            feature_count=self.state_["input_width_"],
+        )
+
+    def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
+        """Atomically save a verified, trusted-local fitted checkpoint."""
+        utils.validation.check_is_fitted(self, attributes=["state_"])
+        destination = pathlib.Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        family = self.model_contract()
+        serialized = io.BytesIO()
+        joblib.dump(
+            {"format": family.checkpoint.format, "estimator": self},
+            serialized,
+        )
+        serialized_payload = serialized.getvalue()
+        envelope = {
+            **self.checkpoint_manifest(),
+            "payload_sha256": hashlib.sha256(serialized_payload).hexdigest(),
+            "payload": serialized_payload,
+        }
+        temporary: pathlib.Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary = pathlib.Path(handle.name)
+            joblib.dump(envelope, temporary)
+            with temporary.open("rb") as handle:
+                os.fsync(handle.fileno())
+            os.replace(temporary, destination)
+            descriptor = os.open(destination.parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        except BaseException:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise
+        return destination
+
+    @classmethod
+    def load_checkpoint(cls, path: str | pathlib.Path) -> "NetworkEstimator":
+        """Load a verified checkpoint for this estimator class.
+
+        Checkpoints are trusted-local joblib payloads. The digest detects
+        truncation and accidental modification; it is not a protection
+        against a malicious pickle.
+        """
+        try:
+            envelope = joblib.load(path)
+        except Exception as error:
+            raise ValueError(
+                "could not read deep-learning checkpoint"
+            ) from error
+        if not isinstance(envelope, dict):
+            raise ValueError("deep-learning checkpoint envelope is invalid")
+        required = {
+            "format",
+            "schema_version",
+            "model_family",
+            "architecture",
+            "input_width",
+            "payload_sha256",
+            "payload",
+        }
+        if not required.issubset(envelope):
+            raise ValueError("deep-learning checkpoint metadata is incomplete")
+        serialized_payload = envelope["payload"]
+        digest = envelope["payload_sha256"]
+        if (
+            envelope["schema_version"] != cls.CHECKPOINT_SCHEMA_VERSION
+            or not isinstance(serialized_payload, bytes)
+            or not isinstance(digest, str)
+            or not hmac.compare_digest(
+                hashlib.sha256(serialized_payload).hexdigest(), digest
+            )
+        ):
+            raise ValueError("deep-learning checkpoint integrity check failed")
+        try:
+            serialized = joblib.load(io.BytesIO(serialized_payload))
+        except Exception as error:
+            raise ValueError(
+                "deep-learning checkpoint payload is invalid"
+            ) from error
+        estimator = (
+            serialized.get("estimator")
+            if isinstance(serialized, dict)
+            else None
+        )
+        if not isinstance(estimator, cls):
+            raise ValueError(f"checkpoint does not contain a {cls.__name__}")
+        utils.validation.check_is_fitted(estimator, attributes=["state_"])
+        family = estimator.model_contract()
+        if (
+            serialized.get("format") != family.checkpoint.format
+            or envelope["format"] != family.checkpoint.format
+            or envelope["model_family"] != family.model_family
+            or envelope["architecture"] != estimator.architecture
+            or envelope["input_width"] != estimator.state_["input_width_"]
+        ):
+            raise ValueError("deep-learning checkpoint metadata does not match")
+        return estimator
 
 
 class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
