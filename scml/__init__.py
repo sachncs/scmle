@@ -7,6 +7,10 @@ from scml.api.predict import predict
 from scml.api.project import MLProject
 from scml.api.project import ModalityCurationProject
 from scml.api.project import ModalityProject
+from scml.api.non_tabular import NonTabularModelCapability
+from scml.api.non_tabular import NonTabularModelProject
+from scml.api.non_tabular import NonTabularModelResult
+from scml.api.non_tabular import UnsupportedNonTabularModelError
 from scml.api.results import RunResult
 from scml.api.sequential import SequentialEstimationProject
 from scml.artifacts.bundle import ModelBundle
@@ -63,6 +67,9 @@ __all__ = [
     "ModalityPredictor",
     "ModalityProject",
     "ModalitySampleDecoder",
+    "NonTabularModelCapability",
+    "NonTabularModelProject",
+    "NonTabularModelResult",
     "ModelBundle",
     "ParameterEstimate",
     "PeriodATE",
@@ -74,6 +81,7 @@ __all__ = [
     "SequentialIPWEstimator",
     "SequentialPeriodDiagnostics",
     "SequentialRegimeEstimate",
+    "UnsupportedNonTabularModelError",
     "__version__",
     "estimate_parameters",
     "load_model",

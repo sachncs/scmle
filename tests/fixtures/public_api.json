@@ -88,6 +88,18 @@
       "kind": "class",
       "signature_sha256": "711014aeb1a77f78329141e9afb53c8d2343c01ff94c43df683a33cb1a6d9a37"
     },
+    "NonTabularModelCapability": {
+      "kind": "class",
+      "signature_sha256": "9843dcab74fb6c04257a14b90ad83d49e3a5646d56dac7c1b8c406e440d63f65"
+    },
+    "NonTabularModelProject": {
+      "kind": "class",
+      "signature_sha256": "5da3ce4b156ca460ab2dd816c1757865adf7e29e10da9f040ee4f031aa051c6d"
+    },
+    "NonTabularModelResult": {
+      "kind": "class",
+      "signature_sha256": "d48197208bb7734d165e2288c8e82bd036c4b19c048bd9c26469dec1789a9e14"
+    },
     "ParameterEstimate": {
       "kind": "class",
       "signature_sha256": "a096737a63512c4b7c8ddbcf3a5506b1c42b6177ee6f581b9d39ecf7073ab6ff"
@@ -127,6 +139,10 @@
     "SequentialRegimeEstimate": {
       "kind": "class",
       "signature_sha256": "b8f09ca8501c73d609c1370f4ff185ebd781e11a657af920427679c2402179f8"
+    },
+    "UnsupportedNonTabularModelError": {
+      "kind": "class",
+      "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
     },
     "__version__": {
       "kind": "value",
