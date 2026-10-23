@@ -56,6 +56,9 @@ Executed on 2026-10-24:
 - Package build: wheel and source distribution built successfully.
 - Twine metadata validation: both artifacts passed.
 - Wheel/sdist artifact inspection: removed planning artifacts were absent.
+- Website verification: npm audit found zero vulnerabilities; Astro built 19
+  pages; accessibility checks passed for all 19 pages; 479 internal links
+  passed; and Playwright passed all 4 Chromium smoke tests.
 - Stale-reference and diff checks: passed.
 
 The full regression and its skip audit now cover the current tip. The
