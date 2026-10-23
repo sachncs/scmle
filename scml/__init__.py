@@ -14,6 +14,12 @@ from scml.evaluation.longitudinal import LongitudinalEstimationPolicy
 from scml.evaluation.longitudinal import LongitudinalEstimationResult
 from scml.evaluation.longitudinal import LongitudinalIPWEstimator
 from scml.evaluation.longitudinal import PeriodATE
+from scml.evaluation.sequential import SequentialEstimand
+from scml.evaluation.sequential import SequentialEstimationPolicy
+from scml.evaluation.sequential import SequentialEstimationResult
+from scml.evaluation.sequential import SequentialIPWEstimator
+from scml.evaluation.sequential import SequentialPeriodDiagnostics
+from scml.evaluation.sequential import SequentialRegimeEstimate
 from scml.evaluation.metrics import register_metric
 from scml.evaluation.parameter_estimation import BayesianPrior
 from scml.evaluation.parameter_estimation import EstimandSpec
@@ -58,6 +64,12 @@ __all__ = [
     "ParameterEstimate",
     "PeriodATE",
     "RunResult",
+    "SequentialEstimand",
+    "SequentialEstimationPolicy",
+    "SequentialEstimationResult",
+    "SequentialIPWEstimator",
+    "SequentialPeriodDiagnostics",
+    "SequentialRegimeEstimate",
     "__version__",
     "estimate_parameters",
     "load_model",

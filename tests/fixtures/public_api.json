@@ -96,6 +96,30 @@
       "kind": "class",
       "signature_sha256": "7b8edb062fd073b5f1740ea0d720309b7df4eaa16724f0140450f12718d435c2"
     },
+    "SequentialEstimand": {
+      "kind": "class",
+      "signature_sha256": "8f20902c045b7a51b47815b59db3c2e89a09d2b642fc4311b80779474f9a882f"
+    },
+    "SequentialEstimationPolicy": {
+      "kind": "class",
+      "signature_sha256": "bb837d04136f242f3a868156fa642831c09889614d2ebaf938fc0cdf44cec289"
+    },
+    "SequentialEstimationResult": {
+      "kind": "class",
+      "signature_sha256": "3a54e9ad1d52a96b5b7b9c7fbd56bf697ea12d30c6bc252f0e5599ab65a6eb0a"
+    },
+    "SequentialIPWEstimator": {
+      "kind": "class",
+      "signature_sha256": "c3d4ab185d8a0f4f7c727e32cc0f85380dd1320474167b3d82a8bfec979489bc"
+    },
+    "SequentialPeriodDiagnostics": {
+      "kind": "class",
+      "signature_sha256": "524a7987810247f321f955fd47ed3929ef06b0926d8028aae3911fe37b02363b"
+    },
+    "SequentialRegimeEstimate": {
+      "kind": "class",
+      "signature_sha256": "b8f09ca8501c73d609c1370f4ff185ebd781e11a657af920427679c2402179f8"
+    },
     "__version__": {
       "kind": "value",
       "value": "0.1.0b1"
