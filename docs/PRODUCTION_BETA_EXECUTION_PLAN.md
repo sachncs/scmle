@@ -4054,3 +4054,18 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   parameter declaration after a failed run, hosted infrastructure evidence,
   and independent release review remain separate work.
 
+## Repository-wide regression at `0b40c6c` on 2026-10-23
+
+- After the implementation batch was closed, the current head ran the full
+  repository suite once: `2520 passed, 38 skipped` in 41m35s. No failures
+  remained.
+- This is the authoritative full-suite result for the naming repair,
+  hierarchical REML, cross-fitted AIPW, release-readiness persistence, and
+  parameter-estimation lineage batch. Focused checks were run during
+  implementation; the full regression was intentionally deferred until the
+  batch was complete.
+- The result verifies the local repository suite only. Hosted CI, public Pages,
+  cloud/container/kernel fault evidence, external broker exactly-once
+  evidence, independent review, and the explicitly experimental or incomplete
+  modality/modeling boundaries remain unreleased gates.
+
