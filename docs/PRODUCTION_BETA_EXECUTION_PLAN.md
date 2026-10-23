@@ -4189,6 +4189,44 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   hosted CI/Pages, external fault evidence, secret custody, and independent
   release review remain open release gates.
 
+## Explicit tabular transformer and JEPA project path at 4382e4e on 2026-10-23
+
+- The public model configuration now has a complete, fail-closed opt-in path
+  for torch_ft_transformer and torch_jepa through
+  models.experimental_models. Both remain excluded from automatic search.
+  Unknown names and unavailable explicit dependencies now raise a
+  configuration error instead of silently falling back to another model.
+- torch_jepa is now a first-class registry adapter. It composes the existing
+  self-supervised tabular JEPA representation estimator with a supervised
+  PyTorch head inside one sklearn pipeline. The same pipeline is used for
+  cross-validation, final fitting, bundle packaging, bundle loading, and
+  prediction. JEPA deliberately discards the downstream label while fitting
+  the representation.
+- The capability registry contains complete experimental declarations for
+  tabular JEPA binary, multiclass, and regression paths, including the
+  deeplearning extra, 100,000-row limit, resource checks, and explicit
+  limitations. The planner records the experimental-only status in its
+  decision log, and the capability gate receives the observed row count before
+  fitting.
+- Focused validation passed 45 tests with 39 optional-dependency skips under
+  -W error::ResourceWarning. Ruff lint, Ruff formatting, mypy over the changed
+  Python modules, and diff checks passed. Focused coverage reported 95% for
+  the capability context, 82% for the planner, 78% for the model registry,
+  77% for the adapter module, and 42% for the JEPA proxy; the JEPA runtime
+  portion is lower because this environment does not install PyTorch and its
+  worker tests are skipped.
+- The standalone Astro modeling guide now gives the exact opt-in configuration
+  and explains that normal package and prediction APIs are used. The site
+  build produced 19 pages, accessibility checks passed for all 19 HTML files,
+  and internal-link checks passed 479 links.
+- This change does not add text, image, audio, video, graph, geospatial, or
+  multimodal transformer/JEPA support. It does not promote either tabular
+  path to production support. Actual PyTorch worker training/package/predict
+  execution remains to be verified in a torch-enabled environment. Hosted CI,
+  public Pages deployment, external fault evidence, broker exactly-once
+  semantics, independent review, and the full repository regression remain
+  separate gates. No full regression was run for this batch by request.
+
 ## Causal Bayesian estimation and transactional streaming at `a078d6f` on 2026-10-23
 
 - Parameter estimation now includes a bounded `bayesian_ate` path. It fits a
