@@ -54,6 +54,7 @@ print(evidence.to_dict())`}</code></pre>
 
   <h2>Read a large local snapshot with a durable ledger</h2>
   <p>For CSV, JSONL, and Parquet files, <code>StreamingLedger</code> binds each bounded batch to the raw snapshot digest, row offset, watermark column, and deterministic batch id. The sink receives that id as its idempotency key. A changed file, malformed state file, checkpoint from another source, or acknowledgement from another consumer group fails closed before the next commit.</p>
+  <p>When the sink can return a transport-owned receipt, use <code>TransactionalSink</code> and <code>commit_transaction()</code>. The ledger atomically stores the receipt with the matching acknowledgement and checkpoint evidence, and a matching retry after restart does not call the sink again. This is a local idempotency boundary; it is not a broker transaction or distributed exactly-once guarantee.</p>
   <pre><code>{`from pathlib import Path
 from scml.data.readers import StreamingConsumer, StreamingLedger, source_for
 

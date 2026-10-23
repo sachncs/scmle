@@ -51,7 +51,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         <tr><th scope="row">Text embeddings</th><td>Install <code>super-charge-ml[embeddings]</code> for the sentence-transformers integration. The text transformer runs in the isolated worker; if unavailable, the documented fallback is TF-IDF.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">TabPFN</th><td>The explicit adapter remains extension-only until the external package, model-weight license, token custody, and independent evidence are supplied.</td><td><span class="status status-extension">Extension-only</span></td></tr>
         <tr><th scope="row">Tabular JEPA</th><td><code>JepaEstimator</code> learns numeric-tabular representations with masked context prediction, an EMA target encoder, variance regularization, worker isolation, checkpointable weights, and <code>transform</code> output. It is not a multimodal JEPA foundation model.</td><td><span class="status status-experimental">Experimental</span></td></tr>
-        <tr><th scope="row">Parameter estimation</th><td><code>estimate_parameters</code> supports declared linear, logistic, Bayesian Gaussian, IPW ATE, and grouped random-intercept estimators, with explicit assumptions, uncertainty, sensitivity, and independent reference evidence. The project API persists the result as <code>parameter_estimation.json</code>.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
+        <tr><th scope="row">Parameter estimation</th><td><code>estimate_parameters</code> supports declared linear, logistic, Bayesian Gaussian, Bayesian ATE, IPW/AIPW ATE, and grouped random-intercept or one-random-slope estimators, with explicit assumptions, uncertainty, sensitivity, and independent reference evidence. The project API persists the result as <code>parameter_estimation.json</code>.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -181,7 +181,7 @@ print(verified.parameters)
 print(verified.covariance)
 print(verified.sensitivity)
 print(verified.reference)`}</code></pre>
-  <p>That report is not automatically a causal conclusion. It is a reproducible estimate under the assumptions you declared. For a treatment effect, use <code>ipw_ate</code> or <code>aipw_ate</code> with explicit consistency, conditional exchangeability, and positivity assumptions. For grouped observations, use <code>hierarchical_linear</code> with explicit random-intercept assumptions and cluster labels. These methods report what they did and what they did not prove; an independent domain review is still required.</p>
+  <p>That report is not automatically a causal conclusion. It is a reproducible estimate under the assumptions you declared. For a treatment effect, use <code>bayesian_ate</code>, <code>ipw_ate</code>, or <code>aipw_ate</code> with explicit identification assumptions. For grouped observations, use <code>hierarchical_linear</code> with explicit random-intercept assumptions, or add one declared <code>random_slope_position</code> with its matching <code>random_slope</code> assumption. These methods report what they did and what they did not prove; an independent domain review is still required.</p>
 
   <h2 id="project-integration">Attach the estimate to an MLProject run</h2>
   <p>Use the project API when the estimate must travel with the same tabular snapshot and run evidence as model selection. The estimation policy does not choose the predictive model, and the predictive model does not silently define the estimand.</p>
@@ -199,7 +199,7 @@ project = MLProject(
 result = project.run()
 assert result.estimation is not None
 print(result.run_dir / "parameter_estimation.json")`}</code></pre>
-  <p>The run binds the digest-verified <code>parameter_estimation.json</code> artifact into evaluation and lineage. Missing, malformed, or tampered reports fail closed. Resume-time reconstruction of a parameter declaration is a separate reliability gap; do not assume that a failed run can recreate an undeclared scientific question from a log.</p>
+  <p>The run binds the digest-verified <code>parameter_estimation.json</code> artifact into evaluation and lineage. Missing, malformed, or tampered reports fail closed. Resume and replay reconstruct the signed declaration and rerun the scientific track; they do not infer an undeclared question from logs.</p>
 
   <h2 id="estimator-matrix">Choose the scientific estimator deliberately</h2>
   <div class="model-table" role="region" aria-label="Parameter estimation methods" tabindex="0">
@@ -208,9 +208,10 @@ print(result.run_dir / "parameter_estimation.json")`}</code></pre>
       <tbody>
         <tr><th scope="row"><code>linear</code> / <code>logistic</code></th><td>Declared Gaussian or Bernoulli associations.</td><td>IID, HC3, or clustered covariance; intervals, missingness and shift diagnostics, optional bootstrap sensitivity, and an independent reference calculation.</td></tr>
         <tr><th scope="row"><code>bayesian_linear</code></th><td>A Gaussian design with a declared conjugate normal-inverse-gamma prior.</td><td>Posterior covariance, credible intervals, prior-strength sensitivity, and an independent positive-definite solve. Robust, clustered, Bayesian logistic, and Bayesian bootstrap variants fail closed.</td></tr>
+        <tr><th scope="row"><code>bayesian_ate</code></th><td>A binary-treatment ATE from a conjugate Gaussian outcome model with covariate adjustment.</td><td>Requires linearity, consistency, conditional exchangeability, and positivity assumptions; reports posterior covariance, Student-t credible intervals, prior sensitivity, treatment-arm counts, and an independent dense solve. Time-varying effects, nuisance uncertainty, clustered covariance, and fully Bayesian multilevel models remain unsupported.</td></tr>
         <tr><th scope="row"><code>ipw_ate</code></th><td>A binary-treatment average treatment effect under a declared propensity model.</td><td>Hájek IPW, clipping and overlap diagnostics, effective sample sizes, influence-function variance, and an independent propensity reference. This does not prove exchangeability, positivity, or absence of unmeasured confounding.</td></tr>
         <tr><th scope="row"><code>aipw_ate</code></th><td>A binary-treatment average treatment effect with propensity and outcome nuisance models.</td><td>Augmented IPW score, clipping and overlap diagnostics, influence-function variance, fitted-nuisance limitations, and an independent propensity-plus-outcome reference. Cross-fitting and nuisance-model uncertainty propagation are not implemented; this remains a bounded scientific estimator.</td></tr>
-        <tr><th scope="row"><code>hierarchical_linear</code></th><td>Grouped Gaussian outcomes with a random-intercept assumption.</td><td>Choose the bounded <code>moment_gls</code> default or explicit <code>reml</code> variance-component estimation, then inspect GLS coefficients, cluster evidence, optimizer/reference diagnostics, and stated uncertainty limits. Variance-component uncertainty, random slopes, nested/crossed effects, and fully Bayesian multilevel inference remain out of scope.</td></tr>
+        <tr><th scope="row"><code>hierarchical_linear</code></th><td>Grouped Gaussian outcomes with a random-intercept assumption, optionally plus one declared random slope.</td><td>Choose bounded <code>moment_gls</code> or explicit <code>reml</code> variance-component estimation. Inspect covariance, cluster evidence, optimizer/reference diagnostics, and stated uncertainty limits. Multiple slopes, nested/crossed effects, fully Bayesian multilevel inference, and variance-component uncertainty propagation remain out of scope.</td></tr>
       </tbody>
     </table>
   </div>
@@ -235,7 +236,7 @@ print(result.run_dir / "parameter_estimation.json")`}</code></pre>
     <li>Can another evaluator reproduce the estimate from raw snapshot, split, seed, software lock, and artifact digest?</li>
     <li>What sensitivity, subgroup, missing-data, and leakage checks would change the interpretation?</li>
   </ul>
-  <div class="callout"><p><strong>Current answer:</strong> predictive modelling and a bounded estimation evidence track are real and can be persisted from <code>MLProject</code>. The estimator contracts cover transparent Gaussian/Bernoulli, conjugate Bayesian, IPW ATE, and grouped random-intercept paths; stronger causal identification, advanced Bayesian models, and modality-specific estimators remain separate work.</p></div>
+  <div class="callout"><p><strong>Current answer:</strong> predictive modelling and a bounded estimation evidence track are real and can be persisted from <code>MLProject</code>. The estimator contracts cover transparent Gaussian/Bernoulli, conjugate Bayesian, Bayesian ATE, IPW/AIPW ATE, and grouped random-intercept or one-random-slope paths; stronger causal identification, advanced Bayesian models, time-varying effects, and modality-specific estimators remain separate work.</p></div>
 
   <h2>Use the right next page</h2>
   <div class="doc-cards">
