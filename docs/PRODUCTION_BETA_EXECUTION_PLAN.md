@@ -4754,3 +4754,17 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   fault and secret-custody evidence, independent review, and the final
   release decision remain open.
 
+## Hosted-control and stability policy evidence on `master` on 2026-10-23
+
+- `uv run python scripts/verify_hosted_controls.py --root .` passed for all
+  five workflow files (`ci.yml`, `full-suite.yml`, `pages.yml`, `release.yml`,
+  and `site.yml`) with `59` pinned action references and no static-control
+  failures.
+- The scheduled stability slice ran three repeated attempts over the API
+  surface, performance contracts, and stability-policy tests. All attempts
+  passed with no quarantined failures, unlisted failures, expired quarantine
+  entries, or inventory changes.
+- These are repository-controlled safeguards. They do not substitute for a
+  successful hosted run, cross-platform runner execution, or independent
+  operational repetition.
+
