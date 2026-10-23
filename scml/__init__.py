@@ -9,6 +9,11 @@ from scml.api.project import ModalityCurationProject
 from scml.api.project import ModalityProject
 from scml.api.results import RunResult
 from scml.artifacts.bundle import ModelBundle
+from scml.evaluation.longitudinal import LongitudinalEstimand
+from scml.evaluation.longitudinal import LongitudinalEstimationPolicy
+from scml.evaluation.longitudinal import LongitudinalEstimationResult
+from scml.evaluation.longitudinal import LongitudinalIPWEstimator
+from scml.evaluation.longitudinal import PeriodATE
 from scml.evaluation.metrics import register_metric
 from scml.evaluation.parameter_estimation import BayesianPrior
 from scml.evaluation.parameter_estimation import EstimandSpec
@@ -37,6 +42,10 @@ __all__ = [
     "LifecycleCancellation",
     "LifecycleCancelledError",
     "LifecycleCheckpoint",
+    "LongitudinalEstimand",
+    "LongitudinalEstimationPolicy",
+    "LongitudinalEstimationResult",
+    "LongitudinalIPWEstimator",
     "MLProject",
     "ModalityCurationAdapter",
     "ModalityCurationProject",
@@ -47,6 +56,7 @@ __all__ = [
     "ModalitySampleDecoder",
     "ModelBundle",
     "ParameterEstimate",
+    "PeriodATE",
     "RunResult",
     "__version__",
     "estimate_parameters",

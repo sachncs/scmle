@@ -32,6 +32,22 @@
       "kind": "class",
       "signature_sha256": "0cbe5c89435e77fffe1df59cf10f7c0799a5eccf0082b32260e538f899dabc53"
     },
+    "LongitudinalEstimand": {
+      "kind": "class",
+      "signature_sha256": "4e13ec6511c5cd99cf1afd8b7deeeb68b8c6b32a6a0c5277f4e7d6021e05f682"
+    },
+    "LongitudinalEstimationPolicy": {
+      "kind": "class",
+      "signature_sha256": "3cf7969a4794b1f26979a69ee4f46b85c8422d91a34326afaaaa4300329c8a3d"
+    },
+    "LongitudinalEstimationResult": {
+      "kind": "class",
+      "signature_sha256": "939ff55a45136eb634b2359113964de188fe96b644512c8efcdd5f90b1b08375"
+    },
+    "LongitudinalIPWEstimator": {
+      "kind": "class",
+      "signature_sha256": "6324dbcabe8dee43d6103cc2617036aa2815ea0848de22ef90d1336ee1374ac5"
+    },
     "MLProject": {
       "kind": "class",
       "signature_sha256": "b63b80c9cb43ef5e595d3c6019bfa4adfa5027eebfd1cb8374e9ca7005f9d8a3"
@@ -71,6 +87,10 @@
     "ParameterEstimate": {
       "kind": "class",
       "signature_sha256": "a096737a63512c4b7c8ddbcf3a5506b1c42b6177ee6f581b9d39ecf7073ab6ff"
+    },
+    "PeriodATE": {
+      "kind": "class",
+      "signature_sha256": "57195beddae0ce18ffb71a1c4b1fe7cf58e6b0fa6124c0369b5f2f8da0be74d8"
     },
     "RunResult": {
       "kind": "class",
