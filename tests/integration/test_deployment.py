@@ -249,12 +249,22 @@ def test_http_serving_reports_diagnostics_for_messy_input(trained):
         adapter.stop()
 
 
-def test_batch_serving_scores_files(trained, tmp_path):
+def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
     source = tmp_path / "in.csv"
     make_frame(40, 3).drop(columns="y").to_csv(source, index=False)
     adapter = serving.BatchServing(trained.bundle)
-    assert adapter.score_file(source, tmp_path / "out.csv") == 40
-    out = pd.read_csv(tmp_path / "out.csv")
+    writes = []
+    real_write = serving.durability.write_atomically
+
+    def record_write(path, content):
+        writes.append((path, content))
+        return real_write(path, content)
+
+    monkeypatch.setattr(serving.durability, "write_atomically", record_write)
+    destination = tmp_path / "out.csv"
+    assert adapter.score_file(source, destination) == 40
+    assert writes and writes[0][0] == destination
+    out = pd.read_csv(destination)
     assert {"prediction", "proba_0", "proba_1"} <= set(out.columns)
 
 

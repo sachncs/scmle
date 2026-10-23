@@ -14,6 +14,7 @@ from typing import Any
 
 import pandas as pd
 
+from scml import durability
 from scml.artifacts import bundle as bundle_module
 from scml.contracts import errors
 
@@ -96,7 +97,9 @@ class BatchServing(ServingAdapter):
             for index, label in enumerate(self.bundle.schema.classes):
                 result[f"proba_{label}"] = probabilities[:, index]
         self.bundle.remember(frame)
-        result.to_csv(destination, index=False)
+        durability.write_atomically(
+            destination, result.to_csv(index=False).encode("utf-8")
+        )
         return len(result)
 
 
