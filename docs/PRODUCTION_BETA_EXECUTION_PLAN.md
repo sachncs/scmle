@@ -3988,3 +3988,23 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   correction does not justify restarting the 41-minute repository run; the
   implementation and regression result remain separately identified above.
 
+## Cross-fitted causal evidence and release-artifact binding at `98bd6dc` on 2026-10-23
+
+- `aipw_ate` now accepts an explicit `cross_fitting_folds` policy. Deterministic
+  folds fit propensity and outcome nuisance models only on training rows,
+  score held-out rows, validate treatment support in every fold, and persist
+  fold assignments, support counts, nuisance-fit diagnostics, and explicit
+  non-Bayesian/non-time-varying limitations. The independent reference
+  recomputes the per-fold propensity and outcome fits.
+- `MLProject.run()` now verifies the atomic parameter report before exposing it,
+  binds its report digest into `evaluation.json`, and updates
+  `RunResult.evaluation` only after that evaluation artifact is atomically
+  persisted. Missing, corrupt, or valid-but-tampered reports fail closed.
+- Release evaluations now serialize the deterministic readiness summary beside
+  detailed findings. Causal policy validation reports the selected estimator
+  rather than a misleading IPW-only label.
+- Focused estimator/project/release/API checks passed; the public API snapshot
+  was updated and the compatibility checker reports `compatible: true`. No new
+  full regression has been run after this implementation batch. The next
+  release-gate action is one repository-wide run from this exact head.
+
