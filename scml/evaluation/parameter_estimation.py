@@ -1424,9 +1424,10 @@ def fit_continuous_ipw_effect(
         raise ValueError(
             "continuous treatment density design matrix is rank deficient"
         )
-    density_coefficients, _, rank, _ = np.linalg.lstsq(
+    density_coefficients, residual_sum, rank, singular_values = np.linalg.lstsq(
         density_design, treatment, rcond=None
     )
+    del residual_sum, singular_values
     if rank != density_design.shape[1]:
         raise ValueError(
             "continuous treatment density model is not identifiable"

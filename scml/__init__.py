@@ -2,15 +2,15 @@
 
 __version__ = "0.1.0b1"
 
+from scml.api.non_tabular import NonTabularModelCapability
+from scml.api.non_tabular import NonTabularModelProject
+from scml.api.non_tabular import NonTabularModelResult
+from scml.api.non_tabular import UnsupportedNonTabularModelError
 from scml.api.predict import load_model
 from scml.api.predict import predict
 from scml.api.project import MLProject
 from scml.api.project import ModalityCurationProject
 from scml.api.project import ModalityProject
-from scml.api.non_tabular import NonTabularModelCapability
-from scml.api.non_tabular import NonTabularModelProject
-from scml.api.non_tabular import NonTabularModelResult
-from scml.api.non_tabular import UnsupportedNonTabularModelError
 from scml.api.results import RunResult
 from scml.api.sequential import SequentialEstimationProject
 from scml.artifacts.bundle import ModelBundle
@@ -67,10 +67,10 @@ __all__ = [
     "ModalityPredictor",
     "ModalityProject",
     "ModalitySampleDecoder",
+    "ModelBundle",
     "NonTabularModelCapability",
     "NonTabularModelProject",
     "NonTabularModelResult",
-    "ModelBundle",
     "ParameterEstimate",
     "PeriodATE",
     "RunResult",

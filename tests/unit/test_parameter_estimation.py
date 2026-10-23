@@ -590,7 +590,8 @@ def test_ipw_ate_fails_closed_without_all_causal_assumptions():
 
 def test_continuous_ipw_ate_reports_gps_overlap_and_effect():
     """Continuous treatment reports a weighted marginal dose-response slope."""
-    features, outcome, _ = continuous_treatment_fixture()
+    features, outcome, unused_clusters = continuous_treatment_fixture()
+    del unused_clusters
     policy = continuous_treatment_policy()
 
     first = estimate_parameters(
@@ -648,7 +649,8 @@ def test_continuous_ipw_ate_requires_declared_density_assumptions():
             treatment_position=0,
         )
 
-    features, outcome, _ = continuous_treatment_fixture()
+    features, outcome, unused_clusters = continuous_treatment_fixture()
+    del unused_clusters
     with pytest.raises(ValueError, match="at least four distinct"):
         estimate_parameters(
             np.column_stack(
