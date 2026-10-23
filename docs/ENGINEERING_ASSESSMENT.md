@@ -43,6 +43,10 @@ Executed on 2026-10-24:
 
 - Focused regression: `22 passed`.
 - Specification suite: `48 passed`.
+- Full repository regression: `2721 passed, 38 skipped` in 51 minutes 40
+  seconds under `-W error::ResourceWarning`.
+- Full-regression skip audit: all `38` skips were approved dependency skips;
+  there were zero unapproved skips, unexplained skips, or xfails.
 - Ruff lint: passed.
 - Ruff format check: passed for `464` files.
 - mypy: no issues in `249` source files.
@@ -54,10 +58,9 @@ Executed on 2026-10-24:
 - Wheel/sdist artifact inspection: removed planning artifacts were absent.
 - Stale-reference and diff checks: passed.
 
-Previously executed repository evidence remains useful but is not silently
-promoted to current-tip proof when a gate was not rerun after the cleanup. In
-particular, the full regression, all-platform hosted matrix, public Pages
-deployment, and independent release review are not claimed here.
+The full regression and its skip audit now cover the current tip. The
+all-platform hosted matrix, public Pages deployment, and independent release
+review remain unverified.
 
 ## Implementation summary
 
