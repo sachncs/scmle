@@ -4008,3 +4008,15 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   full regression has been run after this implementation batch. The next
   release-gate action is one repository-wide run from this exact head.
 
+## Full regression and naming-gate correction at `a69c58b` on 2026-10-23
+
+- The post-batch repository-wide run completed `2515 passed, 38 skipped,
+  1 failed` in 41m32s. The only failure was the repository convention gate:
+  the cross-fitting implementation used `_` for a discarded tuple value,
+  while package source explicitly forbids semi-private local names.
+- `a69c58b` replaces that name with an explicit public local binding and removes
+  the unused value. The affected convention, estimator, and project slice
+  passed `898` tests; Ruff and mypy passed. This is a targeted correction to a
+  completed regression, not a replacement full-suite claim. A fresh full run
+  is still required before calling the current head repository-wide green.
+
