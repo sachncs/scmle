@@ -1,6 +1,7 @@
 """First-class parameter-estimation contracts and uncertainty evidence."""
 
 import json
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -497,8 +498,145 @@ def test_hierarchical_linear_reports_random_intercept_variance():
     assert (
         result.diagnostics["variance_component_uncertainty"] == "not_propagated"
     )
+    assert result.policy.hierarchical_method == "moment_gls"
     assert result.reference["passed"] is True
     json.dumps(result.to_dict())
+
+
+def make_hierarchical_reml_fixture() -> tuple[
+    np.ndarray, np.ndarray, np.ndarray
+]:
+    """Return deterministic grouped data with a non-zero random intercept."""
+    rng = np.random.default_rng(41)
+    clusters = np.repeat(np.arange(8), 12)
+    signal = rng.normal(size=len(clusters))
+    random_intercepts = rng.normal(scale=0.8, size=8)
+    outcome = (
+        1.2
+        + 0.65 * signal
+        + random_intercepts[clusters]
+        + rng.normal(scale=0.35, size=len(clusters))
+    )
+    return signal.reshape(-1, 1), outcome, clusters
+
+
+def make_hierarchical_reml_policy() -> EstimationPolicy:
+    """Return the bounded REML policy used by grouped estimator tests."""
+    return EstimationPolicy(
+        estimator="hierarchical_linear",
+        covariance="iid",
+        cluster_name="site_id",
+        hierarchical_assumptions=(
+            "random_intercept",
+            "cluster_independence",
+            "random_effect_exogeneity",
+            "constant_residual_variance",
+        ),
+        hierarchical_method="reml",
+    )
+
+
+def test_hierarchical_linear_selects_bounded_reml_method():
+    """REML is explicit and records its bounded optimizer contract."""
+    features, outcome, clusters = make_hierarchical_reml_fixture()
+    result = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        make_hierarchical_reml_policy(),
+        clusters=clusters,
+    )
+
+    assert result.policy.hierarchical_method == "reml"
+    assert result.diagnostics["method"] == "bounded_reml_gls"
+    assert result.diagnostics["optimizer"]["method"] == "L-BFGS-B"
+    assert result.diagnostics["optimizer"]["success"] is True
+    assert result.diagnostics["variance_component_uncertainty"] == (
+        "not_propagated"
+    )
+    assert any(
+        "random slopes" in limitation
+        for limitation in result.diagnostics["limitations"]
+    )
+    assert result.reference["passed"] is True
+
+
+def test_hierarchical_linear_reml_is_deterministic():
+    """Identical inputs and policy produce identical REML evidence."""
+    features, outcome, clusters = make_hierarchical_reml_fixture()
+    first = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        make_hierarchical_reml_policy(),
+        clusters=clusters,
+    )
+    second = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        make_hierarchical_reml_policy(),
+        clusters=clusters,
+    )
+
+    assert first.to_dict() == second.to_dict()
+
+
+def test_hierarchical_linear_rejects_invalid_reml_optimizer_state(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A failed optimizer cannot be converted into a release artifact."""
+    features, outcome, clusters = make_hierarchical_reml_fixture()
+
+    def return_failed_optimizer(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        return SimpleNamespace(
+            success=False,
+            status=2,
+            message="forced optimizer failure",
+            x=np.array([0.0, 0.0]),
+            fun=1.0,
+            jac=np.array([0.0, 0.0]),
+            nit=1,
+            nfev=1,
+        )
+
+    monkeypatch.setattr(
+        "scml.evaluation.parameter_estimation.optimize.minimize",
+        return_failed_optimizer,
+    )
+    with pytest.raises(ValueError, match="REML optimizer did not converge"):
+        estimate_parameters(
+            features,
+            outcome,
+            hierarchical_estimand(),
+            make_hierarchical_reml_policy(),
+            clusters=clusters,
+        )
+
+
+def test_hierarchical_linear_reml_serializes_without_losing_policy(
+    tmp_path,
+):
+    """A REML report round-trips its method and bounded policy."""
+    features, outcome, clusters = make_hierarchical_reml_fixture()
+    result = estimate_parameters(
+        features,
+        outcome,
+        hierarchical_estimand(),
+        make_hierarchical_reml_policy(),
+        clusters=clusters,
+    )
+    path = tmp_path / "scml-reml-estimation-report.json"
+    result.write(path)
+    restored = EstimationResult.read(path)
+
+    assert restored.to_dict() == result.to_dict()
+    assert restored.policy.hierarchical_method == "reml"
+    assert restored.policy.reml_variance_bounds == (
+        1e-12,
+        1e12,
+    )
 
 
 def test_hierarchical_linear_requires_groups_and_rejects_robust_policy():
