@@ -170,6 +170,34 @@ using `docs/PRODUCTION_BETA_EXECUTION_PLAN.md` as the source of truth.
    thin wrappers. Every commit must have focused evidence; the final plan
    commit must record the release decision and all unresolved gates.
 
+### Atomic commit sequence for the remaining work
+
+Complete the remaining work in this order, keeping each commit to one
+reviewable concern:
+
+1. `docs(plan): define master branch migration and release gates`
+2. `ci: migrate workflows from feature branch to master`
+3. `ci(release): capture hosted CI and Pages evidence`
+4. `test(reliability): record external transport and fault evidence`
+5. `feat(estimation): complete remaining supported estimation contracts`
+6. `review(release): add independent technical and governance reviews`
+7. `test(release): record clean external reproduction and package verification`
+8. `release: record production beta decision and unresolved gates`
+
+Before the CI migration, rename the current branch to `master`, publish it,
+set its upstream, and update the repository default branch and protections.
+Update every workflow reference from `main` or `feat/v0.1-foundation` to the
+new branch policy: CI and site validation retain `feat/**`, while Pages
+deployment runs only from `master`. Scheduled, manual, and tag-triggered
+workflows must remain branch-independent.
+
+Every commit must leave the repository buildable, include focused tests or
+evidence, and record its command, commit SHA, environment, result, skips, and
+warnings. Keep implementation, documentation, site, and release-policy
+changes separate. The final release commit may state `production-beta
+approved` only when every required gate passes; otherwise it must state
+`blocked` and name each remaining owner.
+
 ### Acceptance criteria
 
 The task is complete only when all of the following are true:
