@@ -4889,3 +4889,13 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   optional-extra, hosted-platform, and independent-review gates remain
   separate.
 
+## Hosted gate recheck at `30331b3` on 2026-10-24
+
+- CI run `40004576842` and Pages run `40004576931` both failed before any
+  workflow step executed. All `20` CI jobs had zero steps; the Pages build
+  also had zero steps and deploy and verification were skipped.
+- This is the same account billing/spending-limit failure reproduced on the
+  current commit. No further repository-controlled retry can close hosted
+  CI or Pages evidence until the GitHub account/repository configuration is
+  repaired.
+
