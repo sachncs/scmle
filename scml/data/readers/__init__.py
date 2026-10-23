@@ -26,13 +26,16 @@ from scml.data.readers.registry import SourceSnapshot
 from scml.data.readers.streaming import CsvChunks
 from scml.data.readers.streaming import JsonLinesChunks
 from scml.data.readers.streaming import ParquetChunks
+from scml.data.readers.streaming import SinkCommitReceipt
 from scml.data.readers.streaming import StreamAcknowledgement
 from scml.data.readers.streaming import StreamBatch
 from scml.data.readers.streaming import StreamCheckpoint
+from scml.data.readers.streaming import StreamCommitEvidence
 from scml.data.readers.streaming import StreamCommitReceipt
 from scml.data.readers.streaming import StreamingConsumer
 from scml.data.readers.streaming import StreamingError
 from scml.data.readers.streaming import StreamingLedger
+from scml.data.readers.streaming import TransactionalSink
 
 __all__ = [
     "CommittedIncrementalState",
@@ -55,6 +58,7 @@ __all__ = [
     "ParquetChunks",
     "SchemaCompatibility",
     "SequenceEventSource",
+    "SinkCommitReceipt",
     "SourceConnector",
     "SourceRegistry",
     "SourceRegistryStore",
@@ -62,10 +66,12 @@ __all__ = [
     "StreamAcknowledgement",
     "StreamBatch",
     "StreamCheckpoint",
+    "StreamCommitEvidence",
     "StreamCommitReceipt",
     "StreamingConsumer",
     "StreamingError",
     "StreamingLedger",
     "StreamingObjectStoreConnector",
+    "TransactionalSink",
     "WarehouseConnector",
 ]

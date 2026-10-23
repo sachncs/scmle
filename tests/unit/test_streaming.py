@@ -14,6 +14,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from scml.contracts import errors
+from scml.data import readers
 from scml.data.readers import streaming
 
 
@@ -162,6 +163,12 @@ def write_stream_csv(path):
         }
     )
     frame.to_csv(path, index=False)
+
+
+def test_transactional_streaming_contracts_are_public_reader_exports():
+    assert readers.TransactionalSink is streaming.TransactionalSink
+    assert readers.SinkCommitReceipt is streaming.SinkCommitReceipt
+    assert readers.StreamCommitEvidence is streaming.StreamCommitEvidence
 
 
 class RecordingSink(streaming.TransactionalSink):
