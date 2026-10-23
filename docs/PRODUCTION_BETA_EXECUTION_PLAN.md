@@ -4475,3 +4475,42 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   design; the prior authoritative full regression remains the result recorded
   at `92e4544`.
 
+## Hosted controls and public release verification at `9599ebe` on 2026-10-23
+
+- `scripts/verify_hosted_controls.py` now provides a credential-free control-
+  plane verifier. It checks that all five repository workflows exist, every
+  GitHub Action reference is pinned to a 40-character commit SHA,
+  `pull_request_target` is absent, the CI/site/Pages/release controls are
+  present, and Astro's public site/base configuration remains bound to
+  `https://sachncs.github.io/super-charge-ml` and `/super-charge-ml`.
+- The verifier is wired into a dedicated CI job, the site build, the Pages
+  build, and the local release preflight. The Pages deploy job now runs the
+  same verifier against every required public route after deployment and
+  uploads the machine-readable route/status/digest record as an artifact.
+  The focused static result at this commit passed with 56 pinned action
+  references. Workflow YAML, shell syntax, Ruff, formatting, and mypy checks
+  also passed.
+- `scripts/verify_external_release.py` performs no-secret external release
+  verification after publication. It resolves the public GitHub tag to the
+  exact source commit, downloads each public GitHub Release asset, compares its
+  SHA-256 to the local wheel/source artifact, and compares the same local
+  digests to PyPI's public JSON metadata. Missing assets, tag/commit mismatch,
+  version mismatch, or digest mismatch fails closed. The release workflow runs
+  it after PyPI and GitHub publication with bounded retries.
+- The new verifier tests passed 8 focused tests. Synthetic GitHub/PyPI
+  responses prove both a matching publication and digest/commit failure. The
+  configured public Pages URL was probed without credentials: static controls
+  passed, but the required routes returned HTTP 404, so public deployment is
+  still not verified. No external release was available to probe at this
+  commit.
+- The reliability boundary remains explicit. `LocalFaultExecutor` and
+  `FaultInjectionHarness` provide bounded local fault evidence only. No
+  verifier in this repository executes or proves cloud, container, kernel,
+  connector, broker transaction, or distributed exactly-once semantics; those
+  scenarios remain release-blocking external gates and are not promoted by
+  this CI change. Hosted runner execution, public Pages deployment, and an
+  independent signed review still require external evidence.
+- This was a focused implementation and control-plane validation batch. The
+  full repository regression was intentionally not run, and no full-suite
+  result is implied by this entry.
+
