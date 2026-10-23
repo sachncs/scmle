@@ -4555,3 +4555,54 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   independent review, and clean external reproduction remain release gates.
   No new full repository regression was run for this implementation batch.
 
+## Continuous-treatment parameter estimation at `2e62f3f` with site guidance at `79faf55` on 2026-10-23
+
+- `EstimationPolicy` now declares a first-class `continuous_ipw_ate`
+  estimator. It requires the treatment position and the complete continuous
+  identification declaration: consistency, conditional exchangeability,
+  continuous-treatment positivity, linear dose response, and a normal
+  conditional treatment density.
+- The estimator fits a Gaussian generalized propensity density from every
+  declared non-treatment feature, forms stabilized marginal-to-conditional
+  density-ratio weights, applies an explicit finite weight cap, and estimates
+  a weighted marginal dose-response slope. The report retains observed
+  treatment support, conditional-density scale, raw and capped weight ranges,
+  quantiles, capped fraction, and effective sample size. Positivity is marked
+  `diagnosed_not_proven`; a cap is numerical protection, not proof of overlap.
+- The existing clustered covariance path is now surfaced as an explicit
+  `cluster_uncertainty` diagnostic for every clustered regression or causal
+  result. It records the finite-sample sandwich method, cluster count and
+  sizes, singleton fraction, declared independent sampling unit, and a small-
+  cluster caution. The existing hierarchical random-intercept, one-random-
+  slope, moment-GLS, and bounded-REML contracts remain intact.
+- Continuous reports include an explicit experimental capability declaration,
+  nuisance-model uncertainty and dose-response limitations, and an
+  independent dense normal-equation reference. Report and project-declaration
+  deserialization preserve the new policy fields without defaults silently
+  changing the scientific question.
+- The focused parameter and project contract command passed `62` tests with
+  `-W error::ResourceWarning`. The new continuous-treatment assertions cover
+  deterministic estimates, effect recovery, overlap and weight diagnostics,
+  clustered uncertainty, assumption failures, policy round trips, and
+  reference checks. Ruff lint, Ruff formatting, mypy, and diff checks passed
+  for the changed Python surface.
+- The standalone modelling guide now contains a runnable continuous-treatment
+  example, the estimand interpretation, diagnostics to inspect, and the
+  explicit boundary against nonlinear dose response, continuous-treatment
+  AIPW, and propagated generalized-propensity uncertainty. Astro built `19`
+  pages, accessibility checks passed all `19` HTML files, internal-link
+  checks passed `479` links, and Playwright passed `4` browser smoke tests.
+- This batch expands the public evaluation contract, not the production
+  modelling guarantee. The continuous estimator is available through
+  `estimate_parameters` and `EstimationResult`; the existing `MLProject`
+  `treatment_column` contract remains reserved for binary uplift workflows,
+  so continuous treatment is not claimed as a complete `MLProject` path.
+  Nonlinear dose-response, continuous-treatment AIPW, full Bayesian
+  multilevel inference, variance-component uncertainty propagation, cloud or
+  kernel fault evidence, hosted CI, public Pages deployment, independent
+  review, and clean external reproduction remain open release gates.
+- No new full repository regression was run for this batch. The repository
+  full-suite command already running from the preceding batch was not
+  restarted or treated as evidence here because its terminal result was not
+  available in this execution context.
+
