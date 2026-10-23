@@ -332,6 +332,7 @@ class ReleaseEvaluation:
             "blocked": self.blocked,
             "blocking_reasons": list(self.blocking_reasons),
             "findings": [item.to_dict() for item in self.findings],
+            "readiness": self.readiness_summary().to_dict(),
         }
 
     def canonical_json(self) -> str:

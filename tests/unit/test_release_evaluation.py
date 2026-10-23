@@ -430,6 +430,7 @@ def test_readiness_summary_counts_findings_and_serializes_deterministically():
     assert (
         summary.canonical_json() == result.readiness_summary().canonical_json()
     )
+    assert result.to_dict()["readiness"] == summary.to_dict()
 
 
 def test_blocked_readiness_summary_distinguishes_blocking_failures():
