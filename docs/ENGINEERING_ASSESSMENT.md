@@ -31,6 +31,7 @@ local tests.
 | F-003 | `pyproject.toml` project URLs | P3 | The changelog URL referenced the retired `main` branch while the repository uses `master`. | Fixed | Stale-branch reference scan is clean. |
 | F-006 | `scml/inference/serving.py:BatchServing.score_file` | P1 | Batch prediction output was written directly to its destination, so interruption could leave a partial CSV visible to downstream consumers. | Fixed | Output now uses the existing fsync-and-replace durability primitive; the batch-serving regression test verifies the atomic writer path. |
 | F-007 | `scml/cli.py:PredictCommand.execute` | P1 | The public `scml predict --output` path had the same direct-write hazard as batch serving. | Fixed | CLI output now uses the atomic writer; `test_predict_with_explicit_renames` verifies the writer path and output. |
+| F-008 | `scml/inference/onnx_export.py:export` | P1 | ONNX graph export wrote serialized model bytes directly to the destination, so interruption could expose a partial artifact. | Fixed | Export now uses the existing atomic writer; the durability failure-preservation tests pass. The ONNX-specific suite remains dependency-gated in this environment. |
 | F-004 | `.github/workflows/` and GitHub account configuration | P1 | Current hosted CI and Pages runs fail before executing steps because of the account billing/spending-limit condition. Hosted platform coverage and publication cannot be verified locally. | Unresolved external blocker | Current runs `40019762196` and `40019762190` failed at hosted startup; all 20 CI jobs and the Pages build had zero executed steps. The live verifier also received HTTP 404 for all 18 configured public routes. |
 | F-005 | Release governance and operations | P1 | Independent signed review, external transport/container/kernel fault evidence, external secret custody, and an approved release decision are not present. Local tests cannot manufacture these witnesses. | Unresolved external blocker | Required by the repository's release boundary and the engineering brief; no independent signed records are available in the checkout. |
 
@@ -81,6 +82,8 @@ review remain unverified.
   `master`.
 - Corrected the JEPA rejection diagnostic without changing its public API.
 - Added a regression test that locks the complete diagnostic message.
+- Routed batch, CLI, and ONNX artifact publication through the existing atomic
+  durability primitive.
 - Added no dependencies and changed no public exports.
 
 ## Residual risk register
