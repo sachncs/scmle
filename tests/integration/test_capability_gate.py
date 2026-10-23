@@ -12,6 +12,7 @@ from scml.core import context as context_module
 from scml.core import orchestrator
 from scml.core import stages
 from scml.models import registry as registry_module
+from scml.models.deeplearning import networks
 from scml.models.sklearn import classical
 
 
@@ -95,6 +96,50 @@ def test_deep_learning_paths_declare_their_optional_extra():
             inference=capabilities.Inference.LIBRARY,
         )
         assert registry.require(key).required_extras == ("deeplearning",)
+
+
+def test_ft_transformer_uses_an_experimental_tabular_boundary():
+    """FT-Transformer must not inherit supported deep-learning status."""
+    adapter = networks.TorchTransformerAdapter()
+    assert adapter.family == "deep_learning"
+    assert adapter.architecture == "ft_transformer"
+    assert adapter.capability_family == "transformer"
+
+    registry = context_module.tabular_beta_capability_registry()
+    declaration = registry.find_model_family("transformer")
+    assert declaration is not None
+    assert declaration.status is capabilities.CapabilityStatus.EXPERIMENTAL
+    assert declaration.modalities == (capabilities.Modality.TABULAR,)
+
+    context = make_context()
+    key = stages.capability_key(
+        context, tasks.TaskType.BINARY, adapter.capability_family
+    )
+    diagnostics = registry.diagnose(key)
+    assert {item.code for item in diagnostics} == {
+        "missing_declaration",
+        "model_family_status_not_allowed",
+    }
+
+
+def test_capability_family_is_used_before_training():
+    """A coarse deep-learning family cannot bypass its boundary identity."""
+
+    class ExperimentalTransformerAdapter(classical.DummyAdapter):
+        """Test adapter with the FT-Transformer boundary identity."""
+
+        name = "experimental_transformer"
+        family = "deep_learning"
+        capability_family = "transformer"
+
+    context = make_context(
+        model_registry=registry_module.ModelRegistry(
+            (ExperimentalTransformerAdapter(),)
+        )
+    )
+
+    with pytest.raises(capabilities.UnsupportedCapabilityError):
+        stages.build_plan(context)
 
 
 def test_extension_only_foundation_adapter_cannot_break_auto_planning(

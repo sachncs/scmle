@@ -442,7 +442,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "end-to-end transformer evaluation contract is incomplete",
         ),
         limitations=(
-            "experimental tabular feature-token transformer path only",
+            "experimental ft_transformer tabular feature-token path only",
             "not a text, image, audio, video, or multimodal transformer",
             "not a complete production capability declaration",
         ),

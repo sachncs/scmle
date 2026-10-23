@@ -129,13 +129,33 @@ class TorchEnsembleAdapter(TorchAdapter):
 
 
 class TorchTransformerAdapter(TorchAdapter):
-    """FT-Transformer: attention over feature tokens."""
+    """Experimental tabular FT-Transformer over numeric feature tokens.
+
+    ``family`` stays ``deep_learning`` for existing reporting and strategy
+    behavior. ``capability_family`` is the stricter release-boundary identity:
+    it resolves to the experimental, tabular-only transformer declaration and
+    must not inherit the supported generic deep-learning capability.
+    """
 
     name = "torch_ft_transformer"
     architecture = "ft_transformer"
+    capability_family = "transformer"
     capabilities = dataclasses.replace(
         TorchAdapter.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
     )
+
+    def rejection_reason(
+        self, task: tasks.TaskType, row_count: int | None = None
+    ) -> str | None:
+        """Keep the experimental transformer out of automatic beta search."""
+        reason = super().rejection_reason(task, row_count)
+        if reason is not None:
+            return reason
+        return (
+            "experimental tabular FT-Transformer requires an explicit "
+            "experimental integration path"
+        )
+
     search_space = search.SearchSpace(
         (
             search.ChoiceParameter("hidden_sizes", ((32,), (64,), (64, 64))),

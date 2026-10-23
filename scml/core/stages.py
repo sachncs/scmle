@@ -721,11 +721,12 @@ def build_plan(
     task = require(context.task, "task")
     for model_name in plan.candidate_models:
         adapter = context.registry.get(model_name)
-        key = capability_key(context, task, adapter.family)
+        model_family = adapter.capability_family or adapter.family
+        key = capability_key(context, task, model_family)
         try:
             context.capability_registry.require(key)
         except capabilities.UnsupportedCapabilityError:
-            if adapter.family not in {"custom", "test"}:
+            if model_family not in {"custom", "test"}:
                 raise
             if context.capability_registry.find(key) is None:
                 context.capability_registry.register(

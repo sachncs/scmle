@@ -88,6 +88,8 @@ class ModelAdapter(abc.ABC):
     Attributes:
         name: Unique registry name.
         family: Coarse family used for reporting (linear, tree, ...).
+        capability_family: Optional release-boundary identity. When absent,
+            the coarse family is used for capability resolution.
         capabilities: Declared capabilities.
         requires: Importable modules needed at build time.
         search_space: Tunable hyperparameters, or None if not tunable.
@@ -100,6 +102,7 @@ class ModelAdapter(abc.ABC):
 
     name: ClassVar[str]
     family: ClassVar[str]
+    capability_family: ClassVar[str | None] = None
     capabilities: ClassVar[Capabilities]
     requires: ClassVar[tuple[str, ...]] = ()
     search_space: ClassVar[search.SearchSpace | None] = None

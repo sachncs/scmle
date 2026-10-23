@@ -1,4 +1,9 @@
-"""Network architectures for tabular data, built lazily from PyTorch."""
+"""Experimental tabular network architectures, built lazily from PyTorch.
+
+The transformer architecture in this module is an FT-Transformer over a
+dense numeric tabular matrix. Its name does not imply text, image, audio,
+video, or multimodal transformer support.
+"""
 
 import abc
 from typing import Any
@@ -176,7 +181,7 @@ class EnsembleArchitecture(Architecture):
 
 
 class TransformerArchitecture(Architecture):
-    """An FT-Transformer: every feature becomes a token, attention mixes them.
+    """An experimental tabular-only FT-Transformer.
 
     Each scalar feature is embedded as `value * weight + bias`, a learned
     classification token is prepended, a stack of pre-norm transformer
