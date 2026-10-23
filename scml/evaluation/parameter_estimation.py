@@ -188,7 +188,7 @@ class EstimationPolicy:
         ):
             raise ValueError(
                 "estimator must be linear, logistic, bayesian_linear, "
-                "ipw_ate, or hierarchical_linear"
+                "ipw_ate, aipw_ate, or hierarchical_linear"
             )
         if self.covariance not in ("iid", "hc3", "clustered"):
             raise ValueError("covariance must be iid, hc3, or clustered")
@@ -262,18 +262,24 @@ class EstimationPolicy:
                 )
         elif self.estimator in causal_estimators:
             if self.prior is not None:
-                raise ValueError("a Bayesian prior is not valid for ipw_ate")
+                raise ValueError(
+                    f"a Bayesian prior is not valid for {self.estimator}"
+                )
             if self.covariance != "iid":
-                raise ValueError("ipw_ate supports only iid covariance")
+                raise ValueError(
+                    f"{self.estimator} supports only iid covariance"
+                )
             if self.treatment_position is None:
-                raise ValueError("ipw_ate requires treatment_position")
+                raise ValueError(
+                    f"{self.estimator} requires treatment_position"
+                )
             if (
                 len(self.causal_assumptions)
                 != len(set(self.causal_assumptions))
                 or set(self.causal_assumptions) != REQUIRED_CAUSAL_ASSUMPTIONS
             ):
                 raise ValueError(
-                    "ipw_ate requires consistency, "
+                    f"{self.estimator} requires consistency, "
                     "conditional_exchangeability, "
                     "and positivity assumptions"
                 )
