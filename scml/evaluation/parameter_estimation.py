@@ -174,6 +174,7 @@ class EstimationPolicy:
     propensity_clip: float = 0.01
     causal_assumptions: tuple[CausalAssumption, ...] = ()
     hierarchical_assumptions: tuple[HierarchicalAssumption, ...] = ()
+    cross_fitting_folds: int = 1
 
     def __post_init__(self) -> None:
         """Validate the policy before data is touched."""
@@ -209,6 +210,12 @@ class EstimationPolicy:
             raise ValueError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
+        if (
+            isinstance(self.cross_fitting_folds, bool)
+            or not isinstance(self.cross_fitting_folds, int)
+            or self.cross_fitting_folds < 1
+        ):
+            raise ValueError("cross_fitting_folds must be a positive integer")
         causal_estimators = {"ipw_ate", "aipw_ate"}
         if (
             self.estimator not in causal_estimators
@@ -227,6 +234,10 @@ class EstimationPolicy:
         if self.estimator not in causal_estimators and self.causal_assumptions:
             raise ValueError(
                 "causal assumptions are supported only by ipw_ate or aipw_ate"
+            )
+        if self.estimator != "aipw_ate" and self.cross_fitting_folds != 1:
+            raise ValueError(
+                "cross_fitting_folds is supported only by aipw_ate"
             )
         if (
             self.estimator != "hierarchical_linear"
@@ -309,6 +320,8 @@ class EstimationPolicy:
             values.pop("treatment_position")
             values.pop("propensity_clip")
             values.pop("causal_assumptions")
+        if self.estimator != "aipw_ate":
+            values.pop("cross_fitting_folds")
         if self.estimator != "hierarchical_linear":
             values.pop("hierarchical_assumptions")
         if self.prior is not None:
@@ -1026,10 +1039,10 @@ def fit_aipw_ate(
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], dict[str, np.ndarray]]:
     """Estimate a binary-treatment ATE with an augmented IPW score.
 
-    The propensity and outcome nuisance models are fitted on the same sample.
-    The result is deliberately reported as a bounded, non-cross-fitted
-    estimator: the influence variance is conditional on the fitted nuisance
-    functions and the diagnostics make that limitation explicit.
+    With one fold, nuisance models are fitted on the full sample, preserving
+    the historical estimator behavior. With multiple folds, each nuisance
+    model is fitted only on the corresponding training rows and its score is
+    evaluated on held-out rows.
     """
     if treatment_position is None:
         raise ValueError("aipw_ate requires treatment_position")
@@ -1045,35 +1058,98 @@ def fit_aipw_ate(
     nuisance_design = np.column_stack(
         (np.ones(confounders.shape[0]), confounders)
     )
-    propensity_coefficients, raw_propensity, propensity_diagnostics = (
-        fit_logistic(
+    fold_count = policy.cross_fitting_folds
+    if fold_count == 1:
+        (
+            propensity,
+            raw_propensity,
+            outcome_control,
+            outcome_treated,
+            nuisance_diagnostics,
+        ) = fit_aipw_nuisance_models(
             nuisance_design,
             treatment,
-            policy.max_iterations,
-            policy.tolerance,
+            values,
+            nuisance_design,
+            policy,
         )
-    )
-    del propensity_coefficients
-    propensity = np.clip(
-        raw_propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
-    )
-
-    treated_design = nuisance_design[treatment == 1.0]
-    control_design = nuisance_design[treatment == 0.0]
-    treated_coefficients = np.linalg.lstsq(
-        treated_design, values[treatment == 1.0], rcond=None
-    )[0]
-    control_coefficients = np.linalg.lstsq(
-        control_design, values[treatment == 0.0], rcond=None
-    )[0]
-    if (
-        np.linalg.matrix_rank(treated_design) != treated_design.shape[1]
-        or np.linalg.matrix_rank(control_design) != control_design.shape[1]
-    ):
-        raise ValueError("aipw_ate outcome design is not identifiable")
-
-    outcome_control = nuisance_design @ control_coefficients
-    outcome_treated = nuisance_design @ treated_coefficients
+        fold_assignments = np.zeros(len(values), dtype=int)
+        cross_fitting = {
+            "status": "disabled",
+            "fold_count": 1,
+            "assignment_method": "not_applicable",
+            "limitations": aipw_limitations(False),
+        }
+    else:
+        fold_assignments = deterministic_fold_assignments(
+            len(values), fold_count
+        )
+        support = validate_cross_fitting_support(
+            treatment, fold_assignments, fold_count
+        )
+        propensity = np.empty(len(values), dtype=float)
+        raw_propensity = np.empty(len(values), dtype=float)
+        outcome_control = np.empty(len(values), dtype=float)
+        outcome_treated = np.empty(len(values), dtype=float)
+        fold_diagnostics: list[dict[str, Any]] = []
+        for fold in range(fold_count):
+            training = fold_assignments != fold
+            validation = ~training
+            (
+                fold_propensity,
+                fold_raw_propensity,
+                fold_outcome_control,
+                fold_outcome_treated,
+                fold_nuisance_diagnostics,
+            ) = fit_aipw_nuisance_models(
+                nuisance_design[training],
+                treatment[training],
+                values[training],
+                nuisance_design[validation],
+                policy,
+            )
+            propensity[validation] = fold_propensity
+            raw_propensity[validation] = fold_raw_propensity
+            outcome_control[validation] = fold_outcome_control
+            outcome_treated[validation] = fold_outcome_treated
+            fold_diagnostics.append(
+                {
+                    "fold": fold,
+                    "training_rows": int(np.sum(training)),
+                    "validation_rows": int(np.sum(validation)),
+                    "propensity_iterations": fold_nuisance_diagnostics[
+                        "propensity_iterations"
+                    ],
+                    "propensity_log_likelihood": fold_nuisance_diagnostics[
+                        "propensity_log_likelihood"
+                    ],
+                    "treated_rank": fold_nuisance_diagnostics["treated_rank"],
+                    "control_rank": fold_nuisance_diagnostics["control_rank"],
+                }
+            )
+        nuisance_diagnostics = {
+            "propensity_iterations": max(
+                item["propensity_iterations"] for item in fold_diagnostics
+            ),
+            "folds": fold_diagnostics,
+        }
+        cross_fitting = {
+            "status": "enabled",
+            "fold_count": fold_count,
+            "assignment_method": "row_index_modulo",
+            "fold_assignments": fold_assignments.tolist(),
+            "support": support,
+            "training_rows_by_fold": {
+                str(fold): int(np.sum(fold_assignments != fold))
+                for fold in range(fold_count)
+            },
+            "validation_rows_by_fold": {
+                str(fold): int(np.sum(fold_assignments == fold))
+                for fold in range(fold_count)
+            },
+            "nuisance_fits": fold_diagnostics,
+            "limitations": aipw_limitations(True),
+        }
     score = (
         outcome_treated
         - outcome_control
@@ -1086,11 +1162,15 @@ def fit_aipw_ate(
     clipped = np.abs(raw_propensity - propensity) > 1e-12
     diagnostics = {
         "converged": True,
-        "iterations": propensity_diagnostics["iterations"],
+        "iterations": nuisance_diagnostics["propensity_iterations"],
         "estimator_family": "causal_augmented_ipw",
         "method": "augmented_ipw",
-        "uncertainty_method": "influence_function_with_fitted_nuisance",
-        "cross_fitting": "not_implemented",
+        "uncertainty_method": (
+            "influence_function_with_cross_fitted_nuisance"
+            if fold_count > 1
+            else "influence_function_with_fitted_nuisance"
+        ),
+        "cross_fitting": cross_fitting,
         "propensity_estimation_uncertainty": "not_propagated",
         "outcome_model_uncertainty": "not_propagated",
         "treatment_position": treatment_position,
@@ -1098,14 +1178,20 @@ def fit_aipw_ate(
         "control_rows": control_count,
         "propensity_model": {
             "method": "logistic_mle",
-            "converged": propensity_diagnostics["converged"],
-            "iterations": propensity_diagnostics["iterations"],
-            "log_likelihood": propensity_diagnostics["log_likelihood"],
+            "converged": True,
+            "iterations": nuisance_diagnostics["propensity_iterations"],
+            "log_likelihood": nuisance_diagnostics.get(
+                "propensity_log_likelihood", "recorded_per_fold"
+            ),
         },
         "outcome_models": {
             "method": "separate_ordinary_least_squares",
-            "treated_rank": int(np.linalg.matrix_rank(treated_design)),
-            "control_rank": int(np.linalg.matrix_rank(control_design)),
+            "treated_rank": nuisance_diagnostics["treated_rank"]
+            if fold_count == 1
+            else "recorded_per_fold",
+            "control_rank": nuisance_diagnostics["control_rank"]
+            if fold_count == 1
+            else "recorded_per_fold",
         },
         "positivity": {
             "status": "diagnosed_not_proven",
@@ -1130,8 +1216,136 @@ def fit_aipw_ate(
             "treatment": treatment,
             "outcome_control": outcome_control,
             "outcome_treated": outcome_treated,
+            "fold_assignments": fold_assignments,
         },
     )
+
+
+def fit_aipw_nuisance_models(
+    training_design: np.ndarray,
+    training_treatment: np.ndarray,
+    training_values: np.ndarray,
+    evaluation_design: np.ndarray,
+    policy: EstimationPolicy,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    dict[str, Any],
+]:
+    """Fit AIPW nuisance models on training rows and predict evaluation rows."""
+    treated = training_treatment == 1.0
+    control = training_treatment == 0.0
+    if int(np.sum(treated)) < 2 or int(np.sum(control)) < 2:
+        raise ValueError(
+            "aipw_ate each training fold needs at least two rows per "
+            "treatment arm"
+        )
+    propensity_coefficients, _, propensity_diagnostics = fit_logistic(
+        training_design,
+        training_treatment,
+        policy.max_iterations,
+        policy.tolerance,
+    )
+    evaluation_raw_propensity = special.expit(
+        evaluation_design @ propensity_coefficients
+    )
+    propensity = np.clip(
+        evaluation_raw_propensity,
+        policy.propensity_clip,
+        1.0 - policy.propensity_clip,
+    )
+    treated_design = training_design[treated]
+    control_design = training_design[control]
+    if (
+        np.linalg.matrix_rank(treated_design) != treated_design.shape[1]
+        or np.linalg.matrix_rank(control_design) != control_design.shape[1]
+    ):
+        raise ValueError("aipw_ate outcome design is not identifiable")
+    treated_coefficients = np.linalg.lstsq(
+        treated_design, training_values[treated], rcond=None
+    )[0]
+    control_coefficients = np.linalg.lstsq(
+        control_design, training_values[control], rcond=None
+    )[0]
+    outcome_control = evaluation_design @ control_coefficients
+    outcome_treated = evaluation_design @ treated_coefficients
+    return (
+        propensity,
+        evaluation_raw_propensity,
+        outcome_control,
+        outcome_treated,
+        {
+            "propensity_iterations": propensity_diagnostics["iterations"],
+            "propensity_log_likelihood": propensity_diagnostics[
+                "log_likelihood"
+            ],
+            "treated_rank": int(np.linalg.matrix_rank(treated_design)),
+            "control_rank": int(np.linalg.matrix_rank(control_design)),
+        },
+    )
+
+
+def deterministic_fold_assignments(rows: int, fold_count: int) -> np.ndarray:
+    """Assign rows to balanced folds using a deterministic row-order rule."""
+    if fold_count < 2:
+        raise ValueError("cross-fitting needs at least two folds")
+    if fold_count > rows:
+        raise ValueError("cross_fitting_folds must not exceed rows")
+    return np.arange(rows, dtype=int) % fold_count
+
+
+def validate_cross_fitting_support(
+    treatment: np.ndarray,
+    fold_assignments: np.ndarray,
+    fold_count: int,
+) -> list[dict[str, int]]:
+    """Validate treatment support in every training and validation fold."""
+    support: list[dict[str, int]] = []
+    for fold in range(fold_count):
+        validation = fold_assignments == fold
+        training = ~validation
+        validation_treated = int(np.sum(treatment[validation] == 1.0))
+        validation_control = int(np.sum(treatment[validation] == 0.0))
+        training_treated = int(np.sum(treatment[training] == 1.0))
+        training_control = int(np.sum(treatment[training] == 0.0))
+        if validation_treated < 1 or validation_control < 1:
+            raise ValueError(
+                "aipw_ate cross-fitting needs both treatment arms in every "
+                "validation fold"
+            )
+        if training_treated < 2 or training_control < 2:
+            raise ValueError(
+                "aipw_ate cross-fitting needs at least two rows per "
+                "treatment arm in every training fold"
+            )
+        support.append(
+            {
+                "fold": fold,
+                "training_treated_rows": training_treated,
+                "training_control_rows": training_control,
+                "validation_treated_rows": validation_treated,
+                "validation_control_rows": validation_control,
+            }
+        )
+    return support
+
+
+def aipw_limitations(cross_fitted: bool) -> list[str]:
+    """Return limitations that apply to both bounded AIPW modes."""
+    limitations = [
+        "propensity and outcome nuisance uncertainty is not propagated",
+        "positivity is diagnosed but not proven",
+        "outcome nuisance models are separate ordinary least squares fits",
+        "this estimator is not Bayesian and does not support time-varying "
+        "treatment effects",
+    ]
+    if not cross_fitted:
+        limitations.append(
+            "nuisance models are fitted on the same rows used for scoring"
+        )
+    return limitations
 
 
 def hajek_ipw_statistics(
@@ -1517,6 +1731,10 @@ def reference_aipw_ate(
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
     """Recompute the augmented IPW score with an independent reference."""
+    if policy.cross_fitting_folds > 1:
+        return reference_cross_fitted_aipw_ate(
+            inputs, values, coefficients, policy
+        )
     nuisance_design = inputs["nuisance_design"]
     treatment = inputs["treatment"]
     confounder_design = nuisance_design
@@ -1568,6 +1786,104 @@ def reference_aipw_ate(
             and difference <= policy.reference_tolerance * 10
         ),
         "message": str(propensity_fit.message),
+    }
+
+
+def reference_cross_fitted_aipw_ate(
+    inputs: Mapping[str, np.ndarray],
+    values: np.ndarray,
+    coefficients: np.ndarray,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Independently recompute each cross-fitted AIPW validation score."""
+    nuisance_design = inputs["nuisance_design"]
+    treatment = inputs["treatment"]
+    fold_assignments = np.asarray(inputs["fold_assignments"], dtype=int)
+    if len(fold_assignments) != len(values):
+        raise ValueError("cross-fitting reference fold assignments are invalid")
+    reference_scores = np.empty(len(values), dtype=float)
+    fold_records: list[dict[str, Any]] = []
+    for fold in range(policy.cross_fitting_folds):
+        training = fold_assignments != fold
+        validation = ~training
+        training_design = nuisance_design[training]
+        training_treatment = treatment[training]
+        training_values = values[training]
+        validation_design = nuisance_design[validation]
+        treated = training_treatment == 1.0
+        control = training_treatment == 0.0
+
+        def objective(
+            candidate: np.ndarray,
+            design: np.ndarray = training_design,
+            observed: np.ndarray = training_treatment,
+        ) -> tuple[float, np.ndarray]:
+            logits = design @ candidate
+            probabilities = special.expit(logits)
+            value = -float(
+                np.sum(observed * logits - np.logaddexp(0.0, logits))
+            )
+            gradient = design.T @ (probabilities - observed)
+            return value, gradient
+
+        propensity_fit = optimize.minimize(
+            lambda candidate: objective(candidate)[0],
+            np.zeros(training_design.shape[1]),
+            jac=lambda candidate: objective(candidate)[1],
+            method="BFGS",
+            options={"gtol": policy.reference_tolerance, "maxiter": 1000},
+        )
+        propensity = np.clip(
+            special.expit(validation_design @ propensity_fit.x),
+            policy.propensity_clip,
+            1.0 - policy.propensity_clip,
+        )
+        treated_design = training_design[treated]
+        control_design = training_design[control]
+        if (
+            np.linalg.matrix_rank(treated_design) != treated_design.shape[1]
+            or np.linalg.matrix_rank(control_design) != control_design.shape[1]
+        ):
+            raise ValueError(
+                "aipw_ate reference outcome design is not identifiable"
+            )
+        treated_coefficients = np.linalg.lstsq(
+            treated_design, training_values[treated], rcond=None
+        )[0]
+        control_coefficients = np.linalg.lstsq(
+            control_design, training_values[control], rcond=None
+        )[0]
+        outcome_treated = validation_design @ treated_coefficients
+        outcome_control = validation_design @ control_coefficients
+        reference_scores[validation] = (
+            outcome_treated
+            - outcome_control
+            + treatment[validation]
+            * (values[validation] - outcome_treated)
+            / propensity
+            - (1.0 - treatment[validation])
+            * (values[validation] - outcome_control)
+            / (1.0 - propensity)
+        )
+        fold_records.append(
+            {
+                "fold": fold,
+                "converged": bool(propensity_fit.success),
+                "message": str(propensity_fit.message),
+            }
+        )
+    reference_ate = float(np.mean(reference_scores))
+    difference = float(abs(reference_ate - coefficients[0]))
+    converged = all(record["converged"] for record in fold_records)
+    return {
+        "method": "scipy.optimize.minimize:BFGS_plus_lstsq_per_training_fold",
+        "converged": converged,
+        "reference_ate": reference_ate,
+        "max_absolute_difference": difference,
+        "folds": fold_records,
+        "passed": bool(
+            converged and difference <= policy.reference_tolerance * 10
+        ),
     }
 
 

@@ -345,10 +345,111 @@ def test_aipw_ate_reports_augmented_score_and_reference_evidence():
     assert result.parameters[0].estimate == pytest.approx(2.0, abs=0.35)
     assert result.diagnostics["estimator_family"] == "causal_augmented_ipw"
     assert result.diagnostics["method"] == "augmented_ipw"
-    assert result.diagnostics["cross_fitting"] == "not_implemented"
+    assert result.diagnostics["cross_fitting"]["status"] == "disabled"
+    assert result.diagnostics["cross_fitting"]["fold_count"] == 1
+    assert any(
+        "same rows used for scoring" in limitation
+        for limitation in result.diagnostics["cross_fitting"]["limitations"]
+    )
     assert result.diagnostics["positivity"]["status"] == "diagnosed_not_proven"
     assert result.reference["passed"] is True
     json.dumps(result.to_dict())
+
+
+def test_aipw_ate_cross_fitting_is_deterministic_and_auditable():
+    """Cross-fitting uses held-out scores and records every fold contract."""
+    rng = np.random.default_rng(24)
+    rows = 600
+    age = rng.normal(size=rows)
+    risk_score = rng.normal(size=rows)
+    treatment_probability = 1.0 / (
+        1.0 + np.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
+    )
+    treatment = rng.binomial(1, treatment_probability)
+    outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
+    outcome += rng.normal(scale=0.8, size=rows)
+    features = np.column_stack((treatment, age, risk_score))
+    policy = EstimationPolicy(
+        estimator="aipw_ate",
+        covariance="iid",
+        treatment_position=0,
+        propensity_clip=0.02,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+        cross_fitting_folds=5,
+    )
+
+    first = estimate_parameters(features, outcome, causal_estimand(), policy)
+    second = estimate_parameters(features, outcome, causal_estimand(), policy)
+    cross_fitting = first.diagnostics["cross_fitting"]
+
+    assert first.parameters[0].estimate == pytest.approx(2.0, abs=0.45)
+    assert first.parameters[0].estimate == second.parameters[0].estimate
+    assert cross_fitting["status"] == "enabled"
+    assert cross_fitting["fold_count"] == 5
+    assert cross_fitting["assignment_method"] == "row_index_modulo"
+    assert cross_fitting["fold_assignments"] == [
+        index % 5 for index in range(rows)
+    ]
+    assert all(
+        support["training_treated_rows"] >= 2
+        and support["training_control_rows"] >= 2
+        and support["validation_treated_rows"] >= 1
+        and support["validation_control_rows"] >= 1
+        for support in cross_fitting["support"]
+    )
+    assert len(cross_fitting["nuisance_fits"]) == 5
+    assert (
+        first.diagnostics["uncertainty_method"]
+        == "influence_function_with_cross_fitted_nuisance"
+    )
+    assert first.reference["method"].endswith("per_training_fold")
+    assert first.reference["passed"] is True
+    assert any(
+        "not Bayesian" in limitation and "time-varying" in limitation
+        for limitation in cross_fitting["limitations"]
+    )
+    assert first.to_dict()["policy"]["cross_fitting_folds"] == 5
+    json.dumps(first.to_dict())
+
+
+def test_aipw_cross_fitting_validates_policy_and_fold_support():
+    """Cross-fitting fails closed for unsupported folds and treatment support."""
+    with pytest.raises(ValueError, match="positive integer"):
+        EstimationPolicy(
+            estimator="aipw_ate",
+            treatment_position=0,
+            cross_fitting_folds=0,
+            causal_assumptions=(
+                "consistency",
+                "conditional_exchangeability",
+                "positivity",
+            ),
+        )
+    with pytest.raises(ValueError, match="only by aipw_ate"):
+        EstimationPolicy(estimator="linear", cross_fitting_folds=2)
+
+    treatment = np.tile((0.0, 1.0), 4)
+    signal = np.arange(8, dtype=float)
+    features = np.column_stack((treatment, signal, signal**2))
+    outcome = signal
+    policy = EstimationPolicy(
+        estimator="aipw_ate",
+        covariance="iid",
+        treatment_position=0,
+        cross_fitting_folds=4,
+        causal_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="both treatment arms"):
+        estimate_parameters(features, outcome, causal_estimand(), policy)
 
 
 def test_hierarchical_linear_reports_random_intercept_variance():
