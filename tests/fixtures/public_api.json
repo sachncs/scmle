@@ -10,7 +10,7 @@
     },
     "EstimationPolicy": {
       "kind": "class",
-      "signature_sha256": "c44acb00417b1b5d661be64308195efd39e6797de8ae8dc42ccdfc60fab7da7d"
+      "signature_sha256": "b60ae20208d4a99abb169218d619fcdeab7046cd358425aa76dce4ab8a095fef"
     },
     "EstimationResult": {
       "kind": "class",
