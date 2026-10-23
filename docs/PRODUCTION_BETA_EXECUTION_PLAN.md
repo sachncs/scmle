@@ -4701,3 +4701,13 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 - This closes the code-level publication-order gap. Hosted execution remains
   unverified until the GitHub billing and Pages blockers are resolved.
 
+## Local operational rehearsal evidence at `33ad773` on 2026-10-23
+
+- The targeted operational slice covering resume, recovery, deployment and
+  rollback, monitoring handoff, signing-key rotation, local fault execution,
+  reliability evidence, and keyring lifecycle passed `121` tests in 10 minutes
+  53 seconds under `-W error::ResourceWarning`.
+- This closes the local automated rehearsal boundary only. The operational
+  release gate remains open for independent-operator repetition and external
+  transport, paging, container, kernel, and secret-custody evidence.
+

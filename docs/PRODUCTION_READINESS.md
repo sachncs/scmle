@@ -49,6 +49,12 @@ must not be described as production-ready until every required gate is green.
 The checklist is intentionally conservative: a green unit suite is evidence
 for the covered behavior, not proof of cross-platform or operational readiness.
 
+Local automated rehearsal evidence is green at the current head: the resume,
+recovery, deployment, monitoring, signing-key, local-fault, reliability, and
+keyring slice passed `121` tests under strict resource warnings. The checklist
+remains open until an independent operator repeats the procedure and external
+transport, paging, container, and kernel boundaries are evidenced.
+
 ## Atomic commits and verification order
 
 Use [plan.md](../plan.md) as the canonical execution plan and keep each
