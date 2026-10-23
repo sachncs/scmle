@@ -4514,3 +4514,44 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   full repository regression was intentionally not run, and no full-suite
   result is implied by this entry.
 
+## Bounded non-tabular modelling API at `79660ab` with site guidance at `3859f7a` on 2026-10-23
+
+- `NonTabularModelProject` is now the narrow public modelling boundary for
+  built-in non-tabular adapters. It accepts only exact `DocumentAdapter`,
+  `TextAdapter`, `ImageAdapter`, `AudioAdapter`, `VideoAdapter`,
+  `GraphAdapter`, `GeospatialAdapter`, and `RasterAdapter` types. Caller-
+  defined subclasses and curation-only extension adapters fail before model
+  fitting, so custom decoder or feature semantics cannot silently cross the
+  production-oriented boundary.
+- The project consumes only the adapter-owned finite representation already
+  present in the repository: bounded character/token counts, decoded RGB
+  pixels, decoded WAV statistics, declared container metadata or explicit
+  bounded video frames, inductive node features, CRS-bound geometry
+  features, and raster metadata or an explicitly named caller-owned decoder.
+  It does not infer codecs, decode arbitrary bytes, or imply OCR, layout,
+  Transformer, JEPA, GNN, foundation-model, or semantic multimodal support.
+- `experimental_opt_in=True` is mandatory because these paths remain
+  experimental. Successful runs atomically persist and then verify the signed
+  fifteen-stage lifecycle report and model package. The result exposes package
+  health, dataset identity, representation policy, decoder policy, and the
+  existing predictor schema checks. Reference and observed video/raster
+  adapters must share the exact decoder object.
+- The focused non-tabular project, existing modality project, serving, and
+  contract suite passed `53` tests. The new API reached `86%` focused line
+  coverage. Ruff lint, Ruff formatting, mypy for `scml/api/non_tabular.py`,
+  and diff checks passed. The API surface test passed; the compatibility test
+  still reports the unrelated in-flight `EstimationPolicy` signature change
+  in the working tree and is not attributed to this feature.
+- The standalone API guide now documents the explicit opt-in, exact adapter
+  boundary, representation/decoder claims, metadata-only video/raster
+  limitation, and the distinction between production-oriented artifacts and
+  supported production status. Astro built `19` pages, accessibility checks
+  passed all `19` HTML files, internal-link checks passed `479` links, and
+  Playwright passed `4` browser smoke tests.
+- This closes a bounded local non-tabular modelling API gap but does not
+  promote any modality to supported production status. External decoder
+  qualification, raw-modality fidelity, reference serving, cloud/container/
+  kernel fault evidence, distributed exactly-once semantics, hosted CI/Pages,
+  independent review, and clean external reproduction remain release gates.
+  No new full repository regression was run for this implementation batch.
+
