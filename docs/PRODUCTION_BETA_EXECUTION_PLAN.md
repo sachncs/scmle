@@ -4673,3 +4673,13 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   evidence; the regression phase remains intentionally deferred until the
   remaining implementation and external release gates are complete.
 
+## Static and API evidence at `5aeaa69` on 2026-10-23
+
+- Ruff lint and formatting checks passed (`485` files already formatted),
+  mypy passed with no issues across `249` source files, and the public API
+  compatibility verifier reported `compatible: true` for `43` exports at
+  release `0.1.0b1`.
+- These checks are complete for the current implementation state. They do not
+  replace hosted CI, external fault execution, independent review, clean
+  external reproduction, or the final repository-wide regression.
+
