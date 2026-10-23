@@ -41,8 +41,9 @@ MIN_SAMPLE_ROWS = 1_000
 MIX = np.uint64(0x9E3779B97F4A7C15)
 MIX_A = np.uint64(0xBF58476D1CE4E5B9)
 MIX_B = np.uint64(0x94D049BB133111EB)
-STREAM_STATE_SCHEMA = 1
+STREAM_STATE_SCHEMA = 2
 STREAM_ACKNOWLEDGEMENT_SCHEMA = 1
+STREAM_TRANSACTION_SCHEMA = 1
 
 
 def row_hash(positions: np.ndarray, seed: int) -> np.ndarray:
@@ -454,11 +455,116 @@ class StreamAcknowledgement:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class SinkCommitReceipt:
+    """A transport-neutral receipt bound to one streaming batch."""
+
+    source_identity: str
+    batch_id: str
+    checkpoint: StreamCheckpoint
+    receipt: str
+
+    def __post_init__(self) -> None:
+        """Validate the receipt's basic identities and checkpoint source."""
+        if not self.source_identity.strip():
+            raise ValueError("source_identity must not be empty")
+        if not self.batch_id.startswith("batch_"):
+            raise ValueError("batch_id must be a streaming batch identity")
+        if not self.receipt.strip():
+            raise ValueError("receipt must not be empty")
+        if self.checkpoint.source_identity != self.source_identity:
+            raise ValueError("receipt and checkpoint sources differ")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible sink receipt evidence."""
+        return {
+            "source_identity": self.source_identity,
+            "batch_id": self.batch_id,
+            "checkpoint": self.checkpoint.to_dict(),
+            "receipt": self.receipt,
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuild a sink receipt from durable JSON."""
+        return cls(
+            source_identity=str(record["source_identity"]),
+            batch_id=str(record["batch_id"]),
+            checkpoint=StreamCheckpoint.from_dict(record["checkpoint"]),
+            receipt=str(record["receipt"]),
+        )
+
+
+class TransactionalSink(abc.ABC):
+    """Caller-owned sink contract for an idempotent streaming commit.
+
+    A sink must commit or deduplicate the supplied ``batch_id`` and return a
+    receipt containing the exact source, batch, and checkpoint identities. The
+    ledger atomically records that receipt with checkpoint acknowledgement in
+    its local JSON state, but this contract does not provide a broker
+    transaction or distributed exactly-once delivery.
+    """
+
+    @abc.abstractmethod
+    def commit(self, batch: StreamBatch) -> SinkCommitReceipt:
+        """Commit one batch and return its transport-owned receipt."""
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class StreamCommitEvidence:
+    """Durable binding of a sink receipt and checkpoint acknowledgement."""
+
+    source_identity: str
+    batch_id: str
+    sink_receipt: SinkCommitReceipt
+    acknowledgement: StreamAcknowledgement
+
+    def __post_init__(self) -> None:
+        """Validate all identities in one durable transaction record."""
+        if self.sink_receipt.source_identity != self.source_identity:
+            raise ValueError("evidence and sink receipt sources differ")
+        if self.acknowledgement.source_identity != self.source_identity:
+            raise ValueError("evidence and acknowledgement sources differ")
+        if self.sink_receipt.batch_id != self.batch_id:
+            raise ValueError("evidence and sink receipt batches differ")
+        if self.acknowledgement.batch_id != self.batch_id:
+            raise ValueError("evidence and acknowledgement batches differ")
+        if self.sink_receipt.checkpoint != self.acknowledgement.checkpoint:
+            raise ValueError(
+                "sink receipt and acknowledgement checkpoints differ"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-compatible transaction evidence."""
+        return {
+            "schema_version": STREAM_TRANSACTION_SCHEMA,
+            "source_identity": self.source_identity,
+            "batch_id": self.batch_id,
+            "sink_receipt": self.sink_receipt.to_dict(),
+            "acknowledgement": self.acknowledgement.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuild transaction evidence from durable JSON."""
+        if record.get("schema_version") != STREAM_TRANSACTION_SCHEMA:
+            raise ValueError("unsupported streaming transaction schema")
+        return cls(
+            source_identity=str(record["source_identity"]),
+            batch_id=str(record["batch_id"]),
+            sink_receipt=SinkCommitReceipt.from_dict(record["sink_receipt"]),
+            acknowledgement=StreamAcknowledgement.from_dict(
+                record["acknowledgement"]
+            ),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class StreamState:
     """Durable idempotency and checkpoint state for one source snapshot."""
 
     checkpoint: StreamCheckpoint
     committed_batch_ids: tuple[str, ...] = ()
+    transaction_evidence: tuple[StreamCommitEvidence, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate deterministic committed batch identities."""
@@ -466,6 +572,15 @@ class StreamState:
             self.committed_batch_ids
         ):
             raise ValueError("committed_batch_ids must be sorted and unique")
+        evidence_ids = tuple(
+            evidence.batch_id for evidence in self.transaction_evidence
+        )
+        if tuple(sorted(set(evidence_ids))) != evidence_ids:
+            raise ValueError("transaction_evidence must be sorted by batch_id")
+        if not set(evidence_ids).issubset(self.committed_batch_ids):
+            raise ValueError(
+                "transaction evidence must identify committed batches"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-compatible durable state."""
@@ -473,17 +588,24 @@ class StreamState:
             "schema_version": STREAM_STATE_SCHEMA,
             "checkpoint": self.checkpoint.to_dict(),
             "committed_batch_ids": list(self.committed_batch_ids),
+            "transaction_evidence": [
+                evidence.to_dict() for evidence in self.transaction_evidence
+            ],
         }
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuild state from durable JSON."""
-        if record.get("schema_version") != STREAM_STATE_SCHEMA:
+        if record.get("schema_version") not in (1, STREAM_STATE_SCHEMA):
             raise ValueError("unsupported streaming state schema")
         return cls(
             checkpoint=StreamCheckpoint.from_dict(record["checkpoint"]),
             committed_batch_ids=tuple(
                 str(value) for value in record["committed_batch_ids"]
+            ),
+            transaction_evidence=tuple(
+                StreamCommitEvidence.from_dict(value)
+                for value in record.get("transaction_evidence", [])
             ),
         )
 
@@ -497,6 +619,8 @@ class StreamCommitReceipt:
     accepted: bool
     duplicate: bool
     checkpoint: StreamCheckpoint
+    sink_receipt: SinkCommitReceipt | None = None
+    acknowledgement: StreamAcknowledgement | None = None
 
     def __post_init__(self) -> None:
         """Validate mutually exclusive commit classification."""
@@ -504,6 +628,18 @@ class StreamCommitReceipt:
             raise ValueError("a commit must be accepted or duplicate")
         if self.checkpoint.source_identity != self.source_identity:
             raise ValueError("receipt and checkpoint sources differ")
+        if self.sink_receipt is not None and (
+            self.sink_receipt.source_identity != self.source_identity
+            or self.sink_receipt.batch_id != self.batch_id
+            or self.sink_receipt.checkpoint != self.checkpoint
+        ):
+            raise ValueError("receipt does not match the commit")
+        if self.acknowledgement is not None and (
+            self.acknowledgement.source_identity != self.source_identity
+            or self.acknowledgement.batch_id != self.batch_id
+            or self.acknowledgement.checkpoint != self.checkpoint
+        ):
+            raise ValueError("acknowledgement does not match the commit")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -592,6 +728,18 @@ class StreamingLedger:
                     "observed_snapshot_sha256": snapshot,
                 },
             )
+        for evidence in state.transaction_evidence:
+            if (
+                evidence.sink_receipt.checkpoint.snapshot_sha256 != snapshot
+                or evidence.acknowledgement.checkpoint.snapshot_sha256
+                != snapshot
+            ):
+                raise StreamingError(
+                    "source_snapshot_changed",
+                    "transaction evidence belongs to another source snapshot",
+                    identity,
+                    {"batch_id": evidence.batch_id},
+                )
         return state
 
     def read_batch(
@@ -702,6 +850,179 @@ class StreamingLedger:
         except FileNotFoundError:
             return
 
+    def validate_batch(self, batch: StreamBatch) -> None:
+        """Validate a batch against this ledger's source snapshot."""
+        identity = self.source.source_identity()
+        if batch.source_identity != identity:
+            raise StreamingError(
+                "batch_source_mismatch",
+                "batch belongs to another source",
+                identity,
+                {},
+            )
+        if batch.snapshot_sha256 != self.source.snapshot_sha256():
+            raise StreamingError(
+                "source_snapshot_changed",
+                "batch belongs to another source snapshot",
+                identity,
+                {},
+            )
+
+    def validate_acknowledgement(
+        self, batch: StreamBatch, acknowledgement: StreamAcknowledgement
+    ) -> None:
+        """Validate the acknowledgement that will be bound to a batch."""
+        identity = self.source.source_identity()
+        if acknowledgement.source_identity != batch.source_identity:
+            raise StreamingError(
+                "acknowledgement_source_mismatch",
+                "acknowledgement does not match the batch source",
+                identity,
+                {},
+            )
+        if acknowledgement.batch_id != batch.batch_id:
+            raise StreamingError(
+                "acknowledgement_batch_mismatch",
+                "acknowledgement does not match the batch",
+                identity,
+                {},
+            )
+        if acknowledgement.checkpoint != batch.next_checkpoint:
+            raise StreamingError(
+                "acknowledgement_checkpoint_mismatch",
+                "acknowledgement does not match the batch checkpoint",
+                identity,
+                {},
+            )
+
+    def validate_sink_receipt(
+        self, batch: StreamBatch, receipt: SinkCommitReceipt
+    ) -> None:
+        """Validate a sink receipt before it enters durable state."""
+        identity = self.source.source_identity()
+        if receipt.source_identity != batch.source_identity:
+            raise StreamingError(
+                "sink_receipt_source_mismatch",
+                "sink receipt belongs to another source",
+                identity,
+                {"receipt_source_identity": receipt.source_identity},
+            )
+        if receipt.batch_id != batch.batch_id:
+            raise StreamingError(
+                "sink_receipt_batch_mismatch",
+                "sink receipt belongs to another batch",
+                identity,
+                {"receipt_batch_id": receipt.batch_id},
+            )
+        if receipt.checkpoint != batch.next_checkpoint:
+            raise StreamingError(
+                "sink_receipt_checkpoint_mismatch",
+                "sink receipt belongs to another checkpoint",
+                identity,
+                {},
+            )
+
+    def commit_transaction(
+        self,
+        batch: StreamBatch,
+        sink: TransactionalSink,
+        acknowledgement: StreamAcknowledgement,
+    ) -> StreamCommitReceipt:
+        """Commit a batch and atomically persist receipt/checkpoint evidence.
+
+        The sink is caller-owned and must deduplicate ``batch.batch_id`` when
+        a process fails after the sink commit but before this local JSON state
+        is replaced. A matching retry is handled without calling the sink a
+        second time. This local transaction binds evidence atomically within
+        the ledger only; it is not a broker transaction or a distributed
+        exactly-once guarantee.
+        """
+        if not isinstance(sink, TransactionalSink):
+            raise TypeError("sink must implement TransactionalSink")
+        if not isinstance(acknowledgement, StreamAcknowledgement):
+            raise TypeError("acknowledgement must be StreamAcknowledgement")
+        self.validate_batch(batch)
+        self.validate_acknowledgement(batch, acknowledgement)
+        with self.lock():
+            current = self.load()
+            evidence = next(
+                (
+                    item
+                    for item in current.transaction_evidence
+                    if item.batch_id == batch.batch_id
+                ),
+                None,
+            )
+            if evidence is not None:
+                if evidence.acknowledgement != acknowledgement:
+                    raise StreamingError(
+                        "acknowledgement_mismatch",
+                        "batch is already bound to another acknowledgement",
+                        self.source.source_identity(),
+                        {},
+                    )
+                return StreamCommitReceipt(
+                    batch.source_identity,
+                    batch.batch_id,
+                    accepted=False,
+                    duplicate=True,
+                    checkpoint=evidence.acknowledgement.checkpoint,
+                    sink_receipt=evidence.sink_receipt,
+                    acknowledgement=evidence.acknowledgement,
+                )
+            if batch.batch_id in current.committed_batch_ids:
+                raise StreamingError(
+                    "transaction_evidence_missing",
+                    "batch was committed without transactional evidence",
+                    self.source.source_identity(),
+                    {},
+                )
+            if batch.start_offset != current.checkpoint.offset:
+                raise StreamingError(
+                    "checkpoint_mismatch",
+                    "batch does not start at the durable checkpoint",
+                    self.source.source_identity(),
+                    {
+                        "batch_start_offset": batch.start_offset,
+                        "checkpoint_offset": current.checkpoint.offset,
+                    },
+                )
+            sink_receipt = sink.commit(batch)
+            if not isinstance(sink_receipt, SinkCommitReceipt):
+                raise StreamingError(
+                    "invalid_sink_receipt",
+                    "transactional sink returned an invalid receipt",
+                    self.source.source_identity(),
+                    {"type": type(sink_receipt).__name__},
+                )
+            self.validate_sink_receipt(batch, sink_receipt)
+            evidence = StreamCommitEvidence(
+                batch.source_identity,
+                batch.batch_id,
+                sink_receipt,
+                acknowledgement,
+            )
+            state = StreamState(
+                batch.next_checkpoint,
+                tuple(sorted((*current.committed_batch_ids, batch.batch_id))),
+                tuple(
+                    sorted(
+                        (*current.transaction_evidence, evidence),
+                        key=lambda item: item.batch_id,
+                    )
+                ),
+            )
+            self.write_atomically(state)
+            return StreamCommitReceipt(
+                batch.source_identity,
+                batch.batch_id,
+                accepted=True,
+                duplicate=False,
+                checkpoint=batch.next_checkpoint,
+                sink_receipt=sink_receipt,
+                acknowledgement=acknowledgement,
+            )
+
     def commit_with_writer(
         self,
         batch: StreamBatch,
@@ -767,6 +1088,7 @@ class StreamingLedger:
             state = StreamState(
                 batch.next_checkpoint,
                 tuple(sorted((*current.committed_batch_ids, batch.batch_id))),
+                current.transaction_evidence,
             )
             self.write_atomically(state)
             if acknowledgement is not None:

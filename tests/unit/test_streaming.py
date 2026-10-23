@@ -164,6 +164,18 @@ def write_stream_csv(path):
     frame.to_csv(path, index=False)
 
 
+class RecordingSink(streaming.TransactionalSink):
+    """Test sink that exposes whether a duplicate called the transport."""
+
+    def __init__(self, receipt):
+        self.receipt = receipt
+        self.committed_batch_ids = []
+
+    def commit(self, batch):
+        self.committed_batch_ids.append(batch.batch_id)
+        return self.receipt
+
+
 def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
@@ -196,6 +208,146 @@ def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
         source.read_batch(
             first.next_checkpoint, rows=2, watermark_column="value"
         )
+
+
+def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
+    tmp_path,
+):
+    path = tmp_path / "events.csv"
+    write_stream_csv(path)
+    source = streaming.CsvChunks(path)
+    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    batch = ledger.read_batch(rows=2, watermark_column="event_time")
+    acknowledgement = streaming.StreamAcknowledgement(
+        batch.source_identity,
+        "events-consumer",
+        batch.batch_id,
+        batch.next_checkpoint,
+    )
+    sink_receipt = streaming.SinkCommitReceipt(
+        batch.source_identity,
+        batch.batch_id,
+        batch.next_checkpoint,
+        "sink-receipt-1",
+    )
+    sink = RecordingSink(sink_receipt)
+
+    first = ledger.commit_transaction(batch, sink, acknowledgement)
+    reopened = streaming.StreamingLedger(ledger.path, source)
+    retry_sink = RecordingSink(sink_receipt)
+    second = reopened.commit_transaction(batch, retry_sink, acknowledgement)
+    durable = json.loads(ledger.path.read_text(encoding="utf-8"))
+    evidence = durable["transaction_evidence"][0]
+
+    assert first.accepted and not first.duplicate
+    assert second.duplicate and not second.accepted
+    assert first.sink_receipt == sink_receipt
+    assert second.sink_receipt == sink_receipt
+    assert sink.committed_batch_ids == [batch.batch_id]
+    assert retry_sink.committed_batch_ids == []
+    assert evidence["batch_id"] == batch.batch_id
+    assert evidence["sink_receipt"]["receipt"] == "sink-receipt-1"
+    assert evidence["acknowledgement"]["checkpoint"] == (
+        batch.next_checkpoint.to_dict()
+    )
+
+
+@pytest.mark.parametrize(
+    ("receipt_kind", "expected_code"),
+    [
+        ("batch", "sink_receipt_batch_mismatch"),
+        ("source", "sink_receipt_source_mismatch"),
+        ("checkpoint", "sink_receipt_checkpoint_mismatch"),
+    ],
+)
+def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
+    tmp_path, receipt_kind, expected_code
+):
+    path = tmp_path / "events.csv"
+    write_stream_csv(path)
+    source = streaming.CsvChunks(path)
+    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    batch = ledger.read_batch(rows=2)
+    acknowledgement = streaming.StreamAcknowledgement(
+        batch.source_identity,
+        "events-consumer",
+        batch.batch_id,
+        batch.next_checkpoint,
+    )
+    if receipt_kind == "batch":
+        receipt = streaming.SinkCommitReceipt(
+            batch.source_identity,
+            "batch_" + "0" * 64,
+            batch.next_checkpoint,
+            "bad-batch",
+        )
+    elif receipt_kind == "source":
+        other_checkpoint = dataclasses.replace(
+            batch.next_checkpoint, source_identity="other-events.csv"
+        )
+        receipt = streaming.SinkCommitReceipt(
+            "other-events.csv",
+            batch.batch_id,
+            other_checkpoint,
+            "bad-source",
+        )
+    else:
+        other_checkpoint = dataclasses.replace(
+            batch.next_checkpoint, offset=batch.next_checkpoint.offset + 1
+        )
+        receipt = streaming.SinkCommitReceipt(
+            batch.source_identity,
+            batch.batch_id,
+            other_checkpoint,
+            "bad-checkpoint",
+        )
+    sink = RecordingSink(receipt)
+
+    with pytest.raises(streaming.StreamingError) as raised:
+        ledger.commit_transaction(batch, sink, acknowledgement)
+
+    assert raised.value.code == expected_code
+    assert sink.committed_batch_ids == [batch.batch_id]
+    assert not ledger.path.exists()
+
+
+def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
+    path = tmp_path / "events.csv"
+    write_stream_csv(path)
+    source = streaming.CsvChunks(path)
+    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    first_batch = ledger.read_batch(rows=2)
+    acknowledgement = streaming.StreamAcknowledgement(
+        first_batch.source_identity,
+        "events-consumer",
+        first_batch.batch_id,
+        first_batch.next_checkpoint,
+    )
+    sink_receipt = streaming.SinkCommitReceipt(
+        first_batch.source_identity,
+        first_batch.batch_id,
+        first_batch.next_checkpoint,
+        "sink-receipt-1",
+    )
+    ledger.commit_transaction(
+        first_batch,
+        RecordingSink(sink_receipt),
+        acknowledgement,
+    )
+
+    second_batch = ledger.read_batch(rows=2)
+    ledger.commit_with_writer(second_batch, lambda frame, batch_id: None)
+
+    reopened = streaming.StreamingLedger(ledger.path, source)
+    retry_sink = RecordingSink(sink_receipt)
+    duplicate = reopened.commit_transaction(
+        first_batch,
+        retry_sink,
+        acknowledgement,
+    )
+
+    assert duplicate.duplicate
+    assert retry_sink.committed_batch_ids == []
 
 
 def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
