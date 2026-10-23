@@ -339,12 +339,51 @@ class MLProject:
         result = self.orchestrator.run(self.output_dir, plan)
         if estimation is not None:
             artifact = result.run_dir / "parameter_estimation.json"
-            estimation.write(artifact)
+            expected_digest = estimation.write(artifact)
+            try:
+                verified = parameter_estimation.EstimationResult.read(artifact)
+            except (OSError, TypeError, ValueError, KeyError) as error:
+                raise errors.ArtifactError(
+                    "parameter estimation artifact cannot be read",
+                    {
+                        "run_dir": str(result.run_dir),
+                        "artifact": artifact.name,
+                    },
+                ) from error
+            if verified.digest() != expected_digest:
+                raise errors.ArtifactError(
+                    "parameter estimation artifact does not match the "
+                    "persisted estimate",
+                    {
+                        "run_dir": str(result.run_dir),
+                        "artifact": artifact.name,
+                    },
+                )
+            parameter_record = {
+                "artifact": artifact.name,
+                "digest": verified.digest(),
+            }
+            evaluation = {
+                **result.evaluation,
+                "parameter_estimation": parameter_record,
+            }
+            durability.write_atomically(
+                result.run_dir / "evaluation.json",
+                (
+                    json.dumps(
+                        evaluation,
+                        default=str,
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n"
+                ).encode("utf-8"),
+            )
+            result.evaluation.clear()
+            result.evaluation.update(evaluation)
             # The result must expose the exact digest-verified artifact that
             # was persisted, rather than an unverified in-memory equivalent.
-            result.estimation = parameter_estimation.EstimationResult.read(
-                artifact
-            )
+            result.estimation = verified
         return result
 
     def estimate_parameters(

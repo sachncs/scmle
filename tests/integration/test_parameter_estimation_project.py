@@ -1,5 +1,8 @@
 """Project integration for the separate parameter-estimation evidence track."""
 
+import hashlib
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -32,6 +35,19 @@ def declared_estimand() -> EstimandSpec:
     )
 
 
+def project_with_estimation(output_dir) -> scml.MLProject:
+    """Build the deterministic project used by artifact-binding tests."""
+    return scml.MLProject(
+        estimation_frame(),
+        "outcome",
+        task="regression",
+        time_budget=30,
+        estimand=declared_estimand(),
+        estimation_policy=EstimationPolicy(estimator="linear"),
+        output_dir=output_dir,
+    )
+
+
 def test_project_run_persists_separate_estimation_evidence(tmp_path):
     """Declared estimation is persisted without changing model selection."""
     project = scml.MLProject(
@@ -55,10 +71,73 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     assert restored.digest() == result.estimation.digest()
     assert restored.policy.covariance == "clustered"
     assert result.evaluation["selected_model"] == result.selected_model
-    assert "parameter_estimation" not in result.evaluation
+    assert result.evaluation["parameter_estimation"] == {
+        "artifact": "parameter_estimation.json",
+        "digest": restored.digest(),
+    }
+    persisted_evaluation = json.loads(
+        (result.run_dir / "evaluation.json").read_text(encoding="utf-8")
+    )
+    assert (
+        persisted_evaluation["parameter_estimation"]
+        == result.evaluation["parameter_estimation"]
+    )
     identity = result.estimation.diagnostics["data_identity"]
     assert identity["source_identity"] is None
     assert identity["snapshot_id"].startswith("snap_")
+
+
+def test_project_run_rejects_missing_estimation_artifact(monkeypatch, tmp_path):
+    """A missing persisted report cannot produce a completed result."""
+    original_read = EstimationResult.read
+
+    def remove_artifact(path):
+        path.unlink()
+        return original_read(path)
+
+    monkeypatch.setattr(EstimationResult, "read", remove_artifact)
+
+    with pytest.raises(errors.ArtifactError, match="cannot be read"):
+        project_with_estimation(tmp_path).run()
+
+    run_directory = next(tmp_path.glob("run_*"))
+    evaluation = json.loads(
+        (run_directory / "evaluation.json").read_text(encoding="utf-8")
+    )
+    assert "parameter_estimation" not in evaluation
+
+
+def test_project_run_rejects_valid_digest_for_tampered_report(
+    monkeypatch, tmp_path
+):
+    """A report changed and re-digested after writing is still rejected."""
+    original_read = EstimationResult.read
+
+    def tamper_artifact(path):
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        envelope["report"]["diagnostics"]["data_identity"]["source_uri"] = (
+            "tampered"
+        )
+        envelope["digest"] = hashlib.sha256(
+            json.dumps(
+                envelope["report"], sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+        ).hexdigest()
+        path.write_text(json.dumps(envelope), encoding="utf-8")
+        return original_read(path)
+
+    monkeypatch.setattr(EstimationResult, "read", tamper_artifact)
+
+    with pytest.raises(
+        errors.ArtifactError, match="does not match the persisted estimate"
+    ):
+        project_with_estimation(tmp_path).run()
+
+    run_directory = next(tmp_path.glob("run_*"))
+    evaluation = json.loads(
+        (run_directory / "evaluation.json").read_text(encoding="utf-8")
+    )
+    assert "parameter_estimation" not in evaluation
 
 
 def test_estimation_fails_closed_without_both_declarations(tmp_path):
