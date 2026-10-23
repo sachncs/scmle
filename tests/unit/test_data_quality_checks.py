@@ -50,6 +50,28 @@ def test_label_noise_needs_data_and_two_classes():
         label_noise.find_label_noise(features, pd.Series(np.zeros(600)))
 
 
+def test_label_noise_observation_retains_reproducible_evidence():
+    features, labels = labelled()
+    noisy = labels.copy()
+    noisy.iloc[::6] = 1 - noisy.iloc[::6]
+
+    observation = label_noise.assess_label_noise(features, noisy, seed=17)
+
+    assert observation.note is not None
+    assert observation.evidence["method"] == (
+        "out_of_fold_confident_disagreement"
+    )
+    assert observation.evidence["seed"] == 17
+    assert observation.evidence["sample_bounds"] == {
+        "input_rows": 600,
+        "rows_checked": 600,
+        "maximum_rows": label_noise.MAX_ROWS,
+        "sampled": False,
+    }
+    assert observation.evidence["metrics"]["suspect_rate"] >= 0.05
+    assert observation.evidence["limitations"]
+
+
 def test_a_sample_from_the_same_population_is_representative():
     sample = population(500, seed=1)
     reference = population(500, seed=2)
@@ -79,3 +101,30 @@ def test_categorical_gaps_and_mismatched_columns():
         representativeness.compare_to_reference(
             sample, reference.rename(columns={"c": "d"})
         )
+
+
+def test_representativeness_observation_retains_reproducible_evidence():
+    sample = population(500, seed=1)
+    reference = population(500, seed=2)
+    sample["a"] = sample["a"] + 1.5
+
+    observation = representativeness.assess_representativeness(
+        sample, reference, seed=23
+    )
+
+    assert observation.note is not None
+    assert observation.evidence["method"] == (
+        "out_of_fold_reference_classifier_and_column_gaps"
+    )
+    assert observation.evidence["seed"] == 23
+    assert observation.evidence["thresholds"]["unrepresentative_auc"] == 0.65
+    assert observation.evidence["sample_bounds"] == {
+        "sample_rows": 500,
+        "reference_rows": 500,
+        "checked_sample_rows": 500,
+        "checked_reference_rows": 500,
+        "maximum_rows_per_side": representativeness.MAX_ROWS,
+        "truncated": False,
+    }
+    assert observation.evidence["metrics"]["column_gaps"][0]["column"] == "a"
+    assert observation.evidence["limitations"]

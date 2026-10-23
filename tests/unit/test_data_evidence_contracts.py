@@ -156,6 +156,48 @@ def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
     assert data.DatasetManifest.from_dict(record) == manifest
 
 
+def test_dataset_profile_serializes_typed_quality_evidence():
+    """Quality evidence is JSON-native without changing existing fields."""
+    profile = data.DatasetProfile(
+        manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "y"),
+        column_statistics={},
+        quality_findings=("label noise: review",),
+        risk_findings=(),
+        target_summary={"task": "binary"},
+        feature_plan=data.FeaturePlan(("x",), ()),
+        quality_evidence=(
+            {
+                "method": "out_of_fold_confident_disagreement",
+                "thresholds": {"minimum_rows": 50},
+                "sample_bounds": {"rows_checked": 100},
+                "seed": 3,
+                "metrics": {"suspect_rate": 0.08},
+                "limitations": ["candidate review is required"],
+            },
+        ),
+    )
+
+    record = profile.to_dict()
+
+    assert record["quality_findings"] == ["label noise: review"]
+    assert record["quality_evidence"][0]["seed"] == 3
+    assert json.loads(json.dumps(record)) == record
+
+
+def test_dataset_profile_rejects_non_json_quality_evidence():
+    """Quality evidence must not silently stringify arbitrary objects."""
+    with pytest.raises(TypeError, match="JSON-native"):
+        data.DatasetProfile(
+            manifest=None,
+            column_statistics={},
+            quality_findings=(),
+            risk_findings=(),
+            target_summary={},
+            feature_plan=data.FeaturePlan(("x",), ()),
+            quality_evidence=({"metrics": {"value": object()}},),
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     (

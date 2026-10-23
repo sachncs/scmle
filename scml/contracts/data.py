@@ -7,10 +7,59 @@ import hashlib
 import math
 from typing import Any
 from typing import Self
+from typing import TypeAlias
 
 from scml.contracts import events
+from scml.contracts import explanations
 
 HIGH_CARDINALITY_LEVELS = 20
+QualityEvidence: TypeAlias = dict[str, explanations.JsonValue]
+
+
+def normalize_quality_evidence(
+    evidence: Mapping[str, Any], field_name: str = "quality_evidence"
+) -> QualityEvidence:
+    """Validates and normalizes one JSON-native quality evidence record.
+
+    Args:
+        evidence: Mapping containing only JSON-native values.
+        field_name: Path used in validation errors.
+
+    Returns:
+        A detached dictionary containing JSON-native values.
+
+    Raises:
+        TypeError: If a key or value is not JSON-native.
+        ValueError: If a floating-point value is not finite.
+    """
+    normalized = explanations.validate_json_value(evidence, field_name)
+    if not isinstance(normalized, dict):
+        raise TypeError(f"{field_name} must serialize to an object")
+    return normalized
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class QualityObservation:
+    """One quality check result and its reproducible evidence.
+
+    Attributes:
+        note: Existing human-readable finding, when the check raises one.
+        evidence: JSON-native method, threshold, sampling, metric, and
+            limitation details for the check.
+    """
+
+    note: str | None
+    evidence: QualityEvidence
+
+    def __post_init__(self) -> None:
+        """Validate and detach the evidence from mutable caller state."""
+        if self.note is not None and not self.note.strip():
+            raise ValueError("note must not be empty")
+        object.__setattr__(
+            self,
+            "evidence",
+            normalize_quality_evidence(self.evidence, "evidence"),
+        )
 
 
 class FindingSeverity(enum.StrEnum):
@@ -671,6 +720,7 @@ class DatasetProfile:
             (shape, types, missingness, target, features, relationships,
             structure, quality, operational, risk).
         missingness: Per-column tests of whether gaps relate to the target.
+        quality_evidence: JSON-native records for reproducible quality checks.
     """
 
     manifest: DatasetManifest
@@ -683,6 +733,15 @@ class DatasetProfile:
         default_factory=dict
     )
     missingness: tuple[Mapping[str, Any], ...] = ()
+    quality_evidence: tuple[QualityEvidence, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Validate and detach structured quality evidence."""
+        normalized = tuple(
+            normalize_quality_evidence(item, f"quality_evidence[{index}]")
+            for index, item in enumerate(self.quality_evidence)
+        )
+        object.__setattr__(self, "quality_evidence", normalized)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -695,6 +754,7 @@ class DatasetProfile:
             "feature_plan": self.feature_plan.to_dict(),
             "dataset": dict(self.dataset_statistics),
             "missingness": [dict(item) for item in self.missingness],
+            "quality_evidence": [dict(item) for item in self.quality_evidence],
         }
 
 

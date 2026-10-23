@@ -41,6 +41,23 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
     report = json.loads(
         (result.run_dir / "curation_report.json").read_text(encoding="utf-8")
     )
+    profile = json.loads(
+        (result.run_dir / "dataset_profile.json").read_text(encoding="utf-8")
+    )
+    evidence_by_observation = {
+        item["observation"]: item for item in profile["quality_evidence"]
+    }
+    assert set(evidence_by_observation) == {
+        "label_noise",
+        "representativeness",
+    }
+    for item in evidence_by_observation.values():
+        assert item["method"]
+        assert item["thresholds"]
+        assert item["sample_bounds"]
+        assert item["seed"] == 42
+        assert item["metrics"]
+        assert item["limitations"]
     assert report["schema_version"] == 1
     assert report["source_rows"] >= report["profiled_rows"]
     assert report["quality_findings"]

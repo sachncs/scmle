@@ -515,31 +515,36 @@ class ProfileStage(Stage):
         categorical = [
             c for c in profile.feature_plan.categorical if c in present
         ]
-        notes = []
+        notes: list[str] = []
+        evidence: list[data_contracts.QualityEvidence] = []
         if columns and task in (
             tasks.TaskType.BINARY,
             tasks.TaskType.MULTICLASS,
         ):
-            note = label_noise.noise_note(
+            observation = label_noise.assess_label_noise(
                 development[columns],
                 development[spec.data.target],
                 spec.validation.seed,
             )
-            if note:
-                notes.append(note)
+            if observation.note:
+                notes.append(observation.note)
+            evidence.append(observation.evidence)
         if spec.data.reference_uri:
             reference = tabular.read_table(spec.data.reference_uri)
-            note = representativeness.representativeness_note(
+            observation = representativeness.assess_representativeness(
                 development[columns + categorical],
                 reference,
                 spec.validation.seed,
             )
-            if note:
-                notes.append(note)
-        if not notes:
+            if observation.note:
+                notes.append(observation.note)
+            evidence.append(observation.evidence)
+        if not notes and not evidence:
             return profile
         return dataclasses.replace(
-            profile, quality_findings=(*profile.quality_findings, *notes)
+            profile,
+            quality_findings=(*profile.quality_findings, *notes),
+            quality_evidence=(*profile.quality_evidence, *evidence),
         )
 
     @staticmethod

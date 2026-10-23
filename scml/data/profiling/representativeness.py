@@ -17,9 +17,12 @@ from sklearn import ensemble
 from sklearn import metrics
 from sklearn import model_selection
 
+from scml.contracts import data as data_contracts
+
 MIN_ROWS = 50
 UNREPRESENTATIVE_AUC = 0.65
 MAX_ROWS = 20000
+FOLDS = 5
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +57,70 @@ class RepresentativenessReport:
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record."""
         return dataclasses.asdict(self)
+
+    def quality_evidence(
+        self,
+        sample_rows: int,
+        reference_rows: int,
+        checked_sample_rows: int,
+        checked_reference_rows: int,
+        seed: int,
+        shared_columns: tuple[str, ...],
+    ) -> data_contracts.QualityEvidence:
+        """Returns reproducible evidence for this comparison.
+
+        Args:
+            sample_rows: Rows available in the development sample.
+            reference_rows: Rows available in the reference sample.
+            checked_sample_rows: Development rows actually checked.
+            checked_reference_rows: Reference rows actually checked.
+            seed: Seed controlling folds and the classifier.
+            shared_columns: Columns included in the comparison.
+
+        Returns:
+            JSON-native quality evidence.
+        """
+        return {
+            "observation": "representativeness",
+            "status": "flagged" if not self.representative else "clear",
+            "method": "out_of_fold_reference_classifier_and_column_gaps",
+            "thresholds": {
+                "minimum_rows_per_side": MIN_ROWS,
+                "maximum_rows_per_side": MAX_ROWS,
+                "unrepresentative_auc": UNREPRESENTATIVE_AUC,
+                "cross_validation_folds": FOLDS,
+            },
+            "sample_bounds": {
+                "sample_rows": sample_rows,
+                "reference_rows": reference_rows,
+                "checked_sample_rows": checked_sample_rows,
+                "checked_reference_rows": checked_reference_rows,
+                "maximum_rows_per_side": MAX_ROWS,
+                "truncated": checked_sample_rows < sample_rows
+                or checked_reference_rows < reference_rows,
+            },
+            "seed": seed,
+            "metrics": {
+                "auc": self.auc,
+                "representative": self.representative,
+                "shared_columns": list(shared_columns),
+                "column_gaps": [
+                    {
+                        "column": gap.column,
+                        "statistic": gap.statistic,
+                        "p_value": gap.p_value,
+                    }
+                    for gap in self.gaps
+                ],
+            },
+            "limitations": [
+                "Classifier distinguishability is a shift signal, not proof "
+                "of population bias.",
+                "Column gaps are univariate diagnostics and do not establish "
+                "causality.",
+                "Only the leading bounded rows from each side are checked.",
+            ],
+        }
 
 
 def column_gap(sample: pd.Series, reference: pd.Series) -> ColumnGap:
@@ -99,7 +166,9 @@ def compare_to_reference(
         ensemble.HistGradientBoostingClassifier(random_state=seed),
         both,
         side,
-        cv=model_selection.StratifiedKFold(5, shuffle=True, random_state=seed),
+        cv=model_selection.StratifiedKFold(
+            FOLDS, shuffle=True, random_state=seed
+        ),
         method="predict_proba",
     )[:, 1]
     auc = float(metrics.roc_auc_score(side, scores))
@@ -112,21 +181,10 @@ def compare_to_reference(
     )
 
 
-def representativeness_note(
-    sample: pd.DataFrame, reference: pd.DataFrame, seed: int = 0
+def representativeness_report_note(
+    report: RepresentativenessReport,
 ) -> str | None:
-    """A data-quality finding when the sample differs from the reference."""
-    shared = [name for name in sample.columns if name in reference.columns]
-    if not shared:
-        return "representativeness: the reference shares no feature columns"
-    try:
-        report = compare_to_reference(
-            sample[shared].head(MAX_ROWS),
-            reference[shared].head(MAX_ROWS),
-            seed,
-        )
-    except ValueError:
-        return None
+    """Returns the existing finding text for a comparison report."""
     if report.representative:
         return None
     worst = report.gaps[0]
@@ -134,4 +192,98 @@ def representativeness_note(
         f"representativeness: development rows are distinguishable from the "
         f"reference sample (AUC {report.auc:.2f}); the largest gap is in "
         f"'{worst.column}'"
+    )
+
+
+def assess_representativeness(
+    sample: pd.DataFrame, reference: pd.DataFrame, seed: int = 0
+) -> data_contracts.QualityObservation:
+    """Compares bounded samples and retains the complete quality evidence.
+
+    Args:
+        sample: Development rows.
+        reference: Rows from the population of interest.
+        seed: Seed controlling folds and the classifier.
+
+    Returns:
+        A quality observation even when the check cannot be evaluated.
+    """
+    sample_rows = len(sample)
+    reference_rows = len(reference)
+    shared = tuple(name for name in sample.columns if name in reference.columns)
+    if not shared:
+        return data_contracts.QualityObservation(
+            note="representativeness: the reference shares no feature columns",
+            evidence={
+                "observation": "representativeness",
+                "status": "not_evaluated",
+                "method": "out_of_fold_reference_classifier_and_column_gaps",
+                "thresholds": {
+                    "minimum_rows_per_side": MIN_ROWS,
+                    "maximum_rows_per_side": MAX_ROWS,
+                    "unrepresentative_auc": UNREPRESENTATIVE_AUC,
+                    "cross_validation_folds": FOLDS,
+                },
+                "sample_bounds": {
+                    "sample_rows": sample_rows,
+                    "reference_rows": reference_rows,
+                    "checked_sample_rows": 0,
+                    "checked_reference_rows": 0,
+                    "maximum_rows_per_side": MAX_ROWS,
+                    "truncated": False,
+                },
+                "seed": seed,
+                "metrics": {"shared_columns": []},
+                "limitations": [
+                    "No common feature columns were available for comparison.",
+                ],
+            },
+        )
+    checked_sample = sample[list(shared)].head(MAX_ROWS)
+    checked_reference = reference[list(shared)].head(MAX_ROWS)
+    try:
+        report = compare_to_reference(checked_sample, checked_reference, seed)
+    except ValueError as error:
+        return data_contracts.QualityObservation(
+            note=None,
+            evidence={
+                "observation": "representativeness",
+                "status": "not_evaluated",
+                "method": "out_of_fold_reference_classifier_and_column_gaps",
+                "thresholds": {
+                    "minimum_rows_per_side": MIN_ROWS,
+                    "maximum_rows_per_side": MAX_ROWS,
+                    "unrepresentative_auc": UNREPRESENTATIVE_AUC,
+                    "cross_validation_folds": FOLDS,
+                },
+                "sample_bounds": {
+                    "sample_rows": sample_rows,
+                    "reference_rows": reference_rows,
+                    "checked_sample_rows": len(checked_sample),
+                    "checked_reference_rows": len(checked_reference),
+                    "maximum_rows_per_side": MAX_ROWS,
+                    "truncated": len(checked_sample) < sample_rows
+                    or len(checked_reference) < reference_rows,
+                },
+                "seed": seed,
+                "metrics": {
+                    "shared_columns": list(shared),
+                    "error": str(error),
+                },
+                "limitations": [
+                    "The comparison was not evaluated because its data "
+                    "contract was not met.",
+                ],
+            },
+        )
+    return data_contracts.QualityObservation(
+        note=representativeness_report_note(report),
+        evidence=report.quality_evidence(
+            sample_rows,
+            reference_rows,
+            len(checked_sample),
+            len(checked_reference),
+            seed,
+            shared,
+        ),
     )
