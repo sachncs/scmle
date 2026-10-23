@@ -4099,3 +4099,27 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   paths, external fault evidence, hosted CI/Pages, secret custody, and
   independent release review remain separate release gates.
 
+## Replay and modality reliability at `3286f0f` on 2026-10-23
+
+- Replay verification now reconstructs the persisted parameter-estimation
+  declaration, reruns the scientific estimator, persists the report, and
+  compares its digest alongside model trials, split, dataset, and environment
+  evidence. A scientific report mismatch now makes replay `different` rather
+  than silently passing model-only replay.
+- Modality curation publication is idempotent for an identical signed
+  artifact. Signature, modality, dataset identity, sample count, canonical
+  content, and evidence digest mismatches fail closed, and a conflicting
+  existing artifact is never overwritten.
+- Persisted curation results now carry a deterministic content digest bound to
+  their canonical unsigned evidence. Reference modality serving accepts a
+  validated bounded request identity, echoes it in response headers and
+  bodies, and includes it in structured errors without logging raw samples.
+- The focused replay, parameter-estimation, curation, capability, project, and
+  serving suite passed `95` tests. Ruff lint, Ruff formatting, and mypy over
+  `scml` and `benchmarks` passed. The consolidated repository regression then
+  completed `2539 passed, 38 skipped` in 42m49s with no failures.
+- These changes strengthen local evidence and operation boundaries; they do
+  not close external broker exactly-once semantics, physical cloud/container/
+  kernel fault evidence, hosted CI/Pages deployment, independent review, or
+  the explicitly experimental non-tabular and foundation-model claims.
+
