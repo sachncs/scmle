@@ -4768,3 +4768,14 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   successful hosted run, cross-platform runner execution, or independent
   operational repetition.
 
+## Hosted gate recheck at `17c6d9e` on 2026-10-23
+
+- The push to `master` triggered CI run `39990976592` and Pages run
+  `39990976720`. Both failed during hosted startup before any workflow step
+  could execute; CI reported every job as failed immediately and Pages
+  skipped deploy and verification after its build job failed.
+- This reproduces the account billing/spending-limit blocker observed on the
+  earlier runs. It is not evidence of a code, test, or workflow-step failure.
+  Hosted CI, Pages visibility/configuration, and the related release gates
+  remain open until the account/repository infrastructure is repaired.
+
