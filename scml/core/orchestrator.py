@@ -7,6 +7,7 @@ checkpointed to disk as they complete.
 """
 
 import functools
+import hashlib
 from importlib import metadata
 import json
 import pathlib
@@ -204,6 +205,8 @@ class Orchestrator:
         self,
         output_dir: str | pathlib.Path = "runs",
         approved: experiments.ExperimentPlan | None = None,
+        *,
+        parameter_estimation_declaration: dict[str, Any] | None = None,
     ) -> results.RunResult:
         """Executes the full workflow in a new run directory.
 
@@ -211,6 +214,8 @@ class Orchestrator:
             output_dir: Parent directory for run directories and the
                 tracking database.
             approved: Approved or modified plan restricting candidates.
+            parameter_estimation_declaration: Explicit scientific declaration
+                for the optional parameter-estimation evidence track.
 
         Returns:
             The completed run.
@@ -223,6 +228,24 @@ class Orchestrator:
         """
         self.apply_plan(approved)
         store = store_module.RunStore.create(output_dir)
+        declaration = dict(
+            parameter_estimation_declaration
+            or {"schema_version": 1, "enabled": False}
+        )
+        declaration.pop("digest", None)
+        declaration["project_config_hash"] = self.spec.config_hash()
+        digest = hashlib.sha256(
+            json.dumps(
+                declaration, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+        ).hexdigest()
+        store.write_json(
+            "parameter_estimation_declaration.json",
+            {**declaration, "digest": digest},
+        )
+        store.write_text(
+            "parameter_estimation_declaration.lock", f"{digest}\n"
+        )
         store.write_json("config.json", json.loads(self.spec.canonical_json()))
         store.write_text("environment.lock", environment_lock())
         return self.execute(store, approved, {}, "run created")

@@ -1,6 +1,7 @@
 """Public API: `MLProject(...).plan()`, `.run()`, `result.predict()`."""
 
 import dataclasses
+import hashlib
 import json
 import pathlib
 from typing import Any
@@ -43,6 +44,163 @@ ValidationStrategy = Literal[
     "rolling",
 ]
 LeakagePolicy = Literal["warn", "block"]
+
+PARAMETER_ESTIMATION_DECLARATION_ARTIFACT = (
+    "parameter_estimation_declaration.json"
+)
+PARAMETER_ESTIMATION_DECLARATION_LOCK = "parameter_estimation_declaration.lock"
+PARAMETER_ESTIMATION_DECLARATION_SCHEMA = 1
+
+
+def build_parameter_estimation_declaration(
+    estimand: parameter_estimation.EstimandSpec | None,
+    policy: parameter_estimation.EstimationPolicy | None,
+) -> dict[str, Any]:
+    """Builds the explicit scientific declaration stored with a run.
+
+    The orchestrator adds the final project configuration hash and the
+    content digest immediately after it allocates the run directory. Keeping
+    this record separate from the model-selection specification lets resume
+    reconstruct the scientific contract without changing the public project
+    specification schema.
+    """
+    if (estimand is None) != (policy is None):
+        raise errors.ConfigError(
+            "parameter estimation requires both an explicit estimand "
+            "and an estimation policy"
+        )
+    declaration: dict[str, Any] = {
+        "schema_version": PARAMETER_ESTIMATION_DECLARATION_SCHEMA,
+        "enabled": estimand is not None,
+    }
+    if estimand is not None and policy is not None:
+        declaration["estimand"] = estimand.to_dict()
+        declaration["policy"] = policy.to_dict()
+    return declaration
+
+
+def parameter_estimation_declaration_digest(
+    declaration: dict[str, Any],
+) -> str:
+    """Returns the canonical digest for a declaration without its digest."""
+    return hashlib.sha256(
+        json.dumps(
+            declaration, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def restore_parameter_estimation_declaration(
+    run_directory: str | pathlib.Path,
+    expected_config_hash: str,
+) -> tuple[
+    parameter_estimation.EstimandSpec | None,
+    parameter_estimation.EstimationPolicy | None,
+]:
+    """Validates and reconstructs the scientific declaration for resume."""
+    artifact_path = pathlib.Path(run_directory)
+    report_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_ARTIFACT
+    lock_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_LOCK
+    try:
+        envelope = json.loads(report_path.read_text(encoding="utf-8"))
+        lock_digest = lock_path.read_text(encoding="utf-8").strip()
+    except (OSError, TypeError, ValueError) as error:
+        raise errors.ArtifactError(
+            "parameter estimation declaration is missing or unreadable",
+            {"run_dir": str(artifact_path)},
+        ) from error
+    if not isinstance(envelope, dict):
+        raise errors.ArtifactError(
+            "parameter estimation declaration must be a JSON object",
+            {"run_dir": str(artifact_path)},
+        )
+    digest = envelope.pop("digest", None)
+    if not isinstance(digest, str):
+        raise errors.ArtifactError(
+            "parameter estimation declaration digest is missing",
+            {"run_dir": str(artifact_path)},
+        )
+    if (
+        digest != parameter_estimation_declaration_digest(envelope)
+        or lock_digest != digest
+    ):
+        raise errors.ArtifactError(
+            "parameter estimation declaration digest mismatch",
+            {"run_dir": str(artifact_path)},
+        )
+    if (
+        envelope.get("schema_version")
+        != PARAMETER_ESTIMATION_DECLARATION_SCHEMA
+    ):
+        raise errors.ArtifactError(
+            "unsupported parameter estimation declaration schema",
+            {"run_dir": str(artifact_path)},
+        )
+    if envelope.get("project_config_hash") != expected_config_hash:
+        raise errors.ArtifactError(
+            "parameter estimation declaration does not match the run "
+            "configuration",
+            {"run_dir": str(artifact_path)},
+        )
+    enabled = envelope.get("enabled")
+    if enabled is False:
+        if set(envelope) != {
+            "schema_version",
+            "enabled",
+            "project_config_hash",
+        }:
+            raise errors.ArtifactError(
+                "disabled parameter estimation declaration has extra fields",
+                {"run_dir": str(artifact_path)},
+            )
+        return None, None
+    if enabled is not True or set(envelope) != {
+        "schema_version",
+        "enabled",
+        "project_config_hash",
+        "estimand",
+        "policy",
+    }:
+        raise errors.ArtifactError(
+            "parameter estimation declaration is incomplete",
+            {"run_dir": str(artifact_path)},
+        )
+    try:
+        estimand_record = envelope["estimand"]
+        estimand = parameter_estimation.EstimandSpec(
+            name=estimand_record["name"],
+            outcome=estimand_record["outcome"],
+            population=estimand_record["population"],
+            likelihood=estimand_record["likelihood"],
+            feature_names=tuple(estimand_record["feature_names"]),
+            assumptions=tuple(estimand_record["assumptions"]),
+            description=estimand_record.get("description", ""),
+        )
+        policy_values = dict(envelope["policy"])
+        if "prior" in policy_values:
+            prior_values = dict(policy_values["prior"])
+            policy_values["prior"] = parameter_estimation.BayesianPrior(
+                mean=tuple(prior_values["mean"]),
+                precision=tuple(
+                    tuple(row) for row in prior_values["precision"]
+                ),
+                shape=prior_values.get("shape", 2.0),
+                scale=prior_values.get("scale", 1.0),
+            )
+        for field in ("causal_assumptions", "hierarchical_assumptions"):
+            if field in policy_values:
+                policy_values[field] = tuple(policy_values[field])
+        if "reml_variance_bounds" in policy_values:
+            policy_values["reml_variance_bounds"] = tuple(
+                policy_values["reml_variance_bounds"]
+            )
+        policy = parameter_estimation.EstimationPolicy(**policy_values)
+    except (KeyError, TypeError, ValueError) as error:
+        raise errors.ArtifactError(
+            "parameter estimation declaration is invalid",
+            {"run_dir": str(artifact_path)},
+        ) from error
+    return estimand, policy
 
 
 def bind_parameter_estimation_evidence(
@@ -104,6 +262,161 @@ def bind_parameter_estimation_evidence(
     inference_evidence.InferenceEvidenceLinker.write_atomically(
         graph_path, record
     )
+
+
+def persist_parameter_estimation_evidence(
+    result: results.RunResult,
+    estimation: parameter_estimation.EstimationResult,
+) -> None:
+    """Persists and binds a verified parameter report to a run result."""
+    artifact = result.run_dir / "parameter_estimation.json"
+    expected_digest = estimation.write(artifact)
+    try:
+        verified = parameter_estimation.EstimationResult.read(artifact)
+    except (OSError, TypeError, ValueError, KeyError) as error:
+        raise errors.ArtifactError(
+            "parameter estimation artifact cannot be read",
+            {
+                "run_dir": str(result.run_dir),
+                "artifact": artifact.name,
+            },
+        ) from error
+    if verified.digest() != expected_digest:
+        raise errors.ArtifactError(
+            "parameter estimation artifact does not match the persisted "
+            "estimate",
+            {
+                "run_dir": str(result.run_dir),
+                "artifact": artifact.name,
+            },
+        )
+    parameter_record = {
+        "artifact": artifact.name,
+        "digest": verified.digest(),
+    }
+    evaluation = {
+        **result.evaluation,
+        "parameter_estimation": parameter_record,
+    }
+    durability.write_atomically(
+        result.run_dir / "evaluation.json",
+        (
+            json.dumps(
+                evaluation,
+                default=str,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        ).encode("utf-8"),
+    )
+    bind_parameter_estimation_evidence(result.run_dir, artifact, verified)
+    result.evaluation.clear()
+    result.evaluation.update(evaluation)
+    # The result must expose the exact digest-verified artifact that was
+    # persisted, rather than an unverified in-memory equivalent.
+    result.estimation = verified
+
+
+def estimate_parameters_for_project(
+    orchestrator: orchestrator_module.Orchestrator,
+    estimand: parameter_estimation.EstimandSpec,
+    policy: parameter_estimation.EstimationPolicy,
+    artifact_directory: str | pathlib.Path | None = None,
+) -> parameter_estimation.EstimationResult:
+    """Estimates the declared parameters against an orchestrator dataset."""
+    if orchestrator.spec.data.modality != "tabular":
+        raise errors.ConfigError(
+            "parameter estimation is supported only for the declared "
+            "tabular modality"
+        )
+    frame = orchestrator.frame
+    if frame is None:
+        frame = tabular.read_table(orchestrator.spec.data.uri)
+    declared = [*estimand.feature_names, estimand.outcome]
+    treatment_column = None
+    if policy.estimator in {"ipw_ate", "aipw_ate"}:
+        treatment_column = orchestrator.spec.data.treatment_column
+        if treatment_column is None:
+            raise errors.ConfigError(
+                f"{policy.estimator} parameter estimation requires "
+                "treatment_column"
+            )
+        if treatment_column not in estimand.feature_names:
+            raise errors.ConfigError(
+                "treatment_column must be included in estimand "
+                "feature_names"
+            )
+        treatment_position = estimand.feature_names.index(treatment_column)
+        if policy.treatment_position != treatment_position:
+            raise errors.ConfigError(
+                "treatment_position must match treatment_column in "
+                "estimand feature_names"
+            )
+        declared.append(treatment_column)
+    if policy.cluster_name is not None:
+        declared.append(policy.cluster_name)
+    declared = list(dict.fromkeys(declared))
+    missing = sorted(set(declared) - set(frame.columns))
+    if missing:
+        raise errors.DataError(
+            f"parameter estimation columns are missing: {missing}"
+        )
+    missing_counts = frame.loc[:, declared].isna().sum()
+    missing_values = {
+        name: int(count) for name, count in missing_counts.items() if count
+    }
+    if missing_values and policy.missing == "reject":
+        raise errors.DataError(
+            "parameter estimation missing values require an explicit "
+            f"complete_case policy: {missing_values}"
+        )
+    features = frame.loc[:, list(estimand.feature_names)]
+    outcome = frame.loc[:, estimand.outcome]
+    clusters = None
+    if policy.cluster_name is not None:
+        clusters = frame.loc[:, policy.cluster_name]
+    cluster_values = None if clusters is None else clusters.tolist()
+    snapshot_id = tabular.snapshot_identity(frame, orchestrator.spec.data.uri)
+    source_identity = None
+    if orchestrator.spec.data.uri not in {"<memory>", "<in-memory>"}:
+        source_identity = connectors.source_identity(orchestrator.spec.data.uri)
+    estimation = parameter_estimation.estimate_parameters(
+        features.to_numpy(),
+        outcome.to_numpy(),
+        estimand,
+        policy,
+        clusters=cluster_values,
+    )
+    estimation = dataclasses.replace(
+        estimation,
+        diagnostics={
+            **estimation.diagnostics,
+            "data_columns": {
+                "features": list(estimand.feature_names),
+                "outcome": estimand.outcome,
+                "treatment": treatment_column,
+                "cluster": policy.cluster_name,
+            },
+            "missingness": {
+                "policy": policy.missing,
+                "columns": declared,
+                "missing_counts": missing_values,
+            },
+            "data_identity": {
+                "source_uri": orchestrator.spec.data.uri,
+                "source_identity": source_identity,
+                "snapshot_id": snapshot_id,
+            },
+        },
+    )
+    if artifact_directory is not None:
+        artifact = (
+            pathlib.Path(artifact_directory) / "parameter_estimation.json"
+        )
+        estimation.write(artifact)
+        estimation = parameter_estimation.EstimationResult.read(artifact)
+    return estimation
 
 
 class MLProject:
@@ -400,57 +713,16 @@ class MLProject:
         estimation = None
         if self.estimand is not None or self.estimation_policy is not None:
             estimation = self.estimate_parameters()
-        result = self.orchestrator.run(self.output_dir, plan)
+        declaration = build_parameter_estimation_declaration(
+            self.estimand, self.estimation_policy
+        )
+        result = self.orchestrator.run(
+            self.output_dir,
+            plan,
+            parameter_estimation_declaration=declaration,
+        )
         if estimation is not None:
-            artifact = result.run_dir / "parameter_estimation.json"
-            expected_digest = estimation.write(artifact)
-            try:
-                verified = parameter_estimation.EstimationResult.read(artifact)
-            except (OSError, TypeError, ValueError, KeyError) as error:
-                raise errors.ArtifactError(
-                    "parameter estimation artifact cannot be read",
-                    {
-                        "run_dir": str(result.run_dir),
-                        "artifact": artifact.name,
-                    },
-                ) from error
-            if verified.digest() != expected_digest:
-                raise errors.ArtifactError(
-                    "parameter estimation artifact does not match the "
-                    "persisted estimate",
-                    {
-                        "run_dir": str(result.run_dir),
-                        "artifact": artifact.name,
-                    },
-                )
-            parameter_record = {
-                "artifact": artifact.name,
-                "digest": verified.digest(),
-            }
-            evaluation = {
-                **result.evaluation,
-                "parameter_estimation": parameter_record,
-            }
-            durability.write_atomically(
-                result.run_dir / "evaluation.json",
-                (
-                    json.dumps(
-                        evaluation,
-                        default=str,
-                        indent=2,
-                        sort_keys=True,
-                    )
-                    + "\n"
-                ).encode("utf-8"),
-            )
-            bind_parameter_estimation_evidence(
-                result.run_dir, artifact, verified
-            )
-            result.evaluation.clear()
-            result.evaluation.update(evaluation)
-            # The result must expose the exact digest-verified artifact that
-            # was persisted, rather than an unverified in-memory equivalent.
-            result.estimation = verified
+            persist_parameter_estimation_evidence(result, estimation)
         return result
 
     def estimate_parameters(
@@ -480,100 +752,12 @@ class MLProject:
                 "parameter estimation is disabled: declare both estimand "
                 "and estimation_policy explicitly"
             )
-        if self.spec.data.modality != "tabular":
-            raise errors.ConfigError(
-                "parameter estimation is supported only for the declared "
-                "tabular modality"
-            )
-        frame = self.orchestrator.frame
-        if frame is None:
-            frame = tabular.read_table(self.spec.data.uri)
-        declared = [*self.estimand.feature_names, self.estimand.outcome]
-        treatment_column = None
-        if self.estimation_policy.estimator in {"ipw_ate", "aipw_ate"}:
-            treatment_column = self.spec.data.treatment_column
-            if treatment_column is None:
-                raise errors.ConfigError(
-                    f"{self.estimation_policy.estimator} parameter estimation "
-                    "requires treatment_column"
-                )
-            if treatment_column not in self.estimand.feature_names:
-                raise errors.ConfigError(
-                    "treatment_column must be included in estimand "
-                    "feature_names"
-                )
-            treatment_position = self.estimand.feature_names.index(
-                treatment_column
-            )
-            if self.estimation_policy.treatment_position != treatment_position:
-                raise errors.ConfigError(
-                    "treatment_position must match treatment_column in "
-                    "estimand feature_names"
-                )
-            declared.append(treatment_column)
-        if self.estimation_policy.cluster_name is not None:
-            declared.append(self.estimation_policy.cluster_name)
-        declared = list(dict.fromkeys(declared))
-        missing = sorted(set(declared) - set(frame.columns))
-        if missing:
-            raise errors.DataError(
-                f"parameter estimation columns are missing: {missing}"
-            )
-        missing_counts = frame.loc[:, declared].isna().sum()
-        missing_values = {
-            name: int(count) for name, count in missing_counts.items() if count
-        }
-        if missing_values and self.estimation_policy.missing == "reject":
-            raise errors.DataError(
-                "parameter estimation missing values require an explicit "
-                f"complete_case policy: {missing_values}"
-            )
-        features = frame.loc[:, list(self.estimand.feature_names)]
-        outcome = frame.loc[:, self.estimand.outcome]
-        clusters = None
-        if self.estimation_policy.cluster_name is not None:
-            clusters = frame.loc[:, self.estimation_policy.cluster_name]
-        cluster_values = None if clusters is None else clusters.tolist()
-        snapshot_id = tabular.snapshot_identity(frame, self.spec.data.uri)
-        source_identity = None
-        if self.spec.data.uri not in {"<memory>", "<in-memory>"}:
-            source_identity = connectors.source_identity(self.spec.data.uri)
-        estimation = parameter_estimation.estimate_parameters(
-            features.to_numpy(),
-            outcome.to_numpy(),
+        return estimate_parameters_for_project(
+            self.orchestrator,
             self.estimand,
             self.estimation_policy,
-            clusters=cluster_values,
+            artifact_directory,
         )
-        estimation = dataclasses.replace(
-            estimation,
-            diagnostics={
-                **estimation.diagnostics,
-                "data_columns": {
-                    "features": list(self.estimand.feature_names),
-                    "outcome": self.estimand.outcome,
-                    "treatment": treatment_column,
-                    "cluster": self.estimation_policy.cluster_name,
-                },
-                "missingness": {
-                    "policy": self.estimation_policy.missing,
-                    "columns": declared,
-                    "missing_counts": missing_values,
-                },
-                "data_identity": {
-                    "source_uri": self.spec.data.uri,
-                    "source_identity": source_identity,
-                    "snapshot_id": snapshot_id,
-                },
-            },
-        )
-        if artifact_directory is not None:
-            artifact = (
-                pathlib.Path(artifact_directory) / "parameter_estimation.json"
-            )
-            estimation.write(artifact)
-            estimation = parameter_estimation.EstimationResult.read(artifact)
-        return estimation
 
     @classmethod
     def resume(
@@ -593,10 +777,23 @@ class MLProject:
         Returns:
             The completed run.
         """
+        run_path = pathlib.Path(run_directory)
         orchestrator = orchestrator_module.Orchestrator.for_run_directory(
-            run_directory, frame=data
+            run_path, frame=data
         )
-        return orchestrator.resume(run_directory)
+        estimand, policy = restore_parameter_estimation_declaration(
+            run_path,
+            orchestrator.spec.config_hash(),
+        )
+        estimation = None
+        if estimand is not None and policy is not None:
+            estimation = estimate_parameters_for_project(
+                orchestrator, estimand, policy
+            )
+        result = orchestrator.resume(run_path)
+        if estimation is not None:
+            persist_parameter_estimation_evidence(result, estimation)
+        return result
 
     @classmethod
     def verify_replay(

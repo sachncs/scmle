@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -96,6 +97,86 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     identity = result.estimation.diagnostics["data_identity"]
     assert identity["source_identity"] is None
     assert identity["snapshot_id"].startswith("snap_")
+    declaration = json.loads(
+        (result.run_dir / "parameter_estimation_declaration.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert declaration["enabled"] is True
+    assert declaration["project_config_hash"] == project.spec.config_hash()
+    assert declaration["digest"] == (
+        (result.run_dir / "parameter_estimation_declaration.lock")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+
+
+def interrupted_estimation_run(tmp_path):
+    """Create a completed run in the state expected by resume."""
+    result = project_with_estimation(tmp_path).run()
+    (result.run_dir / "evaluation.json").unlink()
+    (result.run_dir / "parameter_estimation.json").unlink()
+    shutil.rmtree(result.run_dir / "model")
+    return result
+
+
+def test_resume_reconstructs_estimation_and_rebinds_evidence(tmp_path):
+    """Resume restores the declaration and follows the fresh-run path."""
+    original = interrupted_estimation_run(tmp_path)
+
+    resumed = scml.MLProject.resume(
+        original.run_dir, data=estimation_frame()
+    )
+
+    assert resumed.estimation is not None
+    report = EstimationResult.read(
+        original.run_dir / "parameter_estimation.json"
+    )
+    assert report.digest() == resumed.estimation.digest()
+    assert report.estimand == declared_estimand()
+    assert report.policy == EstimationPolicy(estimator="linear")
+    assert resumed.evaluation["parameter_estimation"] == {
+        "artifact": "parameter_estimation.json",
+        "digest": report.digest(),
+    }
+    graph = InferenceEvidenceLinker.load(
+        original.run_dir / "evidence_graph.json"
+    )
+    assert graph.nodes["parameter-estimation"].digest == report.digest()
+    assert graph.path_exists("snapshot", "parameter-estimation")
+    assert graph.path_exists("evaluation", "parameter-estimation")
+
+
+def test_resume_fails_closed_when_estimation_declaration_is_missing(tmp_path):
+    """Resume cannot infer a scientific policy after declaration loss."""
+    original = interrupted_estimation_run(tmp_path)
+    (original.run_dir / "parameter_estimation_declaration.json").unlink()
+
+    with pytest.raises(errors.ArtifactError, match="declaration"):
+        scml.MLProject.resume(original.run_dir, data=estimation_frame())
+
+
+def test_resume_fails_closed_for_corrupt_estimation_declaration(tmp_path):
+    """Malformed declaration JSON stops resume before execution."""
+    original = interrupted_estimation_run(tmp_path)
+    (original.run_dir / "parameter_estimation_declaration.json").write_text(
+        "not json", encoding="utf-8"
+    )
+
+    with pytest.raises(errors.ArtifactError, match="declaration"):
+        scml.MLProject.resume(original.run_dir, data=estimation_frame())
+
+
+def test_resume_fails_closed_for_tampered_estimation_declaration(tmp_path):
+    """A changed declaration fails digest verification before resume."""
+    original = interrupted_estimation_run(tmp_path)
+    path = original.run_dir / "parameter_estimation_declaration.json"
+    envelope = json.loads(path.read_text(encoding="utf-8"))
+    envelope["estimand"]["name"] = "tampered"
+    path.write_text(json.dumps(envelope), encoding="utf-8")
+
+    with pytest.raises(errors.ArtifactError, match="digest"):
+        scml.MLProject.resume(original.run_dir, data=estimation_frame())
 
 
 def test_project_run_rejects_missing_estimation_artifact(monkeypatch, tmp_path):
