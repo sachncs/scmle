@@ -4825,3 +4825,17 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   that the explicit optional-dependency taxonomy works both when capabilities
   are installed and when the base package intentionally omits them.
 
+## Local security and license evidence on `master` on 2026-10-23
+
+- Bandit completed with exit code `0` over `scml`, and the base-runtime
+  `pip-audit --skip-editable` check reported no known vulnerabilities.
+- The base-runtime license inventory passed for `16` packages. An isolated
+  Python 3.13 environment installed every declared optional extra; its
+  `pip-audit` check reported no known vulnerabilities and the all-extras
+  license inventory passed for `149` packages with no missing or forbidden
+  license evidence.
+- These repository-controlled security gates are green. Hosted execution,
+  Pages publication, independent operational repetition, external fault and
+  secret-custody evidence, independent review, and the final release decision
+  remain open.
+
