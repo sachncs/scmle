@@ -8,8 +8,7 @@ benchmark_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-bench.XXXXXX")"
 benchmark_output="$benchmark_directory/results.json"
 preflight_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-preflight.XXXXXX")"
 
-uv sync --python "$python_version" \
-  --extra boosting --extra optimization --extra multimodal
+uv sync --python "$python_version" --all-extras
 
 echo "== build all artifacts =="
 uv build --python "$python_version" --out-dir "$preflight_directory/python-build"
