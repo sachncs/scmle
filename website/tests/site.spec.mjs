@@ -47,6 +47,29 @@ test("release status page keeps the beta boundary and generated checks visible",
   await expect(page.getByText("You cannot honestly treat the current library as a production-ready platform", { exact: false })).toBeVisible();
 });
 
+test("modeling page exposes the estimation contract and honest boundaries", async ({
+  page,
+}) => {
+  await page.goto("./docs/modeling/");
+  await expect(
+    page.getByRole("heading", {
+      name: "Parameter estimation is not hyperparameter tuning",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Parameter estimation contract" }),
+  ).toBeVisible();
+  await expect(page.getByText("Identifiability", { exact: true })).toBeVisible();
+  await expect(page.getByText("reference calculation", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("There is no image, document, audio, video, graph, or geospatial JEPA", { exact: false })).toBeVisible();
+  await expect(page.getByText("MLProject is not a production non-tabular modelling path", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Use the public API" })).toHaveAttribute(
+    "href",
+    "/super-charge-ml/docs/api/",
+  );
+  await expect(page.locator('a[href*=".md"]')).toHaveCount(0);
+});
+
 test("documentation navigation exposes a keyboard focus path", async ({
   page,
 }) => {

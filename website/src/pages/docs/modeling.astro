@@ -10,7 +10,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 >
   <p class="eyebrow"><span></span> Models, uncertainty, and limits</p>
   <h1>Choose the model<br /><em>after the evidence.</em></h1>
-  <p class="lead">super-charge-ml can search and evaluate several model families, including an optional FT-Transformer path, and can pretrain a bounded tabular JEPA representation. It does not pretend that either adapter is a complete multimodal modelling product.</p>
+  <p class="lead">super-charge-ml can search and evaluate several model families, including an optional FT-Transformer path, and can pretrain a bounded tabular JEPA representation. It also exposes a separate, auditable parameter-estimation contract. Those are useful building blocks—not a claim that every dataset, transformer, or scientific question is production-ready.</p>
 
   <div class="callout"><p><strong>Read this page before installing extras.</strong> The supported beta is still the narrow tabular library workflow. Deep-learning and text-embedding integrations are available as explicit optional paths with separate evidence. Tabular JEPA is experimental; multimodal JEPA is not implemented. Parameter estimation is a separate scientific evidence track that can be attached to an <code>MLProject</code> run, but it never changes model selection.</p></div>
 
@@ -30,7 +30,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   </figure>
   <p>The planner owns the comparison: it screens model families against task, data shape, resource limits, and declared policy. A candidate is not a release because it has the highest point score. The run must retain the split identity, trial parameters, metrics, uncertainty, calibration diagnostics, explanation evidence, package verification, and known limitations.</p>
 
-  <h2>What modelling exists today</h2>
+  <h2 id="onboarding">A developer’s first pass</h2>
+  <p>Start with the question and the raw dataset boundary, not with a model name. The shortest useful path is: run the <a href={`${base}/docs/quickstart/`}>tabular quickstart</a>, inspect the <a href={`${base}/docs/data/`}>curation and dataset identity</a>, choose a supported capability in the <a href={`${base}/docs/capabilities/`}>capability matrix</a>, then use the <a href={`${base}/docs/api/`}>Python API reference</a> to make the declaration explicit. Only after that should you compare optional model families.</p>
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/quickstart/`}><small>01 / RUN</small><h3>Make a first tabular run</h3><p>See the smallest end-to-end project and the artifacts it leaves behind.</p></a>
+    <a class="doc-card" href={`${base}/docs/data/`}><small>02 / UNDERSTAND</small><h3>Audit the raw input</h3><p>Confirm source identity, labels, missingness, leakage, and split eligibility before fitting.</p></a>
+    <a class="doc-card" href={`${base}/docs/api/`}><small>03 / DECLARE</small><h3>Use the public API</h3><p>Declare modality, target, policy, and evidence boundaries in Python.</p></a>
+    <a class="doc-card" href={`${base}/docs/release-evidence/`}><small>04 / PROMOTE</small><h3>Read the release boundary</h3><p>Know which local checks still do not justify a production claim.</p></a>
+  </div>
+
+  <h2 id="support-matrix">What modelling exists today</h2>
+  <p>The matrix below is a claim boundary, not a catalogue of packages that happen to import. “Supported” means the path is the explicitly gated beta workflow. “Experimental” means there is a usable, tested seam with modality-specific limitations. “Extension-only” means the caller owns the missing lifecycle and evidence.</p>
   <div class="model-table" role="region" aria-label="Modeling support matrix" tabindex="0">
     <table>
       <thead><tr><th>Path</th><th>How to use it</th><th>Current claim</th></tr></thead>
@@ -47,16 +57,16 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   </div>
   <p class="note">* “Supported” is intentionally narrow: it describes the explicitly gated tabular library path, not every dataset, model, accelerator, or deployment environment.</p>
 
-  <h2>Try an optional transformer path</h2>
+  <h2 id="transformers">Try an optional transformer path</h2>
   <p>The extra is a deliberate boundary. It keeps the base install small and makes the dependency, worker process, resource cost, and failure mode visible in the run. Start with a small budget and compare the transformer against a simple baseline on the same split.</p>
   <pre><code>{`# Optional PyTorch/Keras model families, including FT-Transformer
 pip install "super-charge-ml[deeplearning]"
 
 # Optional sentence-transformer text encoding
 pip install "super-charge-ml[embeddings]"`}</code></pre>
-  <p>Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. A successful import only proves that the code can start; it does not prove that the model learned the intended signal.</p>
+  <p>Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. A successful import only proves that the code can start; it does not prove that the model learned the intended signal. There is no general transformer registry, distributed training guarantee, hosted weight registry, or production text-understanding claim behind this optional extra.</p>
 
-  <h2>Pretrain a tabular JEPA representation</h2>
+  <h2 id="jepa">Pretrain a tabular JEPA representation</h2>
   <p>JEPA is a transformer-adjacent self-supervised representation workflow, not a target-label model. The current implementation accepts a finite numeric matrix, masks feature values, predicts an EMA target representation, and exposes embeddings for a downstream model you choose. The downstream benchmark, split, and model card remain your responsibility.</p>
   <pre><code>{`from scml.models.deeplearning import JepaEstimator
 
@@ -80,7 +90,22 @@ score = downstream_model.score(embeddings[test], labels[test])`}</code></pre>
     <div class="mini-card"><span class="mini-label">Still separate</span><h3>What is not included</h3><p>There is no document, image, audio, video, graph, or geospatial JEPA encoder; no universal pretrained checkpoint; and no claim that the embedding is semantically meaningful without a domain benchmark.</p><p class="note">A new modality needs its own encoder, masking policy, transfer test, and explanation boundary.</p></div>
   </div>
 
-  <h2>Parameter estimation is not hyperparameter tuning</h2>
+  <h2 id="boundaries">What the current modelling claim does not include</h2>
+  <p>A typed input or a passing unit test is not the same as a production model family. Use this boundary when deciding whether to build on the library or write an extension.</p>
+  <div class="model-table" role="region" aria-label="Unsupported modelling boundary" tabindex="0">
+    <table>
+      <thead><tr><th>Area</th><th>What exists</th><th>Do not infer</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Transformers</th><td>Optional tabular FT-Transformer and text-embedding adapters with explicit dependency and resource gates.</td><td>General-purpose multimodal transformers, foundation-model weights, distributed training, or production serving are not covered.</td></tr>
+        <tr><th scope="row">JEPA</th><td>A tabular numeric representation trainer with masking, an EMA target encoder, checkpoint state, and <code>transform</code> output.</td><td>There is no image, document, audio, video, graph, or geospatial JEPA; no universal checkpoint; and no semantic transfer guarantee.</td></tr>
+        <tr><th scope="row">Non-tabular data</th><td>Experimental curation, typed manifests, bounded baselines, and extension contracts for document, image, audio, video, graph, and geospatial families.</td><td><code>MLProject</code> is not a production non-tabular modelling path. OCR, layout understanding, image representation, audio/video understanding, GNNs, and geospatial foundation models remain outside the supported claim.</td></tr>
+        <tr><th scope="row">External runtime</th><td>Local evidence can record package, inference, and recovery checks within the tested boundary.</td><td>Cloud, container, kernel, broker exactly-once, hosted CI, public deployment, and independent review evidence are not created by a local run.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">When a requirement appears in the third column, use the <a href={`${base}/docs/extensions/`}>extension contract</a> and keep the resulting capability marked extension-only until its own evidence exists.</p>
+
+  <h2 id="selection-vs-estimation">Parameter estimation is not hyperparameter tuning</h2>
   <p>This distinction matters. The current project has useful pieces, but they answer different questions:</p>
   <div class="split-cards">
     <div class="mini-card"><span class="mini-label">Implemented</span><h3>Choosing a model</h3><p>Hyperparameter search explores declared spaces. Bayesian model comparison evaluates repeated score differences. Calibration and conformal methods quantify predictive behaviour. Cross-validation can report intervals around metrics.</p></div>
@@ -95,28 +120,88 @@ score = downstream_model.score(embeddings[test], labels[test])`}</code></pre>
     </div>
   </figure>
 
-  <h2>Run a declared estimate</h2>
-  <p>The estimation API is intentionally explicit. You supply the design matrix, outcome, scientific declaration, and covariance policy; the result tells you what was estimated, how many rows were used, how uncertainty was computed, and whether the independent reference calculation agreed.</p>
-  <pre><code>{`from scml import EstimandSpec, EstimationPolicy, estimate_parameters
+  <p>Suppose a search chooses logistic regression because it predicts held-out conversions well. The selected model’s coefficient is a property of that fitted procedure; it is not automatically the population log-odds effect you meant to estimate. A parameter-estimation run must name the population quantity, the data-generating likelihood, the assumptions that identify it, and the uncertainty calculation before it reports a number.</p>
+
+  <h2 id="parameter-contract">The parameter-estimation contract</h2>
+  <p>Read an <code>EstimationResult</code> as a compact scientific record. Each part answers a different review question:</p>
+  <div class="model-table" role="region" aria-label="Parameter estimation contract" tabindex="0">
+    <table>
+      <thead><tr><th>Evidence</th><th>What it says</th><th>What a reviewer still asks</th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><code>estimand</code></th><td>Name, outcome, population, observation window, likelihood, features, and declared assumptions.</td><td>Is this the quantity the decision-maker actually needs, and does the sample represent that population?</td></tr>
+        <tr><th scope="row">Identifiability</th><td>Assumptions such as conditional exchangeability, positivity, consistency, or random-intercept exogeneity are recorded explicitly.</td><td>Which assumptions are design commitments, which can be checked against data, and which remain untestable domain claims?</td></tr>
+        <tr><th scope="row"><code>parameters</code></th><td>Point estimates, standard errors, intervals, and p-values in the declared coefficient order.</td><td>Does the sign and scale have a domain interpretation, and are the intervals being read as confidence or credible intervals?</td></tr>
+        <tr><th scope="row"><code>covariance</code></th><td>A square covariance matrix for the reported parameters. Its diagonal is the squared standard error; its off-diagonal terms preserve dependence between estimates.</td><td>Is IID, HC3, clustered, posterior, influence-function, or model-based uncertainty appropriate for this design?</td></tr>
+        <tr><th scope="row"><code>sensitivity</code></th><td>Evidence for missingness handling, bootstrap or prior changes where supported, overlap, shift, clipping, and other declared perturbations.</td><td>Would a plausible change in sampling, missingness, prior strength, or distribution shift change the conclusion?</td></tr>
+        <tr><th scope="row"><code>reference</code></th><td>An independent calculation or solver check against the primary implementation, with tolerance and comparison details.</td><td>Did a second route agree within tolerance, and is that route genuinely independent rather than a duplicate helper?</td></tr>
+        <tr><th scope="row">Lineage</th><td>Rows used and dropped, raw-input fingerprint, serialized digest, and—when attached to a project—an artifact in the run evidence graph.</td><td>Can another evaluator retrieve the same raw snapshot, policy, software lock, and report without reconstructing intent from logs?</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="uncertainty">How to read uncertainty without overclaiming</h2>
+  <ol>
+    <li><strong>Start with the estimand.</strong> A 95% confidence interval describes repeated-sampling behaviour under the declared estimator and assumptions. A Bayesian credible interval describes posterior probability under the declared likelihood and prior. Neither one repairs an unidentified question.</li>
+    <li><strong>Read covariance as a matrix, not decoration.</strong> Standard errors describe individual coordinates; covariance describes how estimates move together. Robust or clustered covariance changes the uncertainty calculation, not the underlying population definition.</li>
+    <li><strong>Separate sensitivity from uncertainty.</strong> A narrow interval under one policy can coexist with a large change under a different missingness rule, prior, overlap threshold, sample, or target population.</li>
+    <li><strong>Give the reference calculation a veto.</strong> If the independent calculation disagrees beyond the declared tolerance, treat the result as a failed diagnostic—not as a rounding difference to hide.</li>
+  </ol>
+
+  <h2 id="api-onboarding">Run a declared estimate</h2>
+  <p>The estimation API is intentionally explicit. You supply the design matrix, outcome, scientific declaration, and covariance policy; the result tells you what was estimated, how many rows were used, how uncertainty was computed, and whether the independent reference calculation agreed. This example is self-contained apart from NumPy and the installed package:</p>
+  <pre><code>{`import numpy as np
+
+from scml import EstimandSpec, EstimationPolicy, EstimationResult
+from scml import estimate_parameters
+
+features = np.array([
+    [0.0, 1.0], [1.0, 1.0], [0.0, 2.0], [1.0, 2.0],
+    [0.0, 3.0], [1.0, 3.0], [0.0, 4.0], [1.0, 4.0],
+], dtype=float)
+outcome = np.array([1.2, 2.1, 1.7, 2.6, 2.2, 3.0, 2.8, 3.5])
 
 estimand = EstimandSpec(
-    name="conversion_log_odds",
-    outcome="converted",
-    population="eligible visitors in the 2026 observation window",
-    likelihood="bernoulli",
+    name="conversion_score_association",
+    outcome="conversion_score",
+    population="eligible visitors observed in 2026",
+    likelihood="gaussian",
     feature_names=("treatment", "prior_visits"),
     assumptions=("rows are conditionally independent",),
 )
-report = estimate_parameters(
-    features,
-    converted,
-    estimand,
-    EstimationPolicy(estimator="logistic", covariance="hc3"),
+policy = EstimationPolicy(
+    estimator="linear",
+    covariance="hc3",
+    confidence_level=0.95,
+    seed=7,
 )
-report.write("artifacts/parameter-estimation.json")`}</code></pre>
+report = estimate_parameters(features, outcome, estimand, policy)
+report.write("artifacts/parameter-estimation.json")
+verified = EstimationResult.read("artifacts/parameter-estimation.json")
+print(verified.parameters)
+print(verified.covariance)
+print(verified.sensitivity)
+print(verified.reference)`}</code></pre>
   <p>That report is not automatically a causal conclusion. It is a reproducible estimate under the assumptions you declared. For a treatment effect, use <code>ipw_ate</code> or <code>aipw_ate</code> with explicit consistency, conditional exchangeability, and positivity assumptions. For grouped observations, use <code>hierarchical_linear</code> with explicit random-intercept assumptions and cluster labels. These methods report what they did and what they did not prove; an independent domain review is still required.</p>
 
-  <h2>Choose the scientific estimator deliberately</h2>
+  <h2 id="project-integration">Attach the estimate to an MLProject run</h2>
+  <p>Use the project API when the estimate must travel with the same tabular snapshot and run evidence as model selection. The estimation policy does not choose the predictive model, and the predictive model does not silently define the estimand.</p>
+  <pre><code>{`from scml import MLProject
+
+project = MLProject(
+    data=frame,
+    target="conversion_score",
+    task="regression",
+    modality="tabular",
+    estimand=estimand,
+    estimation_policy=policy,
+    output_dir="runs/conversion-score",
+)
+result = project.run()
+assert result.estimation is not None
+print(result.run_dir / "parameter_estimation.json")`}</code></pre>
+  <p>The run binds the digest-verified <code>parameter_estimation.json</code> artifact into evaluation and lineage. Missing, malformed, or tampered reports fail closed. Resume-time reconstruction of a parameter declaration is a separate reliability gap; do not assume that a failed run can recreate an undeclared scientific question from a log.</p>
+
+  <h2 id="estimator-matrix">Choose the scientific estimator deliberately</h2>
   <div class="model-table" role="region" aria-label="Parameter estimation methods" tabindex="0">
     <table>
       <thead><tr><th>Estimator</th><th>Use it for</th><th>Evidence and limits</th></tr></thead>
