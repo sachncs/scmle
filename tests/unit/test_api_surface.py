@@ -9,6 +9,7 @@ from scml.governance import vault
 
 PUBLIC_API = {
     "BayesianPrior",
+    "DatasetCatalog",
     "EstimandSpec",
     "EstimationPolicy",
     "EstimationResult",

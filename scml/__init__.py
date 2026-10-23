@@ -9,6 +9,7 @@ from scml.api.project import ModalityCurationProject
 from scml.api.project import ModalityProject
 from scml.api.results import RunResult
 from scml.artifacts.bundle import ModelBundle
+from scml.data.catalog import DatasetCatalog
 from scml.evaluation.longitudinal import LongitudinalEstimand
 from scml.evaluation.longitudinal import LongitudinalEstimationPolicy
 from scml.evaluation.longitudinal import LongitudinalEstimationResult
@@ -41,6 +42,7 @@ from scml.models.modality_lifecycle import ModalityPredictor
 
 __all__ = [
     "BayesianPrior",
+    "DatasetCatalog",
     "EstimandSpec",
     "EstimationPolicy",
     "EstimationResult",

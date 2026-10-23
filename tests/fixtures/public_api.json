@@ -4,6 +4,10 @@
       "kind": "class",
       "signature_sha256": "52317b4cf7f1ac6ee768286f568e44426cb799e032457dbb32e5d8c018e29b04"
     },
+    "DatasetCatalog": {
+      "kind": "class",
+      "signature_sha256": "c751f8678b66ccc792fc75d79206364088a7425e6037c0a9dc6b70c06f92a090"
+    },
     "EstimandSpec": {
       "kind": "class",
       "signature_sha256": "5d68c4d372445ce9fbc41ad257b83fd47a79037a8985d7a1435b374d038a2642"
