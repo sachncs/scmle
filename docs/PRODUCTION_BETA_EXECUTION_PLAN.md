@@ -4123,3 +4123,22 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   kernel fault evidence, hosted CI/Pages deployment, independent review, or
   the explicitly experimental non-tabular and foundation-model claims.
 
+## Clustered causal uncertainty at `84baab5` on 2026-10-23
+
+- IPW and AIPW parameter estimation now accept an explicit clustered
+  covariance policy. The estimator computes a finite small-sample corrected
+  variance from centered influence scores, requires at least two clusters,
+  and records cluster count, cluster sizes, and the uncertainty method.
+- HC3 remains rejected for the causal estimators because this bounded slice
+  does not claim a sandwich estimator for nuisance-model uncertainty. The
+  independent reference continues to recompute the causal point estimate and
+  records that clustered variance is produced by the declared influence
+  calculation rather than silently presenting an independent variance check.
+- The estimator, project, API, and replay focused suite passed `58` tests;
+  Ruff lint, formatting, mypy, and diff checks passed. The one consolidated
+  repository regression at the resulting head completed `2542 passed, 38
+  skipped` in 42m37s with no failures.
+- Causal Bayesian inference, time-varying treatment effects, nuisance-model
+  uncertainty propagation, and hierarchical random slopes/nested/crossed or
+  fully Bayesian models remain outside this bounded estimator contract.
+
