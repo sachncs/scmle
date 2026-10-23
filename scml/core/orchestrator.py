@@ -243,9 +243,7 @@ class Orchestrator:
             "parameter_estimation_declaration.json",
             {**declaration, "digest": digest},
         )
-        store.write_text(
-            "parameter_estimation_declaration.lock", f"{digest}\n"
-        )
+        store.write_text("parameter_estimation_declaration.lock", f"{digest}\n")
         store.write_json("config.json", json.loads(self.spec.canonical_json()))
         store.write_text("environment.lock", environment_lock())
         return self.execute(store, approved, {}, "run created")

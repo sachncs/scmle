@@ -84,9 +84,9 @@ def parameter_estimation_declaration_digest(
 ) -> str:
     """Returns the canonical digest for a declaration without its digest."""
     return hashlib.sha256(
-        json.dumps(
-            declaration, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
+        json.dumps(declaration, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
     ).hexdigest()
 
 
@@ -344,8 +344,7 @@ def estimate_parameters_for_project(
             )
         if treatment_column not in estimand.feature_names:
             raise errors.ConfigError(
-                "treatment_column must be included in estimand "
-                "feature_names"
+                "treatment_column must be included in estimand feature_names"
             )
         treatment_position = estimand.feature_names.index(treatment_column)
         if policy.treatment_position != treatment_position:

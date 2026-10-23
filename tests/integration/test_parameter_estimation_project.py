@@ -124,9 +124,7 @@ def test_resume_reconstructs_estimation_and_rebinds_evidence(tmp_path):
     """Resume restores the declaration and follows the fresh-run path."""
     original = interrupted_estimation_run(tmp_path)
 
-    resumed = scml.MLProject.resume(
-        original.run_dir, data=estimation_frame()
-    )
+    resumed = scml.MLProject.resume(original.run_dir, data=estimation_frame())
 
     assert resumed.estimation is not None
     report = EstimationResult.read(
