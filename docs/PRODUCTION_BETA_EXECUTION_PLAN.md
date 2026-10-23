@@ -4876,3 +4876,16 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   and public Pages evidence remain owner-controlled prerequisites; repeated
   local evidence cannot close them.
 
+## Clean-clone contract evidence at `4a31598` on 2026-10-24
+
+- A fresh clone of `origin/master` verified its `HEAD` against the remote
+  branch, installed the base package in an isolated Python 3.14 environment,
+  and ran the bounded unit, property, and end-to-end contract slice.
+- The slice completed with `2182 passed, 129 skipped` in 6 minutes 31 seconds
+  under `-W error::ResourceWarning`. The skip audit classified all `129` as
+  dependency skips and reported zero unapproved skips, unexplained skips, or
+  xfails.
+- This strengthens clean-external-reproduction evidence for the base package;
+  optional-extra, hosted-platform, and independent-review gates remain
+  separate.
+
