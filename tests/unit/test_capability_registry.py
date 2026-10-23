@@ -171,7 +171,7 @@ def test_registry_serialization_is_canonical_across_registration_order():
 
 
 def test_transformer_and_jepa_family_statuses_are_explicit():
-    """Family metadata records experimental boundaries without promotion."""
+    """Family metadata records implemented boundaries without promotion."""
     registry = capabilities.CapabilityRegistry.with_declared_model_families()
 
     families = {
@@ -195,10 +195,88 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
     assert families[capabilities.ModelFamily.JEPA.value].required_extras == (
         "deeplearning",
     )
+    assert families[capabilities.ModelFamily.TRANSFORMER.value].status is (
+        capabilities.CapabilityStatus.EXPERIMENTAL
+    )
+    assert families[capabilities.ModelFamily.TRANSFORMER.value].modalities == (
+        capabilities.Modality.TABULAR,
+    )
+    assert families[
+        capabilities.ModelFamily.TRANSFORMER.value
+    ].supports_modality(capabilities.Modality.TABULAR)
+    assert not families[
+        capabilities.ModelFamily.TRANSFORMER.value
+    ].supports_modality(capabilities.Modality.IMAGE)
+    for family_name in (
+        capabilities.ModelFamily.TEXT_TRANSFORMER.value,
+        capabilities.ModelFamily.VISION_TRANSFORMER.value,
+        capabilities.ModelFamily.AUDIO_TRANSFORMER.value,
+        capabilities.ModelFamily.VIDEO_TRANSFORMER.value,
+        capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
+    ):
+        assert families[family_name].status is (
+            capabilities.CapabilityStatus.EXTENSION_ONLY
+        )
 
     diagnostic = registry.diagnose(make_key(model_family="jepa"))
     assert diagnostic[0].code == "missing_declaration"
     assert diagnostic[0].observed == {"model_family_status": "experimental"}
+
+
+@pytest.mark.parametrize(
+    ("model_family", "modality"),
+    (
+        (capabilities.ModelFamily.JEPA.value, capabilities.Modality.IMAGE),
+        (
+            capabilities.ModelFamily.TRANSFORMER.value,
+            capabilities.Modality.TEXT,
+        ),
+        (
+            capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
+            capabilities.Modality.GRAPH,
+        ),
+    ),
+)
+def test_unsupported_family_modality_reports_structured_diagnostic(
+    model_family, modality
+):
+    """Known families reject undeclared modalities before training."""
+    registry = capabilities.CapabilityRegistry.with_declared_model_families()
+    key = make_key(model_family=model_family, modality=modality)
+
+    diagnostics = registry.diagnose(key)
+
+    modality_diagnostic = next(
+        item
+        for item in diagnostics
+        if item.code == "model_family_modality_unsupported"
+    )
+    assert modality_diagnostic.observed == modality.value
+    assert modality.value not in modality_diagnostic.expected
+    with pytest.raises(capabilities.UnsupportedCapabilityError) as failure:
+        registry.require(key)
+    assert {item["code"] for item in failure.value.details["diagnostics"]} >= {
+        "missing_declaration",
+        "model_family_modality_unsupported",
+    }
+
+
+def test_experimental_family_requires_explicit_status_opt_in():
+    """A catalog entry never becomes training support by being known."""
+    registry = capabilities.CapabilityRegistry.with_declared_model_families()
+    key = make_key(
+        model_family=capabilities.ModelFamily.TRANSFORMER.value,
+        modality=capabilities.Modality.TABULAR,
+    )
+
+    diagnostics = registry.diagnose(key)
+
+    assert {item.code for item in diagnostics} == {
+        "missing_declaration",
+        "model_family_status_not_allowed",
+    }
+    with pytest.raises(capabilities.UnsupportedCapabilityError):
+        registry.require(key)
 
 
 def test_environment_checks_collect_missing_extras_and_resources():

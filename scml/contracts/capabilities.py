@@ -181,6 +181,12 @@ class ModelFamilyDeclaration:
             "limitations": list(self.limitations),
         }
 
+    def supports_modality(self, modality: Modality) -> bool:
+        """Return whether this family declares the requested modality."""
+        if not isinstance(modality, Modality):
+            raise TypeError("modality must be Modality")
+        return modality in self.modalities
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class CapabilityEnvironment:
@@ -427,28 +433,23 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ModelFamilyDeclaration(
         model_family=ModelFamily.TRANSFORMER.value,
         status=CapabilityStatus.EXPERIMENTAL,
-        modalities=(
-            Modality.TEXT,
-            Modality.DOCUMENT,
-            Modality.IMAGE,
-            Modality.AUDIO,
-            Modality.VIDEO,
-        ),
-        required_extras=("embeddings",),
-        resources=ResourceAssumptions(memory_gb=4.0),
+        modalities=(Modality.TABULAR,),
+        required_extras=("deeplearning",),
+        resources=ResourceAssumptions(memory_gb=4.0, gpu_required=True),
         failure_modes=(
-            "modality-specific adapter is not registered",
-            "pretrained weights or tokenizer are unavailable",
-            "end-to-end evaluation contract is incomplete",
+            "torch runtime or tabular transformer adapter is unavailable",
+            "numeric tabular feature tokenization fails",
+            "end-to-end transformer evaluation contract is incomplete",
         ),
         limitations=(
-            "experimental family declaration only",
-            "not a complete training capability",
+            "experimental tabular feature-token transformer path only",
+            "not a text, image, audio, video, or multimodal transformer",
+            "not a complete production capability declaration",
         ),
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.TEXT_TRANSFORMER.value,
-        status=CapabilityStatus.EXPERIMENTAL,
+        status=CapabilityStatus.EXTENSION_ONLY,
         modalities=(Modality.TEXT, Modality.DOCUMENT),
         required_extras=("embeddings",),
         resources=ResourceAssumptions(memory_gb=4.0),
@@ -458,13 +459,14 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "evaluation or explanation evidence is incomplete",
         ),
         limitations=(
-            "experimental family declaration only",
+            "extension-only family declaration",
+            "no built-in text or document transformer training path",
             "no production inference guarantee",
         ),
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.VISION_TRANSFORMER.value,
-        status=CapabilityStatus.EXPERIMENTAL,
+        status=CapabilityStatus.EXTENSION_ONLY,
         modalities=(Modality.IMAGE, Modality.VIDEO),
         required_extras=("multimodal",),
         resources=ResourceAssumptions(memory_gb=8.0, gpu_required=True),
@@ -474,13 +476,14 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "modality-specific evaluation is incomplete",
         ),
         limitations=(
-            "experimental family declaration only",
+            "extension-only family declaration",
+            "no built-in image or video transformer training path",
             "no production lifecycle evidence",
         ),
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.AUDIO_TRANSFORMER.value,
-        status=CapabilityStatus.EXPERIMENTAL,
+        status=CapabilityStatus.EXTENSION_ONLY,
         modalities=(Modality.AUDIO,),
         required_extras=("multimodal",),
         resources=ResourceAssumptions(memory_gb=8.0, gpu_required=True),
@@ -490,13 +493,14 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "audio evaluation is incomplete",
         ),
         limitations=(
-            "experimental family declaration only",
+            "extension-only family declaration",
+            "no built-in audio transformer training path",
             "no production lifecycle evidence",
         ),
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.VIDEO_TRANSFORMER.value,
-        status=CapabilityStatus.EXPERIMENTAL,
+        status=CapabilityStatus.EXTENSION_ONLY,
         modalities=(Modality.VIDEO,),
         required_extras=("multimodal",),
         resources=ResourceAssumptions(memory_gb=12.0, gpu_required=True),
@@ -506,7 +510,8 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "video evaluation is incomplete",
         ),
         limitations=(
-            "experimental family declaration only",
+            "extension-only family declaration",
+            "no built-in video transformer training path",
             "no production lifecycle evidence",
         ),
     ),
@@ -681,7 +686,7 @@ class CapabilityRegistry:
         if capability is None:
             family = self.find_model_family(key.model_family)
             family_status = None if family is None else family.status.value
-            return (
+            family_diagnostics = [
                 CapabilityDiagnostic(
                     code="missing_declaration",
                     message=(
@@ -689,8 +694,36 @@ class CapabilityRegistry:
                     ),
                     expected=key.to_dict(),
                     observed={"model_family_status": family_status},
-                ),
-            )
+                )
+            ]
+            if family is not None and not family.supports_modality(
+                key.modality
+            ):
+                family_diagnostics.append(
+                    CapabilityDiagnostic(
+                        code="model_family_modality_unsupported",
+                        message=(
+                            "model family is not declared for the requested "
+                            "modality"
+                        ),
+                        expected=[item.value for item in family.modalities],
+                        observed=key.modality.value,
+                    )
+                )
+            if family is not None and family.status not in statuses:
+                family_diagnostics.append(
+                    CapabilityDiagnostic(
+                        code="model_family_status_not_allowed",
+                        message=(
+                            f"model family is registered as "
+                            f"{family.status.value}; accepted statuses do "
+                            "not include it"
+                        ),
+                        expected=sorted(status.value for status in statuses),
+                        observed=family.status.value,
+                    )
+                )
+            return tuple(family_diagnostics)
 
         diagnostics: list[CapabilityDiagnostic] = []
         if capability.status not in statuses:
