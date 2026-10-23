@@ -4162,3 +4162,30 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   CI, Pages deployment, independent review, external fault evidence, and the
   broader non-tabular modelling gaps remain open release gates.
 
+## Causal bootstrap, structured curation, and experimental opt-in at `e5199b2` on 2026-10-23
+
+- IPW and AIPW now expose deterministic nonparametric sampling sensitivity.
+  IID policies resample rows; clustered policies resample complete clusters
+  and assign fresh bootstrap cluster identities for influence covariance.
+  Every draw records a digest, sampling unit, seed, successful or failed
+  status, and an independent point-estimate reference check. Intervals fail
+  closed when fewer than two replicates are valid. Bayesian and hierarchical
+  bootstrap sensitivity remain explicitly unsupported.
+- Tabular curation now persists JSON-native `DatasetProfile.quality_evidence`
+  for label-noise and representativeness checks, including method, thresholds,
+  seed, bounded sample counts, metrics, errors, and limitations. The evidence
+  survives profile serialization while the human-readable findings remain
+  visible. Legacy prose-only helper shims were removed.
+- The tabular FT-Transformer can be selected only through explicit
+  `models.experimental_models` opt-in. It remains excluded from automatic
+  beta search and retains its experimental capability status; this does not
+  promote it or JEPA to production support.
+- The combined focused suite passed `155` tests. The repository naming gate
+  passed `869` tests; Ruff, formatting, mypy over 243 source files, and diff
+  checks were clean. The authoritative recovery regression completed
+  `2561 passed, 38 skipped` in 41m47s with no failures.
+- Non-tabular production modelling, multimodal transformers/JEPA, causal
+  Bayesian inference, hierarchical random slopes/nested/crossed effects,
+  hosted CI/Pages, external fault evidence, secret custody, and independent
+  release review remain open release gates.
+
