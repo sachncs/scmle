@@ -194,6 +194,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
             output_dir=tmp_path / "curation",
         ).run()
 
+
 def test_modality_curation_project_reuses_identical_artifact(tmp_path):
     """A verified identical publication is idempotent and not replaced."""
     project = scml.ModalityCurationProject(
