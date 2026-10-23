@@ -4247,6 +4247,18 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   modelling, multimodal transformers/JEPA, hosted CI/Pages, secret custody,
   and independent release review remain open release gates.
 
+## Estimation-boundary documentation at `335b5f3` on 2026-10-23
+
+- The standalone Astro modeling guide now describes `bayesian_ate`, the
+  one-random-slope hierarchical contract, signed resume/replay reconstruction,
+  and the evidence limitations for causal and multilevel inference. The data
+  guide now documents the `TransactionalSink` receipt/checkpoint boundary and
+  its explicit distinction from distributed exactly-once delivery.
+- Astro built all `19` static pages. Accessibility smoke checks passed all
+  `19` HTML files, and internal-link checks passed `479` links. This was a
+  documentation-only change after the green Python regression; no Python
+  regression was rerun for it.
+
 ## Hierarchical uncertainty and modality recovery at `1523bfa` on 2026-10-23
 
 - Hierarchical random-intercept linear estimation now supports deterministic
