@@ -81,7 +81,7 @@ Automated evidence: `tests/integration/test_monitoring.py`,
 
 ## Exit criteria
 
-Attach the evidence bundle to the release review. The production-readiness
-gate remains open if any step was skipped, used an untracked secret, relied
+Attach the evidence bundle to the release review. The release gate remains
+open if any step was skipped, used an untracked secret, relied
 on `trusted=True` outside the disposable rehearsal, or lacked an independent
 operator review.

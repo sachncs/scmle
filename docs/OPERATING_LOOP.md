@@ -39,8 +39,7 @@ uses four kinds of evidence:
 - Every candidate promotion requires locked-data evaluation, monitoring
   reference approval, an independent `PromotionApproval` bound to the exact
   bundle digest, and a rollback decision.
-- Every release requires the gates in
-  [`PRODUCTION_READINESS.md`](PRODUCTION_READINESS.md) to be green.
+- Every release requires the declared release evidence to be complete.
 
 When a signal changes, preserve the evidence first, identify the smallest
 reproducible cause, and then evolve the system with a focused test or control.

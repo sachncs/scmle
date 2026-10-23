@@ -15,8 +15,8 @@ deliberate versioning decision. Modules below `scml.core`, `scml.data`,
 advanced users, but their concrete internals are not stable until promoted to
 the top-level API or documented as a contract.
 
-The project will not claim a stable v1 API until the release, compatibility,
-security, and operational gates in the production-readiness plan are green.
+The project will not claim a stable v1 API until its release, compatibility,
+security, and operational evidence is complete.
 
 ## Bundle migration
 
