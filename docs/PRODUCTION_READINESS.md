@@ -43,3 +43,29 @@ must not be described as production-ready until every required gate is green.
 
 The checklist is intentionally conservative: a green unit suite is evidence
 for the covered behavior, not proof of cross-platform or operational readiness.
+
+## Atomic commits and verification order
+
+Use [plan.md](../plan.md) as the canonical execution plan and keep each
+implementation or evidence change in a small, reviewable commit. Each commit
+must leave the repository buildable, state its evidence command, and record
+the exact commit, environment, result, skips, warnings, and artifacts. Do not
+combine implementation, release-policy, site, and final release-decision
+changes.
+
+The required order is:
+
+1. Build all Python packages, wheels, source distributions, site pages,
+   documentation, and declared optional artifacts after implementation is
+   complete.
+2. Run focused unit, property, contract, static, API, and changed-path tests.
+3. Run supported end-to-end user journeys from input through documented
+   output.
+4. Run integration checks covering package boundaries, optional dependencies,
+   connectors, deployment, site routes, and external boundaries.
+5. Run the full regression and release gates once, on the release candidate,
+   only after all implementation work and phases 1–4 are complete.
+
+A failure blocks the next phase. Fix the implementation in a new atomic
+commit and rerun the affected phase; do not use an early regression run as
+evidence for a later implementation state.

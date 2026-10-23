@@ -153,12 +153,12 @@ using `docs/PRODUCTION_BETA_EXECUTION_PLAN.md` as the source of truth.
    and observability. Add actual transport/container/kernel evidence where
    claimed; otherwise mark the gate open. Do not infer distributed exactly-once
    semantics from a local idempotency ledger.
-7. Run the release evidence loop once implementation is complete: focused
-   tests and coverage, static checks, mutation/property/contract checks,
-   benchmark and performance gates, hosted CI, package install from wheel and
-   sdist, site and Pages route checks, clean-clone reproduction, and the full
-   regression suite. Record exact commands, commit, environment, counts,
-   skips, warnings, failures, and artifacts in the execution plan. Do not
+7. Run the release evidence loop only after implementation is complete. Use
+   the required phase order: build every package, site, and release artifact;
+   run focused tests; run end-to-end tests; run integration tests; then run
+   the repository-wide regression suite once on the release candidate.
+   Record exact commands, commit, environment, counts, skips, warnings,
+   failures, and artifacts in the execution plan. Do not run regression or
    repeatedly run the full suite between implementation batches.
 8. Obtain independent review. A reviewer who did not implement the change
    must recompute key metrics and estimates, inspect raw provenance and
@@ -197,6 +197,28 @@ warnings. Keep implementation, documentation, site, and release-policy
 changes separate. The final release commit may state `production-beta
 approved` only when every required gate passes; otherwise it must state
 `blocked` and name each remaining owner.
+
+### Implementation and verification order
+
+Use this order for the remaining work. A failed phase blocks the next phase;
+repair the implementation and rerun only the affected phase until it passes.
+
+1. **Build:** finish all implementation work, then build the Python package,
+   wheel, sdist, site, documentation, and declared optional artifacts. Verify
+   build outputs and metadata without treating this as test evidence.
+2. **Focused tests:** run the unit, property, contract, static, API, and
+   changed-path tests against the completed implementation.
+3. **End to end:** exercise supported user journeys from raw input through
+   package, load, inference, evidence, and documented output.
+4. **Integration:** run cross-package, optional-dependency, connector,
+   deployment, site, and external-boundary integration checks.
+5. **Regression:** only after phases 1–4 are green and no implementation work
+   remains, run the full repository regression, benchmark, mutation, package,
+   and release-candidate gates once. This is the authoritative final result.
+
+Do not claim regression evidence from a prior implementation state. Record
+each phase separately with its exact commit and artifacts, and keep the final
+regression commit separate from any subsequent implementation change.
 
 ### Acceptance criteria
 

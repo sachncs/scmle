@@ -865,6 +865,26 @@ Do not combine a modality implementation, a release-policy change, and a site
 rewrite in one commit. Every commit must leave the repository buildable and
 must state its evidence command in the PR description.
 
+### 8.1 Current implementation and verification order
+
+The current sequencing contract is maintained in [plan.md](../plan.md) and
+must be followed for the release candidate:
+
+1. Complete implementation and build every package, wheel, sdist, site,
+   documentation, and declared optional artifact.
+2. Run focused unit, property, contract, static, API, and changed-path tests.
+3. Run end-to-end journeys across the supported lifecycle.
+4. Run integration checks across package, optional-dependency, connector,
+   deployment, site, and external boundaries.
+5. Run the full repository regression and final release gates once, only after
+   implementation is complete and phases 1–4 are green.
+
+Keep build, focused-test, end-to-end, integration, regression, and release
+evidence separately attributable to their exact atomic commit. A failed phase
+blocks the next phase; repair in a new atomic commit and rerun the affected
+phase. Do not run or cite repository-wide regression as evidence between
+implementation batches.
+
 ## 9. Stop conditions
 
 Stop and revise the plan if any of these occurs:
