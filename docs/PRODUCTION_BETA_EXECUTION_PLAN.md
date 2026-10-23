@@ -4275,6 +4275,33 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   multimodal transformers/JEPA, hosted CI/Pages, secret custody, and
   independent release review remain open gates.
 
+## Bounded sequential treatment-history estimation at `95ecede` on 2026-10-23
+
+- A new `SequentialIPWEstimator` estimates a bounded static always-treated
+  versus always-control contrast for two or more periods of binary treatment
+  in balanced long-format data. The denominator propensity model conditions
+  on observed treatment history, declared baseline covariates, and declared
+  pre-treatment time-varying covariates. The numerator model conditions on
+  treatment history, producing stabilized cumulative inverse-probability
+  weights.
+- The public contracts require explicit consistency, positivity, sequential
+  exchangeability, no unmeasured time-varying confounding, pre-treatment
+  covariates, and complete follow-up assumptions. Results record per-period
+  propensity support, cumulative-weight truncation, effective sample size,
+  regime estimates and intervals, subject/row accounting, deterministic
+  fingerprints, machine-readable limitations, and an independent normalized
+  history-weight reference calculation. Reports are digest-bound and atomic.
+- The feature-focused suite passed `28` sequential tests, and the combined
+  sequential/API/convention slice passed `914` tests. The new module reached
+  `85%` focused line coverage. Ruff, formatting, mypy for the new module, API
+  compatibility, and the no-semi-private-name convention passed. The full
+  repository regression was intentionally not run for this implementation
+  batch.
+- This remains a bounded static-regime estimator. Dynamic regimes, intermittent
+  follow-up, continuous treatment, g-computation, marginal structural model
+  contrasts, and propensity-model uncertainty propagation remain outside the
+  contract.
+
 ## Longitudinal estimator documentation at `3080c28` on 2026-10-23
 
 - The standalone modeling guide now includes a runnable
