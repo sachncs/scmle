@@ -4247,6 +4247,45 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   modelling, multimodal transformers/JEPA, hosted CI/Pages, secret custody,
   and independent release review remain open release gates.
 
+## Bounded longitudinal causal estimation at `263b9b8` on 2026-10-23
+
+- A new `LongitudinalIPWEstimator` accepts a validated long-format subject/time
+  table and estimates a separate binary-treatment Hájek IPW ATE for each
+  period. The contract requires a named estimand, unique subject-time rows,
+  strict within-subject time order, baseline covariates, explicit
+  consistency/positivity/exchangeability and longitudinal-confounding
+  assumptions, deterministic propensity fitting, overlap and effective
+  sample-size diagnostics, subject-aligned influence covariance, intervals,
+  and independent normalized-weight reference calculations.
+- Results are digest-bound and atomically persisted with directory durability;
+  complete-case row accounting, raw-input fingerprints, period diagnostics,
+  and machine-readable limitations are retained. The estimator is explicitly
+  period-specific cross-sectional weighting, not a sequential g-formula,
+  marginal structural model, or claim that time-varying confounding has been
+  solved.
+- The longitudinal, API, convention, and existing estimation/streaming suite
+  passed `967` focused tests. Ruff, formatting, mypy over `scml` and
+  `benchmarks`, API compatibility, and diff checks were clean. The one
+  deferred repository regression completed `2591 passed, 38 skipped` in
+  41m52s with no failures.
+- Sequential treatment-history estimands, marginal structural models,
+  time-varying covariates, nuisance-model uncertainty propagation, clustered
+  Bayesian covariance, fully Bayesian multilevel inference, external
+  broker/cloud transaction evidence, non-tabular production modelling,
+  multimodal transformers/JEPA, hosted CI/Pages, secret custody, and
+  independent release review remain open gates.
+
+## Longitudinal estimator documentation at `3080c28` on 2026-10-23
+
+- The standalone modeling guide now includes a runnable
+  `LongitudinalIPWEstimator` example, period-specific estimator coverage in
+  the matrix, required subject/time and causal assumptions, and the explicit
+  boundary against sequential g-formula and marginal structural models.
+- Astro built all `19` static pages. Accessibility smoke checks passed all
+  `19` HTML files, and internal-link checks passed `479` links. This was a
+  documentation-only change after the green Python regression; no Python
+  regression was rerun for it.
+
 ## Estimation-boundary documentation at `335b5f3` on 2026-10-23
 
 - The standalone Astro modeling guide now describes `bayesian_ate`, the
