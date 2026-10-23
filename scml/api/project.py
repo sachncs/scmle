@@ -1,9 +1,12 @@
 """Public API: `MLProject(...).plan()`, `.run()`, `result.predict()`."""
 
+import contextlib
 import dataclasses
 import hashlib
 import json
+import os
 import pathlib
+import tempfile
 from typing import Any
 from typing import Literal
 
@@ -44,6 +47,33 @@ ValidationStrategy = Literal[
     "rolling",
 ]
 LeakagePolicy = Literal["warn", "block"]
+
+
+def publish_curation_artifact(path: pathlib.Path, content: bytes) -> None:
+    """Publish curation bytes atomically without replacing an artifact.
+
+    A hard link from a fully flushed sibling file gives the destination a
+    no-clobber, atomic first publication.  ``FileExistsError`` is deliberately
+    preserved for the caller so a concurrent publisher can verify and reuse
+    its result instead of replacing it.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(temporary_name, path)
+        durability.sync_directory(path.parent)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporary_name)
+
 
 PARAMETER_ESTIMATION_DECLARATION_ARTIFACT = (
     "parameter_estimation_declaration.json"
@@ -1059,23 +1089,7 @@ class ModalityCurationProject:
         signature = attestation.sign_payload(unsigned, self.signing_key)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.output_dir / "modality_curation.json"
-        if path.exists():
-            raise FileExistsError(path)
-        payload = {
-            **unsigned,
-            "path": str(path),
-            "signature": {
-                "algorithm": attestation.SIGNATURE_ALGORITHM,
-                "value": signature,
-            },
-        }
-        durability.write_atomically(
-            path,
-            (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode(
-                "utf-8"
-            ),
-        )
-        return modality_lifecycle.ModalityCurationResult(
+        candidate = modality_lifecycle.ModalityCurationResult(
             modality=modality,
             dataset_hash=dataset_hash,
             sample_count=sample_count,
@@ -1084,3 +1098,46 @@ class ModalityCurationProject:
             path=str(path),
             signature=signature,
         )
+        payload = candidate.to_dict()
+        serialized_payload = (
+            json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        try:
+            publish_curation_artifact(path, serialized_payload)
+        except FileExistsError:
+            existing = modality_lifecycle.ModalityCurationResult.read_verified(
+                path, self.signing_key
+            )
+            if existing.modality != candidate.modality:
+                raise ValueError(
+                    "existing curation modality does not match current adapter"
+                ) from None
+            if existing.dataset_hash != candidate.dataset_hash:
+                raise ValueError(
+                    "existing curation dataset_hash does not match current "
+                    "adapter"
+                ) from None
+            if existing.sample_count != candidate.sample_count:
+                raise ValueError(
+                    "existing curation sample_count does not match current "
+                    "adapter"
+                ) from None
+            try:
+                existing_record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, TypeError, ValueError) as error:
+                raise ValueError(
+                    "existing curation artifact is unreadable"
+                ) from error
+            if not isinstance(existing_record, dict):
+                raise ValueError(
+                    "existing curation artifact must be an object"
+                ) from None
+            if attestation.canonical_digest(existing_record) != (
+                attestation.canonical_digest(candidate.to_dict())
+            ):
+                raise ValueError(
+                    "existing curation canonical content does not match "
+                    "current adapter"
+                ) from None
+            return existing
+        return candidate
