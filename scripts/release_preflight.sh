@@ -12,6 +12,8 @@ uv sync --python "$python_version" \
   --extra boosting --extra optimization --extra multimodal
 
 echo "== static checks =="
+uv run --python "$python_version" python scripts/verify_hosted_controls.py \
+  --root .
 uv run --python "$python_version" ruff check .
 uv run --python "$python_version" ruff format --check .
 uv run --python "$python_version" mypy scml benchmarks

@@ -4,6 +4,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -80,3 +83,13 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           awk -v v="## ${version}" '$0 ~ "^"v {f=1; next} /^## /{f=0} f' CHANGELOG.md > notes.md
           gh release create "${GITHUB_REF_NAME}" dist/* --title "${GITHUB_REF_NAME}" --notes-file notes.md
+      - name: Verify public release bytes without credentials
+        run: >-
+          uv run python scripts/verify_external_release.py
+          --repository "${GITHUB_REPOSITORY}"
+          --tag "${GITHUB_REF_NAME}"
+          --source-commit "${GITHUB_SHA}"
+          --artifact-dir dist
+          --pypi-project super-charge-ml
+          --attempts 6
+          --retry-delay 10

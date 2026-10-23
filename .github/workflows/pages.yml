@@ -47,6 +47,8 @@ jobs:
       - name: Check internal links
         run: npm run check:links
         working-directory: website
+      - name: Verify hosted controls without credentials
+        run: python3 scripts/verify_hosted_controls.py --root .
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
         working-directory: website
@@ -95,6 +97,13 @@ jobs:
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: |
-          for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/modalities/ /docs/capabilities/ /docs/modeling/ /docs/evidence/ /docs/release-evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/cards/ /docs/operations/ /docs/security/ /docs/recovery/ /docs/migrations/ /docs/troubleshooting/; do
-            curl --fail --silent --show-error --location "${PAGE_URL%/}${route}" > /dev/null
-          done
+          python3 scripts/verify_hosted_controls.py \
+            --root . \
+            --pages-url "${PAGE_URL%/}" \
+            --output hosted-pages-verification.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: hosted-pages-verification
+          path: hosted-pages-verification.json
+          if-no-files-found: error
