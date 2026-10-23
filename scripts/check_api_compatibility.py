@@ -39,6 +39,17 @@ def stable_value(value: Any) -> Any:
     return str(value)
 
 
+def stable_annotation(annotation: Any) -> str:
+    """Return an annotation string stable across supported Python builds."""
+    rendered = str(annotation)
+    # Python 3.13 exposes the concrete platform-specific pathlib module in
+    # ``str(Path)`` while other supported interpreters render ``pathlib``.
+    # The private module spelling is not part of the public API contract.
+    return rendered.replace("pathlib._local.Path", "pathlib.Path").replace(
+        "pathlib._windows.Path", "pathlib.Path"
+    )
+
+
 def signature_record(value: Any) -> dict[str, Any]:
     """Return a deterministic signature record for one public object."""
     signature = inspect.signature(value)
@@ -46,14 +57,14 @@ def signature_record(value: Any) -> dict[str, Any]:
         {
             "name": parameter.name,
             "kind": parameter.kind.name,
-            "annotation": str(parameter.annotation),
+            "annotation": stable_annotation(parameter.annotation),
             "default": stable_value(parameter.default),
         }
         for parameter in signature.parameters.values()
     ]
     return {
         "parameters": parameters,
-        "return_annotation": str(signature.return_annotation),
+        "return_annotation": stable_annotation(signature.return_annotation),
     }
 
 

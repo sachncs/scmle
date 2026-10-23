@@ -11,7 +11,7 @@
     },
     {
       "category": "dependency",
-      "pattern": "^(?:optional dependency is not installed|the onnx extra is not installed|onnxmltools, lightgbm and xgboost are not all installed|torch is not installed|torch and keras are not installed|ray is not installed|sentence-transformers is not installed)$"
+      "pattern": "^(?:optional dependency is not installed|the optional deeplearning extra is not installed|the onnx extra is not installed|onnxmltools, lightgbm and xgboost are not all installed|torch is not installed|torch and keras are not installed|ray is not installed|sentence-transformers is not installed)$"
     },
     {
       "category": "dependency",

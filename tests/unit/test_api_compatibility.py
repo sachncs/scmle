@@ -39,3 +39,17 @@ def test_compatibility_gate_reports_removed_and_changed_exports():
 def test_set_defaults_are_canonicalized(value):
     """Set-like defaults cannot make the compatibility record nondeterministic."""
     assert check_api_compatibility.stable_value(value) == ["a", "b"]
+
+
+@pytest.mark.parametrize(
+    ("annotation", "expected"),
+    [
+        ("pathlib._local.Path", "pathlib.Path"),
+        ("pathlib._windows.Path | None", "pathlib.Path | None"),
+    ],
+)
+def test_platform_private_pathlib_annotations_are_canonicalized(
+    annotation, expected
+):
+    """Private pathlib module spellings must not change the public contract."""
+    assert check_api_compatibility.stable_annotation(annotation) == expected

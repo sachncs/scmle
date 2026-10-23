@@ -49,6 +49,16 @@ def test_skip_audit_reports_the_reason_category(tmp_path: Path, capsys):
     assert '"unapproved": []' in output
 
 
+def test_skip_audit_accepts_a_missing_optional_extra(tmp_path: Path):
+    """Optional capability jobs may explicitly report an absent extra."""
+    report = tmp_path / "results.xml"
+    write_report(
+        report, "Skipped: the optional deeplearning extra is not installed"
+    )
+
+    assert check_pytest_skips.main([str(report)]) == 0
+
+
 def test_skip_audit_accepts_an_environment_reason(tmp_path: Path):
     """Environment-dependent skips remain valid release evidence."""
     report = tmp_path / "results.xml"
