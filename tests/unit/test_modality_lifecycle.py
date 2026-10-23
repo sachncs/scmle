@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import shutil
 import wave
 
 import numpy as np
@@ -777,6 +778,51 @@ def test_lifecycle_completed_checkpoint_resume_is_idempotent(tmp_path: Path):
     )
 
     assert second == first
+
+
+def test_lifecycle_completed_resume_rejects_a_replaced_package(
+    tmp_path: Path,
+):
+    """Recovery rejects a valid package with different signed identity."""
+    adapter = text_adapter()
+    package_path = tmp_path / "package"
+    report_path = tmp_path / "report.json"
+    checkpoint_path = tmp_path / "checkpoint.json"
+    modality_lifecycle.ModalityLifecycle().run(
+        adapter,
+        package_path,
+        signing_key="checkpoint-key",
+        report_path=report_path,
+        checkpoint_path=checkpoint_path,
+    )
+
+    replacement_samples = tuple(
+        dataclasses.replace(sample, content=sample.content + " replacement")
+        for sample in adapter.dataset.samples
+    )
+    replacement_adapter = modality_lifecycle.TextAdapter(
+        document.DocumentDataset(replacement_samples)
+    )
+    replacement_path = tmp_path / "replacement-package"
+    modality_lifecycle.ModalityLifecycle().run(
+        replacement_adapter,
+        replacement_path,
+        signing_key="checkpoint-key",
+    )
+    shutil.rmtree(package_path)
+    shutil.copytree(replacement_path, package_path)
+
+    with pytest.raises(
+        ValueError, match="lifecycle report dataset identity does not match"
+    ):
+        modality_lifecycle.ModalityLifecycle().run(
+            adapter,
+            package_path,
+            signing_key="checkpoint-key",
+            report_path=report_path,
+            checkpoint_path=checkpoint_path,
+            resume=True,
+        )
 
 
 def test_lifecycle_checkpoint_rejects_tampering_and_changed_identity(

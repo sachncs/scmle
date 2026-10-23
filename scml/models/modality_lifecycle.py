@@ -3865,7 +3865,12 @@ class ModalityLifecycle:
                             "completed lifecycle report does not match "
                             "the requested resume"
                         )
-                    load_package(completed_report.package.path, signing_key)
+                    ModalityPredictor.from_package(
+                        adapter,
+                        completed_report.package.path,
+                        signing_key,
+                        lifecycle_report_path=report_target,
+                    )
                     return completed_report
                 resume_count = len(checkpoint.completed_stages)
                 resume_digests = checkpoint.stage_digests
