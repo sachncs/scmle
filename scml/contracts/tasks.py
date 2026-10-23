@@ -477,10 +477,14 @@ class ModelSpec(FrozenModel):
         exclude_models: Model names that must not run.
         exclude_families: Model families that must not run (for example
             `deep_learning`, `boosting`).
+        experimental_models: Explicitly opt-in model names that are not part
+            of automatic beta search. Their experimental capability status is
+            still preserved in the plan and release evidence.
     """
 
     exclude_models: list[str] = pydantic.Field(default_factory=list)
     exclude_families: list[str] = pydantic.Field(default_factory=list)
+    experimental_models: list[str] = pydantic.Field(default_factory=list)
 
 
 class DecisionSpec(FrozenModel):

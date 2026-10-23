@@ -165,6 +165,56 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                         ),
                     )
                 )
+    for task in (
+        tasks.TaskType.BINARY,
+        tasks.TaskType.MULTICLASS,
+        tasks.TaskType.REGRESSION,
+    ):
+        for fairness in (
+            (
+                capabilities.Fairness.NONE,
+                capabilities.Fairness.MITIGATION,
+            )
+            if task in (tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS)
+            else (capabilities.Fairness.NONE,)
+        ):
+            records.append(
+                capabilities.Capability(
+                    key=capabilities.CapabilityKey(
+                        modality=capabilities.Modality.TABULAR,
+                        task=task,
+                        model_family=capabilities.ModelFamily.TRANSFORMER.value,
+                        evaluation=capabilities.Evaluation.STANDARD,
+                        uncertainty=capabilities.Uncertainty.NONE,
+                        fairness=fairness,
+                        explainability=capabilities.Explainability.NONE,
+                        inference=capabilities.Inference.LIBRARY,
+                    ),
+                    status=capabilities.CapabilityStatus.EXPERIMENTAL,
+                    required_extras=("deeplearning",),
+                    resources=capabilities.ResourceAssumptions(
+                        memory_gb=4.0,
+                    ),
+                    failure_modes=(
+                        "torch runtime or tabular transformer adapter is "
+                        "unavailable",
+                        "numeric feature-token training or evaluation fails",
+                        "resource limits or experimental evidence are "
+                        "incomplete",
+                    ),
+                    evidence_links=(
+                        "tests/integration/test_capability_gate.py",
+                        "tests/unit/test_deeplearning.py",
+                    ),
+                    limitations=(
+                        "experimental tabular FT-Transformer only",
+                        "requires explicit models.experimental_models opt-in",
+                        "not a text, image, audio, video, or multimodal "
+                        "transformer",
+                        "no production support guarantee",
+                    ),
+                )
+            )
     return capabilities.CapabilityRegistry.with_declared_model_families(records)
 
 

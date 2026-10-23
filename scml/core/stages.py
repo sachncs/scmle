@@ -723,8 +723,18 @@ def build_plan(
         adapter = context.registry.get(model_name)
         model_family = adapter.capability_family or adapter.family
         key = capability_key(context, task, model_family)
+        allowed_statuses = (
+            {
+                capabilities.CapabilityStatus.SUPPORTED,
+                capabilities.CapabilityStatus.EXPERIMENTAL,
+            }
+            if model_name in context.spec.models.experimental_models
+            else None
+        )
         try:
-            context.capability_registry.require(key)
+            context.capability_registry.require(
+                key, allowed_statuses=allowed_statuses
+            )
         except capabilities.UnsupportedCapabilityError:
             if model_family not in {"custom", "test"}:
                 raise

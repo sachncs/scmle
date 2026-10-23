@@ -117,9 +117,26 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     )
     diagnostics = registry.diagnose(key)
     assert {item.code for item in diagnostics} == {
-        "missing_declaration",
-        "model_family_status_not_allowed",
+        "status_not_allowed",
     }
+
+
+def test_experimental_transformer_requires_explicit_model_opt_in():
+    """An experimental FT-Transformer can be selected only by declaration."""
+    adapter = networks.TorchTransformerAdapter()
+    registry = registry_module.ModelRegistry(
+        (classical.DummyAdapter(), adapter)
+    )
+    default_context = make_context(model_registry=registry)
+    default_plan = stages.build_plan(default_context)
+    assert adapter.name not in default_plan.candidate_models
+
+    spec = default_context.spec.model_copy(
+        update={"models": tasks.ModelSpec(experimental_models=[adapter.name])}
+    )
+    opted_in_context = make_context(model_registry=registry, spec=spec)
+    opted_in_plan = stages.build_plan(opted_in_context)
+    assert adapter.name in opted_in_plan.candidate_models
 
 
 def test_capability_family_is_used_before_training():

@@ -140,21 +140,11 @@ class TorchTransformerAdapter(TorchAdapter):
     name = "torch_ft_transformer"
     architecture = "ft_transformer"
     capability_family = "transformer"
+    auto_candidate = False
+    auto_candidate = False
     capabilities = dataclasses.replace(
         TorchAdapter.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
     )
-
-    def rejection_reason(
-        self, task: tasks.TaskType, row_count: int | None = None
-    ) -> str | None:
-        """Keep the experimental transformer out of automatic beta search."""
-        reason = super().rejection_reason(task, row_count)
-        if reason is not None:
-            return reason
-        return (
-            "experimental tabular FT-Transformer requires an explicit "
-            "experimental integration path"
-        )
 
     search_space = search.SearchSpace(
         (

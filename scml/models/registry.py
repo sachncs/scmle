@@ -140,13 +140,18 @@ class ModelRegistry:
         return self.adapters[name]
 
     def candidates(
-        self, task: tasks.TaskType, row_count: int | None = None
+        self,
+        task: tasks.TaskType,
+        row_count: int | None = None,
+        experimental_models: tuple[str, ...] = (),
     ) -> tuple[list[models.ModelAdapter], dict[str, str]]:
         """Splits adapters into compatible ones and rejection reasons.
 
         Args:
             task: Resolved task type.
             row_count: Dataset size, if known.
+            experimental_models: Explicit model names allowed to bypass the
+                automatic-candidate boundary.
 
         Returns:
             Compatible adapters sorted by (cost, name), and a mapping of
@@ -160,6 +165,15 @@ class ModelRegistry:
         )
         for adapter in ordered:
             if not adapter.capabilities.standalone:
+                continue
+            if (
+                not adapter.auto_candidate
+                and adapter.name not in experimental_models
+            ):
+                rejected[adapter.name] = (
+                    "model is experimental-only; add it to "
+                    "models.experimental_models for explicit opt-in"
+                )
                 continue
             reason = adapter.rejection_reason(task, row_count)
             if reason is None:

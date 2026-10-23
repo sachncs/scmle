@@ -636,7 +636,9 @@ class Planner:
         spec, profile, task = context.spec, context.profile, context.task
         metric = self.catalog.resolve(spec.primary_metric, task)
         compatible, rejected = self.registry.candidates(
-            task, profile.manifest.row_count
+            task,
+            profile.manifest.row_count,
+            tuple(spec.models.experimental_models),
         )
         decisions = [
             experiments.Decision(name, Action.REJECT, reason)
