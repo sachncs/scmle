@@ -1,5 +1,8 @@
 """Public proxy for the optional tabular JEPA representation trainer."""
 
+import hashlib
+import hmac
+import io
 import os
 import pathlib
 import tempfile
@@ -22,7 +25,8 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
     """
 
     engine_path = "scml.models.deeplearning.jepa_engine.JepaEngine"
-    CHECKPOINT_FORMAT = "scml.tabular-jepa.v1"
+    CHECKPOINT_FORMAT = "scml.tabular-jepa.v2"
+    CHECKPOINT_SCHEMA_VERSION = 1
 
     def __init__(
         self,
@@ -75,9 +79,12 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
     def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
         """Save a fitted JEPA representation checkpoint.
 
-        The checkpoint contains the estimator configuration, training report,
-        and NumPy-only worker state. It is intended for trusted local storage;
-        loading it uses joblib's pickle-based format.
+        The checkpoint contains a versioned envelope around the estimator
+        configuration, training report, and NumPy-only worker state. The
+        envelope includes a SHA-256 digest so truncated or accidentally
+        modified files fail closed before the estimator is trusted. It is
+        intended for trusted local storage; loading it uses joblib's
+        pickle-based format and is not a security boundary.
 
         Args:
             path: Destination file. Its parent directory must already exist.
@@ -100,8 +107,24 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
                 delete=False,
             ) as handle:
                 temporary = pathlib.Path(handle.name)
+            serialized = io.BytesIO()
             joblib.dump(
                 {"format": self.CHECKPOINT_FORMAT, "estimator": self},
+                serialized,
+            )
+            serialized_payload = serialized.getvalue()
+            joblib.dump(
+                {
+                    "format": self.CHECKPOINT_FORMAT,
+                    "schema_version": self.CHECKPOINT_SCHEMA_VERSION,
+                    "scope": "tabular_numeric_representation",
+                    "payload_sha256": hashlib.sha256(
+                        serialized_payload
+                    ).hexdigest(),
+                    "input_width": self.state_["input_width_"],
+                    "embedding_size": self.embedding_size,
+                    "payload": serialized_payload,
+                },
                 temporary,
             )
             with temporary.open("rb") as handle:
@@ -131,16 +154,61 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         Raises:
             ValueError: If the checkpoint format or payload is invalid.
         """
-        payload = joblib.load(path)
+        try:
+            payload = joblib.load(path)
+        except (EOFError, OSError, ValueError, TypeError) as error:
+            raise ValueError(
+                "could not read tabular JEPA checkpoint"
+            ) from error
         if (
             not isinstance(payload, dict)
             or payload.get("format") != cls.CHECKPOINT_FORMAT
         ):
             raise ValueError("unsupported tabular JEPA checkpoint format")
-        estimator = payload.get("estimator")
+        required = {
+            "schema_version",
+            "scope",
+            "payload_sha256",
+            "input_width",
+            "embedding_size",
+            "payload",
+        }
+        if not required.issubset(payload):
+            raise ValueError("tabular JEPA checkpoint metadata is incomplete")
+        serialized_payload = payload["payload"]
+        digest = payload["payload_sha256"]
+        if (
+            payload["schema_version"] != cls.CHECKPOINT_SCHEMA_VERSION
+            or payload["scope"] != "tabular_numeric_representation"
+            or not isinstance(serialized_payload, bytes)
+            or not isinstance(digest, str)
+            or not hmac.compare_digest(
+                hashlib.sha256(serialized_payload).hexdigest(), digest
+            )
+        ):
+            raise ValueError("tabular JEPA checkpoint integrity check failed")
+        try:
+            serialized = joblib.load(io.BytesIO(serialized_payload))
+        except (EOFError, OSError, ValueError, TypeError) as error:
+            raise ValueError(
+                "tabular JEPA checkpoint payload is invalid"
+            ) from error
+        if (
+            not isinstance(serialized, dict)
+            or serialized.get("format") != cls.CHECKPOINT_FORMAT
+        ):
+            raise ValueError(
+                "tabular JEPA checkpoint payload format is invalid"
+            )
+        estimator = serialized.get("estimator")
         if not isinstance(estimator, cls):
             raise ValueError("checkpoint does not contain a JepaEstimator")
         utils.validation.check_is_fitted(estimator, attributes=["state_"])
+        if (
+            payload["input_width"] != estimator.state_.get("input_width_")
+            or payload["embedding_size"] != estimator.embedding_size
+        ):
+            raise ValueError("tabular JEPA checkpoint metadata does not match")
         return estimator
 
 

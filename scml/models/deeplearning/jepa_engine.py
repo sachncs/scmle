@@ -87,20 +87,71 @@ class JepaEngine:
     ) -> "JepaEngine":
         """Fit context prediction without consuming labels."""
         del target, sample_weight
-        torch = importlib.import_module("torch")
-        matrix = np.asarray(features, dtype=np.float32)
-        if matrix.ndim != 2 or len(matrix) < 8:
+        try:
+            matrix = np.asarray(features, dtype=np.float32)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "tabular JEPA requires a numeric 2-D feature matrix"
+            ) from error
+        if matrix.ndim != 2:
+            raise ValueError("tabular JEPA requires a 2-D feature matrix")
+        if len(matrix) < 8:
             raise ValueError("tabular JEPA needs at least 8 rows")
+        if matrix.shape[1] < 1:
+            raise ValueError("tabular JEPA needs at least one feature")
         if not np.isfinite(matrix).all():
             raise ValueError("tabular JEPA requires finite numeric features")
-        if not 0.0 < self.mask_probability < 1.0:
+        if (
+            not isinstance(self.hidden_size, (int, np.integer))
+            or isinstance(self.hidden_size, bool)
+            or self.hidden_size < 1
+            or not isinstance(self.embedding_size, (int, np.integer))
+            or isinstance(self.embedding_size, bool)
+            or self.embedding_size < 1
+        ):
+            raise ValueError("JEPA layer sizes must be positive integers")
+        if (
+            not np.isfinite(self.mask_probability)
+            or not 0.0 < self.mask_probability < 1.0
+        ):
             raise ValueError(
-                "mask_probability must lie strictly between 0 and 1"
+                "mask_probability must be finite and lie strictly between "
+                "0 and 1"
             )
-        if not 0.0 < self.ema_decay < 1.0:
-            raise ValueError("ema_decay must lie strictly between 0 and 1")
-        if self.hidden_size < 1 or self.embedding_size < 1:
-            raise ValueError("JEPA layer sizes must be positive")
+        if not np.isfinite(self.ema_decay) or not 0.0 < self.ema_decay < 1.0:
+            raise ValueError(
+                "ema_decay must be finite and lie strictly between 0 and 1"
+            )
+        if not np.isfinite(self.learning_rate) or self.learning_rate <= 0.0:
+            raise ValueError("learning_rate must be finite and positive")
+        if not np.isfinite(self.weight_decay) or self.weight_decay < 0.0:
+            raise ValueError("weight_decay must be finite and non-negative")
+        if (
+            not isinstance(self.epochs, (int, np.integer))
+            or isinstance(self.epochs, bool)
+            or self.epochs < 1
+        ):
+            raise ValueError("epochs must be a positive integer")
+        if self.batch_size != "auto" and (
+            not isinstance(self.batch_size, (int, np.integer))
+            or isinstance(self.batch_size, bool)
+            or self.batch_size < 1
+        ):
+            raise ValueError("batch_size must be auto or a positive integer")
+        if not np.isfinite(self.variance_weight) or self.variance_weight < 0.0:
+            raise ValueError("variance_weight must be finite and non-negative")
+        if (
+            self.device != "auto"
+            and self.device != "cpu"
+            and not str(self.device).startswith("cuda")
+        ):
+            raise ValueError("device must be auto, cpu, or cuda")
+        torch = importlib.import_module("torch")
+        if (
+            str(self.device).startswith("cuda")
+            and not torch.cuda.is_available()
+        ):
+            raise ValueError("requested CUDA device is not available")
         torch.manual_seed(self.random_state)
         device = (
             "cuda"
@@ -187,10 +238,20 @@ class JepaEngine:
     def encode(self, features: Any) -> np.ndarray:
         """Encode rows with the learned context encoder."""
         torch = importlib.import_module("torch")
-        matrix = np.asarray(features, dtype=np.float32)
-        if matrix.ndim != 2 or matrix.shape[1] != self.input_width_:
+        try:
+            matrix = np.asarray(features, dtype=np.float32)
+        except (TypeError, ValueError) as error:
             raise ValueError(
-                f"features must have shape (rows, {self.input_width_})"
+                "tabular JEPA requires a numeric 2-D feature matrix"
+            ) from error
+        if (
+            matrix.ndim != 2
+            or matrix.shape[1] != self.input_width_
+            or not np.isfinite(matrix).all()
+        ):
+            raise ValueError(
+                "features must be finite and have shape "
+                f"(rows, {self.input_width_})"
             )
         with torch.no_grad():
             return self.network_.module.context_encoder(

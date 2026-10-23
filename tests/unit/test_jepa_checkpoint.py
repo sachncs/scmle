@@ -61,3 +61,33 @@ def test_invalid_checkpoint_format_is_rejected(tmp_path):
 
     with pytest.raises(ValueError, match="checkpoint format"):
         JepaEstimator.load_checkpoint(path)
+
+
+def test_checkpoint_payload_tampering_is_rejected(tmp_path):
+    """A modified serialized payload fails the integrity check."""
+    import joblib
+
+    checkpoint = (
+        estimator().fit(features()).save_checkpoint(tmp_path / "jepa.joblib")
+    )
+    payload = joblib.load(checkpoint)
+    payload["payload"] = payload["payload"][:-1] + b"x"
+    joblib.dump(payload, checkpoint)
+
+    with pytest.raises(ValueError, match="integrity check"):
+        JepaEstimator.load_checkpoint(checkpoint)
+
+
+def test_checkpoint_metadata_mismatch_is_rejected(tmp_path):
+    """Envelope metadata cannot silently describe another representation."""
+    import joblib
+
+    checkpoint = (
+        estimator().fit(features()).save_checkpoint(tmp_path / "jepa.joblib")
+    )
+    payload = joblib.load(checkpoint)
+    payload["input_width"] += 1
+    joblib.dump(payload, checkpoint)
+
+    with pytest.raises(ValueError, match="metadata does not match"):
+        JepaEstimator.load_checkpoint(checkpoint)

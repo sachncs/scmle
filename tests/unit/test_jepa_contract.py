@@ -3,6 +3,7 @@
 import pytest
 
 from scml.models.deeplearning.jepa import JepaEstimator
+from scml.models.deeplearning.jepa_engine import JepaEngine
 
 
 def test_jepa_is_a_self_supervised_representation_contract():
@@ -47,3 +48,39 @@ def test_tabular_jepa_trains_and_encodes():
 
     assert embeddings.shape == (5, 8)
     assert np.isfinite(embeddings).all()
+
+
+@pytest.mark.skipif(
+    pytest.importorskip("importlib.util").find_spec("torch") is None,
+    reason="torch is not installed",
+)
+@pytest.mark.parametrize(
+    ("parameter", "value", "message"),
+    [
+        ("epochs", 0, "epochs must be a positive integer"),
+        ("batch_size", 0, "batch_size must be auto or a positive integer"),
+        ("learning_rate", 0.0, "learning_rate must be finite and positive"),
+    ],
+)
+def test_invalid_training_configuration_has_actionable_diagnostic(
+    parameter, value, message
+):
+    """Invalid training settings fail at the JEPA contract boundary."""
+    import numpy as np
+
+    rng = np.random.default_rng(11)
+    features = rng.normal(size=(8, 3)).astype(np.float32)
+    settings = {parameter: value}
+
+    with pytest.raises(ValueError, match=message):
+        JepaEngine(**settings).fit(features)
+
+
+@pytest.mark.skipif(
+    pytest.importorskip("importlib.util").find_spec("torch") is None,
+    reason="torch is not installed",
+)
+def test_non_numeric_features_have_actionable_diagnostic():
+    """String data is rejected as outside the numeric-tabular JEPA contract."""
+    with pytest.raises(ValueError, match="numeric 2-D feature matrix"):
+        JepaEngine(epochs=1).fit([["a"], ["b"], ["c"], ["d"]] * 2)
