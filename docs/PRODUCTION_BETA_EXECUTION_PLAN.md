@@ -4415,3 +4415,25 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   and diff checks were clean. No full repository regression was run for this
   focused implementation batch by design.
 
+## Completed implementation-batch regression at `92e4544` on 2026-10-23
+
+- The implementation batch covering sequential treatment-history estimation,
+  the general dataset catalog, and explicit opt-in tabular transformer/JEPA
+  paths completed one repository-wide strict regression: `2,656 passed, 38
+  skipped` in `42m30s` under `uv run pytest -q tests -W
+  error::ResourceWarning`.
+- Before that full run, the focused feature/API/convention gate passed `955`
+  tests. Focused coverage for the new slices was `88%` combined, including
+  `93%` for `scml/data/catalog.py` and `85%` for
+  `scml/evaluation/sequential.py`. Ruff lint, Ruff formatting, and mypy over
+  `scml` and `benchmarks` passed.
+- The unavailable-torch integration case was made environment-independent by
+  forcing the adapter availability probe to false; this test correction was
+  committed separately at `a33b656`. The public-export import ordering repair
+  is recorded at `92e4544`.
+- This is local repository evidence only. It does not promote the new
+  transformer/JEPA paths beyond explicit tabular experimental status, does not
+  make arbitrary non-tabular modelling production-supported, and does not
+  close hosted CI/Pages, external broker/cloud fault evidence, secret custody,
+  or independent release review gates.
+
