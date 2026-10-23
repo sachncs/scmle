@@ -4437,3 +4437,20 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   close hosted CI/Pages, external broker/cloud fault evidence, secret custody,
   or independent release review gates.
 
+## Standalone catalog and sequential-estimation guidance at `d893d5c` on 2026-10-23
+
+- The standalone Astro developer site now explains `DatasetCatalog` as the
+  model-agnostic entry point for arbitrary data observations, including source
+  identity, schema, missingness, duplicates, labels, release blockers, and
+  the caller-owned adapter boundary for opaque formats.
+- The modelling guide now includes a runnable `SequentialIPWEstimator`
+  example, the stabilized treatment-history weighting contract, required
+  assumptions, per-period evidence, and the explicit boundary against dynamic
+  regimes, g-computation, and marginal structural models.
+- Astro built `19` pages. Accessibility checks passed for all `19` HTML files,
+  internal-link checks passed `479` links, and Playwright passed `4` browser
+  smoke tests. The generated test-results directory was not committed.
+- This documentation-only change did not rerun the Python regression; the
+  authoritative repository result remains the `2,656 passed, 38 skipped`
+  run recorded at `92e4544`.
+
