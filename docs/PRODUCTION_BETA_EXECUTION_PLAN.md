@@ -4779,3 +4779,27 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   Hosted CI, Pages visibility/configuration, and the related release gates
   remain open until the account/repository infrastructure is repaired.
 
+## Cross-version contract matrix and CI-gate repair at `2aebe83` on 2026-10-23
+
+- The bounded contract matrix was rerun in isolated Python 3.11, 3.12, 3.13,
+  and 3.14 environments with native math-library threads capped at one to
+  avoid local runner oversubscription. Each interpreter completed `2229
+  passed, 90 skipped` under `-W error::ResourceWarning`; the per-version
+  runtimes were 7:00, 6:45, 7:02, and 7:02 respectively.
+- The API compatibility gate passed on all four interpreters after the
+  checker canonicalized Python 3.13's private `pathlib._local.Path` spelling
+  to the public `pathlib.Path` contract. The focused API and skip-policy unit
+  tests passed `13` tests.
+- All four matrix JUnit reports passed `scripts/check_pytest_skips.py` after
+  the manifest explicitly approved the declared
+  `the optional deeplearning extra is not installed` dependency reason. No
+  unexplained skips or xfails were present.
+- The prior matrix's apparent Python 3.13 end-to-end failures were
+  cancellation artifacts from OpenMP oversubscription; the affected cases
+  were rerun individually and passed (Python 3.11: `1 passed`; Python 3.13:
+  `2 passed`).
+- This closes the local supported-Python contract evidence. Native Windows and
+  macOS hosted execution, hosted CI/Pages billing and visibility, independent
+  operational repetition, external fault/secret-custody evidence, review,
+  and final release approval remain open.
+
