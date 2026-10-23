@@ -281,7 +281,10 @@ class NetworkEstimator(base.BaseEstimator):
             "schema_version",
             "model_family",
             "architecture",
+            "modality",
             "input_width",
+            "inference",
+            "explanation",
             "payload_sha256",
             "payload",
         }
@@ -318,7 +321,15 @@ class NetworkEstimator(base.BaseEstimator):
             or envelope["format"] != family.checkpoint.format
             or envelope["model_family"] != family.model_family
             or envelope["architecture"] != estimator.architecture
+            or envelope["modality"] != family.inference.modality.value
             or envelope["input_width"] != estimator.state_["input_width_"]
+            or envelope["inference"] != family.inference.to_dict()
+            or envelope["explanation"]
+            != (
+                None
+                if family.explanation is None
+                else family.explanation.to_dict()
+            )
         ):
             raise ValueError("deep-learning checkpoint metadata does not match")
         return estimator
