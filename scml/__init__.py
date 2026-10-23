@@ -8,6 +8,7 @@ from scml.api.project import MLProject
 from scml.api.project import ModalityCurationProject
 from scml.api.project import ModalityProject
 from scml.api.results import RunResult
+from scml.api.sequential import SequentialEstimationProject
 from scml.artifacts.bundle import ModelBundle
 from scml.data.catalog import DatasetCatalog
 from scml.evaluation.longitudinal import LongitudinalEstimand
@@ -68,6 +69,7 @@ __all__ = [
     "RunResult",
     "SequentialEstimand",
     "SequentialEstimationPolicy",
+    "SequentialEstimationProject",
     "SequentialEstimationResult",
     "SequentialIPWEstimator",
     "SequentialPeriodDiagnostics",
