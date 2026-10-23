@@ -4040,3 +4040,17 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   repair passed its targeted slice. A fresh full regression is still required
   at the current head before repository-wide green status can be claimed.
 
+## Parameter-estimation lineage binding at `ea165d9` on 2026-10-23
+
+- Parameter reports are now first-class nodes in the content-linked run graph.
+  The graph binds the dataset snapshot and evaluation artifact to the exact
+  report digest, refreshes the evaluation-node digest after its parameter
+  pointer is persisted, and writes the updated graph atomically.
+- The project integration test verifies the parameter node, both lineage
+  edges, the updated evaluation digest, and graph self-verification. The
+  focused integration, lineage, API, and surface slice passed `23` tests with
+  Ruff and mypy clean.
+- This closes the local report-to-lineage gap. Resume-time reconstruction of a
+  parameter declaration after a failed run, hosted infrastructure evidence,
+  and independent release review remain separate work.
+
