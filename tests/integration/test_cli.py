@@ -184,7 +184,7 @@ def test_catalog_command_rejects_unknown_tabular_suffix(tmp_path, caplog):
     assert "data error" in caplog.text
 
 
-def test_predict_with_explicit_renames(binary_frame, tmp_path):
+def test_predict_with_explicit_renames(binary_frame, tmp_path, monkeypatch):
     data = tmp_path / "d.csv"
     binary_frame.to_csv(data, index=False)
     code = cli.main(
@@ -217,8 +217,17 @@ def test_predict_with_explicit_renames(binary_frame, tmp_path):
         str(output),
     ]
     assert cli.main(base) == cli.EXIT_FAILED  # exact names required by default
+    writes = []
+    real_write = cli.durability.write_atomically
+
+    def record_write(path, content):
+        writes.append((path, content))
+        return real_write(path, content)
+
+    monkeypatch.setattr(cli.durability, "write_atomically", record_write)
     code = cli.main([*base, "--rename", "A_value=a", "--case-insensitive"])
     assert code == 0 and len(pd.read_csv(output)) == len(binary_frame)
+    assert writes and writes[0][0] == output
 
 
 def test_config_file_and_flags_reach_the_full_specification(

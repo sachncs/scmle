@@ -17,6 +17,7 @@ from typing import ClassVar
 import pandas as pd
 
 from scml import DatasetCatalog
+from scml import durability
 from scml.api import project
 from scml.artifacts import bundle as bundle_module
 from scml.contracts import errors
@@ -453,7 +454,9 @@ class PredictCommand(Command):
             proba = model.predict_proba(args.data, mapping)
             for index, label in enumerate(model.classes):
                 frame[f"proba_{label}"] = proba[:, index]
-        frame.to_csv(pathlib.Path(args.output), index=False)
+        durability.write_atomically(
+            pathlib.Path(args.output), frame.to_csv(index=False).encode("utf-8")
+        )
         LOGGER.info("wrote %d predictions to %s", len(frame), args.output)
         return EXIT_OK
 
