@@ -4851,3 +4851,19 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   gates remain unavailable until the GitHub account/repository configuration
   is repaired.
 
+## Clean-clone artifact reproduction at `d0738b8` on 2026-10-23
+
+- A fresh clone of `origin/master` verified that its `HEAD` matched the
+  remote `master` tip before running `SCML_PYTHON_VERSION=3.14
+  scripts/verify_release_artifacts.sh`.
+- The clean clone produced byte-identical artifacts within the run, with
+  wheel SHA-256
+  `249a995ac170027f9323c346c698f63257f6a9345f8514a0eafc95923835186f` and
+  source-distribution SHA-256
+  `859e18c64abb0ef9ebb305aa39aefa0e8cb762302ae56a6865e7862ffbd6bdc2`.
+  Both the wheel and a wheel rebuilt from the source distribution installed
+  successfully in network-isolated Python 3.14 environments as `0.1.0b1`.
+- This closes the clean-clone package reproduction slice. It does not replace
+  hosted CI/Pages execution or independent signed technical, statistical,
+  security, and operational review.
+
