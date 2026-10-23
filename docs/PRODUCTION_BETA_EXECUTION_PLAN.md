@@ -4711,3 +4711,17 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   release gate remains open for independent-operator repetition and external
   transport, paging, container, kernel, and secret-custody evidence.
 
+## Final repository regression at `fbc3a89` on 2026-10-23
+
+- The staged final regression command
+  `uv run pytest -q tests -W error::ResourceWarning
+  --junitxml=/tmp/scml-final-regression.xml` completed with `2717 passed, 38
+  skipped` in 1 hour 49 minutes 46 seconds.
+- `scripts/check_pytest_skips.py` accepted all `38` skips as approved
+  dependency gaps (`catboost`, `imblearn`, `mlflow`, `openpyxl`, `polars`,
+  `ray`, and ONNX tooling); there were zero unexplained skips or xfails.
+- No `ResourceWarning` was promoted. This closes the local repository
+  regression gate for the current implementation state; benchmark, mutation,
+  hosted-platform, external-fault, independent-review, and final release
+  decision gates remain separate.
+
