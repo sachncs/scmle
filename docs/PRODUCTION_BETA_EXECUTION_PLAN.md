@@ -4725,3 +4725,32 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   hosted-platform, external-fault, independent-review, and final release
   decision gates remain separate.
 
+## Benchmark and mutation gates on `22905a2` on 2026-10-23
+
+- The offline benchmark gate ran five seeds with a 120-second budget and two
+  workers across breast cancer, wine, digits, and diabetes progression. All
+  four datasets completed without trial failures; the verdicts were `tie`,
+  `tie`, `tie`, and `ahead`, respectively. `benchmarks.check_regression`
+  reported `0 regression(s)`.
+- The mutation gate generated and executed `2270` mutants across `8` files
+  with four workers. `1642` mutants were killed and the resulting `72%`
+  score exceeded the required `70%` minimum. There was one timeout and `627`
+  surviving mutants; no mutation gate failure was reported.
+
+## Package and site release verification on `22905a2` on 2026-10-23
+
+- `scripts/verify_release_artifacts.sh` passed on Python 3.14. Independent
+  wheel and source-distribution builds were byte-identical within the run
+  (`wheel sha256 249a995ac170027f9323c346c698f63257f6a9345f8514a0eafc95923835186f`,
+  `sdist sha256 4711c17a67bb5a5e6cde4fe44de49b09e2d1333781c4cbc6819e89eec3cce029`).
+  Both the direct wheel and rebuilt-from-sdist wheel installed and imported
+  successfully in network-isolated environments as version `0.1.0b1`.
+- Website release checks passed: `npm audit --omit=dev --audit-level=high`
+  found zero vulnerabilities, accessibility checks passed for `19` HTML
+  files, internal-link checks passed for `479` links, and Playwright passed
+  all `4` Chromium end-to-end tests.
+- These local gates are green. Hosted CI/Pages billing and visibility,
+  supported-platform execution, independent operational repetition, external
+  fault and secret-custody evidence, independent review, and the final
+  release decision remain open.
+
