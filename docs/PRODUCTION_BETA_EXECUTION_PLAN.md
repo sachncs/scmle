@@ -4867,3 +4867,12 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   hosted CI/Pages execution or independent signed technical, statistical,
   security, and operational review.
 
+## Hosted gate recheck at `84cefac` on 2026-10-23
+
+- CI run `40003480331` and Pages run `40003480216` both failed before any
+  workflow step executed. The CI run completed after its initial queue;
+  Pages failed at the build boundary and did not run deploy or verification.
+- The account billing/spending-limit blocker is unchanged. Hosted execution
+  and public Pages evidence remain owner-controlled prerequisites; repeated
+  local evidence cannot close them.
+
