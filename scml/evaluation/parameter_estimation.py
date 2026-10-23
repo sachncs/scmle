@@ -36,6 +36,7 @@ EstimatorKind = Literal[
     "bayesian_ate",
     "ipw_ate",
     "aipw_ate",
+    "continuous_ipw_ate",
     "hierarchical_linear",
 ]
 CovarianceKind = Literal["iid", "hc3", "clustered"]
@@ -45,6 +46,13 @@ CausalAssumption = Literal[
     "consistency",
     "conditional_exchangeability",
     "positivity",
+]
+ContinuousTreatmentAssumption = Literal[
+    "consistency",
+    "conditional_exchangeability",
+    "continuous_treatment_positivity",
+    "linear_dose_response",
+    "normal_conditional_treatment_density",
 ]
 HierarchicalAssumption = Literal[
     "random_intercept",
@@ -63,6 +71,15 @@ REQUIRED_CAUSAL_ASSUMPTIONS = frozenset(
 )
 REQUIRED_BAYESIAN_ATE_ASSUMPTIONS = frozenset(
     {"linearity", *REQUIRED_CAUSAL_ASSUMPTIONS}
+)
+REQUIRED_CONTINUOUS_TREATMENT_ASSUMPTIONS = frozenset(
+    {
+        "consistency",
+        "conditional_exchangeability",
+        "continuous_treatment_positivity",
+        "linear_dose_response",
+        "normal_conditional_treatment_density",
+    }
 )
 REQUIRED_HIERARCHICAL_ASSUMPTIONS = frozenset(
     {
@@ -188,6 +205,10 @@ class EstimationPolicy:
     treatment_position: int | None = None
     propensity_clip: float = 0.01
     causal_assumptions: tuple[CausalAssumption, ...] = ()
+    continuous_treatment_assumptions: tuple[
+        ContinuousTreatmentAssumption, ...
+    ] = ()
+    continuous_weight_cap: float = 20.0
     hierarchical_assumptions: tuple[HierarchicalAssumption, ...] = ()
     cross_fitting_folds: int = 1
     hierarchical_method: HierarchicalMethod = "moment_gls"
@@ -203,11 +224,13 @@ class EstimationPolicy:
             "bayesian_ate",
             "ipw_ate",
             "aipw_ate",
+            "continuous_ipw_ate",
             "hierarchical_linear",
         ):
             raise ValueError(
                 "estimator must be linear, logistic, bayesian_linear, "
-                "bayesian_ate, ipw_ate, aipw_ate, or hierarchical_linear"
+                "bayesian_ate, ipw_ate, aipw_ate, continuous_ipw_ate, or "
+                "hierarchical_linear"
             )
         if self.covariance not in ("iid", "hc3", "clustered"):
             raise ValueError("covariance must be iid, hc3, or clustered")
@@ -229,6 +252,11 @@ class EstimationPolicy:
             raise ValueError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
+        if (
+            not math.isfinite(self.continuous_weight_cap)
+            or self.continuous_weight_cap <= 1.0
+        ):
+            raise ValueError("continuous_weight_cap must be greater than 1")
         if (
             isinstance(self.cross_fitting_folds, bool)
             or not isinstance(self.cross_fitting_folds, int)
@@ -264,7 +292,12 @@ class EstimationPolicy:
                 "reml_variance_bounds must contain two finite positive "
                 "values in increasing order"
             )
-        causal_estimators = {"bayesian_ate", "ipw_ate", "aipw_ate"}
+        causal_estimators = {
+            "bayesian_ate",
+            "ipw_ate",
+            "aipw_ate",
+            "continuous_ipw_ate",
+        }
         propensity_estimators = {"ipw_ate", "aipw_ate"}
         if (
             self.estimator not in causal_estimators
@@ -272,7 +305,7 @@ class EstimationPolicy:
         ):
             raise ValueError(
                 "treatment_position is supported only by bayesian_ate, "
-                "ipw_ate, or aipw_ate"
+                "ipw_ate, aipw_ate, or continuous_ipw_ate"
             )
         if (
             self.estimator not in propensity_estimators
@@ -285,6 +318,21 @@ class EstimationPolicy:
             raise ValueError(
                 "causal assumptions are supported only by bayesian_ate, "
                 "ipw_ate, or aipw_ate"
+            )
+        if (
+            self.estimator != "continuous_ipw_ate"
+            and self.continuous_treatment_assumptions
+        ):
+            raise ValueError(
+                "continuous treatment assumptions are supported only by "
+                "continuous_ipw_ate"
+            )
+        if (
+            self.estimator != "continuous_ipw_ate"
+            and self.continuous_weight_cap != 20.0
+        ):
+            raise ValueError(
+                "continuous_weight_cap is supported only by continuous_ipw_ate"
             )
         if self.estimator != "aipw_ate" and self.cross_fitting_folds != 1:
             raise ValueError(
@@ -343,7 +391,26 @@ class EstimationPolicy:
                 raise ValueError(
                     f"{self.estimator} requires treatment_position"
                 )
-            if (
+            if self.estimator == "continuous_ipw_ate":
+                if self.causal_assumptions:
+                    raise ValueError(
+                        "continuous_ipw_ate requires "
+                        "continuous_treatment_assumptions"
+                    )
+                if (
+                    len(self.continuous_treatment_assumptions)
+                    != len(set(self.continuous_treatment_assumptions))
+                    or set(self.continuous_treatment_assumptions)
+                    != REQUIRED_CONTINUOUS_TREATMENT_ASSUMPTIONS
+                ):
+                    raise ValueError(
+                        "continuous_ipw_ate requires consistency, "
+                        "conditional_exchangeability, "
+                        "continuous_treatment_positivity, "
+                        "linear_dose_response, and "
+                        "normal_conditional_treatment_density assumptions"
+                    )
+            elif (
                 len(self.causal_assumptions)
                 != len(set(self.causal_assumptions))
                 or set(self.causal_assumptions) != REQUIRED_CAUSAL_ASSUMPTIONS
@@ -406,9 +473,18 @@ class EstimationPolicy:
         values = dataclasses.asdict(self)
         if self.prior is None:
             values.pop("prior")
-        if self.estimator not in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
+        if self.estimator not in {
+            "bayesian_ate",
+            "ipw_ate",
+            "aipw_ate",
+            "continuous_ipw_ate",
+        }:
             values.pop("treatment_position")
+        if self.estimator not in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
             values.pop("causal_assumptions")
+        if self.estimator != "continuous_ipw_ate":
+            values.pop("continuous_treatment_assumptions")
+            values.pop("continuous_weight_cap")
         if self.estimator not in {"ipw_ate", "aipw_ate"}:
             values.pop("propensity_clip")
         if self.estimator != "aipw_ate":
@@ -624,6 +700,7 @@ class EstimationResult:
         policy_values = dict(policy_record)
         for policy_field in (
             "causal_assumptions",
+            "continuous_treatment_assumptions",
             "hierarchical_assumptions",
         ):
             if policy_field in policy_values:
@@ -706,7 +783,7 @@ def estimate_parameters(
     ):
         raise ValueError("random_slope_position is outside the feature matrix")
     if (
-        policy.estimator in {"ipw_ate", "aipw_ate"}
+        policy.estimator in {"ipw_ate", "aipw_ate", "continuous_ipw_ate"}
         and input_clusters is not None
         and policy.covariance != "clustered"
     ):
@@ -720,6 +797,7 @@ def estimate_parameters(
         "bayesian_ate": "gaussian",
         "ipw_ate": "gaussian",
         "aipw_ate": "gaussian",
+        "continuous_ipw_ate": "gaussian",
         "hierarchical_linear": "gaussian",
     }[policy.estimator]
     if estimand.likelihood != expected_likelihood:
@@ -741,7 +819,12 @@ def estimate_parameters(
         raise ValueError(
             f"{policy.estimator} estimation does not accept clusters"
         )
-    if policy.estimator in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
+    if policy.estimator in {
+        "bayesian_ate",
+        "ipw_ate",
+        "aipw_ate",
+        "continuous_ipw_ate",
+    }:
         if policy.treatment_position is None:
             raise ValueError(f"{policy.estimator} requires treatment_position")
         if not 0 <= policy.treatment_position < matrix.shape[1]:
@@ -928,6 +1011,46 @@ def estimate_parameters(
         standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
         interval_errors = standard_errors
         diagnostics = {**diagnostics, "likelihood": likelihood}
+    elif policy.estimator == "continuous_ipw_ate":
+        if policy.treatment_position is None:
+            raise ValueError("continuous_ipw_ate requires treatment_position")
+        coefficients, covariance, diagnostics = fit_continuous_ipw_effect(
+            matrix,
+            values,
+            policy.treatment_position,
+            policy,
+            cluster_values,
+        )
+        reference = reference_continuous_ipw_effect(
+            matrix,
+            values,
+            policy.treatment_position,
+            policy,
+            coefficients,
+            cluster_values,
+        )
+        treatment_name = estimand.feature_names[policy.treatment_position]
+        names = ("intercept", f"{treatment_name}_dose_response_slope")
+        likelihood = "gaussian"
+        pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
+        p_values = 2.0 * stats.norm.sf(
+            np.abs(coefficients)
+            / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+        )
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        interval_errors = standard_errors
+        diagnostics = {
+            **diagnostics,
+            "likelihood": likelihood,
+            "treatment_name": treatment_name,
+            "treatment_position": policy.treatment_position,
+            "estimand_interpretation": (
+                "the slope is the marginal outcome change for a one-unit "
+                "increase in continuous treatment under the declared "
+                "linear dose-response and generalized-propensity-density "
+                "assumptions"
+            ),
+        }
     elif policy.estimator == "hierarchical_linear":
         if cluster_values is None:
             raise ValueError("hierarchical_linear requires cluster labels")
@@ -1010,6 +1133,14 @@ def estimate_parameters(
         **diagnostics,
         "covariance_conditioning": covariance_conditioning,
     }
+    if policy.covariance == "clustered":
+        if cluster_values is None:
+            raise ValueError(
+                "cluster labels are required for cluster diagnostics"
+            )
+        diagnostics["cluster_uncertainty"] = cluster_uncertainty_diagnostics(
+            cluster_values
+        )
 
     if policy.estimator not in {"bayesian_linear", "bayesian_ate"}:
         standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
@@ -1246,6 +1377,279 @@ def fit_linear(
         raise ValueError("linear design matrix is rank deficient")
     coefficients = np.linalg.solve(gram, design.T @ values)
     return coefficients, {"converged": True, "iterations": 1}
+
+
+def fit_continuous_ipw_effect(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    treatment_position: int,
+    policy: EstimationPolicy,
+    clusters: np.ndarray | None,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Estimate a linear continuous-treatment effect with GPS weights.
+
+    The generalized propensity score is a conditional Gaussian treatment
+    density estimated from the declared non-treatment features. Stabilized
+    density-ratio weights then define a weighted marginal dose-response
+    regression. The reported treatment slope is a one-unit marginal effect,
+    not a claim about an arbitrary nonlinear dose-response curve.
+
+    Args:
+        matrix: Complete numeric feature matrix.
+        values: Complete numeric outcomes.
+        treatment_position: Column containing the continuous treatment.
+        policy: Continuous-treatment and uncertainty policy.
+        clusters: Optional independent sampling-unit labels.
+
+    Returns:
+        Weighted intercept, dose-response slope, covariance, and diagnostics.
+
+    Raises:
+        ValueError: If treatment support, density fitting, or weighted
+            regression is not identifiable.
+    """
+    treatment = matrix[:, treatment_position]
+    unique_treatment = np.unique(treatment)
+    if len(unique_treatment) < 4:
+        raise ValueError(
+            "continuous_ipw_ate needs at least four distinct treatment values"
+        )
+    marginal_scale = float(np.std(treatment, ddof=1))
+    if not math.isfinite(marginal_scale) or marginal_scale <= 1e-12:
+        raise ValueError("continuous_ipw_ate needs positive treatment variance")
+
+    confounders = np.delete(matrix, treatment_position, axis=1)
+    density_design = np.column_stack((np.ones(len(confounders)), confounders))
+    if np.linalg.matrix_rank(density_design) != density_design.shape[1]:
+        raise ValueError(
+            "continuous treatment density design matrix is rank deficient"
+        )
+    density_coefficients, _, rank, _ = np.linalg.lstsq(
+        density_design, treatment, rcond=None
+    )
+    if rank != density_design.shape[1]:
+        raise ValueError(
+            "continuous treatment density model is not identifiable"
+        )
+    conditional_mean = density_design @ density_coefficients
+    density_residuals = treatment - conditional_mean
+    residual_degrees = len(treatment) - density_design.shape[1]
+    if residual_degrees < 1:
+        raise ValueError(
+            "continuous treatment density model needs residual degrees of "
+            "freedom"
+        )
+    conditional_scale = float(
+        np.sqrt(np.sum(density_residuals**2) / residual_degrees)
+    )
+    if not math.isfinite(conditional_scale) or conditional_scale <= 1e-12:
+        raise ValueError(
+            "continuous treatment density has non-positive residual scale"
+        )
+    log_marginal_density = stats.norm.logpdf(
+        treatment, loc=float(np.mean(treatment)), scale=marginal_scale
+    )
+    log_conditional_density = stats.norm.logpdf(
+        treatment, loc=conditional_mean, scale=conditional_scale
+    )
+    log_weight = log_marginal_density - log_conditional_density
+    raw_weights = np.exp(np.clip(log_weight, -745.0, 709.0))
+    if not np.isfinite(raw_weights).all() or np.any(raw_weights <= 0.0):
+        raise ValueError("continuous treatment density weights are invalid")
+    weights = np.minimum(raw_weights, policy.continuous_weight_cap)
+    capped = raw_weights > policy.continuous_weight_cap
+    effective_sample_size = float(np.sum(weights) ** 2 / np.sum(weights**2))
+    if effective_sample_size < 2.0:
+        raise ValueError(
+            "continuous treatment weights leave fewer than two effective "
+            "observations"
+        )
+
+    dose_design = np.column_stack((np.ones(len(treatment)), treatment))
+    weighted_design = dose_design * np.sqrt(weights)[:, None]
+    weighted_outcome = values * np.sqrt(weights)
+    if np.linalg.matrix_rank(weighted_design) != weighted_design.shape[1]:
+        raise ValueError("weighted dose-response design is rank deficient")
+    coefficients = np.linalg.solve(
+        weighted_design.T @ weighted_design,
+        weighted_design.T @ weighted_outcome,
+    )
+    weighted_residuals = (values - dose_design @ coefficients) * np.sqrt(
+        weights
+    )
+    covariance = covariance_matrix(
+        weighted_design,
+        weighted_residuals,
+        policy.covariance,
+        clusters,
+        None,
+    )
+    overlap = {
+        "status": "diagnosed_not_proven",
+        "treatment_min": float(np.min(treatment)),
+        "treatment_max": float(np.max(treatment)),
+        "unique_treatment_values": len(unique_treatment),
+        "marginal_treatment_mean": float(np.mean(treatment)),
+        "marginal_treatment_sd": marginal_scale,
+        "conditional_treatment_residual_sd": conditional_scale,
+        "conditional_standardized_residual_quantiles": [
+            float(item)
+            for item in np.quantile(
+                np.abs(density_residuals) / conditional_scale,
+                (0.5, 0.9, 0.99, 1.0),
+            )
+        ],
+        "conditional_density_min": float(
+            np.min(np.exp(log_conditional_density))
+        ),
+        "conditional_density_max": float(
+            np.max(np.exp(log_conditional_density))
+        ),
+    }
+    weight_diagnostics = {
+        "raw_min": float(np.min(raw_weights)),
+        "raw_max": float(np.max(raw_weights)),
+        "capped_min": float(np.min(weights)),
+        "capped_max": float(np.max(weights)),
+        "cap": policy.continuous_weight_cap,
+        "fraction_capped": float(np.mean(capped)),
+        "quantiles": [
+            float(item)
+            for item in np.quantile(weights, (0.0, 0.5, 0.9, 0.99, 1.0))
+        ],
+        "effective_sample_size": effective_sample_size,
+        "effective_sample_fraction": effective_sample_size / len(weights),
+        "normalization": "stabilized_marginal_over_conditional_density",
+    }
+    diagnostics: dict[str, Any] = {
+        "converged": True,
+        "iterations": 1,
+        "estimator_family": "causal_continuous_ipw",
+        "method": "stabilized_generalized_propensity_weighted_regression",
+        "uncertainty_method": (
+            "weighted_gaussian_regression"
+            if policy.covariance == "iid"
+            else "clustered_weighted_gaussian_regression"
+        ),
+        "nuisance_model_uncertainty": "not_propagated",
+        "treatment_density_model": {
+            "method": "ordinary_least_squares_gaussian_density",
+            "conditional_mean_features": "all_declared_non_treatment_features",
+            "residual_degrees_of_freedom": residual_degrees,
+            "residual_scale": conditional_scale,
+        },
+        "overlap": overlap,
+        "weights": weight_diagnostics,
+        "capability": {
+            "status": "experimental",
+            "name": "continuous_treatment_effect",
+            "contract": "linear_marginal_dose_response",
+            "assumptions": list(policy.continuous_treatment_assumptions),
+            "evidence": [
+                "generalized_propensity_density_diagnostics",
+                "weight_effective_sample_size",
+                "independent_reference_calculation",
+            ],
+            "limitations": [
+                "normal conditional treatment density is required",
+                "linear dose-response is required",
+                "nuisance-model uncertainty is not propagated",
+                "nonlinear dose-response and continuous-treatment AIPW are "
+                "unsupported",
+            ],
+        },
+        "limitations": [
+            "positivity is diagnosed but not proven",
+            "normal conditional treatment density is imposed",
+            "linear dose-response is imposed",
+            "nuisance-model uncertainty is not propagated",
+            "nonlinear dose-response and continuous-treatment AIPW are "
+            "unsupported",
+        ],
+    }
+    if policy.covariance == "clustered":
+        diagnostics["cluster_uncertainty"] = cluster_uncertainty_diagnostics(
+            clusters
+        )
+    return coefficients, covariance, diagnostics
+
+
+def reference_continuous_ipw_effect(
+    matrix: np.ndarray,
+    values: np.ndarray,
+    treatment_position: int,
+    policy: EstimationPolicy,
+    coefficients: np.ndarray,
+    clusters: np.ndarray | None,
+) -> dict[str, Any]:
+    """Recompute the GPS-weighted dose-response with dense linear algebra.
+
+    This reference intentionally uses a separate least-squares and normal
+    equation calculation from :func:`fit_continuous_ipw_effect`. It verifies
+    the point estimate, while the primary fit separately records covariance
+    and overlap evidence.
+    """
+    treatment = matrix[:, treatment_position]
+    confounders = np.delete(matrix, treatment_position, axis=1)
+    density_design = np.column_stack((np.ones(len(confounders)), confounders))
+    density_coefficients = np.linalg.lstsq(
+        density_design, treatment, rcond=None
+    )[0]
+    conditional_mean = density_design @ density_coefficients
+    residual_degrees = len(treatment) - density_design.shape[1]
+    conditional_scale = float(
+        np.sqrt(
+            np.sum((treatment - conditional_mean) ** 2)
+            / max(residual_degrees, 1)
+        )
+    )
+    marginal_scale = float(np.std(treatment, ddof=1))
+    log_weights = stats.norm.logpdf(
+        treatment, np.mean(treatment), marginal_scale
+    ) - stats.norm.logpdf(treatment, conditional_mean, conditional_scale)
+    weights = np.minimum(
+        np.exp(np.clip(log_weights, -745.0, 709.0)),
+        policy.continuous_weight_cap,
+    )
+    dose_design = np.column_stack((np.ones(len(treatment)), treatment))
+    information = dose_design.T @ (weights[:, None] * dose_design)
+    right_hand_side = dose_design.T @ (weights * values)
+    reference = linalg.solve(information, right_hand_side, assume_a="pos")
+    difference = float(np.max(np.abs(reference - coefficients)))
+    return {
+        "method": "scipy.linalg.solve:dense_stabilized_gps_regression",
+        "max_absolute_difference": difference,
+        "reference_dose_response_slope": float(reference[1]),
+        "clustered_reference": clusters is not None,
+        "passed": difference <= policy.reference_tolerance * 10,
+    }
+
+
+def cluster_uncertainty_diagnostics(
+    clusters: np.ndarray | None,
+) -> dict[str, Any]:
+    """Return explicit sampling-unit diagnostics for clustered covariance."""
+    if clusters is None:
+        raise ValueError("cluster labels are required for cluster diagnostics")
+    try:
+        labels = tuple(dict.fromkeys(clusters.tolist()))
+    except TypeError as error:
+        raise ValueError(
+            "cluster labels must be hashable scalar values"
+        ) from error
+    if len(labels) < 2:
+        raise ValueError("clustered covariance needs at least two clusters")
+    sizes = [int(np.sum(clusters == label)) for label in labels]
+    return {
+        "method": "finite_sample_cluster_robust_sandwich",
+        "cluster_count": len(labels),
+        "cluster_sizes": sizes,
+        "minimum_cluster_size": min(sizes),
+        "maximum_cluster_size": max(sizes),
+        "singleton_cluster_fraction": float(np.mean(np.asarray(sizes) == 1)),
+        "independent_sampling_unit": "declared_cluster_label",
+        "small_cluster_caution": len(labels) < 30,
+    }
 
 
 def fit_ipw_ate(
@@ -3433,6 +3837,7 @@ def sensitivity_report(
     if policy.bootstrap_replicates and policy.estimator in {
         "ipw_ate",
         "aipw_ate",
+        "continuous_ipw_ate",
     }:
         report["sampling"] = causal_bootstrap_sensitivity(
             matrix,

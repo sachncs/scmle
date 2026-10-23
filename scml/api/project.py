@@ -217,7 +217,11 @@ def restore_parameter_estimation_declaration(
                 shape=prior_values.get("shape", 2.0),
                 scale=prior_values.get("scale", 1.0),
             )
-        for field in ("causal_assumptions", "hierarchical_assumptions"):
+        for field in (
+            "causal_assumptions",
+            "continuous_treatment_assumptions",
+            "hierarchical_assumptions",
+        ):
             if field in policy_values:
                 policy_values[field] = tuple(policy_values[field])
         if "reml_variance_bounds" in policy_values:
@@ -365,7 +369,12 @@ def estimate_parameters_for_project(
         frame = tabular.read_table(orchestrator.spec.data.uri)
     declared = [*estimand.feature_names, estimand.outcome]
     treatment_column = None
-    if policy.estimator in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
+    if policy.estimator in {
+        "bayesian_ate",
+        "ipw_ate",
+        "aipw_ate",
+        "continuous_ipw_ate",
+    }:
         treatment_column = orchestrator.spec.data.treatment_column
         if treatment_column is None:
             raise errors.ConfigError(

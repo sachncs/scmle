@@ -87,6 +87,65 @@ def clustered_causal_policy(
     )
 
 
+def continuous_treatment_estimand() -> EstimandSpec:
+    """Return a declared continuous-treatment dose-response estimand."""
+    return EstimandSpec(
+        name="continuous_treatment_dose_response",
+        outcome="outcome",
+        population="eligible observations in the 2026 study window",
+        likelihood="gaussian",
+        feature_names=("dose", "age", "risk_score"),
+        assumptions=(
+            "the treatment and outcome are measured in the same observation",
+            "the declared covariates precede treatment assignment",
+        ),
+    )
+
+
+def continuous_treatment_policy(
+    covariance: Literal["iid", "clustered"] = "iid",
+) -> EstimationPolicy:
+    """Return the fully identified bounded continuous-treatment policy."""
+    return EstimationPolicy(
+        estimator="continuous_ipw_ate",
+        covariance=covariance,
+        cluster_name="site_id" if covariance == "clustered" else None,
+        treatment_position=0,
+        continuous_weight_cap=8.0,
+        continuous_treatment_assumptions=(
+            "consistency",
+            "conditional_exchangeability",
+            "continuous_treatment_positivity",
+            "linear_dose_response",
+            "normal_conditional_treatment_density",
+        ),
+    )
+
+
+def continuous_treatment_fixture(
+    cluster_count: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    """Return a confounded continuous-treatment fixture with known slope."""
+    rng = np.random.default_rng(414)
+    rows = 720 if cluster_count == 1 else cluster_count * 24
+    age = rng.normal(size=rows)
+    risk_score = rng.normal(size=rows)
+    dose = 0.6 * age - 0.45 * risk_score + rng.normal(scale=1.1, size=rows)
+    outcome = (
+        0.8
+        + 1.75 * dose
+        + 0.45 * age
+        - 0.25 * risk_score
+        + rng.normal(scale=0.7, size=rows)
+    )
+    clusters = (
+        None
+        if cluster_count == 1
+        else np.repeat(np.arange(cluster_count), rows // cluster_count)
+    )
+    return np.column_stack((dose, age, risk_score)), outcome, clusters
+
+
 def hierarchical_estimand() -> EstimandSpec:
     """Return a Gaussian estimand for grouped observations."""
     return EstimandSpec(
@@ -527,6 +586,98 @@ def test_ipw_ate_fails_closed_without_all_causal_assumptions():
             treatment_position=0,
             causal_assumptions=("positivity",),
         )
+
+
+def test_continuous_ipw_ate_reports_gps_overlap_and_effect():
+    """Continuous treatment reports a weighted marginal dose-response slope."""
+    features, outcome, _ = continuous_treatment_fixture()
+    policy = continuous_treatment_policy()
+
+    first = estimate_parameters(
+        features, outcome, continuous_treatment_estimand(), policy
+    )
+    second = estimate_parameters(
+        features.copy(), outcome.copy(), continuous_treatment_estimand(), policy
+    )
+
+    assert first.to_dict() == second.to_dict()
+    assert first.parameters[1].name == "dose_dose_response_slope"
+    assert first.parameters[1].estimate == pytest.approx(1.75, abs=0.18)
+    assert first.diagnostics["estimator_family"] == "causal_continuous_ipw"
+    assert first.diagnostics["method"] == (
+        "stabilized_generalized_propensity_weighted_regression"
+    )
+    assert first.diagnostics["overlap"]["status"] == "diagnosed_not_proven"
+    assert first.diagnostics["weights"]["cap"] == 8.0
+    assert 0.0 <= first.diagnostics["weights"]["fraction_capped"] <= 1.0
+    assert first.diagnostics["weights"]["effective_sample_size"] > 2.0
+    assert first.diagnostics["capability"]["status"] == "experimental"
+    assert first.reference["passed"] is True
+    json.dumps(first.to_dict())
+
+
+def test_continuous_ipw_ate_supports_clustered_uncertainty():
+    """Continuous-treatment covariance names its independent sampling units."""
+    features, outcome, clusters = continuous_treatment_fixture(cluster_count=24)
+    policy = continuous_treatment_policy("clustered")
+
+    result = estimate_parameters(
+        features,
+        outcome,
+        continuous_treatment_estimand(),
+        policy,
+        clusters=clusters,
+    )
+
+    cluster_evidence = result.diagnostics["cluster_uncertainty"]
+    assert cluster_evidence["method"] == (
+        "finite_sample_cluster_robust_sandwich"
+    )
+    assert cluster_evidence["cluster_count"] == 24
+    assert cluster_evidence["minimum_cluster_size"] == 24
+    assert result.reference["clustered_reference"] is True
+    assert result.reference["passed"] is True
+
+
+def test_continuous_ipw_ate_requires_declared_density_assumptions():
+    """A continuous-treatment claim cannot reuse the binary policy default."""
+    with pytest.raises(ValueError, match="continuous_treatment_positivity"):
+        EstimationPolicy(
+            estimator="continuous_ipw_ate",
+            covariance="iid",
+            treatment_position=0,
+        )
+
+    features, outcome, _ = continuous_treatment_fixture()
+    with pytest.raises(ValueError, match="at least four distinct"):
+        estimate_parameters(
+            np.column_stack(
+                (
+                    np.tile((0.0, 1.0), len(features) // 2),
+                    features[:, 1],
+                    features[:, 2],
+                )
+            ),
+            outcome,
+            continuous_treatment_estimand(),
+            continuous_treatment_policy(),
+        )
+
+
+def test_continuous_policy_round_trip_preserves_explicit_capability():
+    """Serialized continuous policy evidence reconstructs without defaults."""
+    policy = continuous_treatment_policy()
+    restored = EstimationPolicy(**policy.to_dict())
+
+    assert restored == policy
+    assert restored.to_dict()["continuous_weight_cap"] == 8.0
+    assert restored.to_dict()["continuous_treatment_assumptions"] == (
+        "consistency",
+        "conditional_exchangeability",
+        "continuous_treatment_positivity",
+        "linear_dose_response",
+        "normal_conditional_treatment_density",
+    )
 
 
 def test_aipw_ate_reports_augmented_score_and_reference_evidence():
