@@ -61,14 +61,18 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         target: Any = None,
         sample_weight: Any = None,
     ) -> "JepaEstimator":
-        """Learn a representation without using a target label."""
+        """Learn a representation without using a target label.
+
+        Pipeline.fit forwards the supervised target to every intermediate
+        transformer. JEPA must not consume that target, so this method
+        deliberately replaces it with a constant placeholder before the
+        worker call. This keeps the representation path self-supervised even
+        when it is composed with a downstream classifier or regressor.
+        """
+        del target
         return super().fit(
             features,
-            (
-                np.zeros(len(features), dtype=np.float32)
-                if target is None
-                else target
-            ),
+            np.zeros(len(features), dtype=np.float32),
             sample_weight,
         )
 

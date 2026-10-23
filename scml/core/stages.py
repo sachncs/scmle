@@ -724,6 +724,7 @@ def build_plan(
         )
     )
     task = require(context.task, "task")
+    manifest = require(context.manifest, "manifest")
     for model_name in plan.candidate_models:
         adapter = context.registry.get(model_name)
         model_family = adapter.capability_family or adapter.family
@@ -738,7 +739,9 @@ def build_plan(
         )
         try:
             context.capability_registry.require(
-                key, allowed_statuses=allowed_statuses
+                key,
+                allowed_statuses=allowed_statuses,
+                row_count=manifest.row_count,
             )
         except capabilities.UnsupportedCapabilityError:
             if model_family not in {"custom", "test"}:
@@ -750,6 +753,7 @@ def build_plan(
             context.capability_registry.require(
                 key,
                 allowed_statuses={capabilities.CapabilityStatus.EXTENSION_ONLY},
+                row_count=manifest.row_count,
             )
     return plan
 

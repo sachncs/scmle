@@ -156,7 +156,17 @@ class ModelRegistry:
         Returns:
             Compatible adapters sorted by (cost, name), and a mapping of
             rejected adapter name to the reason.
+
+        Raises:
+            ConfigError: If an explicitly requested experimental model is not
+                registered in this registry.
         """
+        unknown = sorted(set(experimental_models) - set(self.adapters))
+        if unknown:
+            raise errors.ConfigError(
+                "unknown experimental model(s): "
+                f"{unknown}; registered: {sorted(self.adapters)}"
+            )
         compatible: list[models.ModelAdapter] = []
         rejected: dict[str, str] = {}
         ordered = sorted(
@@ -179,5 +189,10 @@ class ModelRegistry:
             if reason is None:
                 compatible.append(adapter)
             else:
+                if adapter.name in experimental_models:
+                    raise errors.ConfigError(
+                        f"explicit experimental model '{adapter.name}' "
+                        f"cannot be used: {reason}"
+                    )
                 rejected[adapter.name] = reason
         return compatible, rejected

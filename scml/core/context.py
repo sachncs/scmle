@@ -194,6 +194,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                     required_extras=("deeplearning",),
                     resources=capabilities.ResourceAssumptions(
                         memory_gb=4.0,
+                        max_rows=100_000,
                     ),
                     failure_modes=(
                         "torch runtime or tabular transformer adapter is "
@@ -211,6 +212,59 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                         "requires explicit models.experimental_models opt-in",
                         "not a text, image, audio, video, or multimodal "
                         "transformer",
+                        "no production support guarantee",
+                    ),
+                )
+            )
+    for task in (
+        tasks.TaskType.BINARY,
+        tasks.TaskType.MULTICLASS,
+        tasks.TaskType.REGRESSION,
+    ):
+        for fairness in (
+            (
+                capabilities.Fairness.NONE,
+                capabilities.Fairness.MITIGATION,
+            )
+            if task in (tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS)
+            else (capabilities.Fairness.NONE,)
+        ):
+            records.append(
+                capabilities.Capability(
+                    key=capabilities.CapabilityKey(
+                        modality=capabilities.Modality.TABULAR,
+                        task=task,
+                        model_family=capabilities.ModelFamily.JEPA.value,
+                        evaluation=capabilities.Evaluation.STANDARD,
+                        uncertainty=capabilities.Uncertainty.NONE,
+                        fairness=fairness,
+                        explainability=capabilities.Explainability.NONE,
+                        inference=capabilities.Inference.LIBRARY,
+                    ),
+                    status=capabilities.CapabilityStatus.EXPERIMENTAL,
+                    required_extras=("deeplearning",),
+                    resources=capabilities.ResourceAssumptions(
+                        memory_gb=4.0,
+                        max_rows=100_000,
+                    ),
+                    failure_modes=(
+                        "torch runtime or tabular JEPA adapter is unavailable",
+                        "numeric representation training or downstream "
+                        "head evaluation fails",
+                        "resource limits or experimental evidence are "
+                        "incomplete",
+                    ),
+                    evidence_links=(
+                        "tests/integration/test_capability_gate.py",
+                        "tests/integration/test_experimental_models.py",
+                        "tests/unit/test_jepa_contract.py",
+                    ),
+                    limitations=(
+                        "experimental tabular numeric representation plus "
+                        "supervised head only",
+                        "requires explicit models.experimental_models opt-in",
+                        "not a text, image, audio, video, graph, or "
+                        "multimodal JEPA",
                         "no production support guarantee",
                     ),
                 )

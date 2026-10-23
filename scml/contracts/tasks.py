@@ -479,7 +479,10 @@ class ModelSpec(FrozenModel):
             `deep_learning`, `boosting`).
         experimental_models: Explicitly opt-in model names that are not part
             of automatic beta search. Their experimental capability status is
-            still preserved in the plan and release evidence.
+            still preserved in the plan and release evidence. Built-in
+            experimental names currently include torch_ft_transformer and
+            torch_jepa; both require the deeplearning extra and remain
+            tabular-only.
     """
 
     exclude_models: list[str] = pydantic.Field(default_factory=list)

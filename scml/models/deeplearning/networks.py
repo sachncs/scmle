@@ -5,12 +5,16 @@ import dataclasses
 from typing import Any
 from typing import ClassVar
 
+from sklearn import pipeline
+
+from scml.contracts import data as data_contracts
 from scml.contracts import errors
 from scml.contracts import models
 from scml.contracts import search
 from scml.contracts import tasks
 from scml.models.deeplearning import estimators
 from scml.models.deeplearning import foundation
+from scml.models.deeplearning import jepa
 from scml.models.deeplearning import worker
 
 ALL_TASKS = tasks.STANDARD_TASKS
@@ -141,7 +145,6 @@ class TorchTransformerAdapter(TorchAdapter):
     architecture = "ft_transformer"
     capability_family = "transformer"
     auto_candidate = False
-    auto_candidate = False
     capabilities = dataclasses.replace(
         TorchAdapter.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
     )
@@ -152,6 +155,145 @@ class TorchTransformerAdapter(TorchAdapter):
             *COMMON_SPACE,
         )
     )
+
+
+class TorchJepaAdapter(TorchAdapter):
+    """Experimental tabular JEPA representation plus supervised head.
+
+    The adapter composes the existing worker-backed numeric JEPA estimator
+    with a small supervised PyTorch head. It is intentionally a complete
+    candidate pipeline so cross-validation, packaging, and prediction all
+    use the same representation state. This is tabular-only experimental
+    support; it is not a multimodal or pretrained JEPA foundation model.
+    """
+
+    name = "torch_jepa"
+    family = "deep_learning"
+    capability_family = "jepa"
+    auto_candidate = False
+    requires: ClassVar[tuple[str, ...]] = ("torch",)
+    capabilities = dataclasses.replace(
+        TorchAdapter.capabilities,
+        max_rows=100_000,
+        cost=5,
+        memory_factor=8.0,
+    )
+    search_space = search.SearchSpace(
+        (
+            search.ChoiceParameter("hidden_size", (32, 64, 128)),
+            search.ChoiceParameter("embedding_size", (16, 32, 64)),
+            search.FloatParameter("mask_probability", 0.15, 0.5),
+            search.FloatParameter("ema_decay", 0.95, 0.999),
+            search.FloatParameter("variance_weight", 0.05, 0.3),
+            search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
+            search.FloatParameter("weight_decay", 1e-6, 1e-2, log=True),
+            search.ChoiceParameter("epochs", (20, 40, 80)),
+            search.ChoiceParameter("batch_size", ("auto", 64, 128)),
+        )
+    )
+
+    def rejection_reason(
+        self, task: tasks.TaskType, row_count: int | None = None
+    ) -> str | None:
+        """Rejects datasets too small for representation cross-validation."""
+        reason = super().rejection_reason(task, row_count)
+        if reason is not None:
+            return reason
+        if row_count is not None and row_count < 16:
+            return "tabular JEPA requires at least 16 rows for its training "
+            "and validation boundaries"
+        return None
+
+    def build(
+        self,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> pipeline.Pipeline:
+        """Builds a JEPA representation followed by a prediction head.
+
+        Args:
+            task: Resolved binary, multiclass, or regression task.
+            seed: Seed shared by the representation and prediction head.
+            params: Optional search overrides shared by both stages where
+                their parameter names overlap.
+
+        Returns:
+            An unfitted sklearn pipeline.
+
+        Raises:
+            errors.ConfigError: If PyTorch is not installed.
+        """
+        if not self.is_available():
+            raise errors.ConfigError(
+                f"{self.name}: install the 'deeplearning' extra (torch)"
+            )
+        values = dict(params or {})
+        representation_names = {
+            "hidden_size",
+            "embedding_size",
+            "mask_probability",
+            "learning_rate",
+            "weight_decay",
+            "epochs",
+            "batch_size",
+            "ema_decay",
+            "variance_weight",
+        }
+        head_names = {
+            "learning_rate",
+            "weight_decay",
+            "epochs",
+            "batch_size",
+        }
+        representation_params = {
+            name: value
+            for name, value in values.items()
+            if name in representation_names
+        }
+        representation_params["random_state"] = seed
+        head_params = {
+            name: value for name, value in values.items() if name in head_names
+        }
+        head_params.update({"hidden_sizes": (32,), "random_state": seed})
+        head = (
+            estimators.TorchClassifier(**head_params)
+            if task.is_classification
+            else estimators.TorchRegressor(**head_params)
+        )
+        return pipeline.Pipeline(
+            [
+                (
+                    "representation",
+                    jepa.JepaEstimator(**representation_params),
+                ),
+                ("model", head),
+            ]
+        )
+
+    def assemble(
+        self,
+        plan: data_contracts.FeaturePlan,
+        task: tasks.TaskType,
+        seed: int,
+        params: Mapping[str, Any] | None = None,
+    ) -> pipeline.Pipeline:
+        """Builds the raw-frame pipeline used by project training.
+
+        The shared feature front end turns the declared tabular columns into
+        a finite numeric matrix. JEPA then learns only from that matrix, and
+        the supervised head consumes its embeddings. Keeping this composition
+        in the adapter makes it available to every strategy, package, and
+        prediction path without a special-case orchestrator branch.
+        """
+        from scml.data.curation import preprocessing
+
+        options = preprocessing.default_options(plan, self)
+        front_end = preprocessing.build_front_end(plan, options)
+        representation_pipeline = self.build(task, seed, params)
+        return pipeline.Pipeline(
+            [("prep", front_end), *representation_pipeline.steps]
+        )
 
 
 class TorchRobustMlpAdapter(TorchAdapter):
@@ -279,6 +421,7 @@ DEEP_LEARNING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
     TorchResidualAdapter,
     TorchEnsembleAdapter,
     TorchTransformerAdapter,
+    TorchJepaAdapter,
     TorchRobustMlpAdapter,
     KerasMlpAdapter,
 )

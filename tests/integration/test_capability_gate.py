@@ -115,7 +115,7 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     key = stages.capability_key(
         context, tasks.TaskType.BINARY, adapter.capability_family
     )
-    diagnostics = registry.diagnose(key)
+    diagnostics = registry.diagnose(key, row_count=120)
     assert {item.code for item in diagnostics} == {
         "status_not_allowed",
     }
@@ -123,6 +123,10 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
 
 def test_experimental_transformer_requires_explicit_model_opt_in():
     """An experimental FT-Transformer can be selected only by declaration."""
+    pytest.importorskip(
+        "torch",
+        reason="the optional deeplearning extra is not installed",
+    )
     adapter = networks.TorchTransformerAdapter()
     registry = registry_module.ModelRegistry(
         (classical.DummyAdapter(), adapter)

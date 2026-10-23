@@ -653,7 +653,10 @@ class Planner:
             experiments.Decision(
                 a.name,
                 Action.INCLUDE,
-                f"{a.family} candidate (cost {a.capabilities.cost})",
+                (
+                    f"{'experimental-only ' if not a.auto_candidate else ''}"
+                    f"{a.family} candidate (cost {a.capabilities.cost})"
+                ),
             )
             for a in candidates
         ]
