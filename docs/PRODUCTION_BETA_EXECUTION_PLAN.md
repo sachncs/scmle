@@ -4803,3 +4803,15 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   operational repetition, external fault/secret-custody evidence, review,
   and final release approval remain open.
 
+## Hosted gate recheck at `6f51f66` on 2026-10-23
+
+- CI run `40002346139` and Pages run `40002346097` both failed within seconds
+  of dispatch before any workflow step executed. Every CI job reported an
+  immediate startup failure; Pages skipped deploy and verification after its
+  build job failed.
+- This is a third current-commit reproduction of the same account
+  billing/spending-limit infrastructure blocker. It does not invalidate the
+  local Python matrix or indicate a code-level workflow failure. Hosted
+  runners, Pages publication, and the final external release gates remain
+  unavailable until the GitHub account/repository configuration is repaired.
+
