@@ -717,7 +717,12 @@ class LifecycleCheckpoint:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ModalityCurationResult:
-    """Signed curation evidence for a dataset without a model claim."""
+    """Signed curation evidence for a dataset without a model claim.
+
+    ``content_digest`` is the SHA-256 digest of the canonical unsigned
+    evidence. It is deliberately independent of the signing key so that
+    consumers can compare curation content across attestations.
+    """
 
     modality: str
     dataset_hash: str
@@ -770,6 +775,11 @@ class ModalityCurationResult:
             "dataset_card": dict(self.dataset_card),
         }
 
+    @property
+    def content_digest(self) -> str:
+        """Return the deterministic digest of the unsigned evidence."""
+        return attestation.canonical_digest(self.unsigned_dict())
+
     def verify_signature(self, signing_key: str | bytes) -> bool:
         """Return whether the persisted curation signature verifies."""
         expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
@@ -778,6 +788,7 @@ class ModalityCurationResult:
     def to_dict(self) -> dict[str, object]:
         """Return JSON-native curation result evidence."""
         record = self.unsigned_dict()
+        record["content_digest"] = self.content_digest
         record["path"] = self.path
         record["signature"] = {
             "algorithm": attestation.SIGNATURE_ALGORITHM,
@@ -819,7 +830,7 @@ class ModalityCurationResult:
             signature_value
         ):
             raise ValueError("modality curation signature is invalid")
-        return cls(
+        result = cls(
             modality=cast(str, modality),
             dataset_hash=cast(str, dataset_hash),
             sample_count=sample_count,
@@ -828,6 +839,17 @@ class ModalityCurationResult:
             path=cast(str, path),
             signature=signature_value,
         )
+        content_digest = record.get("content_digest")
+        if content_digest is not None:
+            if not isinstance(content_digest, str) or not is_sha256(
+                content_digest
+            ):
+                raise ValueError("modality curation content_digest is invalid")
+            if not hmac.compare_digest(content_digest, result.content_digest):
+                raise ValueError(
+                    "modality curation content_digest does not match evidence"
+                )
+        return result
 
     @classmethod
     def read(cls, path: str | Path) -> Self:

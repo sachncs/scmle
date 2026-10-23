@@ -174,14 +174,93 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     assert json.loads(Path(result.path).read_text(encoding="utf-8")) == (
         result.to_dict()
     )
-
     tampered = json.loads(Path(result.path).read_text(encoding="utf-8"))
     tampered["dataset_card"]["intended_use"] = "tampered"
     Path(result.path).write_text(json.dumps(tampered), encoding="utf-8")
-    with pytest.raises(ValueError, match="signature does not verify"):
+    with pytest.raises(
+        ValueError,
+        match=r"signature does not verify|content_digest does not match evidence",
+    ):
         scml.ModalityCurationResult.read_verified(
             result.path, "test-signing-key"
         )
+    with pytest.raises(
+        ValueError,
+        match=r"signature does not verify|content_digest does not match evidence",
+    ):
+        scml.ModalityCurationProject(
+            adapter,
+            "test-signing-key",
+            output_dir=tmp_path / "curation",
+        ).run()
+
+def test_modality_curation_project_reuses_identical_artifact(tmp_path):
+    """A verified identical publication is idempotent and not replaced."""
+    project = scml.ModalityCurationProject(
+        text_adapter(),
+        "test-signing-key",
+        output_dir=tmp_path / "curation",
+    )
+
+    first = project.run()
+    original_bytes = Path(first.path).read_bytes()
+
+    second = project.run()
+
+    assert second == first
+    assert second.to_dict() == first.to_dict()
+    assert Path(first.path).read_bytes() == original_bytes
+
+
+def test_modality_curation_project_rejects_identity_conflict_without_overwrite(
+    tmp_path,
+):
+    """A valid artifact for another dataset remains untouched and fails."""
+    output_dir = tmp_path / "curation"
+    first = scml.ModalityCurationProject(
+        text_adapter(), "test-signing-key", output_dir=output_dir
+    ).run()
+    original_bytes = Path(first.path).read_bytes()
+    samples = list(text_adapter().dataset.samples)
+    samples[0] = document.DocumentSample(
+        document_id=samples[0].document_id,
+        content="different source content",
+        label=samples[0].label,
+    )
+    changed_adapter = modality_lifecycle.TextAdapter(
+        document.DocumentDataset(tuple(samples))
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="dataset_hash does not match current adapter",
+    ):
+        scml.ModalityCurationProject(
+            changed_adapter, "test-signing-key", output_dir=output_dir
+        ).run()
+
+    assert Path(first.path).read_bytes() == original_bytes
+
+
+def test_modality_curation_project_rejects_unsigned_artifact_tampering(
+    tmp_path,
+):
+    """A verified signature cannot authorize unknown record content."""
+    project = scml.ModalityCurationProject(
+        text_adapter(),
+        "test-signing-key",
+        output_dir=tmp_path / "curation",
+    )
+    result = project.run()
+    artifact = Path(result.path)
+    record = json.loads(artifact.read_text(encoding="utf-8"))
+    record["unexpected"] = "tampered"
+    artifact.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(
+        ValueError, match="canonical content does not match current adapter"
+    ):
+        project.run()
 
 
 def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hooks(
