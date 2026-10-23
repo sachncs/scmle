@@ -189,3 +189,47 @@ The task is complete only when all of the following are true:
 - the release decision states either `production-beta approved` or `blocked`,
   with the remaining risks and next owner named. No “production-ready” label
   is allowed while a required gate is merely planned or locally inferred.
+
+## What is left (as of the execution plan's last batch)
+
+Engineering is largely implemented and locally tested. What remains is almost
+entirely evidence that only a witness other than the implementer can supply:
+
+**Independent witnesses (blocking `production-beta approved`)**
+
+- Hosted CI on the exact release commit across the declared OS/Python/
+  lowest-direct/deep-learning matrix, and the public Pages deployment.
+- Clean external reproduction from a fresh machine or container, without local
+  untracked state.
+- Signed independent technical, statistical/domain, security/privacy, and
+  operational review records.
+- External key custody for release signing and key-rotation rehearsal.
+
+**Reliability evidence still local-only**
+
+- Real transport, container, cloud, and kernel fault rehearsals; broker or
+  cloud exactly-once is not claimed.
+- External paging/ticketing delivery evidence and serving defaults for the
+  redacted observability and incident path.
+- Mutation-survivor triage and the remaining leakage, property, specification,
+  and benchmark tiers.
+
+**Scientific scope explicitly open**
+
+- Nonlinear dose response, continuous-treatment AIPW, and propagated
+  generalized-propensity uncertainty.
+- Full Bayesian multilevel inference and variance-component uncertainty
+  propagation.
+- Continuous treatment through `MLProject` (currently binary uplift only).
+- Raw-modality causal validation and human or benchmark adjudication.
+
+**Unsupported until full evidence exists**
+
+- Multimodal Transformer/JEPA, OCR/layout, image/audio/video/graph/geospatial
+  foundation models, and hosted infrastructure.
+
+**Bookkeeping**
+
+- One final full-regression run on the release commit (the last one was never
+  recorded as complete), classification of every skip and warning with an
+  owner, and the final `production-beta approved` or `blocked` decision record.
