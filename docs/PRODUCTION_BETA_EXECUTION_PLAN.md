@@ -3973,7 +3973,18 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
 - The standalone release-status page now explains the beta boundary and open
   production gates without routing developers to repository Markdown files.
   The site build produced 19 pages; the focused estimator/project slice passed
-  25 tests and the release-evaluation slice passed 18 tests. A new full
-  regression has intentionally not been run yet; it is the next release-gate
-  action after this implementation batch.
+  25 tests and the release-evaluation slice passed 18 tests.
+
+## Full regression and public-contract correction at `123eaef` on 2026-10-23
+
+- The one post-batch full regression completed with `2511 passed, 38 skipped,
+  1 failed` in 41m15s. The failure was the checked-in public API snapshot,
+  which correctly detected that the intentional `EstimationPolicy` contract
+  expansion to `aipw_ate` changed the class signature and the dependent
+  `EstimationResult` signature digest.
+- `123eaef` updates only those two versioned snapshot digests. The focused API
+  compatibility and surface tests then passed `9` tests, and
+  `check_api_compatibility.py` reported `compatible: true`. This metadata-only
+  correction does not justify restarting the 41-minute repository run; the
+  implementation and regression result remain separately identified above.
 
