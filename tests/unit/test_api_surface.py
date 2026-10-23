@@ -35,6 +35,7 @@ PUBLIC_API = {
     "RunResult",
     "SequentialEstimand",
     "SequentialEstimationPolicy",
+    "SequentialEstimationProject",
     "SequentialEstimationResult",
     "SequentialIPWEstimator",
     "SequentialPeriodDiagnostics",
