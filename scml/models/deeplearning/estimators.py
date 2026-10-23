@@ -513,6 +513,8 @@ class KerasEstimator(NetworkEstimator):
         random_state: Seed.
     """
 
+    architecture = "mlp"
+
     def __init__(
         self,
         hidden_sizes: tuple[int, ...] = (64,),

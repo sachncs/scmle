@@ -28,6 +28,12 @@ def separable(rows=400, seed=0):
     return features, labels
 
 
+def test_the_keras_estimator_declares_its_dense_architecture_contract():
+    model = estimators.KerasClassifier(**FAST)
+
+    assert model.architecture == "mlp"
+
+
 def test_the_classifier_learns_and_keeps_string_labels():
     features, labels = separable()
 
