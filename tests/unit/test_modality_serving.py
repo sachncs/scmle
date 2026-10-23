@@ -1,6 +1,8 @@
 """Reference HTTP serving tests for verified modality packages."""
 
 import json
+import re
+from typing import cast
 import urllib.error
 import urllib.request
 
@@ -66,13 +68,16 @@ def adapter() -> modality_lifecycle.DocumentAdapter:
 
 
 def request(
-    url: str, body: bytes, content_type: str
+    url: str, body: bytes, content_type: str, request_id: str | None = None
 ) -> tuple[int, dict[str, object]]:
     """Send a request body and return status plus decoded JSON."""
+    headers = {"Content-Type": content_type}
+    if request_id is not None:
+        headers["X-Request-ID"] = request_id
     request = urllib.request.Request(
         url,
         body,
-        {"Content-Type": content_type},
+        headers,
     )
     try:
         with urllib.request.urlopen(request) as response:
@@ -81,9 +86,16 @@ def request(
         return error.code, json.loads(error.read())
 
 
-def post(url: str, payload: object) -> tuple[int, dict[str, object]]:
+def post(
+    url: str, payload: object, request_id: str | None = None
+) -> tuple[int, dict[str, object]]:
     """Post JSON and return status plus decoded body."""
-    return request(url, json.dumps(payload).encode(), "application/json")
+    return request(
+        url,
+        json.dumps(payload).encode(),
+        "application/json",
+        request_id=request_id,
+    )
 
 
 def test_modality_http_serving_verifies_health_schema_and_predictions(
@@ -139,10 +151,11 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         }
         status, body = post(f"{serving.address}/predict", payload)
         assert status == 200
+        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
         assert body["package_verified"] is True
         assert body["sample_count"] == 2
-        assert len(body["predictions"]) == 2
-        assert len(body["probabilities"]) == 2
+        assert len(cast(list[object], body["predictions"])) == 2
+        assert len(cast(list[object], body["probabilities"])) == 2
 
         status, body = post(f"{serving.address}/predict", {"samples": []})
         assert status == 422
@@ -164,12 +177,14 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         )
         assert status == 415
         assert body["category"] == "request"
+        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
 
         status, body = request(
             f"{serving.address}/predict", b"not-json", "application/json"
         )
         assert status == 400
         assert body["category"] == "request"
+        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
     finally:
         serving.stop()
 
@@ -253,7 +268,7 @@ def test_modality_http_serving_rejects_invalid_request_bounds():
     """The reference server refuses unsafe zero-sized request limits."""
     with pytest.raises(ValueError, match="request bounds"):
         modality_serving.ModalityHttpServing(
-            predictor=None,
+            predictor=cast(modality_lifecycle.ModalityPredictor, None),
             decoder=DocumentDecoder(),
             max_request_bytes=0,
         )
@@ -283,9 +298,70 @@ def test_modality_http_serving_classifies_unexpected_decoder_errors(tmp_path):
             {"samples": [{"document_id": "request", "content": "alpha"}]},
         )
         assert status == 500
-        assert body == {
-            "error": "internal modality serving failure",
-            "category": "internal",
-        }
+        assert body["error"] == "internal modality serving failure"
+        assert body["category"] == "internal"
+        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
+    finally:
+        serving.stop()
+
+
+def test_modality_http_serving_echoes_valid_request_identity(tmp_path):
+    """A valid caller identity is echoed in the body and response header."""
+    reference = adapter()
+    report = modality_lifecycle.ModalityLifecycle().run(
+        reference,
+        tmp_path / "package",
+        signing_key="serving-key",
+    )
+    predictor = modality_lifecycle.ModalityPredictor.from_package(
+        reference,
+        report.package.path,
+        "serving-key",
+    )
+    serving = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
+    serving.start()
+    try:
+        request = urllib.request.Request(
+            f"{serving.address}/health",
+            headers={"X-Request-ID": "caller.request-42"},
+        )
+        with urllib.request.urlopen(request) as response:
+            body = json.loads(response.read())
+            assert response.headers["X-Request-ID"] == "caller.request-42"
+        assert body["request_id"] == "caller.request-42"
+    finally:
+        serving.stop()
+
+
+@pytest.mark.parametrize("request_id", ["", "bad value", "é", "x" * 129])
+def test_modality_http_serving_rejects_unsafe_request_identity(
+    tmp_path, request_id
+):
+    """Unsafe caller identities are rejected without echoing their contents."""
+    reference = adapter()
+    report = modality_lifecycle.ModalityLifecycle().run(
+        reference,
+        tmp_path / "package",
+        signing_key="serving-key",
+    )
+    predictor = modality_lifecycle.ModalityPredictor.from_package(
+        reference,
+        report.package.path,
+        "serving-key",
+    )
+    serving = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
+    serving.start()
+    try:
+        status, body = post(
+            f"{serving.address}/predict",
+            {"samples": []},
+            request_id=request_id,
+        )
+        assert status == 400
+        assert body["category"] == "request"
+        assert "request_id" in body
+        if request_id:
+            assert request_id not in json.dumps(body)
+        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
     finally:
         serving.stop()

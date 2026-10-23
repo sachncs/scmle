@@ -11,8 +11,10 @@ from __future__ import annotations
 import abc
 from http import server
 import json
+import re
 import threading
 from typing import Any
+import uuid
 
 import numpy as np
 
@@ -22,6 +24,8 @@ from scml.models import modality_lifecycle
 
 MAX_MODALITY_REQUEST_BYTES = 16 * 1024 * 1024
 MAX_MODALITY_REQUEST_SAMPLES = 10_000
+MAX_REQUEST_ID_LENGTH = 128
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
 
 class ModalitySampleDecoder(abc.ABC):
@@ -112,6 +116,19 @@ class ModalityHttpServing:
             "lifecycle_report_digest": self.predictor.lifecycle_report_digest,
         }
 
+    @staticmethod
+    def is_valid_request_id(request_id: str) -> bool:
+        """Return whether a caller request ID is safe to echo in headers."""
+        return (
+            1 <= len(request_id) <= MAX_REQUEST_ID_LENGTH
+            and REQUEST_ID_PATTERN.fullmatch(request_id) is not None
+        )
+
+    @staticmethod
+    def new_server_request_id() -> str:
+        """Return a bounded, opaque request ID that contains no request data."""
+        return f"srv-{uuid.uuid4().hex}"
+
     def start(self) -> None:
         """Bind the socket and serve in a daemon thread."""
         if self.httpd is not None:
@@ -121,24 +138,51 @@ class ModalityHttpServing:
         class Handler(server.BaseHTTPRequestHandler):
             """Handle one modality reference-server request."""
 
+            def request_identity(self) -> tuple[str, str | None]:
+                """Return the safe ID and an optional validation error."""
+                caller_request_id = self.headers.get("X-Request-ID")
+                if caller_request_id is None:
+                    return adapter.new_server_request_id(), None
+                if adapter.is_valid_request_id(caller_request_id):
+                    return caller_request_id, None
+                return (
+                    adapter.new_server_request_id(),
+                    "X-Request-ID must be 1-128 ASCII characters from "
+                    "A-Z, a-z, 0-9, '.', '_', ':', or '-': request rejected",
+                )
+
             def send_json(
-                self, status: int, payload: dict[str, object]
+                self,
+                status: int,
+                payload: dict[str, object],
+                request_id: str,
             ) -> None:
                 """Send a JSON response with safe reference-server headers."""
-                body = json.dumps(payload).encode()
+                response_payload = dict(payload)
+                response_payload["request_id"] = request_id
+                body = json.dumps(response_payload).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("X-Request-ID", request_id)
                 self.end_headers()
                 self.wfile.write(body)
 
             def do_GET(self) -> None:
                 """Serve health and decoder-schema evidence."""
+                request_id, identity_error = self.request_identity()
+                if identity_error is not None:
+                    self.send_json(
+                        400,
+                        {"error": identity_error, "category": "request"},
+                        request_id,
+                    )
+                    return
                 if self.path == "/health":
-                    self.send_json(200, adapter.predictor.health())
+                    self.send_json(200, adapter.predictor.health(), request_id)
                 elif self.path == "/schema":
                     self.send_json(
                         200,
@@ -153,14 +197,23 @@ class ModalityHttpServing:
                                 adapter.predictor.feature_names
                             ),
                         },
+                        request_id,
                     )
                 else:
-                    self.send_json(404, {"error": "not found"})
+                    self.send_json(404, {"error": "not found"}, request_id)
 
             def do_POST(self) -> None:
                 """Decode and score a bounded prediction request."""
+                request_id, identity_error = self.request_identity()
+                if identity_error is not None:
+                    self.send_json(
+                        400,
+                        {"error": identity_error, "category": "request"},
+                        request_id,
+                    )
+                    return
                 if self.path != "/predict":
-                    self.send_json(404, {"error": "not found"})
+                    self.send_json(404, {"error": "not found"}, request_id)
                     return
                 try:
                     content_type = self.headers.get("Content-Type", "")
@@ -175,6 +228,7 @@ class ModalityHttpServing:
                                 ),
                                 "category": "request",
                             },
+                            request_id,
                         )
                         return
                     raw_length = self.headers.get("Content-Length")
@@ -185,6 +239,7 @@ class ModalityHttpServing:
                                 "error": "Content-Length is required",
                                 "category": "request",
                             },
+                            request_id,
                         )
                         return
                     try:
@@ -196,6 +251,7 @@ class ModalityHttpServing:
                                 "error": "Content-Length must be an integer",
                                 "category": "request",
                             },
+                            request_id,
                         )
                         return
                     if length < 0 or length > adapter.max_request_bytes:
@@ -211,6 +267,7 @@ class ModalityHttpServing:
                                 "error": "request body is incomplete",
                                 "category": "request",
                             },
+                            request_id,
                         )
                         return
                     try:
@@ -222,9 +279,10 @@ class ModalityHttpServing:
                                 "error": f"invalid JSON request: {error.msg}",
                                 "category": "request",
                             },
+                            request_id,
                         )
                         return
-                    self.send_json(200, adapter.response(payload))
+                    self.send_json(200, adapter.response(payload), request_id)
                 except OverflowError as error:
                     self.send_json(
                         413,
@@ -232,6 +290,7 @@ class ModalityHttpServing:
                             "error": str(error),
                             "category": "request",
                         },
+                        request_id,
                     )
                 except (TypeError, ValueError) as error:
                     self.send_json(
@@ -240,6 +299,7 @@ class ModalityHttpServing:
                             "error": f"invalid modality samples: {error}",
                             "category": "samples",
                         },
+                        request_id,
                     )
                 except Exception:
                     self.send_json(
@@ -248,6 +308,7 @@ class ModalityHttpServing:
                             "error": "internal modality serving failure",
                             "category": "internal",
                         },
+                        request_id,
                     )
 
             def log_message(self, format: str, *args: Any) -> None:
