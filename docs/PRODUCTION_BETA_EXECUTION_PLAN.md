@@ -4815,3 +4815,13 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   runners, Pages publication, and the final external release gates remain
   unavailable until the GitHub account/repository configuration is repaired.
 
+## Minimal-dependency CI evidence on `master` on 2026-10-23
+
+- The exact `base-install` contract was run in an isolated Python 3.14
+  environment with no optional extras: `2182 passed, 129 skipped` in 4
+  minutes 13 seconds under strict resource warnings.
+- The skip audit classified all `129` skips as approved dependency gaps and
+  reported zero unapproved skips, unexplained skips, or xfails. This confirms
+  that the explicit optional-dependency taxonomy works both when capabilities
+  are installed and when the base package intentionally omits them.
+
