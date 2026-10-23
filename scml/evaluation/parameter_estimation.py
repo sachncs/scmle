@@ -1248,12 +1248,17 @@ def fit_aipw_nuisance_models(
             "aipw_ate each training fold needs at least two rows per "
             "treatment arm"
         )
-    propensity_coefficients, _, propensity_diagnostics = fit_logistic(
+    (
+        propensity_coefficients,
+        propensity_probabilities,
+        propensity_diagnostics,
+    ) = fit_logistic(
         training_design,
         training_treatment,
         policy.max_iterations,
         policy.tolerance,
     )
+    del propensity_probabilities
     evaluation_raw_propensity = special.expit(
         evaluation_design @ propensity_coefficients
     )
