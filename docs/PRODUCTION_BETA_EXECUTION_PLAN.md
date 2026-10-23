@@ -4142,3 +4142,23 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   uncertainty propagation, and hierarchical random slopes/nested/crossed or
   fully Bayesian models remain outside this bounded estimator contract.
 
+## JEPA integrity and transformer boundary at `98616e0` on 2026-10-23
+
+- Tabular JEPA checkpoints now use a versioned envelope with a SHA-256 payload
+  digest, scope metadata, input-width and embedding-size binding, and
+  fail-closed validation before a serialized estimator is trusted. The engine
+  also rejects invalid numeric matrices, non-finite values, invalid training
+  parameters, and unavailable CUDA requests with explicit diagnostics.
+- The FT-Transformer adapter now carries a separate `capability_family` so its
+  experimental, tabular-only boundary cannot inherit the supported generic
+  deep-learning declaration. It is excluded from automatic beta candidate
+  search until an explicit experimental integration path exists.
+- Focused validation passed `48` tests after correcting the planner boundary;
+  Ruff, formatting, mypy, and diff checks were clean. The combined repository
+  regression then completed `2550 passed, 38 skipped` in 41m48s with no
+  failures.
+- This does not add multimodal transformer or JEPA support, and it does not
+  make the existing tabular representation path production-supported. Hosted
+  CI, Pages deployment, independent review, external fault evidence, and the
+  broader non-tabular modelling gaps remain open release gates.
+
