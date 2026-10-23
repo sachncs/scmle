@@ -7,6 +7,7 @@ executes itself, so adding a command never touches the dispatcher.
 import abc
 import argparse
 from collections.abc import Sequence
+import json
 import logging
 import pathlib
 import sys
@@ -15,11 +16,13 @@ from typing import ClassVar
 
 import pandas as pd
 
+from scml import DatasetCatalog
 from scml.api import project
 from scml.artifacts import bundle as bundle_module
 from scml.contracts import errors
 from scml.contracts import tasks
 from scml.core import config
+from scml.data.readers import tabular
 from scml.inference import mapping as mapping_module
 from scml.inference import serving
 from scml.optimization import optimizers
@@ -305,6 +308,110 @@ class ResumeCommand(Command):
         return EXIT_OK
 
 
+class CatalogCommand(Command):
+    """Produces model-agnostic dataset curation evidence."""
+
+    name = "catalog"
+    help = "catalog a local table or opaque raw bytes"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds input, label, source and artifact options."""
+        parser.add_argument(
+            "input",
+            nargs="?",
+            help=(
+                "supported local tabular path, or '-' to read raw bytes "
+                "from standard input"
+            ),
+        )
+        parser.add_argument(
+            "--raw-bytes",
+            nargs="?",
+            const="-",
+            metavar="PATH",
+            help=(
+                "read opaque raw bytes from PATH; omit PATH or use '-' "
+                "for standard input"
+            ),
+        )
+        parser.add_argument(
+            "--label-column",
+            help="explicit label field to describe; labels are never inferred",
+        )
+        parser.add_argument(
+            "--source-uri",
+            help="declared source URI; defaults to the local input identity",
+        )
+        parser.add_argument(
+            "--output",
+            help="optional path for the atomically written JSON artifact",
+        )
+
+    def read_raw_bytes(self, location: str) -> bytes:
+        """Reads raw bytes from a local path or standard input."""
+        if location == "-":
+            stream = getattr(sys.stdin, "buffer", sys.stdin)
+            payload = stream.read()
+        else:
+            try:
+                payload = pathlib.Path(location).read_bytes()
+            except OSError as error:
+                raise errors.DataError(
+                    f"failed to read raw bytes from {location}: {error}"
+                ) from error
+        if not isinstance(payload, bytes):
+            raise errors.DataError("raw byte input must be a binary stream")
+        return payload
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Builds, emits and optionally persists catalog evidence."""
+        if args.input is not None and args.raw_bytes is not None:
+            raise errors.ConfigError(
+                "provide either a tabular input or --raw-bytes, not both"
+            )
+        if args.input is None and args.raw_bytes is None:
+            raise errors.ConfigError(
+                "catalog requires a tabular input or --raw-bytes"
+            )
+
+        raw_location = args.raw_bytes
+        if args.input == "-":
+            raw_location = "-"
+        if raw_location is not None:
+            catalog_input: bytes | pd.DataFrame = self.read_raw_bytes(
+                raw_location
+            )
+            source = args.source_uri or (
+                "memory://stdin" if raw_location == "-" else raw_location
+            )
+        else:
+            loader = tabular.DatasetLoader()
+            catalog_input = loader.load(args.input)
+            source = args.source_uri or args.input
+
+        try:
+            result = DatasetCatalog.from_data(
+                catalog_input,
+                source=source,
+                label_column=args.label_column,
+            )
+        except (TypeError, ValueError) as error:
+            raise errors.ConfigError(
+                f"invalid catalog options: {error}"
+            ) from error
+
+        if args.output is not None:
+            try:
+                result.write(args.output)
+            except OSError as error:
+                raise errors.ArtifactError(
+                    f"failed to write catalog artifact {args.output}: {error}"
+                ) from error
+
+        print(json.dumps(result.to_dict(), ensure_ascii=False, sort_keys=True))
+        return EXIT_OK
+
+
 class PredictCommand(Command):
     """Scores a dataset with a saved bundle."""
 
@@ -437,6 +544,7 @@ COMMANDS: tuple[Command, ...] = (
     PlanCommand(),
     RunCommand(),
     ResumeCommand(),
+    CatalogCommand(),
     PredictCommand(),
     ServeCommand(),
     ExportOnnxCommand(),

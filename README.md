@@ -40,7 +40,7 @@ result.save("artifacts/churn", signing_key="...")  # signed bundle
 result.predict("new_customers.parquet")
 ```
 
-CLI: `scml plan | run | resume | predict` (see `scml --help`).
+CLI: `scml plan | run | resume | catalog | predict` (see `scml --help`).
 More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 
 ## What it does

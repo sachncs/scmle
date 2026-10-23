@@ -1,10 +1,14 @@
 """Tests for the command-line interface."""
 
+import hashlib
+import io
+import json
 import logging
 
 import pandas as pd
 
 from scml import cli
+from scml.data.catalog import DatasetCatalog
 
 
 def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
@@ -83,12 +87,101 @@ def test_commands_are_polymorphic():
         "plan",
         "run",
         "resume",
+        "catalog",
         "predict",
         "serve",
         "export-onnx",
         "package",
     ]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
+
+
+def test_catalog_command_catalogs_tabular_data_and_writes_verified_artifact(
+    tmp_path, capsys
+):
+    """The command emits the public catalog contract and persists it."""
+    data = tmp_path / "events.csv"
+    pd.DataFrame(
+        {"value": [1, 2, 2], "label": ["keep", "drop", "drop"]}
+    ).to_csv(data, index=False)
+    output = tmp_path / "catalog.json"
+
+    code = cli.main(
+        [
+            "catalog",
+            str(data),
+            "--label-column",
+            "label",
+            "--source-uri",
+            "s3://bucket/events.csv?version=7",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert code == cli.EXIT_OK
+    emitted = json.loads(capsys.readouterr().out)
+    restored = DatasetCatalog.read_verified(output)
+    assert emitted == restored.to_dict()
+    assert restored.shape == (3, 2)
+    assert restored.source.uri == "s3://bucket/events.csv?version=7"
+    assert restored.label.field == "label"
+    assert restored.label.status == "observed"
+
+
+def test_catalog_command_does_not_infer_a_label_column(tmp_path, capsys):
+    """A table without an explicit label stays unsupervised evidence."""
+    data = tmp_path / "events.csv"
+    pd.DataFrame({"value": [1, 2], "label": ["keep", "drop"]}).to_csv(
+        data, index=False
+    )
+
+    assert cli.main(["catalog", str(data)]) == cli.EXIT_OK
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["label"]["status"] == "not_declared"
+    assert emitted["label"]["field"] is None
+
+
+def test_catalog_command_catalogs_raw_bytes_without_decoding(tmp_path, capsys):
+    """An explicit raw-byte input remains opaque and receives direct identity."""
+    payload = b"not a tabular format"
+    raw_path = tmp_path / "payload.unknown"
+    raw_path.write_bytes(payload)
+
+    assert cli.main(["catalog", "--raw-bytes", str(raw_path)]) == cli.EXIT_OK
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["data_kind"] == "bytes"
+    assert emitted["content_identity"] == (
+        f"sha256:{hashlib.sha256(payload).hexdigest()}"
+    )
+    assert (
+        "modality_specific_decoding_was_not_attempted" in emitted["limitations"]
+    )
+
+
+def test_catalog_command_reads_raw_bytes_from_standard_input(
+    monkeypatch, capsys
+):
+    """The '-' input gives a pipe-friendly raw-byte catalog path."""
+    payload = b"streamed bytes"
+    monkeypatch.setattr(cli.sys, "stdin", io.TextIOWrapper(io.BytesIO(payload)))
+
+    assert cli.main(["catalog", "-"]) == cli.EXIT_OK
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted["source"]["uri"] == "memory://stdin"
+    assert emitted["sample_count"] == 1
+
+
+def test_catalog_command_rejects_unknown_tabular_suffix(tmp_path, caplog):
+    """Unknown formats fail through the existing data-error exit convention."""
+    path = tmp_path / "events.unknown"
+    path.write_bytes(b"opaque")
+
+    assert cli.main(["catalog", str(path)]) == cli.EXIT_FAILED
+    assert "data error" in caplog.text
 
 
 def test_predict_with_explicit_renames(binary_frame, tmp_path):

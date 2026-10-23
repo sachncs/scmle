@@ -192,6 +192,8 @@ whose outcome has arrived, with the labeled fraction alongside.
 scml plan  data.csv --target churn
 scml run   data.csv --target churn --workers 4 --time-budget 600
 scml resume runs/run_20261015_001
+scml catalog data.csv --label-column churn --output artifacts/catalog.json
+cat payload.bin | scml catalog --raw-bytes
 scml predict artifacts/churn new.csv --output scored.csv   # signed bundles
 ```
 
