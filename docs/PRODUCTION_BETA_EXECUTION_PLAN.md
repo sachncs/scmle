@@ -4189,3 +4189,27 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   hosted CI/Pages, external fault evidence, secret custody, and independent
   release review remain open release gates.
 
+## Hierarchical uncertainty and modality recovery at `1523bfa` on 2026-10-23
+
+- Hierarchical random-intercept linear estimation now supports deterministic
+  whole-cluster bootstrap sensitivity for fixed-effect estimates. Each draw
+  resamples complete clusters, assigns fresh identities, reruns the declared
+  moment-GLS or REML estimator, records a digest and independent reference
+  check, and preserves failed-replicate evidence. Percentile intervals fail
+  closed when fewer than two replicates succeed. Variance-component uncertainty,
+  random slopes, nested effects, crossed effects, and fully Bayesian inference
+  remain explicit limitations.
+- Completed modality checkpoint recovery now validates the package through the
+  signed lifecycle report rather than loading a package by path alone. A
+  replaced but otherwise valid package is rejected when its dataset identity
+  does not match the completed lifecycle evidence.
+- The combined focused suite passed `134` tests. The repository naming gate
+  passed `869` tests; Ruff lint, formatting, mypy over `scml` and `benchmarks`,
+  and diff checks were clean. The one deferred repository regression after
+  this implementation batch completed `2565 passed, 38 skipped` in 41m49s
+  with no failures.
+- Non-tabular production modelling, multimodal transformers/JEPA, causal
+  Bayesian inference, hierarchical random slopes/nested/crossed effects,
+  hosted CI/Pages, external fault evidence, secret custody, and independent
+  release review remain open release gates.
+
