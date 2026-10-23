@@ -4221,6 +4221,32 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   secret custody, and independent release review remain separate release
   gates.
 
+## Hierarchical random slopes and public streaming contracts at `a9e7aa4` on 2026-10-23
+
+- `hierarchical_linear` now supports one explicitly declared random slope in
+  addition to its existing random-intercept default. The policy requires a
+  `random_slope` assumption, validates within-cluster variation, estimates a
+  positive-semidefinite intercept/slope covariance block with moment GLS or
+  bounded REML, records covariance and optimizer evidence, and verifies the
+  fixed-effect result with an independent dense reference calculation.
+  Cluster-bootstrap sensitivity preserves the declared random-effects
+  structure. The bounded contract still excludes multiple slopes, nested or
+  crossed effects, fully Bayesian multilevel inference, and propagation of
+  variance-component uncertainty.
+- The transactional streaming types are now re-exported from
+  `scml.data.readers`, making the caller-owned `TransactionalSink`, receipt,
+  and durable evidence contracts discoverable through the supported reader
+  surface.
+- The combined estimator, project, streaming, API, and convention suite
+  passed `953` tests. Ruff lint, formatting, mypy over `scml` and
+  `benchmarks`, and diff checks were clean. The one deferred repository
+  regression completed `2577 passed, 38 skipped` in 41m53s with no failures.
+- Time-varying causal effects, nuisance-model uncertainty propagation,
+  clustered Bayesian covariance, fully Bayesian multilevel inference,
+  external broker/cloud transaction evidence, non-tabular production
+  modelling, multimodal transformers/JEPA, hosted CI/Pages, secret custody,
+  and independent release review remain open release gates.
+
 ## Hierarchical uncertainty and modality recovery at `1523bfa` on 2026-10-23
 
 - Hierarchical random-intercept linear estimation now supports deterministic
