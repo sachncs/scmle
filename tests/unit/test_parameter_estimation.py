@@ -310,6 +310,173 @@ def test_bayesian_estimation_fails_closed_for_unsupported_policies():
         EstimationPolicy(estimator="linear", prior=prior)
 
 
+def test_bayesian_ate_reports_causal_posterior_evidence():
+    """A Gaussian outcome model identifies a declared binary-treatment ATE."""
+    rng = np.random.default_rng(121)
+    rows = 420
+    age = rng.normal(size=rows)
+    risk_score = rng.normal(size=rows)
+    treatment_probability = 1.0 / (
+        1.0 + np.exp(-(-0.3 + 0.7 * age - 0.4 * risk_score))
+    )
+    treatment = rng.binomial(1, treatment_probability)
+    outcome = (
+        0.8
+        + 2.25 * treatment
+        + 0.6 * age
+        - 0.3 * risk_score
+        + rng.normal(scale=0.4, size=rows)
+    )
+    features = np.column_stack((treatment, age, risk_score))
+    prior = BayesianPrior(
+        mean=(0.0, 0.0, 0.0, 0.0),
+        precision=tuple(
+            tuple(0.01 if row == column else 0.0 for column in range(4))
+            for row in range(4)
+        ),
+    )
+    policy = EstimationPolicy(
+        estimator="bayesian_ate",
+        covariance="iid",
+        prior=prior,
+        treatment_position=0,
+        causal_assumptions=(
+            "linearity",
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+
+    result = estimate_parameters(features, outcome, causal_estimand(), policy)
+
+    assert result.parameters[1].name == "treatment"
+    assert result.parameters[1].estimate == pytest.approx(2.25, abs=0.16)
+    assert result.parameters[1].interval[0] < result.parameters[1].estimate
+    assert result.parameters[1].interval[1] > result.parameters[1].estimate
+    assert result.diagnostics["estimator_family"] == (
+        "causal_bayesian_gaussian"
+    )
+    assert result.diagnostics["method"] == (
+        "normal_inverse_gamma_outcome_regression"
+    )
+    assert result.diagnostics["uncertainty"] == ("posterior_credible_interval")
+    assert result.diagnostics["posterior_covariance"][1][1] > 0.0
+    assert result.diagnostics["credible_interval"]["distribution"] == (
+        "student_t"
+    )
+    assert result.sensitivity["prior"]["status"] == "evaluated"
+    assert (
+        "treatment_coefficient_change"
+        in result.sensitivity["prior"]["alternatives"][0]
+    )
+    assert result.reference["passed"] is True
+    assert any(
+        "time-varying treatment effects" in limitation
+        for limitation in result.diagnostics["limitations"]
+    )
+    assert any(
+        "nuisance-model uncertainty" in limitation
+        for limitation in result.diagnostics["limitations"]
+    )
+    json.dumps(result.to_dict())
+
+
+def test_bayesian_ate_validates_causal_policy_and_prior_shape():
+    """Causal Bayesian estimation fails closed at its scientific boundary."""
+    with pytest.raises(ValueError, match="requires an explicit prior"):
+        EstimationPolicy(
+            estimator="bayesian_ate",
+            treatment_position=0,
+            causal_assumptions=(
+                "linearity",
+                "consistency",
+                "conditional_exchangeability",
+                "positivity",
+            ),
+        )
+
+    prior = BayesianPrior(
+        mean=(0.0, 0.0),
+        precision=((1.0, 0.0), (0.0, 1.0)),
+    )
+    policy_values = {
+        "estimator": "bayesian_ate",
+        "covariance": "iid",
+        "prior": prior,
+        "treatment_position": 0,
+        "causal_assumptions": (
+            "linearity",
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    }
+    with pytest.raises(ValueError, match="prior dimension"):
+        estimate_parameters(
+            np.column_stack(
+                (
+                    np.tile((0.0, 1.0), 6),
+                    np.arange(12, dtype=float),
+                    np.arange(12, dtype=float) ** 2,
+                )
+            ),
+            np.arange(12, dtype=float),
+            causal_estimand(),
+            EstimationPolicy(**policy_values),
+        )
+
+    with pytest.raises(ValueError, match="requires consistency"):
+        EstimationPolicy(
+            estimator="bayesian_ate",
+            covariance="iid",
+            prior=BayesianPrior(
+                mean=(0.0, 0.0, 0.0, 0.0),
+                precision=tuple(
+                    tuple(1.0 if row == column else 0.0 for column in range(4))
+                    for row in range(4)
+                ),
+            ),
+            treatment_position=0,
+            causal_assumptions=("positivity",),
+        )
+
+    with pytest.raises(ValueError, match="only iid covariance"):
+        EstimationPolicy(
+            estimator="bayesian_ate",
+            covariance="hc3",
+            prior=policy_values["prior"],
+            treatment_position=0,
+            causal_assumptions=(
+                "linearity",
+                "consistency",
+                "conditional_exchangeability",
+                "positivity",
+            ),
+        )
+
+    with pytest.raises(ValueError, match="does not support clustered"):
+        EstimationPolicy(
+            estimator="bayesian_ate",
+            covariance="iid",
+            cluster_name="site_id",
+            prior=BayesianPrior(
+                mean=(0.0, 0.0, 0.0, 0.0),
+                precision=tuple(
+                    tuple(1.0 if row == column else 0.0 for column in range(4))
+                    for row in range(4)
+                ),
+            ),
+            treatment_position=0,
+            causal_assumptions=(
+                "linearity",
+                "consistency",
+                "conditional_exchangeability",
+                "positivity",
+            ),
+        )
+
+
 def test_ipw_ate_requires_declared_assumptions_and_reports_overlap():
     """IPW exposes treatment assignment evidence without claiming proof."""
     rng = np.random.default_rng(23)

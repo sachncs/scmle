@@ -365,7 +365,7 @@ def estimate_parameters_for_project(
         frame = tabular.read_table(orchestrator.spec.data.uri)
     declared = [*estimand.feature_names, estimand.outcome]
     treatment_column = None
-    if policy.estimator in {"ipw_ate", "aipw_ate"}:
+    if policy.estimator in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
         treatment_column = orchestrator.spec.data.treatment_column
         if treatment_column is None:
             raise errors.ConfigError(

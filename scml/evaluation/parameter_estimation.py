@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+from typing import cast
 from typing import Literal
 
 import numpy as np
@@ -32,6 +33,7 @@ EstimatorKind = Literal[
     "linear",
     "logistic",
     "bayesian_linear",
+    "bayesian_ate",
     "ipw_ate",
     "aipw_ate",
     "hierarchical_linear",
@@ -39,6 +41,7 @@ EstimatorKind = Literal[
 CovarianceKind = Literal["iid", "hc3", "clustered"]
 MissingPolicy = Literal["reject", "complete_case"]
 CausalAssumption = Literal[
+    "linearity",
     "consistency",
     "conditional_exchangeability",
     "positivity",
@@ -56,6 +59,9 @@ COVARIANCE_CONDITION_THRESHOLD = 1e12
 
 REQUIRED_CAUSAL_ASSUMPTIONS = frozenset(
     {"consistency", "conditional_exchangeability", "positivity"}
+)
+REQUIRED_BAYESIAN_ATE_ASSUMPTIONS = frozenset(
+    {"linearity", *REQUIRED_CAUSAL_ASSUMPTIONS}
 )
 REQUIRED_HIERARCHICAL_ASSUMPTIONS = frozenset(
     {
@@ -130,12 +136,13 @@ class BayesianPrior:
         """Reject a prior that cannot define a proper posterior."""
         if not self.mean:
             raise ValueError("Bayesian prior needs a coefficient mean")
-        if len(self.precision) != len(self.mean) or any(
-            len(row) != len(self.mean) for row in self.precision
-        ):
-            raise ValueError("Bayesian prior precision must be square")
+        prior_mean = np.asarray(self.mean, dtype=float)
         prior_precision = np.asarray(self.precision, dtype=float)
-        if not np.isfinite(self.mean).all():
+        if prior_mean.ndim != 1:
+            raise ValueError("Bayesian prior mean must be one-dimensional")
+        if prior_precision.shape != (len(self.mean), len(self.mean)):
+            raise ValueError("Bayesian prior precision must be square")
+        if not np.isfinite(prior_mean).all():
             raise ValueError("Bayesian prior mean must be finite")
         if not np.isfinite(prior_precision).all():
             raise ValueError("Bayesian prior precision must be finite")
@@ -188,13 +195,14 @@ class EstimationPolicy:
             "linear",
             "logistic",
             "bayesian_linear",
+            "bayesian_ate",
             "ipw_ate",
             "aipw_ate",
             "hierarchical_linear",
         ):
             raise ValueError(
                 "estimator must be linear, logistic, bayesian_linear, "
-                "ipw_ate, aipw_ate, or hierarchical_linear"
+                "bayesian_ate, ipw_ate, aipw_ate, or hierarchical_linear"
             )
         if self.covariance not in ("iid", "hc3", "clustered"):
             raise ValueError("covariance must be iid, hc3, or clustered")
@@ -243,16 +251,18 @@ class EstimationPolicy:
                 "reml_variance_bounds must contain two finite positive "
                 "values in increasing order"
             )
-        causal_estimators = {"ipw_ate", "aipw_ate"}
+        causal_estimators = {"bayesian_ate", "ipw_ate", "aipw_ate"}
+        propensity_estimators = {"ipw_ate", "aipw_ate"}
         if (
             self.estimator not in causal_estimators
             and self.treatment_position is not None
         ):
             raise ValueError(
-                "treatment_position is supported only by ipw_ate or aipw_ate"
+                "treatment_position is supported only by bayesian_ate, "
+                "ipw_ate, or aipw_ate"
             )
         if (
-            self.estimator not in causal_estimators
+            self.estimator not in propensity_estimators
             and self.propensity_clip != 0.01
         ):
             raise ValueError(
@@ -260,7 +270,8 @@ class EstimationPolicy:
             )
         if self.estimator not in causal_estimators and self.causal_assumptions:
             raise ValueError(
-                "causal assumptions are supported only by ipw_ate or aipw_ate"
+                "causal assumptions are supported only by bayesian_ate, "
+                "ipw_ate, or aipw_ate"
             )
         if self.estimator != "aipw_ate" and self.cross_fitting_folds != 1:
             raise ValueError(
@@ -274,19 +285,37 @@ class EstimationPolicy:
                 "hierarchical assumptions are supported only by "
                 "hierarchical_linear"
             )
-        if self.estimator == "bayesian_linear":
+        if self.estimator in {"bayesian_linear", "bayesian_ate"}:
             if self.prior is None:
                 raise ValueError(
-                    "bayesian_linear estimation requires an explicit prior"
+                    f"{self.estimator} estimation requires an explicit prior"
                 )
             if self.covariance != "iid":
                 raise ValueError(
-                    "bayesian_linear estimation supports only iid covariance"
+                    f"{self.estimator} estimation supports only iid covariance"
                 )
             if self.bootstrap_replicates:
                 raise ValueError(
-                    "bayesian_linear bootstrap sensitivity is unsupported"
+                    f"{self.estimator} bootstrap sensitivity is unsupported"
                 )
+            if self.estimator == "bayesian_ate":
+                if self.treatment_position is None:
+                    raise ValueError("bayesian_ate requires treatment_position")
+                if (
+                    len(self.causal_assumptions)
+                    != len(set(self.causal_assumptions))
+                    or set(self.causal_assumptions)
+                    != REQUIRED_BAYESIAN_ATE_ASSUMPTIONS
+                ):
+                    raise ValueError(
+                        "bayesian_ate requires consistency, "
+                        "conditional_exchangeability, positivity, and "
+                        "linearity assumptions"
+                    )
+                if self.cluster_name is not None:
+                    raise ValueError(
+                        "bayesian_ate does not support clustered data"
+                    )
         elif self.estimator in causal_estimators:
             if self.prior is not None:
                 raise ValueError(
@@ -334,7 +363,8 @@ class EstimationPolicy:
                 )
         elif self.prior is not None:
             raise ValueError(
-                "a Bayesian prior is supported only by bayesian_linear"
+                "a Bayesian prior is supported only by bayesian_linear or "
+                "bayesian_ate"
             )
         if self.estimator != "hierarchical_linear":
             if self.hierarchical_method != "moment_gls":
@@ -353,10 +383,11 @@ class EstimationPolicy:
         values = dataclasses.asdict(self)
         if self.prior is None:
             values.pop("prior")
-        if self.estimator not in {"ipw_ate", "aipw_ate"}:
+        if self.estimator not in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
             values.pop("treatment_position")
-            values.pop("propensity_clip")
             values.pop("causal_assumptions")
+        if self.estimator not in {"ipw_ate", "aipw_ate"}:
+            values.pop("propensity_clip")
         if self.estimator != "aipw_ate":
             values.pop("cross_fitting_folds")
         if self.estimator != "hierarchical_linear":
@@ -617,8 +648,8 @@ def estimate_parameters(
         outcome: Numeric response, or binary labels for logistic estimation.
         estimand: Scientific definition and identification assumptions.
         policy: Estimator, covariance, missingness, and uncertainty policy.
-            ``bayesian_linear`` requires an explicit ``BayesianPrior`` and
-            reports posterior credible intervals.
+            ``bayesian_linear`` and ``bayesian_ate`` require an explicit
+            ``BayesianPrior`` and report posterior credible intervals.
         clusters: Optional cluster labels. Required for clustered covariance.
         shift_reference: Optional feature matrix from the target population for
             standardized mean-shift diagnostics.
@@ -657,6 +688,7 @@ def estimate_parameters(
         "linear": "gaussian",
         "logistic": "bernoulli",
         "bayesian_linear": "gaussian",
+        "bayesian_ate": "gaussian",
         "ipw_ate": "gaussian",
         "aipw_ate": "gaussian",
         "hierarchical_linear": "gaussian",
@@ -673,9 +705,14 @@ def estimate_parameters(
         {0.0, 1.0}
     ):
         raise ValueError("logistic outcome must contain only 0 and 1")
-    if policy.estimator == "bayesian_linear" and clusters is not None:
-        raise ValueError("bayesian_linear estimation does not accept clusters")
-    if policy.estimator in {"ipw_ate", "aipw_ate"}:
+    if (
+        policy.estimator in {"bayesian_linear", "bayesian_ate"}
+        and clusters is not None
+    ):
+        raise ValueError(
+            f"{policy.estimator} estimation does not accept clusters"
+        )
+    if policy.estimator in {"bayesian_ate", "ipw_ate", "aipw_ate"}:
         if policy.treatment_position is None:
             raise ValueError(f"{policy.estimator} requires treatment_position")
         if not 0 <= policy.treatment_position < matrix.shape[1]:
@@ -728,17 +765,65 @@ def estimate_parameters(
             )
         )
         diagnostics = {**diagnostics, "likelihood": likelihood}
-    elif policy.estimator == "bayesian_linear":
+    elif policy.estimator in {"bayesian_linear", "bayesian_ate"}:
         if policy.prior is None:
             raise ValueError(
-                "bayesian_linear estimation requires an explicit prior"
+                f"{policy.estimator} estimation requires an explicit prior"
             )
+        if policy.estimator == "bayesian_ate":
+            treatment_position = policy.treatment_position
+            if treatment_position is None:
+                raise ValueError("bayesian_ate requires treatment_position")
+            treatment_position = int(treatment_position)
+            treatment = matrix[:, treatment_position]
+            if not set(np.unique(treatment)).issubset({0.0, 1.0}):
+                raise ValueError(
+                    "bayesian_ate treatment must contain only 0 and 1"
+                )
+            treated_rows = int(np.sum(treatment == 1.0))
+            control_rows = int(np.sum(treatment == 0.0))
+            if treated_rows < 2 or control_rows < 2:
+                raise ValueError(
+                    "bayesian_ate needs at least two rows per treatment arm"
+                )
         coefficients, covariance, diagnostics = fit_bayesian_linear(
             design, values, policy.prior
         )
-        reference = reference_bayesian_linear(
-            design, values, policy.prior, coefficients, policy
-        )
+        if policy.estimator == "bayesian_ate":
+            reference = reference_bayesian_ate(
+                design,
+                values,
+                policy.prior,
+                coefficients,
+                policy,
+            )
+            diagnostics = {
+                **diagnostics,
+                "estimator_family": "causal_bayesian_gaussian",
+                "method": "normal_inverse_gamma_outcome_regression",
+                "treatment_position": treatment_position,
+                "treatment_name": estimand.feature_names[
+                    cast(int, treatment_position)
+                ],
+                "treated_rows": treated_rows,
+                "control_rows": control_rows,
+                "identification": (
+                    "the treatment coefficient is the ATE under the "
+                    "declared linearity, consistency, conditional "
+                    "exchangeability, and positivity assumptions"
+                ),
+                "limitations": [
+                    "time-varying treatment effects are unsupported",
+                    "propensity or other nuisance-model uncertainty is not "
+                    "propagated",
+                    "clustered covariance is unsupported",
+                    "fully Bayesian multilevel models are unsupported",
+                ],
+            }
+        else:
+            reference = reference_bayesian_linear(
+                design, values, policy.prior, coefficients, policy
+            )
         likelihood = "gaussian"
         posterior_scale = np.asarray(diagnostics["posterior_scale"])
         posterior_degrees = diagnostics["posterior_degrees_of_freedom"]
@@ -757,6 +842,13 @@ def estimate_parameters(
             "likelihood": likelihood,
             "uncertainty": "posterior_credible_interval",
             "p_value_semantics": "two-sided posterior tail probability",
+            "posterior_covariance": covariance.tolist(),
+            "credible_interval": {
+                "level": policy.confidence_level,
+                "distribution": "student_t",
+                "degrees_of_freedom": posterior_degrees,
+                "scale_matrix": posterior_scale.tolist(),
+            },
         }
     elif policy.estimator in {"ipw_ate", "aipw_ate"}:
         if policy.estimator == "ipw_ate":
@@ -865,7 +957,7 @@ def estimate_parameters(
         "covariance_conditioning": covariance_conditioning,
     }
 
-    if policy.estimator != "bayesian_linear":
+    if policy.estimator not in {"bayesian_linear", "bayesian_ate"}:
         standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
         interval_errors = standard_errors
 
@@ -898,7 +990,11 @@ def estimate_parameters(
         shift_reference,
         estimand,
         cluster_values,
-        prior=policy.prior if policy.estimator == "bayesian_linear" else None,
+        prior=(
+            policy.prior
+            if policy.estimator in {"bayesian_linear", "bayesian_ate"}
+            else None
+        ),
     )
     return EstimationResult(
         estimand=dataclasses.replace(estimand, likelihood=likelihood),
@@ -1640,10 +1736,7 @@ def fit_bayesian_linear(
     prior: BayesianPrior,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     """Compute a conjugate Gaussian posterior from an explicit prior."""
-    if len(prior.mean) != design.shape[1]:
-        raise ValueError(
-            "Bayesian prior dimension must match intercept and features"
-        )
+    validate_bayesian_prior_shape(prior, design.shape[1])
     prior_mean = np.asarray(prior.mean, dtype=float)
     prior_precision = np.asarray(prior.precision, dtype=float)
     posterior_precision = prior_precision + design.T @ design
@@ -1695,6 +1788,17 @@ def fit_bayesian_linear(
             "posterior_degrees_of_freedom": posterior_degrees,
         },
     )
+
+
+def validate_bayesian_prior_shape(prior: BayesianPrior, dimension: int) -> None:
+    """Validate prior vector and matrix dimensions against a design."""
+    mean_shape = np.asarray(prior.mean, dtype=float).shape
+    precision_shape = np.asarray(prior.precision, dtype=float).shape
+    expected_shape = (dimension, dimension)
+    if mean_shape != (dimension,) or precision_shape != expected_shape:
+        raise ValueError(
+            "Bayesian prior dimension must match intercept and features"
+        )
 
 
 def fit_hierarchical_linear(
@@ -2517,6 +2621,37 @@ def reference_bayesian_linear(
     }
 
 
+def reference_bayesian_ate(
+    design: np.ndarray,
+    values: np.ndarray,
+    prior: BayesianPrior,
+    coefficients: np.ndarray,
+    policy: EstimationPolicy,
+) -> dict[str, Any]:
+    """Independently verify the causal posterior mean and ATE coefficient."""
+    validate_bayesian_prior_shape(prior, design.shape[1])
+    prior_mean = np.asarray(prior.mean, dtype=float)
+    prior_precision = np.asarray(prior.precision, dtype=float)
+    posterior_precision = prior_precision + design.T @ design
+    reference = linalg.solve(
+        posterior_precision,
+        prior_precision @ prior_mean + design.T @ values,
+        assume_a="pos",
+    )
+    difference = float(np.max(np.abs(reference - coefficients)))
+    treatment_index = policy.treatment_position
+    if treatment_index is None:
+        raise ValueError("bayesian_ate requires treatment_position")
+    coefficient_index = treatment_index + 1
+    return {
+        "method": "scipy.linalg.solve:positive_definite_causal_gaussian",
+        "max_absolute_difference": difference,
+        "reference_treatment_coefficient": float(reference[coefficient_index]),
+        "treatment_position": treatment_index,
+        "passed": difference <= policy.reference_tolerance,
+    }
+
+
 def reference_logistic(
     design: np.ndarray,
     values: np.ndarray,
@@ -2594,6 +2729,7 @@ def sensitivity_report(
         },
     }
     if prior is not None:
+        validate_bayesian_prior_shape(prior, design.shape[1])
         baseline = np.asarray(coefficients, dtype=float)
         alternatives = []
         prior_mean = np.asarray(prior.mean, dtype=float)
@@ -2607,14 +2743,20 @@ def sensitivity_report(
                 alternative_precision + design.T @ design,
                 alternative_precision @ prior_mean + design.T @ values,
             )
-            alternatives.append(
-                {
-                    "name": label,
-                    "max_absolute_coefficient_change": float(
-                        np.max(np.abs(alternative - baseline))
-                    ),
-                }
-            )
+            alternative_record = {
+                "name": label,
+                "max_absolute_coefficient_change": float(
+                    np.max(np.abs(alternative - baseline))
+                ),
+            }
+            if policy.estimator == "bayesian_ate":
+                if policy.treatment_position is None:
+                    raise ValueError("bayesian_ate requires treatment_position")
+                target_index = policy.treatment_position + 1
+                alternative_record["treatment_coefficient_change"] = float(
+                    alternative[target_index] - baseline[target_index]
+                )
+            alternatives.append(alternative_record)
         report["prior"] = {
             "status": "evaluated",
             "method": "precision_scale_sensitivity",

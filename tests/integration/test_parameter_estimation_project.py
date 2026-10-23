@@ -111,6 +111,63 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     )
 
 
+def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
+    """The generic project track binds a causal Bayesian declaration."""
+    frame = estimation_frame().assign(
+        treatment=np.arange(80, dtype=float) % 2.0,
+    )
+    estimand = EstimandSpec(
+        name="treatment_effect",
+        outcome="outcome",
+        population="the declared project dataset",
+        likelihood="gaussian",
+        feature_names=("treatment", "signal"),
+        assumptions=("the declared causal assumptions hold",),
+    )
+    prior = scml.BayesianPrior(
+        mean=(0.0, 0.0, 0.0),
+        precision=((0.01, 0.0, 0.0), (0.0, 0.01, 0.0), (0.0, 0.0, 0.01)),
+    )
+    policy = EstimationPolicy(
+        estimator="bayesian_ate",
+        covariance="iid",
+        prior=prior,
+        treatment_position=0,
+        causal_assumptions=(
+            "linearity",
+            "consistency",
+            "conditional_exchangeability",
+            "positivity",
+        ),
+    )
+    project = scml.MLProject(
+        frame,
+        "outcome",
+        task="uplift",
+        treatment_column="treatment",
+        time_budget=30,
+        estimand=estimand,
+        estimation_policy=policy,
+        output_dir=tmp_path,
+    )
+
+    result = project.run()
+
+    assert result.estimation is not None
+    assert result.estimation.policy == policy
+    declaration = json.loads(
+        (result.run_dir / "parameter_estimation_declaration.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert declaration["policy"]["estimator"] == "bayesian_ate"
+    assert declaration["policy"]["treatment_position"] == 0
+    assert declaration["policy"]["prior"] == json.loads(
+        json.dumps(prior.to_dict())
+    )
+    assert result.estimation.reference["passed"] is True
+
+
 def interrupted_estimation_run(tmp_path):
     """Create a completed run in the state expected by resume."""
     result = project_with_estimation(tmp_path).run()
