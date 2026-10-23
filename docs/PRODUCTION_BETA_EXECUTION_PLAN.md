@@ -4683,3 +4683,12 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   replace hosted CI, external fault execution, independent review, clean
   external reproduction, or the final repository-wide regression.
 
+## Hosted gate observation at `5ed67b2` on 2026-10-23
+
+- GitHub Actions `ci` run `39970847084` and Pages build run `39970846930`
+  reached no workflow steps and failed within seconds on the account
+  billing/spending-limit condition. They are not hosted test results.
+- GitHub currently reports the repository as private with Pages disabled. The
+  public documentation deployment therefore remains unverified until the
+  owner resolves repository visibility, Pages configuration, and billing.
+

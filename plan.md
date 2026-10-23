@@ -240,21 +240,23 @@ The task is complete only when all of the following are true:
   with the remaining risks and next owner named. No “production-ready” label
   is allowed while a required gate is merely planned or locally inferred.
 
-## What is left (as of 2026-10-23, commit `4861e1f`)
+## What is left (as of 2026-10-23, commit `5ed67b2`)
 
 Engineering is largely implemented and locally tested. What remains is almost
 entirely evidence that only a witness other than the implementer can supply:
 
 **Hosted CI is currently blocked, not failing on code**
 
-- Every job in the `ci` run on `11f8fc6` (run `39955435993`), and in the site
-  and Pages deploy runs, ended in 2-3 seconds with the annotation: "The job
-  was not started because recent account payments have failed or your spending
-  limit needs to be increased." No job executed, so there is no hosted
-  evidence for any commit on this branch. Fixing the account billing or
-  spending limit is the first unblocker; then re-run on the release commit.
-  Until then every hosted gate below is open, and the earlier red runs must
-  not be read as test results.
+- The current `ci` run `39970847084` and Pages build run `39970846930` for
+  `5ed67b2` ended within seconds before any workflow step executed, matching
+  the account billing/spending-limit failure already recorded for this
+  repository. No hosted job ran, so these failures are not code test results.
+  Fixing the account billing or spending limit is the first unblocker; then
+  rerun CI and Pages on the final release commit. Until then every hosted gate
+  below remains open.
+- GitHub reports the repository as private with Pages disabled, so the public
+  documentation URL cannot currently provide deployment evidence. Visibility
+  and Pages configuration remain owner-controlled release prerequisites.
 
 **Independent witnesses (blocking `production-beta approved`)**
 
