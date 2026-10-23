@@ -29,7 +29,7 @@ local tests.
 | F-001 | `scml/models/deeplearning/networks.py` | P2 | A split string literal after `return` made the JEPA small-dataset rejection message incomplete. This reduced actionable diagnostics. | Fixed | `tests/unit/test_deeplearning_contracts.py::test_jepa_rejection_reason_includes_both_training_boundaries` passed. |
 | F-002 | Repository root, `docs/`, and `benchmarks/` | P2 | Orphaned planning/release evidence and two unreferenced benchmark result snapshots increased maintenance and stale-information risk. | Fixed | Deleted files have no remaining repository references; package artifact inspection found none of them. |
 | F-003 | `pyproject.toml` project URLs | P3 | The changelog URL referenced the retired `main` branch while the repository uses `master`. | Fixed | Stale-branch reference scan is clean. |
-| F-004 | `.github/workflows/` and GitHub account configuration | P1 | Current hosted CI and Pages runs fail before executing steps because of the account billing/spending-limit condition. Hosted platform coverage and publication cannot be verified locally. | Unresolved external blocker | Current runs `40012844572` and `40012844428` failed at hosted startup; all 20 CI jobs and the Pages build had zero executed steps. |
+| F-004 | `.github/workflows/` and GitHub account configuration | P1 | Current hosted CI and Pages runs fail before executing steps because of the account billing/spending-limit condition. Hosted platform coverage and publication cannot be verified locally. | Unresolved external blocker | Current runs `40019762196` and `40019762190` failed at hosted startup; all 20 CI jobs and the Pages build had zero executed steps. |
 | F-005 | Release governance and operations | P1 | Independent signed review, external transport/container/kernel fault evidence, external secret custody, and an approved release decision are not present. Local tests cannot manufacture these witnesses. | Unresolved external blocker | Required by the repository's release boundary and the engineering brief; no independent signed records are available in the checkout. |
 
 The Vulture findings for `Estimator.get_params(deep=...)` and
@@ -59,6 +59,8 @@ Executed on 2026-10-24:
 - Website verification: npm audit found zero vulnerabilities; Astro built 19
   pages; accessibility checks passed for all 19 pages; 479 internal links
   passed; and Playwright passed all 4 Chromium smoke tests.
+- Hosted-control static verification: all 5 workflow files passed with 59
+  pinned action references and no static-control failures.
 - Stale-reference and diff checks: passed.
 
 The full regression and its skip audit now cover the current tip. The
