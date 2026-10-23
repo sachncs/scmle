@@ -61,6 +61,22 @@ report = project.run()
 print(report.documentation["status"])  # experimental</code></pre>
   <p>This surface does not promote the modality to supported production status. The report says <code>experimental</code> until decoder ownership, modality-specific fidelity, external serving and fault evidence, and independent review are complete. For verified package inference, use the exported <code>ModalityPredictor</code> with the same typed adapter. Do not pass raw bytes to <code>MLProject</code> and expect a tabular estimator to infer their semantics.</p>
 
+  <h2>Use the bounded non-tabular model API</h2>
+  <p><code>NonTabularModelProject</code> is the narrower modelling boundary for applications that need a durable package around an existing built-in representation. It allowlists the exact document, text, image, audio, video, graph, geospatial, and raster adapter types; it does not discover codecs, accept arbitrary adapter subclasses, infer semantics from raw bytes, or claim Transformer, JEPA, GNN, OCR, layout, or foundation-model support. Video and raster metadata-only paths remain metadata representations, not visual modelling.</p>
+  <pre><code>{`from scml import NonTabularModelProject
+
+project = NonTabularModelProject(
+    adapter,
+    signing_key="load-this-from-your-secret-manager",
+    experimental_opt_in=True,
+    output_dir="runs/text-bounded-baseline",
+)
+result = project.run()
+assert result.health()["support_status"] == "experimental"
+print(result.capability.representation)
+print(result.predict(adapter.samples[:2]))`}</code></pre>
+  <p>The explicit opt-in is required because these are bounded, production-oriented artifacts—not supported production capabilities. The result verifies the signed lifecycle report and package, preserves the exact feature schema and dataset identity, and exposes prediction health. Custom adapter subclasses and curation-only extension adapters fail before fitting; use <code>ModalityProject</code> for broader experimental extension work.</p>
+
   <h2>Bring a new dataset family</h2>
   <p>Use <code>ExtensionModality</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>ExtensionCurationAdapter</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
   <pre><code>{`from scml.contracts import modalities
@@ -95,7 +111,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
   <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 
   <h2>What is safe to depend on</h2>
-  <p>The supported top-level exports are <code>MLProject</code>, <code>ModalityProject</code>, <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, <code>ModalitySampleDecoder</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
+  <p>The supported top-level exports are <code>MLProject</code>, <code>ModalityProject</code>, <code>NonTabularModelProject</code>, <code>NonTabularModelResult</code>, <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, <code>ModalitySampleDecoder</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
 
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
