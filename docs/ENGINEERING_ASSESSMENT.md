@@ -44,8 +44,9 @@ Executed on 2026-10-24:
 
 - Focused regression: `22 passed`.
 - Specification suite: `48 passed`.
-- Full repository regression: `2721 passed, 38 skipped` in 51 minutes 40
-  seconds under `-W error::ResourceWarning`.
+- Full repository regression at `e6b9df0`, before the subsequent serving fix:
+  `2721 passed, 38 skipped` in 51 minutes 40 seconds under
+  `-W error::ResourceWarning`.
 - Full-regression skip audit: all `38` skips were approved dependency skips;
   there were zero unapproved skips, unexplained skips, or xfails.
 - Ruff lint: passed.
@@ -66,9 +67,10 @@ Executed on 2026-10-24:
   18 required routes, so public documentation deployment is not verified.
 - Stale-reference and diff checks: passed.
 
-The full regression and its skip audit now cover the current tip. The
-all-platform hosted matrix, public Pages deployment, and independent release
-review remain unverified.
+The full regression covers the pre-serving-fix implementation; the focused
+serving/durability suite covers the current fix. A new full regression on the
+latest serving commit, the all-platform hosted matrix, public Pages deployment,
+and independent release review remain unverified.
 
 ## Implementation summary
 
