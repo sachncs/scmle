@@ -4839,3 +4839,15 @@ Current-head release preflight evidence at `edf9d39` on 2026-10-21:
   secret-custody evidence, independent review, and the final release decision
   remain open.
 
+## Hosted gate recheck at `9094528` on 2026-10-23
+
+- CI run `40003336746` and Pages run `40003336713` both completed within
+  seconds of dispatch with no workflow steps executed. Every CI job failed at
+  hosted startup; the Pages build failed at the same boundary and deploy and
+  verification were skipped.
+- This is a current-commit reproduction of the account billing/spending-limit
+  infrastructure blocker. It is not evidence of a code or workflow-step
+  failure. Hosted runners, Pages publication, and the final external release
+  gates remain unavailable until the GitHub account/repository configuration
+  is repaired.
+
