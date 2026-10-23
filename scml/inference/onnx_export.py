@@ -18,6 +18,7 @@ from sklearn import impute
 from sklearn import pipeline
 from sklearn import preprocessing
 
+from scml import durability
 from scml.contracts import errors
 from scml.data.validation import columns
 from scml.models import weighting
@@ -252,7 +253,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
         entry = model.metadata_props.add()
         entry.key, entry.value = CODES_KEY, "1"
     destination = pathlib.Path(path)
-    destination.write_bytes(model.SerializeToString())
+    durability.write_atomically(destination, model.SerializeToString())
     return destination
 
 
