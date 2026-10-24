@@ -6,7 +6,7 @@
     },
     "DatasetCatalog": {
       "kind": "class",
-      "signature_sha256": "c751f8678b66ccc792fc75d79206364088a7425e6037c0a9dc6b70c06f92a090"
+      "signature_sha256": "ce12ce844904740d38fa6ea8eebc164102c0ceb92481bae60447627db3229d96"
     },
     "EstimandSpec": {
       "kind": "class",
@@ -14,11 +14,11 @@
     },
     "EstimationPolicy": {
       "kind": "class",
-      "signature_sha256": "c73d62e2cd2028611055070c4139cfd00fd2857170e6ec1df63b12a7c514e13b"
+      "signature_sha256": "937c7642fe1830cc0840e5123d4b5163143037f7a92d27dcfd9fe0b7f346626c"
     },
     "EstimationResult": {
       "kind": "class",
-      "signature_sha256": "0254daa21cc76f6052afa2e537e354b5b16750611a4bf28e3cd711071d79287a"
+      "signature_sha256": "7b6458c9d7cbb65ec6c05cd31cf2e145bdcf70520c08e7d68f5512d2b4f9ae9b"
     },
     "ExtensionCurationAdapter": {
       "kind": "class",
@@ -46,15 +46,15 @@
     },
     "LongitudinalEstimationResult": {
       "kind": "class",
-      "signature_sha256": "939ff55a45136eb634b2359113964de188fe96b644512c8efcdd5f90b1b08375"
+      "signature_sha256": "097f300349c56e7c55794faacb9d168f92ea9f5e925ee74257507c09c1c8dd62"
     },
     "LongitudinalIPWEstimator": {
       "kind": "class",
-      "signature_sha256": "6324dbcabe8dee43d6103cc2617036aa2815ea0848de22ef90d1336ee1374ac5"
+      "signature_sha256": "81b789503f32c24543cfba73b15d02afdd6928e9407bb04b6dc0c8f587150c4b"
     },
     "MLProject": {
       "kind": "class",
-      "signature_sha256": "b63b80c9cb43ef5e595d3c6019bfa4adfa5027eebfd1cb8374e9ca7005f9d8a3"
+      "signature_sha256": "d3ed664bc5873412503ae47186734262dcdf6d0c04834ed0f67186e1f0cc6d7f"
     },
     "ModalityCurationAdapter": {
       "kind": "class",
@@ -62,7 +62,7 @@
     },
     "ModalityCurationProject": {
       "kind": "class",
-      "signature_sha256": "57fa1b75c7ee97f22c053b379c41e82112d8a197900690204a1aafa4580a66a5"
+      "signature_sha256": "b3ae6242ae285fd1f808c36b2c5768b8604347b026f9a98fffa41c8949c3df04"
     },
     "ModalityCurationResult": {
       "kind": "class",
@@ -78,7 +78,7 @@
     },
     "ModalityProject": {
       "kind": "class",
-      "signature_sha256": "8bba27ffc502cd0ae27c28355f2ea68ab3655d01c742ac4c7b7bce4f29fbaf16"
+      "signature_sha256": "f34d8c1cfb6abb9690911e9ee6accf5d4e25180bd0cb2f0130e92d65db8c8c08"
     },
     "ModalitySampleDecoder": {
       "kind": "class",
@@ -86,7 +86,7 @@
     },
     "ModelBundle": {
       "kind": "class",
-      "signature_sha256": "711014aeb1a77f78329141e9afb53c8d2343c01ff94c43df683a33cb1a6d9a37"
+      "signature_sha256": "8ca49c3dfa4d6203d1ae9742a505940aad9a1cc8caa7dd130ca1ff6ca86886f5"
     },
     "NonTabularModelCapability": {
       "kind": "class",
@@ -110,7 +110,7 @@
     },
     "RunResult": {
       "kind": "class",
-      "signature_sha256": "7b8edb062fd073b5f1740ea0d720309b7df4eaa16724f0140450f12718d435c2"
+      "signature_sha256": "c04a1980f6d67a033f458eee0d28d68ba73eb14fc49aa11e8115f369069f45da"
     },
     "SequentialEstimand": {
       "kind": "class",
@@ -122,15 +122,15 @@
     },
     "SequentialEstimationProject": {
       "kind": "class",
-      "signature_sha256": "5efefdf6ea3089c93855d1e887a32383d36e164a0b328d516b78adb68aaaa967"
+      "signature_sha256": "02d0e4658fdc8b51ceef6a3ca4b31a4873ef739d705996bbc01af3ad2bbd9b14"
     },
     "SequentialEstimationResult": {
       "kind": "class",
-      "signature_sha256": "3a54e9ad1d52a96b5b7b9c7fbd56bf697ea12d30c6bc252f0e5599ab65a6eb0a"
+      "signature_sha256": "faad40a3cf935b8fc053253521ee27eebe1b7b6ae8d4c585e82b26d35a971d85"
     },
     "SequentialIPWEstimator": {
       "kind": "class",
-      "signature_sha256": "c3d4ab185d8a0f4f7c727e32cc0f85380dd1320474167b3d82a8bfec979489bc"
+      "signature_sha256": "cc2002b25c40191fdb98107b06ac9f613ff5edb691d300a8d1c6af755db1f2b4"
     },
     "SequentialPeriodDiagnostics": {
       "kind": "class",
@@ -150,23 +150,23 @@
     },
     "estimate_parameters": {
       "kind": "callable",
-      "signature_sha256": "5b838e0934528efb91ae7cc2bc9c2bd0e38dbf98a9686fc45fb18776976b0174"
+      "signature_sha256": "ba69c8285a24611db62abf91572e13c531249169a568469ec99ed4912ceb0ce6"
     },
     "load_model": {
       "kind": "callable",
-      "signature_sha256": "b2570d34fa027ba62369eb032bca7044b3ea4ff0964852288fb4c38173c3e13e"
+      "signature_sha256": "74fafc7ef72abc658f965ebb5d3b1ec56e51d536249355bf404533364c7f388f"
     },
     "predict": {
       "kind": "callable",
-      "signature_sha256": "a438fb38781d4095156a7252b76a2d2b14c3eb8960444474f99ae726de01af7a"
+      "signature_sha256": "f64da2d2a1e19221d1f8dadcd7d9df81a1b82d4ad7a45bdf961bdf655bbe6a23"
     },
     "register_estimator": {
       "kind": "callable",
-      "signature_sha256": "bac7c7b6b3f23dd029475dfc5586dc7e98ccb053d555ef6589537b325e6aa908"
+      "signature_sha256": "f13e74ca8a72c17da89348745a097f7e33d0892df00c57267333af44d61b212c"
     },
     "register_metric": {
       "kind": "callable",
-      "signature_sha256": "204205d9ecbf58dffda0d2288aa56de417730506434f0ad2f3d66019eeafb3bb"
+      "signature_sha256": "72fda1b19d57c792930b34fd7bb80d16d93e4c0bec203c2c1ee3293f4257f403"
     },
     "unregister_estimator": {
       "kind": "callable",

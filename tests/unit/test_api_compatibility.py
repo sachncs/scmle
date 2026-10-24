@@ -53,3 +53,12 @@ def test_platform_private_pathlib_annotations_are_canonicalized(
 ):
     """Private pathlib module spellings must not change the public contract."""
     assert check_api_compatibility.stable_annotation(annotation) == expected
+
+
+def test_write_regenerates_a_snapshot_that_then_passes(tmp_path):
+    snapshot = tmp_path / "api.json"
+
+    assert check_api_compatibility.main([str(snapshot), "--write"]) == 0
+    assert check_api_compatibility.main([str(snapshot)]) == 0
+    written = json.loads(snapshot.read_text(encoding="utf-8"))
+    assert written == check_api_compatibility.current_snapshot()

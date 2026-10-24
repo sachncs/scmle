@@ -128,12 +128,26 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
         description="Check the public API compatibility snapshot."
     )
     parser.add_argument("snapshot", type=Path)
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="rewrite the snapshot from the current API (a deliberate "
+        "contract change: add a changelog entry and a migration note)",
+    )
     return parser.parse_args(arguments)
 
 
 def main(arguments: list[str] | None = None) -> int:
     """Return zero only when the current API matches the snapshot."""
     options = parse_arguments(arguments)
+    if options.write:
+        options.snapshot.write_text(
+            json.dumps(current_snapshot(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        print(f"wrote {options.snapshot}")
+        return 0
     try:
         expected = json.loads(options.snapshot.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
