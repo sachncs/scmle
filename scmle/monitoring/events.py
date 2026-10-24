@@ -92,10 +92,8 @@ class PredictionLog:
 
     def append(self, kind: str, record: dict[str, Any]) -> None:
         """Appends one typed record."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         line = json.dumps({"type": kind, **record}, default=str)
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(line + "\n")
+        durability.append_text(self.path, line + "\n")
 
     def log_predictions(
         self,
@@ -198,17 +196,15 @@ class PredictionLog:
             error_category=error_category,
             redacted_fields=self.observability_policy.redacted_fields,
         )
-        path = self.observability_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(
-                json.dumps(
-                    {"type": "inference", **event.to_dict()},
-                    ensure_ascii=True,
-                    separators=(",", ":"),
-                )
-                + "\n"
+        durability.append_text(
+            self.observability_path,
+            json.dumps(
+                {"type": "inference", **event.to_dict()},
+                ensure_ascii=True,
+                separators=(",", ":"),
             )
+            + "\n",
+        )
 
     def enforce_retention(
         self, observed_at: str | None = None
@@ -218,8 +214,16 @@ class PredictionLog:
         The raw prediction log is intentionally untouched. Retention applies
         only to the redacted observability sidecar, and malformed evidence
         aborts before replacement so an operator never receives a silently
-        truncated log.
+        truncated log. Appends to the sidecar wait while the rewrite runs, so
+        none is lost to the replaced file.
         """
+        with durability.path_lock(self.observability_path):
+            return self.enforce_retention_locked(observed_at)
+
+    def enforce_retention_locked(
+        self, observed_at: str | None
+    ) -> dict[str, Any]:
+        """Rewrites the sidecar while holding its lock."""
         if self.observability_policy is None:
             raise ValueError(
                 "retention enforcement requires an observability policy"

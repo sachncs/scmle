@@ -156,11 +156,12 @@ class JsonlAlertSink(AlertSink):
             "alert": alert.to_dict(),
             "delivered_at": delivered_at,
         }
-        with self.path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record, sort_keys=True) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        durability.sync_directory(self.path.parent)
+        with durability.path_lock(self.path):
+            with self.path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            durability.sync_directory(self.path.parent)
         return AlertDelivery(
             alert.alert_id,
             alert.route,
@@ -254,9 +255,20 @@ class AlertDispatcher:
             raise ValueError("alert routes must not be empty")
         self.sinks = dict(sinks)
         self.journal = Path(journal)
+        self.lock = durability.path_lock(self.journal)
 
     def dispatch(self, alert: Alert) -> AlertDelivery:
-        """Deliver an alert or return a prior successful delivery."""
+        """Deliver an alert or return a prior successful delivery.
+
+        The journal check, the delivery and the journal write are one step
+        per journal within this process, so concurrent threads cannot both
+        send the same alert.
+        """
+        with self.lock:
+            return self.dispatch_locked(alert)
+
+    def dispatch_locked(self, alert: Alert) -> AlertDelivery:
+        """Dispatches one alert while holding the journal lock."""
         previous = self.successful_alerts()
         if alert.alert_id in previous:
             return AlertDelivery(
@@ -307,11 +319,12 @@ class AlertDispatcher:
         """Persist one alert and its delivery outcome durably."""
         self.journal.parent.mkdir(parents=True, exist_ok=True)
         record = {"alert": alert.to_dict(), "delivery": delivery.to_dict()}
-        with self.journal.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record, sort_keys=True) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        durability.sync_directory(self.journal.parent)
+        with self.lock:
+            with self.journal.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            durability.sync_directory(self.journal.parent)
 
 
 __all__ = [

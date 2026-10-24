@@ -1,15 +1,35 @@
 """Durable, auditable incident state transitions for ML operations."""
 
+from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
 import enum
+import functools
 import hashlib
 import json
 import pathlib
 from typing import Any
+from typing import TypeVar
 
 from scmle import durability
 from scmle.monitoring import slo
+
+Method = TypeVar("Method", bound=Callable[..., Any])
+
+
+def serialized(method: Method) -> Method:
+    """Runs a workflow method while holding the journal's lock.
+
+    Every transition reads the journal, decides, then appends; the lock
+    makes that one step, so concurrent threads see one hash chain.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self: "IncidentWorkflow", *args: Any, **kwargs: Any) -> Any:
+        with self.lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
 
 
 class IncidentStatus(enum.StrEnum):
@@ -159,9 +179,14 @@ class IncidentWorkflow:
     """Append-only incident workflow with idempotent transitions."""
 
     def __init__(self, path: str | pathlib.Path) -> None:
-        """Initialize a workflow backed by a JSONL event journal."""
-        self.path = pathlib.Path(path)
+        """Initialize a workflow backed by a JSONL event journal.
 
+        Transitions are serialized per journal file within this process.
+        """
+        self.path = pathlib.Path(path)
+        self.lock = durability.path_lock(self.path)
+
+    @serialized
     def read_events(self) -> tuple[dict[str, Any], ...]:
         """Read and verify the complete journal, failing closed on tamper."""
         if not self.path.exists():
@@ -224,6 +249,7 @@ class IncidentWorkflow:
             previous_digest = str(record["event_digest"])
         return tuple(events)
 
+    @serialized
     def records(self) -> tuple[Incident, ...]:
         """Return the latest state for every incident in journal order."""
         latest: dict[str, Incident] = {}
@@ -232,6 +258,7 @@ class IncidentWorkflow:
             latest[incident.incident_id] = incident
         return tuple(latest.values())
 
+    @serialized
     def open(
         self,
         evaluation: slo.SLOEvaluation,
@@ -268,6 +295,7 @@ class IncidentWorkflow:
         self.append_event("opened", incident)
         return incident
 
+    @serialized
     def acknowledge(
         self,
         identity: str,
@@ -294,6 +322,7 @@ class IncidentWorkflow:
         self.append_event("acknowledged", updated)
         return updated
 
+    @serialized
     def resolve(
         self,
         identity: str,
@@ -336,6 +365,7 @@ class IncidentWorkflow:
                 return record
         raise KeyError(f"unknown incident '{identity}'")
 
+    @serialized
     def append_event(self, event_type: str, incident: Incident) -> None:
         """Append one chained state snapshot durably."""
         require_text(event_type, "event_type")
