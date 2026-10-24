@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 import scmle
+from scmle import durability
 from scmle.api import results
 from scmle.contracts import errors
 from scmle.governance import registry as registry_module
@@ -134,9 +135,9 @@ class LifecycleManager:
 
     def write_state(self, state: dict[str, Any]) -> None:
         """Saves the state atomically."""
-        temporary = self.state_path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(state), encoding="utf-8", newline="\n")
-        temporary.replace(self.state_path)
+        durability.write_atomically(
+            self.state_path, json.dumps(state).encode("utf-8")
+        )
 
     def skip_reason(
         self, state: dict[str, Any], fresh: pd.DataFrame
@@ -233,6 +234,17 @@ class LifecycleManager:
         Returns:
             The outcome.
         """
+        with durability.path_lock(self.state_path):  # One attempt at a time.
+            return self.review_locked(fresh, target, retrain, project_options)
+
+    def review_locked(
+        self,
+        fresh: pd.DataFrame,
+        target: str,
+        retrain: bool,
+        project_options: dict[str, Any] | None,
+    ) -> LifecycleOutcome:
+        """Runs `review` while holding the manager's state lock."""
         current = self.registry.load(self.model)
         features = fresh.drop(columns=[target])
         report = monitor_module.ModelMonitor(current).assess(

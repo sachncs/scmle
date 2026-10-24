@@ -16,6 +16,7 @@ import shutil
 from typing import Any
 from typing import Self
 
+from scmle import durability
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
 from scmle.contracts import events
@@ -182,11 +183,16 @@ class ModelRegistryStore:
     def __init__(self, root: str | pathlib.Path) -> None:
         """Opens (creating if needed) a registry.
 
+        Changes take a per-directory lock shared by every store object over
+        the same root, so threads of one process never interleave a
+        read-modify-write. Separate processes are not coordinated.
+
         Args:
             root: Registry directory.
         """
         self.root = pathlib.Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        self.lock = durability.path_lock(self.root)
 
     def read_index(self) -> dict[str, Any]:
         """Loads the registry index (empty when new)."""
@@ -197,11 +203,9 @@ class ModelRegistryStore:
 
     def write_index(self, index: dict[str, Any]) -> None:
         """Writes the index atomically (temp file + rename)."""
-        temporary = self.root / (INDEX_FILE + ".tmp")
-        temporary.write_text(
-            json.dumps(index, indent=2), encoding="utf-8", newline="\n"
+        durability.write_atomically(
+            self.root / INDEX_FILE, json.dumps(index, indent=2).encode("utf-8")
         )
-        temporary.replace(self.root / INDEX_FILE)
 
     def audit(self, action: str, **details: Any) -> None:
         """Appends an audit record."""
@@ -210,8 +214,9 @@ class ModelRegistryStore:
             "action": action,
             **details,
         }
-        with (self.root / AUDIT_FILE).open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, default=str) + "\n")
+        durability.append_text(
+            self.root / AUDIT_FILE, json.dumps(record, default=str) + "\n"
+        )
 
     def register(
         self,
@@ -255,6 +260,28 @@ class ModelRegistryStore:
             pathlib.Path(bundle_directory), signing_key
         )
         content_id = content_id_of(bundle_directory)
+        with self.lock:
+            return self.register_locked(
+                model,
+                bundle_directory,
+                content_id,
+                signed,
+                metrics,
+                config,
+                run_id,
+            )
+
+    def register_locked(
+        self,
+        model: str,
+        bundle_directory: str | pathlib.Path,
+        content_id: str,
+        signed: bool,
+        metrics: dict[str, float] | None,
+        config: dict[str, Any] | None,
+        run_id: str,
+    ) -> VersionRecord:
+        """Assigns the next version and writes it, holding the lock."""
         index = self.read_index()
         entry = index["models"].setdefault(
             model, {"versions": {}, "aliases": {}}
@@ -320,6 +347,18 @@ class ModelRegistryStore:
             ArtifactError: If the model or version does not exist, or if a
                 champion promotion lacks valid independent approval.
         """
+        with self.lock:
+            self.promote_locked(model, version, alias, approval, signing_key)
+
+    def promote_locked(
+        self,
+        model: str,
+        version: int,
+        alias: str,
+        approval: PromotionApproval | None,
+        signing_key: str | bytes | None,
+    ) -> None:
+        """Moves the alias while holding the lock."""
         index = self.read_index()
         entry = index["models"].get(model)
         if entry is None or str(version) not in entry["versions"]:

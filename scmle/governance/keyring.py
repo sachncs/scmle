@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import threading
 from typing import Any
 from typing import Self
 
@@ -211,6 +212,7 @@ class SigningKeyRegistry:
 
     def __init__(self, records: Iterable[SigningKeyRecord] = ()) -> None:
         """Create a registry from unique key records."""
+        self.lock = threading.RLock()
         self.records: dict[str, SigningKeyRecord] = {}
         for record in records:
             self.register(record)
@@ -219,9 +221,10 @@ class SigningKeyRegistry:
         """Add a key record without replacing an existing identity."""
         if not isinstance(record, SigningKeyRecord):
             raise TypeError("record must be SigningKeyRecord")
-        if record.key_id in self.records:
-            raise ValueError(f"key already registered: {record.key_id}")
-        self.records[record.key_id] = record
+        with self.lock:
+            if record.key_id in self.records:
+                raise ValueError(f"key already registered: {record.key_id}")
+            self.records[record.key_id] = record
 
     def get(self, key_id: str) -> SigningKeyRecord:
         """Return metadata for a key or fail closed."""
@@ -261,24 +264,27 @@ class SigningKeyRegistry:
         replacement_key_id: str | None = None,
     ) -> SigningKeyRecord:
         """Apply one explicit lifecycle transition."""
-        current = self.get(key_id)
-        if current.state is not KeyState.ACTIVE:
-            raise ValueError(f"key is already {current.state.value}: {key_id}")
-        if state is KeyState.ACTIVE:
-            raise ValueError("active is not a terminal transition")
-        updated = dataclasses.replace(
-            current,
-            state=state,
-            state_changed_at=changed_at,
-            reason=reason,
-            replacement_key_id=replacement_key_id,
-        )
-        if replacement_key_id is not None:
-            replacement = self.get(replacement_key_id)
-            if replacement.state is not KeyState.ACTIVE:
-                raise ValueError("replacement key must be active")
-        self.records[key_id] = updated
-        return updated
+        with self.lock:  # Read, validate and replace as one step.
+            current = self.get(key_id)
+            if current.state is not KeyState.ACTIVE:
+                raise ValueError(
+                    f"key is already {current.state.value}: {key_id}"
+                )
+            if state is KeyState.ACTIVE:
+                raise ValueError("active is not a terminal transition")
+            updated = dataclasses.replace(
+                current,
+                state=state,
+                state_changed_at=changed_at,
+                reason=reason,
+                replacement_key_id=replacement_key_id,
+            )
+            if replacement_key_id is not None:
+                replacement = self.get(replacement_key_id)
+                if replacement.state is not KeyState.ACTIVE:
+                    raise ValueError("replacement key must be active")
+            self.records[key_id] = updated
+            return updated
 
     def sign(
         self,
@@ -322,7 +328,8 @@ class SigningKeyRegistry:
         return {
             "schema_version": 1,
             "keys": [
-                self.records[key].to_dict() for key in sorted(self.records)
+                record.to_dict()
+                for key, record in sorted(dict(self.records).items())
             ],
         }
 

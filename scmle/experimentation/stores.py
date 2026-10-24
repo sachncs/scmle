@@ -14,6 +14,7 @@ import pathlib
 import sqlite3
 from typing import Any
 
+from scmle import durability
 from scmle.contracts import events
 from scmle.contracts import experiments
 
@@ -152,7 +153,7 @@ class SqliteExperimentStore(ExperimentStore):
         """
         self.path = pathlib.Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.session() as connection:
+        with durability.path_lock(self.path), self.session() as connection:
             connection.executescript(SCHEMA)
             self.migrate(connection)
 
@@ -169,13 +170,27 @@ class SqliteExperimentStore(ExperimentStore):
             "artifacts",
         ):
             if column not in existing:
-                connection.execute(f"ALTER TABLE runs ADD COLUMN {column} TEXT")
+                self.add_column(connection, "runs", column)
         trial_columns = {
             row["name"]
             for row in connection.execute("PRAGMA table_info(trials)")
         }
         if "strategy" not in trial_columns:
-            connection.execute("ALTER TABLE trials ADD COLUMN strategy TEXT")
+            self.add_column(connection, "trials", "strategy")
+
+    @staticmethod
+    def add_column(
+        connection: sqlite3.Connection, table: str, column: str
+    ) -> None:
+        """Adds a text column, tolerating another process adding it first."""
+        try:
+            # Identifiers come from the fixed lists in `migrate`.
+            connection.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} TEXT"  # nosec B608
+            )
+        except sqlite3.OperationalError as error:
+            if "duplicate column name" not in str(error):
+                raise
 
     @contextlib.contextmanager
     def session(self) -> Iterator[sqlite3.Connection]:
