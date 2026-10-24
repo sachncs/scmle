@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+* The public API snapshot (`tests/fixtures/public_api.json`) was regenerated
+  after the `scmle` rename, which had left it stale; the set of exports is
+  unchanged. `scripts/check_api_compatibility.py --write` regenerates it.
+* Replay verification now reports `different` when a trial's status changed
+  between the original run and the rerun; it used to report `exact`.
+* Registered TabPFN engines refuse `sample_weight` instead of ignoring it, and
+  a skipped conformal calibration is recorded as a `conformal.skipped` event.
 * Model bundles now checksum `schema.json` and use bundle format 2. Legacy
   format 1 bundles are refused because their schema was not authenticated.
 
