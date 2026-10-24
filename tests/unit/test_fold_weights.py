@@ -5,10 +5,10 @@ import pandas as pd
 import pytest
 from sklearn import metrics as sk_metrics
 
-from scml.contracts import data as data_contracts
-from scml.contracts import metrics as metric_contracts
-from scml.contracts import tasks
-from scml.experimentation import trials
+from scmle.contracts import data as data_contracts
+from scmle.contracts import metrics as metric_contracts
+from scmle.contracts import tasks
+from scmle.experimentation import trials
 
 
 def payload(weighted):

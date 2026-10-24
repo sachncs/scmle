@@ -4,7 +4,7 @@ import json
 
 import support
 
-from scml.governance import audit
+from scmle.governance import audit
 
 
 def finish(binary_frame, tmp_path):

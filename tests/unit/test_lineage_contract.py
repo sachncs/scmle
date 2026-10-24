@@ -2,7 +2,7 @@
 
 import pytest
 
-from scml.contracts import lineage
+from scmle.contracts import lineage
 
 
 def node(node_id: str, kind: lineage.EvidenceNodeKind) -> lineage.EvidenceNode:

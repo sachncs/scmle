@@ -10,12 +10,12 @@ import pytest
 from sklearn import dummy
 import support
 
-from scml.contracts import errors
-from scml.contracts import models
-from scml.contracts import tasks
-from scml.core import limits
-from scml.core import orchestrator as orchestrator_module
-from scml.models import registry as registry_module
+from scmle.contracts import errors
+from scmle.contracts import models
+from scmle.contracts import tasks
+from scmle.core import limits
+from scmle.core import orchestrator as orchestrator_module
+from scmle.models import registry as registry_module
 
 
 def run_with(frame, tmp_path, **resources):

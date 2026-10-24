@@ -5,18 +5,18 @@ import statistics
 import pytest
 import support
 
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.core import orchestrator as orchestrator_module
-from scml.core import scheduler
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.core import orchestrator as orchestrator_module
+from scmle.core import scheduler
 
 
 def test_mlflow_store_records_runs_trials_and_lineage(binary_frame, tmp_path):
     pytest.importorskip("mlflow")
-    from scml.integrations import mlflow_store
+    from scmle.integrations import mlflow_store
 
     store = mlflow_store.MlflowExperimentStore(
-        f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scml-test"
+        f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scmle-test"
     )
     spec = support.make_project(binary_frame, "y", time_budget=300).spec
     result = orchestrator_module.Orchestrator(
@@ -43,14 +43,14 @@ def test_mlflow_store_records_runs_trials_and_lineage(binary_frame, tmp_path):
 
 def test_mlflow_store_reuses_the_parent_run_on_resume(binary_frame, tmp_path):
     pytest.importorskip("mlflow")
-    from scml.integrations import mlflow_store
+    from scmle.integrations import mlflow_store
 
     store = mlflow_store.MlflowExperimentStore(
-        f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scml-resume"
+        f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scmle-resume"
     )
     store.start_run("run_x", "hash", "/tmp/x", "2026-10-15T00:00:00+00:00")
     again = mlflow_store.MlflowExperimentStore(
-        f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scml-resume"
+        f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scmle-resume"
     )
     again.start_run("run_x", "hash", "/tmp/x", "2026-10-15T01:00:00+00:00")
     assert len(again.runs()) == 1
@@ -67,7 +67,7 @@ def test_mlflow_without_the_library_is_a_config_error(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", blocked)
-    from scml.integrations import mlflow_store
+    from scmle.integrations import mlflow_store
 
     with pytest.raises(errors.ConfigError, match="tracking"):
         mlflow_store.MlflowExperimentStore()
@@ -123,7 +123,7 @@ def test_unknown_executor_is_rejected():
 
 def test_mlflow_artifacts_stay_beside_the_sqlite_store(tmp_path, monkeypatch):
     pytest.importorskip("mlflow")
-    from scml.integrations import mlflow_store
+    from scmle.integrations import mlflow_store
 
     monkeypatch.chdir(tmp_path)
     location = mlflow_store.MlflowExperimentStore.artifact_location(

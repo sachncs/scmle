@@ -5,12 +5,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 <DocsLayout
   title="Modelling & estimation"
-  description="A precise guide to the modelling paths, transformer integrations, uncertainty evidence, and parameter-estimation limits in super-charge-ml."
+  description="A precise guide to the modelling paths, transformer integrations, uncertainty evidence, and parameter-estimation limits in scmle."
   current="modeling"
 >
   <p class="eyebrow"><span></span> Models, uncertainty, and limits</p>
   <h1>Choose the model<br /><em>after the evidence.</em></h1>
-  <p class="lead">super-charge-ml can search and evaluate several model families, including an optional FT-Transformer path, and can pretrain a bounded tabular JEPA representation. It also exposes a separate, auditable parameter-estimation contract. Those are useful building blocks—not a claim that every dataset, transformer, or scientific question is production-ready.</p>
+  <p class="lead">scmle can search and evaluate several model families, including an optional FT-Transformer path, and can pretrain a bounded tabular JEPA representation. It also exposes a separate, auditable parameter-estimation contract. Those are useful building blocks—not a claim that every dataset, transformer, or scientific question is production-ready.</p>
 
   <div class="callout"><p><strong>Read this page before installing extras.</strong> The supported beta is still the narrow tabular library workflow. Deep-learning and text-embedding integrations are available as explicit optional paths with separate evidence. Tabular JEPA is experimental; multimodal JEPA is not implemented. Parameter estimation is a separate scientific evidence track that can be attached to an <code>MLProject</code> run, but it never changes model selection.</p></div>
 
@@ -36,7 +36,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <a class="doc-card" href={`${base}/docs/quickstart/`}><small>01 / RUN</small><h3>Make a first tabular run</h3><p>See the smallest end-to-end project and the artifacts it leaves behind.</p></a>
     <a class="doc-card" href={`${base}/docs/data/`}><small>02 / UNDERSTAND</small><h3>Audit the raw input</h3><p>Confirm source identity, labels, missingness, leakage, and split eligibility before fitting.</p></a>
     <a class="doc-card" href={`${base}/docs/api/`}><small>03 / DECLARE</small><h3>Use the public API</h3><p>Declare modality, target, policy, and evidence boundaries in Python.</p></a>
-    <a class="doc-card" href={`${base}/docs/release-evidence/`}><small>04 / PROMOTE</small><h3>Read the release boundary</h3><p>Know which local checks still do not justify a production claim.</p></a>
   </div>
 
   <h2 id="support-matrix">What modelling exists today</h2>
@@ -46,11 +45,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       <thead><tr><th>Path</th><th>How to use it</th><th>Current claim</th></tr></thead>
       <tbody>
         <tr><th scope="row">Tabular beta</th><td>Use <code>MLProject</code> with a declared target and tabular input. The planner can compare the built-in linear, tree, and other candidate families under the supported workflow.</td><td><span class="status status-supported">Supported*</span></td></tr>
-        <tr><th scope="row">FT-Transformer</th><td>Install <code>super-charge-ml[deeplearning]</code> and explicitly opt in with <code>ModelSpec(experimental_models=["torch_ft_transformer"])</code>. The adapter then enters the normal project plan, cross-validation, package, and prediction path after dependency, row-limit, and capability checks.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">FT-Transformer</th><td>Install <code>scmle[deeplearning]</code> and explicitly opt in with <code>ModelSpec(experimental_models=["torch_ft_transformer"])</code>. The adapter then enters the normal project plan, cross-validation, package, and prediction path after dependency, row-limit, and capability checks.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">Other PyTorch families</th><td>The same optional extra exposes MLP, residual, TabM-style ensemble, and RealMLP-style families. They are explicit candidates, not silent dependencies.</td><td><span class="status status-experimental">Experimental</span></td></tr>
-        <tr><th scope="row">Text embeddings</th><td>Install <code>super-charge-ml[embeddings]</code> for the sentence-transformers integration. The text transformer runs in the isolated worker; if unavailable, the documented fallback is TF-IDF.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">Text embeddings</th><td>Install <code>scmle[embeddings]</code> for the sentence-transformers integration. The text transformer runs in the isolated worker; if unavailable, the documented fallback is TF-IDF.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">TabPFN</th><td>The explicit adapter remains extension-only until the external package, model-weight license, token custody, and independent evidence are supplied.</td><td><span class="status status-extension">Extension-only</span></td></tr>
-        <tr><th scope="row">Tabular JEPA</th><td>Install <code>super-charge-ml[deeplearning]</code> and explicitly opt in with <code>ModelSpec(experimental_models=["torch_jepa"])</code>. The project adapter composes the self-supervised <code>JepaEstimator</code> with a supervised head, so the same representation is evaluated, packaged, loaded, and used by <code>RunResult.predict</code>.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">Tabular JEPA</th><td>Install <code>scmle[deeplearning]</code> and explicitly opt in with <code>ModelSpec(experimental_models=["torch_jepa"])</code>. The project adapter composes the self-supervised <code>JepaEstimator</code> with a supervised head, so the same representation is evaluated, packaged, loaded, and used by <code>RunResult.predict</code>.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">Parameter estimation</th><td><code>estimate_parameters</code> supports declared linear, logistic, Bayesian Gaussian, binary and continuous-treatment IPW/AIPW paths, and grouped random-intercept or one-random-slope estimators, with explicit assumptions, uncertainty, sensitivity, and independent reference evidence. Clustered uncertainty names its sampling units and diagnostics. Reports are digest-bound and can be persisted with <code>EstimationResult.write</code>.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
         <tr><th scope="row">Longitudinal causal estimation</th><td><code>LongitudinalIPWEstimator</code> accepts validated subject/time rows and estimates period-specific binary-treatment Hájek IPW effects with overlap, effective sample size, subject-aligned covariance, and digest-bound reports.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
         <tr><th scope="row">Sequential causal estimation</th><td><code>SequentialIPWEstimator</code> estimates a static always-treated versus always-control contrast over two or more periods using stabilized treatment-history weights and declared pre-treatment time-varying covariates.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
@@ -61,8 +60,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   <h2 id="transformers">Try an optional transformer path</h2>
   <p>The extra is a deliberate boundary. It keeps the base install small and makes the dependency, worker process, resource cost, and failure mode visible in the run. Start with a small budget and compare the transformer against a simple baseline on the same split.</p>
-  <pre><code>{`from scml import MLProject
-from scml.contracts.tasks import ModelSpec
+  <pre><code>{`from scmle import MLProject
+from scmle.contracts.tasks import ModelSpec
 
 # The opt-in is part of the hashed project configuration and the run plan.
 project = MLProject(
@@ -76,11 +75,11 @@ plan = project.plan()
 result = project.run(plan)
 predictions = result.predict(new_rows)
 result.save("bundle", signing_key="load-this-from-your-secret-store")`}</code></pre>
-  <p>Install the optional runtime before running this example: <code>pip install "super-charge-ml[deeplearning]"</code>. Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. An explicit opt-in makes the path runnable; it does not make it production-supported. There is no general transformer registry, distributed training guarantee, hosted weight registry, or production text-understanding claim behind this optional extra.</p>
+  <p>Install the optional runtime before running this example: <code>pip install "scmle[deeplearning]"</code>. Before treating the result as useful, inspect the run evidence for the resolved adapter, dependency versions, seed, train/validation/test identity, resource observations, failed trials, and explanation limitations. An explicit opt-in makes the path runnable; it does not make it production-supported. There is no general transformer registry, distributed training guarantee, hosted weight registry, or production text-understanding claim behind this optional extra.</p>
 
   <h2 id="jepa">Pretrain a tabular JEPA representation</h2>
   <p>JEPA is a transformer-adjacent self-supervised representation workflow, not a target-label model. The project integration accepts a tabular feature plan, masks the resulting finite numeric matrix, predicts an EMA target representation, and trains a small supervised head on the embeddings. The downstream benchmark, split, and model card remain your responsibility.</p>
-  <pre><code>{`from scml.models.deeplearning import JepaEstimator
+  <pre><code>{`from scmle.models.deeplearning import JepaEstimator
 
 encoder = JepaEstimator(
     embedding_size=64,
@@ -163,8 +162,8 @@ score = downstream_model.score(embeddings[test], labels[test])`}</code></pre>
   <p>The estimation API is intentionally explicit. You supply the design matrix, outcome, scientific declaration, and covariance policy; the result tells you what was estimated, how many rows were used, how uncertainty was computed, and whether the independent reference calculation agreed. This example is self-contained apart from NumPy and the installed package:</p>
   <pre><code>{`import numpy as np
 
-from scml import EstimandSpec, EstimationPolicy, EstimationResult
-from scml import estimate_parameters
+from scmle import EstimandSpec, EstimationPolicy, EstimationResult
+from scmle import estimate_parameters
 
 features = np.array([
     [0.0, 1.0], [1.0, 1.0], [0.0, 2.0], [1.0, 2.0],
@@ -197,7 +196,7 @@ print(verified.reference)`}</code></pre>
 
   <h2 id="project-integration">Attach the estimate to an MLProject run</h2>
   <p>Use the project API when the estimate must travel with the same tabular snapshot and run evidence as model selection. The estimation policy does not choose the predictive model, and the predictive model does not silently define the estimand.</p>
-  <pre><code>{`from scml import MLProject
+  <pre><code>{`from scmle import MLProject
 
 project = MLProject(
     data=frame,
@@ -215,9 +214,9 @@ print(result.run_dir / "parameter_estimation.json")`}</code></pre>
 
   <h2 id="longitudinal">Estimate period-specific effects safely</h2>
   <p>Use <code>LongitudinalIPWEstimator</code> when each subject contributes ordered rows at several periods and you want a separate effect per period. The contract requires unique subject-time identities, baseline covariates, treatment support, overlap, and explicit assumptions about consistency, positivity, exchangeability, and time-varying confounding.</p>
-  <pre><code>{`from scml import LongitudinalIPWEstimator
-from scml import LongitudinalEstimationPolicy
-from scml import LongitudinalEstimand
+  <pre><code>{`from scmle import LongitudinalIPWEstimator
+from scmle import LongitudinalEstimationPolicy
+from scmle import LongitudinalEstimand
 
 longitudinal_estimand = LongitudinalEstimand(
     name="period_specific_treatment_effect",
@@ -244,9 +243,9 @@ report.write("artifacts/longitudinal-ate.json")`}</code></pre>
 
   <h2 id="sequential">Estimate a sustained treatment-history contrast</h2>
   <p>Use <code>SequentialIPWEstimator</code> when the scientific question is a static regime contrast—every period treated versus every period untreated—and the data contains one complete, ordered row per subject and period. At each period, the denominator model conditions on observed treatment history, baseline covariates, and declared pre-treatment time-varying covariates. A numerator model conditions on treatment history to stabilize the cumulative weights.</p>
-  <pre><code>{`from scml import SequentialEstimand
-from scml import SequentialEstimationPolicy
-from scml import SequentialIPWEstimator
+  <pre><code>{`from scmle import SequentialEstimand
+from scmle import SequentialEstimationPolicy
+from scmle import SequentialIPWEstimator
 
 sequential_estimand = SequentialEstimand(
     name="sustained_treatment_effect",
@@ -276,9 +275,9 @@ report.write("artifacts/sequential-ate.json")
 
   <h2 id="continuous-treatment">Estimate a continuous-treatment dose response</h2>
   <p>Use <code>continuous_ipw_ate</code> when treatment is numeric and the scientific quantity is a one-unit marginal outcome change. The estimator fits an explicit Gaussian generalized propensity score—treatment conditional on every declared non-treatment feature—then uses stabilized marginal-to-conditional density weights for a weighted linear dose-response regression.</p>
-  <pre><code>{`from scml import EstimandSpec
-from scml import EstimationPolicy
-from scml import estimate_parameters
+  <pre><code>{`from scmle import EstimandSpec
+from scmle import EstimationPolicy
+from scmle import estimate_parameters
 
 estimand = EstimandSpec(
     name="dose_response_slope",

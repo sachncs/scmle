@@ -2,7 +2,7 @@
 
 import pytest
 
-from scml.contracts import observability
+from scmle.contracts import observability
 
 
 def policy() -> observability.ObservabilityPolicy:

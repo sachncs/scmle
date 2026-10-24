@@ -8,19 +8,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.data.curation import preprocessing
-from scml.data.modalities import document
-from scml.data.profiling import profiler
-from scml.data.readers import tabular
-from scml.data.splitting import splitters
-from scml.data.validation import target as target_module
-from scml.governance import attestation
-from scml.models import registry as registry_module
-from scml.models import thresholds
-from scml.monitoring import reference
-from scml.sampling import resampling
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
+from scmle.data.modalities import document
+from scmle.data.profiling import profiler
+from scmle.data.readers import tabular
+from scmle.data.splitting import splitters
+from scmle.data.validation import target as target_module
+from scmle.governance import attestation
+from scmle.models import registry as registry_module
+from scmle.models import thresholds
+from scmle.monitoring import reference
+from scmle.sampling import resampling
 
 SETTINGS = settings(
     max_examples=40,
@@ -105,7 +105,7 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
     try:
         task = target_module.TaskResolver(spec).resolve(frame["y"])
         profile = profiler.DatasetProfiler(spec).profile(frame, manifest, task)
-    except errors.ScmlError:
+    except errors.ScmleError:
         return
     plan = profile.feature_plan
     assert "y" not in plan.features
@@ -130,7 +130,7 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
             .profile(frame, manifest, task)
             .feature_plan
         )
-    except errors.ScmlError:
+    except errors.ScmleError:
         return
     features = frame.drop(columns="y")
     for name in (

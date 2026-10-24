@@ -3,7 +3,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
-<DocsLayout title="Security" description="Understand signing, dependency, privacy, and trust boundaries before using super-charge-ml in a release workflow." current="security">
+<DocsLayout title="Security" description="Understand signing, dependency, privacy, and trust boundaries before using scmle in a release workflow." current="security">
   <p class="eyebrow"><span></span> Trust boundaries</p>
   <h1>Know what is<br /><em>trusted.</em></h1>
   <p class="lead">Security here means more than a clean dependency scan. It means knowing which bytes, identities, keys, and operators a claim depends on—and refusing to turn missing evidence into a green status.</p>
@@ -24,7 +24,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   <h2>Bundle verification is mandatory</h2>
   <p>A bundle load verifies the manifest signature, model payload digest, model digest, and fitted type before deserialization. Treat <code>trusted=True</code> as an explicit executable-code boundary, not as a convenience switch.</p>
-  <pre><code>{`from scml import ModelBundle
+  <pre><code>{`from scmle import ModelBundle
 
 bundle = ModelBundle.load(
     "runs/run-42/model",

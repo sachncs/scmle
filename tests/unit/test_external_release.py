@@ -7,8 +7,8 @@ from scripts import verify_external_release
 
 def make_artifacts(tmp_path):
     """Create deterministic wheel and source-distribution fixtures."""
-    wheel = tmp_path / "super_charge_ml-0.1.0b1-py3-none-any.whl"
-    source = tmp_path / "super_charge_ml-0.1.0b1.tar.gz"
+    wheel = tmp_path / "scmle-0.1.0b1-py3-none-any.whl"
+    source = tmp_path / "scmle-0.1.0b1.tar.gz"
     wheel.write_bytes(b"wheel-bytes")
     source.write_bytes(b"source-bytes")
     return wheel, source
@@ -36,7 +36,7 @@ def test_external_release_matches_public_github_and_pypi_digests(
             ],
         },
         commit_url: {"sha": "a" * 40},
-        "https://pypi.example/super-charge-ml/0.1.0b1/json": {
+        "https://pypi.example/scmle/0.1.0b1/json": {
             "info": {"version": "0.1.0b1"},
             "urls": [
                 {
@@ -69,7 +69,7 @@ def test_external_release_matches_public_github_and_pypi_digests(
         "v0.1.0b1",
         "a" * 40,
         tmp_path,
-        "super-charge-ml",
+        "scmle",
         github_api="https://api.example",
         pypi_api="https://pypi.example",
     )
@@ -92,7 +92,7 @@ def test_external_release_rejects_published_digest_mismatch(
         "https://api.example/repos/sachncs/magicml/releases/tags/v0.1.0b1"
     )
     commit_url = "https://api.example/repos/sachncs/magicml/commits/v0.1.0b1"
-    pypi_url = "https://pypi.example/super-charge-ml/0.1.0b1/json"
+    pypi_url = "https://pypi.example/scmle/0.1.0b1/json"
     responses = {
         release_url: {
             "tag_name": "v0.1.0b1",
@@ -136,7 +136,7 @@ def test_external_release_rejects_published_digest_mismatch(
         "v0.1.0b1",
         "a" * 40,
         tmp_path,
-        "super-charge-ml",
+        "scmle",
         github_api="https://api.example",
         pypi_api="https://pypi.example",
     )

@@ -7,10 +7,10 @@ import joblib
 import numpy as np
 import pytest
 
-from scml.contracts import tasks
-from scml.models import conformance
-from scml.models import registry as registry_module
-from scml.models.deeplearning import estimators
+from scmle.contracts import tasks
+from scmle.models import conformance
+from scmle.models import registry as registry_module
+from scmle.models.deeplearning import estimators
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None

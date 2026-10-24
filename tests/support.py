@@ -4,9 +4,9 @@ import time
 
 from sklearn import dummy
 
-import scml
-from scml.contracts import models
-from scml.contracts import tasks
+import scmle
+from scmle.contracts import models
+from scmle.contracts import tasks
 
 NO_TUNING = tasks.SearchSpec(top_models=0)
 NO_STRATEGIES = tasks.StrategySpec(top_models=0)
@@ -23,7 +23,7 @@ def make_project(data, target, **kwargs):
     kwargs.setdefault("ensemble", NO_ENSEMBLE)
     kwargs.setdefault("models", FAST_MODELS)  # PyTorch trains slowly
     kwargs.setdefault("enforcement", "cooperative")  # fast, in-process
-    return scml.MLProject(data, target, **kwargs)
+    return scmle.MLProject(data, target, **kwargs)
 
 
 class HungryClassifier(dummy.DummyClassifier):

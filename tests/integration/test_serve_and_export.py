@@ -12,14 +12,14 @@ import pandas as pd
 import pytest
 import support
 
-from scml import cli
-from scml.artifacts import bundle as bundle_module
-from scml.contracts import data as data_contracts
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.data.curation import preprocessing
-from scml.inference import serving
-from scml.models import registry as registry_module
+from scmle import cli
+from scmle.artifacts import bundle as bundle_module
+from scmle.contracts import data as data_contracts
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
+from scmle.inference import serving
+from scmle.models import registry as registry_module
 
 
 @pytest.fixture(scope="module")
@@ -191,7 +191,7 @@ def test_health_reports_the_model_version_and_checksum(saved):
     assert len(health["model_sha256"]) == 64
     assert headers["Cache-Control"] == "no-store"
     assert headers["X-Content-Type-Options"] == "nosniff"
-    assert headers["Server"] == "scml-reference"
+    assert headers["Server"] == "scmle-reference"
 
 
 def test_the_server_rejects_starting_twice(saved):
@@ -200,7 +200,7 @@ def test_the_server_rejects_starting_twice(saved):
     adapter = serving.HttpServing(model)
     adapter.start()
     try:
-        with pytest.raises(errors.ScmlError, match="already running"):
+        with pytest.raises(errors.ScmleError, match="already running"):
             adapter.start()
     finally:
         adapter.stop()

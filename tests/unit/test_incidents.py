@@ -2,9 +2,9 @@
 
 import pytest
 
-from scml.contracts import observability
-from scml.monitoring import incidents
-from scml.monitoring import slo
+from scmle.contracts import observability
+from scmle.monitoring import incidents
+from scmle.monitoring import slo
 
 
 def evaluation() -> slo.SLOEvaluation:

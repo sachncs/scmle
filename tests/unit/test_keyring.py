@@ -4,7 +4,7 @@ import datetime
 
 import pytest
 
-from scml.governance import keyring
+from scmle.governance import keyring
 
 CREATED = "2026-10-20T00:00:00+00:00"
 ROTATED = "2026-10-21T00:00:00+00:00"

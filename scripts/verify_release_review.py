@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import sys
 
-from scml.governance import review
+from scmle.governance import review
 
 DEFAULT_REQUIRED_KINDS = [kind.value for kind in review.ReviewClaimKind]
 
@@ -28,7 +28,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--signing-key-env",
-        default="SCML_REVIEW_SIGNING_KEY",
+        default="SCMLE_REVIEW_SIGNING_KEY",
         help="Environment variable containing the review verification key.",
     )
     return parser.parse_args(arguments)

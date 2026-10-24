@@ -7,18 +7,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scml
-from scml.contracts import capabilities
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.core import context as context_module
-from scml.core import orchestrator
-from scml.core import stages
-from scml.models import registry as registry_module
-from scml.models.deeplearning import estimators
-from scml.models.deeplearning import jepa
-from scml.models.deeplearning import networks
-from scml.models.sklearn import classical
+import scmle
+from scmle.contracts import capabilities
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.core import context as context_module
+from scmle.core import orchestrator
+from scmle.core import stages
+from scmle.models import registry as registry_module
+from scmle.models.deeplearning import estimators
+from scmle.models.deeplearning import jepa
+from scmle.models.deeplearning import networks
+from scmle.models.sklearn import classical
 
 
 def test_unknown_experimental_model_fails_closed():
@@ -177,7 +177,7 @@ def test_explicit_deep_model_project_packages_and_predicts(
     binary_frame, tmp_path, model_name
 ):
     """An opt-in tabular deep model uses normal package/predict APIs."""
-    project = scml.MLProject(
+    project = scmle.MLProject(
         binary_frame,
         "y",
         time_budget=600,
@@ -196,7 +196,7 @@ def test_explicit_deep_model_project_packages_and_predicts(
     result = project.run(plan)
     features = binary_frame.drop(columns="y").head(12)
     saved = result.save(tmp_path / f"{model_name}-bundle")
-    loaded = scml.load_model(saved, trusted=True)
+    loaded = scmle.load_model(saved, trusted=True)
 
     assert result.selected_model == model_name
     assert len(result.predict(features)) == 12

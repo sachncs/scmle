@@ -2,8 +2,8 @@
 
 import datetime
 
-from scml.artifacts import explanation_report
-from scml.contracts import explanations
+from scmle.artifacts import explanation_report
+from scmle.contracts import explanations
 
 
 def evidence(

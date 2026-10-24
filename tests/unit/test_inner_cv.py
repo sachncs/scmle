@@ -5,11 +5,11 @@ import itertools
 import numpy as np
 import pandas as pd
 
-from scml.contracts import data as data_contracts
-from scml.contracts import tasks
-from scml.data.splitting import inner_cv
-from scml.models import registry as registry_module
-from scml.sampling import strategies
+from scmle.contracts import data as data_contracts
+from scmle.contracts import tasks
+from scmle.data.splitting import inner_cv
+from scmle.models import registry as registry_module
+from scmle.sampling import strategies
 
 BINARY = tasks.TaskType.BINARY
 
@@ -87,7 +87,7 @@ def test_calibration_strategy_uses_the_structured_splitter():
 def test_stack_members_are_full_pipelines_cross_fitted_by_group():
     registry = registry_module.ModelRegistry.with_builtins()
     params = {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]}
-    from scml.data.curation import preprocessing
+    from scmle.data.curation import preprocessing
 
     stack = preprocessing.build_pipeline(
         plan(group_column="unit"), registry.get("stacking"), BINARY, 0, params

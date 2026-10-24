@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-from scml.governance import review
+from scmle.governance import review
 
 
 def claim(
@@ -89,7 +89,7 @@ def test_signed_review_writes_atomically_and_cli_verifies_exact_commit(
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, "SCML_REVIEW_SIGNING_KEY": "release-key"},
+        env={**os.environ, "SCMLE_REVIEW_SIGNING_KEY": "release-key"},
     )
 
     assert restored == make_review().sign("release-key")
@@ -108,7 +108,7 @@ def test_signed_review_writes_atomically_and_cli_verifies_exact_commit(
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, "SCML_REVIEW_SIGNING_KEY": "release-key"},
+        env={**os.environ, "SCMLE_REVIEW_SIGNING_KEY": "release-key"},
     )
     assert wrong_commit.returncode == 1
 
@@ -159,7 +159,7 @@ def test_cli_requires_reliability_and_security_claims_by_default(
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, "SCML_REVIEW_SIGNING_KEY": "release-key"},
+        env={**os.environ, "SCMLE_REVIEW_SIGNING_KEY": "release-key"},
     )
 
     assert result.returncode == 1

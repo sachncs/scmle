@@ -10,9 +10,9 @@ from sklearn import linear_model
 from sklearn import naive_bayes
 import support
 
-import scml
-from scml.contracts import errors
-from scml.contracts import search
+import scmle
+from scmle.contracts import errors
+from scmle.contracts import search
 
 
 class WrongLength(base.ClassifierMixin, base.BaseEstimator):
@@ -30,7 +30,7 @@ class WrongLength(base.ClassifierMixin, base.BaseEstimator):
 def clean_registry():
     yield
     for name in ("gaussian_nb", "bayes_ridge", "broken"):
-        scml.unregister_estimator(name)
+        scmle.unregister_estimator(name)
 
 
 def frame(rows=500, seed=0):
@@ -43,7 +43,7 @@ def frame(rows=500, seed=0):
 
 
 def test_a_registered_classifier_competes_in_a_run(tmp_path):
-    scml.register_estimator("gaussian_nb", classifier=naive_bayes.GaussianNB)
+    scmle.register_estimator("gaussian_nb", classifier=naive_bayes.GaussianNB)
 
     result = support.make_project(
         frame(), "y", time_budget=300, output_dir=tmp_path
@@ -57,7 +57,7 @@ def test_a_registered_regressor_gets_a_search_space(tmp_path):
     space = search.SearchSpace(
         (search.FloatParameter("alpha_1", 1e-8, 1e-3, log=True),)
     )
-    adapter = scml.register_estimator(
+    adapter = scmle.register_estimator(
         "bayes_ridge", regressor=linear_model.BayesianRidge, search_space=space
     )
 
@@ -78,35 +78,35 @@ def test_a_registered_regressor_gets_a_search_space(tmp_path):
 
 def test_an_estimator_that_breaks_the_contract_is_refused_with_the_check():
     with pytest.raises(errors.ConfigError, match="wrong length"):
-        scml.register_estimator("broken", classifier=WrongLength)
+        scmle.register_estimator("broken", classifier=WrongLength)
 
-    from scml.models import registry
+    from scmle.models import registry
 
     assert "broken" not in registry.USER_ADAPTERS
 
 
 def test_builtin_names_and_duplicates_are_refused():
     with pytest.raises(errors.ConfigError, match="built-in"):
-        scml.register_estimator(
+        scmle.register_estimator(
             "random_forest", classifier=naive_bayes.GaussianNB
         )
-    scml.register_estimator("gaussian_nb", classifier=naive_bayes.GaussianNB)
+    scmle.register_estimator("gaussian_nb", classifier=naive_bayes.GaussianNB)
     with pytest.raises(errors.ConfigError, match="already registered"):
-        scml.register_estimator(
+        scmle.register_estimator(
             "gaussian_nb", classifier=naive_bayes.GaussianNB
         )
-    scml.register_estimator(
+    scmle.register_estimator(
         "gaussian_nb", classifier=naive_bayes.GaussianNB, replace=True
     )
 
 
 def test_a_class_is_required():
     with pytest.raises(errors.ConfigError, match="classifier class"):
-        scml.register_estimator("gaussian_nb")
+        scmle.register_estimator("gaussian_nb")
 
 
 def test_the_adapter_survives_pickling_for_trial_processes():
-    adapter = scml.register_estimator(
+    adapter = scmle.register_estimator(
         "gaussian_nb", classifier=naive_bayes.GaussianNB
     )
 
@@ -117,7 +117,7 @@ def test_the_adapter_survives_pickling_for_trial_processes():
 
 
 def test_a_registered_model_runs_under_hard_enforcement(tmp_path):
-    scml.register_estimator("gaussian_nb", classifier=naive_bayes.GaussianNB)
+    scmle.register_estimator("gaussian_nb", classifier=naive_bayes.GaussianNB)
 
     result = support.make_project(
         frame(),

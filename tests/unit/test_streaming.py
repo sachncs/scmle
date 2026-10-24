@@ -13,9 +13,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from scml.contracts import errors
-from scml.data import readers
-from scml.data.readers import streaming
+from scmle.contracts import errors
+from scmle.data import readers
+from scmle.data.readers import streaming
 
 
 def write_parquet(path, rows, columns=6, chunk=100_000, seed=0):
@@ -91,7 +91,7 @@ def test_a_file_far_larger_than_the_budget_is_read_in_bounded_memory(tmp_path):
         f"""
         import json, sys
         import numpy as np, pandas as pd
-        from scml.data.readers import streaming
+        from scmle.data.readers import streaming
         def peak():
             if sys.platform == "win32":
                 import psutil

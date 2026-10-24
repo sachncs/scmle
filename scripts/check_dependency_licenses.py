@@ -240,7 +240,7 @@ def main() -> None:
     validate_inventory(inventory, missing)
     record = {
         "schema_version": 1,
-        "project": "super-charge-ml",
+        "project": "scmle",
         "scope": (
             "all-optional-extras" if arguments.all_extras else "base-runtime"
         ),

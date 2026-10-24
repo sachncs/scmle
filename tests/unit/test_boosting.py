@@ -2,12 +2,12 @@
 
 import pytest
 
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.models import conformance
-from scml.models import registry as registry_module
-from scml.models.boosting import boosters
-from scml.models.boosting import early_stopping
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.models import conformance
+from scmle.models import registry as registry_module
+from scmle.models.boosting import boosters
+from scmle.models.boosting import early_stopping
 
 
 @pytest.mark.parametrize("library", ["lightgbm", "xgboost"])
@@ -74,7 +74,7 @@ def test_label_encoded_classifier_roundtrips_string_labels():
     import pandas as pd
     from sklearn import tree
 
-    from scml.models import wrappers
+    from scmle.models import wrappers
 
     rng = np.random.default_rng(0)
     features = pd.DataFrame({"a": rng.normal(size=60)})
@@ -94,7 +94,7 @@ def test_wrapper_survives_pickling_and_cloning():
     from sklearn import base
     from sklearn import tree
 
-    from scml.models import wrappers
+    from scmle.models import wrappers
 
     model = wrappers.LabelEncodedClassifier(tree.DecisionTreeClassifier())
     assert base.clone(model).get_params()["estimator"] is not None
@@ -111,7 +111,7 @@ def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
     pytest.importorskip("catboost")
     import support
 
-    from scml.contracts import tasks
+    from scmle.contracts import tasks
 
     only = tasks.StrategySpec(top_models=0)
     project = support.make_project(
@@ -140,7 +140,7 @@ def test_flat_prediction_wrapper_flattens_column_vectors():
     import pandas as pd
     from sklearn import tree
 
-    from scml.models import wrappers
+    from scmle.models import wrappers
 
     class ColumnVectorTree(tree.DecisionTreeClassifier):
         def predict(self, features):
@@ -161,7 +161,7 @@ def test_flat_prediction_wrapper_flattens_column_vectors():
 
 def test_catboost_multiclass_predictions_are_one_dimensional(multiclass_frame):
     pytest.importorskip("catboost")
-    from scml.contracts import tasks
+    from scmle.contracts import tasks
 
     adapter = registry_module.ModelRegistry.with_builtins().get("catboost")
     estimator = adapter.build(tasks.TaskType.MULTICLASS, 0, {"iterations": 20})

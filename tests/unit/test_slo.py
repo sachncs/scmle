@@ -2,8 +2,8 @@
 
 import pytest
 
-from scml.contracts import observability
-from scml.monitoring import slo
+from scmle.contracts import observability
+from scmle.monitoring import slo
 
 
 def target() -> slo.SLOTarget:

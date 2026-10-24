@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 import test_diagnostics
 
-from scml.contracts import tasks
-from scml.evaluation import diagnostics
-from scml.evaluation import suite as full_suite
-from scml.explainability import dependence
-from scml.explainability import importance
-from scml.explainability import interaction
-from scml.explainability import local
+from scmle.contracts import tasks
+from scmle.evaluation import diagnostics
+from scmle.evaluation import suite as full_suite
+from scmle.explainability import dependence
+from scmle.explainability import importance
+from scmle.explainability import interaction
+from scmle.explainability import local
 
 
 def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():

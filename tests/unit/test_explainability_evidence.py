@@ -8,9 +8,9 @@ from typing import TypedDict
 import pydantic
 import pytest
 
-from scml.contracts import explanations
-from scml.evaluation import diagnostics
-from scml.explainability import suite
+from scmle.contracts import explanations
+from scmle.evaluation import diagnostics
+from scmle.explainability import suite
 
 
 class CustomExplanation(diagnostics.Diagnostic):

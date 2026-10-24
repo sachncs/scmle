@@ -2,9 +2,9 @@
 
 import pytest
 
-from scml.contracts import events
-from scml.contracts import experiments
-from scml.experimentation import stores
+from scmle.contracts import events
+from scmle.contracts import experiments
+from scmle.experimentation import stores
 
 
 def make_trial(

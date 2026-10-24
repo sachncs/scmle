@@ -1,4 +1,4 @@
-# super-charge-ml marketing site
+# scmle marketing site
 
 The marketing site is a small static Astro site. It is intentionally kept
 separate from the Python package so the product story can evolve without

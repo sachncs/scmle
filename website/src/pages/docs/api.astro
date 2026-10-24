@@ -4,13 +4,13 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
-<DocsLayout title="Python API" description="The supported top-level Python API for super-charge-ml." current="api">
+<DocsLayout title="Python API" description="The supported top-level Python API for scmle." current="api">
   <p class="eyebrow"><span></span> Stable surface</p>
   <h1>Use the API<br /><em>with intent.</em></h1>
   <p class="lead">The package keeps its supported surface small: define an <code>MLProject</code>, inspect a <code>RunResult</code>, save or load a signed <code>ModelBundle</code>, and extend registries when the built-ins are not enough.</p>
 
   <h2>The lifecycle objects</h2>
-  <pre><code>from scml import MLProject, load_model, predict
+  <pre><code>from scmle import MLProject, load_model, predict
 
 project = MLProject(data=df, target="outcome", task="regression")
 plan = project.plan()
@@ -38,9 +38,9 @@ predictions = predict(loaded, new_rows)</code></pre>
 
   <h2>Run a non-tabular lifecycle explicitly</h2>
   <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>ExtensionModality</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, and <code>ModalitySampleDecoder</code> are also exported for verified library inference and explicit reference serving.</p>
-  <pre><code>from scml import ModalityProject
-from scml.data.modalities import DocumentDataset, DocumentSample
-from scml.models.modality_lifecycle import TextAdapter
+  <pre><code>from scmle import ModalityProject
+from scmle.data.modalities import DocumentDataset, DocumentSample
+from scmle.models.modality_lifecycle import TextAdapter
 
 adapter = TextAdapter(DocumentDataset((
     DocumentSample("a", "red apple", label="fruit"),
@@ -63,7 +63,7 @@ print(report.documentation["status"])  # experimental</code></pre>
 
   <h2>Use the bounded non-tabular model API</h2>
   <p><code>NonTabularModelProject</code> is the narrower modelling boundary for applications that need a durable package around an existing built-in representation. It allowlists the exact document, text, image, audio, video, graph, geospatial, and raster adapter types; it does not discover codecs, accept arbitrary adapter subclasses, infer semantics from raw bytes, or claim Transformer, JEPA, GNN, OCR, layout, or foundation-model support. Video and raster metadata-only paths remain metadata representations, not visual modelling.</p>
-  <pre><code>{`from scml import NonTabularModelProject
+  <pre><code>{`from scmle import NonTabularModelProject
 
 project = NonTabularModelProject(
     adapter,
@@ -79,8 +79,8 @@ print(result.predict(adapter.samples[:2]))`}</code></pre>
 
   <h2>Bring a new dataset family</h2>
   <p>Use <code>ExtensionModality</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>ExtensionCurationAdapter</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
-  <pre><code>{`from scml.contracts import modalities
-from scml.models import modality_lifecycle
+  <pre><code>{`from scmle.contracts import modalities
+from scmle.models import modality_lifecycle
 
 class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
     modality = modalities.ExtensionModality("acme/point-cloud")
@@ -95,7 +95,7 @@ assert report.documentation["status"] == "extension-only"`}</code></pre>
 
   <h2>Connect a warehouse without hiding its boundary</h2>
   <p><code>WarehouseConnector</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>
-  <pre><code>from scml.data.readers import SourceSchema, WarehouseConnector
+  <pre><code>from scmle.data.readers import SourceSchema, WarehouseConnector
 
 connector = WarehouseConnector(
     "warehouse://analytics/events",
@@ -111,13 +111,13 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
   <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 
   <h2>What is safe to depend on</h2>
-  <p>The supported top-level exports are <code>MLProject</code>, <code>ModalityProject</code>, <code>NonTabularModelProject</code>, <code>NonTabularModelResult</code>, <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, <code>ModalitySampleDecoder</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scml.core</code>, <code>scml.data</code>, and <code>scml.models</code> may change until promoted into a documented contract.</p>
+  <p>The supported top-level exports are <code>MLProject</code>, <code>ModalityProject</code>, <code>NonTabularModelProject</code>, <code>NonTabularModelResult</code>, <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, <code>ModalitySampleDecoder</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scmle.core</code>, <code>scmle.data</code>, and <code>scmle.models</code> may change until promoted into a documented contract.</p>
 
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
-  <pre><code>from scml.data.modalities import DocumentDataset, DocumentSample
-from scml.data.modalities import DocumentReader
-from scml.models.documents import DocumentClassifier, DocumentModelConfig
+  <pre><code>from scmle.data.modalities import DocumentDataset, DocumentSample
+from scmle.data.modalities import DocumentReader
+from scmle.models.documents import DocumentClassifier, DocumentModelConfig
 
 train = DocumentDataset((
     DocumentSample("a", "red apple orchard", label="fruit"),
@@ -156,9 +156,9 @@ sample = reader.load("policy.pdf", document_id="policy-2026")`}</code></pre>
 
   <h2>Experimental image baseline</h2>
   <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for exact and near-duplicate content, mixed label state, augmentation lineage, and sensitive metadata, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
-  <pre><code>from scml.data.modalities import ImageAugmentation, ImageDataset
-from scml.data.modalities import ImageSample
-from scml.models.images import ImageClassifier, ImageModelConfig
+  <pre><code>from scmle.data.modalities import ImageAugmentation, ImageDataset
+from scmle.data.modalities import ImageSample
+from scmle.models.images import ImageClassifier, ImageModelConfig
 
 train = ImageDataset((
     ImageSample.from_path("red.png", label="red"),
@@ -200,7 +200,7 @@ assert report.release_ready is False if sample.sensitive_metadata else True`}</c
 
   <h2>Experimental audio feature preparation</h2>
   <p>The audio foundation can produce bounded signal statistics for inspection and future baseline work. It makes the observation boundary explicit; it is not an audio classifier and does not silently decode non-WAV containers.</p>
-  <pre><code>from scml.data.modalities import AudioDataset, AudioSample
+  <pre><code>from scmle.data.modalities import AudioDataset, AudioSample
 
 clip = AudioSample.from_bytes(
     wav_bytes, source="clip.wav", group_id="speaker-17"
@@ -215,7 +215,7 @@ print(features.frames_truncated)</code></pre>
 
   <h2>Experimental video metadata features</h2>
   <p>Video exposes metadata evidence by default. When you own a versioned decoder, you can opt into a bounded temporal baseline without hiding codec or resource decisions inside the core package.</p>
-  <pre><code>from scml.data.modalities import VideoDataset, VideoSample
+  <pre><code>from scmle.data.modalities import VideoDataset, VideoSample
 
 clip = VideoSample.from_bytes(encoded, metadata, source="clip.mp4")
 features = VideoDataset((clip,)).prepare_metadata_features()
@@ -232,7 +232,7 @@ print(temporal.sampled_frame_indices)</code></pre>
   <p><code>prepare_frame_features</code> selects evenly spaced frames, records their indices, computes bounded pixel statistics, and rejects oversized, malformed, or non-finite decoder output. The lifecycle can use the same explicit decoder to emit frame-statistics occlusion evidence. This is not raw saliency, motion attribution, synchronization proof, or a production video model; those require a versioned decoder policy, temporal leakage review, independent evaluation, serving, and recovery evidence. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit.</p>
   <h2>Video temporal boundaries</h2>
   <p>A video clip may have an observation time independent of its encoded container timestamp. Pass a timezone-aware ISO-8601 value or <code>datetime</code> to <code>VideoSample.from_bytes</code>. The sample stores the canonical UTC value and binds it into the dataset identity. <code>VideoDataset.curate()</code> reports absent, mixed, or complete temporal coverage; <code>split_temporal</code> fails closed unless every clip is timed. To make the experimental lifecycle use this policy, pass the same cutoff as <code>VideoAdapter(temporal_cutoff=...)</code>; otherwise the adapter retains its explicit group-aware split.</p>
-  <pre><code>{`from scml.data.modalities import VideoDataset, VideoSample
+  <pre><code>{`from scmle.data.modalities import VideoDataset, VideoSample
 
 clip = VideoSample.from_bytes(
     encoded,

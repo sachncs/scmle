@@ -7,12 +7,12 @@ import pytest
 from sklearn import dummy
 import support
 
-from scml.contracts import errors
-from scml.contracts import models
-from scml.contracts import tasks
-from scml.core import orchestrator as orchestrator_module
-from scml.core import stages as stages_module
-from scml.models import registry as registry_module
+from scmle.contracts import errors
+from scmle.contracts import models
+from scmle.contracts import tasks
+from scmle.core import orchestrator as orchestrator_module
+from scmle.core import stages as stages_module
+from scmle.models import registry as registry_module
 
 BINARY = frozenset({tasks.TaskType.BINARY})
 
@@ -57,7 +57,7 @@ def test_all_trials_failing_ends_in_failed_state(binary_frame, tmp_path):
     registry = registry_module.ModelRegistry((ExplodingAdapter(),))
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
-    with pytest.raises(errors.ScmlError, match="all trials failed") as caught:
+    with pytest.raises(errors.ScmleError, match="all trials failed") as caught:
         project.run()
     assert (
         read_events(caught.value.details["run_dir"])[-1]["kind"]

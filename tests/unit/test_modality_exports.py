@@ -1,7 +1,7 @@
 """Tests for the public data-foundation import surfaces."""
 
-from scml.data import modalities
-from scml.data import readers
+from scmle.data import modalities
+from scmle.data import readers
 
 
 def test_modality_and_connector_surfaces_are_public():

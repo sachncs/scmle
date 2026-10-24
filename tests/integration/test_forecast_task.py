@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import support
 
-from scml.contracts import errors
+from scmle.contracts import errors
 
 HORIZON = 4
 PERIOD = 7

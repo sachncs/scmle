@@ -7,11 +7,11 @@ import sys
 import numpy as np
 import pytest
 
-from scml.contracts import tasks
-from scml.models import registry as registry_module
-from scml.models.deeplearning import estimators
-from scml.models.deeplearning import foundation
-from scml.models.deeplearning import worker
+from scmle.contracts import tasks
+from scmle.models import registry as registry_module
+from scmle.models.deeplearning import estimators
+from scmle.models.deeplearning import foundation
+from scmle.models.deeplearning import worker
 
 STUBS = str(pathlib.Path(__file__).resolve().parents[1] / "stubs")
 

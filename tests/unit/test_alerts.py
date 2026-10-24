@@ -7,7 +7,7 @@ import threading
 
 import pytest
 
-from scml.monitoring import alerts
+from scmle.monitoring import alerts
 
 
 def make_alert(route: str = "on-call") -> alerts.Alert:

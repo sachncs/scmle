@@ -5,8 +5,8 @@ import importlib.util
 import numpy as np
 import pytest
 
-from scml.contracts import errors
-from scml.models.deeplearning import estimators
+from scmle.contracts import errors
+from scmle.models.deeplearning import estimators
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None, reason="torch is not installed"
@@ -117,5 +117,5 @@ def test_unknown_options_are_refused_before_training(kind, settings):
         kind(**settings).fit(features, labels)
 
     assert "ConfigError" in type(caught.value).__name__ or isinstance(
-        caught.value, errors.ScmlError
+        caught.value, errors.ScmleError
     )

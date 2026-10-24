@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.data.profiling import profiler
-from scml.data.readers import tabular
-from scml.data.validation import target as target_module
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.profiling import profiler
+from scmle.data.readers import tabular
+from scmle.data.validation import target as target_module
 
 
 def make_spec(task="auto", **data_overrides):

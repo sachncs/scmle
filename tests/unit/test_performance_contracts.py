@@ -2,7 +2,7 @@
 
 import pytest
 
-from scml.contracts import performance
+from scmle.contracts import performance
 
 OBSERVED = "2026-10-21T00:00:00+00:00"
 

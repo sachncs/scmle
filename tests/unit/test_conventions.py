@@ -12,7 +12,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = sorted(
     path
-    for folder in ("scml", "tests")
+    for folder in ("scmle", "tests")
     for path in (ROOT / folder).rglob("*.py")
 )
 

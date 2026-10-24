@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from scml.contracts import capabilities
-from scml.contracts import errors
-from scml.contracts import tasks
+from scmle.contracts import capabilities
+from scmle.contracts import errors
+from scmle.contracts import tasks
 
 
 def make_key(**overrides):

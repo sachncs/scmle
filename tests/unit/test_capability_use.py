@@ -4,12 +4,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import data as data_contracts
-from scml.contracts import tasks
-from scml.data.curation import preprocessing
-from scml.intelligence import planner
-from scml.models import registry as registry_module
-from scml.sampling import strategies
+from scmle.contracts import data as data_contracts
+from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
+from scmle.intelligence import planner
+from scmle.models import registry as registry_module
+from scmle.sampling import strategies
 
 BINARY = tasks.TaskType.BINARY
 

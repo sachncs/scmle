@@ -4,16 +4,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.artifacts import bundle as bundle_module
-from scml.contracts import data as data_contracts
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.data.curation import preprocessing
-from scml.governance import lifecycle
-from scml.governance import registry as registry_module
-from scml.models import registry as models_module
-from scml.monitoring import abtest
-from scml.monitoring import shadow
+from scmle.artifacts import bundle as bundle_module
+from scmle.contracts import data as data_contracts
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
+from scmle.governance import lifecycle
+from scmle.governance import registry as registry_module
+from scmle.models import registry as models_module
+from scmle.monitoring import abtest
+from scmle.monitoring import shadow
 
 PLAN = data_contracts.FeaturePlan(("a", "b"), ())
 MODELS = models_module.ModelRegistry.with_builtins()

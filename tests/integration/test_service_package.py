@@ -14,13 +14,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml import cli
-from scml.artifacts import bundle as bundle_module
-from scml.contracts import data as data_contracts
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.data.curation import preprocessing
-from scml.models import registry as registry_module
+from scmle import cli
+from scmle.artifacts import bundle as bundle_module
+from scmle.contracts import data as data_contracts
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
+from scmle.models import registry as registry_module
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -97,7 +97,7 @@ def test_the_folder_holds_everything_needed_to_run_and_rebuild(boosted):
     ):
         assert (folder / name).exists()
     pins = (folder / "requirements.txt").read_text()
-    assert f"super-charge-ml=={bundle.info.scml_version}" in pins
+    assert f"scmle=={bundle.info.scmle_version}" in pins
     assert f"scikit-learn=={bundle.info.sklearn}" in pins
     assert "python:" in (folder / "Dockerfile").read_text()
     with pytest.raises(errors.ArtifactError, match="already holds"):
@@ -115,7 +115,7 @@ def test_the_generated_server_scores_rows_like_the_bundle(boosted):
     bundle, frame, root = boosted
     folder = bundle.export_service(root / "running")
     port = free_port()
-    process = start(folder, port, {"SCML_TRUSTED": "1"})
+    process = start(folder, port, {"SCMLE_TRUSTED": "1"})
     try:
         assert wait_for(port, process), process.stderr.read().decode()
         rows = frame.head(20).to_dict("records")

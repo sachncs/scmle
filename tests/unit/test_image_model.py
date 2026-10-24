@@ -6,10 +6,10 @@ import math
 
 import pytest
 
-from scml.data.modalities import image
-from scml.models.images import ImageClassifier
-from scml.models.images import ImageModelConfig
-from scml.models.images import ImageMonitor
+from scmle.data.modalities import image
+from scmle.models.images import ImageClassifier
+from scmle.models.images import ImageModelConfig
+from scmle.models.images import ImageMonitor
 
 try:
     from PIL import Image

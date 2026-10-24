@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import data as data_contracts
-from scml.contracts import tasks
-from scml.models import registry as registry_module
-from scml.sampling import resampling
-from scml.sampling import strategies
+from scmle.contracts import data as data_contracts
+from scmle.contracts import tasks
+from scmle.models import registry as registry_module
+from scmle.sampling import resampling
+from scmle.sampling import strategies
 
 REGRESSION = tasks.TaskType.REGRESSION
 

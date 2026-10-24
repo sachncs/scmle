@@ -16,9 +16,9 @@ jobs:
       - name: Tag matches the package version and the changelog
         run: |
           version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          init=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('scml/__init__.py').read()).group(1))")
+          init=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('scmle/__init__.py').read()).group(1))")
           [ "${GITHUB_REF_NAME}" = "v${version}" ] || { echo "tag ${GITHUB_REF_NAME} != v${version}"; exit 1; }
-          [ "${init}" = "${version}" ] || { echo "scml.__version__ ${init} != ${version}"; exit 1; }
+          [ "${init}" = "${version}" ] || { echo "scmle.__version__ ${init} != ${version}"; exit 1; }
           grep -q "^## ${version}" CHANGELOG.md || { echo "CHANGELOG has no ${version} section"; exit 1; }
 
   test:
@@ -59,7 +59,7 @@ jobs:
           cache-dependency-path: website/package-lock.json
       - name: Run staged release preflight
         env:
-          SCML_PYTHON_VERSION: "3.14"
+          SCMLE_PYTHON_VERSION: "3.14"
         run: ./scripts/release_preflight.sh
 
   publish:
@@ -87,12 +87,12 @@ jobs:
         run: |
           uv venv --python 3.14 /tmp/release-wheel-env
           uv pip install --python /tmp/release-wheel-env/bin/python dist/*.whl
-          /tmp/release-wheel-env/bin/scml --help
-          /tmp/release-wheel-env/bin/python -c "import scml; print(scml.__version__)"
+          /tmp/release-wheel-env/bin/scmle --help
+          /tmp/release-wheel-env/bin/python -c "import scmle; print(scmle.__version__)"
           uv venv --python 3.14 /tmp/release-sdist-env
           uv pip install --python /tmp/release-sdist-env/bin/python dist/*.tar.gz
-          /tmp/release-sdist-env/bin/scml --help
-          /tmp/release-sdist-env/bin/python -c "import scml; print(scml.__version__)"
+          /tmp/release-sdist-env/bin/scmle --help
+          /tmp/release-sdist-env/bin/python -c "import scmle; print(scmle.__version__)"
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
       - name: GitHub release
         env:
@@ -108,6 +108,6 @@ jobs:
           --tag "${GITHUB_REF_NAME}"
           --source-commit "${GITHUB_SHA}"
           --artifact-dir dist
-          --pypi-project super-charge-ml
+          --pypi-project scmle
           --attempts 6
           --retry-delay 10

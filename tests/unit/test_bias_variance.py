@@ -7,7 +7,7 @@ from sklearn import dummy
 from sklearn import linear_model
 from sklearn import tree
 
-from scml.evaluation import bias_variance
+from scmle.evaluation import bias_variance
 
 
 def curve(rows=400, seed=0, noise=0.3):

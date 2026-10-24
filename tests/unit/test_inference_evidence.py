@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from scml.contracts import lineage
-from scml.inference import evidence
+from scmle.contracts import lineage
+from scmle.inference import evidence
 
 
 def build_graph() -> lineage.EvidenceGraph:

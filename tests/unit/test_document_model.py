@@ -5,13 +5,13 @@ import math
 
 import pytest
 
-from scml.data.modalities.document import DocumentDataset
-from scml.data.modalities.document import DocumentReader
-from scml.data.modalities.document import DocumentSample
-from scml.models import documents
-from scml.models.documents import DocumentClassifier
-from scml.models.documents import DocumentModelConfig
-from scml.models.documents import DocumentMonitor
+from scmle.data.modalities.document import DocumentDataset
+from scmle.data.modalities.document import DocumentReader
+from scmle.data.modalities.document import DocumentSample
+from scmle.models import documents
+from scmle.models.documents import DocumentClassifier
+from scmle.models.documents import DocumentModelConfig
+from scmle.models.documents import DocumentMonitor
 
 
 def sample(document_id: str, content: str, label: str) -> DocumentSample:

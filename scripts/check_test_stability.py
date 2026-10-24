@@ -300,7 +300,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if test_arguments and test_arguments[0] == "--":
         test_arguments = test_arguments[1:]
     policy = load_policy(Path(arguments.quarantine))
-    with tempfile.TemporaryDirectory(prefix="scml-test-stability-") as root:
+    with tempfile.TemporaryDirectory(prefix="scmle-test-stability-") as root:
         runs = tuple(
             run_pytest(test_arguments, attempt, Path(root))
             for attempt in range(1, arguments.runs + 1)

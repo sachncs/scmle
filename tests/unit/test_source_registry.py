@@ -6,8 +6,8 @@ import json
 import pandas as pd
 import pytest
 
-from scml.contracts import data
-from scml.data.readers import registry
+from scmle.contracts import data
+from scmle.data.readers import registry
 
 
 def make_manifest(snapshot_id: str, data_hash: str) -> data.DatasetManifest:

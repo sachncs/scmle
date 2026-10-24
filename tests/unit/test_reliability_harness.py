@@ -4,9 +4,9 @@ import hashlib
 
 import pytest
 
-from scml.contracts import errors
-from scml.contracts import reliability
-from scml.governance import reliability as harness_module
+from scmle.contracts import errors
+from scmle.contracts import reliability
+from scmle.governance import reliability as harness_module
 
 
 def artifact(evidence_type: str) -> harness_module.FaultArtifact:

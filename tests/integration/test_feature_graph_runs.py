@@ -9,9 +9,9 @@ import pandas as pd
 import pytest
 import support
 
-import scml
-from scml.contracts import errors
-from scml.contracts import tasks
+import scmle
+from scmle.contracts import errors
+from scmle.contracts import tasks
 
 
 def node(name, op, inputs, **params):
@@ -115,7 +115,7 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
 def test_bundle_with_a_graph_roundtrips_and_records_its_fingerprint(tmp_path):
     frame = graph_frame()
     result = run(frame, tmp_path)
-    loaded = scml.ModelBundle.load(
+    loaded = scmle.ModelBundle.load(
         result.save(tmp_path / "export"), trusted=True
     )
     raw = frame.drop(columns=["y"])
@@ -308,7 +308,7 @@ def test_a_single_new_record_gets_lag_and_rolling_values_from_stored_history(
 
 def test_history_survives_save_and_load_and_tampering_is_detected(tmp_path):
     result = run_series(series_frame(), tmp_path / "run")
-    from scml.artifacts import bundle as bundle_module
+    from scmle.artifacts import bundle as bundle_module
 
     directory = tmp_path / "saved"
     result.bundle.save(directory)
@@ -323,7 +323,7 @@ def test_history_survives_save_and_load_and_tampering_is_detected(tmp_path):
 def test_serving_remembers_records_so_the_next_single_record_sees_them(
     tmp_path,
 ):
-    from scml.inference import serving
+    from scmle.inference import serving
 
     result = run_series(series_frame(), tmp_path)
     adapter = serving.BatchServing(result.bundle)

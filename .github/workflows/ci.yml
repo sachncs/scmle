@@ -37,12 +37,12 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization --extra multimodal
       - run: uv run ruff check . && uv run ruff format --check .
-      - run: uv run mypy scml benchmarks
+      - run: uv run mypy scmle benchmarks
       - run: uv run python scripts/check_api_compatibility.py tests/fixtures/public_api.json
       # Keep pull requests bounded. The scheduled full-suite workflow retains
       # coverage for every integration and optional path.
       - run: >-
-          uv run pytest -q --cov=scml --cov-report=xml
+          uv run pytest -q --cov=scmle --cov-report=xml
           -W error::ResourceWarning
           --cov-fail-under=50
           tests/unit tests/property tests/leakage
@@ -87,7 +87,7 @@ jobs:
       - name: Reject unexplained skips and xfails
         run: uv run python scripts/check_pytest_skips.py cross-platform.xml
       - name: Smoke test the CLI
-        run: uv run scml --help
+        run: uv run scmle --help
 
   minimal-dependencies:
     name: lowest supported dependency versions (Python 3.11)
@@ -173,7 +173,6 @@ jobs:
           tests/integration/test_integrations.py
           tests/integration/test_ray_cluster.py
           tests/integration/test_text_embedding_run.py
-          tests/unit/test_curriculum.py
           --junitxml=optional-capabilities.xml
         env:
           MLFLOW_DISABLE_AGENT_HINT: "1"
@@ -260,7 +259,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: uv sync --python 3.14
-      - run: uv run bandit -q -r scml
+      - run: uv run bandit -q -r scmle
       - run: uv run pip-audit --skip-editable
       - name: Validate runtime dependency licenses
         run: uv run python scripts/check_dependency_licenses.py --output dependency-licenses.json
@@ -272,8 +271,8 @@ jobs:
           from importlib.metadata import distributions
           from pathlib import Path
 
-          import scml
-          from scml.governance import sbom
+          import scmle
+          from scmle.governance import sbom
 
           packages = {
               str(distribution.metadata["Name"]): distribution.version
@@ -283,7 +282,7 @@ jobs:
           record = sbom.build(
               packages,
               run_id=f"ci-{os.environ['GITHUB_SHA']}",
-              software_version=scml.__version__,
+              software_version=scmle.__version__,
           )
           Path("sbom.cyclonedx.json").write_text(
               json.dumps(record, indent=2) + "\n", encoding="utf-8"
@@ -337,11 +336,11 @@ jobs:
         run: |
           uv venv --python 3.14 /tmp/wheel-env
           uv pip install --python /tmp/wheel-env/bin/python dist/*.whl
-          /tmp/wheel-env/bin/scml --help
-          /tmp/wheel-env/bin/python -c "import scml; print(scml.__version__)"
+          /tmp/wheel-env/bin/scmle --help
+          /tmp/wheel-env/bin/python -c "import scmle; print(scmle.__version__)"
       - name: Install the source distribution into a clean environment
         run: |
           uv venv --python 3.14 /tmp/sdist-env
           uv pip install --python /tmp/sdist-env/bin/python dist/*.tar.gz
-          /tmp/sdist-env/bin/scml --help
-          /tmp/sdist-env/bin/python -c "import scml; print(scml.__version__)"
+          /tmp/sdist-env/bin/scmle --help
+          /tmp/sdist-env/bin/python -c "import scmle; print(scmle.__version__)"

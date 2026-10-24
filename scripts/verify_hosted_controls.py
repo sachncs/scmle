@@ -41,7 +41,6 @@ PAGES_ROUTES = (
     "/docs/capabilities/",
     "/docs/modeling/",
     "/docs/evidence/",
-    "/docs/release-evidence/",
     "/docs/workflows/",
     "/docs/api/",
     "/docs/architecture/",
@@ -141,7 +140,6 @@ def workflow_failures(root: Path) -> list[str]:
             "name: github-pages",
             "needs: deploy",
             "scripts/verify_hosted_controls.py",
-            "/docs/release-evidence/",
             "curl --fail",
         ),
         "full-suite.yml": (
@@ -169,8 +167,8 @@ def workflow_failures(root: Path) -> list[str]:
     if astro_config.is_file():
         astro_content = read_text(astro_config)
         for marker in (
-            'site: "https://sachncs.github.io/super-charge-ml"',
-            'base: "/super-charge-ml"',
+            'site: "https://sachncs.github.io/magicml"',
+            'base: "/magicml"',
         ):
             if marker not in astro_content:
                 failures.append(
@@ -217,7 +215,7 @@ def public_page_evidence(
         url = f"{base}{route}"
         request = urllib.request.Request(
             url,
-            headers={"User-Agent": "super-charge-ml-release-verifier/1"},
+            headers={"User-Agent": "scmle-release-verifier/1"},
         )
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:

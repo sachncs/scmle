@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from scml.data.modalities import document
+from scmle.data.modalities import document
 
 
 @pytest.fixture

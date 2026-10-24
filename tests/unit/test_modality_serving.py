@@ -8,11 +8,11 @@ import urllib.request
 
 import pytest
 
-import scml
-from scml.contracts import errors
-from scml.data.modalities import document
-from scml.inference import modality_serving
-from scml.models import modality_lifecycle
+import scmle
+from scmle.contracts import errors
+from scmle.data.modalities import document
+from scmle.inference import modality_serving
+from scmle.models import modality_lifecycle
 
 
 class DocumentDecoder(modality_serving.ModalitySampleDecoder):
@@ -102,8 +102,8 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
     tmp_path,
 ):
     """A caller decoder can expose a signed modality package safely."""
-    assert scml.ModalityHttpServing is modality_serving.ModalityHttpServing
-    assert scml.ModalitySampleDecoder is modality_serving.ModalitySampleDecoder
+    assert scmle.ModalityHttpServing is modality_serving.ModalityHttpServing
+    assert scmle.ModalitySampleDecoder is modality_serving.ModalitySampleDecoder
     reference = adapter()
     report = modality_lifecycle.ModalityLifecycle().run(
         reference,
@@ -188,7 +188,7 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
     finally:
         serving.stop()
 
-    with pytest.raises(errors.ScmlError, match="not running"):
+    with pytest.raises(errors.ScmleError, match="not running"):
         print(serving.address)
 
 

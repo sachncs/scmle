@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scml.data.readers import incremental
+from scmle.data.readers import incremental
 
 
 def event(event_id, sequence, minute, value=None):

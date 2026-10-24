@@ -24,14 +24,14 @@ jobs:
       - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
       - run: >-
           uv run pytest -q -W error::ResourceWarning
-          --cov=scml --cov-report=xml --durations=25
+          --cov=scmle --cov-report=xml --durations=25
           --junitxml=full-suite.xml
       - name: Reject unexplained skips and xfails
         run: uv run python scripts/check_pytest_skips.py full-suite.xml
       - name: Enforce core contract coverage
         run: >-
           uv run coverage report
-          --include=scml/contracts/*,scml/data/*,scml/evaluation/*,scml/governance/*,scml/inference/*,scml/monitoring/*
+          --include=scmle/contracts/*,scmle/data/*,scmle/evaluation/*,scmle/governance/*,scmle/inference/*,scmle/monitoring/*
           --fail-under=85
       - name: Enforce critical mutation score
         run: |
@@ -57,15 +57,15 @@ jobs:
         run: |
           git clone --filter=blob:none --no-checkout \
             "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            /tmp/super-charge-ml-clean-clone
-          git -C /tmp/super-charge-ml-clean-clone checkout --detach "${GITHUB_SHA}"
-          test -z "$(git -C /tmp/super-charge-ml-clean-clone status --porcelain)"
+            /tmp/scmle-clean-clone
+          git -C /tmp/scmle-clean-clone checkout --detach "${GITHUB_SHA}"
+          test -z "$(git -C /tmp/scmle-clean-clone status --porcelain)"
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
-      - run: uv sync --directory /tmp/super-charge-ml-clean-clone --python 3.14 --extra boosting --extra optimization --extra multimodal
+      - run: uv sync --directory /tmp/scmle-clean-clone --python 3.14 --extra boosting --extra optimization --extra multimodal
       - name: Run the clean-clone acceptance slice
         run: >-
-          uv run --directory /tmp/super-charge-ml-clean-clone pytest -q
+          uv run --directory /tmp/scmle-clean-clone pytest -q
           -W error::ResourceWarning
           tests/unit tests/property tests/leakage
           tests/integration/test_end_to_end.py
@@ -73,10 +73,10 @@ jobs:
           --junitxml=/tmp/clean-clone-suite.xml
       - name: Reject unexplained clean-clone skips and xfails
         run: >-
-          uv run --directory /tmp/super-charge-ml-clean-clone
+          uv run --directory /tmp/scmle-clean-clone
           python scripts/check_pytest_skips.py /tmp/clean-clone-suite.xml
       - name: Verify the package entry point from the clean clone
-        run: uv run --directory /tmp/super-charge-ml-clean-clone scml --help
+        run: uv run --directory /tmp/scmle-clean-clone scmle --help
 
   stability:
     name: repeated test stability and quarantine policy

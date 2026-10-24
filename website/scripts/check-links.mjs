@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 const siteRoot = resolve("dist");
-const siteBase = "/super-charge-ml";
+const siteBase = "/magicml";
 const siteOrigin = "https://sachncs.github.io";
 
 function htmlFiles(directory) {

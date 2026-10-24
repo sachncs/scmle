@@ -4,7 +4,7 @@ import pathlib
 
 import pytest
 
-from scml import durability
+from scmle import durability
 
 
 def test_sync_directory_flushes_a_real_directory(tmp_path: pathlib.Path):

@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.data.splitting import splitters
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.splitting import splitters
 
 BINARY = tasks.TaskType.BINARY
 

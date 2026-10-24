@@ -3,10 +3,10 @@
 import numpy as np
 import pytest
 
-from scml.contracts import tasks
-from scml.models import conformance
-from scml.models import ensembles
-from scml.models import registry as registry_module
+from scmle.contracts import tasks
+from scmle.models import conformance
+from scmle.models import ensembles
+from scmle.models import registry as registry_module
 
 
 def test_the_blender_puts_its_weight_on_the_member_that_predicts_best():

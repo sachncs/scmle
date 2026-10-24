@@ -2,7 +2,7 @@
 import DocsLayout from "../../layouts/DocsLayout.astro";
 ---
 
-<DocsLayout title="Capability matrix" description="The evidence boundary for each dataset modality in super-charge-ml." current="capabilities">
+<DocsLayout title="Capability matrix" description="The evidence boundary for each dataset modality in scmle." current="capabilities">
   <p class="eyebrow"><span></span> Support boundary</p>
   <h1>Know what is<br /><em>actually supported.</em></h1>
   <p class="lead">A parser is not a production capability. A dataset family is supported only when ingestion, curation, modelling, evaluation, packaging, inference, monitoring, documentation, and recovery have evidence.</p>
@@ -29,7 +29,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Model-family declarations are not support claims</h2>
   <p>The capability registry separates a known model family from a complete end-to-end capability. Transformer families are catalogued with their modality, extra, resource, and failure boundaries; JEPA is explicitly declared as <strong>tabular-only and experimental</strong>. A caller still needs a full eight-dimensional declaration—modality, task, model family, evaluation, uncertainty, fairness, explainability, and inference—before a run can cross the support gate.</p>
-  <pre><code>{`from scml.contracts.capabilities import CapabilityRegistry
+  <pre><code>{`from scmle.contracts.capabilities import CapabilityRegistry
 
 registry = CapabilityRegistry.with_declared_model_families()
 family = registry.find_model_family("jepa")

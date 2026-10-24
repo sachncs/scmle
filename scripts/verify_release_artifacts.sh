@@ -3,9 +3,9 @@
 # Verify release artifacts are reproducible and installable without an index.
 set -euo pipefail
 
-python_version="${SCML_PYTHON_VERSION:-3.14}"
+python_version="${SCMLE_PYTHON_VERSION:-3.14}"
 source_date_epoch="${SOURCE_DATE_EPOCH:-1792497600}"
-probe_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-artifacts.XXXXXX")"
+probe_directory="$(mktemp -d "${TMPDIR:-/tmp}/scmle-artifacts.XXXXXX")"
 
 build_artifacts() {
   local output_directory="$1"
@@ -51,7 +51,7 @@ uv venv --python "$python_version" "$probe_directory/wheel-environment"
   --python "$probe_directory/wheel-environment/bin/python" \
   --no-index --no-deps "$wheel_one")
 (cd /tmp && "$probe_directory/wheel-environment/bin/python" -c \
-  'import importlib.metadata as metadata; print(metadata.version("super-charge-ml"))')
+  'import importlib.metadata as metadata; print(metadata.version("scmle"))')
 
 echo "== network-isolated source distribution rebuild and installation =="
 uv build --offline --wheel --python "$python_version" \
@@ -63,6 +63,6 @@ uv venv --python "$python_version" "$probe_directory/sdist-environment"
   --python "$probe_directory/sdist-environment/bin/python" \
   --no-index --no-deps "$rebuilt_wheel")
 (cd /tmp && "$probe_directory/sdist-environment/bin/python" -c \
-  'import importlib.metadata as metadata; print(metadata.version("super-charge-ml"))')
+  'import importlib.metadata as metadata; print(metadata.version("scmle"))')
 
 echo "release artifact verification passed; evidence directory: $probe_directory"

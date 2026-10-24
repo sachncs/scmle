@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import pandas as pd
 import pytest
 
-from scml.data.readers import connectors
+from scmle.data.readers import connectors
 
 
 @pytest.fixture

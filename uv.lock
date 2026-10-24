@@ -5585,7 +5585,7 @@ wheels = [
 ]
 
 [[package]]
-name = "super-charge-ml"
+name = "scmle"
 version = "0.1.0b1"
 source = { editable = "." }
 dependencies = [
@@ -5715,7 +5715,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.16.2" },
     { name = "sentence-transformers", marker = "extra == 'embeddings'", specifier = ">=3.0" },
     { name = "skl2onnx", marker = "extra == 'onnx'", specifier = ">=1.17" },
-    { name = "super-charge-ml", extras = ["boosting", "catboost", "deeplearning", "optimization", "sampling", "polars", "spreadsheets", "tracking", "distributed", "benchmarks", "multimodal"], marker = "extra == 'all'" },
+    { name = "scmle", extras = ["boosting", "catboost", "deeplearning", "optimization", "sampling", "polars", "spreadsheets", "tracking", "distributed", "benchmarks", "multimodal"], marker = "extra == 'all'" },
     { name = "tabpfn", marker = "extra == 'tabpfn'", specifier = ">=2.0" },
     { name = "threadpoolctl", specifier = ">=3.6" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'deeplearning'", specifier = ">=2.8", index = "https://download.pytorch.org/whl/cpu" },

@@ -2,9 +2,9 @@
 
 import pytest
 
-from scml.contracts import observability
-from scml.monitoring import events
-from scml.monitoring import observability as evaluation
+from scmle.contracts import observability
+from scmle.monitoring import events
+from scmle.monitoring import observability as evaluation
 
 
 def make_policy() -> observability.ObservabilityPolicy:

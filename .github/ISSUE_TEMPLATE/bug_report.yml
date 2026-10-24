@@ -12,14 +12,14 @@ body:
     id: repro
     attributes:
       label: Minimal reproduction
-      description: Code or a `scml` command; a small synthetic dataset is ideal.
+      description: Code or a `scmle` command; a small synthetic dataset is ideal.
       render: python
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: super-charge-ml version
+      label: scmle version
     validations:
       required: true
   - type: input

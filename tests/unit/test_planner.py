@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import errors
-from scml.contracts import experiments
-from scml.contracts import tasks
-from scml.data.profiling import profiler
-from scml.data.readers import tabular
-from scml.intelligence import planner as planner_module
-from scml.models import registry as registry_module
+from scmle.contracts import errors
+from scmle.contracts import experiments
+from scmle.contracts import tasks
+from scmle.data.profiling import profiler
+from scmle.data.readers import tabular
+from scmle.intelligence import planner as planner_module
+from scmle.models import registry as registry_module
 
 BINARY = tasks.TaskType.BINARY
 

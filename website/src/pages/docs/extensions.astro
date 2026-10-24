@@ -7,7 +7,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <h1>Bring the raw data.<br /><em>Keep the proof.</em></h1>
   <p class="lead">The core cannot know the semantics of every dataset on earth. An extension lets your team bring a new family—point clouds, medical records, telemetry, chemical structures, or something more specific—through the same lifecycle without calling it a supported modality before it has earned that label.</p>
 
-  <div class="callout"><p><strong>The contract is an admission boundary.</strong> You own decoding, representation, labels, and domain policy. super-charge-ml owns the shared evidence sequence: curation, leakage-aware splitting, packaging, inference parity, monitoring, documentation, and recovery checks.</p></div>
+  <div class="callout"><p><strong>The contract is an admission boundary.</strong> You own decoding, representation, labels, and domain policy. scmle owns the shared evidence sequence: curation, leakage-aware splitting, packaging, inference parity, monitoring, documentation, and recovery checks.</p></div>
 
   <h2>Start from the raw material</h2>
   <p>Do not begin with a dataframe that someone has already cleaned for you. Begin with the bytes or records as they arrive, plus the facts that make those bytes interpretable. Preserve the source snapshot, acquisition time, source owner, license, schema or codec metadata, sample identity, label provenance, transformation lineage, privacy classification, and deletion policy.</p>
@@ -29,7 +29,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Give the family a stable identity</h2>
   <p>Use <code>ExtensionModality</code> with a lowercase, namespaced name. The serialized identity is explicit—for example, <code>extension:acme/point-cloud</code>. It cannot collide with <code>image</code>, <code>audio</code>, or another built-in modality.</p>
-  <pre><code>{`from scml.contracts.modalities import ExtensionModality
+  <pre><code>{`from scmle.contracts.modalities import ExtensionModality
 
 modality = ExtensionModality("acme/point-cloud")
 print(modality.value)
@@ -38,8 +38,8 @@ print(modality.value)
 
   <h2>Implement the polymorphic adapter</h2>
   <p>An extension adapter implements the same narrow interface as the built-in adapters. Each method has one responsibility: source identity, canonical samples, data understanding, leakage-aware partitions, bounded representations, stable sample identity, labels, monitoring, and user-visible limitations. The optional explanation hook is where your domain-specific raw-data explanation belongs; the shared lifecycle never invents one.</p>
-  <pre><code>{`from scml.contracts import modalities
-from scml.models import modality_lifecycle
+  <pre><code>{`from scmle.contracts import modalities
+from scmle.models import modality_lifecycle
 
 
 class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
@@ -76,7 +76,7 @@ class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
   <p>The ellipses above are a contract outline, not a compatibility shim. A real adapter must implement every abstract method and test its boundaries against raw fixtures. Keep domain code in the adapter; do not add a generic wrapper that hides missing semantics.</p>
 
   <h2>Run the lifecycle with explicit governance</h2>
-  <pre><code>{`from scml import ModalityProject
+  <pre><code>{`from scmle import ModalityProject
 
 project = ModalityProject(
     PointCloudAdapter(...),
@@ -92,7 +92,7 @@ assert len(report.stage_evidence) == 15`}</code></pre>
 
   <h2>Curate without modelling</h2>
   <p>Not every useful dataset is labelled, supervised, or ready for a classifier. Use <code>ModalityCurationProject</code> when the immediate job is to understand the raw snapshot. It writes an atomic, signed curation record and dataset card, accepts empty and unlabeled snapshots, and never invents labels, features, metrics, or a model.</p>
-  <pre><code>{`from scml import ModalityCurationProject
+  <pre><code>{`from scmle import ModalityCurationProject
 
 curation = ModalityCurationProject(
     PointCloudAdapter(...),
@@ -104,9 +104,9 @@ print(curation.dataset_card["curation"])
 print(curation.path)
 # No modelling stage was run.`}</code></pre>
   <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurationAdapter</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The callback must return a report bound to the extension identity, dataset hash, and sample count.</p>
-  <pre><code>{`from scml import ExtensionCurationAdapter, ModalityCurationProject
-from scml.contracts import modalities
-from scml.data.modalities.curation import ModalityCurationReport
+  <pre><code>{`from scmle import ExtensionCurationAdapter, ModalityCurationProject
+from scmle.contracts import modalities
+from scmle.data.modalities.curation import ModalityCurationReport
 
 records = ({"x": 1, "y": 2}, {"x": 3, "y": 4})
 extension = modalities.ExtensionModality("acme/point-cloud")

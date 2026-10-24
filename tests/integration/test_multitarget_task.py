@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import support
 
-from scml.contracts import errors
+from scmle.contracts import errors
 
 
 def labelled(rows=1500, seed=0):

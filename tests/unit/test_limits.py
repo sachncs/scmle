@@ -2,8 +2,8 @@
 
 import time
 
-from scml.contracts import tasks
-from scml.core import limits
+from scmle.contracts import tasks
+from scmle.core import limits
 
 
 def governor(**kwargs):

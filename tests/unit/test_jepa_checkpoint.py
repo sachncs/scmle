@@ -5,7 +5,7 @@ import importlib.util
 import numpy as np
 import pytest
 
-from scml.models.deeplearning.jepa import JepaEstimator
+from scmle.models.deeplearning.jepa import JepaEstimator
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None,

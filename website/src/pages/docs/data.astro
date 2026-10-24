@@ -2,7 +2,7 @@
 import DocsLayout from "../../layouts/DocsLayout.astro";
 ---
 
-<DocsLayout title="Data & curation" description="Supported dataset formats and the curation-first workflow in super-charge-ml." current="data">
+<DocsLayout title="Data & curation" description="Supported dataset formats and the curation-first workflow in scmle." current="data">
   <p class="eyebrow"><span></span> Inputs and evidence</p>
   <h1>Meet the data<br /><em>where it is.</em></h1>
   <p class="lead">The framework accepts common files, in-memory tables, and bounded streams. The input contract is broad; the curation contract is strict.</p>
@@ -39,7 +39,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2 id="catalog-any-data">Catalog any dataset before modelling</h2>
   <p><code>DatasetCatalog</code> is the model-agnostic entry point for data that is not yet ready for a task or a model. It observes common Python forms—tables, arrays, column mappings, record sequences, scalars, and raw bytes—and records what was actually observed. For an opaque domain object, provide an adapter-owned observation and a caller-supplied SHA-256 identity; the catalog will not invent a process-dependent hash.</p>
-  <pre><code>{`from scml import DatasetCatalog
+  <pre><code>{`from scmle import DatasetCatalog
 
 catalog = DatasetCatalog.from_data(
     records,
@@ -75,7 +75,7 @@ print(evidence.to_dict())`}</code></pre>
   <p>For CSV, JSONL, and Parquet files, <code>StreamingLedger</code> binds each bounded batch to the raw snapshot digest, row offset, watermark column, and deterministic batch id. The sink receives that id as its idempotency key. A changed file, malformed state file, checkpoint from another source, or acknowledgement from another consumer group fails closed before the next commit.</p>
   <p>When the sink can return a transport-owned receipt, use <code>TransactionalSink</code> and <code>commit_transaction()</code>. The ledger atomically stores the receipt with the matching acknowledgement and checkpoint evidence, and a matching retry after restart does not call the sink again. This is a local idempotency boundary; it is not a broker transaction or distributed exactly-once guarantee.</p>
   <pre><code>{`from pathlib import Path
-from scml.data.readers import StreamingConsumer, StreamingLedger, source_for
+from scmle.data.readers import StreamingConsumer, StreamingLedger, source_for
 
 source = source_for(Path("events.csv"))
 ledger = StreamingLedger(Path("state/events.json"), source)
@@ -95,7 +95,7 @@ print(receipt.batch_id, receipt.duplicate, receipt.checkpoint.to_dict())`}</code
 
 import pandas as pd
 
-from scml.data.readers import ObjectStoreConnector
+from scmle.data.readers import ObjectStoreConnector
 
 
 def decode_custom(uri: str, payload: bytes) -> pd.DataFrame:
@@ -127,7 +127,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
 
   <h2>Bind non-tabular governance before modelling</h2>
   <p>Non-tabular lifecycles accept a typed <code>ModalityManifest</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training. For unlabeled or unsupervised snapshots, <code>ModalityCurationProject</code> persists the data-understanding evidence without entering modelling.</p>
-  <pre><code>{`from scml.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
+  <pre><code>{`from scmle.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
 
 manifest = ModalityManifest(
     dataset_id="documents-2026-10-21",
@@ -155,7 +155,7 @@ report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)`}<
 
   <h2>Verify a modality package before prediction</h2>
   <p>The experimental lifecycle exposes a library predictor for callers that already own a typed adapter. It verifies the signed package, modality, feature names, and estimator dimension before converting new samples into features. Codec choice and raw transport remain caller-owned.</p>
-  <pre><code>{`from scml.models.modality_lifecycle import ModalityPredictor
+  <pre><code>{`from scmle.models.modality_lifecycle import ModalityPredictor
 
 predictor = ModalityPredictor.from_package(
     adapter, "artifacts/modality-package", signing_key
@@ -172,9 +172,9 @@ print(predictor.health())`}</code></pre>
     <div class="doc-card"><small>VIDEO</small><h3>Decoder and time policy are yours</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. Use the metadata matrix by default, or provide an audited decoder for bounded, evenly sampled frame statistics. When observation times exist, <code>split_temporal</code> creates a UTC-normalized past/future boundary and refuses mixed timestamp coverage. The core package never guesses from a filename or imports a codec stack implicitly.</p></div>
     <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Spatial-block splitting keeps nearby features together in CRS units, and envelope crossings are surfaced as a review warning before modelling. Raster samples require dimensions, bands, dtype, CRS, and transform metadata; a caller-owned, named decoder may add bounded pixel summaries, measured nodata evidence, and decoded-pixel region occlusion with source-CRS window envelopes. That is pixel-window evidence, not reprojection, semantic localization, or encoded-byte attribution.</p></div>
   </div>
-  <pre><code>{`from scml.data.modalities import AudioDataset, AudioSample, GeospatialDataset, VideoDataset
-from scml.data.modalities import VideoSample
-from scml.data.modalities import DocumentDataset, DocumentSample
+  <pre><code>{`from scmle.data.modalities import AudioDataset, AudioSample, GeospatialDataset, VideoDataset
+from scmle.data.modalities import VideoSample
+from scmle.data.modalities import DocumentDataset, DocumentSample
 
 audio = AudioSample.from_bytes(
     wav_bytes, source="clip.wav", group_id="speaker-17"

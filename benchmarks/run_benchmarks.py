@@ -1,4 +1,4 @@
-"""Runs scml end to end on open datasets and reports the results.
+"""Runs scmle end to end on open datasets and reports the results.
 
 Usage:
     python -m benchmarks.run_benchmarks [--offline] [--only NAME ...]
@@ -20,8 +20,8 @@ from typing import Any
 from benchmarks import datasets
 from benchmarks import intervals
 from benchmarks import reference
-import scml
-from scml.core import limits
+import scmle
+from scmle.core import limits
 
 LOGGER = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ def run_one(
         frame = dataset.load()
         cv_scores: list[float] = []
         for seed in range(seeds):
-            project = scml.MLProject(
+            project = scmle.MLProject(
                 frame,
                 dataset.target,
                 task=dataset.task,

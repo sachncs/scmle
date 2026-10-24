@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from scml.contracts import reliability
+from scmle.contracts import reliability
 
 
 def make_evidence(

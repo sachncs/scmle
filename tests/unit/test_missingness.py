@@ -3,11 +3,11 @@
 import numpy as np
 import pandas as pd
 
-from scml.contracts import data as data_contracts
-from scml.contracts import tasks
-from scml.data.curation import preprocessing
-from scml.data.profiling import missingness
-from scml.models import registry as registry_module
+from scmle.contracts import data as data_contracts
+from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
+from scmle.data.profiling import missingness
+from scmle.models import registry as registry_module
 
 
 def sample(rows=1500, seed=0):

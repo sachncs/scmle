@@ -7,8 +7,8 @@ import logging
 
 import pandas as pd
 
-from scml import cli
-from scml.data.catalog import DatasetCatalog
+from scmle import cli
+from scmle.data.catalog import DatasetCatalog
 
 
 def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):

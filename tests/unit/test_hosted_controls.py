@@ -70,7 +70,7 @@ def test_public_pages_probe_records_route_digests(monkeypatch):
     routes = ("/", "/docs/")
 
     evidence = verify_hosted_controls.public_page_evidence(
-        "https://example.test/super-charge-ml", routes=routes, timeout=3
+        "https://example.test/magicml", routes=routes, timeout=3
     )
 
     assert evidence["passed"] is True
@@ -79,7 +79,7 @@ def test_public_pages_probe_records_route_digests(monkeypatch):
         evidence["routes"][0]["sha256"]
         == hashlib.sha256(b"<html>verified</html>").hexdigest()
     )
-    assert requested[0][0].endswith("/super-charge-ml/")
+    assert requested[0][0].endswith("/magicml/")
 
 
 def test_public_pages_probe_requires_https():

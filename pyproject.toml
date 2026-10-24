@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "super-charge-ml"
+name = "scmle"
 version = "0.1.0b1"
 description = "Autonomous, leakage-safe ML lifecycle framework for tabular data"
 readme = "README.md"
@@ -52,7 +52,7 @@ tabpfn = ["tabpfn>=2.0", "filelock>=4.2.1"]
 # use); not part of `all` because it pulls the transformers stack.
 embeddings = ["sentence-transformers>=3.0", "filelock>=4.2.1"]
 # ONNX export (onnxmltools adds LightGBM and XGBoost); onnxruntime has no
-# free-threaded (3.14t) wheel yet. Any model can ship with `scml package`.
+# free-threaded (3.14t) wheel yet. Any model can ship with `scmle package`.
 onnx = ["skl2onnx>=1.17", "onnxruntime>=1.20", "onnxmltools>=1.13"]
 optimization = ["optuna>=4.0"]
 sampling = ["imbalanced-learn>=0.14.1"]
@@ -63,17 +63,17 @@ benchmarks = ["huggingface_hub>=0.25"]
 distributed = ["ray>=2.40"]
 multimodal = ["pillow>=13.0"]
 all = [
-    "super-charge-ml[boosting,catboost,deeplearning,optimization,sampling,polars,spreadsheets,tracking,distributed,benchmarks,multimodal]",
+    "scmle[boosting,catboost,deeplearning,optimization,sampling,polars,spreadsheets,tracking,distributed,benchmarks,multimodal]",
 ]
 
 [project.urls]
 Homepage = "https://github.com/sachncs/magicml"
-Documentation = "https://sachncs.github.io/super-charge-ml/"
+Documentation = "https://sachncs.github.io/magicml/"
 Issues = "https://github.com/sachncs/magicml/issues"
 Changelog = "https://github.com/sachncs/magicml/blob/master/CHANGELOG.md"
 
 [project.scripts]
-scml = "scml.cli:main"
+scmle = "scmle.cli:main"
 
 [dependency-groups]
 dev = [
@@ -90,7 +90,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["scml"]
+packages = ["scmle"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -112,7 +112,7 @@ convention = "google"
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
 force-single-line = true
-known-first-party = ["scml"]
+known-first-party = ["scmle"]
 case-sensitive = false
 order-by-type = false
 

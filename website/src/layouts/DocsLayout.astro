@@ -16,7 +16,6 @@ const links = [
   { href: `${base}/docs/capabilities/`, label: "Capability matrix", key: "capabilities" },
   { href: `${base}/docs/modeling/`, label: "Modelling & estimation", key: "modeling" },
   { href: `${base}/docs/evidence/`, label: "Evidence & gates", key: "evidence" },
-  { href: `${base}/docs/release-evidence/`, label: "Release status", key: "release-evidence" },
   { href: `${base}/docs/workflows/`, label: "Workflows", key: "workflows" },
   { href: `${base}/docs/api/`, label: "Python API", key: "api" },
   { href: `${base}/docs/architecture/`, label: "Architecture", key: "architecture" },
@@ -40,13 +39,13 @@ const next = currentIndex >= 0 && currentIndex < links.length - 1 ? links[curren
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <title>{title} — super-charge-ml docs</title>
+    <title>{title} — SCMLE docs</title>
   </head>
   <body>
     <header class="docs-nav shell">
-      <a class="brand" href={`${base}/`} aria-label="super-charge-ml home">
-        <span class="brand-mark">✳</span>
-        <span>super-charge-ml</span>
+      <a class="brand" href={`${base}/`} aria-label="SCMLE home">
+        <img class="brand-logo" src={`${base}/scmle-mark.svg`} alt="" />
+        <span>SCMLE</span>
       </a>
       <div class="docs-nav-label">Developer documentation</div>
       <a class="repo-link" href="https://github.com/sachncs/magicml">GitHub ↗</a>
@@ -55,7 +54,7 @@ const next = currentIndex >= 0 && currentIndex < links.length - 1 ? links[curren
     <div class="docs-shell shell">
       <aside class="sidebar" aria-label="Documentation navigation">
         <p class="eyebrow"><span></span> Docs</p>
-        <p class="sidebar-intro">Build trustworthy ML systems by starting with the data.</p>
+        <p class="sidebar-intro">Mathematics meets engineering for trustworthy ML systems.</p>
         <nav>
           {links.map((link) => (
             <a class:list={{ active: current === link.key }} aria-current={current === link.key ? "page" : undefined} href={link.href}>
@@ -80,8 +79,8 @@ const next = currentIndex >= 0 && currentIndex < links.length - 1 ? links[curren
     </div>
 
     <footer class="footer shell">
-      <a class="brand" href={`${base}/`}><span class="brand-mark">✳</span><span>super-charge-ml</span></a>
-      <span>Open-source ML lifecycle infrastructure</span>
+      <a class="brand" href={`${base}/`}><span class="brand-mark">✳</span><span>scmle</span></a>
+      <span>Mathematics meets engineering</span>
       <span>© 2026</span>
     </footer>
   </body>
@@ -94,8 +93,8 @@ const next = currentIndex >= 0 && currentIndex < links.length - 1 ? links[curren
   :global(a) { color: inherit; }
   :global(a:focus-visible) { outline: 3px solid #9eaf2e; outline-offset: 4px; }
   .shell { margin-inline: auto; width: min(1180px, calc(100% - 64px)); }
-  .brand { align-items: center; color: #18231f; display: inline-flex; font-size: 15px; font-weight: 700; gap: 9px; letter-spacing: -.02em; text-decoration: none; }
-  .brand-mark { align-items: center; background: #d9e96a; border-radius: 50%; display: inline-flex; font-size: 16px; height: 27px; justify-content: center; width: 27px; }
+  .brand { align-items: center; color: #18231f; display: inline-flex; font-size: 15px; font-weight: 700; gap: 9px; letter-spacing: .04em; text-decoration: none; }
+  .brand-logo { height: 30px; width: 30px; }
   .docs-nav { align-items: center; border-bottom: 1px solid #d9ddd2; display: flex; justify-content: space-between; min-height: 88px; }
   .docs-nav-label, .repo-link { color: #65716c; font: 11px 'DM Mono', monospace; text-transform: uppercase; }
   .repo-link { border-bottom: 1px solid #18231f; color: #18231f; padding-bottom: 5px; text-decoration: none; text-transform: none; }

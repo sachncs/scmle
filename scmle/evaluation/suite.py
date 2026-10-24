@@ -1,0 +1,24 @@
+"""The complete post-selection diagnostic suite."""
+
+from scmle.evaluation import diagnostics
+from scmle.evaluation import fairness
+from scmle.evaluation import robustness
+from scmle.evaluation import shift
+from scmle.evaluation import slices
+from scmle.explainability import suite as explanation_suite
+
+
+def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
+    """Returns every diagnostic run after the final evaluation.
+
+    Performance reports, subgroup scores, stress tests, distribution shift
+    between development and test rows, and model explanations.
+    """
+    return (
+        *diagnostics.default_suite(),
+        slices.SliceReport(),
+        fairness.FairnessReport(),
+        robustness.RobustnessReport(),
+        shift.AdversarialValidation(),
+        *explanation_suite.default_suite(),
+    )

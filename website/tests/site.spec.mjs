@@ -9,7 +9,6 @@ const routes = [
   "./docs/capabilities/",
   "./docs/modeling/",
   "./docs/evidence/",
-  "./docs/release-evidence/",
   "./docs/workflows/",
   "./docs/api/",
   "./docs/architecture/",
@@ -30,23 +29,6 @@ test("every public route renders a standalone page", async ({ page }) => {
   }
 });
 
-test("release status page keeps the beta boundary and generated checks visible", async ({
-  page,
-}) => {
-  await page.goto("./docs/release-evidence/");
-  await expect(page.getByRole("heading", { name: /Know the boundary/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Release status/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Current release status" })).toBeVisible();
-  await expect(page.getByText("Tabular MLProject", { exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Production boundary summary" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Capability evidence view" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Tabular beta evidence board" })).toBeVisible();
-  await expect(page.getByText("Independent review", { exact: true })).toBeVisible();
-  await expect(page.getByText("experimental", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("non-tabular lifecycles remain experimental", { exact: false })).toBeVisible();
-  await expect(page.getByText("You cannot honestly treat the current library as a production-ready platform", { exact: false })).toBeVisible();
-});
-
 test("modeling page exposes the estimation contract and honest boundaries", async ({
   page,
 }) => {
@@ -65,7 +47,7 @@ test("modeling page exposes the estimation contract and honest boundaries", asyn
   await expect(page.getByText("MLProject is not a production non-tabular modelling path", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Use the public API" })).toHaveAttribute(
     "href",
-    "/super-charge-ml/docs/api/",
+    "/magicml/docs/api/",
   );
   await expect(page.locator('a[href*=".md"]')).toHaveCount(0);
 });
@@ -77,7 +59,7 @@ test("documentation navigation exposes a keyboard focus path", async ({
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toHaveAttribute(
     "aria-label",
-    "super-charge-ml home",
+    "SCMLE home",
   );
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");

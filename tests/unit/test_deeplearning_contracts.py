@@ -6,12 +6,12 @@ import joblib
 import numpy as np
 import pytest
 
-from scml.contracts import capabilities
-from scml.contracts import tasks
-from scml.models.deeplearning import contracts
-from scml.models.deeplearning import estimators
-from scml.models.deeplearning import jepa
-from scml.models.deeplearning import networks
+from scmle.contracts import capabilities
+from scmle.contracts import tasks
+from scmle.models.deeplearning import contracts
+from scmle.models.deeplearning import estimators
+from scmle.models.deeplearning import jepa
+from scmle.models.deeplearning import networks
 
 pytestmark = pytest.mark.skipif(
     util.find_spec("torch") is None,

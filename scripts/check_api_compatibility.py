@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import scml
+import scmle
 
 
 def stable_value(value: Any) -> Any:
@@ -82,8 +82,8 @@ def signature_digest(value: Any) -> str:
 def current_snapshot() -> dict[str, Any]:
     """Return the current top-level API in canonical JSON form."""
     exports: dict[str, Any] = {}
-    for name in sorted(scml.__all__):
-        value = getattr(scml, name)
+    for name in sorted(scmle.__all__):
+        value = getattr(scmle, name)
         if name == "__version__":
             exports[name] = {"kind": "value", "value": value}
         else:
@@ -93,7 +93,7 @@ def current_snapshot() -> dict[str, Any]:
             }
     return {
         "schema_version": 1,
-        "release": scml.__version__,
+        "release": scmle.__version__,
         "exports": exports,
     }
 
@@ -148,8 +148,8 @@ def main(arguments: list[str] | None = None) -> int:
         json.dumps(
             {
                 "compatible": True,
-                "release": scml.__version__,
-                "exports": len(scml.__all__),
+                "release": scmle.__version__,
+                "exports": len(scmle.__all__),
             },
             sort_keys=True,
         )

@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.models.survival import competing
-from scml.models.survival import estimators
-from scml.models.survival import timevarying
+from scmle.models.survival import competing
+from scmle.models.survival import estimators
+from scmle.models.survival import timevarying
 
 
 def two_causes(rows=3000, seed=0):

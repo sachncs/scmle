@@ -2,9 +2,9 @@
 
 import pytest
 
-from scml.contracts import evaluation
-from scml.contracts import tasks
-from scml.evaluation import policies
+from scmle.contracts import evaluation
+from scmle.contracts import tasks
+from scmle.evaluation import policies
 
 
 def test_empty_criteria_do_not_invent_release_thresholds():

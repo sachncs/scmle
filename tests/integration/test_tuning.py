@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 import support
 
-import scml
-from scml.contracts import tasks
+import scmle
+from scmle.contracts import tasks
 
 SEARCH = tasks.SearchSpec(top_models=1, configs_per_model=6, prune_fraction=0.5)
 
@@ -59,7 +59,7 @@ def test_params_survive_in_leaderboard_and_bundle(binary_frame, tmp_path):
         .map(lambda value: isinstance(json.loads(value), dict))
         .all()
     )
-    loaded = scml.ModelBundle.load(
+    loaded = scmle.ModelBundle.load(
         result.save(tmp_path / "exported"), trusted=True
     )
     assert loaded.info.model_params == result.bundle.info.model_params
@@ -114,7 +114,7 @@ def test_optuna_backend(binary_frame, tmp_path):
 
 def test_cli_exposes_search_options(binary_frame, tmp_path, caplog):
     caplog.set_level(logging.INFO)
-    from scml import cli
+    from scmle import cli
 
     path = tmp_path / "d.csv"
     binary_frame.to_csv(path, index=False)

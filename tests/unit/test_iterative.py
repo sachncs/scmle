@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scml.data.splitting import iterative
+from scmle.data.splitting import iterative
 
 
 def labels(rows=1000, seed=0):

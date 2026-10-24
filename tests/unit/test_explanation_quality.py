@@ -2,7 +2,7 @@
 
 import pytest
 
-from scml.explainability import quality
+from scmle.explainability import quality
 
 
 def report(*features: str) -> dict[str, object]:

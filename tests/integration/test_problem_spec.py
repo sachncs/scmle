@@ -7,10 +7,10 @@ import pandas as pd
 import pytest
 import support
 
-from scml.contracts import errors
-from scml.contracts import evidence
-from scml.contracts import tasks
-from scml.governance import attestation
+from scmle.contracts import errors
+from scmle.contracts import evidence
+from scmle.contracts import tasks
+from scmle.governance import attestation
 
 
 def frame(rows=700, seed=0):
@@ -119,7 +119,7 @@ def test_a_misspelled_metric_stops_the_run_before_the_test_is_opened(tmp_path):
 def test_packaged_release_attestation_is_signed_when_key_is_configured(
     tmp_path, monkeypatch
 ):
-    monkeypatch.setenv("SCML_SIGNING_KEY", "release-key")
+    monkeypatch.setenv("SCMLE_SIGNING_KEY", "release-key")
 
     result = run(tmp_path, {"roc_auc": 0.8})
     record = attestation.ReleaseAttestation.from_dict(

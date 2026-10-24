@@ -31,20 +31,20 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <meta name="description" content="Super-charge-ml turns messy tables into trustworthy machine learning systems." />
-    <link rel="canonical" href="https://sachncs.github.io/super-charge-ml/" />
+    <meta name="description" content="SCMLE brings mathematics and engineering together for trustworthy machine learning workflows." />
+    <link rel="canonical" href="https://sachncs.github.io/magicml/" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://sachncs.github.io/super-charge-ml/" />
-    <meta property="og:title" content="super-charge-ml — curate first, model with confidence" />
-    <meta property="og:description" content="Turn messy tables into trustworthy machine learning systems." />
+    <meta property="og:url" content="https://sachncs.github.io/magicml/" />
+    <meta property="og:title" content="SCMLE — mathematics meets engineering" />
+    <meta property="og:description" content="A curation-first machine learning lifecycle for teams that need evidence, not just scores." />
     <meta name="twitter:card" content="summary" />
-    <title>super-charge-ml — curate first, model with confidence</title>
+    <title>SCMLE — mathematics meets engineering</title>
   </head>
   <body>
     <header class="nav shell">
-      <a class="brand" href={`${base}/`} aria-label="super-charge-ml home">
-        <span class="brand-mark">✳</span>
-        <span>super-charge-ml</span>
+      <a class="brand" href={`${base}/`} aria-label="SCMLE home">
+        <img class="brand-logo" src={`${base}/scmle-mark.svg`} alt="" />
+        <span>SCMLE</span>
       </a>
       <nav aria-label="Primary navigation">
         <a href="#approach">Approach</a>
@@ -57,9 +57,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <main>
       <section class="hero shell">
         <div class="hero-copy">
-          <p class="eyebrow"><span></span> Open-source ML lifecycle infrastructure</p>
-          <h1>Better data in.<br /><em>Better decisions out.</em></h1>
-          <p class="lede">A Python workflow for profiling messy tabular data, choosing leakage-safe validation, comparing bounded model candidates, and exporting an auditable bundle.</p>
+          <p class="eyebrow"><span></span> Mathematics meets engineering</p>
+          <h1>Evidence in.<br /><em>Confidence out.</em></h1>
+          <p class="lede">SCMLE is a Python workflow for turning imperfect data into reproducible machine learning systems: mathematically disciplined, operationally grounded, and ready to explain.</p>
           <div class="hero-actions">
             <a class="button button-primary" href={`${base}/docs/`}>Explore the docs <span>→</span></a>
             <a class="text-link" href="#approach">See how it works <span>↓</span></a>
@@ -82,12 +82,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       </section>
 
       <section class="ticker" aria-label="Project principles">
-        <div class="ticker-inner shell"><span>CURATE FIRST</span><i>✳</i><span>MODEL WITH RESTRAINT</span><i>✳</i><span>SHIP WITH EVIDENCE</span><i>✳</i><span>CURATE FIRST</span></div>
+        <div class="ticker-inner shell"><span>MATHEMATICS</span><i>∑</i><span>ENGINEERING</span><i>∫</i><span>EVIDENCE</span><i>→</i><span>MATHEMATICS</span></div>
       </section>
 
       <section class="approach shell" id="approach">
-        <div class="section-intro"><p class="eyebrow"><span></span> The operating principle</p><h2>Data curation is the product.</h2></div>
-        <div class="intro-copy"><p>super-charge-ml is a Python framework for turning heterogeneous, imperfect datasets into reproducible ML workflows.</p><p>Here, <strong>curation</strong> means checking what each column means, when it becomes available, how labels are formed, how rows should be split, and which quality problems must be resolved before training.</p></div>
+        <div class="section-intro"><p class="eyebrow"><span></span> The operating principle</p><h2>Reliable ML starts before the model.</h2></div>
+        <div class="intro-copy"><p>SCMLE is built for teams who need a defensible path from raw data to a deployed decision.</p><p><strong>Mathematics</strong> makes assumptions explicit. <strong>Engineering</strong> makes them repeatable: contracts, checkpoints, signed artifacts, and observability around every meaningful decision.</p></div>
         <div class="pillars">
           {pillars.map((pillar) => <article class="pillar"><span class="pillar-number">{pillar.number}</span><h3>{pillar.title}</h3><p>{pillar.copy}</p></article>)}
         </div>
@@ -101,14 +101,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       </section>
 
       <section class="closing shell">
-        <p class="eyebrow"><span></span> Start with the data</p>
-        <h2>Build systems<br /><em>you can explain.</em></h2>
-        <p>Start with a tiny table, inspect the decisions, then bring the same workflow to your real data.</p>
+        <p class="eyebrow"><span></span> Mathematics meets engineering</p>
+        <h2>Build systems<br /><em>you can defend.</em></h2>
+        <p>Start with a tiny table, inspect every decision, then bring the same disciplined workflow to your real data.</p>
         <a class="button button-primary" href={`${base}/docs/quickstart/`}>Start the quickstart <span>→</span></a>
       </section>
     </main>
 
-    <footer class="footer shell"><a class="brand" href={`${base}/`}><span class="brand-mark">✳</span><span>super-charge-ml</span></a><span>Open-source ML lifecycle infrastructure</span><span>© 2026</span></footer>
+    <footer class="footer shell"><a class="brand" href={`${base}/`}><img class="brand-logo" src={`${base}/scmle-mark.svg`} alt="" /><span>SCMLE</span></a><span>Mathematics meets engineering</span><span>© 2026</span></footer>
   </body>
 </html>
 
@@ -119,8 +119,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   :global(body) { margin: 0; color: #18231f; background: #f5f4ef; font-family: 'DM Sans', sans-serif; }
   .shell { width: min(1180px, calc(100% - 64px)); margin-inline: auto; }
   .nav { align-items: center; display: flex; justify-content: space-between; min-height: 88px; }
-  .brand { align-items: center; color: #18231f; display: inline-flex; font-size: 15px; font-weight: 700; gap: 9px; letter-spacing: -.02em; text-decoration: none; }
-  .brand-mark { align-items: center; background: #d9e96a; border-radius: 50%; display: inline-flex; font-size: 16px; height: 27px; justify-content: center; width: 27px; }
+  .brand { align-items: center; color: #18231f; display: inline-flex; font-size: 15px; font-weight: 700; gap: 9px; letter-spacing: .04em; text-decoration: none; }
+  .brand-logo { height: 30px; width: 30px; }
   nav { display: flex; gap: 32px; margin-left: 110px; }
   nav a, .text-link { color: #65716c; font: 12px 'DM Mono', monospace; text-decoration: none; }
   nav a:hover, .text-link:hover { color: #18231f; }

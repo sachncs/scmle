@@ -7,11 +7,11 @@ from typing import cast
 
 import pytest
 
-import scml
-from scml.contracts import modalities
-from scml.data.modalities import curation
-from scml.data.modalities import document
-from scml.models import modality_lifecycle
+import scmle
+from scmle.contracts import modalities
+from scmle.data.modalities import curation
+from scmle.data.modalities import document
+from scmle.models import modality_lifecycle
 
 
 def text_adapter() -> modality_lifecycle.TextAdapter:
@@ -36,7 +36,7 @@ class ExtensionTextAdapter(modality_lifecycle.TextAdapter):
 
 def test_modality_project_runs_and_persists_all_stages(tmp_path):
     """The public project surface preserves the complete lifecycle contract."""
-    project = scml.ModalityProject(
+    project = scmle.ModalityProject(
         text_adapter(), "test-signing-key", output_dir=tmp_path / "run"
     )
 
@@ -47,7 +47,7 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
     assert project.declaration().status.value == "experimental"
     assert (tmp_path / "run" / "model" / "manifest.json").is_file()
     assert (tmp_path / "run" / "modality_lifecycle.json").is_file()
-    predictor = scml.ModalityPredictor.from_package(
+    predictor = scmle.ModalityPredictor.from_package(
         project.adapter,
         report.package.path,
         "test-signing-key",
@@ -58,15 +58,15 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
 def test_modality_project_rejects_invalid_configuration(tmp_path):
     """Configuration errors are explicit before a lifecycle can start."""
     with pytest.raises(TypeError, match="ModalityAdapter"):
-        scml.ModalityProject(
+        scmle.ModalityProject(
             cast(modality_lifecycle.ModalityAdapter, object()),
             "key",
             output_dir=tmp_path,
         )
     with pytest.raises(ValueError, match="signing_key"):
-        scml.ModalityProject(text_adapter(), "", output_dir=tmp_path)
+        scmle.ModalityProject(text_adapter(), "", output_dir=tmp_path)
 
-    project = scml.ModalityProject(
+    project = scmle.ModalityProject(
         text_adapter(), "key", output_dir=tmp_path / "run"
     )
     with pytest.raises(RuntimeError, match="run must complete"):
@@ -75,7 +75,7 @@ def test_modality_project_rejects_invalid_configuration(tmp_path):
 
 def test_modality_project_can_cancel_before_publication(tmp_path):
     """Cancellation prevents a modality package and report from appearing."""
-    project = scml.ModalityProject(
+    project = scmle.ModalityProject(
         text_adapter(), "key", output_dir=tmp_path / "cancelled"
     )
 
@@ -95,7 +95,7 @@ def test_modality_project_can_require_independent_explanation_ground_truth(
     tmp_path,
 ):
     """Production-configured runs fail before publishing an unverified package."""
-    project = scml.ModalityProject(
+    project = scmle.ModalityProject(
         text_adapter(),
         "key",
         output_dir=tmp_path / "run",
@@ -116,7 +116,7 @@ def test_modality_project_rejects_file_output(tmp_path):
     """A file cannot be used as the lifecycle output directory."""
     output = Path(tmp_path) / "output"
     output.write_text("occupied", encoding="utf-8")
-    project = scml.ModalityProject(text_adapter(), "key", output_dir=output)
+    project = scmle.ModalityProject(text_adapter(), "key", output_dir=output)
 
     with pytest.raises(ValueError, match="output_dir"):
         project.run()
@@ -124,7 +124,7 @@ def test_modality_project_rejects_file_output(tmp_path):
 
 def test_modality_project_preserves_extension_identity_and_status(tmp_path):
     """Arbitrary dataset families use the lifecycle without support inflation."""
-    project = scml.ModalityProject(
+    project = scmle.ModalityProject(
         ExtensionTextAdapter(text_adapter().dataset),
         "test-signing-key",
         output_dir=tmp_path / "extension-run",
@@ -154,7 +154,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     )
     adapter = modality_lifecycle.TextAdapter(document.DocumentDataset(samples))
 
-    result = scml.ModalityCurationProject(
+    result = scmle.ModalityCurationProject(
         adapter,
         "test-signing-key",
         output_dir=tmp_path / "curation",
@@ -167,7 +167,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     assert result.dataset_card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()
 
-    restored = scml.ModalityCurationResult.read_verified(
+    restored = scmle.ModalityCurationResult.read_verified(
         result.path, "test-signing-key"
     )
     assert restored == result
@@ -181,14 +181,14 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
         ValueError,
         match=r"signature does not verify|content_digest does not match evidence",
     ):
-        scml.ModalityCurationResult.read_verified(
+        scmle.ModalityCurationResult.read_verified(
             result.path, "test-signing-key"
         )
     with pytest.raises(
         ValueError,
         match=r"signature does not verify|content_digest does not match evidence",
     ):
-        scml.ModalityCurationProject(
+        scmle.ModalityCurationProject(
             adapter,
             "test-signing-key",
             output_dir=tmp_path / "curation",
@@ -197,7 +197,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
 
 def test_modality_curation_project_reuses_identical_artifact(tmp_path):
     """A verified identical publication is idempotent and not replaced."""
-    project = scml.ModalityCurationProject(
+    project = scmle.ModalityCurationProject(
         text_adapter(),
         "test-signing-key",
         output_dir=tmp_path / "curation",
@@ -218,7 +218,7 @@ def test_modality_curation_project_rejects_identity_conflict_without_overwrite(
 ):
     """A valid artifact for another dataset remains untouched and fails."""
     output_dir = tmp_path / "curation"
-    first = scml.ModalityCurationProject(
+    first = scmle.ModalityCurationProject(
         text_adapter(), "test-signing-key", output_dir=output_dir
     ).run()
     original_bytes = Path(first.path).read_bytes()
@@ -236,7 +236,7 @@ def test_modality_curation_project_rejects_identity_conflict_without_overwrite(
         ValueError,
         match="dataset_hash does not match current adapter",
     ):
-        scml.ModalityCurationProject(
+        scmle.ModalityCurationProject(
             changed_adapter, "test-signing-key", output_dir=output_dir
         ).run()
 
@@ -247,7 +247,7 @@ def test_modality_curation_project_rejects_unsigned_artifact_tampering(
     tmp_path,
 ):
     """A verified signature cannot authorize unknown record content."""
-    project = scml.ModalityCurationProject(
+    project = scmle.ModalityCurationProject(
         text_adapter(),
         "test-signing-key",
         output_dir=tmp_path / "curation",
@@ -277,7 +277,7 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
         sample_count=len(records),
         profile={"record_type": "point", "dimensions": 2},
     )
-    adapter = scml.ExtensionCurationAdapter(
+    adapter = scmle.ExtensionCurationAdapter(
         extension=extension,
         sample_values=records,
         dataset_hash_value=dataset_hash,
@@ -286,7 +286,7 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
     )
 
     assert not isinstance(adapter, modality_lifecycle.ModalityAdapter)
-    result = scml.ModalityCurationProject(
+    result = scmle.ModalityCurationProject(
         adapter,
         "test-signing-key",
         output_dir=tmp_path / "point-cloud-curation",
@@ -306,7 +306,7 @@ def test_extension_curation_adapter_rejects_detached_report():
         sample_count=1,
         profile={},
     )
-    adapter = scml.ExtensionCurationAdapter(
+    adapter = scmle.ExtensionCurationAdapter(
         extension=extension,
         sample_values=({"x": 1},),
         dataset_hash_value=hashlib.sha256(b"declared-snapshot").hexdigest(),
@@ -322,7 +322,7 @@ def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
     """Empty snapshots remain valid curation evidence without modelling."""
     extension = modalities.ExtensionModality("acme/empty-stream")
     dataset_hash = hashlib.sha256(b"empty-snapshot").hexdigest()
-    adapter = scml.ExtensionCurationAdapter(
+    adapter = scmle.ExtensionCurationAdapter(
         extension=extension,
         sample_values=(),
         dataset_hash_value=dataset_hash,
@@ -335,7 +335,7 @@ def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
         limitations=("The caller owns source availability checks.",),
     )
 
-    result = scml.ModalityCurationProject(
+    result = scmle.ModalityCurationProject(
         adapter,
         "test-signing-key",
         output_dir=tmp_path / "empty-curation",

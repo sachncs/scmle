@@ -1,7 +1,7 @@
 """Tests for the fit-health verdict."""
 
-from scml.contracts import experiments
-from scml.evaluation import fit_health
+from scmle.contracts import experiments
+from scmle.evaluation import fit_health
 
 
 def test_a_model_that_memorises_is_overfit():

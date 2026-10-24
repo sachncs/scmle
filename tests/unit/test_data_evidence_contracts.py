@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from scml.contracts import data
+from scmle.contracts import data
 
 
 def make_finding(

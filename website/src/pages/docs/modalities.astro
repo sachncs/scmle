@@ -11,7 +11,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 >
   <p class="eyebrow"><span></span> Dataset families</p>
   <h1>One contract.<br /><em>Many modalities.</em></h1>
-  <p class="lead">A file extension is not a modelling capability. This guide shows how super-charge-ml handles documents, images, audio, video, graphs, and geospatial data without hiding the decisions that make their results trustworthy.</p>
+  <p class="lead">A file extension is not a modelling capability. This guide shows how scmle handles documents, images, audio, video, graphs, and geospatial data without hiding the decisions that make their results trustworthy.</p>
 
   <div class="callout"><p><strong>Read this before adding a modality.</strong> The experimental lifecycle is deliberately broader than the supported beta path. It can curate and exercise bounded baselines across several dataset families; only an explicitly gated capability may be advertised as supported production functionality.</p></div>
 
@@ -65,7 +65,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   <h2>Use the typed manifest as the hand-off</h2>
   <p>The manifest is the boundary between raw material and an experimental lifecycle. It binds the exact snapshot to the modality, task, owner, label lineage, privacy policy, and content hash. It does not guess missing governance information.</p>
-  <pre><code>{`from scml.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
+  <pre><code>{`from scmle.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
 
 manifest = ModalityManifest(
     dataset_id="documents-2026-10-21",

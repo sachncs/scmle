@@ -6,10 +6,10 @@ import pathlib
 import pytest
 import support
 
-import scml
-from scml.contracts import errors
-from scml.core import policies
-from scml.core import state
+import scmle
+from scmle.contracts import errors
+from scmle.core import policies
+from scmle.core import state
 
 
 def project(frame, tmp_path, *gates):
@@ -118,4 +118,4 @@ def test_checkpoints_do_not_change_results(binary_frame, tmp_path):
     assert gated.evaluation["selected_cv_score"] == pytest.approx(
         plain.evaluation["selected_cv_score"]
     )
-    assert isinstance(scml.MLProject, type)
+    assert isinstance(scmle.MLProject, type)

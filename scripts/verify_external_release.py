@@ -46,7 +46,7 @@ def request_bytes(url: str, timeout: float = 30.0) -> bytes:
         url,
         headers={
             "Accept": "application/json",
-            "User-Agent": "super-charge-ml-release-verifier/1",
+            "User-Agent": "scmle-release-verifier/1",
         },
     )
     with urlopen(request, timeout=timeout) as response:
@@ -191,7 +191,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--artifact-dir", type=Path, required=True)
-    parser.add_argument("--pypi-project", default="super-charge-ml")
+    parser.add_argument("--pypi-project", default="scmle")
     parser.add_argument("--github-api", default="https://api.github.com")
     parser.add_argument("--pypi-api", default="https://pypi.org/pypi")
     parser.add_argument("--attempts", type=int, default=1)

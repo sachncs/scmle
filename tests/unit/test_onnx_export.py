@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.artifacts import bundle as bundle_module
-from scml.contracts import data as data_contracts
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.data.curation import preprocessing
-from scml.inference import onnx_export
-from scml.models import registry as registry_module
+from scmle.artifacts import bundle as bundle_module
+from scmle.contracts import data as data_contracts
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
+from scmle.inference import onnx_export
+from scmle.models import registry as registry_module
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("skl2onnx") is None

@@ -2,8 +2,8 @@
 
 import pytest
 
-from scml.models.deeplearning.jepa import JepaEstimator
-from scml.models.deeplearning.jepa_engine import JepaEngine
+from scmle.models.deeplearning.jepa import JepaEstimator
+from scmle.models.deeplearning.jepa_engine import JepaEngine
 
 
 def test_jepa_is_a_self_supervised_representation_contract():

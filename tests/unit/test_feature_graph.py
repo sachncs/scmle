@@ -7,9 +7,9 @@ import pandas as pd
 import pytest
 from sklearn import base
 
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.features import feature_graph
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.features import feature_graph
 
 
 def node(name, op, inputs, **params):

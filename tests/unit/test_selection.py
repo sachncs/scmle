@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from scml.data.curation import selection
+from scmle.data.curation import selection
 
 
 def frame(rows=600, seed=0):

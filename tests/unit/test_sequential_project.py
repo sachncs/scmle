@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.api.sequential import resolve_tabular_input
-from scml.api.sequential import SequentialEstimationProject
-from scml.evaluation.sequential import SequentialEstimand
-from scml.evaluation.sequential import SequentialEstimationPolicy
+from scmle.api.sequential import resolve_tabular_input
+from scmle.api.sequential import SequentialEstimationProject
+from scmle.evaluation.sequential import SequentialEstimand
+from scmle.evaluation.sequential import SequentialEstimationPolicy
 
 
 def make_estimand() -> SequentialEstimand:

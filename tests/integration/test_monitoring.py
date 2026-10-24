@@ -7,11 +7,11 @@ import pandas as pd
 import pytest
 import support
 
-from scml.contracts import errors
-from scml.contracts import observability
-from scml.monitoring import champion
-from scml.monitoring import events
-from scml.monitoring import monitor as monitor_module
+from scmle.contracts import errors
+from scmle.contracts import observability
+from scmle.monitoring import champion
+from scmle.monitoring import events
+from scmle.monitoring import monitor as monitor_module
 
 
 def make_frame(rows, seed, shift=0.0, relabel=False):
@@ -232,7 +232,7 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
     import copy
     import dataclasses
 
-    from scml.evaluation import diagnostics
+    from scmle.evaluation import diagnostics
 
     seen = []
     real = diagnostics.resample_rows

@@ -6,11 +6,11 @@ from typing import cast
 
 import pytest
 
-from scml.contracts import capabilities
-from scml.contracts import data
-from scml.contracts import errors
-from scml.contracts import modalities
-from scml.data.modalities import curation
+from scmle.contracts import capabilities
+from scmle.contracts import data
+from scmle.contracts import errors
+from scmle.contracts import modalities
+from scmle.data.modalities import curation
 
 
 def make_evidence(

@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.evaluation.longitudinal import LongitudinalEstimand
-from scml.evaluation.longitudinal import LongitudinalEstimationPolicy
-from scml.evaluation.longitudinal import LongitudinalEstimationResult
-from scml.evaluation.longitudinal import LongitudinalIPWEstimator
+from scmle.evaluation.longitudinal import LongitudinalEstimand
+from scmle.evaluation.longitudinal import LongitudinalEstimationPolicy
+from scmle.evaluation.longitudinal import LongitudinalEstimationResult
+from scmle.evaluation.longitudinal import LongitudinalIPWEstimator
 
 
 def make_estimand() -> LongitudinalEstimand:

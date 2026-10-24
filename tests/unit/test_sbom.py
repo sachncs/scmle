@@ -2,7 +2,7 @@
 
 import pytest
 
-from scml.governance import sbom
+from scmle.governance import sbom
 
 
 def test_sbom_has_deterministic_component_identity():

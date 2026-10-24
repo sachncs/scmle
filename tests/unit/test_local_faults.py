@@ -5,9 +5,9 @@ from urllib.parse import urlparse
 
 import pytest
 
-from scml.contracts import reliability
-from scml.governance import local_faults
-from scml.governance import reliability as reliability_harness
+from scmle.contracts import reliability
+from scmle.governance import local_faults
+from scmle.governance import reliability as reliability_harness
 
 
 def test_local_executor_passes_every_declared_scenario(tmp_path):

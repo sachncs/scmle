@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.evaluation import uplift
-from scml.models.uplift import estimators
+from scmle.evaluation import uplift
+from scmle.models.uplift import estimators
 
 
 def experiment(rows=4000, seed=0):

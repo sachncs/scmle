@@ -2,7 +2,7 @@
 import DocsLayout from "../../layouts/DocsLayout.astro";
 ---
 
-<DocsLayout title="Operations" description="Operate, observe, and safely evolve super-charge-ml workflows." current="operations">
+<DocsLayout title="Operations" description="Operate, observe, and safely evolve scmle workflows." current="operations">
   <p class="eyebrow"><span></span> Shipping with evidence</p>
   <h1>Observe the run.<br /><em>Earn the release.</em></h1>
   <p class="lead">A production workflow is more than a serving endpoint. It must be resumable, inspectable, authenticated, monitored, and reversible.</p>
@@ -17,13 +17,13 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Safe recovery</h2>
   <p>Interrupted or failed runs preserve checkpoints and recoverable trials. Resume only with the same configuration and data identity; stale checkpoints are refused.</p>
-  <pre><code>scml resume runs/&lt;run-id&gt;</code></pre>
+  <pre><code>scmle resume runs/&lt;run-id&gt;</code></pre>
 
   <h2>Durable state</h2>
   <p>Run evidence, incremental checkpoints, source registries, observability retention files, fault evidence, and signing-key rotation use a temporary file, flush its contents, atomically replace the destination, and flush the containing directory. This protects both the bytes and the rename across a sudden process or power failure. It does not make a remote object store transactional; distributed transports still need their own commit protocol.</p>
 
   <h2>Bundle security</h2>
-  <p>Sign bundles with <code>SCML_SIGNING_KEY</code> and verify them at load time. Rotate keys without reserializing the model:</p>
+  <p>Sign bundles with <code>SCMLE_SIGNING_KEY</code> and verify them at load time. Rotate keys without reserializing the model:</p>
   <pre><code>ModelBundle.rotate_signing_key(
     "runs/&lt;run-id&gt;/model",
     current_key,
@@ -31,7 +31,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 )</code></pre>
 
   <h2>Read the release controls</h2>
-  <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; <code>release_attestation.json</code> for the canonical HMAC binding across those records; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. Set <code>SCML_SIGNING_KEY</code> in the release environment. The release evaluator verifies the attestation and blocks unsigned or tampered evidence. <code>FaultInjectionHarness</code> persists digest-bound scenario artifacts, while <code>LocalFaultExecutor</code> supplies bounded local execution evidence. External transport, container, and kernel-resource injectors remain a separate release requirement.</p>
+  <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; <code>release_attestation.json</code> for the canonical HMAC binding across those records; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. Set <code>SCMLE_SIGNING_KEY</code> in the release environment. The release evaluator verifies the attestation and blocks unsigned or tampered evidence. <code>FaultInjectionHarness</code> persists digest-bound scenario artifacts, while <code>LocalFaultExecutor</code> supplies bounded local execution evidence. External transport, container, and kernel-resource injectors remain a separate release requirement.</p>
   <p>For inference telemetry, use the redacted observability sidecar and evaluate it against an explicit policy. Missing required signals, stale or future timestamps, and threshold breaches must remain visible as failed evidence instead of being silently dropped.</p>
 
   <h2>Make reliability operable</h2>
@@ -52,7 +52,7 @@ evaluation = SLOMonitor().evaluate(target, metrics, observed_at=now)`}</code></p
 
   <h2>Deliver the alert once</h2>
   <p><code>AlertDispatcher</code> keeps the SLO decision separate from delivery. It derives a stable alert identity from the evidence, records successful delivery, and deduplicates replays. Use the local JSONL sink for an operator handoff or the bounded HTTPS webhook sink for an authenticated incident gateway.</p>
-  <pre><code>{`from scml.monitoring.alerts import Alert, AlertDispatcher, WebhookAlertSink
+  <pre><code>{`from scmle.monitoring.alerts import Alert, AlertDispatcher, WebhookAlertSink
 
 alert = Alert.from_evidence(
     route="on-call",
@@ -70,7 +70,7 @@ delivery = AlertDispatcher(
 
   <h2>Turn a breach into an incident</h2>
   <p>An alert is not a recovery plan. Open an incident with the affected run and the exact rollback target, then require an explicit acknowledgement before resolution. The journal is append-only, hash-chained, and rejects tampering; repeating a transition is idempotent.</p>
-  <pre><code>{`from scml.monitoring.incidents import IncidentWorkflow
+  <pre><code>{`from scmle.monitoring.incidents import IncidentWorkflow
 
 workflow = IncidentWorkflow("runs/&lt;run-id&gt;/incidents.jsonl")
 incident = workflow.open(
@@ -95,7 +95,7 @@ workflow.resolve(
 
   <h2>Join serving evidence to the run</h2>
   <p>Prediction telemetry tells you what happened; the evidence graph tells you what produced the bundle. Link an event only with the input and output fingerprints captured at the serving boundary and the exact bundle digest loaded for that request.</p>
-  <pre><code>{`from scml.inference.evidence import InferenceEvidenceLinker
+  <pre><code>{`from scmle.inference.evidence import InferenceEvidenceLinker
 
 InferenceEvidenceLinker().link(
     "runs/&lt;run-id&gt;/evidence_graph.json",
@@ -128,8 +128,8 @@ only a verified, digest-bound state may move forward`}</code></pre>
   <p>The repository includes a bounded local executor for all 15 declared fault scenarios. It exercises real child-process termination, timeout cancellation, atomic publication, artifact quarantine, signature rejection, checkpoint and snapshot mismatch, retry exhaustion, duplicate-event idempotency, incomplete lineage, and rejected approvals.</p>
   <pre><code>{`from pathlib import Path
 
-from scml.contracts import reliability
-from scml.governance.local_faults import LocalFaultExecutor
+from scmle.contracts import reliability
+from scmle.governance.local_faults import LocalFaultExecutor
 
 executor = LocalFaultExecutor(Path("rehearsal/faults"))
 for scenario in reliability.FaultScenario:

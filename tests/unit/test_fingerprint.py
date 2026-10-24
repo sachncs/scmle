@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import tasks
-from scml.data.profiling import profiler
-from scml.data.readers import tabular
-from scml.data.validation import columns
-from scml.intelligence import fingerprint
+from scmle.contracts import tasks
+from scmle.data.profiling import profiler
+from scmle.data.readers import tabular
+from scmle.data.validation import columns
+from scmle.intelligence import fingerprint
 
 
 def profile_of(frame, task=tasks.TaskType.BINARY, **data_overrides):

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import support
 
-from scml.contracts import errors
+from scmle.contracts import errors
 
 
 def partly_labeled(rows=900, unlabeled=300, seed=0):

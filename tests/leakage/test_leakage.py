@@ -7,9 +7,9 @@ import pandas as pd
 import pytest
 import support
 
-import scml
-from scml.contracts import errors
-from scml.contracts import tasks
+import scmle
+from scmle.contracts import errors
+from scmle.contracts import tasks
 
 
 def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
@@ -58,7 +58,7 @@ def test_test_set_is_opened_exactly_once_per_run(binary_frame, tmp_path):
 
 
 def run_default(frame, directory):
-    return scml.MLProject(
+    return scmle.MLProject(
         frame,
         "y",
         time_budget=600,
@@ -125,7 +125,7 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
 ):
     base = support.make_project(binary_frame, "y", output_dir=tmp_path / "a")
     base.plan()
-    from scml.data.splitting import splitters
+    from scmle.data.splitting import splitters
 
     split = splitters.SplitManager(base.spec, tasks.TaskType.BINARY).split(
         binary_frame
@@ -154,7 +154,7 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
 def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
     binary_frame, tmp_path
 ):
-    from scml.data.splitting import splitters
+    from scmle.data.splitting import splitters
 
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     split = splitters.SplitManager(project.spec, tasks.TaskType.BINARY).split(
@@ -173,7 +173,7 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
 def test_hard_enforcement_moves_the_test_rows_out_of_reach(
     tmp_path, monkeypatch
 ):
-    from scml.core import limits
+    from scmle.core import limits
 
     rng = np.random.default_rng(21)
     frame = pd.DataFrame(

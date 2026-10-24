@@ -3,7 +3,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
-<DocsLayout title="Quickstart" description="Run your first super-charge-ml project." current="quickstart">
+<DocsLayout title="Quickstart" description="Run your first SCMLE project." current="quickstart">
   <p class="eyebrow"><span></span> First run</p>
   <h1>From table to<br /><em>evidence.</em></h1>
   <p class="lead">The smallest useful workflow is deliberately boring: install, point at a dataset, declare the target, and inspect what the system learned before choosing a model.</p>
@@ -11,7 +11,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <h2>1. Install</h2>
   <pre><code>python -m venv .venv
 source .venv/bin/activate
-pip install super-charge-ml</code></pre>
+pip install scmle</code></pre>
 
   <h2>2. Create a tiny dataset</h2>
   <p>Use this fixture to verify the installation before connecting a production table:</p>
@@ -25,7 +25,7 @@ CSV</code></pre>
 
   <h2>3. Run a project</h2>
   <p>The target is <code>churned</code>; the identifier is not a feature:</p>
-  <pre><code>scml run customers.csv \
+  <pre><code>scmle run customers.csv \
   --target churned \
   --id-columns customer_id \
   --output-dir runs/customers</code></pre>
@@ -46,7 +46,7 @@ CSV</code></pre>
   <p>Start with <code>dataset_card.json</code> for intended use, exclusions, ownership, privacy, and limitations; then read <code>curation_report.json</code> for row-level decisions. If the data is not trustworthy, a better score is not a better result.</p>
 
   <h2>5. Score new rows</h2>
-  <pre><code>scml predict runs/customers/&lt;run-id&gt;/model \
+  <pre><code>scmle predict runs/customers/&lt;run-id&gt;/model \
   new_customers.csv \
   --output predictions.csv</code></pre>
   <div class="callout"><p>Bundles are pickle-based. Sign them in production and load them with the signing key; only use <code>--trusted</code> for artifacts whose source you explicitly control.</p></div>

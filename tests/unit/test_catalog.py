@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scml
-from scml.data import catalog
+import scmle
+from scmle.data import catalog
 
 
 def test_dataframe_observation_is_deterministic_and_reviewable():
@@ -197,8 +197,8 @@ def test_adapter_owned_observation_supports_unknown_shapes():
 
 def test_catalog_is_a_top_level_public_entry_point():
     """The general catalog is discoverable without importing implementation files."""
-    assert scml.DatasetCatalog is catalog.DatasetCatalog
-    assert "DatasetCatalog" in scml.__all__
+    assert scmle.DatasetCatalog is catalog.DatasetCatalog
+    assert "DatasetCatalog" in scmle.__all__
 
 
 def test_invalid_mapping_lengths_and_tampered_source_fail_closed():

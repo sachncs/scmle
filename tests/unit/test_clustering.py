@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from sklearn import datasets
 
-from scml.unsupervised import clustering
+from scmle.unsupervised import clustering
 
 
 def blobs(centers=3, rows=300, spread=0.6, seed=0):

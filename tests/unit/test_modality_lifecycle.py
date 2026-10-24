@@ -12,18 +12,18 @@ import wave
 import numpy as np
 import pytest
 
-from scml.contracts import data
-from scml.contracts import modalities
-from scml.contracts import performance
-from scml.data.modalities import audio
-from scml.data.modalities import document
-from scml.data.modalities import geospatial
-from scml.data.modalities import graph
-from scml.data.modalities import image
-from scml.data.modalities import video
-from scml.explainability import quality
-from scml.governance import attestation
-from scml.models import modality_lifecycle
+from scmle.contracts import data
+from scmle.contracts import modalities
+from scmle.contracts import performance
+from scmle.data.modalities import audio
+from scmle.data.modalities import document
+from scmle.data.modalities import geospatial
+from scmle.data.modalities import graph
+from scmle.data.modalities import image
+from scmle.data.modalities import video
+from scmle.explainability import quality
+from scmle.governance import attestation
+from scmle.models import modality_lifecycle
 
 
 def document_adapter() -> modality_lifecycle.DocumentAdapter:

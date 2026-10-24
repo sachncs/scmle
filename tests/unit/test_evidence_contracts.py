@@ -2,7 +2,7 @@
 
 import pytest
 
-from scml.contracts import evidence
+from scmle.contracts import evidence
 
 
 def make_record(

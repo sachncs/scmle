@@ -5,10 +5,10 @@ import json
 
 import pytest
 
-from scml.contracts import evaluation
-from scml.contracts import evidence
-from scml.contracts import tasks
-from scml.evaluation import release
+from scmle.contracts import evaluation
+from scmle.contracts import evidence
+from scmle.contracts import tasks
+from scmle.evaluation import release
 
 
 def make_record(

@@ -5,7 +5,7 @@ import io
 import numpy as np
 import pytest
 
-from scml.data.modalities import image
+from scmle.data.modalities import image
 
 try:
     from PIL import Image

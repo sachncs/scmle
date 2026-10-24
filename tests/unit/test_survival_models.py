@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from scml.evaluation import concordance
-from scml.models.survival import estimators
+from scmle.evaluation import concordance
+from scmle.models.survival import estimators
 
 
 def cohort(rows=1200, seed=0):

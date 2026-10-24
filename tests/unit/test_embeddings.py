@@ -12,8 +12,8 @@ import pytest
 from sklearn import linear_model
 from sklearn import metrics
 
-from scml.data.curation import embedding
-from scml.data.curation import transformers
+from scmle.data.curation import embedding
+from scmle.data.curation import transformers
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("sentence_transformers") is None
@@ -37,7 +37,7 @@ def test_the_framework_process_never_imports_torch():
     script = textwrap.dedent(
         """
         import sys
-        from scml.data.curation import embedding
+        from scmle.data.curation import embedding
         model = embedding.TextEmbedder().fit(["a car", "an apple"])
         model.transform(["a truck"])
         assert model.mode_ == "embedding", model.mode_

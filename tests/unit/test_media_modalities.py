@@ -9,9 +9,9 @@ import wave
 import numpy as np
 import pytest
 
-from scml.data.modalities import audio
-from scml.data.modalities import geospatial
-from scml.data.modalities import video
+from scmle.data.modalities import audio
+from scmle.data.modalities import geospatial
+from scmle.data.modalities import video
 
 
 def wav_bytes(frame_count: int = 8) -> bytes:

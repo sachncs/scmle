@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from scml.contracts import errors
-from scml.contracts import tasks
-from scml.core import config
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.core import config
 
 
 def make_spec():

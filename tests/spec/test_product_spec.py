@@ -19,27 +19,27 @@ import pandas as pd
 import pytest
 import support
 
-import scml
-from scml.artifacts import bundle as bundle_module
-from scml.contracts import errors
-from scml.contracts import events
-from scml.contracts import experiments
-from scml.contracts import models as model_contracts
-from scml.contracts import tasks
-from scml.core import scheduler
-from scml.core import stages
-from scml.core import state
-from scml.data.validation import columns
-from scml.data.validation import target as target_module
-from scml.governance import lifecycle
-from scml.inference import mapping as mapping_module
-from scml.integrations import ray_backend
-from scml.models import conformance
-from scml.models import registry as registry_module
-from scml.sampling import strategies as strategies_module
+import scmle
+from scmle.artifacts import bundle as bundle_module
+from scmle.contracts import errors
+from scmle.contracts import events
+from scmle.contracts import experiments
+from scmle.contracts import models as model_contracts
+from scmle.contracts import tasks
+from scmle.core import scheduler
+from scmle.core import stages
+from scmle.core import state
+from scmle.data.validation import columns
+from scmle.data.validation import target as target_module
+from scmle.governance import lifecycle
+from scmle.inference import mapping as mapping_module
+from scmle.integrations import ray_backend
+from scmle.models import conformance
+from scmle.models import registry as registry_module
+from scmle.sampling import strategies as strategies_module
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "scml"
+PACKAGE = ROOT / "scmle"
 
 
 def make_frame(rows=600, seed=0):
@@ -65,7 +65,7 @@ def frame():
 @pytest.fixture(scope="module")
 def run(frame, tmp_path_factory):
     """One complete run with every default feature enabled."""
-    project = scml.MLProject(
+    project = scmle.MLProject(
         frame,
         "y",
         task="classification",
@@ -167,7 +167,9 @@ def test_l23_to_l39_decision_table(run):
     assert "content_id" in {
         f.name
         for f in dataclasses.fields(
-            __import__("scml.governance.registry", fromlist=["x"]).VersionRecord
+            __import__(
+                "scmle.governance.registry", fromlist=["x"]
+            ).VersionRecord
         )
     }  # content-addressed artifacts
     assert {"tracking", "distributed", "optimization"} <= set(
@@ -198,7 +200,7 @@ def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
     }
     assert not names & forbidden
     code = (
-        "import sys, scml; from scml.models import registry; "
+        "import sys, scmle; from scmle.models import registry; "
         "registry.ModelRegistry.with_builtins(); "
         "bad=[m for m in ('ray','mlflow','torch','kubernetes') if m in sys.modules]; "
         "assert not bad, bad"
@@ -223,7 +225,7 @@ def test_l101_l105_three_planes_are_separate_packages():
 
 
 def test_l113_l176_package_organization():
-    """L113-L176: every module of the spec's tree exists (flat `scml/`)."""
+    """L113-L176: every module of the spec's tree exists (flat `scmle/`)."""
     packages = (
         "api",
         "contracts",
@@ -294,11 +296,11 @@ def test_l178_modules_use_stable_contracts_not_private_internals():
             if (
                 isinstance(node, ast.ImportFrom)
                 and node.module
-                and node.module.startswith("scml")
+                and node.module.startswith("scmle")
             ):
                 assert (
-                    node.module.startswith("scml.contracts")
-                    or node.module == "scml"
+                    node.module.startswith("scmle.contracts")
+                    or node.module == "scmle"
                 ), f"{path.name} imports {node.module}"
     for path in PACKAGE.rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text())):
@@ -338,11 +340,11 @@ def test_l192_cross_field_validation():
             data=tasks.DataSpec(uri="x", target="y"),
             validation=tasks.ValidationSpec(strategy="temporal"),
         )
-    from scml.evaluation import metrics
+    from scmle.evaluation import metrics
 
     with pytest.raises(errors.ConfigError):
         metrics.CATALOG.resolve("pr_auc", tasks.TaskType.MULTICLASS)
-    from scml.data.splitting import splitters
+    from scmle.data.splitting import splitters
 
     frame = make_frame(100).assign(t="not a date")
     spec = tasks.ProjectSpec(
@@ -360,7 +362,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
     assert dataclasses.fields(
         model_contracts.Capabilities
     )  # capability discovery
-    from scml.experimentation import trials
+    from scmle.experimentation import trials
 
     assert {f.name for f in dataclasses.fields(trials.TrialPayload)} >= {
         "job",
@@ -399,9 +401,9 @@ def test_l198_l206_foundational_and_production_contracts(run):
 def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     """L210-L224: key invariant of each module in the I/O matrix."""
     project, result = run
-    from scml.data.profiling import profiler
-    from scml.data.readers import tabular
-    from scml.data.splitting import splitters
+    from scmle.data.profiling import profiler
+    from scmle.data.readers import tabular
+    from scmle.data.splitting import splitters
 
     frame = make_frame(200)
     before = frame.copy()
@@ -535,7 +537,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     """L278-L288: retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
     import shutil
 
-    from scml.core import orchestrator as orchestrator_module
+    from scmle.core import orchestrator as orchestrator_module
 
     project = support.make_project(
         frame, "y", time_budget=300, output_dir=tmp_path
@@ -543,7 +545,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     first = project.run()
     (first.run_dir / "evaluation.json").unlink()
     shutil.rmtree(first.run_dir / "model")
-    resumed = scml.MLProject.resume(
+    resumed = scmle.MLProject.resume(
         first.run_dir, data=frame
     )  # idempotent retry / restart
     assert [t.trial_id for t in resumed.trials] == [
@@ -627,7 +629,7 @@ def test_l311_l321_decision_policy_examples():
     frame = pd.DataFrame({"x": rng.normal(size=300)})
     frame["c"] = rng.choice([f"k{i}" for i in range(200)], 300)
     frame["y"] = (rng.random(300) < 0.05).astype(int)
-    plan = scml.MLProject(frame, "y", time_budget=60).plan()
+    plan = scmle.MLProject(frame, "y", time_budget=60).plan()
     names = set(plan.candidate_models)
     assert (
         "dummy" in names and "logistic_regression" in names
@@ -713,7 +715,7 @@ def test_l360_planner_reads_capabilities_not_library_names():
 
 def test_l370_optimizer_library_is_not_the_architecture():
     """L370: Optuna sits behind our ask/tell interface."""
-    from scml.optimization import optimizers
+    from scmle.optimization import optimizers
 
     assert issubclass(optimizers.OptunaOptimizer, optimizers.Optimizer)
     assert issubclass(optimizers.RandomOptimizer, optimizers.Optimizer)
@@ -724,7 +726,7 @@ def test_l370_optimizer_library_is_not_the_architecture():
 
 def test_l374_l393_balancing_and_augmentation(frame):
     """L374-L393: the technique table and its policies."""
-    from scml.sampling import strategies
+    from scmle.sampling import strategies
 
     for name in (
         "class_weight",
@@ -740,10 +742,10 @@ def test_l374_l393_balancing_and_augmentation(frame):
         "jitter_augment" in strategies.OPT_IN
         and "copula_augment" in strategies.OPT_IN
     )  # research plugins
-    from scml.contracts import data as data_contracts
-    from scml.data.profiling import profiler
-    from scml.data.readers import tabular
-    from scml.sampling import resampling
+    from scmle.contracts import data as data_contracts
+    from scmle.data.profiling import profiler
+    from scmle.data.readers import tabular
+    from scmle.sampling import resampling
 
     # Sampling happens inside the training fold (inside fit), never on the full dataset.
     assert "fit" in resampling.ResamplingClassifier.__dict__
@@ -785,7 +787,7 @@ def test_l399_l409_evaluation_contract(run):
         "calibration",
         "threshold_analysis",
     } <= set(result.diagnostics)
-    from scml.evaluation import metrics
+    from scmle.evaluation import metrics
 
     defaults = set(metrics.MetricCatalog.default_metric.values())
     assert not defaults & {
@@ -844,7 +846,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
     assert (
         manifest["train_ids"] and manifest["test_ids"]
     )  # 1 immutable row-id manifest
-    from scml.data.splitting import splitters
+    from scmle.data.splitting import splitters
 
     assert (
         dataclasses.is_dataclass(splitters.SplitManifest)
@@ -877,7 +879,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
 
 def test_l439_deployment_scenario_splits(frame):
     """L439: temporal/entity data must not use a random split."""
-    from scml.data.splitting import splitters
+    from scmle.data.splitting import splitters
 
     with_time = support.make_project(
         frame.assign(t=range(len(frame))), "y", time_column="t"
@@ -949,7 +951,7 @@ def test_l470_l474_artifact_format_and_untrusted_artifacts(run, tmp_path):
 
 def test_l476_exact_replay_vs_comparable_rerun(run):
     """L476: records reproducibility conditions; distinguishes exact from comparable."""
-    from scml.artifacts import reproducibility
+    from scmle.artifacts import reproducibility
 
     assert {
         reproducibility.EXACT,
@@ -957,7 +959,7 @@ def test_l476_exact_replay_vs_comparable_rerun(run):
         reproducibility.DIFFERENT,
     } == {"exact", "comparable", "different"}
     assert "reproducibility" in run[1].evaluation
-    assert hasattr(scml.MLProject, "verify_replay")
+    assert hasattr(scmle.MLProject, "verify_replay")
 
 
 def test_l480_l496_inference_contract(run, frame, tmp_path):
@@ -987,7 +989,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     assert caught.value.details["missing"] == ["b"]  # structured errors
     path = tmp_path / "batch.csv"
     features.to_csv(path, index=False)
-    from scml.inference import serving
+    from scmle.inference import serving
 
     assert serving.BatchServing(result.bundle).score_file(
         path, tmp_path / "out.csv"
@@ -1028,7 +1030,7 @@ def test_l500_l546_stack_and_extras():
 def test_l548_no_heavy_imports_until_a_model_is_selected():
     """L548: a registry entry must not import GPU/deep-learning dependencies."""
     code = (
-        "import sys; from scml.contracts import tasks; from scml.models import registry; "
+        "import sys; from scmle.contracts import tasks; from scmle.models import registry; "
         "r = registry.ModelRegistry.with_builtins(); r.candidates(tasks.TaskType.BINARY, 100); "
         "assert not [m for m in ('lightgbm','xgboost','catboost','torch','tensorflow') if m in sys.modules]"
     )
@@ -1038,40 +1040,36 @@ def test_l548_no_heavy_imports_until_a_model_is_selected():
     )
 
 
-def test_l554_l606_roadmap_deliverables(frame, tmp_path):
-    """L554-L600: M0-M4 deliverables are observable behaviours."""
-    from scml.data.readers import tabular
+def test_core_deliverables_are_observable(frame, tmp_path):
+    """Core lifecycle deliverables remain observable behaviours."""
+    from scmle.data.readers import tabular
 
-    assert tabular.read_table  # M0: CSV/Parquet ingestion + typed config
-    result = support.make_project(
-        frame, "y", output_dir=tmp_path
-    ).run()  # M1: MLProject(...).run()
+    assert tabular.read_table
+    result = support.make_project(frame, "y", output_dir=tmp_path).run()
     assert result.predict(frame.drop(columns="y")).shape[0] == len(frame)
-    assert len({t.model_name for t in result.trials}) > 3  # M2: multi-model
-    assert (
-        tmp_path / "experiments.sqlite"
-    ).exists()  # M2: experiment persistence
+    assert len({t.model_name for t in result.trials}) > 3
+    assert (tmp_path / "experiments.sqlite").exists()
     plan = support.make_project(frame, "y").plan()
     assert any(
         d.technique in {"class_weight", "log_skewed", "calibrated"}
         for d in plan.decisions
-    )  # M3: data strategies
+    )
     assert (ROOT / "benchmarks" / "baseline.json").exists() and (
         ROOT / "docs" / "SECURITY.md"
-    ).exists()  # M4
+    ).exists()
 
 
 def test_l610_l629_backlog_priorities(run):
     """L610-L629: each backlog row has a working implementation."""
-    from scml.contracts import models as model_contracts
-    from scml.evaluation import diagnostics
-    from scml.explainability import importance
-    from scml.governance import registry
-    from scml.inference import serving
-    from scml.intelligence import knowledge
-    from scml.models import ensembles
-    from scml.monitoring import monitor
-    from scml.sampling import synthesis
+    from scmle.contracts import models as model_contracts
+    from scmle.evaluation import diagnostics
+    from scmle.explainability import importance
+    from scmle.governance import registry
+    from scmle.inference import serving
+    from scmle.intelligence import knowledge
+    from scmle.models import ensembles
+    from scmle.monitoring import monitor
+    from scmle.sampling import synthesis
 
     result = run[1]
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
@@ -1161,9 +1159,9 @@ def test_l739_l747_first_sprint_outcomes(run):
     assert (ROOT / "pyproject.toml").exists() and list(
         (ROOT / "tests").rglob("test_*.py")
     )  # 2 package skeleton + tests
-    from scml.data.profiling import profiler
-    from scml.data.readers import tabular
-    from scml.data.splitting import splitters
+    from scmle.data.profiling import profiler
+    from scmle.data.readers import tabular
+    from scmle.data.splitting import splitters
 
     frame = make_frame()
     manifest = tabular.build_manifest(frame, "y", "<memory>")
@@ -1183,7 +1181,7 @@ def test_l739_l747_first_sprint_outcomes(run):
 
 def test_l751_l761_frozen_api(frame, tmp_path):
     """L751-L761: the API as written, incl. approved plans and the classification alias."""
-    project = scml.MLProject(
+    project = scmle.MLProject(
         frame,
         "y",
         task="classification",
@@ -1218,15 +1216,15 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     """L765-L778: each architectural commitment works, not merely exists."""
     import pickle
 
-    from scml.core import policies
-    from scml.data.splitting import splitters
-    from scml.experimentation import trials
-    from scml.features import feature_graph
-    from scml.intelligence import knowledge
-    from scml.models import registry as models_registry
-    from scml.monitoring import events as monitor_events
-    from scml.sampling import resampling
-    from scml.sampling import synthesis
+    from scmle.core import policies
+    from scmle.data.splitting import splitters
+    from scmle.experimentation import trials
+    from scmle.features import feature_graph
+    from scmle.intelligence import knowledge
+    from scmle.models import registry as models_registry
+    from scmle.monitoring import events as monitor_events
+    from scmle.sampling import resampling
+    from scmle.sampling import synthesis
 
     registry = models_registry.ModelRegistry.with_builtins()
     neural = registry.get("neural_network")  # deep learning: a plugin family
@@ -1253,7 +1251,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(series)
     gaps = [min(held) - max(fit) for fit, held in split.manifest.folds]
     assert all(gap > 5 for gap in gaps)  # time-series: embargo is honoured
-    profile = scml.MLProject(
+    profile = scmle.MLProject(
         series.drop(columns="a").assign(b=np.arange(120.0) % 7),
         "y",
         time_column="t",
@@ -1279,12 +1277,12 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     np.testing.assert_allclose(out["sq"], frame["b"] ** 2)
 
     vector = knowledge.fingerprint(
-        scml_profile(frame), tasks.TaskType.BINARY
+        scmle_profile(frame), tasks.TaskType.BINARY
     )  # meta-learning fingerprint
     assert set(vector) == set(knowledge.FIELDS)
 
     rejecting = policies.CallbackCheckpoint(lambda review: False)
-    gated = scml.MLProject(
+    gated = scmle.MLProject(
         frame, "y", output_dir=tmp_path, checkpoints=(rejecting,)
     )
     with pytest.raises(errors.BlockedError):
@@ -1302,10 +1300,10 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
         assert backend.map(abs, [-1, -2, -3]) == [1, 2, 3]
 
 
-def scml_profile(frame):
+def scmle_profile(frame):
     """Profile of `frame` for fingerprint checks."""
-    from scml.data.profiling import profiler
-    from scml.data.readers import tabular
+    from scmle.data.profiling import profiler
+    from scmle.data.readers import tabular
 
     manifest = tabular.build_manifest(frame, "y", "<memory>")
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
@@ -1318,11 +1316,11 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     frame,
 ):
     """L786-L801: a candidate is a complete, independently evaluable pipeline."""
-    from scml.sampling import strategies
+    from scmle.sampling import strategies
 
     registry = registry_module.ModelRegistry.with_builtins()
-    plan = scml.MLProject(frame, "y").plan()
-    profile = scml.MLProject(frame, "y")
+    plan = scmle.MLProject(frame, "y").plan()
+    profile = scmle.MLProject(frame, "y")
     profile.plan()
     feature_plan = profile.profile.feature_plan
     candidate = strategies.STRATEGIES["default"].build(
@@ -1349,8 +1347,8 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
 
 def test_l805_l829_five_abstractions_and_the_core_path(run):
     """L805-L829: Dataset, Plan, Experiment, Model Bundle, Lifecycle; Dataset->Plan->Experiment->Bundle."""
-    from scml.contracts import data as data_contracts
-    from scml.governance import registry
+    from scmle.contracts import data as data_contracts
+    from scmle.governance import registry
 
     result = run[1]
     assert isinstance(

@@ -1,6 +1,6 @@
 """Independent plain-scikit-learn reference on the framework's exact split.
 
-The reference knows nothing about scml's planning or search: it fits a
+The reference knows nothing about scmle's planning or search: it fits a
 default HistGradientBoosting model on the same development rows and scores it
 on the same locked test rows, so the comparison is apples to apples.
 """
@@ -14,8 +14,8 @@ from sklearn import ensemble
 from sklearn import pipeline
 from sklearn import preprocessing
 
-from scml.contracts import tasks
-from scml.evaluation import metrics as scml_metrics
+from scmle.contracts import tasks
+from scmle.evaluation import metrics as scmle_metrics
 
 
 def reference_score(
@@ -59,8 +59,8 @@ def reference_score(
     estimator = pipeline.make_pipeline(transformer, model_class(random_state=0))
     dev, test = manifest["train_ids"], manifest["test_ids"]
     estimator.fit(features.iloc[dev], frame[target].iloc[dev])
-    metric = scml_metrics.CATALOG.metrics[metric_name]
-    positive = scml_metrics.positive_label(frame[target], tasks.TaskType(task))
+    metric = scmle_metrics.CATALOG.metrics[metric_name]
+    positive = scmle_metrics.positive_label(frame[target], tasks.TaskType(task))
     return metric.score(
         estimator, features.iloc[test], frame[target].iloc[test], positive
     )

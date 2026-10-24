@@ -9,8 +9,8 @@ import pandas as pd
 import pytest
 import support
 
-import scml
-from scml.contracts import errors
+import scmle
+from scmle.contracts import errors
 
 
 def read_kinds(run_dir):
@@ -78,7 +78,7 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
     assert "trial.ok" in read_kinds(result.run_dir)
 
     exported = result.save(tmp_path / "exported")
-    loaded = scml.ModelBundle.load(exported, trusted=True)
+    loaded = scmle.ModelBundle.load(exported, trusted=True)
     features = binary_frame.drop(columns="y")
     np.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)
@@ -213,13 +213,13 @@ def test_exported_bundle_can_be_signed_and_loaded_without_trust(
 ):
     result = run(binary_frame, tmp_path)
     exported = result.save(tmp_path / "signed", signing_key="shared-secret")
-    loaded = scml.ModelBundle.load(exported, signing_key="shared-secret")
+    loaded = scmle.ModelBundle.load(exported, signing_key="shared-secret")
     features = binary_frame.drop(columns="y")
     np.testing.assert_array_equal(
         loaded.predict(features), result.predict(features)
     )
     with pytest.raises(Exception, match="unauthenticated"):
-        scml.ModelBundle.load(exported)
+        scmle.ModelBundle.load(exported)
 
 
 def test_confidence_intervals_follow_the_data_structure(binary_frame, tmp_path):
@@ -404,7 +404,7 @@ def test_classification_bundles_return_prediction_sets_that_survive_saving(
         binary_frame, "y", time_budget=300, output_dir=tmp_path
     ).run()
     result.save(tmp_path / "model")
-    reloaded = scml.load_model(tmp_path / "model", trusted=True)
+    reloaded = scmle.load_model(tmp_path / "model", trusted=True)
     rows = binary_frame.drop(columns="y")
 
     sets = reloaded.predict_set(rows, coverage=0.9)
@@ -576,7 +576,7 @@ def test_bundles_flag_rows_unlike_the_training_data_and_keep_the_detector(
     flags = result.bundle.novelty_of(rows)["out_of_distribution"]
     scored = result.bundle.score(rows)
     result.save(tmp_path / "net")
-    reloaded = scml.load_model(tmp_path / "net", trusted=True)
+    reloaded = scmle.load_model(tmp_path / "net", trusted=True)
 
     assert bool(flags.iloc[0]) is True
     assert scored["out_of_distribution"][0] is True

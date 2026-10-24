@@ -8,13 +8,13 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from scml.evaluation import parameter_estimation as estimation_module
-from scml.evaluation.parameter_estimation import BayesianPrior
-from scml.evaluation.parameter_estimation import EstimandSpec
-from scml.evaluation.parameter_estimation import estimate_parameters
-from scml.evaluation.parameter_estimation import EstimationPolicy
-from scml.evaluation.parameter_estimation import EstimationResult
-from scml.evaluation.parameter_estimation import ParameterEstimate
+from scmle.evaluation import parameter_estimation as estimation_module
+from scmle.evaluation.parameter_estimation import BayesianPrior
+from scmle.evaluation.parameter_estimation import EstimandSpec
+from scmle.evaluation.parameter_estimation import estimate_parameters
+from scmle.evaluation.parameter_estimation import EstimationPolicy
+from scmle.evaluation.parameter_estimation import EstimationResult
+from scmle.evaluation.parameter_estimation import ParameterEstimate
 
 
 def linear_estimand() -> EstimandSpec:
@@ -1474,7 +1474,7 @@ def test_hierarchical_linear_rejects_invalid_reml_optimizer_state(
         )
 
     monkeypatch.setattr(
-        "scml.evaluation.parameter_estimation.optimize.minimize",
+        "scmle.evaluation.parameter_estimation.optimize.minimize",
         return_failed_optimizer,
     )
     with pytest.raises(ValueError, match="REML optimizer did not converge"):
@@ -1499,7 +1499,7 @@ def test_hierarchical_linear_reml_serializes_without_losing_policy(
         make_hierarchical_reml_policy(),
         clusters=clusters,
     )
-    path = tmp_path / "scml-reml-estimation-report.json"
+    path = tmp_path / "scmle-reml-estimation-report.json"
     result.write(path)
     restored = EstimationResult.read(path)
 
@@ -1616,7 +1616,7 @@ def test_covariance_conditioning_is_reported_and_nonfinite_shift_fails_closed(
         return np.zeros((3, 3))
 
     monkeypatch.setattr(
-        "scml.evaluation.parameter_estimation.covariance_matrix",
+        "scmle.evaluation.parameter_estimation.covariance_matrix",
         return_zero_covariance,
     )
     result = estimate_parameters(

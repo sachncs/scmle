@@ -6,7 +6,7 @@ import json
 import pydantic
 import pytest
 
-from scml.contracts import explanations
+from scmle.contracts import explanations
 
 
 def build_evidence(**overrides: object) -> explanations.ExplanationEvidence:

@@ -1,0 +1,530 @@
+"""Measured performance evidence and explicit release budgets."""
+
+from collections.abc import Mapping
+import dataclasses
+import datetime
+import enum
+import math
+import statistics
+from typing import Any
+from typing import Self
+
+
+class PerformanceOperation(enum.StrEnum):
+    """Lifecycle operation whose resource cost can be released."""
+
+    INGEST = "ingest"
+    FIT = "fit"
+    PACKAGE = "package"
+    LOAD = "load"
+    INFERENCE = "inference"
+
+
+def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
+    """Parse an offset-aware ISO-8601 timestamp."""
+    timestamp = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+        raise ValueError(f"{field_name} must include timezone information")
+    return timestamp
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PerformanceObservation:
+    """One measured operation with the machine context for its result."""
+
+    operation: PerformanceOperation
+    elapsed_seconds: float
+    peak_memory_gb: float | None
+    sample_count: int
+    machine: str
+    observed_at: str
+    software: str
+
+    def __post_init__(self) -> None:
+        """Reject measurements that cannot support a budget decision."""
+        if not isinstance(self.operation, PerformanceOperation):
+            object.__setattr__(
+                self, "operation", PerformanceOperation(self.operation)
+            )
+        if not math.isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
+            raise ValueError("elapsed_seconds must be finite and non-negative")
+        if self.peak_memory_gb is not None and (
+            not math.isfinite(self.peak_memory_gb) or self.peak_memory_gb < 0
+        ):
+            raise ValueError(
+                "peak_memory_gb must be finite and non-negative when present"
+            )
+        if isinstance(self.sample_count, bool) or self.sample_count < 0:
+            raise ValueError("sample_count must be non-negative")
+        if not isinstance(self.machine, str) or not self.machine.strip():
+            raise ValueError("machine must not be empty")
+        if not isinstance(self.software, str) or not self.software.strip():
+            raise ValueError("software must not be empty")
+        parse_timestamp(self.observed_at, "observed_at")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native performance evidence."""
+        return {
+            "operation": self.operation.value,
+            "elapsed_seconds": self.elapsed_seconds,
+            "peak_memory_gb": self.peak_memory_gb,
+            "sample_count": self.sample_count,
+            "machine": self.machine,
+            "observed_at": self.observed_at,
+            "software": self.software,
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuild an observation from JSON-native evidence."""
+        return cls(
+            operation=PerformanceOperation(record["operation"]),
+            elapsed_seconds=float(record["elapsed_seconds"]),
+            peak_memory_gb=(
+                float(record["peak_memory_gb"])
+                if record.get("peak_memory_gb") is not None
+                else None
+            ),
+            sample_count=int(record["sample_count"]),
+            machine=str(record["machine"]),
+            observed_at=str(record["observed_at"]),
+            software=str(record["software"]),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PerformanceRun:
+    """One complete performance measurement run."""
+
+    run_id: str
+    observations: tuple[PerformanceObservation, ...]
+
+    def __post_init__(self) -> None:
+        """Reject empty or ambiguous run evidence."""
+        if not isinstance(self.run_id, str) or not self.run_id.strip():
+            raise ValueError("run_id must not be empty")
+        normalized = tuple(self.observations)
+        operations = [observation.operation for observation in normalized]
+        if not normalized:
+            raise ValueError("performance run must contain observations")
+        if len(set(operations)) != len(operations):
+            raise ValueError(
+                "performance run observations must be unique per operation"
+            )
+        environments = {
+            (observation.machine, observation.software)
+            for observation in normalized
+        }
+        if len(environments) != 1:
+            raise ValueError(
+                "performance run observations must share one environment"
+            )
+        object.__setattr__(self, "observations", normalized)
+
+    def observation(
+        self, operation: PerformanceOperation
+    ) -> PerformanceObservation | None:
+        """Return the observation for an operation, when present."""
+        return next(
+            (
+                observation
+                for observation in self.observations
+                if observation.operation is operation
+            ),
+            None,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native run evidence."""
+        return {
+            "run_id": self.run_id,
+            "observations": [
+                observation.to_dict() for observation in self.observations
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuild a measured run from JSON-native evidence."""
+        return cls(
+            run_id=str(record["run_id"]),
+            observations=tuple(
+                PerformanceObservation.from_dict(observation)
+                for observation in record["observations"]
+            ),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PerformanceComparison:
+    """Decision and measurements from a baseline comparison."""
+
+    passed: bool
+    baseline_run_count: int
+    current_run_id: str
+    relative_regressions: dict[str, dict[str, float | None]]
+    violations: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native comparison evidence."""
+        return {
+            "passed": self.passed,
+            "baseline_run_count": self.baseline_run_count,
+            "current_run_id": self.current_run_id,
+            "relative_regressions": self.relative_regressions,
+            "violations": list(self.violations),
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PerformanceBaseline:
+    """Repeated-run performance baseline with a relative regression gate."""
+
+    reference_runs: tuple[PerformanceRun, ...]
+    max_relative_regression: float = 0.10
+
+    def __post_init__(self) -> None:
+        """Validate repeated, schema-consistent reference measurements."""
+        runs = tuple(self.reference_runs)
+        if len(runs) < 2:
+            raise ValueError(
+                "performance baseline requires at least two reference runs"
+            )
+        if (
+            not math.isfinite(self.max_relative_regression)
+            or self.max_relative_regression < 0
+        ):
+            raise ValueError(
+                "max_relative_regression must be finite and non-negative"
+            )
+        expected = {
+            observation.operation for observation in runs[0].observations
+        }
+        expected_sample_counts = {
+            observation.operation: observation.sample_count
+            for observation in runs[0].observations
+        }
+        if not expected:
+            raise ValueError(
+                "performance baseline operations must not be empty"
+            )
+        if any(
+            {observation.operation for observation in run.observations}
+            != expected
+            for run in runs[1:]
+        ):
+            raise ValueError(
+                "performance baseline runs must share the same operations"
+            )
+        for run in runs[1:]:
+            for operation in expected:
+                observation = run.observation(operation)
+                if observation is None:
+                    raise ValueError(
+                        "performance baseline runs must share the same "
+                        "operations"
+                    )
+                if (
+                    observation.sample_count
+                    != expected_sample_counts[operation]
+                ):
+                    raise ValueError(
+                        "performance baseline runs must share sample counts"
+                    )
+        environments = {
+            (observation.machine, observation.software)
+            for run in runs
+            for observation in run.observations
+        }
+        if len(environments) != 1:
+            raise ValueError(
+                "performance baseline runs must share one environment"
+            )
+        object.__setattr__(self, "reference_runs", runs)
+
+    def evaluate(self, current: PerformanceRun) -> PerformanceComparison:
+        """Compare one run with the median of the repeated baseline."""
+        operations = {
+            observation.operation for observation in current.observations
+        }
+        expected = {
+            observation.operation
+            for observation in self.reference_runs[0].observations
+        }
+        if operations != expected:
+            missing = sorted(
+                operation.value for operation in expected - operations
+            )
+            extra = sorted(
+                operation.value for operation in operations - expected
+            )
+            details = []
+            if missing:
+                details.append(f"missing={missing}")
+            if extra:
+                details.append(f"extra={extra}")
+            raise ValueError(
+                "performance comparison operations differ: "
+                + ", ".join(details)
+            )
+
+        reference_environment = (
+            self.reference_runs[0].observations[0].machine,
+            self.reference_runs[0].observations[0].software,
+        )
+        current_environment = (
+            current.observations[0].machine,
+            current.observations[0].software,
+        )
+        if current_environment != reference_environment:
+            return PerformanceComparison(
+                passed=False,
+                baseline_run_count=len(self.reference_runs),
+                current_run_id=current.run_id,
+                relative_regressions={},
+                violations=(
+                    "performance comparison environment differs from baseline",
+                ),
+            )
+
+        sample_count_violations_list: list[str] = []
+        for operation in sorted(expected, key=lambda item: item.value):
+            baseline_observation = self.reference_runs[0].observation(operation)
+            current_observation = current.observation(operation)
+            if baseline_observation is None or current_observation is None:
+                raise RuntimeError(
+                    "validated sample-count observation disappeared: "
+                    f"{operation.value}"
+                )
+            if (
+                current_observation.sample_count
+                != baseline_observation.sample_count
+            ):
+                sample_count_violations_list.append(
+                    f"{operation.value} sample count differs from baseline: "
+                    f"expected {baseline_observation.sample_count}, "
+                    f"observed {current_observation.sample_count}"
+                )
+        sample_count_violations = tuple(sample_count_violations_list)
+        if sample_count_violations:
+            return PerformanceComparison(
+                passed=False,
+                baseline_run_count=len(self.reference_runs),
+                current_run_id=current.run_id,
+                relative_regressions={},
+                violations=sample_count_violations,
+            )
+
+        regressions: dict[str, dict[str, float | None]] = {}
+        violations: list[str] = []
+        for operation in sorted(expected, key=lambda item: item.value):
+            current_observation = current.observation(operation)
+            if current_observation is None:
+                raise RuntimeError(
+                    "validated performance observation disappeared: "
+                    f"{operation.value}"
+                )
+            reference_observations = [
+                run.observation(operation) for run in self.reference_runs
+            ]
+            if any(
+                observation is None for observation in reference_observations
+            ):
+                raise RuntimeError(
+                    "validated baseline observation disappeared: "
+                    f"{operation.value}"
+                )
+            reference_times = [
+                observation.elapsed_seconds
+                for observation in reference_observations
+                if observation is not None
+            ]
+            time_regression = relative_change(
+                statistics.median(reference_times),
+                current_observation.elapsed_seconds,
+            )
+            memory_regression: float | None = None
+            reference_memory = [
+                observation.peak_memory_gb
+                for observation in reference_observations
+                if observation is not None
+            ]
+            if all(value is not None for value in reference_memory):
+                if current_observation.peak_memory_gb is None:
+                    violations.append(
+                        f"missing peak memory observation: {operation.value}"
+                    )
+                else:
+                    memory_regression = relative_change(
+                        statistics.median(
+                            [
+                                value
+                                for value in reference_memory
+                                if value is not None
+                            ]
+                        ),
+                        current_observation.peak_memory_gb,
+                    )
+            regressions[operation.value] = {
+                "elapsed_seconds": time_regression,
+                "peak_memory_gb": memory_regression,
+            }
+            if time_regression > self.max_relative_regression:
+                violations.append(
+                    f"{operation.value} time regression "
+                    f"{time_regression:.2%} exceeds "
+                    f"{self.max_relative_regression:.2%}"
+                )
+            if (
+                memory_regression is not None
+                and memory_regression > self.max_relative_regression
+            ):
+                violations.append(
+                    f"{operation.value} memory regression "
+                    f"{memory_regression:.2%} exceeds "
+                    f"{self.max_relative_regression:.2%}"
+                )
+        return PerformanceComparison(
+            passed=not violations,
+            baseline_run_count=len(self.reference_runs),
+            current_run_id=current.run_id,
+            relative_regressions=regressions,
+            violations=tuple(violations),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native baseline policy and reference evidence."""
+        return {
+            "max_relative_regression": self.max_relative_regression,
+            "reference_runs": [run.to_dict() for run in self.reference_runs],
+        }
+
+
+def relative_change(reference: float, current: float) -> float:
+    """Return the non-negative relative increase from reference to current."""
+    if reference == 0:
+        return 0.0 if current <= 0 else math.inf
+    return max((current - reference) / reference, 0.0)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PerformanceBudget:
+    """Explicit time and optional memory ceilings for lifecycle operations."""
+
+    max_seconds: Mapping[PerformanceOperation, float]
+    max_peak_memory_gb: float | None = None
+
+    def __post_init__(self) -> None:
+        """Validate positive ceilings and normalize operation names."""
+        normalized: dict[PerformanceOperation, float] = {}
+        for operation, limit in self.max_seconds.items():
+            resolved = (
+                operation
+                if isinstance(operation, PerformanceOperation)
+                else PerformanceOperation(operation)
+            )
+            if not math.isfinite(limit) or limit <= 0:
+                raise ValueError(
+                    f"performance limit must be positive: {resolved.value}"
+                )
+            normalized[resolved] = float(limit)
+        if not normalized:
+            raise ValueError("max_seconds must not be empty")
+        if self.max_peak_memory_gb is not None and (
+            not math.isfinite(self.max_peak_memory_gb)
+            or self.max_peak_memory_gb <= 0
+        ):
+            raise ValueError("max_peak_memory_gb must be positive when present")
+        object.__setattr__(self, "max_seconds", normalized)
+
+    def evaluate(
+        self, observations: tuple[PerformanceObservation, ...]
+    ) -> "PerformanceResult":
+        """Evaluate observations without treating missing data as pass."""
+        by_operation: dict[PerformanceOperation, PerformanceObservation] = {}
+        violations: list[str] = []
+        for observation in observations:
+            if observation.operation in by_operation:
+                raise ValueError(
+                    "performance observations must be unique per operation"
+                )
+            by_operation[observation.operation] = observation
+        for operation, limit in sorted(
+            self.max_seconds.items(), key=lambda item: item[0].value
+        ):
+            measurement = by_operation.get(operation)
+            if measurement is None:
+                violations.append(
+                    f"missing performance observation: {operation.value}"
+                )
+                continue
+            if measurement.elapsed_seconds > limit:
+                violations.append(
+                    f"{operation.value} took "
+                    f"{measurement.elapsed_seconds:.6g}s "
+                    f"> {limit:.6g}s budget"
+                )
+            memory = measurement.peak_memory_gb
+            if self.max_peak_memory_gb is not None and memory is None:
+                violations.append(
+                    f"missing peak memory observation: {operation.value}"
+                )
+            elif (
+                self.max_peak_memory_gb is not None
+                and memory is not None
+                and memory > self.max_peak_memory_gb
+            ):
+                violations.append(
+                    f"{operation.value} used "
+                    f"{memory:.6g} GB "
+                    f"> {self.max_peak_memory_gb:.6g} GB budget"
+                )
+        return PerformanceResult(
+            passed=not violations,
+            observations=observations,
+            violations=tuple(violations),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native budget policy."""
+        return {
+            "max_seconds": {
+                operation.value: limit
+                for operation, limit in sorted(
+                    self.max_seconds.items(), key=lambda item: item[0].value
+                )
+            },
+            "max_peak_memory_gb": self.max_peak_memory_gb,
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PerformanceResult:
+    """Budget decision with the observations that justify it."""
+
+    passed: bool
+    observations: tuple[PerformanceObservation, ...]
+    violations: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return JSON-native performance decision evidence."""
+        return {
+            "passed": self.passed,
+            "observations": [
+                observation.to_dict() for observation in self.observations
+            ],
+            "violations": list(self.violations),
+        }
+
+
+__all__ = [
+    "PerformanceBaseline",
+    "PerformanceBudget",
+    "PerformanceComparison",
+    "PerformanceObservation",
+    "PerformanceOperation",
+    "PerformanceResult",
+    "PerformanceRun",
+    "parse_timestamp",
+    "relative_change",
+]

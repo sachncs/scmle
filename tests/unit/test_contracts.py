@@ -4,12 +4,12 @@ import json
 
 import pytest
 
-from scml.contracts import data
-from scml.contracts import errors
-from scml.contracts import events
-from scml.contracts import experiments
-from scml.contracts import models
-from scml.contracts import tasks
+from scmle.contracts import data
+from scmle.contracts import errors
+from scmle.contracts import events
+from scmle.contracts import experiments
+from scmle.contracts import models
+from scmle.contracts import tasks
 
 
 def test_event_log_writes_jsonl(tmp_path):

@@ -2,7 +2,7 @@
 
 import json
 
-from scml.governance import model_card
+from scmle.governance import model_card
 
 
 def test_model_card_requires_review_and_preserves_evaluation_context():

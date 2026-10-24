@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from scml.contracts import evaluation
-from scml.contracts import tasks
+from scmle.contracts import evaluation
+from scmle.contracts import tasks
 
 
 def release_policy(

@@ -6,7 +6,7 @@ from sklearn import dummy
 from sklearn import linear_model
 from sklearn import metrics
 
-from scml.evaluation import learning_curve
+from scmle.evaluation import learning_curve
 
 SCORER = metrics.get_scorer("r2")
 

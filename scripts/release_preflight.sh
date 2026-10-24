@@ -3,10 +3,10 @@
 # Reproduce the local release evidence without mutating tracked files.
 set -euo pipefail
 
-python_version="${SCML_PYTHON_VERSION:-3.14}"
-benchmark_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-bench.XXXXXX")"
+python_version="${SCMLE_PYTHON_VERSION:-3.14}"
+benchmark_directory="$(mktemp -d "${TMPDIR:-/tmp}/scmle-bench.XXXXXX")"
 benchmark_output="$benchmark_directory/results.json"
-preflight_directory="$(mktemp -d "${TMPDIR:-/tmp}/scml-preflight.XXXXXX")"
+preflight_directory="$(mktemp -d "${TMPDIR:-/tmp}/scmle-preflight.XXXXXX")"
 
 uv sync --python "$python_version" --all-extras
 
@@ -19,8 +19,8 @@ uv run --python "$python_version" python scripts/verify_hosted_controls.py \
   --root .
 uv run --python "$python_version" ruff check .
 uv run --python "$python_version" ruff format --check .
-uv run --python "$python_version" mypy scml benchmarks
-uv run --python "$python_version" bandit -q -r scml
+uv run --python "$python_version" mypy scmle benchmarks
+uv run --python "$python_version" bandit -q -r scmle
 uv run --python "$python_version" pip-audit --skip-editable
 uv run --python "$python_version" python scripts/check_api_compatibility.py \
   tests/fixtures/public_api.json
@@ -28,7 +28,7 @@ uv run --python "$python_version" python scripts/check_api_compatibility.py \
 echo "== focused tests =="
 uv run --python "$python_version" pytest -q \
   -W error::ResourceWarning \
-  --cov=scml --cov-report=xml --cov-fail-under=50 \
+  --cov=scmle --cov-report=xml --cov-fail-under=50 \
   tests/unit tests/property tests/leakage \
   --junitxml="$preflight_directory/bounded-suite.xml"
 uv run --python "$python_version" python scripts/check_pytest_skips.py \
@@ -68,7 +68,7 @@ uv run --python "$python_version" python scripts/check_test_stability.py \
   tests/unit/test_performance_contracts.py \
   tests/unit/test_test_stability.py
 uv run --python "$python_version" coverage report \
-  --include='scml/contracts/*,scml/data/*,scml/evaluation/*,scml/governance/*,scml/inference/*,scml/monitoring/*' \
+  --include='scmle/contracts/*,scmle/data/*,scmle/evaluation/*,scmle/governance/*,scmle/inference/*,scmle/monitoring/*' \
   --fail-under=85
 uv run --python "$python_version" mutmut run --max-children 4
 scripts/check_mutation_score.sh 70

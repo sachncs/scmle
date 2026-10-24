@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import support
 
-from scml.contracts import errors
+from scmle.contracts import errors
 
 
 def corpus(queries=150, per_query=15, seed=0):

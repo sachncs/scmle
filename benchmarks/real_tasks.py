@@ -29,17 +29,17 @@ import pandas as pd
 from sklearn import ensemble
 from sklearn import multioutput
 
-import scml
-from scml.evaluation import concordance
-from scml.evaluation import multitarget
-from scml.evaluation import ordinal
-from scml.evaluation import ranking
-from scml.evaluation import uplift
-from scml.models.survival import estimators as survival_estimators
+import scmle
+from scmle.evaluation import concordance
+from scmle.evaluation import multitarget
+from scmle.evaluation import ordinal
+from scmle.evaluation import ranking
+from scmle.evaluation import uplift
+from scmle.models.survival import estimators as survival_estimators
 
 LOGGER = logging.getLogger(__name__)
 RDATASETS = "https://vincentarelbundock.github.io/Rdatasets/csv/"
-CACHE = pathlib.Path(tempfile.gettempdir()) / "scml_real_data"
+CACHE = pathlib.Path(tempfile.gettempdir()) / "scmle_real_data"
 
 
 @dataclasses.dataclass
@@ -114,7 +114,7 @@ def openml(name: str, version: int | str = "active") -> pd.DataFrame:
     )
 
 
-def split_ids(result: scml.RunResult) -> tuple[np.ndarray, np.ndarray]:
+def split_ids(result: scmle.RunResult) -> tuple[np.ndarray, np.ndarray]:
     """Development and locked row positions of a finished run."""
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
@@ -130,11 +130,11 @@ def encode(frame: pd.DataFrame) -> pd.DataFrame:
 
 def project(
     frame: pd.DataFrame, target: Any, root: pathlib.Path, **kw: Any
-) -> scml.MLProject:
+) -> scmle.MLProject:
     """A project with the suite's shared settings."""
     kw.setdefault("time_budget", BUDGET)
     kw.setdefault("workers", 2)
-    return scml.MLProject(frame, target, output_dir=root, **kw)
+    return scmle.MLProject(frame, target, output_dir=root, **kw)
 
 
 BUDGET = 150
@@ -418,7 +418,7 @@ def streaming_case(root: pathlib.Path) -> Row:
     if not path.exists():
         data = fetch_covtype(as_frame=True).frame
         data.to_parquet(path)
-    result = scml.MLProject(
+    result = scmle.MLProject(
         str(path),
         "Cover_Type",
         task="classification",
@@ -430,7 +430,7 @@ def streaming_case(root: pathlib.Path) -> Row:
     streamed = result.evaluation["streamed_locked"]
     # Baseline: boosting trained on every development row, scored on the
     # same hashed locked rows.
-    from scml.data.readers import streaming
+    from scmle.data.readers import streaming
 
     frame = pd.read_parquet(path)
     side = streaming.side_of(np.arange(len(frame)), 0.2, 42)

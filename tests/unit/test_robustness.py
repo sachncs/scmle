@@ -3,8 +3,8 @@
 import numpy as np
 import test_diagnostics
 
-from scml.contracts import tasks
-from scml.evaluation import robustness
+from scmle.contracts import tasks
+from scmle.evaluation import robustness
 
 
 def inputs():

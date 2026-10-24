@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.sampling import synthesis
+from scmle.sampling import synthesis
 
 
 def correlated_frame(rows=1500, seed=0):

@@ -10,15 +10,15 @@ Development works the same on Linux, macOS and Windows. Install
 ```bash
 uv sync --extra boosting --extra optimization
 uv run ruff check . && uv run ruff format --check .
-uv run mypy scml benchmarks
+uv run mypy scmle benchmarks
 uv run pytest
 uv run python -m benchmarks.run_benchmarks --offline --output results.json
 uv run python -m benchmarks.check_regression results.json
 ```
 
 To reproduce the bounded release evidence locally, run
-`./scripts/release_preflight.sh`. Set `SCML_PYTHON_VERSION` to test another
-supported interpreter, for example `SCML_PYTHON_VERSION=3.11`.
+`./scripts/release_preflight.sh`. Set `SCMLE_PYTHON_VERSION` to test another
+supported interpreter, for example `SCMLE_PYTHON_VERSION=3.11`.
 
 Rules (all enforced by CI):
 
@@ -38,7 +38,7 @@ Rules (all enforced by CI):
 
 ## Layout
 
-* `scml/`: the package (`core` orchestration, `data`, `models`,
+* `scmle/`: the package (`core` orchestration, `data`, `models`,
   `evaluation`, `governance`, `inference`, ...); see `docs/ARCHITECTURE.md`.
 * `tests/`: `unit`, `property`, `leakage`, `integration`, `spec`.
 * `benchmarks/`: regression gate run in CI.
@@ -46,5 +46,5 @@ Rules (all enforced by CI):
 ## Adding a model family
 
 Implement the `ModelAdapter` contract, register it, and make
-`scml.models.conformance.check_conformance` pass for it (see
+`scmle.models.conformance.check_conformance` pass for it (see
 `docs/TUTORIAL.md`).

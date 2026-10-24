@@ -3,8 +3,8 @@
 import pandas as pd
 import pytest
 
-from scml.contracts import errors
-from scml.data.readers import tabular
+from scmle.contracts import errors
+from scmle.data.readers import tabular
 
 
 @pytest.fixture

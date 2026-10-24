@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.evaluation.sequential import SequentialEstimand
-from scml.evaluation.sequential import SequentialEstimationPolicy
-from scml.evaluation.sequential import SequentialEstimationResult
-from scml.evaluation.sequential import SequentialIPWEstimator
-from scml.evaluation.sequential import SequentialPeriodDiagnostics
-from scml.evaluation.sequential import SequentialRegimeEstimate
+from scmle.evaluation.sequential import SequentialEstimand
+from scmle.evaluation.sequential import SequentialEstimationPolicy
+from scmle.evaluation.sequential import SequentialEstimationResult
+from scmle.evaluation.sequential import SequentialIPWEstimator
+from scmle.evaluation.sequential import SequentialPeriodDiagnostics
+from scmle.evaluation.sequential import SequentialRegimeEstimate
 
 
 def make_estimand() -> SequentialEstimand:

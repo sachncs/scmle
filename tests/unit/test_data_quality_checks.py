@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.data.profiling import label_noise
-from scml.data.profiling import representativeness
+from scmle.data.profiling import label_noise
+from scmle.data.profiling import representativeness
 
 
 def population(rows=600, seed=0):

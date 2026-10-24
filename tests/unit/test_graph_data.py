@@ -9,17 +9,17 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scml.data.modalities.graph import edges_from_records
-from scml.data.modalities.graph import graph_identity
-from scml.data.modalities.graph import GraphData
-from scml.data.modalities.graph import GraphEdge
-from scml.data.modalities.graph import GraphInputError
-from scml.data.modalities.graph import GraphNode
-from scml.data.modalities.graph import GraphTemporalError
-from scml.data.modalities.graph import GraphValidationError
-from scml.data.modalities.graph import inductive_node_split
-from scml.data.modalities.graph import prepare_features
-from scml.data.modalities.graph import read_edges
+from scmle.data.modalities.graph import edges_from_records
+from scmle.data.modalities.graph import graph_identity
+from scmle.data.modalities.graph import GraphData
+from scmle.data.modalities.graph import GraphEdge
+from scmle.data.modalities.graph import GraphInputError
+from scmle.data.modalities.graph import GraphNode
+from scmle.data.modalities.graph import GraphTemporalError
+from scmle.data.modalities.graph import GraphValidationError
+from scmle.data.modalities.graph import inductive_node_split
+from scmle.data.modalities.graph import prepare_features
+from scmle.data.modalities.graph import read_edges
 
 
 @pytest.fixture

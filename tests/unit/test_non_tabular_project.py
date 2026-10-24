@@ -8,14 +8,14 @@ import wave
 import numpy as np
 import pytest
 
-import scml
-from scml.data.modalities import audio
-from scml.data.modalities import document
-from scml.data.modalities import geospatial
-from scml.data.modalities import graph
-from scml.data.modalities import image
-from scml.data.modalities import video
-from scml.models import modality_lifecycle
+import scmle
+from scmle.data.modalities import audio
+from scmle.data.modalities import document
+from scmle.data.modalities import geospatial
+from scmle.data.modalities import graph
+from scmle.data.modalities import image
+from scmle.data.modalities import video
+from scmle.models import modality_lifecycle
 
 
 def text_adapter() -> modality_lifecycle.TextAdapter:
@@ -125,10 +125,10 @@ def raster_adapter() -> modality_lifecycle.RasterAdapter:
 def test_project_requires_explicit_experimental_opt_in(tmp_path: Path):
     """Experimental non-tabular paths never become an implicit default."""
     with pytest.raises(
-        scml.UnsupportedNonTabularModelError,
+        scmle.UnsupportedNonTabularModelError,
         match="experimental_opt_in=True",
     ):
-        scml.NonTabularModelProject(
+        scmle.NonTabularModelProject(
             text_adapter(), "test-key", output_dir=tmp_path
         )
 
@@ -136,7 +136,7 @@ def test_project_requires_explicit_experimental_opt_in(tmp_path: Path):
 def test_project_runs_and_reloads_verified_bounded_result(tmp_path: Path):
     """A run returns a verified package tied to its representation contract."""
     adapter = text_adapter()
-    project = scml.NonTabularModelProject(
+    project = scmle.NonTabularModelProject(
         adapter,
         "test-key",
         experimental_opt_in=True,
@@ -166,10 +166,10 @@ def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
 
     adapter = CustomTextAdapter(text_adapter().dataset)
     with pytest.raises(
-        scml.UnsupportedNonTabularModelError,
+        scmle.UnsupportedNonTabularModelError,
         match="exact built-in ModalityAdapter types",
     ):
-        scml.NonTabularModelProject(
+        scmle.NonTabularModelProject(
             adapter,
             "test-key",
             experimental_opt_in=True,
@@ -179,7 +179,7 @@ def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
 
 def test_capability_reports_existing_metadata_representation():
     """Metadata-only video is explicit and does not imply visual modelling."""
-    capability = scml.NonTabularModelProject.capability_for_adapter(
+    capability = scmle.NonTabularModelProject.capability_for_adapter(
         metadata_video_adapter()
     )
 
@@ -202,7 +202,7 @@ def test_capability_allowlist_uses_existing_feature_representations(
     factory, representation: str
 ):
     """Every admitted built-in branch names the representation it consumes."""
-    capability = scml.NonTabularModelProject.capability_for_adapter(factory())
+    capability = scmle.NonTabularModelProject.capability_for_adapter(factory())
 
     assert capability.representation == representation
     assert capability.status == "experimental"
@@ -211,7 +211,7 @@ def test_capability_allowlist_uses_existing_feature_representations(
 def test_capability_rejects_non_modelling_curation_adapter():
     """Curation-only extension adapters cannot cross the modelling boundary."""
     with pytest.raises(TypeError, match="ModalityAdapter"):
-        scml.NonTabularModelProject.capability_for_adapter(  # type: ignore[arg-type]
+        scmle.NonTabularModelProject.capability_for_adapter(  # type: ignore[arg-type]
             object()
         )
 
@@ -219,10 +219,10 @@ def test_capability_rejects_non_modelling_curation_adapter():
 def test_project_rejects_mismatched_observed_representation(tmp_path: Path):
     """Monitoring cannot silently compare incompatible feature contracts."""
     with pytest.raises(
-        scml.UnsupportedNonTabularModelError,
+        scmle.UnsupportedNonTabularModelError,
         match="same bounded capability",
     ):
-        scml.NonTabularModelProject(
+        scmle.NonTabularModelProject(
             text_adapter(),
             "test-key",
             experimental_opt_in=True,
@@ -233,7 +233,7 @@ def test_project_rejects_mismatched_observed_representation(tmp_path: Path):
 
 def test_public_capability_record_is_json_native():
     """The representation claim can travel with release evidence."""
-    record = scml.NonTabularModelProject.capability_for_adapter(
+    record = scmle.NonTabularModelProject.capability_for_adapter(
         text_adapter()
     ).to_dict()
 

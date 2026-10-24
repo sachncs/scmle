@@ -2,7 +2,7 @@
 
 import pytest
 
-from scml.models.deeplearning import training
+from scmle.models.deeplearning import training
 
 
 def test_auto_batch_size_scales_with_the_data_within_bounds():

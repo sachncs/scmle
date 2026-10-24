@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import support
 
-from scml.contracts import tasks
+from scmle.contracts import tasks
 
 
 def frame(rows=600, seed=0):

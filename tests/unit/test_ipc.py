@@ -3,8 +3,8 @@
 import pandas as pd
 import pytest
 
-from scml.core import ipc
-from scml.governance import vault
+from scmle.core import ipc
+from scmle.governance import vault
 
 
 def test_vault_releases_rows_once_over_the_channel():
@@ -18,4 +18,4 @@ def test_vault_releases_rows_once_over_the_channel():
 
 def test_a_helper_that_exits_before_connecting_is_reported():
     with pytest.raises(ipc.HelperStartError):
-        ipc.start_helper("scml.nonexistent_module")
+        ipc.start_helper("scmle.nonexistent_module")

@@ -55,13 +55,13 @@ jobs:
         working-directory: website
       - name: Smoke test generated routes
         run: |
-          python3 -m http.server 4173 --directory website/dist > /tmp/super-charge-ml-pages.log 2>&1 &
+          python3 -m http.server 4173 --directory website/dist > /tmp/magicml-pages.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
-          for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/modalities/ /docs/capabilities/ /docs/modeling/ /docs/evidence/ /docs/release-evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/cards/ /docs/operations/ /docs/security/ /docs/recovery/ /docs/migrations/ /docs/troubleshooting/; do
+          for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/modalities/ /docs/capabilities/ /docs/modeling/ /docs/evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/cards/ /docs/operations/ /docs/security/ /docs/recovery/ /docs/migrations/ /docs/troubleshooting/; do
             curl --fail --silent --show-error "http://127.0.0.1:4173${route}" > /dev/null
           done
-          grep -q "/super-charge-ml/docs/" website/dist/index.html
+          grep -q "/magicml/docs/" website/dist/index.html
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

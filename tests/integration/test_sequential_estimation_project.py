@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scml.api.sequential import SequentialEstimationProject
+from scmle.api.sequential import SequentialEstimationProject
 from tests.unit.test_sequential_project import make_estimand
 from tests.unit.test_sequential_project import make_frame
 from tests.unit.test_sequential_project import make_policy

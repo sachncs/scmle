@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from scml.governance import attestation
+from scmle.governance import attestation
 
 
 def records() -> tuple[dict[str, object], dict[str, object]]:

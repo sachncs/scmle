@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scml.contracts import capabilities
-from scml.contracts import tasks
-from scml.core import context as context_module
-from scml.core import orchestrator
-from scml.core import stages
-from scml.models import registry as registry_module
-from scml.models.deeplearning import networks
-from scml.models.sklearn import classical
+from scmle.contracts import capabilities
+from scmle.contracts import tasks
+from scmle.core import context as context_module
+from scmle.core import orchestrator
+from scmle.core import stages
+from scmle.models import registry as registry_module
+from scmle.models.deeplearning import networks
+from scmle.models.sklearn import classical
 
 
 def binary_frame() -> pd.DataFrame:

@@ -6,8 +6,8 @@ from sklearn import linear_model
 from sklearn import metrics
 from sklearn import model_selection
 
-from scml.contracts import search
-from scml.evaluation import nested
+from scmle.contracts import search
+from scmle.evaluation import nested
 
 SPACE = search.SearchSpace((search.FloatParameter("C", 1e-3, 100.0, log=True),))
 
