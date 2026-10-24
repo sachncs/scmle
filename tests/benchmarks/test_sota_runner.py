@@ -70,7 +70,8 @@ def test_a_run_becomes_a_record_in_the_results_file(tmp_path):
 
 
 def test_a_crash_is_a_failed_record_not_an_exception(tmp_path):
-    train, test, _, kind = frames()
+    loaded = frames()
+    train, test, kind = loaded[0], loaded[1], loaded[3]
 
     record = scmle_runner.run_frames(
         7, 0, 0, (train, test, "missing", kind), 15, tmp_path
