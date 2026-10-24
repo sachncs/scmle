@@ -1,14 +1,17 @@
-# Architecture
+# SCMLE architecture
 
-scml is a modular monolith with three planes that stay separate:
+SCMLE is a modular monolith with three planes that stay separate. The design
+keeps the public surface small, moves variability behind typed contracts, and
+lets concrete implementations evolve without making the orchestrator know
+about every model, reader, or serving runtime.
 
 | Plane | Decides / does | Code |
 | --- | --- | --- |
-| Control | what to do, when and why | `scml.core` (orchestrator, stages, state machine), `scml.intelligence` (planner, meta-learning) |
-| Execution | transformations, training, tuning, evaluation | `scml.data`, `scml.models`, `scml.optimization`, `scml.experimentation.trials`, `scml.core.scheduler` |
-| Evidence | artifacts, measurements, decisions, provenance | `scml.artifacts`, `scml.experimentation.stores`, `scml.monitoring`, `scml.governance`, `scml.inference` |
+| Control | what to do, when and why | `scmle.core` (orchestrator, stages, state machine), `scmle.intelligence` (planner, meta-learning) |
+| Execution | transformations, training, tuning, evaluation | `scmle.data`, `scmle.models`, `scmle.optimization`, `scmle.experimentation.trials`, `scmle.core.scheduler` |
+| Evidence | artifacts, measurements, decisions, provenance | `scmle.artifacts`, `scmle.experimentation.stores`, `scmle.monitoring`, `scmle.governance`, `scmle.inference` |
 
-Modules interact only through the typed contracts in `scml.contracts`.
+Modules interact only through the typed contracts in `scmle.contracts`.
 
 ## The run
 
@@ -76,9 +79,14 @@ leakage associations) are computed on the whole dataset, as the design specifica
 orders profiling before splitting; stratified splits legitimately use labels
 to choose the test rows.
 
-## Extension points
+## Extension points and polymorphism
 
-Add a subclass; no core edits are needed.
+Add a focused implementation of a contract; no core edits are needed. The
+framework uses polymorphism where it buys a real product capability: model
+families, data readers, split strategies, execution backends, diagnostics, and
+serving adapters can vary behind the same lifecycle. It intentionally avoids
+deep wrapper hierarchies and speculative interfaces; a contract should own a
+decision boundary, not merely rename a function call.
 
 | To add | Subclass | Register |
 | --- | --- | --- |
@@ -87,7 +95,7 @@ Add a subclass; no core edits are needed.
 | a feature operation | `FeatureOp` | `feature_graph.OPS` |
 | a synthetic-data generator | `SyntheticGenerator` | `GeneratorOverSampler.generator_class` |
 | a validation protocol | `SplitStrategy` | `splitting.STRATEGIES` |
-| a model family | `ModelAdapter` | `ModelRegistry.register` or the `scml.models` entry point |
+| a model family | `ModelAdapter` | `ModelRegistry.register` or the `scmle.models` entry point |
 | a data strategy | `DataStrategy` | `strategies.STRATEGIES` |
 | a planning policy | `PlanningRule` | `Planner(rules=...)` |
 | a search algorithm | `Optimizer` | `optimizers.OPTIMIZERS` |
@@ -99,7 +107,7 @@ Add a subclass; no core edits are needed.
 | a workflow stage | `Stage` | `Orchestrator(stages=...)` |
 
 Third-party model adapters must pass
-`scml.models.conformance.check_conformance`.
+`scmle.models.conformance.check_conformance`.
 
 ## Conventions
 

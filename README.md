@@ -1,25 +1,32 @@
-# super-charge-ml
+# SCMLE
+
+> Mathematics meets engineering.
 
 [![CI](https://github.com/sachncs/magicml/actions/workflows/ci.yml/badge.svg)](https://github.com/sachncs/magicml/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/super-charge-ml)](https://pypi.org/project/super-charge-ml/)
-[![Python](https://img.shields.io/pypi/pyversions/super-charge-ml)](https://pypi.org/project/super-charge-ml/)
+[![PyPI](https://img.shields.io/pypi/v/scmle)](https://pypi.org/project/scmle/)
+[![Python](https://img.shields.io/pypi/pyversions/scmle)](https://pypi.org/project/scmle/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Autonomous, leakage-safe ML lifecycle framework for tabular data. Runs on
-Linux, macOS and Windows with Python 3.11 or newer (tested on 3.11 to 3.14,
-including the free-threaded 3.14 build). The design is described in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+SCMLE is a curation-first machine learning lifecycle for teams that need
+reproducible decisions, not just a high score. It connects statistical
+discipline with production engineering: typed contracts, leakage-safe
+evaluation, signed artifacts, operational checkpoints, and monitoring.
+
+Runs on Linux, macOS and Windows with Python 3.11 or newer (tested on 3.11 to
+3.14, including the free-threaded 3.14 build). Start with the
+[quickstart](docs/TUTORIAL.md), then use the [architecture guide](docs/ARCHITECTURE.md)
+to understand how the system is composed.
 
 ```bash
-pip install super-charge-ml                  # core
-pip install "super-charge-ml[boosting]"      # + LightGBM, XGBoost
-pip install "super-charge-ml[all]"           # most optional extras
+pip install scmle                  # core
+pip install "scmle[boosting]"      # + LightGBM, XGBoost
+pip install "scmle[all]"           # most optional extras
 ```
 
 On macOS, the `boosting` extra needs the OpenMP runtime (`brew install libomp`).
 
-The PyPI distribution is `super-charge-ml`; the import name and the command
-are both `scml`. **Status: beta.** The public API may change between `0.x`
+The PyPI distribution is `scmle`; the import name and the command
+are both `scmle`. **Status: beta.** The public API may change between `0.x`
 releases; see [`CHANGELOG.md`](CHANGELOG.md).
 The supported entry points are documented in
 [`docs/API_STABILITY.md`](docs/API_STABILITY.md).
@@ -27,10 +34,10 @@ The supported entry points are documented in
 ```python
 import logging
 
-import scml
+import scmle
 
 logging.basicConfig(level=logging.INFO)
-project = scml.MLProject("customers.parquet", target="churn", metric="roc_auc")
+project = scmle.MLProject("customers.parquet", target="churn", metric="roc_auc")
 logging.info(project.plan().summary())  # inspect before any training
 result = project.run()  # profile, split, search, test, package
 logging.info("\n%s", result.leaderboard())
@@ -38,8 +45,24 @@ result.save("artifacts/churn", signing_key="...")  # signed bundle
 result.predict("new_customers.parquet")
 ```
 
-CLI: `scml plan | run | resume | catalog | predict` (see `scml --help`).
+CLI: `scmle plan | run | resume | catalog | predict` (see `scmle --help`).
 More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
+
+## Documentation map
+
+| Need | Start here |
+| --- | --- |
+| Learn the product | [`docs/TUTORIAL.md`](docs/TUTORIAL.md) |
+| Understand the system | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| Choose an input and validation strategy | [`docs/OPERATING_LOOP.md`](docs/OPERATING_LOOP.md) |
+| Integrate the Python API | [`docs/API_STABILITY.md`](docs/API_STABILITY.md) |
+| Run and recover safely | [`docs/OPERATIONS_REHEARSAL.md`](docs/OPERATIONS_REHEARSAL.md) |
+| Review security boundaries | [`docs/SECURITY.md`](docs/SECURITY.md) |
+| Inspect dependency policy | [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) |
+| Compare benchmark results | [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) |
+
+The hosted documentation is available at
+[`sachncs.github.io/magicml`](https://sachncs.github.io/magicml/).
 
 ## What it does
 
@@ -127,31 +150,31 @@ wide data). The full tables, and where it is behind, are in
 
 | Package | Responsibility |
 | --- | --- |
-| `scml.contracts` | Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, ABCs |
-| `scml.data` | `readers` (CSV, Parquet, Arrow / Polars interchange), `profiling`, `validation` (column kinds, target and task), `curation` (fold-local preprocessing), `splitting` (leakage-safe and structure-aware strategies) |
-| `scml.features` | Versioned, fitted feature graph (row-wise and series nodes) |
-| `scml.sampling` | Resamplers, synthesis, and the data strategies evaluated inside folds |
-| `scml.models` | `ModelAdapter` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
-| `scml.optimization` | Ask/tell optimizers (random, Optuna) |
-| `scml.experimentation` | Trials, tuning, strategy and ensemble search, experiment stores (SQLite) |
-| `scml.intelligence` | Dataset fingerprint, `Planner` and `PlanningRule`s, recommendations, meta-learning from run history |
-| `scml.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
-| `scml.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
-| `scml.core` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
-| `scml.artifacts` | Signed model bundle, run store, report, replay verification |
-| `scml.inference` | Column mapping, input validation, batch / HTTP serving |
-| `scml.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
-| `scml.governance` | Access ledger, content-addressed model registry, lifecycle manager, run audit |
-| `scml.integrations` | Optional MLflow and Ray adapters |
-| `scml.api` | `MLProject`, `RunResult`, `load_model` / `predict` |
+| `scmle.contracts` | Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, ABCs |
+| `scmle.data` | `readers` (CSV, Parquet, Arrow / Polars interchange), `profiling`, `validation` (column kinds, target and task), `curation` (fold-local preprocessing), `splitting` (leakage-safe and structure-aware strategies) |
+| `scmle.features` | Versioned, fitted feature graph (row-wise and series nodes) |
+| `scmle.sampling` | Resamplers, synthesis, and the data strategies evaluated inside folds |
+| `scmle.models` | `ModelAdapter` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
+| `scmle.optimization` | Ask/tell optimizers (random, Optuna) |
+| `scmle.experimentation` | Trials, tuning, strategy and ensemble search, experiment stores (SQLite) |
+| `scmle.intelligence` | Dataset fingerprint, `Planner` and `PlanningRule`s, recommendations, meta-learning from run history |
+| `scmle.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
+| `scmle.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
+| `scmle.core` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
+| `scmle.artifacts` | Signed model bundle, run store, report, replay verification |
+| `scmle.inference` | Column mapping, input validation, batch / HTTP serving |
+| `scmle.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
+| `scmle.governance` | Access ledger, content-addressed model registry, lifecycle manager, run audit |
+| `scmle.integrations` | Optional MLflow and Ray adapters |
+| `scmle.api` | `MLProject`, `RunResult`, `load_model` / `predict` |
 
 Extension points are polymorphic: add a `TableReader`, `ColumnKind`,
 `SplitStrategy`, `DataStrategy`, `ModelAdapter`, `Optimizer`, `PlanningRule`,
 `SelectionPolicy`, `Diagnostic`, `PolicyCheckpoint`, `ExecutionBackend`,
 `ExperimentStore`, `ServingAdapter` or `Stage` subclass; no core edits are
 needed ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). Third-party adapters
-can also register via the `scml.models` entry-point group and must pass
-`scml.models.conformance.check_conformance`.
+can also register via the `scmle.models` entry-point group and must pass
+`scmle.models.conformance.check_conformance`.
 
 ## Conventions
 
@@ -162,7 +185,7 @@ by `ruff` and `mypy`. No underscore-prefixed names anywhere, enforced by
 ```bash
 uv sync --extra boosting --extra optimization --extra multimodal
 uv run ruff check . && uv run ruff format --check .
-uv run mypy scml benchmarks
+uv run mypy scmle benchmarks
 uv run pytest
 uv run python -m benchmarks.run_benchmarks --offline --output results.json
 uv run python -m benchmarks.check_regression results.json

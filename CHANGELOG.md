@@ -9,9 +9,9 @@
 
 First public release.
 
-* Distribution name `super-charge-ml`; import name and command `scml`.
-  Environment variables are `SCML_SIGNING_KEY` and `SCML_TRUSTED`; the base
-  exception is `ScmlError`.
+* Distribution name `scmle`; import name and command `scmle`.
+  Environment variables are `SCMLE_SIGNING_KEY` and `SCMLE_TRUSTED`; the base
+  exception is `ScmleError`.
 * Windows, macOS and Linux are supported and tested in CI. Helper processes
   (the test-set vault and the PyTorch worker) connect over an authenticated
   local channel instead of an inherited file descriptor; trial supervision
@@ -26,7 +26,7 @@ First public release.
   label are independent in training; locked rows are untouched.
 * `selection.sensitivity_repeats` runs the sensitivity analysis on the selected
   model and stores it in `evaluation["sensitivity"]`.
-* Clustering (`scml.unsupervised.clustering.find_clusters`): k-means, Gaussian
+* Clustering (`scmle.unsupervised.clustering.find_clusters`): k-means, Gaussian
   mixture and agglomerative at several counts, scored by silhouette,
   Davies-Bouldin, Calinski-Harabasz and bootstrap stability.
 * Competing risks (`CauseSpecificCox`, Aalen-Johansen `cumulative_incidence`)
@@ -38,18 +38,16 @@ First public release.
   `weight_column`.
 * Dirichlet calibration (`bundle.calibrate(..., method="dirichlet")`) for
   multiclass models.
-* Sensitivity analysis (`scml.evaluation.sensitivity`): training (seed,
+* Sensitivity analysis (`scmle.evaluation.sensitivity`): training (seed,
   resample), evaluation (split) and performance (input noise) sensitivity.
 * `RollbackPolicy.tolerance` now defaults to 0.01 so routine retraining noise
   does not undo promotions.
-* `docs/CURRICULUM.md`: the eight modelling stages mapped to modules, tests
-  and equations, with one executed example per stage.
 * Data quality: label-noise detection (`find_label_noise`) and
   representativeness against a reference sample (`compare_to_reference`).
 * Lifecycle: shadow evaluation (`ShadowEvaluator`), A/B analysis with an
   independent bootstrap (`compare_arms`), and rollback criteria
   (`LifecycleManager.check_rollback`, `previous` registry alias).
-* Package layout follows the section 3 module tree under a flat `scml/`;
+* Package layout follows the section 3 module tree under a flat `scmle/`;
   modules carry their real names, with no compatibility aliases.
 * Logging replaces `print` in the library, CLI, benchmarks and examples.
 * PyTorch model families (MLP, residual, TabM-style ensemble,
@@ -64,7 +62,7 @@ First public release.
   report.
 * Conformal prediction intervals and sets stored in the bundle.
 * Automatic feature construction and L1 selection as tested strategies.
-* Profile-driven recommendations; run audit; `scml.predict` / `scml.load_model`.
+* Profile-driven recommendations; run audit; `scmle.predict` / `scmle.load_model`.
 * Under hard enforcement the locked test rows live in a separate vault
   process.
 * Rolling-origin validation and `data.feature_delays`.
@@ -73,7 +71,7 @@ First public release.
   encoded as fold-local TF-IDF terms.
 * Missing-value indicator and iterative-imputation strategies; arcsinh target
   transform for long-tailed regression targets.
-* `scml.register_metric` for user-defined metrics.
+* `scmle.register_metric` for user-defined metrics.
 * Greedy weighted blending searched alongside stacking.
 * Fairness report (`data.sensitive_columns`), out-of-distribution flags in
   the bundle, a learning curve, monotonic constraints
@@ -100,11 +98,11 @@ First public release.
 * Multiclass reliability report (top-label calibration error), calibration
   error before/after in `bundle.calibrate`, and a quantile-interval coverage
   curve on the locked rows (`evaluation["quantile_coverage"]`).
-* ONNX export (`bundle.export_onnx`, `scml export-onnx`, `onnx` extra)
-  with a parity check; unsupported models are refused by name. `scml
+* ONNX export (`bundle.export_onnx`, `scmle export-onnx`, `onnx` extra)
+  with a parity check; unsupported models are refused by name. `scmle
   serve` runs the HTTP server; schema violations return 422 and `/health`
   reports the model version and checksum.
-* `scml.register_estimator` registers any scikit-learn-compatible estimator
+* `scmle.register_estimator` registers any scikit-learn-compatible estimator
   class as a model (conformance-checked, picklable for trial processes).
 * Ordinal targets: `task="ordinal"` with `ordinal_order`; thresholded
   regressors give ordered labels and probabilities, scored by quadratic
@@ -125,7 +123,7 @@ First public release.
 * Lifecycle retraining policy: one retrain per drift event (data digest),
   a row cooldown, a minimum of labeled rows, and an audit record for every
   review, skip, rejection and promotion with its evidence.
-* Production for any model: `bundle.export_service` / `scml package`
+* Production for any model: `bundle.export_service` / `scmle package`
   write a service folder (bundle, pinned requirements, build environment,
   server script, Dockerfile). ONNX also covers LightGBM and XGBoost with
   `onnxmltools`; refusals point to the service package.

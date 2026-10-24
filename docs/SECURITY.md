@@ -1,8 +1,8 @@
 # Security review (0.1.0 beta)
 
-Scope: the `scml` package, its default configuration and optional extras.
+Scope: the `scmle` package, its default configuration and optional extras.
 Method: manual review of every deserialization, subprocess, network, SQL and
-file-write path, plus `bandit -r scml` and `pip-audit` (both run in CI).
+file-write path, plus `bandit -r scmle` and `pip-audit` (both run in CI).
 
 ## Threat model
 
@@ -19,7 +19,7 @@ file-write path, plus `bandit -r scml` and `pip-audit` (both run in CI).
 
 | Risk | Control | Test |
 | --- | --- | --- |
-| Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCML_SIGNING_KEY` or `signing_key=`), or the caller vouches with `trusted=True` | `tests/unit/test_bundle.py` |
+| Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCMLE_SIGNING_KEY` or `signing_key=`), or the caller vouches with `trusted=True` | `tests/unit/test_bundle.py` |
 | Tampered model file | SHA-256 per file is verified **before** unpickling; an invalid signature is an error even with `trusted=True` | tamper and swapped-model tests |
 | Dependency drift | Bundle records Python and scikit-learn versions; mismatches are refused unless allowed | version-mismatch test |
 | SQL injection | Tracking SQL binds every value; dynamic column names come from a fixed whitelist | `tests/unit/test_tracking.py` |
@@ -33,12 +33,12 @@ file-write path, plus `bandit -r scml` and `pip-audit` (both run in CI).
 
 ## Guidance for operators
 
-1. Set `SCML_SIGNING_KEY` wherever bundles are produced and verified.
+1. Set `SCMLE_SIGNING_KEY` wherever bundles are produced and verified.
 2. Rotate keys with `ModelBundle.rotate_signing_key(directory, old, new)`;
    verify the new key before retiring the old one. Maintain the corresponding
    `SigningKeyRegistry` record and transition it to `retired` only after
    parity is confirmed.
-3. Never pass `trusted=True` (or `scml predict --trusted`) for a bundle you
+3. Never pass `trusted=True` (or `scmle predict --trusted`) for a bundle you
    did not produce.
 4. Serve behind an authenticating gateway; bind to loopback by default.
 5. Treat the model registry directory as a trust boundary: it is read with
