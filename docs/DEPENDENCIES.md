@@ -17,6 +17,13 @@
 | `tracking` | MLflow | `MlflowExperimentStore` |
 | `distributed` | Ray | `ResourceSpec(executor="ray")`; no free-threaded (3.14t) wheel yet |
 | `catboost` | CatBoost | no free-threaded (3.14t) wheel yet; kept out of `boosting` for that reason |
+| `deeplearning` | PyTorch, Keras 3 (PyTorch backend) | model families run in a separate worker process; CPU wheel on Linux via `uv` |
+| `tabpfn` | TabPFN | needs an accepted Prior Labs license and `TABPFN_TOKEN`; extension-only, not in `all` |
+| `embeddings` | sentence-transformers | downloads a model on first use; not in `all` |
+| `onnx` | skl2onnx, onnxruntime, onnxmltools | for `scmle export-onnx` |
+| `tracking` | MLflow | `MlflowExperimentStore` |
+| `multimodal` | Pillow | image modality |
+| `benchmarks` | huggingface_hub | Hugging Face benchmark suite |
 
 * **Lower bounds are tested**, not guessed: CI resolves
   `--resolution lowest-direct` and runs the unit, property and leakage suites

@@ -45,21 +45,26 @@ result.save("artifacts/churn", signing_key="...")  # signed bundle
 result.predict("new_customers.parquet")
 ```
 
-CLI: `scmle plan | run | resume | catalog | predict` (see `scmle --help`).
+CLI: `scmle plan | run | resume | catalog | predict | serve | export-onnx | package`
+(see [`docs/CLI.md`](docs/CLI.md)).
 More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 
 ## Documentation map
 
 | Need | Start here |
 | --- | --- |
-| Learn the product | [`docs/TUTORIAL.md`](docs/TUTORIAL.md) |
+| Browse every page | [`docs/README.md`](docs/README.md) |
+| Learn the product | [`docs/TUTORIAL.md`](docs/TUTORIAL.md), [`examples/`](examples/README.md) |
+| Use the command line | [`docs/CLI.md`](docs/CLI.md) |
+| Know what a run writes | [`docs/ARTIFACTS.md`](docs/ARTIFACTS.md) |
 | Understand the system | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Choose an input and validation strategy | [`docs/OPERATING_LOOP.md`](docs/OPERATING_LOOP.md) |
 | Integrate the Python API | [`docs/API_STABILITY.md`](docs/API_STABILITY.md) |
 | Run and recover safely | [`docs/OPERATIONS_REHEARSAL.md`](docs/OPERATIONS_REHEARSAL.md) |
 | Review security boundaries | [`docs/SECURITY.md`](docs/SECURITY.md) |
 | Inspect dependency policy | [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) |
-| Compare benchmark results | [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) |
+| Compare benchmark results and reliability checks | [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md), [`benchmarks/`](benchmarks/README.md) |
+| Cut a release | [`docs/RELEASING.md`](docs/RELEASING.md) |
 
 The hosted documentation is available at
 [`sachncs.github.io/scmle`](https://sachncs.github.io/scmle/).
@@ -110,6 +115,15 @@ The hosted documentation is available at
   trial starts past a limit; every trial runs in a supervised process that is
   killed at a hard time ceiling or when its resident memory exceeds the limit) and each run reports how every limit was applied and what was
   observed; reruns are classified `exact`, `comparable` or `different`.
+
+## Does it keep its promises?
+
+`python -m benchmarks.reliability` checks nine properties on synthetic data
+with known answers: same seed gives the same result, replay agrees, noise
+labels never score well, a planted leak is found, signed bundles round-trip
+and reject tampering, 90% intervals cover, drift is flagged only when real, and
+one crashing candidate cannot sink a run. See
+[`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Benchmarks on open datasets
 
@@ -166,6 +180,8 @@ wide data). The full tables, and where it is behind, are in
 | `scmle.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
 | `scmle.governance` | Access ledger, content-addressed model registry, lifecycle manager, run audit |
 | `scmle.integrations` | Optional MLflow and Ray adapters |
+| `scmle.unsupervised` | Clustering model search and scoring |
+| `scmle.durability` | Atomic, crash-safe file writes used by the stores |
 | `scmle.api` | `MLProject`, `RunResult`, `load_model` / `predict` |
 
 Extension points are polymorphic: add a `TableReader`, `ColumnKind`,
@@ -189,11 +205,12 @@ uv run mypy scmle benchmarks
 uv run pytest
 uv run python -m benchmarks.run_benchmarks --offline --output results.json
 uv run python -m benchmarks.check_regression results.json
+uv run python -m benchmarks.reliability
 ```
 
 Quality gates in CI: lint and types; the lowest supported dependency
 versions; a base install without extras; the MLflow / Ray integrations; the
-benchmark regression gate; `bandit` and `pip-audit`; and a wheel build
+benchmark regression and reliability gates; `bandit` and `pip-audit`; and a wheel build
 installed into a clean environment.
 
 ## Known limits
@@ -212,10 +229,11 @@ installed into a clean environment.
   partition alone.
 * The HTTP serving adapter is a minimal reference server (no authentication
   or TLS); run it behind a gateway.
-* PyTorch model families ship with the `deeplearning` extra and run in a
-  separate worker process (two OpenMP runtimes in one process crash); Keras
-  and pretrained tabular foundation models (TabPFN) are not bundled, but
-  plug in through the same `ModelAdapter` contract.
+* PyTorch and Keras model families ship with the `deeplearning` extra and run
+  in a separate worker process (two OpenMP runtimes in one process crash).
+  TabPFN (the `tabpfn` extra) stays extension-only and needs its own license
+  and token; other pretrained models plug in through the `ModelAdapter`
+  contract.
 * `gpu="required"` blocks a run unless PyTorch can see a CUDA device.
 * The test-set vault keeps the locked rows out of trial processes. It cannot
   stop a process from reading the original data file when a path was given,

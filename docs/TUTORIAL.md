@@ -177,9 +177,9 @@ if outcome.comparison and outcome.comparison.decision == "promote":
 Inference is strict about column names unless you state a policy:
 
 ```python
-policy = scmle.inference.mapping.ColumnMapping(
-    {"cust_age": "age"}, case_insensitive=True
-)
+from scmle.inference import mapping
+
+policy = mapping.ColumnMapping({"cust_age": "age"}, case_insensitive=True)
 bundle.predict(new_rows, policy)
 ```
 
@@ -273,13 +273,23 @@ result.bundle.predict_set(rows, coverage=0.9)  # classification
 ```
 
 Register any scikit-learn-compatible estimator in one call; the class must be
-defined at module level so trial processes can import it:
+defined at module level so trial processes can import it. Registered models
+default to `cost=3`, and budgets under 300 s only search cheap models, so pass
+`cost=1` for a fast one or raise `time_budget` (see
+[`examples/custom_estimator.py`](../examples/custom_estimator.py)):
 
 ```python
-scmle.register_estimator("gaussian_nb", classifier=GaussianNB)
+scmle.register_estimator("gaussian_nb", classifier=GaussianNB, cost=1)
 ```
 
-## 10. Extending
+## 10. More runnable examples
+
+[`examples/`](../examples/README.md) holds self-contained scripts for signed
+bundles, drift monitoring, custom estimators, regression intervals, temporal
+validation and approval gates. [`ARTIFACTS.md`](ARTIFACTS.md) explains every
+file a run writes, and [`CLI.md`](CLI.md) the shell interface.
+
+## 11. Extending
 
 Subclass `ModelAdapter` and pass `check_conformance`, or register it through
 the `scmle.models` entry point. See `docs/ARCHITECTURE.md` for every extension

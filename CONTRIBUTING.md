@@ -14,6 +14,7 @@ uv run mypy scmle benchmarks
 uv run pytest
 uv run python -m benchmarks.run_benchmarks --offline --output results.json
 uv run python -m benchmarks.check_regression results.json
+uv run python -m benchmarks.reliability
 ```
 
 To reproduce the bounded release evidence locally, run
@@ -41,10 +42,18 @@ Rules (all enforced by CI):
 * `scmle/`: the package (`core` orchestration, `data`, `models`,
   `evaluation`, `governance`, `inference`, ...); see `docs/ARCHITECTURE.md`.
 * `tests/`: `unit`, `property`, `leakage`, `integration`, `spec`.
-* `benchmarks/`: regression gate run in CI.
+* `benchmarks/`: accuracy benchmarks, the regression gate and reliability
+  checks run in CI ([`benchmarks/README.md`](benchmarks/README.md)).
+* `examples/`: runnable scripts, one idea each ([`examples/README.md`](examples/README.md)).
+* `scripts/`: release and repository controls ([`scripts/README.md`](scripts/README.md)).
+* `docs/`: start at [`docs/README.md`](docs/README.md); `website/` is the hosted copy.
 
 ## Adding a model family
 
 Implement the `ModelAdapter` contract, register it, and make
 `scmle.models.conformance.check_conformance` pass for it (see
 `docs/TUTORIAL.md`).
+
+Commit messages: short imperative subject with a conventional prefix
+(`docs:`, `feat:`, `ci:`, ...), one logical change per commit, and no
+co-author trailers.

@@ -25,11 +25,12 @@ tracking database.
    newline-delimited JSON, Parquet, Feather/Arrow), pandas/Arrow-compatible
    in-memory tables, and bounded streaming sources. It fingerprints the data
    and maps infinities to missing values (reported as findings).
-2. **Profile** resolves the task, classifies columns (`ColumnKind`), and raises
-   leakage *hypotheses* (value association, outcome-dependent recording).
-3. **Plan** splits the data (`SplitStrategy`) behind a `LockedTestSet` and asks
-   the `Planner` (a chain of `PlanningRule`s) for candidates, recording every
-   included, rejected and deferred technique.
+2. **Profile** resolves the task, splits the data (`SplitStrategy`) behind a
+   `LockedTestSet`, then classifies columns (`ColumnKind`) and raises leakage
+   *hypotheses* (value association, outcome-dependent recording) from the
+   development rows only.
+3. **Plan** asks the `Planner` (a chain of `PlanningRule`s) for candidates,
+   recording every included, rejected and deferred technique.
 4. **Train** screens every compatible `ModelAdapter`, then evaluates data
    strategies (`DataStrategy`), tunes the winners with pruned search, and
    assembles a cross-fitted stack. Every candidate is a complete pipeline
@@ -74,10 +75,11 @@ tracking database.
 * `tests/leakage` proves it: rewriting the test partition's labels and
   features leaves every trial, fold score and selection unchanged.
 
-Known, documented limits: profiling statistics (imbalance ratio, skew,
-leakage associations) are computed on the whole dataset, as the design specification
-orders profiling before splitting; stratified splits legitimately use labels
-to choose the test rows.
+Known, documented limit: only the target is looked at before the split (to
+resolve the task and, for stratified splits, to choose the test rows).
+Profiling, feature selection, leakage detection and the dataset fingerprint
+use the development partition alone; `tests/leakage` checks that a leak
+present only in the test rows is not a profile finding.
 
 ## Extension points and polymorphism
 
