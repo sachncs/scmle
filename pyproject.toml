@@ -44,13 +44,13 @@ dependencies = [
 boosting = ["lightgbm>=4.6", "xgboost>=3.0"]
 catboost = ["catboost>=1.2.8"]  # no free-threaded (3.14t) wheel yet
 # Keras 3 runs on the PyTorch backend inside the same worker process.
-deeplearning = ["torch>=2.8", "keras>=3.5"]
+deeplearning = ["torch>=2.8", "keras>=3.5", "filelock>=4.2.1"]
 # TabPFN needs an accepted Prior Labs license and TABPFN_TOKEN for its weights,
 # so it is not part of the `all` extra.
-tabpfn = ["tabpfn>=2.0"]
+tabpfn = ["tabpfn>=2.0", "filelock>=4.2.1"]
 # Pretrained sentence embeddings for text columns (downloads a model on first
 # use); not part of `all` because it pulls the transformers stack.
-embeddings = ["sentence-transformers>=3.0"]
+embeddings = ["sentence-transformers>=3.0", "filelock>=4.2.1"]
 # ONNX export (onnxmltools adds LightGBM and XGBoost); onnxruntime has no
 # free-threaded (3.14t) wheel yet. Any model can ship with `scml package`.
 onnx = ["skl2onnx>=1.17", "onnxruntime>=1.20", "onnxmltools>=1.13"]
