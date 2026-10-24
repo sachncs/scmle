@@ -2,7 +2,6 @@
 
 import io
 import random
-from typing import Any
 
 import joblib
 import numpy as np
@@ -14,7 +13,6 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 
 ROWS = 120
-ABSENT = object()
 
 
 def toy_problem(
@@ -55,22 +53,6 @@ def toy_problem(
         classes = 2 if task is tasks.TaskType.BINARY else 3
         target = pd.Series(rng.integers(0, classes, ROWS))
     return features, target
-
-
-def applied_value(params: dict[str, Any], key: str) -> Any:
-    """Finds `key` among estimator params, including wrapped estimators.
-
-    Args:
-        params: Result of `get_params(deep=True)`.
-        key: Hyperparameter name from the search space.
-
-    Returns:
-        The configured value, or a sentinel when the key is absent.
-    """
-    if key in params:
-        return params[key]
-    nested = [v for k, v in params.items() if k.endswith(f"__{key}")]
-    return nested[0] if nested else ABSENT
 
 
 def check_declared_capabilities(
