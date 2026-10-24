@@ -137,6 +137,7 @@ def compare_runs(
         if left["status"] != right["status"]:
             was, now = left["status"], right["status"]
             reasons.append(f"{left['trial_id']}: status {was} -> {now}")
+            exact = False
             comparable = False
             continue
         gaps = [
