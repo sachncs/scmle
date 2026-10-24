@@ -31,7 +31,8 @@ local tests.
 | F-003 | `pyproject.toml` project URLs | P3 | The changelog URL referenced the retired `main` branch while the repository uses `master`. | Documentation link could lead users to a missing or incorrect page. | Keep repository URLs aligned with the canonical branch. | Fixed | Targeted stale-URL scan is clean. |
 | F-006 | `scml/inference/serving.py:BatchServing.score_file` | P1 | Batch prediction output was written directly to its destination. | Interruption could leave a partial CSV visible to downstream consumers. | Publish output through the existing fsync-and-replace durability primitive. | Fixed | Serving regression test verifies the atomic writer path; durability failure tests pass. |
 | F-007 | `scml/cli.py:PredictCommand.execute` | P1 | The public `scml predict --output` path had the same direct-write hazard as batch serving. | A failed CLI process could expose incomplete prediction output. | Use the atomic writer for CLI-produced artifacts. | Fixed | `test_predict_with_explicit_renames` verifies the writer path and output. |
-| F-008 | `scml/inference/onnx_export.py:export` | P1 | ONNX graph export wrote serialized model bytes directly to the destination. | Interruption could expose a partial model artifact. | Use the atomic writer for exported graphs and retain failure-preservation coverage. | Fixed | Export uses the atomic writer; durability failure-preservation tests pass. The ONNX-specific suite remains dependency-gated in this environment. |
+| F-008 | `scml/inference/onnx_export.py:export` | P1 | ONNX graph export wrote serialized model bytes directly to the destination. | Interruption could expose a partial model artifact. | Use the atomic writer for exported graphs and retain failure-preservation coverage. | Fixed | Export uses the atomic writer; durability failure-preservation tests pass. The ONNX suite passed `11` tests with `4` booster-specific skips under CPython 3.13. |
+| F-009 | Optional dependency resolution (`pyproject.toml`, `uv.lock`) | P1 | The all-extras environment selected `filelock 4.2.0`, which was reported with six known CVEs by `pip-audit`; all listed fixes are available in `4.2.1` or newer. | Optional Torch/transformer/TabPFN environments could install a vulnerable transitive dependency. | Constrain the affected optional extras to `filelock>=4.2.1` and lock a patched release. | Fixed | `uv.lock` selects `filelock 4.2.4`; all-extras `pip-audit` reports no known vulnerabilities. |
 | F-004 | `.github/workflows/` and GitHub account configuration | P1 | Current hosted CI and Pages runs fail before executing steps because of the account billing/spending-limit condition. | Hosted platform coverage and public documentation publication cannot be verified locally. | Repair the account/repository billing condition, rerun hosted CI and Pages, and record successful job-level evidence. | Unresolved external blocker | Runs `40019762196` and `40019762190` failed at hosted startup; all 20 CI jobs and the Pages build had zero executed steps. The live verifier received HTTP 404 for all 18 configured public routes. |
 | F-005 | Release governance and operations | P1 | Independent signed review, external transport/container/kernel fault evidence, external secret custody, and an approved release decision are absent. | Local tests cannot establish the required operational and governance evidence for a production release. | Obtain and retain the required independent signed reviews, external fault evidence, secret-custody proof, and release approval. | Unresolved external blocker | Required by the release boundary and engineering brief; no independent signed records are available in the checkout. |
 
@@ -69,6 +70,11 @@ Executed on 2026-10-24:
 - Operational and secret-boundary checks: `65 passed` across observability,
   health/readiness, monitoring, incident, vault, keyring, release-review,
   release-evaluation, and external-release contract tests.
+- Optional-capability matrix with all declared extras under CPython 3.13:
+  `125 passed, 0 skipped` in 9 minutes 44 seconds; the skip audit reported
+  no skips or xfails. One upstream MLflow deprecation warning was emitted.
+- All-extras dependency audit after the filelock remediation: no known
+  vulnerabilities; only the editable project was not auditable on PyPI.
 - Ruff lint: passed.
 - Ruff format check: passed for `464` files.
 - mypy: no issues in `249` source files.
@@ -115,7 +121,8 @@ independent release review remain unverified.
 - Added a regression test that locks the complete diagnostic message.
 - Routed batch, CLI, and ONNX artifact publication through the existing atomic
   durability primitive.
-- Added no dependencies and changed no public exports.
+- Constrained optional Torch/transformer/TabPFN environments to patched
+  `filelock` and regenerated `uv.lock`; no public exports changed.
 
 ## Explicit production-boundary decisions
 
