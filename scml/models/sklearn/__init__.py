@@ -1,1 +1,0 @@
-"""Scikit-learn model adapters."""
