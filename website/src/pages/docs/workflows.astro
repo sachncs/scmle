@@ -37,6 +37,7 @@ project = MLProject(
 scmle resume runs/orders/&lt;run-id&gt;
 scmle predict runs/orders/&lt;run-id&gt;/model --input data/new_orders.parquet</code></pre>
   <p>Runs are bounded and restartable. If a worker or host disappears, resume from the run directory rather than starting a second experiment with a different implicit state. Predictions should be made from the packaged bundle, not from an estimator reconstructed by hand.</p>
+  <p>The full command set is <code>plan</code>, <code>run</code>, <code>resume</code>, <code>catalog</code>, <code>predict</code>, <code>serve</code>, <code>export-onnx</code>, and <code>package</code>; see <code>scmle --help</code>.</p>
 
   <h2>Choose the task explicitly when it matters</h2>
   <p>Supported task requests include binary and multiclass classification, regression, survival, ordinal, ranking, multilabel, multioutput, forecast, and uplift. <code>auto</code> is useful for exploration; a named task is better for a release because it documents the intended semantics.</p>

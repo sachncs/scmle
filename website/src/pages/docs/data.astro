@@ -32,7 +32,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <h2>The curation pass</h2>
   <ol>
     <li><strong>Identify:</strong> fingerprint the schema, rows, target, and source.</li>
-    <li><strong>Profile:</strong> inspect missingness, duplicates, label quality, representativeness, and feature roles.</li>
+    <li><strong>Profile:</strong> after the split, on the development rows only (only the target is read earlier), inspect missingness, duplicates, label quality, representativeness, and feature roles.</li>
     <li><strong>Protect:</strong> detect leakage and choose a validation strategy that matches time, groups, treatment, or events.</li>
     <li><strong>Decide:</strong> record what was kept, repaired, excluded, or deferred in <code>curation_report.json</code>.</li>
   </ol>
