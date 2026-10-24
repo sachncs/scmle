@@ -4,6 +4,46 @@ import contextlib
 import os
 import pathlib
 import tempfile
+import threading
+
+PATH_LOCKS: dict[str, threading.RLock] = {}
+PATH_LOCKS_GUARD = threading.Lock()
+
+
+def path_lock(path: str | pathlib.Path) -> threading.RLock:
+    """Returns the process-wide re-entrant lock that guards one file.
+
+    Every writer of a shared journal or index takes the lock for the same
+    path, whichever object it goes through, so a read-modify-write or an
+    append cannot interleave with another thread's. The lock is per process;
+    it does not coordinate separate processes.
+
+    Args:
+        path: The guarded file or directory (symlinks are resolved).
+
+    Returns:
+        The lock for that path; the same object on every call.
+    """
+    key = os.path.realpath(path)
+    with PATH_LOCKS_GUARD:
+        lock = PATH_LOCKS.get(key)
+        if lock is None:
+            lock = PATH_LOCKS[key] = threading.RLock()
+        return lock
+
+
+def append_text(path: str | pathlib.Path, text: str) -> None:
+    """Appends text as one unit, never interleaved with another thread's.
+
+    Args:
+        path: File to append to (parent directories are created).
+        text: Complete text to add, including its trailing newline.
+    """
+    target = pathlib.Path(path)
+    with path_lock(target):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(text)
 
 
 def sync_directory(directory: str | pathlib.Path) -> None:
