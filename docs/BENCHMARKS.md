@@ -1,5 +1,30 @@
 # Benchmarks on more open datasets
 
+## Reliability checks
+
+Accuracy tables say how good a model is; they do not say whether the package
+keeps its promises. `python -m benchmarks.reliability` runs nine checks on
+synthetic data with known ground truth and exits non-zero if any fails. Results
+are written to `benchmarks/results_reliability.json` with the measured value
+next to the threshold.
+
+| Check | Claim | Passes when |
+| --- | --- | --- |
+| `determinism` | Same data and seed give the same result. | same model, score difference <= 1e-9 |
+| `replay` | `verify_replay` recognises an unchanged rerun. | level is `exact` |
+| `no_false_skill` | Noise labels do not produce a convincing score. | mean ROC-AUC gap from 0.5 <= 0.08 over 5 seeds |
+| `leak_detection` | A planted leaked column is found. | flagged, and `leakage_policy="block"` stops the run |
+| `bundle_roundtrip` | A saved signed bundle predicts identically. | difference is exactly 0 |
+| `tamper_detection` | Wrong key or modified file is refused. | both raise `ArtifactError` |
+| `interval_coverage` | A 90% interval covers fresh rows. | observed coverage >= 0.85 |
+| `drift_detection` | A +3 sigma shift is flagged; clean data is not. | shifted != `none`, clean == `none` |
+| `failure_isolation` | A crashing candidate does not sink the run. | run `COMPLETED`, crashing trial not `ok` |
+
+These complement, and do not replace, `tests/leakage`, the mutation gate and
+the operational rehearsal ([`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md)).
+Reproduce the accuracy tables with the commands in
+[`benchmarks/README.md`](../benchmarks/README.md).
+
 Besides the nine core datasets in the README, the framework was run on 20 tables from the Hugging Face Hub and 21 more from OpenML (`python -m benchmarks.run_benchmarks --suite huggingface|extended`, 240 s budget, 2 workers). Every number is the score on the **locked test rows**; the reference is a plain scikit-learn `HistGradientBoosting` fitted on the same development rows. Lower is better for log loss and RMSE.
 
 ## Hugging Face Hub (inria-soda/tabular-benchmark and scikit-learn tables)

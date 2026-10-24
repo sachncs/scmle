@@ -79,6 +79,7 @@ jobs:
         run: uv run python scripts/check_pytest_skips.py release-full-suite.xml
       - run: uv run python -m benchmarks.run_benchmarks --offline --seeds 5 --budget 120 --workers 2 --output results.json
       - run: uv run python -m benchmarks.check_regression results.json
+      - run: uv run python -m benchmarks.reliability --output reliability.json
       - run: uv build --python 3.14
       - run: uv run twine check dist/*
       - name: Verify reproducible and network-isolated artifacts

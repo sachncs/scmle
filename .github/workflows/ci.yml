@@ -247,10 +247,13 @@ jobs:
       - run: uv sync --python 3.14 --extra boosting --extra optimization
       - run: uv run python -m benchmarks.run_benchmarks --offline --seeds 5 --budget 120 --workers 2 --output results.json
       - run: uv run python -m benchmarks.check_regression results.json
+      - run: uv run python -m benchmarks.reliability --output reliability.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: benchmark-results
-          path: results.json
+          path: |
+            results.json
+            reliability.json
 
   security:
     name: static analysis and dependency audit

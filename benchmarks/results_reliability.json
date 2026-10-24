@@ -1,0 +1,117 @@
+{
+  "version": "0.1.0b1",
+  "results": [
+    {
+      "name": "determinism",
+      "claim": "Same data and seed give the same selection and test score.",
+      "passed": true,
+      "measured": {
+        "models": [
+          "logistic_regression",
+          "logistic_regression"
+        ],
+        "score_difference": 0.0
+      },
+      "threshold": "same model, |score difference| <= 1e-9",
+      "seconds": 11.18,
+      "error": ""
+    },
+    {
+      "name": "replay",
+      "claim": "verify_replay classifies a rerun of the same configuration as exact.",
+      "passed": true,
+      "measured": {
+        "level": "exact",
+        "reasons": []
+      },
+      "threshold": "level == exact",
+      "seconds": 9.89,
+      "error": ""
+    },
+    {
+      "name": "no_false_skill",
+      "claim": "On pure-noise labels the locked-test ROC-AUC stays near 0.5.",
+      "passed": true,
+      "measured": {
+        "mean_gap": 0.014433598698905847,
+        "worst": 0.03954235246888804
+      },
+      "threshold": "mean |AUC - 0.5| <= 0.08 and worst <= 0.15 over 5 seeds",
+      "seconds": 19.44,
+      "error": ""
+    },
+    {
+      "name": "leak_detection",
+      "claim": "A planted leaked column is flagged and leakage_policy=block stops.",
+      "passed": true,
+      "measured": {
+        "flagged": true,
+        "blocked": true
+      },
+      "threshold": "flagged and blocked",
+      "seconds": 3.66,
+      "error": ""
+    },
+    {
+      "name": "bundle_roundtrip",
+      "claim": "Predictions are identical before saving and after a verified load.",
+      "passed": true,
+      "measured": {
+        "max_difference": 0.0
+      },
+      "threshold": "max |difference| == 0",
+      "seconds": 4.44,
+      "error": ""
+    },
+    {
+      "name": "tamper_detection",
+      "claim": "Loading refuses a wrong key and a modified model file.",
+      "passed": true,
+      "measured": {
+        "wrong_key": true,
+        "modified_file": true
+      },
+      "threshold": "both refused with ArtifactError",
+      "seconds": 5.36,
+      "error": ""
+    },
+    {
+      "name": "interval_coverage",
+      "claim": "A 90% conformal interval covers at least 85% of fresh rows.",
+      "passed": true,
+      "measured": {
+        "coverage": 0.8855
+      },
+      "threshold": "empirical coverage >= 0.85",
+      "seconds": 6.43,
+      "error": ""
+    },
+    {
+      "name": "drift_detection",
+      "claim": "Monitoring flags a +3 sigma shift and stays quiet on clean data.",
+      "passed": true,
+      "measured": {
+        "clean": "none",
+        "shifted": "retrain"
+      },
+      "threshold": "shifted != none and clean == none",
+      "seconds": 3.88,
+      "error": ""
+    },
+    {
+      "name": "failure_isolation",
+      "claim": "A crashing candidate is recorded as failed; the run still completes.",
+      "passed": true,
+      "measured": {
+        "state": "COMPLETED",
+        "crashing_status": [
+          "failed"
+        ],
+        "others_ok": true
+      },
+      "threshold": "run COMPLETED, crashing trial not ok, another trial ok",
+      "seconds": 3.45,
+      "error": ""
+    }
+  ]
+}
