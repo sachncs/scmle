@@ -16,6 +16,7 @@ import os
 import pathlib
 import platform
 import tempfile
+import threading
 from typing import Any
 from typing import Self
 
@@ -313,6 +314,8 @@ class ModelBundle:
         self.conformal = conformal
         self.novelty = novelty
         self.quantile = quantile
+        # Serializes `remember`, which rewrites `history` from itself.
+        self.history_lock = threading.RLock()
 
     @classmethod
     def create(
@@ -631,18 +634,21 @@ class ModelBundle:
         """
         if not self.schema.series:
             return
-        builder = self.series_builder()
-        frame = self.read_frame(data)
-        columns = builder.history_columns
-        parts = [frame[columns]]
-        if self.history is not None:
-            parts.insert(0, self.history)
-        combined = pd.concat(parts, ignore_index=True)
-        key = [
-            c for c in (self.schema.group_column, self.schema.time_column) if c
-        ]
-        combined = combined.drop_duplicates(subset=key, keep="last")
-        self.history = builder.build_history(combined)
+        with self.history_lock:  # Read-modify-write of `history`.
+            builder = self.series_builder()
+            frame = self.read_frame(data)
+            columns = builder.history_columns
+            parts = [frame[columns]]
+            if self.history is not None:
+                parts.insert(0, self.history)
+            combined = pd.concat(parts, ignore_index=True)
+            key = [
+                c
+                for c in (self.schema.group_column, self.schema.time_column)
+                if c
+            ]
+            combined = combined.drop_duplicates(subset=key, keep="last")
+            self.history = builder.build_history(combined)
 
     def save(
         self,
