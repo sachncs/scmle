@@ -32,6 +32,8 @@ import scmle
 LOGGER = logging.getLogger(__name__)
 
 SYSTEM = "scmle"
+CPUS = 12  # Every system gets the same cores (PROTOCOL.md, amendment 1).
+
 OVERRUN = 1.10
 METRICS = {
     "binary": "roc_auc",
@@ -174,6 +176,7 @@ def run_frames(
         versions={
             "scmle": scmle.__version__,
             "python": platform.python_version(),
+            "cpus": str(workers),
         },
     )
     started = time.monotonic()
@@ -209,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--budgets", type=int, nargs="+", default=[60])
     parser.add_argument("--fold", type=int, default=0)
     parser.add_argument("--repeat", type=int, default=0)
-    parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--workers", type=int, default=CPUS)
     parser.add_argument("--output", type=pathlib.Path, required=True)
     parser.add_argument("--runs-dir", type=pathlib.Path, required=True)
     parser.add_argument("--open-holdout", action="store_true")

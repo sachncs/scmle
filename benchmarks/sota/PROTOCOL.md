@@ -112,4 +112,12 @@ An amendment is a dated section appended here, committed before the
 hold-out is opened, stating what changed and why. It cannot change the hold-out
 assignment, the claim thresholds in section 1, or the seeds in section 5.
 
-*(none)*
+### Amendment 1 (2026-10-25): equal CPU for every system
+
+Committed before any result file exists. Section 4 said "the same CPU and
+memory limits" without a number. Every system is run with **12 CPU cores**
+(this machine's core count), one task at a time, and the core count is
+recorded in each result record (`versions.cpus`). SCMLE uses `workers=12`;
+reference systems are given 12 threads or processes through their own
+settings. A system that cannot honour the limit is reported as such rather
+than run with more. No threshold, seed or hold-out rule changes.
