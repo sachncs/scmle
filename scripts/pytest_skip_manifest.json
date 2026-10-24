@@ -22,6 +22,10 @@
       "pattern": "^tabpfn is installed here$"
     },
     {
+      "category": "dependency",
+      "pattern": "^(?:tabpfn is not installed|TABPFN_TOKEN is not set)$"
+    },
+    {
       "category": "environment",
       "pattern": "^(?:Accelerate is macOS only|Windows handles are not file descriptors)$"
     },

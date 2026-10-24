@@ -1,11 +1,21 @@
-"""Tests for the TabPFN adapter plumbing (with a stand-in package)."""
+"""Tests for the TabPFN adapter and engines.
 
+The engines are real production classes whose only external dependency is the
+`tabpfn` package, reached through `TabPfnEngine.build`. The tests below
+override that one documented factory with ordinary scikit-learn models, so the
+store, rebuild, limit and worker paths run for real without the licensed
+package. Tests against the real package run only when it is installed and
+`TABPFN_TOKEN` is set.
+"""
+
+import importlib.util
 import os
 import pathlib
-import sys
 
 import numpy as np
 import pytest
+from scipy import sparse
+from sklearn import linear_model
 
 from scmle.contracts import tasks
 from scmle.models import registry as registry_module
@@ -13,15 +23,29 @@ from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import foundation
 from scmle.models.deeplearning import worker
 
-STUBS = str(pathlib.Path(__file__).resolve().parents[1] / "stubs")
+HERE = str(pathlib.Path(__file__).resolve().parent)
 
 
-@pytest.fixture
-def stub_package(monkeypatch):
-    monkeypatch.syspath_prepend(STUBS)
-    sys.modules.pop("tabpfn", None)
-    yield
-    sys.modules.pop("tabpfn", None)
+class SklearnClassifierEngine(foundation.ClassifierEngine):
+    """The classifier engine with scikit-learn behind `build`."""
+
+    def build(self):
+        """Returns logistic regression in TabPFN's place."""
+        return linear_model.LogisticRegression(max_iter=500)
+
+
+class SklearnRegressorEngine(foundation.RegressorEngine):
+    """The regressor engine with scikit-learn behind `build`."""
+
+    def build(self):
+        """Returns ridge regression in TabPFN's place."""
+        return linear_model.Ridge()
+
+
+class WorkerClassifier(estimators.TabPfnClassifier):
+    """Worker-backed classifier whose engine lives in this module."""
+
+    engine_path = "test_foundation.SklearnClassifierEngine"
 
 
 def separable(rows=300):
@@ -30,10 +54,10 @@ def separable(rows=300):
     return features, (features[:, 0] > 0).astype(int)
 
 
-def test_the_engine_stores_rows_and_rebuilds_from_its_state(stub_package):
+def test_the_engine_stores_rows_and_rebuilds_from_its_state():
     features, labels = separable()
-    engine = foundation.ClassifierEngine().fit(features, labels)
-    restored = foundation.ClassifierEngine.__new__(foundation.ClassifierEngine)
+    engine = SklearnClassifierEngine().fit(features, labels)
+    restored = SklearnClassifierEngine.__new__(SklearnClassifierEngine)
     restored.__setstate__(engine.__getstate__())
 
     assert list(engine.__getstate__()["classes_"]) == [0, 1]
@@ -43,21 +67,78 @@ def test_the_engine_stores_rows_and_rebuilds_from_its_state(stub_package):
     assert (restored.predict(features) == labels).mean() > 0.9
 
 
-def test_data_beyond_tabpfns_limits_is_refused(stub_package):
+def test_the_state_carries_settings_and_the_training_rows():
+    features, labels = separable(60)
+    engine = SklearnClassifierEngine(
+        device="cpu", random_state=3, n_estimators=2
+    ).fit(features, labels)
+
+    state = engine.__getstate__()
+
+    assert (state["device"], state["random_state"]) == ("cpu", 3)
+    assert state["n_estimators"] == 2
+    assert state["train_features_"].shape == (60, 3)
+    assert state["train_features_"].dtype == np.float32
+
+
+def test_sparse_rows_are_densified_for_fit_and_prediction():
+    features, labels = separable(120)
+
+    engine = SklearnClassifierEngine().fit(sparse.csr_matrix(features), labels)
+
+    assert engine.predict(sparse.csr_matrix(features)).shape == (120,)
+    assert engine.rows(sparse.csr_matrix(features)).dtype == np.float32
+
+
+def test_data_beyond_tabpfns_row_and_feature_limits_is_refused():
     too_wide = np.zeros((20, foundation.MAX_FEATURES + 1), dtype=np.float32)
+    too_long = np.zeros((foundation.MAX_ROWS + 1, 2), dtype=np.float32)
 
     with pytest.raises(ValueError, match="supports up to"):
-        foundation.ClassifierEngine().fit(too_wide, np.zeros(20))
+        SklearnClassifierEngine().fit(too_wide, np.zeros(20))
+    with pytest.raises(ValueError, match="supports up to"):
+        SklearnClassifierEngine().fit(
+            too_long, np.zeros(foundation.MAX_ROWS + 1)
+        )
 
 
-def test_the_regression_engine_predicts(stub_package):
+def test_sample_weights_are_refused_rather_than_silently_ignored():
+    features, labels = separable(50)
+
+    with pytest.raises(ValueError, match="does not support sample weights"):
+        SklearnClassifierEngine().fit(
+            features, labels, sample_weight=np.ones(50)
+        )
+
+
+def test_the_regression_engine_predicts():
     rng = np.random.default_rng(1)
     features = rng.normal(size=(200, 2)).astype(np.float32)
     target = features[:, 0] * 3
 
-    engine = foundation.RegressorEngine().fit(features, target)
+    engine = SklearnRegressorEngine().fit(features, target)
 
     assert np.corrcoef(engine.predict(features), target)[0, 1] > 0.99
+
+
+def test_the_default_build_uses_the_named_tabpfn_class(monkeypatch):
+    """`build` asks the installed package for the engine's class."""
+    seen = {}
+
+    class Library:
+        class TabPFNClassifier:
+            def __init__(self, **settings):
+                seen.update(settings)
+
+    monkeypatch.setattr(
+        foundation.importlib, "import_module", lambda name: Library
+    )
+
+    foundation.ClassifierEngine(
+        device="cuda", random_state=5, n_estimators=4
+    ).build()
+
+    assert seen == {"device": "cuda", "random_state": 5, "n_estimators": 4}
 
 
 def test_the_adapter_is_rejected_without_the_package_and_explains_why():
@@ -85,17 +166,59 @@ def test_the_adapter_stays_extension_only_when_its_package_is_available(
 
 
 def test_the_proxy_trains_and_predicts_through_the_worker(monkeypatch):
+    if importlib.util.find_spec("torch") is None:
+        pytest.skip("torch is not installed")
     existing = os.environ.get("PYTHONPATH", "")
     worker.client().shutdown()
     monkeypatch.setenv(
-        "PYTHONPATH", STUBS + (":" + existing if existing else "")
+        "PYTHONPATH", HERE + (os.pathsep + existing if existing else "")
     )
     try:
         features, labels = separable()
-        model = estimators.TabPfnClassifier().fit(features, labels)
+        model = WorkerClassifier().fit(features, labels)
 
         assert list(model.classes_) == [0, 1]
         assert (model.predict(features) == labels).mean() > 0.9
         assert model.predict_proba(features).shape == (300, 2)
     finally:
         worker.client().shutdown()
+
+
+def real_tabpfn_ready():
+    """Why the real package cannot be exercised here, or an empty string."""
+    if importlib.util.find_spec("tabpfn") is None:
+        return "tabpfn is not installed"
+    if not os.environ.get("TABPFN_TOKEN"):
+        return "TABPFN_TOKEN is not set"
+    return ""
+
+
+def test_real_tabpfn_classifies_through_the_engine():
+    reason = real_tabpfn_ready()
+    if reason:
+        pytest.skip(reason)
+    features, labels = separable(200)
+
+    engine = foundation.ClassifierEngine(device="cpu").fit(features, labels)
+    restored = foundation.ClassifierEngine.__new__(foundation.ClassifierEngine)
+    restored.__setstate__(engine.__getstate__())
+
+    assert (engine.predict(features) == labels).mean() > 0.9
+    np.testing.assert_allclose(
+        engine.predict_proba(features),
+        restored.predict_proba(features),
+        atol=1e-3,
+    )
+
+
+def test_real_tabpfn_regresses_through_the_engine():
+    reason = real_tabpfn_ready()
+    if reason:
+        pytest.skip(reason)
+    rng = np.random.default_rng(1)
+    features = rng.normal(size=(200, 2)).astype(np.float32)
+    target = features[:, 0] * 3
+
+    engine = foundation.RegressorEngine(device="cpu").fit(features, target)
+
+    assert np.corrcoef(engine.predict(features), target)[0, 1] > 0.95

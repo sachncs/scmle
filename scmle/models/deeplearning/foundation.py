@@ -54,8 +54,12 @@ class TabPfnEngine:
         """Stores the training rows with the model (in-context learning).
 
         Raises:
-            ValueError: If the data exceeds what TabPFN supports.
+            ValueError: If the data exceeds what TabPFN supports, or if
+                `sample_weight` is given (in-context learning has no way to
+                weight rows, and ignoring the weights silently would be wrong).
         """
+        if sample_weight is not None:
+            raise ValueError("TabPFN does not support sample weights")
         if sparse.issparse(features):
             features = features.toarray()
         matrix = np.asarray(features, dtype=np.float32)
