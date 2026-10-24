@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+* Thread safety: the estimator and metric registries, experiment store, model
+  registry, key registry, monitoring journals, shadow evaluator and bundle
+  history are safe to use from several threads in one process (see
+  `docs/ARCHITECTURE.md`, Concurrency). Separate processes sharing one
+  registry or run directory are still not coordinated.
+* The L1 feature selector no longer fails on multiclass targets.
 * The public API snapshot (`tests/fixtures/public_api.json`) was regenerated
   after the `scmle` rename, which had left it stale; the set of exports is
   unchanged. `scripts/check_api_compatibility.py --write` regenerates it.
