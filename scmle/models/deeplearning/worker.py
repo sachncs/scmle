@@ -159,12 +159,22 @@ class WorkerClient:
 
 
 CLIENTS: dict[int, WorkerClient] = {}
+CLIENTS_LOCK = threading.Lock()
 
 
 def client() -> WorkerClient:
-    """Returns this process's worker client (one worker per process)."""
+    """Returns this process's worker client (one worker per process).
+
+    Safe to call from several threads: the first creates the client, and
+    every other caller gets that same one.
+    """
     pid = os.getpid()
-    if pid not in CLIENTS:
-        CLIENTS[pid] = WorkerClient()
-        atexit.register(CLIENTS[pid].shutdown)
-    return CLIENTS[pid]
+    found = CLIENTS.get(pid)
+    if found is not None:
+        return found
+    with CLIENTS_LOCK:
+        found = CLIENTS.get(pid)
+        if found is None:
+            found = CLIENTS[pid] = WorkerClient()
+            atexit.register(found.shutdown)
+        return found

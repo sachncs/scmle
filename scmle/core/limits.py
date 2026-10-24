@@ -25,6 +25,7 @@ import os
 import signal
 import subprocess  # nosec B404
 import sys
+import threading
 import time
 from typing import Any
 
@@ -52,6 +53,13 @@ class TrialLimitError(errors.ScmleError):
     """Raised when a supervised trial was stopped or lost."""
 
 
+ENVIRONMENT_LOCK = threading.Lock()
+ENVIRONMENT_USERS = [0]
+"""How many threads are inside `forkserver_environment` (one-item list)."""
+ENVIRONMENT_SAVED: list[str | None] = [None]
+"""The variable's value before the first of them changed it."""
+
+
 @contextlib.contextmanager
 def forkserver_environment() -> Iterator[None]:
     """Starts the forkserver with a fork-safe BLAS configuration.
@@ -62,20 +70,29 @@ def forkserver_environment() -> Iterator[None]:
     product. Accelerate reads `VECLIB_MAXIMUM_THREADS` when it loads, so the
     server (which loads numpy) is started with it set to 1. Trials are
     already single-threaded; parallelism comes from running several. The
-    variable is restored afterwards so this process is unaffected.
+    variable is restored afterwards so this process is unaffected. Threads
+    share one change: the first in saves the original value and the last
+    out restores it, so overlapping uses cannot leave the "1" behind.
     """
     if sys.platform != "darwin":
         yield
         return
-    previous = os.environ.get(ACCELERATE_THREADS)
-    os.environ[ACCELERATE_THREADS] = "1"
+    with ENVIRONMENT_LOCK:
+        if ENVIRONMENT_USERS[0] == 0:
+            ENVIRONMENT_SAVED[0] = os.environ.get(ACCELERATE_THREADS)
+            os.environ[ACCELERATE_THREADS] = "1"
+        ENVIRONMENT_USERS[0] += 1
     try:
         yield
     finally:
-        if previous is None:
-            os.environ.pop(ACCELERATE_THREADS, None)
-        else:
-            os.environ[ACCELERATE_THREADS] = previous
+        with ENVIRONMENT_LOCK:
+            ENVIRONMENT_USERS[0] -= 1
+            if ENVIRONMENT_USERS[0] == 0:
+                previous = ENVIRONMENT_SAVED[0]
+                if previous is None:
+                    os.environ.pop(ACCELERATE_THREADS, None)
+                else:
+                    os.environ[ACCELERATE_THREADS] = previous
 
 
 def peak_memory_gb() -> float:
