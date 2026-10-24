@@ -66,6 +66,9 @@ Executed on 2026-10-24:
 - Container smoke check: Linux arm64 Python 3.13 installed the package from
   the checkout, imported it, and passed the CLI help smoke test through
   Colima/Docker. The temporary VM was stopped after the check.
+- Operational and secret-boundary checks: `65 passed` across observability,
+  health/readiness, monitoring, incident, vault, keyring, release-review,
+  release-evaluation, and external-release contract tests.
 - Ruff lint: passed.
 - Ruff format check: passed for `464` files.
 - mypy: no issues in `249` source files.
@@ -113,6 +116,18 @@ independent release review remain unverified.
 - Routed batch, CLI, and ONNX artifact publication through the existing atomic
   durability primitive.
 - Added no dependencies and changed no public exports.
+
+## Explicit production-boundary decisions
+
+- The reference HTTP adapter remains gateway-only. Authentication, TLS,
+  transport-specific decoding, and paging must be supplied and evidenced by
+  the deployment owner before production use.
+- Experimental non-tabular and foundation-model paths remain explicitly
+  excluded from the production-supported claim until their optional
+  dependency, platform, and independent review evidence is complete.
+- Version `0.1.0b1` remains beta and is not eligible for release promotion
+  until hosted execution, external fault evidence, secret custody, and signed
+  independent approval are complete.
 
 ## Residual risk register
 
