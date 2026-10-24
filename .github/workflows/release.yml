@@ -44,8 +44,8 @@ jobs:
       - name: Reject unexplained skips and xfails
         run: uv run python scripts/check_pytest_skips.py release-platform.xml
 
-  release-evidence:
-    name: staged release evidence
+  release-checks:
+    name: staged release checks
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -63,7 +63,7 @@ jobs:
         run: ./scripts/release_preflight.sh
 
   publish:
-    needs: [test, release-evidence]
+    needs: [test, release-checks]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: pypi
