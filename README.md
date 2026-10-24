@@ -2,7 +2,7 @@
 
 > Mathematics meets engineering.
 
-[![CI](https://github.com/sachncs/magicml/actions/workflows/ci.yml/badge.svg)](https://github.com/sachncs/magicml/actions/workflows/ci.yml)
+[![CI](https://github.com/sachncs/scmle/actions/workflows/ci.yml/badge.svg)](https://github.com/sachncs/scmle/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/scmle)](https://pypi.org/project/scmle/)
 [![Python](https://img.shields.io/pypi/pyversions/scmle)](https://pypi.org/project/scmle/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)

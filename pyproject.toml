@@ -67,10 +67,10 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sachncs/magicml"
+Homepage = "https://github.com/sachncs/scmle"
 Documentation = "https://sachncs.github.io/scmle/"
-Issues = "https://github.com/sachncs/magicml/issues"
-Changelog = "https://github.com/sachncs/magicml/blob/master/CHANGELOG.md"
+Issues = "https://github.com/sachncs/scmle/issues"
+Changelog = "https://github.com/sachncs/scmle/blob/master/CHANGELOG.md"
 
 [project.scripts]
 scmle = "scmle.cli:main"

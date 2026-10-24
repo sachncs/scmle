@@ -8,7 +8,7 @@ older releases are not patched.
 ## Reporting a vulnerability
 
 Please do not open a public issue. Report it privately through GitHub's
-[private vulnerability reporting](https://github.com/sachncs/magicml/security/advisories/new)
+[private vulnerability reporting](https://github.com/sachncs/scmle/security/advisories/new)
 or email sch.cs.96@gmail.com with the affected version, a description and, if
 possible, a reproduction. Expect an acknowledgement within a week.
 

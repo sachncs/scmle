@@ -22,9 +22,9 @@ def test_external_release_matches_public_github_and_pypi_digests(
     records = verify_external_release.artifact_records(tmp_path)
     digests = {record["name"]: record["sha256"] for record in records}
     release_url = (
-        "https://api.example/repos/sachncs/magicml/releases/tags/v0.1.0b1"
+        "https://api.example/repos/sachncs/scmle/releases/tags/v0.1.0b1"
     )
-    commit_url = "https://api.example/repos/sachncs/magicml/commits/v0.1.0b1"
+    commit_url = "https://api.example/repos/sachncs/scmle/commits/v0.1.0b1"
     wheel_url = "https://downloads.example/wheel"
     source_url = "https://downloads.example/source"
     responses = {
@@ -65,7 +65,7 @@ def test_external_release_matches_public_github_and_pypi_digests(
     monkeypatch.setattr(verify_external_release, "request_bytes", fake_bytes)
 
     evidence = verify_external_release.verify_external_release(
-        "sachncs/magicml",
+        "sachncs/scmle",
         "v0.1.0b1",
         "a" * 40,
         tmp_path,
@@ -89,9 +89,9 @@ def test_external_release_rejects_published_digest_mismatch(
     wheel, source = make_artifacts(tmp_path)
     records = verify_external_release.artifact_records(tmp_path)
     release_url = (
-        "https://api.example/repos/sachncs/magicml/releases/tags/v0.1.0b1"
+        "https://api.example/repos/sachncs/scmle/releases/tags/v0.1.0b1"
     )
-    commit_url = "https://api.example/repos/sachncs/magicml/commits/v0.1.0b1"
+    commit_url = "https://api.example/repos/sachncs/scmle/commits/v0.1.0b1"
     pypi_url = "https://pypi.example/scmle/0.1.0b1/json"
     responses = {
         release_url: {
@@ -132,7 +132,7 @@ def test_external_release_rejects_published_digest_mismatch(
     monkeypatch.setattr(verify_external_release, "request_bytes", fake_bytes)
 
     evidence = verify_external_release.verify_external_release(
-        "sachncs/magicml",
+        "sachncs/scmle",
         "v0.1.0b1",
         "a" * 40,
         tmp_path,
