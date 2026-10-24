@@ -123,7 +123,7 @@ def register_estimator(
         )
     if name in registry.builtin_names():
         raise errors.ConfigError(f"'{name}' is a built-in model name")
-    if name in registry.USER_ADAPTERS and not replace:
+    if name in registry.user_adapters() and not replace:
         raise errors.ConfigError(f"model '{name}' is already registered")
     adapter = rebuild(
         EstimatorSpec(
@@ -139,7 +139,7 @@ def register_estimator(
         )
     )
     conformance.check_conformance(adapter)
-    registry.USER_ADAPTERS[name] = adapter
+    registry.add_user_adapter(adapter, replace)  # Authoritative, atomic check.
     return adapter
 
 
@@ -147,4 +147,4 @@ def unregister_estimator(name: str) -> None:
     """Removes a registered estimator (no-op if it is not registered)."""
     from scmle.models import registry  # Deferred: registry imports this module.
 
-    registry.USER_ADAPTERS.pop(name, None)
+    registry.remove_user_adapter(name)

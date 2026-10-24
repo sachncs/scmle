@@ -5,6 +5,7 @@ Scores are always reported in natural units (log loss is positive);
 """
 
 from collections.abc import Callable
+import threading
 from typing import Any
 
 import pandas as pd
@@ -201,6 +202,7 @@ class MetricCatalog:
         Args:
             metrics: Available metrics.
         """
+        self.lock = threading.RLock()
         self.metrics = {metric.name: metric for metric in metrics}
         self.report_names = {
             task: tuple(names)
@@ -212,6 +214,10 @@ class MetricCatalog:
     ) -> None:
         """Adds a user-defined metric, reported alongside the standard ones.
 
+        The tables are replaced, never edited in place, so a reader that
+        already holds one keeps a consistent view. `metrics` is published
+        first so every reported name is already resolvable.
+
         Args:
             metric: The metric.
             replace: Allow overriding an existing metric of the same name.
@@ -219,21 +225,33 @@ class MetricCatalog:
         Raises:
             ConfigError: If the name is taken and `replace` is False.
         """
-        if metric.name in self.metrics and not replace:
-            raise errors.ConfigError(f"metric '{metric.name}' already exists")
-        self.metrics[metric.name] = metric
-        for task in metric.tasks:
-            names = self.report_names[task]
-            if metric.name not in names:
-                self.report_names[task] = (*names, metric.name)
+        with self.lock:
+            if metric.name in self.metrics and not replace:
+                raise errors.ConfigError(
+                    f"metric '{metric.name}' already exists"
+                )
+            report_names = dict(self.report_names)
+            for task in metric.tasks:
+                names = report_names[task]
+                if metric.name not in names:
+                    report_names[task] = (*names, metric.name)
+            self.metrics = {**self.metrics, metric.name: metric}
+            self.report_names = report_names
 
     def unregister(self, name: str) -> None:
-        """Removes a user-defined metric (no-op if it is not registered)."""
-        self.metrics.pop(name, None)
-        self.report_names = {
-            task: tuple(n for n in names if n != name)
-            for task, names in self.report_names.items()
-        }
+        """Removes a user-defined metric (no-op if it is not registered).
+
+        The reported names shrink first, so no reader is told to score a
+        metric that is already gone.
+        """
+        with self.lock:
+            self.report_names = {
+                task: tuple(n for n in names if n != name)
+                for task, names in self.report_names.items()
+            }
+            self.metrics = {
+                key: value for key, value in self.metrics.items() if key != name
+            }
 
     def resolve(
         self, name: str | None, task: tasks.TaskType
@@ -291,9 +309,13 @@ class MetricCatalog:
         positive = (
             classes[1] if task is BINARY and classes is not None else None
         )
-        for name in self.report_names[task]:
+        names = self.report_names[task]
+        table = self.metrics  # One snapshot, immune to concurrent changes.
+        for name in names:
+            if name not in table:  # Unregistered since `names` was read.
+                continue
             try:
-                results[name] = self.metrics[name].score(
+                results[name] = table[name].score(
                     estimator, features, target, positive, sample_weight
                 )
             except (ValueError, TypeError):

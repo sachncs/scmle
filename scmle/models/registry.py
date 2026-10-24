@@ -5,6 +5,7 @@ heavy imports only happen when an adapter is actually built.
 """
 
 from importlib import metadata
+import threading
 from typing import Self
 
 from scmle.contracts import errors
@@ -24,17 +25,50 @@ from scmle.models.uplift import adapters as uplift_adapters
 
 ENTRY_POINT_GROUP = "scmle.models"
 USER_ADAPTERS: dict[str, models.ModelAdapter] = {}
-"""Adapters added with `register_estimator`, shared by later projects."""
+"""Adapters added with `register_estimator`, shared by later projects.
+
+Change it only through `add_user_adapter` and `remove_user_adapter`, and read
+it only through `user_adapters`; all three hold `USER_LOCK`.
+"""
+USER_LOCK = threading.RLock()
+"""Serializes check-then-act changes to `USER_ADAPTERS`."""
+
+
+def user_adapters() -> dict[str, models.ModelAdapter]:
+    """Returns a consistent copy of the registered user adapters."""
+    with USER_LOCK:
+        return dict(USER_ADAPTERS)
+
+
+def add_user_adapter(
+    adapter: models.ModelAdapter, replace: bool = False
+) -> None:
+    """Registers a user adapter atomically.
+
+    Args:
+        adapter: The adapter to add.
+        replace: Allow replacing an earlier registration of the same name.
+
+    Raises:
+        ConfigError: If the name is taken and `replace` is False.
+    """
+    with USER_LOCK:
+        if adapter.name in USER_ADAPTERS and not replace:
+            raise errors.ConfigError(
+                f"model '{adapter.name}' is already registered"
+            )
+        USER_ADAPTERS[adapter.name] = adapter
+
+
+def remove_user_adapter(name: str) -> None:
+    """Removes a user adapter atomically (no-op if it is not registered)."""
+    with USER_LOCK:
+        USER_ADAPTERS.pop(name, None)
 
 
 def builtin_names() -> frozenset[str]:
     """Names of the built-in model families."""
-    saved = dict(USER_ADAPTERS)
-    USER_ADAPTERS.clear()
-    try:
-        return frozenset(ModelRegistry.with_builtins().adapters)
-    finally:
-        USER_ADAPTERS.update(saved)
+    return frozenset(ModelRegistry.with_builtins(include_user=False).adapters)
 
 
 class ModelRegistry:
@@ -52,10 +86,14 @@ class ModelRegistry:
             self.register(adapter)
 
     @classmethod
-    def with_builtins(cls) -> Self:
+    def with_builtins(cls, include_user: bool = True) -> Self:
         """Creates a registry with the built-in adapters.
 
         These are scikit-learn, boosting and PyTorch families.
+
+        Args:
+            include_user: Also add adapters from `register_estimator`
+                (a snapshot taken once, so later changes do not leak in).
 
         Optional adapters register unconditionally; they are rejected at
         planning time when their library is not installed.
@@ -74,8 +112,9 @@ class ModelRegistry:
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))
         registry.register(ensembles.BlendingAdapter(registry))
-        for adapter in USER_ADAPTERS.values():
-            registry.register(adapter, overwrite=True)
+        if include_user:
+            for adapter in user_adapters().values():
+                registry.register(adapter, overwrite=True)
         return registry
 
     def register(
