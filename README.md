@@ -239,5 +239,11 @@ installed into a clean environment.
   stop a process from reading the original data file when a path was given,
   and a caller's own in-memory DataFrame still holds every row.
 * Ray and CatBoost have no free-threaded (3.14t) wheels yet.
+* Threads: the public API may be called from several threads of one process
+  (registries, runs, prediction, stores and journals; see "Concurrency" in
+  `docs/ARCHITECTURE.md`). Locks are per process, so separate processes that
+  share one registry, journal or run directory are not coordinated, and
+  mutating a shared `ModelBundle` (`calibrate`) while others predict is not
+  supported.
 * Windows: peak-memory reporting counts this process only (finished child
   processes are not reported), and the free-threaded build is not tested.

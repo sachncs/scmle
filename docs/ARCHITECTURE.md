@@ -116,3 +116,45 @@ Third-party model adapters must pass
 Google Python style (80 columns, Google docstrings, module imports), checked
 by `ruff` and `mypy`. No identifier, attribute or file name starts with an
 underscore (`tests/unit/test_conventions.py`).
+
+## Concurrency
+
+The public API can be called from several threads of one process, including
+on the free-threaded build (`tests/unit/test_thread_safety.py`).
+
+* **Registries.** `register_estimator` / `unregister_estimator`
+  (`models.registry.USER_ADAPTERS`) and `register_metric`
+  (`MetricCatalog`) check and change under a lock, so a duplicate name has
+  exactly one winner. Readers take a snapshot: `ModelRegistry.with_builtins`
+  copies the user adapters once, and `MetricCatalog` replaces its tables
+  rather than editing them, so a run that is scoring never sees a metric
+  vanish halfway. A registration made while a run is in flight may or may
+  not be visible to that run; register before you start.
+* **Runs.** Each `MLProject.run()` owns its context, run directory (made
+  with an atomic `mkdir`) and seeded random state, so parallel runs give the
+  results a sequential run with the same seed gives. Runs that share an
+  `output_dir` share one `experiments.sqlite`, whose connections are
+  per call. `limits.forkserver_environment` reference-counts its change to
+  `VECLIB_MAXIMUM_THREADS` so overlapping trials restore the original value.
+* **Prediction.** `ModelBundle.predict`, `predict_proba` and `score` only
+  read the bundle. `remember` (series history) is serialized by
+  `history_lock`; `calibrate` and other methods that replace fitted parts are
+  setup steps, not safe to run beside predictions.
+* **Files.** `durability.path_lock(path)` gives every writer of one file the
+  same re-entrant lock, and `durability.append_text` appends whole records.
+  The model registry store, lifecycle state, incident journal, alert
+  journal, prediction log and SQLite schema migration use them. Their
+  read-modify-write steps (assign a version, move an alias, chain an
+  incident event, dedupe an alert) are one critical section each.
+* **Lazy singletons.** `worker.client()` creates the PyTorch worker client
+  once; requests to the worker are serialized by its own lock.
+
+Limits: locks are per process. Separate processes writing one registry,
+journal or run directory are not coordinated (SQLite and `os.replace` keep
+single files intact, but a read-modify-write can still lose an update).
+`ShadowEvaluator` and `SigningKeyRegistry` are thread safe; the
+`Embedder` cache and `optuna` verbosity live in worker or global state that
+only a single caller drives. One `RunContext` must not be used by two
+threads. Registry locks are never held while a user estimator runs, but a
+`LifecycleManager.review` holds its state lock for the whole retrain.
+
