@@ -21,6 +21,7 @@ Reading guide and published tables: [`docs/BENCHMARKS.md`](../docs/BENCHMARKS.md
 | `results.json` | Committed output of the core suite, quoted in the root README. |
 | `results_seeds.json` | Committed 3-seed run with intervals. |
 | `results_real_tasks.json` | Committed output of `real_tasks.py`. |
+| `sota/` | Pre-registered comparison against external AutoML systems: [`PROTOCOL.md`](sota/PROTOCOL.md), the pinned task table and the seeded development / hold-out split (`split.py`). No results yet. |
 | `results_reliability.json` | Committed output of `reliability.py`. |
 
 ## Run
