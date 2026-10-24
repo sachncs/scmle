@@ -46,11 +46,26 @@ Executed on 2026-10-24:
 
 - Focused regression: `22 passed`.
 - Specification suite: `48 passed`.
-- Full repository regression at `c59a3d8`, before the subsequent CLI output
-  fix: `2721 passed, 38 skipped` in 45 minutes 11 seconds under
+- Full repository regression at current `master` commit `30d3c6c` under
+  CPython 3.13: `2610 passed, 149 skipped` in 38 minutes 15 seconds under
   `-W error::ResourceWarning`.
-- Full-regression skip audit: all `38` skips were approved dependency skips;
+- Full-regression skip audit: all `149` skips were approved dependency skips;
   there were zero unapproved skips, unexplained skips, or xfails.
+- ONNX-specific suite under CPython 3.13 with the ONNX extra: `11 passed, 4
+  skipped`; the skips require optional booster packages not installed in that
+  environment.
+- Vulture: the scan found only the intentional sklearn-compatible `deep` and
+  `unused` signature parameters; no genuine dead code was reported.
+- Runtime smoke checks: Python 3.12, 3.13, and normal CPython 3.14 each
+  installed/imported the package and passed the CLI help smoke test on macOS
+  arm64.
+- Local reliability rehearsal: all 15 declared fault scenarios passed and
+  content-addressed evidence was retained under the recorded temporary
+  evidence directory. This is controlled local evidence, not proof of a
+  cloud broker, physical disk, or kernel-wide failure.
+- Container smoke check: Linux arm64 Python 3.13 installed the package from
+  the checkout, imported it, and passed the CLI help smoke test through
+  Colima/Docker. The temporary VM was stopped after the check.
 - Ruff lint: passed.
 - Ruff format check: passed for `464` files.
 - mypy: no issues in `249` source files.
@@ -77,10 +92,10 @@ Executed on 2026-10-24:
   18 required routes, so public documentation deployment is not verified.
 - Stale-reference and diff checks: passed.
 
-The full regression covers the pre-CLI-fix implementation; focused serving,
-durability, and CLI suites cover the current output-writing changes. The
-all-platform hosted matrix, public Pages deployment, and independent release
-review remain unverified.
+The current full regression covers the final local `master` tip. The
+all-platform hosted matrix, Windows execution, public Pages deployment,
+external transport/container/kernel fault evidence, secret custody, and
+independent release review remain unverified.
 
 ## Implementation summary
 
@@ -105,6 +120,12 @@ review remain unverified.
   account/repository configuration is repaired.
 - Native Windows/macOS hosted execution and optional integration execution
   require successful hosted runs or an independent external reproduction.
+- The free-threaded CPython 3.14 environment cannot currently resolve the
+  ONNX runtime wheel on this macOS arm64 host; normal CPython 3.14 package
+  import and CLI smoke checks passed.
+- The local fault executor deliberately does not claim cloud, physical-disk,
+  or kernel-wide failure semantics; those require environment-specific
+  operators and independent review.
 - The reference HTTP adapter remains gateway-only and does not provide
   authentication or TLS.
 - Experimental non-tabular and foundation-model paths remain outside the
