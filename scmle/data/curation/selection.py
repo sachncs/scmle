@@ -22,6 +22,7 @@ MIN_ROWS = 20
 DEFAULT_ALPHA = 0.02
 DEFAULT_STRENGTH = 0.1
 ZERO = 1e-8
+BINARY_CLASSES = 2
 
 
 class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
@@ -122,9 +123,11 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
         """Fits the sparse model and records which columns it keeps."""
         model: Any
         if self.classification:
+            # liblinear is fast but cannot fit three or more classes.
+            multiclass = len(np.unique(target)) > BINARY_CLASSES
             model = linear_model.LogisticRegression(
                 l1_ratio=1.0,
-                solver="liblinear",
+                solver="saga" if multiclass else "liblinear",
                 C=self.strength,
                 random_state=self.random_state,
             )

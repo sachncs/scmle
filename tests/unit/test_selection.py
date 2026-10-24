@@ -100,3 +100,16 @@ def test_regression_selection_and_the_never_empty_guarantee():
         matrix, target
     )
     assert heavy.support_.sum() == 1 and heavy.support_[1]
+
+
+def test_the_sparse_selector_handles_more_than_two_classes():
+    """liblinear cannot fit multiclass, which failed whole trials."""
+    rng = np.random.default_rng(3)
+    matrix = rng.normal(size=(300, 6))
+    target = np.digitize(matrix[:, 0] + 0.1 * matrix[:, 1], [-0.5, 0.5])
+
+    chooser = selection.SparseSelector(classification=True).fit(matrix, target)
+
+    assert set(np.unique(target)) == {0, 1, 2}
+    assert chooser.support_[0]
+    assert chooser.transform(matrix).shape[0] == 300
