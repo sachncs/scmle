@@ -28,7 +28,7 @@ uv run --python "$python_version" python scripts/check_api_compatibility.py \
 echo "== focused tests =="
 uv run --python "$python_version" pytest -q \
   -W error::ResourceWarning \
-  --cov=scmle --cov-report=xml --cov-fail-under=50 \
+  --cov=scmle --cov-report=xml --cov-fail-under=75 \
   tests/unit tests/property tests/leakage \
   --junitxml="$preflight_directory/bounded-suite.xml"
 uv run --python "$python_version" python scripts/check_pytest_skips.py \

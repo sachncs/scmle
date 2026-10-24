@@ -23,7 +23,7 @@ uses four kinds of evidence:
 | Question | Primary evidence | Review trigger |
 | --- | --- | --- |
 | Did the code remain correct? | PR contract suite and scheduled full-suite coverage | Failed test, unexplained skip, or coverage regression |
-| Did performance regress? | Offline benchmark results and regression checker | Any failed benchmark gate or material drift from baseline |
+| Did performance regress? | Offline benchmark results, regression checker and reliability checks (`benchmarks/README.md`) | Any failed benchmark gate or material drift from baseline |
 | Did the data remain trustworthy? | `curation_report.json`, manifest, fingerprint, leakage checks | New schema, missingness, duplicates, drift, or representativeness finding |
 | Can the result be reproduced? | Run events, checkpoints, bundle checksums, environment metadata | Resume mismatch, corrupt artifact, or environment change |
 | Is the deployed model still healthy? | Monitoring report, labeled coverage, drift and rollback decision | Threshold breach or insufficient outcome coverage |
@@ -32,7 +32,7 @@ uses four kinds of evidence:
 ## Review cadence
 
 - Every pull request runs the bounded contract tier and records its coverage
-  artifact; the enforced floor is currently 50%.
+  artifact; the enforced floor is currently 75% (the bounded suite measured 79% without the optional extras installed; the nightly run enforces 85% on core contracts).
 - Every scheduled full-suite run publishes coverage and benchmark evidence.
 - Every dataset or schema change requires reviewing the curation report before
   model comparisons are interpreted.
