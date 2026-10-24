@@ -7,12 +7,43 @@ workflow is a directed acyclic graph rather than a hard-coded sequence.
 """
 
 from collections.abc import Sequence
-from typing import Any
+from typing import ClassVar
+from typing import Protocol
+from typing import TYPE_CHECKING
+from typing import TypeVar
 
 from scmle.contracts import errors
 
+if TYPE_CHECKING:
+    from scmle.core import context as context_module
+    from scmle.core import state as run_state
 
-def compile_workflow(stages: Sequence[Any]) -> tuple[Any, ...]:
+
+class WorkflowStage(Protocol):
+    """Minimal structural contract for a compilable workflow stage.
+
+    The compiler intentionally depends on this protocol rather than the
+    concrete lifecycle ``Stage`` hierarchy. That keeps the DAG compiler
+    reusable for lightweight replacement stages and third-party workflows
+    without introducing an inheritance requirement into the extension point.
+    """
+
+    state: ClassVar["run_state.RunState"]
+    requires: ClassVar[tuple[type["WorkflowStage"], ...]]
+
+    def describe(self, context: "context_module.RunContext") -> str:
+        """Return the reason recorded on stage entry."""
+
+    def execute(self, context: "context_module.RunContext") -> None:
+        """Execute the stage against the shared run context."""
+
+
+StageT = TypeVar("StageT", bound=WorkflowStage)
+
+
+def compile_workflow(
+    stages: Sequence[StageT],
+) -> tuple[StageT, ...]:
     """Orders stages so every stage runs after the stages it requires.
 
     Args:
@@ -41,8 +72,8 @@ def compile_workflow(stages: Sequence[Any]) -> tuple[Any, ...]:
                 "the workflow"
             )
     remaining = list(stages)
-    done: list[Any] = []
-    ordered: list[Any] = []
+    done: list[StageT] = []
+    ordered: list[StageT] = []
     while remaining:
         ready = next(
             (
