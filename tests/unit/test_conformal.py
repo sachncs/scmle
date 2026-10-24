@@ -88,3 +88,38 @@ def test_round_trip_and_wrong_kind_errors():
     assert restored == calibrator
     with pytest.raises(ValueError, match="classification"):
         restored.sets(np.ones((2, 2)))
+
+
+class RecordingContext:
+    """Collects the events a stage emits."""
+
+    def __init__(self):
+        self.events = []
+
+    def emit(self, kind, reason="", artifacts=(), data=None):
+        self.events.append((kind, reason, data))
+
+
+def test_a_skipped_calibration_is_recorded_as_an_event():
+    from scmle.core import stages
+
+    context = RecordingContext()
+
+    stages.PackageStage().note_conformal_skipped(context, "time budget spent")
+
+    kind, reason, data = context.events[0]
+    assert kind == "conformal.skipped"
+    assert "time budget spent" in reason and data == {
+        "reason": "time budget spent"
+    }
+
+
+def test_asking_for_intervals_without_calibration_points_at_the_event():
+    from scmle.artifacts import bundle as bundle_module
+    from scmle.contracts import errors
+
+    model = bundle_module.ModelBundle.__new__(bundle_module.ModelBundle)
+    model.conformal = None
+
+    with pytest.raises(errors.ArtifactError, match=r"conformal\.skipped"):
+        model.require_conformal("regression")

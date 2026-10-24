@@ -1548,6 +1548,8 @@ class ModelBundle:
         """Returns the calibrator of the right kind or explains its absence."""
         if self.conformal is None or self.conformal.kind != kind:
             raise errors.ArtifactError(
-                f"this bundle has no {kind} conformal calibration"
+                f"this bundle has no {kind} conformal calibration; the run "
+                "skips it when the time budget is spent or too few held-out "
+                "rows exist (see the conformal.skipped event in events.jsonl)"
             )
         return self.conformal

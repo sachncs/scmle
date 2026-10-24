@@ -2030,6 +2030,16 @@ class PackageStage(Stage):
         )
         return None if curve is None else curve.to_dict()
 
+    def note_conformal_skipped(
+        self, context: context_module.RunContext, reason: str
+    ) -> None:
+        """Records why the bundle will have no prediction intervals or sets."""
+        context.emit(
+            "conformal.skipped",
+            f"conformal calibration skipped: {reason}",
+            data={"reason": reason},
+        )
+
     def conformal_calibration(
         self,
         context: context_module.RunContext,
@@ -2057,7 +2067,9 @@ class PackageStage(Stage):
             tasks.TaskType.UPLIFT,
         ):
             return None  # Conformal margins need point predictions or labels.
-        if context.resource_governor.skip_reason(first=False):
+        reason = context.resource_governor.skip_reason(first=False)
+        if reason:
+            self.note_conformal_skipped(context, reason)
             return None
         split = require(context.split, "split")
         template = strategies.get_strategy(selected.strategy).build(
@@ -2071,7 +2083,9 @@ class PackageStage(Stage):
         held_scores: list[Any] = []
         classes = list(bundle.classes or ())
         for fit_positions, evaluate_positions in split.manifest.folds:
-            if context.resource_governor.skip_reason(first=False):
+            reason = context.resource_governor.skip_reason(first=False)
+            if reason:
+                self.note_conformal_skipped(context, reason)
                 return None
             fit = np.asarray(fit_positions)
             evaluate = np.asarray(evaluate_positions)
@@ -2093,6 +2107,11 @@ class PackageStage(Stage):
                 for i in range(len(rows))
             )
         if len(held_labels) < conformal.MIN_CALIBRATION_ROWS:
+            self.note_conformal_skipped(
+                context,
+                f"only {len(held_labels)} held-out rows; need "
+                f"{conformal.MIN_CALIBRATION_ROWS}",
+            )
             return None
         if task is tasks.TaskType.REGRESSION:
             return conformal.ConformalCalibrator.for_regression(
