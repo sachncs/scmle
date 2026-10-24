@@ -69,3 +69,24 @@ def read(path: pathlib.Path) -> list[RunRecord]:
                 fields: dict[str, Any] = json.loads(line)
                 records.append(RunRecord(**fields))
     return records
+
+
+def key(record: RunRecord) -> tuple[str, int, int, int, int]:
+    """Identifies one run: system, budget, task, fold and repeat."""
+    return (
+        record.system,
+        record.budget_s,
+        record.task_id,
+        record.fold,
+        record.repeat,
+    )
+
+
+def completed(path: pathlib.Path) -> set[tuple[str, int, int, int, int]]:
+    """Keys of the runs that finished `ok`, so a restart skips them.
+
+    A failed or timed-out run is not complete and will be tried again.
+    """
+    if not path.exists():
+        return set()
+    return {key(r) for r in read(path) if r.status == "ok"}

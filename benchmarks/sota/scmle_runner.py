@@ -218,6 +218,7 @@ def main(argv: list[str] | None = None) -> int:
 
     check_task_ids(args.tasks, args.open_holdout)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    done = records.completed(args.output)
     failures = 0
     for task_id in args.tasks:
         try:
@@ -226,6 +227,9 @@ def main(argv: list[str] | None = None) -> int:
             frames = None
             error = traceback.format_exc(limit=4)
         for budget in args.budgets:
+            if (SYSTEM, budget, task_id, args.fold, args.repeat) in done:
+                LOGGER.info("task %d budget %d: already done", task_id, budget)
+                continue
             if frames is None:
                 record = records.RunRecord(
                     system=SYSTEM,

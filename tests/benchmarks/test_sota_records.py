@@ -48,3 +48,14 @@ def test_an_unknown_status_is_rejected():
 def test_an_ok_record_must_carry_a_score():
     with pytest.raises(ValueError, match="needs a score"):
         record(score=None)
+
+
+def test_only_ok_runs_count_as_completed_so_failures_are_retried(tmp_path):
+    path = tmp_path / "results.jsonl"
+    good = record()
+    bad = record(task_id=2, score=None, status="failed", error="boom")
+    records.append(path, good)
+    records.append(path, bad)
+
+    assert records.completed(path) == {records.key(good)}
+    assert records.completed(tmp_path / "missing.jsonl") == set()
