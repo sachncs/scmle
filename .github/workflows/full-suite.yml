@@ -15,7 +15,7 @@ permissions:
 jobs:
   tests:
     name: complete test suite (Python 3.14)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -48,7 +48,7 @@ jobs:
 
   clean-clone:
     name: exact-SHA clean-clone rehearsal
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Clone the published repository into a fresh directory
@@ -80,7 +80,7 @@ jobs:
 
   stability:
     name: repeated test stability and quarantine policy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

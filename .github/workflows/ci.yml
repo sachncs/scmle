@@ -16,7 +16,8 @@ permissions:
 jobs:
   release-controls:
     name: hosted workflow and release controls
-    runs-on: ubuntu-latest
+    # Pin Ubuntu until the 26.04 image migration is validated for SCMLE.
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -25,7 +26,7 @@ jobs:
 
   quality:
     name: lint, types, tests (Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -91,7 +92,7 @@ jobs:
 
   minimal-dependencies:
     name: lowest supported dependency versions (Python 3.11)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -107,7 +108,7 @@ jobs:
 
   deep-learning:
     name: PyTorch model families (CPU)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -124,7 +125,7 @@ jobs:
 
   reliability:
     name: bounded fault and recovery matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -150,7 +151,7 @@ jobs:
 
   optional-capabilities:
     name: all optional capability paths (Python 3.13)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -188,7 +189,7 @@ jobs:
 
   integrations:
     name: MLflow and Ray integrations
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -206,7 +207,7 @@ jobs:
 
   base-install:
     name: base install without extras
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -221,7 +222,7 @@ jobs:
 
   data-formats:
     name: dataset formats and optional curation dependencies
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -238,7 +239,7 @@ jobs:
 
   benchmarks:
     name: benchmark regression gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -253,7 +254,7 @@ jobs:
 
   security:
     name: static analysis and dependency audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -301,7 +302,7 @@ jobs:
 
   security-all-extras:
     name: optional-extra security and license audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -323,7 +324,7 @@ jobs:
 
   package:
     name: build and verify distribution
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
