@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 const siteRoot = resolve("dist");
-const siteBase = "/magicml";
+const siteBase = "/scmle";
 const siteOrigin = "https://sachncs.github.io";
 
 function htmlFiles(directory) {

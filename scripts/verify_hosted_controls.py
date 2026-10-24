@@ -167,8 +167,8 @@ def workflow_failures(root: Path) -> list[str]:
     if astro_config.is_file():
         astro_content = read_text(astro_config)
         for marker in (
-            'site: "https://sachncs.github.io/magicml"',
-            'base: "/magicml"',
+            'site: "https://sachncs.github.io/scmle"',
+            'base: "/scmle"',
         ):
             if marker not in astro_content:
                 failures.append(

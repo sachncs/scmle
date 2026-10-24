@@ -68,7 +68,7 @@ def test_package_documentation_points_to_standalone_site():
     """Package metadata must lead developers to the standalone docs site."""
     project_urls = metadata.metadata("scmle").get_all("Project-URL")
 
-    assert "Documentation, https://sachncs.github.io/magicml/" in (
+    assert "Documentation, https://sachncs.github.io/scmle/" in (
         project_urls or []
     )
 

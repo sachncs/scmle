@@ -68,7 +68,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/sachncs/magicml"
-Documentation = "https://sachncs.github.io/magicml/"
+Documentation = "https://sachncs.github.io/scmle/"
 Issues = "https://github.com/sachncs/magicml/issues"
 Changelog = "https://github.com/sachncs/magicml/blob/master/CHANGELOG.md"
 

@@ -47,7 +47,7 @@ test("modeling page exposes the estimation contract and honest boundaries", asyn
   await expect(page.getByText("MLProject is not a production non-tabular modelling path", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Use the public API" })).toHaveAttribute(
     "href",
-    "/magicml/docs/api/",
+    "/scmle/docs/api/",
   );
   await expect(page.locator('a[href*=".md"]')).toHaveCount(0);
 });

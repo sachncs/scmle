@@ -62,7 +62,7 @@ More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 | Compare benchmark results | [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) |
 
 The hosted documentation is available at
-[`sachncs.github.io/magicml`](https://sachncs.github.io/magicml/).
+[`sachncs.github.io/scmle`](https://sachncs.github.io/scmle/).
 
 ## What it does
 
