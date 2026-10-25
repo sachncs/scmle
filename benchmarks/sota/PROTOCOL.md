@@ -121,3 +121,25 @@ recorded in each result record (`versions.cpus`). SCMLE uses `workers=12`;
 reference systems are given 12 threads or processes through their own
 settings. A system that cannot honour the limit is reported as such rather
 than run with more. No threshold, seed or hold-out rule changes.
+
+### Amendment 2 (2026-10-25): versions and baseline definitions actually used
+
+Committed before the hold-out is opened. Changes what the protocol names, not
+the claim, thresholds, seeds or the split.
+
+* **AutoGluon** is `1.6.4b20261024`, not `1.6.3`: the TabArena harness pins
+  `autogluon.tabular>=1.6.3b...,!=1.6.3`, so 1.6.3 cannot be installed beside
+  it. TabArena source commit `d89e796`, Python 3.12.14. XGBoost 3.4.1,
+  LightGBM 4.7.0, CatBoost 1.2.10, FLAML 2.7.0. `faiss-cpu` is removed from
+  the baseline environment because it breaks LightGBM inside AutoGluon on
+  macOS (duplicate OpenMP runtime).
+* **`lightgbm` baseline** is a random hyperparameter search on an 80/20
+  holdout of the training rows using up to 70% of the budget, then a refit on
+  all training rows. It is a deliberately simple reference, not TabArena's own
+  LightGBM configuration, and is reported as such.
+* **Development window systems:** AutoGluon `best_quality`, FLAML, `lightgbm`
+  and SCMLE. AutoGluon `high_quality`, XGBoost and CatBoost as separate systems
+  are run on the hold-out only if time allows and are otherwise reported as not
+  run.
+* **Calibration** (Step 1) compares AutoGluon `best_quality` on development
+  tasks with TabArena's published per-split results for the same split.
