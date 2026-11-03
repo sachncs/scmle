@@ -191,6 +191,11 @@ jobs:
     name: MLflow and Ray integrations
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # Under `uv run`, Ray starts each worker with another `uv run` that
+      # rebuilds the project without the `distributed` extra, so workers
+      # cannot import ray. Workers must use the environment synced above.
+      RAY_ENABLE_UV_RUN_RUNTIME_ENV: "0"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
