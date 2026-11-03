@@ -1,0 +1,306 @@
+"""Sentinels: codes that stand in for "missing" and hide in every statistic.
+
+A numeric value is a sentinel candidate when its point mass is far larger
+than a smooth density estimated from the rest of the column can explain, and
+the count must also be at least `MIN_RATIO` times the expected count (an
+effect floor, because the local density is itself estimated). For
+a candidate value v with count c among n values, the other values m = n - c
+give a local mass: the share of them inside a window of half-width h around
+v (h reaches the k nearest others) times the ratio of the column's grid
+spacing to the window width on the support. A one-sided exact binomial test
+compares c with that mass; the family is Bonferroni-corrected over every
+candidate tested. Text cells are matched exactly (case and surrounding
+spaces ignored) against a dictionary the charter declares. Flagged cells can
+be recoded to missing, and the recode is logged.
+
+This is a proposed method in the F5 specification, not a published
+procedure; its operating characteristics come from its certificate. A real
+zero-inflated or heaped (rounded) column also shows a point mass and is
+flagged as a candidate; a flag is a candidate, not proof.
+"""
+
+from collections.abc import Sequence
+import dataclasses
+import math
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+MIN_COUNT = 5
+MIN_WINDOW = 30
+WINDOW_SHARE = 0.05
+MIN_RATIO = 3.0
+ALPHA = 0.01
+MIN_VALUES = 30
+TEXT_CODES = (
+    "n/a",
+    "na",
+    "null",
+    "none",
+    "nan",
+    "?",
+    "-",
+    "--",
+    "missing",
+    "unknown",
+    "#n/a",
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class SentinelFinding:
+    """One suspected sentinel value in one column.
+
+    Attributes:
+        column: Column name.
+        value: The suspected code (number or text).
+        count: Cells holding it.
+        expected: Count expected under the smooth density (numeric), or
+            None for a dictionary match.
+        p_value: One-sided binomial p-value (numeric), or None.
+        kind: `spike` (numeric point mass), `declared_numeric` or
+            `dictionary` (text).
+    """
+
+    column: str
+    value: float | str
+    count: int
+    expected: float | None
+    p_value: float | None
+    kind: str
+
+
+@dataclasses.dataclass(frozen=True)
+class SentinelReport:
+    """Sentinel findings and the cells they cover.
+
+    Attributes:
+        findings: One per suspected code, ordered by column then value.
+        rows: Rows examined.
+        tier: Always `unverified`: no provenance confirms a code.
+    """
+
+    findings: tuple[SentinelFinding, ...]
+    rows: int
+    tier: str = "unverified"
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return dataclasses.asdict(self)
+
+
+def grid_spacing(unique_values: np.ndarray) -> float:
+    """Median positive gap between distinct sorted values."""
+    gaps = np.diff(unique_values)
+    gaps = gaps[gaps > 0]
+    return float(np.median(gaps)) if gaps.size else 0.0
+
+
+def expected_share(others: np.ndarray, value: float, spacing: float) -> float:
+    """Share of all draws a smooth density would put on `value`.
+
+    Args:
+        others: The column's values excluding every copy of `value`.
+        value: Candidate value.
+        spacing: Grid spacing of the column.
+
+    Returns:
+        Local density times spacing, in [0, 1].
+    """
+    distance = np.sort(np.abs(others - value))
+    k = min(len(others), max(MIN_WINDOW, math.ceil(WINDOW_SHARE * len(others))))
+    half = float(distance[k - 1])
+    inside = int((distance <= half).sum())
+    low, high = float(others.min()), float(others.max())
+    if value < low or value > high:
+        width = half
+    else:
+        width = min(half, value - low) + min(half, high - value)
+    if width <= 0.0:
+        return 1.0
+    return min(1.0, inside / len(others) * spacing / width)
+
+
+def numeric_spikes(
+    column: str, series: pd.Series, min_count: int = MIN_COUNT
+) -> list[tuple[SentinelFinding, int]]:
+    """Candidate spikes of one numeric column with their test sizes.
+
+    Returns:
+        (finding, n) pairs; the caller applies the multiplicity correction.
+    """
+    values = series.to_numpy(dtype=float)
+    values = values[np.isfinite(values)]
+    if len(values) < MIN_VALUES:
+        return []
+    unique, counts = np.unique(values, return_counts=True)
+    found = []
+    spacing = grid_spacing(unique[counts < min_count])
+    if spacing == 0.0:
+        spacing = grid_spacing(unique)
+    for value, count in zip(unique, counts, strict=True):
+        if count < min_count:
+            continue
+        others = values[values != value]
+        if len(others) < 2 * MIN_WINDOW:
+            continue
+        share = expected_share(others, float(value), spacing)
+        if count < MIN_RATIO * share * len(values):
+            continue
+        p_value = float(
+            stats.binomtest(int(count), len(values), share, "greater").pvalue
+        )
+        found.append(
+            (
+                SentinelFinding(
+                    column,
+                    float(value),
+                    int(count),
+                    share * len(values),
+                    p_value,
+                    "spike",
+                ),
+                len(values),
+            )
+        )
+    return found
+
+
+def text_findings(
+    column: str, series: pd.Series, codes: Sequence[str]
+) -> list[SentinelFinding]:
+    """Dictionary matches in a text column."""
+    lowered = {c.strip().lower() for c in codes}
+    present = series.dropna()
+    cleaned = present.astype(str).str.strip().str.lower()
+    out = []
+    for token in sorted(lowered):
+        hits = int((cleaned == token).sum())
+        if hits:
+            original = str(present[cleaned == token].iloc[0])
+            out.append(
+                SentinelFinding(
+                    column, original, hits, None, None, "dictionary"
+                )
+            )
+    return out
+
+
+def find_sentinels(
+    frame: pd.DataFrame,
+    columns: Sequence[str] | None = None,
+    text_codes: Sequence[str] = TEXT_CODES,
+    numeric_codes: Sequence[float] = (),
+    alpha: float = ALPHA,
+) -> SentinelReport:
+    """Finds suspected sentinel codes.
+
+    Args:
+        frame: Exploration rows.
+        columns: Columns to examine; defaults to all.
+        text_codes: Declared text dictionary.
+        numeric_codes: Declared numeric codes (always reported if present).
+        alpha: Family level for the spike tests, in (0, 1).
+
+    Returns:
+        The report; spikes are those with Bonferroni-adjusted p < alpha.
+    """
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be within (0, 1)")
+    names = list(frame.columns) if columns is None else list(columns)
+    candidates: list[SentinelFinding] = []
+    declared = [float(c) for c in numeric_codes]
+    findings: list[SentinelFinding] = []
+    for name in names:
+        series = frame[name]
+        if pd.api.types.is_bool_dtype(series):
+            continue
+        if pd.api.types.is_numeric_dtype(series):
+            candidates += [f for f, _ in numeric_spikes(str(name), series)]
+            numbers = series.to_numpy(dtype=float)
+            for code in declared:
+                hits = int((numbers == code).sum())
+                if hits:
+                    findings.append(
+                        SentinelFinding(
+                            str(name),
+                            code,
+                            hits,
+                            None,
+                            None,
+                            "declared_numeric",
+                        )
+                    )
+        elif pd.api.types.is_string_dtype(series) or series.dtype == object:
+            findings += text_findings(str(name), series, text_codes)
+    threshold = alpha / max(len(candidates), 1)
+    seen = {(f.column, f.value) for f in findings}
+    for finding in candidates:
+        key = (finding.column, finding.value)
+        significant = finding.p_value is not None and (
+            finding.p_value < threshold
+        )
+        if significant and key not in seen:
+            findings.append(finding)
+    findings.sort(key=lambda f: (f.column, str(f.value)))
+    return SentinelReport(tuple(findings), len(frame))
+
+
+def sentinel_mask(frame: pd.DataFrame, report: SentinelReport) -> pd.DataFrame:
+    """Boolean frame marking the cells that hold a reported code."""
+    mask = pd.DataFrame(False, index=frame.index, columns=frame.columns)
+    for finding in report.findings:
+        series = frame[finding.column]
+        if finding.kind == "dictionary":
+            token = str(finding.value).strip().lower()
+            hit = series.astype(str).str.strip().str.lower() == token
+            hit &= series.notna()
+        else:
+            hit = series == finding.value
+        mask[finding.column] |= hit.fillna(False).to_numpy(dtype=bool)
+    return mask
+
+
+def recode_missing(
+    frame: pd.DataFrame, report: SentinelReport
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    """Replaces reported codes by missing values and logs each recode.
+
+    Args:
+        frame: The table; it is not modified.
+        report: Findings from `find_sentinels`.
+
+    Returns:
+        The recoded copy and one log record per finding.
+    """
+    mask = sentinel_mask(frame, report)
+    out = frame.copy()
+    log = []
+    for finding in report.findings:
+        cells = mask[finding.column]
+        column = out[finding.column]
+        if pd.api.types.is_integer_dtype(column):
+            column = column.astype("float64")
+        column = column.copy()
+        column[cells.to_numpy()] = np.nan
+        out[finding.column] = column
+        log.append(
+            {
+                "column": finding.column,
+                "value": finding.value,
+                "recoded": int(cells.sum()),
+                "kind": finding.kind,
+            }
+        )
+    return out, log
+
+
+def sentinel_rows(frame: pd.DataFrame) -> pd.Series:
+    """One boolean per row: does it hold a reported sentinel code?"""
+    report = find_sentinels(frame)
+    return pd.Series(
+        sentinel_mask(frame, report).any(axis=1).to_numpy(dtype=bool),
+        index=frame.index,
+    )

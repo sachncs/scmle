@@ -1,0 +1,193 @@
+"""Exact and near-duplicate rows.
+
+Exact duplicates reuse the grouping of `scmle.data.splitting.duplicates`
+(floats rounded to six decimals, text exact), so detection and the
+group-aware split agree. Near-duplicates are found by blocking and a
+nearest-neighbour distance: non-numeric columns form a blocking key (rows
+differing there are never compared); numeric columns are scaled by their
+standard deviation and the distance is the root-mean-square difference per
+column, in units of column standard deviations. The default cut is a policy
+value selected by the certification harness from a grid on clean data (see
+`benchmarks/qualification/f5.py`), not chosen by hand.
+
+MinHash on tokenised strings, named in the F5 specification, is not
+implemented: text columns only block exact matches.
+
+The duplicate rate carries an exact (Clopper-Pearson) binomial interval.
+"""
+
+from collections.abc import Sequence
+import dataclasses
+import math
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+from sklearn import neighbors
+
+from scmle.data.splitting import duplicates as groups
+
+DEFAULT_CUT = 0.01
+MIN_BLOCK = 2
+CONFIDENCE = 0.95
+
+
+@dataclasses.dataclass(frozen=True)
+class DuplicateReport:
+    """Duplicate evidence for a table.
+
+    Attributes:
+        rows: Rows examined.
+        exact_extra: Rows that repeat an earlier row exactly.
+        exact_rate: `exact_extra / rows`.
+        exact_interval: Clopper-Pearson interval for the rate.
+        near_extra: Rows within the cut of an earlier, non-identical row.
+        cut: Distance cut used (column standard deviations, RMS).
+        label_conflicts: Exact groups whose rows disagree on the target
+            (0 when no target was given).
+        groups: Number of exact duplicate groups.
+    """
+
+    rows: int
+    exact_extra: int
+    exact_rate: float
+    exact_interval: tuple[float, float]
+    near_extra: int
+    cut: float
+    label_conflicts: int
+    groups: int
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return dataclasses.asdict(self)
+
+
+def exact_flags(frame: pd.DataFrame, columns: Sequence[str]) -> np.ndarray:
+    """True for every row after the first of its exact-duplicate group."""
+    ids = groups.duplicate_groups(frame, list(columns))
+    flags = np.zeros(len(frame), dtype=bool)
+    seen: set[int] = set()
+    for position, group in enumerate(ids):
+        if group == groups.NOT_DUPLICATED:
+            continue
+        if int(group) in seen:
+            flags[position] = True
+        seen.add(int(group))
+    return flags
+
+
+def standardized_block(values: pd.DataFrame, spread: pd.Series) -> np.ndarray:
+    """Numeric block divided by column spread, missing filled by the mean."""
+    block = values.to_numpy(dtype=float, copy=True)
+    block[~np.isfinite(block)] = np.nan
+    centre = np.nanmean(block, axis=0)
+    block = np.where(np.isnan(block), centre, block)
+    return np.asarray(block / spread.to_numpy(dtype=float))
+
+
+def near_flags(
+    frame: pd.DataFrame, columns: Sequence[str], cut: float = DEFAULT_CUT
+) -> np.ndarray:
+    """True for rows within `cut` of an earlier row in the same block.
+
+    Args:
+        frame: Table.
+        columns: Columns that define a record.
+        cut: Maximum RMS standardized distance, positive.
+
+    Returns:
+        A boolean per row. Rows that are exact copies are also flagged here
+        when within the cut; combine with `exact_flags` as needed.
+
+    Raises:
+        ValueError: If `cut` is not positive and finite.
+    """
+    if not math.isfinite(cut) or cut <= 0.0:
+        raise ValueError("cut must be positive and finite")
+    flags = np.zeros(len(frame), dtype=bool)
+    numeric = [
+        c
+        for c in columns
+        if pd.api.types.is_numeric_dtype(frame[c])
+        and not pd.api.types.is_bool_dtype(frame[c])
+    ]
+    other = [c for c in columns if c not in numeric]
+    if not numeric:
+        return flags
+    spread = frame[numeric].std(ddof=0).replace(0.0, 1.0).fillna(1.0)
+    block = standardized_block(frame[numeric], spread)
+    if other:
+        keys = frame[other].astype(str).agg("\x1f".join, axis=1).to_numpy()
+        labels = pd.factorize(keys)[0]
+    else:
+        labels = np.zeros(len(frame), dtype=int)
+    radius = cut * math.sqrt(len(numeric))
+    for label in np.unique(labels):
+        members = np.flatnonzero(labels == label)
+        if len(members) < MIN_BLOCK:
+            continue
+        tree = neighbors.NearestNeighbors(radius=radius).fit(block[members])
+        near = tree.radius_neighbors(block[members], return_distance=False)
+        for local, row_neighbours in zip(members, near, strict=True):
+            earlier = members[row_neighbours]
+            if np.any(earlier < local):
+                flags[local] = True
+    return flags
+
+
+def duplicate_flags(frame: pd.DataFrame, cut: float = DEFAULT_CUT) -> pd.Series:
+    """Rows that repeat an earlier row exactly or within the near cut."""
+    columns = list(frame.columns)
+    flags = exact_flags(frame, columns) | near_flags(frame, columns, cut)
+    return pd.Series(flags, index=frame.index)
+
+
+def clopper_pearson(
+    successes: int, n: int, confidence: float = CONFIDENCE
+) -> tuple[float, float]:
+    """Exact two-sided binomial interval (via scipy)."""
+    result = stats.binomtest(successes, n).proportion_ci(confidence)
+    return float(result.low), float(result.high)
+
+
+def assess_duplicates(
+    frame: pd.DataFrame,
+    columns: Sequence[str] | None = None,
+    target: str | None = None,
+    cut: float = DEFAULT_CUT,
+) -> DuplicateReport:
+    """Counts exact and near duplicates and label conflicts.
+
+    Args:
+        frame: Exploration rows.
+        columns: Columns that define a record; defaults to all.
+        target: Optional label column checked for conflicts among exact
+            duplicates.
+        cut: Near-duplicate distance cut.
+
+    Returns:
+        The report.
+    """
+    names = list(frame.columns) if columns is None else list(columns)
+    exact = exact_flags(frame, names)
+    near = near_flags(frame, names, cut) & ~exact
+    ids = groups.duplicate_groups(frame, names)
+    members = ids[ids != groups.NOT_DUPLICATED]
+    conflicts = 0
+    if target is not None:
+        for group in np.unique(members):
+            labels = frame[target].to_numpy()[ids == group]
+            if len(pd.unique(pd.Series(labels))) > 1:
+                conflicts += 1
+    extra = int(exact.sum())
+    return DuplicateReport(
+        rows=len(frame),
+        exact_extra=extra,
+        exact_rate=extra / len(frame),
+        exact_interval=clopper_pearson(extra, len(frame)),
+        near_extra=int(near.sum()),
+        cut=cut,
+        label_conflicts=conflicts,
+        groups=len(np.unique(members)),
+    )
