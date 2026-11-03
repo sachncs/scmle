@@ -27,6 +27,12 @@ a name is promoted to `scmle.__all__` only deliberately, with a changelog
 entry and a regenerated snapshot (`scripts/check_api_compatibility.py
 --write`). `tests/unit/test_qualification_api_rule.py` enforces both halves.
 
+One deliberate change to the pinned surface: `MLProject` gained the optional
+keyword `charter` (default `None`, so every existing call is unchanged) and the
+snapshot was regenerated for that single entry. The charter and custody
+modules (`scmle.data.charter`, `scmle.data.custody`) are extension surfaces
+like the other qualification modules.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

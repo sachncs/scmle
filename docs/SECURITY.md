@@ -29,7 +29,20 @@ file-write path, plus `bandit -r scmle` and `pip-audit` (both run in CI).
 | Server fingerprint disclosure | The reference handler emits a stable minimal `Server` header without the Python runtime version | `tests/integration/test_serve_and_export.py` |
 | Secrets | No credentials are read, stored or logged; the signing key lives only in the environment | review |
 | Supply chain | Releases use PyPI trusted publishing (OIDC), no stored token; `pip-audit` gates CI | `.github/workflows` |
+| Reading the confirmation set early | With a charter, the confirmation rows are sealed in a separate vault process (even under `enforcement="cooperative"`); exploration code receives only an `ExplorationView` with no reference to a vault, token or log; a second open is refused; every attempt is written to a hash-chained log | `tests/leakage/test_custody_access.py` |
+| Edited charter or split manifest | The charter carries a SHA-256 hash and an optional HMAC signature; the split manifest v2 carries a full SHA-256; either fails to load if a byte changes | `tests/unit/test_charter_signing.py`, `tests/unit/test_custody_manifest.py` |
 | Signing-key lifecycle | Public key metadata records identity, owner, expiry, retirement, replacement, and emergency revocation without storing secret material | `tests/unit/test_keyring.py` |
+
+### Limits of custody
+
+The vault is a subprocess of the same user with a key passed on standard input.
+It stops accidental and in-code access. It is **not** adversary-proof on one
+machine: a process with the same operating-system privileges could attach to the
+vault or read the original data file. This process drops its own reference to
+the sealed rows, but a DataFrame the caller passed in, or the data file, still
+holds every row. Custody against a hostile operator needs separation: another
+operating-system user, a service, or a write-once object store. Do not describe
+a confirmation set as sealed beyond this.
 
 ## Guidance for operators
 

@@ -8,6 +8,23 @@
   exploration wealth and the confirmation level as separate types
   (`scmle.data.ledger.budget`), and keyed, order-independent random streams
   (`scmle.core.randomness`). None are top-level exports yet.
+* Qualification verification harness (benchmarks/qualification): defect injector, semi-synthetic simulator, frozen scipy-generated reference oracles, corpus manifest, certificate store that refuses stale or missing certificates for gating detectors; mutation scope now covers the qualification modules.
+* Analysis charter and custody (opt-in; runs without a charter are unchanged).
+  `scmle charter init|check|sign` and `MLProject(charter=...)` /
+  `--charter` fix the question, an ICH E9(R1)-style estimand, the decision map,
+  set sizes and the error budget before profiling, with a SHA-256 hash and an
+  optional HMAC signature. A charter run carves a confirmation set `C` out of
+  the development rows (group- and duplicate-aware, time blocks with an embargo
+  for temporal data) and seals it in a separate vault process, even with
+  `enforcement="cooperative"`; profiling and trials see exploration rows only.
+  Closed-form power gives a `feasible`, `downgrade` or `infeasible` verdict:
+  when the set is too small, or the carve would leave a validation fold
+  empty, the run completes as `exploratory_unconfirmed` with no `C`.
+  New artifacts: `analysis_charter.json`, `error_budget.json`,
+  `feasibility.json`, `split_manifest.json` (v2, full 64-hex SHA-256) and the
+  hash-chained `custody_log.jsonl`. The `MLProject` signature snapshot was
+  regenerated for the new optional `charter` argument. Custody is
+  tamper-evident on one machine, not adversary-proof; see `docs/SECURITY.md`.
 * Thread safety: the estimator and metric registries, experiment store, model
   registry, key registry, monitoring journals, shadow evaluator and bundle
   history are safe to use from several threads in one process (see

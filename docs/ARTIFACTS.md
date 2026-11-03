@@ -27,6 +27,9 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 | `source_registry.json` | Source identities and the snapshots seen. |
 | `curation_report.json` | What curation found and changed (missingness, duplicates, drift, representativeness). |
 | `validation_manifest.json` | Which rows went to development folds and to the locked test set. |
+| `analysis_charter.json`, `error_budget.json`, `feasibility.json` | With `--charter`: the verified charter (hash and optional signature), its error budget, and whether the confirmation set supports the promised power. |
+| `split_manifest.json` | With `--charter`: the exploration, confirmation, embargo and final-test ids, isolation level per sealed set, and a full 64-hex SHA-256 over all of it. Version 1 manifests (`validation_manifest.json`) stay readable. |
+| `custody_log.jsonl` | With `--charter`: a hash-chained record of every seal, token issue, open and refused attempt. It holds ids and counts, never row values. |
 
 ## Search and results
 

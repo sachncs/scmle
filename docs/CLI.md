@@ -13,6 +13,7 @@ The `scmle` command mirrors the Python API. Global option:
 | `scmle serve BUNDLE` | Serve a bundle over HTTP. |
 | `scmle export-onnx BUNDLE` | Export an ONNX graph (needs the `onnx` extra). |
 | `scmle package BUNDLE` | Write a ready-to-run service folder with a Dockerfile. |
+| `scmle charter init\|check\|sign PATH` | Create, validate or sign an analysis charter (see below). |
 
 `plan` and `run` take the same options; `scmle run --help` lists them all.
 The common ones:
@@ -26,9 +27,30 @@ The common ones:
 | `--group-column`, `--time-column`, `--weight-column` | Data structure. |
 | `--exclude`, `--id-columns`, `--unavailable-at-prediction` | Keep columns out of the features. |
 | `--leakage-policy {warn,block}` | `block` stops the run on suspicious features. |
+| `--charter FILE` | Govern the run by an analysis charter: a sealed confirmation set is split off before profiling. |
 | `--exclude-models`, `--exclude-families` | Restrict the search. |
 | `--output-dir`, `--seed` | Where runs go; reproducibility. |
 | `--config FILE` | Read a complete project specification (the format of `config.json`). |
+
+## Analysis charter
+
+A charter fixes the question, the estimand (population, target, prediction
+moment, intercurrent events, summary measure), the decision map, the set sizes
+and the error budget before any data is profiled.
+
+```bash
+scmle charter init charter.json        # a template that fails `check` until filled in
+scmle charter check charter.json --rows 5000   # validate; report whether the
+                                       # confirmation set can support the promised power
+SCMLE_SIGNING_KEY=... scmle charter sign charter.json   # add an HMAC-SHA256 signature
+scmle run data.csv --target churn --charter charter.json
+```
+
+`check` verifies the charter hash and, when a key is configured, the
+signature; a one-byte edit fails verification. The signature proves possession
+of the key, not the signer's identity. If the confirmation set is too small to
+support the promised power the run still completes: the scope becomes
+`exploratory_unconfirmed` and `feasibility.json` reports the detectable effect.
 
 ## Examples
 
