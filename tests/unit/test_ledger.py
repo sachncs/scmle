@@ -1,0 +1,362 @@
+"""The hash-chained hypothesis ledger: order, replay and tamper evidence."""
+
+from fractions import Fraction
+import json
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from scmle.contracts import errors
+from scmle.contracts import qualification
+from scmle.data.ledger import bivariate
+from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import online_fdr
+from tests.unit.test_charter_contracts import make_charter
+
+L = ledger_module
+F = Fraction
+
+
+def data(rows=300, seed=0):
+    rng = np.random.default_rng(seed)
+    features = pd.DataFrame(
+        {
+            "signal": rng.normal(size=rows),
+            "other": rng.normal(size=rows),
+            "noise": rng.normal(size=rows),
+        }
+    )
+    target = pd.Series(
+        features["signal"] * 0.9
+        + features["other"] * 0.0
+        + rng.normal(size=rows)
+    )
+    return features, target
+
+
+def spec(column, name=None):
+    return L.HypothesisSpec.create(
+        name=name or f"{column}~y",
+        family="bivariate",
+        statistic="spearman",
+        null=f"no monotone association between {column} and y",
+        column=column,
+    )
+
+
+TEN_PERCENT = F(1, 10)
+
+
+def fresh(path=None, rule=online_fdr.ELOND, alpha=TEN_PERCENT):
+    config = online_fdr.RuleConfig(rule, alpha)
+    return L.Ledger.create(
+        path,
+        charter_hash="c" * 64,
+        config=config,
+        alpha_confirm=F(1, 20),
+        seed=7,
+    )
+
+
+def explore(ledger, features, target):
+    handles = [ledger.register(spec(c)) for c in features.columns]
+    return [ledger.test(h, features, target) for h in handles]
+
+
+def test_a_registered_hypothesis_is_tested_and_recorded_with_wealth():
+    features, target = data()
+    ledger = fresh()
+    h = ledger.register(spec("signal"))
+    before = ledger.wealth
+    result = ledger.test(h, features, target)
+    assert result.rejected and result.decision == L.REJECT
+    assert result.wealth_before == before == F(1, 10)
+    assert result.wealth_after == ledger.wealth == F(1, 20)
+    assert result.level == F(1, 10) * F(1, 2)
+    assert ledger.decision(h) is result
+    check = result.check
+    assert check.set_id is qualification.SetId.EXPLORATION
+    assert check.tier is qualification.Tier.UNVERIFIED
+    assert check.decision is qualification.Decision.WARN
+    assert check.p_value < 1e-10
+    assert check.seed_path[0] == 7
+    assert check.check_id == "h000001:X"
+
+
+def test_a_retained_hypothesis_passes():
+    features, target = data()
+    ledger = fresh()
+    h = ledger.register(spec("noise"))
+    result = ledger.test(h, features, target)
+    assert result.decision == L.RETAIN
+    assert result.check.decision is qualification.Decision.PASS
+
+
+def test_evaluating_before_registering_is_refused_in_code():
+    features, target = data()
+    ledger = fresh()
+    ghost = L.Hypothesis("h000001", spec("signal"))
+    with pytest.raises(L.LedgerError, match="registration must precede"):
+        ledger.test(ghost, features, target)
+    other = fresh()
+    foreign = other.register(spec("signal"))
+    with pytest.raises(L.LedgerError, match="not registered"):
+        ledger.test(foreign, features, target)
+    outcome = bivariate.Outcome(0.01, 0.2, 0.2, 100)
+    with pytest.raises(L.LedgerError):
+        ledger.record(ghost, outcome)
+    assert len(ledger.rows) == 1  # only the open row
+
+
+def test_a_hypothesis_is_tested_once_and_names_are_unique():
+    features, target = data()
+    ledger = fresh()
+    h = ledger.register(spec("signal"))
+    ledger.test(h, features, target)
+    with pytest.raises(L.LedgerError, match="already tested"):
+        ledger.test(h, features, target)
+    with pytest.raises(L.LedgerError, match="registered"):
+        ledger.register(spec("signal"))
+    with pytest.raises(L.LedgerError, match="no result"):
+        ledger.decision(ledger.register(spec("noise")))
+
+
+def test_only_exploration_hypotheses_can_be_registered():
+    ledger = fresh()
+    on_c = L.HypothesisSpec.create(
+        name="x",
+        family="f",
+        statistic="spearman",
+        null="n",
+        column="a",
+        set_id=qualification.SetId.CONFIRMATION,
+    )
+    with pytest.raises(L.LedgerError, match="exploration"):
+        ledger.register(on_c)
+
+
+def test_spec_validation_and_round_trip():
+    s = spec("signal")
+    assert L.HypothesisSpec.from_dict(s.to_dict()) == s
+    assert len(s.code_hash) == 64
+    with pytest.raises(ValueError, match="direction"):
+        L.HypothesisSpec.create(
+            name="n", family="f", statistic="spearman", null="x", direction="up"
+        )
+    with pytest.raises(ValueError, match="name"):
+        L.HypothesisSpec.create(
+            name=" ", family="f", statistic="spearman", null="x"
+        )
+    record = s.to_dict()
+    record["extra"] = 1
+    with pytest.raises(ValueError, match="unexpected"):
+        L.HypothesisSpec.from_dict(record)
+
+
+def test_the_file_reloads_replays_and_continues(tmp_path):
+    features, target = data()
+    path = tmp_path / "hypothesis_ledger.jsonl"
+    first = fresh(path)
+    explore(first, features, target)
+    again = L.Ledger.load(path)
+    assert again.head == first.head
+    assert again.wealth == first.wealth
+    assert {k: v.decision for k, v in again.results.items()} == {
+        k: v.decision for k, v in first.results.items()
+    }
+    extra = again.register(spec("signal", name="signal~y second"))
+    assert extra.hypothesis_id == "h000004"
+    L.Ledger.verify_file(path)
+
+
+def test_two_identical_runs_write_identical_bytes(tmp_path):
+    features, target = data()
+    a, b = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    explore(fresh(a), features, target)
+    explore(fresh(b), features, target)
+    assert a.read_bytes() == b.read_bytes()
+
+
+def lines(path):
+    return path.read_text(encoding="utf-8").splitlines()
+
+
+def write(path, rows):
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
+def make_file(tmp_path):
+    features, target = data()
+    path = tmp_path / "hypothesis_ledger.jsonl"
+    explore(fresh(path), features, target)
+    return path
+
+
+def test_editing_a_line_breaks_the_chain(tmp_path):
+    path = make_file(tmp_path)
+    rows = lines(path)
+    record = json.loads(rows[4])
+    record["body"]["evidence"]["p"] = 0.5
+    rows[4] = json.dumps(record, sort_keys=True)
+    write(path, rows)
+    with pytest.raises(L.LedgerError, match="chain broken at row 4"):
+        L.Ledger.load(path)
+
+
+def test_deleting_or_reordering_a_line_breaks_the_chain(tmp_path):
+    path = make_file(tmp_path)
+    rows = lines(path)
+    write(path, rows[:2] + rows[3:])
+    with pytest.raises(L.LedgerError, match="chain broken"):
+        L.Ledger.load(path)
+    swapped = rows[:]
+    swapped[2], swapped[3] = swapped[3], swapped[2]
+    write(path, swapped)
+    with pytest.raises(L.LedgerError, match="chain broken"):
+        L.Ledger.load(path)
+
+
+def test_truncating_the_tail_is_caught_only_against_a_recorded_head(tmp_path):
+    path = make_file(tmp_path)
+    head = L.Ledger.load(path).head
+    write(path, lines(path)[:-1])
+    L.Ledger.load(path)  # a valid prefix on its own
+    with pytest.raises(L.LedgerError, match="head does not match"):
+        L.Ledger.load(path, expected_head=head)
+
+
+def test_a_rechained_forgery_is_caught_by_replay(tmp_path):
+    path = make_file(tmp_path)
+    rows = [json.loads(r) for r in lines(path)]
+    # Flip the first result to a rejection of a null hypothesis and rechain.
+    target = next(
+        i
+        for i, r in enumerate(rows)
+        if r["kind"] == "result" and not r["body"]["rejected"]
+    )
+    rows[target]["body"]["rejected"] = True
+    prev = rows[target - 1]["hash"]
+    out = []
+    for row in rows[target:]:
+        row["prev"] = prev
+        row["hash"] = L.digest(
+            {k: row[k] for k in ("seq", "kind", "body", "prev")}
+        )
+        prev = row["hash"]
+        out.append(row)
+    write(path, [json.dumps(r, sort_keys=True) for r in rows[:target] + out])
+    with pytest.raises(L.LedgerError, match="replay"):
+        L.Ledger.load(path)
+
+
+def test_a_result_before_its_registration_is_rejected_on_load(tmp_path):
+    path = make_file(tmp_path)
+    rows = [json.loads(r) for r in lines(path)]
+    # Move the first result in front of the registrations and rechain.
+    result_at = next(i for i, r in enumerate(rows) if r["kind"] == "result")
+    moved = rows.pop(result_at)
+    rows.insert(1, moved)
+    prev = rows[0]["hash"]
+    for index, row in enumerate(rows[1:], start=1):
+        row["seq"] = index
+        row["prev"] = prev
+        row["hash"] = L.digest(
+            {k: row[k] for k in ("seq", "kind", "body", "prev")}
+        )
+        prev = row["hash"]
+    write(path, [json.dumps(r, sort_keys=True) for r in rows])
+    with pytest.raises(L.LedgerError, match="unregistered"):
+        L.Ledger.load(path)
+
+
+def test_garbage_and_missing_files_are_ledger_errors(tmp_path):
+    path = tmp_path / "x.jsonl"
+    with pytest.raises(L.LedgerError, match="does not exist"):
+        L.Ledger.load(path)
+    path.write_text("not json\n", encoding="utf-8")
+    with pytest.raises(L.LedgerError, match="not JSON"):
+        L.Ledger.load(path)
+    path.write_text("", encoding="utf-8")
+    with pytest.raises(L.LedgerError, match="empty"):
+        L.Ledger.load(path)
+    path.write_text('{"seq": 0}\n', encoding="utf-8")
+    with pytest.raises(L.LedgerError, match="wrong fields"):
+        L.Ledger.load(path)
+    assert isinstance(L.LedgerError("x"), errors.ArtifactError)
+
+
+def test_create_refuses_to_overwrite(tmp_path):
+    path = make_file(tmp_path)
+    with pytest.raises(L.LedgerError, match="already exists"):
+        fresh(path)
+
+
+def test_exhausted_wealth_logs_not_tested_without_computing(tmp_path):
+    features, target = data()
+    ledger = fresh(rule=online_fdr.ELOND, alpha=F(0))
+    results = explore(ledger, features, target)
+    assert [r.decision for r in results] == [L.NOT_TESTED] * 3
+    assert all(r.check is None for r in results)
+    assert "wealth exhausted" in results[0].reason
+    assert ledger.survivors() == ()
+    ledger.verify()
+
+
+def test_survivors_freeze_before_confirmation_and_block_new_hypotheses():
+    features, target = data()
+    ledger = fresh()
+    explore(ledger, features, target)
+    ledger.record_control({"observed": 1})
+    frozen = ledger.freeze()
+    assert frozen.hypothesis_ids == ("h000001",)
+    assert ledger.freeze() is frozen
+    with pytest.raises(L.LedgerError, match="frozen"):
+        ledger.register(spec("signal", name="late"))
+    with pytest.raises(L.LedgerError, match="frozen"):
+        ledger.record_control({"observed": 2})
+    ledger.seal({"outcome": "confirmed"})
+    assert ledger.confirmation["survivors_sha256"] == frozen.sha256
+    with pytest.raises(L.LedgerError, match="no row may follow"):
+        ledger.freeze() and ledger.record_control({})
+    ledger.verify()
+
+
+def test_confirmation_needs_frozen_survivors():
+    ledger = fresh()
+    with pytest.raises(L.LedgerError, match="freeze"):
+        ledger.seal({})
+
+
+def test_open_creates_then_reuses_and_rejects_a_different_charter(tmp_path):
+    charter = make_charter()
+    first = L.Ledger.open(tmp_path, charter)
+    assert (tmp_path / L.FILE_NAME).exists()
+    assert first.config.alpha == charter.error_budget.exploration.initial
+    assert first.header["alpha_confirm"] == str(
+        charter.error_budget.confirmation.alpha_confirm
+    )
+    assert first.header["guarantee"]["dependence"] == "arbitrary"
+    again = L.Ledger.open(tmp_path, charter)
+    assert again.head == first.head
+    other = make_charter(question="A different question?")
+    with pytest.raises(L.LedgerError, match="different charter"):
+        L.Ledger.open(tmp_path, other)
+    with pytest.raises(L.LedgerError, match="different rule"):
+        L.Ledger.open(tmp_path, charter, rule=online_fdr.SAFFRON)
+
+
+def test_each_rule_runs_through_the_ledger():
+    features, target = data()
+    for rule in online_fdr.RULE_NAMES:
+        ledger = fresh(rule=rule)
+        results = explore(ledger, features, target)
+        assert results[0].rejected
+        ledger.verify()
+
+
+def test_in_memory_verify_replays_the_rows():
+    features, target = data()
+    ledger = fresh()
+    explore(ledger, features, target)
+    ledger.verify()
