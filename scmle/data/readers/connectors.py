@@ -514,7 +514,7 @@ class LocalFileConnector(SourceConnector):
             raise UnsupportedUriSchemeError(
                 value, scheme.lower(), self.supported_schemes
             )
-        if parsed.scheme:
+        if scheme:
             if parsed.netloc not in ("", "localhost"):
                 raise UnsupportedUriSchemeError(
                     value, parsed.scheme.lower(), ("file",)

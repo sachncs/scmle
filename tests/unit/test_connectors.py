@@ -471,3 +471,14 @@ def test_retry_budget_rejects_invalid_values():
         connectors.RetryBudget(max_retries=-1)
     with pytest.raises(ValueError, match="delay_seconds"):
         connectors.RetryBudget(delay_seconds=-0.1)
+
+
+def test_windows_drive_path_is_a_path_not_a_uri_scheme():
+    """`C:\\data\\a.csv` must keep its drive letter.
+
+    `urlsplit` reads the `C` as a URI scheme and leaves `\\data\\a.csv`,
+    which Windows then resolves against the current drive (D:\\data\\a.csv).
+    """
+    connector = connectors.LocalFileConnector("C:\\data\\a.csv")
+
+    assert str(connector.path).endswith("C:\\data\\a.csv")
