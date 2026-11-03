@@ -9,12 +9,15 @@ any platform and Python version (a float p-value is read as its exact binary
 value). Floating point enters only when a p-value is calibrated into an
 e-value, and the ledger stores the e-value it used.
 
-Verified statements (read from the primary sources on 2026-11-03, see
-``docs`` for the full list). "Verified" means the statement was read in the
-cited paper or package manual; it does not mean this code is proved correct.
+Verified statements (read from the primary sources on 2026-11-03).
+"Verified" means the statement was read in the cited arXiv paper or in the
+onlineFDR manual; it does not mean this code is proved correct. Journal and
+conference venues are quoted as the manual or the paper gives them; the
+AISTATS 2024 venue of e-LOND is from memory and was not checked (the arXiv
+text read is v1, November 2023).
 
-e-LOND (Xu and Ramdas, "Online multiple testing with e-values", AISTATS 2024,
-arXiv:2311.06412, Section 3.2, Theorem 1; proof in Section 8.1)
+e-LOND (Xu and Ramdas, "Online multiple testing with e-values",
+arXiv:2311.06412v1, Section 3.2, Theorem 1; proof in Section 8.1)
     Level ``alpha_t = alpha * gamma_t * (|R_{t-1}| + 1)`` where ``gamma_t``
     is a fixed nonnegative sequence with ``sum gamma_t <= 1``. Hypothesis
     ``t`` is rejected when ``e_t >= 1 / alpha_t``. If every true null has a
@@ -367,8 +370,8 @@ class ELond(OnlineRule):
             "the discount sequence is fixed and sums to at most one",
         ),
         citation=(
-            "Xu and Ramdas, Online multiple testing with e-values, AISTATS "
-            "2024, arXiv:2311.06412, Theorem 1; calibrator: Vovk and Wang, "
+            "Xu and Ramdas, Online multiple testing with e-values, "
+            "arXiv:2311.06412v1, Theorem 1; calibrator: Vovk and Wang, "
             "Ann. Statist. 49(3), 2021"
         ),
         verified=True,
