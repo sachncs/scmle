@@ -15,6 +15,7 @@ The module imports nothing from custody; the caller hands `C` over as
 `source`, so the code that selects survivors cannot reach it.
 """
 
+from collections.abc import Sequence
 import dataclasses
 from fractions import Fraction
 import json
@@ -24,6 +25,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from scmle.contracts import qualification
 from scmle.data.ledger import budget as budget_module
 from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
@@ -123,6 +125,7 @@ def run_governed(
         multiplicity.DEFAULT_RULE
     ),
     policy: str = confirm.UNCONFIRMED,
+    diagnostics: Sequence[tuple[str, qualification.Check]] = (),
 ) -> GovernedRun:
     """Explores `X` under the ledger, runs the control and confirms on `C`.
 
@@ -138,6 +141,8 @@ def run_governed(
         rule: Online rule for exploration.
         confirmation_rule: Multiplicity rule for the confirmation.
         policy: Failure policy of the confirmation.
+        diagnostics: (source, check) pairs from detectors run on `X`; they
+            are logged once, before exploration, and spend no wealth.
 
     Returns:
         The governed run; artifacts are written when `run_dir` is given.
@@ -166,6 +171,9 @@ def run_governed(
     config = ledger.config
     if config is None:  # pragma: no cover - open() always sets it
         raise ledger_module.LedgerError("ledger has no rule")
+    if diagnostics and not ledger.diagnostics:
+        for source_name, found in diagnostics:
+            ledger.record_diagnostic(found, source_name)
     results = explore.run_exploration(ledger, features, codes, plan)
     observed = sum(1 for r in results if r.rejected)
 

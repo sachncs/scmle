@@ -14,6 +14,10 @@ reordering any line breaks the chain from there on. Rows are:
     wealth before and after. Registration precedes evaluation: a result for an
     unregistered or already tested hypothesis is refused in code and, on
     load, rejected as a broken ledger.
+``diagnostic``
+    A `Check` from a detector run on `X` (leakage suspicion, F5 detectors).
+    It spends no wealth and never enters the survivors; it is chained so a
+    suspicion that was raised cannot be removed afterwards.
 ``control``
     The negative-control summary (optional, before the survivors are frozen).
 ``survivors``
@@ -64,6 +68,7 @@ OPEN = "open"
 REGISTER = "register"
 RESULT = "result"
 CONTROL = "control"
+DIAGNOSTIC = "diagnostic"
 SURVIVORS = "survivors"
 CONFIRMATION = "confirmation"
 
@@ -265,6 +270,7 @@ class Ledger:
         self.state = online_fdr.State()
         self.survivor_set: SurvivorSet | None = None
         self.control: dict[str, Any] | None = None
+        self.diagnostics: list[qualification.Check] = []
         self.confirmation: dict[str, Any] | None = None
         self.seed = 0
 
@@ -474,6 +480,7 @@ class Ledger:
             REGISTER: self.apply_register,
             RESULT: self.apply_result,
             CONTROL: self.apply_control,
+            DIAGNOSTIC: self.apply_diagnostic,
             SURVIVORS: self.apply_survivors,
             CONFIRMATION: self.apply_confirmation,
         }
@@ -599,6 +606,14 @@ class Ledger:
         """Stores the negative-control summary (before the survivors)."""
         self.require_unfrozen()
         self.control = dict(body)
+
+    def apply_diagnostic(self, body: Mapping[str, Any]) -> None:
+        """Stores a detector check; it never touches the online rule."""
+        self.require_unfrozen()
+        check = qualification.Check.from_dict(body["check"])
+        if check.set_id is not qualification.SetId.EXPLORATION:
+            raise LedgerError("diagnostics may only read the exploration set")
+        self.diagnostics.append(check)
 
     def apply_survivors(self, body: Mapping[str, Any]) -> None:
         """Freezes the survivor set, which must be the rejected hypotheses."""
@@ -791,6 +806,17 @@ class Ledger:
     def record_control(self, summary: Mapping[str, Any]) -> None:
         """Logs the negative-control summary; call before `freeze`."""
         self.commit(CONTROL, {**summary, "sha256": digest(dict(summary))})
+
+    def record_diagnostic(
+        self, check: qualification.Check, source: str
+    ) -> None:
+        """Logs a detector check run on `X`; call before `freeze`.
+
+        Args:
+            check: The check; it must have read the exploration set.
+            source: Which detector produced it, for the reader.
+        """
+        self.commit(DIAGNOSTIC, {"source": source, "check": check.to_dict()})
 
     def freeze(self) -> SurvivorSet:
         """Freezes the survivor set before the confirmation set is opened.
