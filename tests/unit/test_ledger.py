@@ -360,3 +360,210 @@ def test_in_memory_verify_replays_the_rows():
     ledger = fresh()
     explore(ledger, features, target)
     ledger.verify()
+
+
+def rechain(rows):
+    """Re-hashes a list of row dicts so that only semantics can fail."""
+    previous = L.GENESIS
+    out = []
+    for index, row in enumerate(rows):
+        row["seq"] = index
+        row["prev"] = previous
+        row["hash"] = L.digest(
+            {k: row[k] for k in ("seq", "kind", "body", "prev")}
+        )
+        previous = row["hash"]
+        out.append(json.dumps(row, sort_keys=True))
+    return out
+
+
+def forged(tmp_path, edit):
+    folder = tmp_path / f"case{len(list(tmp_path.iterdir()))}"
+    folder.mkdir()
+    path = make_file(folder)
+    rows = [json.loads(r) for r in lines(path)]
+    edit(rows)
+    write(path, rechain(rows))
+    return path
+
+
+def test_header_forgeries_are_rejected(tmp_path):
+    def wrong_version(rows):
+        rows[0]["body"]["ledger_version"] = 99
+
+    with pytest.raises(L.LedgerError, match="version"):
+        L.Ledger.load(forged(tmp_path, wrong_version))
+
+    def bad_rule(rows):
+        rows[0]["body"]["rule"]["rule"] = "bonferroni"
+
+    with pytest.raises(L.LedgerError, match="invalid rule"):
+        L.Ledger.load(forged(tmp_path, bad_rule))
+
+
+def test_row_order_and_kind_forgeries_are_rejected(tmp_path):
+    def second_open(rows):
+        rows.insert(1, json.loads(json.dumps(rows[0])))
+
+    with pytest.raises(L.LedgerError, match="exactly one"):
+        L.Ledger.load(forged(tmp_path, second_open))
+
+    def starts_with_register(rows):
+        rows.pop(0)
+
+    with pytest.raises(L.LedgerError, match="first ledger row"):
+        L.Ledger.load(forged(tmp_path, starts_with_register))
+
+    def unknown(rows):
+        rows[1]["kind"] = "mystery"
+
+    with pytest.raises(L.LedgerError, match="unknown"):
+        L.Ledger.load(forged(tmp_path, unknown))
+
+
+def test_registration_forgeries_are_rejected(tmp_path):
+    def skip_id(rows):
+        rows[1]["body"]["hypothesis_id"] = "h000007"
+
+    with pytest.raises(L.LedgerError, match="sequential"):
+        L.Ledger.load(forged(tmp_path, skip_id))
+
+    def duplicate_name(rows):
+        rows[2]["body"]["spec"]["name"] = rows[1]["body"]["spec"]["name"]
+
+    with pytest.raises(L.LedgerError, match="registered"):
+        L.Ledger.load(forged(tmp_path, duplicate_name))
+
+    def extra_field(rows):
+        rows[1]["body"]["spec"]["bogus"] = 1
+
+    with pytest.raises(L.LedgerError, match="invalid registration"):
+        L.Ledger.load(forged(tmp_path, extra_field))
+
+
+def first_result(rows):
+    return next(r for r in rows if r["kind"] == "result")
+
+
+def test_result_forgeries_are_rejected(tmp_path):
+    def double(rows):
+        again = json.loads(json.dumps(first_result(rows)))
+        rows.append(again)
+
+    with pytest.raises(L.LedgerError, match="already tested"):
+        L.Ledger.load(forged(tmp_path, double))
+
+    def wrong_level(rows):
+        first_result(rows)["body"]["level"] = "1/3"
+
+    with pytest.raises(L.LedgerError, match="replay"):
+        L.Ledger.load(forged(tmp_path, wrong_level))
+
+    def wrong_wealth(rows):
+        first_result(rows)["body"]["wealth_after"] = "9/10"
+
+    with pytest.raises(L.LedgerError, match="replay"):
+        L.Ledger.load(forged(tmp_path, wrong_wealth))
+
+    def bad_e(rows):
+        first_result(rows)["body"]["evidence"]["e"] *= 1.5
+
+    with pytest.raises(L.LedgerError, match=r"replay|calibrated"):
+        L.Ledger.load(forged(tmp_path, bad_e))
+
+    def bad_decision(rows):
+        first_result(rows)["body"]["decision"] = "retain"
+
+    with pytest.raises(L.LedgerError, match="invalid decision"):
+        L.Ledger.load(forged(tmp_path, bad_decision))
+
+    def missing_field(rows):
+        del first_result(rows)["body"]["level"]
+
+    with pytest.raises(L.LedgerError, match="malformed"):
+        L.Ledger.load(forged(tmp_path, missing_field))
+
+
+def test_survivor_and_confirmation_forgeries_are_rejected(tmp_path):
+    features, target = data()
+    path = tmp_path / "hypothesis_ledger.jsonl"
+    ledger = fresh(path)
+    explore(ledger, features, target)
+    ledger.freeze()
+    ledger.seal({"outcome": "confirmed"})
+    base = [json.loads(r) for r in lines(path)]
+
+    def edit(change):
+        rows = json.loads(json.dumps(base))
+        change(rows)
+        write(path, rechain(rows))
+        return path
+
+    def other_ids(rows):
+        next(r for r in rows if r["kind"] == "survivors")["body"]["ids"] = []
+
+    with pytest.raises(L.LedgerError, match="survivors differ"):
+        L.Ledger.load(edit(other_ids))
+
+    def other_hash(rows):
+        next(r for r in rows if r["kind"] == "survivors")["body"]["sha256"] = (
+            "0"
+        )
+
+    with pytest.raises(L.LedgerError, match="hash does not match"):
+        L.Ledger.load(edit(other_hash))
+
+    def other_survivors(rows):
+        next(r for r in rows if r["kind"] == "confirmation")["body"][
+            "survivors_sha256"
+        ] = "0"
+
+    with pytest.raises(L.LedgerError, match="different survivors"):
+        L.Ledger.load(edit(other_survivors))
+
+    def row_after_confirmation(rows):
+        rows.append(json.loads(json.dumps(rows[1])))
+
+    with pytest.raises(L.LedgerError, match="no row may follow"):
+        L.Ledger.load(edit(row_after_confirmation))
+
+    def confirmation_without_survivors(rows):
+        rows[:] = [r for r in rows if r["kind"] != "survivors"]
+
+    with pytest.raises(L.LedgerError, match="needs frozen survivors"):
+        L.Ledger.load(edit(confirmation_without_survivors))
+
+    def result_after_survivors(rows):
+        survivors_at = next(
+            i for i, r in enumerate(rows) if r["kind"] == "survivors"
+        )
+        rows.insert(survivors_at + 1, json.loads(json.dumps(rows[1])))
+
+    with pytest.raises(L.LedgerError, match="frozen"):
+        L.Ledger.load(edit(result_after_survivors))
+
+
+def test_a_not_tested_row_cannot_hide_a_rejection(tmp_path):
+    features, target = data()
+    path = tmp_path / "hypothesis_ledger.jsonl"
+    explore(fresh(path), features, target)
+    rows = [json.loads(r) for r in lines(path)]
+    first = first_result(rows)
+    assert first["body"]["rejected"] is True
+    first["body"]["decision"] = L.NOT_TESTED
+    write(path, rechain(rows))
+    with pytest.raises(L.LedgerError, match="invalid decision"):
+        L.Ledger.load(path)
+
+
+def test_the_ledger_reports_state_properties():
+    features, target = data()
+    ledger = fresh()
+    assert ledger.head == ledger.rows[-1]["hash"]
+    assert ledger.frozen is False
+    explore(ledger, features, target)
+    ledger.freeze()
+    assert ledger.frozen is True
+    assert L.Ledger(None).head == L.GENESIS
+    with pytest.raises(L.LedgerError, match="no open row"):
+        L.Ledger(None).require_rule()
