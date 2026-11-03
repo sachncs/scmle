@@ -15,6 +15,18 @@ deliberate versioning decision. Modules below `scmle.core`, `scmle.data`,
 advanced users, but their concrete internals are not stable until promoted to
 the top-level API or documented as a contract.
 
+## Qualification types
+
+The data-qualification records and helpers live below the pinned top-level API
+and are extension surfaces until promoted: `scmle.contracts.qualification`
+(`Check`, `Claim`, `Certificate`, `Tier`, `Decision`, `SetId`),
+`scmle.data.ledger.budget` (`ErrorBudget` and the budget functions) and
+`scmle.core.randomness` (keyed random streams). Rule: new qualification names
+are added without touching any entry in `tests/fixtures/public_api.json`, and
+a name is promoted to `scmle.__all__` only deliberately, with a changelog
+entry and a regenerated snapshot (`scripts/check_api_compatibility.py
+--write`). `tests/unit/test_qualification_api_rule.py` enforces both halves.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

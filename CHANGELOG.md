@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+* Data qualification foundations (no behavior change to existing runs): record
+  types `Check`, `Claim` and `Certificate` with evidence tiers
+  (`scmle.contracts.qualification`), an exact-arithmetic error budget that keeps
+  exploration wealth and the confirmation level as separate types
+  (`scmle.data.ledger.budget`), and keyed, order-independent random streams
+  (`scmle.core.randomness`). None are top-level exports yet.
 * Thread safety: the estimator and metric registries, experiment store, model
   registry, key registry, monitoring journals, shadow evaluator and bundle
   history are safe to use from several threads in one process (see
