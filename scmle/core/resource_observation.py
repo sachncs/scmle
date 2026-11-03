@@ -8,12 +8,14 @@ import os
 import pathlib
 import re
 import shutil
+import sys
 from typing import Any
 
 from scmle.contracts import capabilities
 
 OBSERVATION_SCHEMA_VERSION = 1
 BYTES_PER_GB = 1024**3
+WINDOWS = sys.platform == "win32"
 PROJECT_DISTRIBUTION = "scmle"
 CORE_EXTRA = "core"
 EXTRA_MARKER = re.compile(r";\s*extra\s*==\s*['\"]([^'\"]+)['\"]")
@@ -139,17 +141,34 @@ def observe_cpu_cores() -> tuple[int | None, str]:
 
 
 def observe_memory_gb() -> tuple[float | None, str]:
-    """Return physical memory capacity from portable ``sysconf`` probes."""
+    """Return physical memory capacity from portable probes.
+
+    POSIX hosts report it through ``sysconf``. Windows has no ``sysconf``, so
+    it is read from ``psutil`` (a Windows-only core dependency).
+    """
     try:
         pages = os.sysconf("SC_PHYS_PAGES")
         page_size = os.sysconf("SC_PAGE_SIZE")
     except (AttributeError, OSError, ValueError):
-        return None, "unknown"
+        return observe_windows_memory_gb() if WINDOWS else (None, "unknown")
     if not isinstance(pages, int) or not isinstance(page_size, int):
         return None, "unknown"
     if pages <= 0 or page_size <= 0:
         return None, "unknown"
     return pages * page_size / BYTES_PER_GB, "os.sysconf(SC_PHYS_PAGES)"
+
+
+def observe_windows_memory_gb() -> tuple[float | None, str]:
+    """Return total physical memory on Windows from ``psutil``."""
+    try:
+        import psutil  # Windows-only dependency.
+
+        total = psutil.virtual_memory().total
+    except (ImportError, OSError, AttributeError):
+        return None, "unknown"
+    if not isinstance(total, int) or total <= 0:
+        return None, "unknown"
+    return total / BYTES_PER_GB, "psutil.virtual_memory()"
 
 
 def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
