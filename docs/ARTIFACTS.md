@@ -30,6 +30,8 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 | `analysis_charter.json`, `error_budget.json`, `feasibility.json` | With `--charter`: the verified charter (hash and optional signature), its error budget, and whether the confirmation set supports the promised power. |
 | `split_manifest.json` | With `--charter`: the exploration, confirmation, embargo and final-test ids, isolation level per sealed set, and a full 64-hex SHA-256 over all of it. Version 1 manifests (`validation_manifest.json`) stay readable. |
 | `custody_log.jsonl` | With `--charter`: a hash-chained record of every seal, token issue, open and refused attempt. It holds ids and counts, never row values. |
+| `admissibility_table.json` | With `--charter` and a predictive estimand: one decision per feature (`admit`, `admit_flagged`, `quarantine`) with tier and reasons. Fields carry no declared provenance in a charter, so they are decided in permissive mode; a field is quarantined only by a leakage suspicion that a current, passing certificate lets gate. Quarantined fields leave the feature plan (`dropped`). |
+| `detector_certificates.json` | With `--charter`: the F5 certificate store the run used, copied from `benchmarks/qualification/`. It is read from a source checkout; when absent, every detector is descriptive and the `admissibility.completed` event says so. |
 
 ## Search and results
 

@@ -288,3 +288,16 @@ First public beta.
   bundles; tracking lineage with artifact checksums; save-and-reload parity
   verification; optional probability calibration at inference.
 * Workflow compiler (stages declare dependencies).
+* Admissibility and detectors in charter runs (runs without a charter are
+  unchanged): leakage suspicion tests, the admissibility table and the F5
+  detector pipeline now run on the exploration set `X` only, and write
+  `admissibility_table.json` and `detector_certificates.json` (the
+  certificates the run used). Each leakage check is chained into the ledger as a new
+  `diagnostic` row that spends no wealth. Certificates are read from
+  `benchmarks/qualification/`, which the installed package does not ship; when
+  the files are missing every detector is descriptive. The shipped leakage
+  certificate is not gating (the noisy-copy leak type is descriptive), so a
+  suspicion is reported but quarantines nothing yet. The old profiler
+  constants `LEAK_ASSOCIATION`, `MISSINGNESS_LEAK` and the `LEAKAGE_MARKER`
+  string match remain: they still drive `leakage_policy="block"` for runs
+  without a charter.

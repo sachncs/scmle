@@ -191,3 +191,85 @@ def test_a_run_without_a_charter_has_no_ledger(binary_frame, tmp_path):
     folder = pathlib.Path(result.run_dir)
     assert not (folder / "hypothesis_ledger.jsonl").exists()
     assert all(e["kind"] != "ledger.completed" for e in events(result.run_dir))
+
+
+def leaky_frame(binary_frame):
+    frame = binary_frame.copy()
+    frame["echo"] = frame["y"] * 1.0
+    return frame
+
+
+def test_a_charter_run_writes_the_admissibility_artifacts(
+    binary_frame, tmp_path
+):
+    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    folder = pathlib.Path(result.run_dir)
+
+    table = json.loads((folder / "admissibility_table.json").read_text())
+    assert table["kind"] == "predictive" and table["mode"] == "permissive"
+    assert {d["name"] for d in table["decisions"]} == {"a", "b", "c"}
+    assert all(d["admission"] == "admit_flagged" for d in table["decisions"])
+    copied = json.loads((folder / "detector_certificates.json").read_text())
+    assert copied["certificates"]
+    done = event(result.run_dir, "admissibility.completed")["data"]
+    assert done["quarantined"] == {}
+    assert set(done["detector_status"]) >= {"f5-sentinel", "f5-missingness"}
+
+
+def test_leakage_suspicion_is_logged_but_descriptive_until_certified(
+    binary_frame, tmp_path
+):
+    result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
+    folder = pathlib.Path(result.run_dir)
+
+    done = event(result.run_dir, "admissibility.completed")["data"]
+    assert done["leakage_gate"] == "descriptive"
+    assert "echo" in done["suspects"] and done["quarantined"] == {}
+    rows = [
+        json.loads(line)
+        for line in (folder / "hypothesis_ledger.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    diagnostics = [r for r in rows if r["kind"] == "diagnostic"]
+    assert diagnostics
+    assert {r["body"]["check"]["set_id"] for r in diagnostics} == {"X"}
+    plan = json.loads((folder / "dataset_profile.json").read_text())
+    assert "echo" in plan["feature_plan"]["numeric"]
+
+
+def test_a_gating_certificate_drops_the_quarantined_field_from_the_plan(
+    binary_frame, tmp_path, monkeypatch
+):
+    from scmle.data.admissibility import qualify
+    from scmle.data.detectors import certificates
+
+    monkeypatch.setattr(
+        qualify.leakage,
+        "gate_status",
+        lambda *args, **kwargs: certificates.GateStatus.GATING,
+    )
+    result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
+    folder = pathlib.Path(result.run_dir)
+
+    plan = json.loads((folder / "dataset_profile.json").read_text())[
+        "feature_plan"
+    ]
+    assert "echo" not in plan["numeric"]
+    assert "quarantined by admissibility" in plan["dropped"]["echo"]
+    table = json.loads((folder / "admissibility_table.json").read_text())
+    decisions = {d["name"]: d["admission"] for d in table["decisions"]}
+    assert decisions["echo"] == "quarantine"
+
+
+def test_a_run_without_a_charter_writes_no_admissibility_artifacts(
+    binary_frame, tmp_path
+):
+    result = run(binary_frame, tmp_path)
+    folder = pathlib.Path(result.run_dir)
+
+    assert not (folder / "admissibility_table.json").exists()
+    assert not (folder / "detector_certificates.json").exists()
+    assert all(
+        e["kind"] != "admissibility.completed" for e in events(result.run_dir)
+    )
