@@ -54,7 +54,9 @@ def identifiers(tree: ast.AST) -> list[tuple[int, str]]:
 def test_no_private_names(path):
     offenders = [
         f"{path.name}:{line} {name}"
-        for line, name in identifiers(ast.parse(path.read_text()))
+        for line, name in identifiers(
+            ast.parse(path.read_text(encoding="utf-8"))
+        )
         if is_private(name)
     ]
     assert not offenders, offenders

@@ -22,9 +22,9 @@ import pathlib
 import time
 from typing import Any
 from typing import TypeVar
-from urllib.parse import unquote
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
+from urllib.request import url2pathname
 
 import pandas as pd
 
@@ -519,7 +519,7 @@ class LocalFileConnector(SourceConnector):
                 raise UnsupportedUriSchemeError(
                     value, parsed.scheme.lower(), ("file",)
                 )
-            path = pathlib.Path(unquote(parsed.path))
+            path = pathlib.Path(url2pathname(parsed.path))
         else:
             path = pathlib.Path(value)
         self.path = path.expanduser().resolve(strict=False)

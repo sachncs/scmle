@@ -8,9 +8,9 @@ import abc
 import hashlib
 import pathlib
 from typing import ClassVar
-from urllib.parse import unquote
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
+from urllib.request import url2pathname
 
 import numpy as np
 import pandas as pd
@@ -272,7 +272,7 @@ def raw_source_hash(uri: str | pathlib.Path) -> str:
     parsed = urlsplit(canonical_uri(uri))
     if parsed.scheme != "file":
         return ""
-    path = pathlib.Path(unquote(parsed.path))
+    path = pathlib.Path(url2pathname(parsed.path))
     if not path.is_file():
         return ""
     digest = hashlib.sha256()
