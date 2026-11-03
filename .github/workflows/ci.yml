@@ -180,7 +180,7 @@ jobs:
           RAY_ENABLE_UV_RUN_RUNTIME_ENV: "0"
       - name: Reject unexplained skips and xfails
         run: uv run python scripts/check_pytest_skips.py optional-capabilities.xml
-      - uses: actions/upload-artifact@ea165f8f65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: optional-capabilities
