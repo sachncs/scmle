@@ -168,14 +168,14 @@ def certify_leakage(workers: int = 1) -> tuple[Any, dict[str, Any]]:
         jobs += [(defect, s) for s in range(PLANT_REPLICATES)]
     outcomes = run_parallel(jobs, workers)
     nulls = outcomes[:NULL_REPLICATES]
-    false_alarms = sum(flag for flag, _ in nulls)
-    p_alone = sum(p <= leakage.CERTIFIED.alpha for _, p in nulls)
+    false_alarms = sum(item[0] for item in nulls)
+    p_alone = sum(item[1] <= leakage.CERTIFIED.alpha for item in nulls)
     results = []
     recalls = {}
     for k, defect in enumerate(leakage.LEAK_DEFECTS):
         start = NULL_REPLICATES + k * PLANT_REPLICATES
         part = outcomes[start : start + PLANT_REPLICATES]
-        detected = sum(flag for flag, _ in part)
+        detected = sum(item[0] for item in part)
         recalls[defect] = detected
         results.append(
             qualification.Certificate(

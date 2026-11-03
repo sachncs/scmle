@@ -176,7 +176,8 @@ def stratified_chi2(
     df = 0
     skipped = 0
     pooled = pd.crosstab(frame[x], frame[y])
-    for _stratum, rows in frame.groupby(keys, sort=True, observed=True):
+    groups = frame.groupby(keys, sort=True, observed=True)
+    for rows in (part[1] for part in groups):
         table = pd.crosstab(rows[x], rows[y])
         if table.shape[0] < 2 or table.shape[1] < 2:
             skipped += 1

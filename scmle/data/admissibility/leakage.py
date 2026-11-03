@@ -320,6 +320,26 @@ def cross_fit_skill(
     return skill_of(pred, y, task), pred
 
 
+def bootstrap_skill(
+    pred: np.ndarray,
+    y: np.ndarray,
+    task: str,
+    members: list[np.ndarray] | None,
+    rng: np.random.Generator,
+) -> float | None:
+    """Skill on one bootstrap resample, or None if it lacks a class."""
+    n = len(y)
+    if members is not None:
+        picks = rng.integers(0, len(members), size=len(members))
+        index = np.concatenate([members[i] for i in picks])
+    else:
+        index = rng.integers(0, n, size=n)
+    try:
+        return skill_of(pred[index], y[index], task)
+    except ValueError:
+        return None
+
+
 def lower_bound(
     pred: np.ndarray,
     y: np.ndarray,
@@ -333,24 +353,17 @@ def lower_bound(
     Rows are resampled, or whole groups when `groups` is given. Draws that
     lack a class are skipped; if every draw is skipped the bound is -inf.
     """
-    n = len(y)
     labels = pd.unique(groups) if groups is not None else None
     members = (
         [np.flatnonzero(groups == g) for g in labels]
         if groups is not None and labels is not None
         else None
     )
-    values: list[float] = []
-    for _ in range(cfg.bootstrap):
-        if members is not None:
-            picks = rng.integers(0, len(members), size=len(members))
-            index = np.concatenate([members[i] for i in picks])
-        else:
-            index = rng.integers(0, n, size=n)
-        try:
-            values.append(skill_of(pred[index], y[index], task))
-        except ValueError:
-            continue
+    draws = [
+        bootstrap_skill(pred, y, task, members, rng)
+        for draw in range(cfg.bootstrap)
+    ]
+    values = [v for v in draws if v is not None]
     if not values:
         return -math.inf
     return float(np.quantile(values, 1.0 - cfg.confidence))
@@ -454,15 +467,18 @@ def skill_test(
         x, y, task, cfg, group_values, block_size, seed
     )
     rng = randomness.component_rng(cfg.run_seed, path, 1)
-    null = []
-    for _ in range(cfg.permutations):
-        order = permute_within(y, rng, group_values, block_size)
-        permuted = y[order]
-        null.append(
-            cross_fit_skill(
-                x, permuted, task, cfg, group_values, block_size, seed
-            )[0]
-        )
+    null = [
+        cross_fit_skill(
+            x,
+            y[permute_within(y, rng, group_values, block_size)],
+            task,
+            cfg,
+            group_values,
+            block_size,
+            seed,
+        )[0]
+        for draw in range(cfg.permutations)
+    ]
     p_value = permutation_p(skill, null)
     bound = lower_bound(
         pred,
@@ -534,7 +550,7 @@ def strata_labels(
             random_state=0,
         ).fit(z, filled)
     else:
-        codes, _ = pd.factorize(feature.astype("object"))
+        codes = pd.factorize(feature.astype("object"))[0]
         tree = DecisionTreeClassifier(
             max_leaf_nodes=cfg.n_strata,
             min_samples_leaf=cfg.min_samples_leaf,
@@ -542,6 +558,16 @@ def strata_labels(
         ).fit(z, codes)
     leaves = tree.apply(z).astype("int64")
     return leaves
+
+
+def within_strata(
+    n: int, members: list[np.ndarray], rng: np.random.Generator
+) -> np.ndarray:
+    """Row order that permutes rows within each stratum."""
+    order = np.arange(n)
+    for where in members:
+        order[where] = where[rng.permutation(len(where))]
+    return order
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -601,20 +627,22 @@ def conditional_test(
     x = design(feature)
     path = f"{CONDITIONAL}.{name}"
     seed = randomness.derive_int_seed(cfg.run_seed, path, 0)
-    skill, _ = cross_fit_skill(x, y, task, cfg, group_values, block_size, seed)
+    skill = cross_fit_skill(x, y, task, cfg, group_values, block_size, seed)[0]
     labels = strata_labels(feature, others, cfg)
     members = [np.flatnonzero(labels == v) for v in np.unique(labels)]
     rng = randomness.component_rng(cfg.run_seed, path, 1)
-    null = []
-    for _ in range(cfg.permutations):
-        order = np.arange(len(y))
-        for where in members:
-            order[where] = where[rng.permutation(len(where))]
-        null.append(
-            cross_fit_skill(
-                x[order], y, task, cfg, group_values, block_size, seed
-            )[0]
-        )
+    null = [
+        cross_fit_skill(
+            x[within_strata(len(y), members, rng)],
+            y,
+            task,
+            cfg,
+            group_values,
+            block_size,
+            seed,
+        )[0]
+        for draw in range(cfg.permutations)
+    ]
     p_value = permutation_p(skill, null)
     keeps = p_value <= cfg.alpha
     check = qualification.Check(

@@ -106,7 +106,8 @@ def test_stratified_chi_square_equals_the_sum_of_scipy_per_stratum_statistics():
     result = ind.stratified_chi2(frame, "x", "y", ["s"])
     total = 0.0
     df = 0
-    for _, rows in frame.groupby("s"):
+    for key, rows in frame.groupby("s"):
+        assert key in (0, 1, 2)
         table = pd.crosstab(rows["x"], rows["y"])
         total += stats.chi2_contingency(table, correction=False)[0]
         df += 1
@@ -175,7 +176,7 @@ def test_latent_parents_skip_the_node():
     graph = dag_module.Dag.build(
         [("U", "a"), ("a", "b"), ("b", "c")], "expert", latent=["U"]
     )
-    _, skipped = ind.implied_statements(graph)
+    skipped = ind.implied_statements(graph)[1]
     assert skipped == ["a"]
 
 
@@ -226,7 +227,7 @@ def test_falsification_threshold_is_inclusive(monkeypatch):
             ind.CIKind.FISHER_Z, 1.0, level, 0.1, len(frame), 0, 0
         )
 
-    statements, _ = ind.implied_statements(CHAIN)
+    statements = ind.implied_statements(CHAIN)[0]
     level = 0.05 / len(statements)
     monkeypatch.setattr(ind, "run_test", fake)
     report = ind.falsify(CHAIN, sem_frame(50, 0))

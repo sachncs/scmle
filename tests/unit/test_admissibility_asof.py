@@ -171,7 +171,7 @@ def audit(rows, log, **kw):
 
 
 def test_clean_table_has_no_mismatch_and_a_derived_rule():
-    rows, log, _ = make_clean()
+    rows, log = make_clean()[:2]
     result = audit(rows, log)
     assert result.log_check.mismatched == 0
     assert result.counts == {
@@ -246,7 +246,7 @@ def test_the_tolerance_decides_the_field_and_the_gate_the_decision():
 
 
 def test_log_provenance_confirms_a_clean_field_and_refuses_a_mismatched_rule():
-    rows, log, _ = make_clean()
+    rows, log = make_clean()[:2]
     base = make_field("stored", source=p.AsOfSource.NONE)
     record = asof.log_provenance(base, audit(rows, log))
     assert record.as_of_source is p.AsOfSource.LOG
@@ -270,7 +270,7 @@ def test_a_failed_audit_gives_a_field_that_is_not_confirmed():
 
 
 def test_empty_rows_are_rejected():
-    rows, log, _ = make_clean()
+    rows, log = make_clean()[:2]
     with pytest.raises(ValueError, match="empty"):
         audit(rows.iloc[:0], log)
 

@@ -174,7 +174,7 @@ def test_null_features_are_rarely_suspect_and_p_values_are_valid():
 
 
 def planted(kind, seed, n=300):
-    y, _ = binary_world(seed, n)
+    y = binary_world(seed, n)[0]
     rng = np.random.default_rng(seed + 1)
     if kind == "copy":
         x = y.astype(float)
