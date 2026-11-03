@@ -1,0 +1,127 @@
+"""Reconciliation gate: every gap needs a named, quantified explanation."""
+
+import pytest
+
+from scmle.contracts.qualification import Decision
+from scmle.contracts.qualification import Tier
+from scmle.data.admissibility import reconciliation as rec
+from scmle.data.detectors import certificates
+
+GATING = certificates.GateStatus.GATING
+FILTER = rec.Mechanism.FILTER
+
+
+def item(extract, source=1000.0, explanations=(), name="rows"):
+    return rec.Item(name, extract, source, "finance ledger", explanations)
+
+
+def test_gap_is_the_relative_absolute_difference():
+    assert item(950.0).gap == pytest.approx(0.05)
+    assert item(1050.0).gap == pytest.approx(0.05)
+    assert item(500.0, 2000.0).gap == pytest.approx(0.75)
+    assert item(-90.0, -100.0).gap == pytest.approx(0.1)  # |source| in divisor
+
+
+def test_an_exact_match_passes_without_an_explanation():
+    result = rec.reconcile_item(item(1000.0))
+    assert result.status is rec.Status.MATCHED
+    assert result.tier is Tier.ATTESTED
+    assert result.check.decision is Decision.PASS
+
+
+def test_a_gap_exactly_at_the_tolerance_matches_and_above_it_does_not():
+    assert rec.reconcile_item(item(950.0), 0.05).status is rec.Status.MATCHED
+    over = rec.reconcile_item(item(949.9), 0.05, GATING)
+    assert over.status is rec.Status.UNEXPLAINED
+    assert over.check.decision is Decision.BLOCK
+
+
+def test_an_unexplained_gap_fails_the_gate_and_blocks_when_certified():
+    result = rec.reconcile_item(item(900.0), gate=GATING)
+    assert result.status is rec.Status.UNEXPLAINED
+    assert result.check.decision is Decision.BLOCK
+    assert result.tier is Tier.UNVERIFIED
+    # not certified: described, never blocking
+    soft = rec.reconcile_item(item(900.0))
+    assert soft.check.decision is Decision.WARN
+
+
+def test_an_explained_gap_passes_with_the_explanation_recorded():
+    why = rec.Explanation(FILTER, "test accounts removed", -100.0, "j.doe")
+    result = rec.reconcile_item(item(900.0, explanations=(why,)), gate=GATING)
+    assert result.status is rec.Status.EXPLAINED
+    assert result.residual_gap == pytest.approx(0.0)
+    assert result.tier is Tier.ATTESTED
+    assert result.check.decision is Decision.PASS
+    assert result.to_dict()["explanations"][0]["mechanism"] == "filter"
+
+
+def test_an_explanation_must_cover_the_gap_within_the_tolerance():
+    partial = rec.Explanation(rec.Mechanism.DEDUPE, "duplicate orders", -60.0)
+    result = rec.reconcile_item(
+        item(900.0, explanations=(partial,)), gate=GATING
+    )
+    assert result.status is rec.Status.UNEXPLAINED
+    assert result.residual_gap == pytest.approx(0.04)
+    lenient = rec.reconcile_item(item(900.0, explanations=(partial,)), 0.04)
+    assert lenient.status is rec.Status.EXPLAINED  # residual == tolerance
+
+
+def test_several_mechanisms_add_up_with_their_signs():
+    late = rec.Explanation(
+        rec.Mechanism.LATE_ARRIVAL, "batch after cutoff", -70.0
+    )
+    dup = rec.Explanation(rec.Mechanism.DEDUPE, "double posted", 20.0)
+    filt = rec.Explanation(FILTER, "voided", -50.0)
+    result = rec.reconcile_item(item(900.0, explanations=(late, dup, filt)))
+    assert result.status is rec.Status.EXPLAINED
+    # sum of amounts is -100, the observed difference
+    over = rec.reconcile_item(item(900.0, explanations=(late, filt)))
+    assert over.status is rec.Status.UNEXPLAINED
+
+
+def test_an_explanation_that_overshoots_is_not_accepted():
+    big = rec.Explanation(FILTER, "everything", -400.0)
+    assert (
+        rec.reconcile_item(item(900.0, explanations=(big,))).status
+        is rec.Status.UNEXPLAINED
+    )
+
+
+def test_unattested_explanations_leave_the_tier_unverified():
+    why = rec.Explanation(FILTER, "voided", -100.0)
+    result = rec.reconcile_item(item(900.0, explanations=(why,)))
+    assert result.status is rec.Status.EXPLAINED
+    assert result.tier is Tier.UNVERIFIED
+
+
+def test_inputs_are_validated():
+    with pytest.raises(ValueError, match="non-zero"):
+        rec.Item("n", 1.0, 0.0, "s")
+    with pytest.raises(ValueError, match="source_name"):
+        rec.Item("n", 1.0, 1.0, " ")
+    with pytest.raises(ValueError):
+        rec.Item("n", float("nan"), 1.0, "s")
+    with pytest.raises(ValueError, match="detail"):
+        rec.Explanation(FILTER, " ", 1.0)
+    with pytest.raises(ValueError, match="Mechanism"):
+        rec.Explanation("filter", "x", 1.0)  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        rec.reconcile_item(item(1.0), tolerance=1.5)
+    with pytest.raises(ValueError, match="at least one"):
+        rec.reconcile([])
+    with pytest.raises(ValueError, match="unique"):
+        rec.reconcile([item(1000.0), item(1000.0)])
+
+
+def test_the_dataset_gate_fails_on_any_unexplained_item():
+    why = rec.Explanation(FILTER, "voided", -100.0, "j.doe")
+    good = rec.reconcile(
+        [item(1000.0, name="a"), item(900.0, explanations=(why,), name="b")]
+    )
+    assert good.passed
+    bad = rec.reconcile([item(1000.0, name="a"), item(800.0, name="b")])
+    assert not bad.passed
+    assert bad.to_dict()["passed"] is False
+    assert len(bad.checks) == 2
+    assert {c.seed_path[2] for c in bad.checks} == {0, 1}
