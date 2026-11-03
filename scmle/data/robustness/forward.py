@@ -1,0 +1,216 @@
+"""The forward-in-time check on the holdout `F` (F6, step 7).
+
+It runs after the survivors are fixed and only for temporal data. Nothing is
+fitted on `F`: each surviving finding's rank correlation is re-estimated on
+the forward rows and compared with its sign on `X`. `F` is a sealed set that
+opens once; this module asks for the release token once, opens once, and
+the custody log records the open under the actor `f6-forward`.
+
+`C` tests replication; `F` tests stability over time. The two are never
+merged, and a forward result never changes a `confirmed` tier.
+
+Labels, per finding, by the bootstrap interval of the effect on `F`:
+
+* `holds`: the interval excludes zero on the same side as the effect on `X`;
+* `unstable_over_time`: it excludes zero on the opposite side;
+* `inconclusive`: it contains zero (the forward set may simply be small).
+
+With non-temporal data, no `F`, or no surviving finding, the check is
+skipped with a reason and, in the last case, `F` is not opened.
+"""
+
+from collections.abc import Callable
+from collections.abc import Mapping
+import dataclasses
+import math
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from scmle.contracts import qualification
+from scmle.core import randomness
+from scmle.data.ledger import confirm
+from scmle.data.robustness import stability
+
+ACTOR = "f6-forward"
+CHECK_ID = "f6-forward"
+HOLDS = "holds"
+UNSTABLE = "unstable_over_time"
+INCONCLUSIVE = "inconclusive"
+BOOTSTRAP = 1000
+CONFIDENCE = 0.95
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ForwardFinding:
+    """One finding evaluated on the forward set.
+
+    Attributes:
+        name: The finding (feature name).
+        effect_x: Its effect on the exploration set.
+        effect_f: Its effect on `F`, or None when not defined.
+        label: `holds`, `unstable_over_time` or `inconclusive`.
+        check: The `Check` record on `F`, or None when not defined.
+    """
+
+    name: str
+    effect_x: float
+    effect_f: float | None
+    label: str
+    check: qualification.Check | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return {
+            "name": self.name,
+            "effect_x": self.effect_x,
+            "effect_f": self.effect_f,
+            "label": self.label,
+            "check": None if self.check is None else self.check.to_dict(),
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ForwardResult:
+    """Outcome of the forward check.
+
+    Attributes:
+        status: `checked` or `skipped`.
+        reason: One sentence saying why.
+        opened: Whether `F` was opened (at most once).
+        findings: One record per finding when checked.
+    """
+
+    status: str
+    reason: str
+    opened: bool
+    findings: tuple[ForwardFinding, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return {
+            "status": self.status,
+            "reason": self.reason,
+            "opened": self.opened,
+            "findings": [f.to_dict() for f in self.findings],
+        }
+
+
+def skipped(reason: str) -> ForwardResult:
+    """A result that says the check did not run, and why."""
+    return ForwardResult("skipped", reason, False, ())
+
+
+def label_for(effect_x: float, low: float, high: float) -> str:
+    """Label from the interval of the forward effect and the sign on `X`."""
+    sign = math.copysign(1.0, effect_x)
+    if low > 0.0 or high < 0.0:
+        return HOLDS if (low > 0.0) == (sign > 0.0) else UNSTABLE
+    return INCONCLUSIVE
+
+
+def evaluate_finding(
+    name: str,
+    effect_x: float,
+    values: np.ndarray,
+    target: np.ndarray,
+    seed: int,
+    bootstrap: int,
+) -> ForwardFinding:
+    """Re-estimates one finding on the forward rows and labels it."""
+    effect = stability.rank_effect(values, target)
+    if not math.isfinite(effect):
+        return ForwardFinding(name, effect_x, None, INCONCLUSIVE, None)
+    rng = randomness.component_rng(seed, f"{CHECK_ID}.{name}", 0)
+    rows = len(values)
+    picks = [rng.integers(0, rows, size=rows) for index in range(bootstrap)]
+    draws = np.array(
+        [stability.rank_effect(values[p], target[p]) for p in picks]
+    )
+    draws = draws[np.isfinite(draws)]
+    tail = (1.0 - CONFIDENCE) / 2.0 * 100.0
+    low, high = (
+        (float(v) for v in np.percentile(draws, (tail, 100.0 - tail)))
+        if draws.size
+        else (effect, effect)
+    )
+    low, high = min(low, effect), max(high, effect)
+    label = label_for(effect_x, low, high)
+    check = qualification.Check(
+        check_id=f"{CHECK_ID}:{name}",
+        null_hypothesis="the finding's effect on the forward set is zero",
+        statistic=effect,
+        p_value=None,
+        interval=(low, high),
+        effect=effect,
+        n=rows,
+        decision=(
+            qualification.Decision.WARN
+            if label == UNSTABLE
+            else qualification.Decision.PASS
+        ),
+        set_id=qualification.SetId.FORWARD,
+        seed_path=randomness.seed_path(seed, f"{CHECK_ID}.{name}", 0),
+        tier=qualification.Tier.UNVERIFIED,
+    )
+    return ForwardFinding(name, effect_x, effect, label, check)
+
+
+def forward_check(
+    source: confirm.ConfirmationSource | None,
+    effects: Mapping[str, float],
+    encode: Callable[[pd.Series], np.ndarray],
+    *,
+    temporal: bool,
+    seed: int,
+    bootstrap: int = BOOTSTRAP,
+) -> ForwardResult:
+    """Opens `F` once and evaluates the surviving findings on it.
+
+    Args:
+        source: The sealed forward set, or None when there is none.
+        effects: Finding (feature name) to its effect on `X`. The findings
+            must already be fixed; nothing is selected here.
+        encode: Turns the forward target into the codes used on `X`.
+        temporal: Whether the data have a time order. Non-temporal data skip
+            the check.
+        seed: Run seed.
+        bootstrap: Resamples for the interval.
+
+    Returns:
+        The result. `F` is opened at most once and not at all when the check
+        is skipped.
+    """
+    if not temporal:
+        return skipped("the data are not temporal: no forward check")
+    if source is None:
+        return skipped("no forward set was sealed")
+    if not effects:
+        return skipped("no surviving finding to check; F was not opened")
+    token = source.issue_token()
+    features, target = source.open(token, ACTOR)
+    codes = encode(target)
+    findings = []
+    for name, effect_x in effects.items():
+        if name not in features.columns:
+            findings.append(
+                ForwardFinding(name, effect_x, None, INCONCLUSIVE, None)
+            )
+            continue
+        findings.append(
+            evaluate_finding(
+                name,
+                effect_x,
+                features[name].to_numpy(dtype=float),
+                np.asarray(codes, dtype=float),
+                seed,
+                bootstrap,
+            )
+        )
+    return ForwardResult(
+        "checked",
+        "F was opened once and nothing was fitted on it",
+        True,
+        tuple(findings),
+    )
