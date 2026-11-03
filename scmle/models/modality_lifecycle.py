@@ -4102,17 +4102,12 @@ def file_digest(path: Path) -> str:
 
 def sync_file(path: Path) -> None:
     """Flush a file before it becomes visible through an atomic rename."""
-    with path.open("rb") as stream:
-        os.fsync(stream.fileno())
+    durability.sync_file(path)
 
 
 def sync_directory(path: Path) -> None:
     """Flush a directory entry after an atomic replacement."""
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
+    durability.sync_directory(path)
 
 
 def load_package(

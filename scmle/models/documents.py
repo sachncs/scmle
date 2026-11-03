@@ -26,6 +26,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
+from scmle import durability
 from scmle.data.modalities import document
 
 
@@ -487,8 +488,7 @@ class DocumentClassifier:
             )
             model_path = temporary_directory / "model.joblib"
             joblib.dump(self, model_path, compress=3)
-            with model_path.open("rb") as stream:
-                os.fsync(stream.fileno())
+            durability.sync_file(model_path)
             manifest = {
                 "schema_version": 1,
                 "model_path": "model.joblib",
@@ -645,11 +645,7 @@ def file_digest(path: pathlib.Path) -> str:
 
 def sync_directory(path: pathlib.Path) -> None:
     """Flush a directory entry after an atomic package replacement."""
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
+    durability.sync_directory(path)
 
 
 __all__ = [

@@ -21,6 +21,7 @@ from scipy import sparse
 from sklearn import base
 from sklearn import utils
 
+from scmle import durability
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import worker
 
@@ -246,14 +247,9 @@ class NetworkEstimator(base.BaseEstimator):
             ) as handle:
                 temporary = pathlib.Path(handle.name)
             joblib.dump(envelope, temporary)
-            with temporary.open("rb") as handle:
-                os.fsync(handle.fileno())
+            durability.sync_file(temporary)
             os.replace(temporary, destination)
-            descriptor = os.open(destination.parent, os.O_RDONLY)
-            try:
-                os.fsync(descriptor)
-            finally:
-                os.close(descriptor)
+            durability.sync_directory(destination.parent)
         except BaseException:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)

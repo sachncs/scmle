@@ -46,6 +46,19 @@ def append_text(path: str | pathlib.Path, text: str) -> None:
             handle.write(text)
 
 
+def sync_file(path: str | pathlib.Path) -> None:
+    """Flush an existing file's contents to stable storage.
+
+    The file is opened for update because Windows rejects ``fsync`` on a
+    read-only descriptor (``EBADF``) while POSIX accepts it.
+
+    Args:
+        path: File to flush; it must exist.
+    """
+    with open(path, "r+b") as handle:
+        os.fsync(handle.fileno())
+
+
 def sync_directory(directory: str | pathlib.Path) -> None:
     """Flush a directory entry after an atomic replacement.
 
