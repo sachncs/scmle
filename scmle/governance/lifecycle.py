@@ -129,9 +129,10 @@ class LifecycleManager:
 
     def read_state(self) -> dict[str, Any]:
         """The last attempt's data digest and the rows seen since."""
-        if not self.state_path.exists():
-            return {"last_digest": None, "rows_since_attempt": 0}
-        return json.loads(self.state_path.read_text(encoding="utf-8"))
+        with durability.path_lock(self.state_path):
+            if not self.state_path.exists():
+                return {"last_digest": None, "rows_since_attempt": 0}
+            return json.loads(self.state_path.read_text(encoding="utf-8"))
 
     def write_state(self, state: dict[str, Any]) -> None:
         """Saves the state atomically."""

@@ -3,8 +3,16 @@
 import contextlib
 import os
 import pathlib
+import sys
 import tempfile
 import threading
+import time
+
+WINDOWS = sys.platform == "win32"
+# Windows refuses to replace a file another handle still has open, usually
+# for a few milliseconds (a reader, an indexer, a scanner).
+REPLACE_ATTEMPTS = 8
+REPLACE_DELAY_SECONDS = 0.02
 
 PATH_LOCKS: dict[str, threading.RLock] = {}
 PATH_LOCKS_GUARD = threading.Lock()
@@ -82,6 +90,38 @@ def sync_directory(directory: str | pathlib.Path) -> None:
         os.close(descriptor)
 
 
+def replace_file(
+    source: str | pathlib.Path, target: str | pathlib.Path
+) -> None:
+    """Atomically move ``source`` over ``target``, tolerating Windows sharing.
+
+    The replacement holds the target's path lock, so in-process readers that
+    take the same lock never overlap it. On Windows a replace can still be
+    denied by a handle held elsewhere (another process); it is retried a
+    bounded number of times with a short growing delay. Other platforms, and
+    other errors, surface immediately.
+
+    Args:
+        source: Fully written temporary file.
+        target: Destination path.
+
+    Raises:
+        PermissionError: If the replacement is still denied after the
+            attempts, or at once on a platform other than Windows.
+    """
+    with path_lock(target):
+        attempt = 1
+        while True:
+            try:
+                os.replace(source, target)
+                return
+            except PermissionError:
+                if not WINDOWS or attempt >= REPLACE_ATTEMPTS:
+                    raise
+                time.sleep(REPLACE_DELAY_SECONDS * attempt)
+                attempt += 1
+
+
 def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
     """Write bytes with flush, fsync, atomic replacement, and cleanup.
 
@@ -103,7 +143,7 @@ def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary_name, target)
+        replace_file(temporary_name, target)
         sync_directory(target.parent)
     except BaseException:
         with contextlib.suppress(FileNotFoundError):
