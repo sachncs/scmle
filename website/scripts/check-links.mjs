@@ -46,8 +46,9 @@ const files = htmlFiles(siteRoot);
 for (const filePath of files) {
   const contents = readFileSync(filePath, "utf8");
   const sourceUrl = pageUrl(filePath);
-  const links = contents.matchAll(/href=["']([^"']+)["']/g);
-  for (const [, href] of links) {
+  const links = contents.matchAll(/(?:href|src)=["']([^"']+)["']|<meta[^>]+(?:og:image|twitter:image)"\s+content="([^"]+)"/g);
+  for (const [, hrefAttr, metaUrl] of links) {
+    const href = hrefAttr ?? metaUrl;
     if (href === "#" || /^(mailto|tel|javascript):/i.test(href)) continue;
     const url = new URL(href, sourceUrl);
     if (url.origin !== siteOrigin) continue;

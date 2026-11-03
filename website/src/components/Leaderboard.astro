@@ -1,0 +1,23 @@
+---
+interface Row { name: string; score: number; win?: boolean }
+interface Props { rows: Row[]; idPrefix?: string }
+const { rows, idPrefix = "lb" } = Astro.props;
+const W = 360;
+const rowH = 44;
+const H = rows.length * rowH + 8;
+const width = (v: number) => Math.max(0, ((v - 0.5) / 0.5) * W);
+const summary = rows.map((r) => `${r.name} ${r.score.toFixed(4)}`).join("; ");
+---
+
+<svg class="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby={`${idPrefix}-t ${idPrefix}-d`}>
+  <title id={`${idPrefix}-t`}>Cross-validated ROC-AUC by model family</title>
+  <desc id={`${idPrefix}-d`}>Horizontal bars from 0.5 (chance) to 1.0. {summary}.</desc>
+  {rows.map((r, i) => (
+    <g transform={`translate(0 ${i * rowH})`}>
+      <text x="0" y="14">{r.name}</text>
+      <text x={W} y="14" text-anchor="end" class="val">{r.score.toFixed(4)}</text>
+      <rect class="track" x="0" y="22" width={W} height="8" rx="4" />
+      {r.score > 0.5 && <rect class:list={["bar", { win: r.win }]} style={`--i:${i}`} x="0" y="22" width={width(r.score)} height="8" rx="4" />}
+    </g>
+  ))}
+</svg>

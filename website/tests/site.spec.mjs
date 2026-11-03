@@ -57,11 +57,113 @@ test("documentation navigation exposes a keyboard focus path", async ({
 }) => {
   await page.goto("./docs/architecture/");
   await page.keyboard.press("Tab");
+  await expect(page.locator(":focus")).toHaveAttribute("href", "#main");
+  await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toHaveAttribute(
     "aria-label",
     "SCMLE home",
   );
+  // The sidebar links must be reachable by keyboard.
+  let reached = false;
+  for (let press = 0; press < 20 && !reached; press += 1) {
+    await page.keyboard.press("Tab");
+    reached = await page.evaluate(() => {
+      const el = document.activeElement;
+      return Boolean(el && el.closest(".sidebar nav") && /docs\//.test(el.getAttribute("href") ?? ""));
+    });
+  }
+  expect(reached).toBe(true);
+});
+
+test("landing page tells the product story with base-aware calls to action", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Mathematics meets engineering." }),
+  ).toBeVisible();
+  const main = page.locator("main");
+  await expect(main.getByRole("link", { name: "Get started" })).toHaveAttribute(
+    "href",
+    "/scmle/docs/quickstart/",
+  );
+  await expect(main.getByRole("link", { name: "View on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/sachncs/scmle",
+  );
+  for (const id of ["lifecycle", "capabilities", "quickstart", "benchmarks", "trust", "install"]) {
+    await expect(page.locator(`#${id}`), id).toHaveCount(1);
+  }
+  await expect(page.getByText("In development", { exact: true })).toBeVisible();
+  await expect(page.locator("main svg[role='img'] title").first()).toBeAttached();
+});
+
+test("landing page loads no third-party fonts or scripts", async ({ page }) => {
+  const external = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.hostname !== "127.0.0.1") external.push(request.url());
+  });
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  expect(external).toEqual([]);
+});
+
+test("theme toggle switches, persists and respects the system scheme", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ colorScheme: "light" });
+  const page = await context.newPage();
+  await page.goto("http://127.0.0.1:4322/scmle/");
+  const toggle = page.getByRole("button", { name: /Switch to dark theme/ });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByRole("button", { name: /Switch to light theme/ })).toBeVisible();
+  await context.close();
+
+  const dark = await browser.newContext({ colorScheme: "dark" });
+  const darkPage = await dark.newPage();
+  await darkPage.goto("http://127.0.0.1:4322/scmle/");
+  const background = await darkPage.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(background).toBe("rgb(11, 11, 13)");
+  await dark.close();
+});
+
+test("reduced motion shows all content without reveal transitions", async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: "reduce" });
+  const page = await context.newPage();
+  await page.goto("http://127.0.0.1:4322/scmle/");
+  await expect(page.locator("#trust .reveal").first()).toHaveCSS("opacity", "1");
+  await context.close();
+});
+
+test("docs pages offer anchors, copy buttons, filter and pager", async ({ page }) => {
+  await page.goto("./docs/quickstart/");
+  await expect(page.locator("h2 .anchor").first()).toHaveAttribute("href", /^#/);
+  await expect(page.getByRole("button", { name: "Copy code to clipboard" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Next/ })).toHaveAttribute("href", "/scmle/docs/data/");
+  await page.getByLabel("Filter documentation pages").fill("secur");
+  await expect(page.locator(".sidebar nav a:visible")).toHaveCount(1);
+});
+
+test("skip link is the first tab stop and focus is visible", async ({ page }) => {
+  await page.goto("./");
   await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
-  await expect(page.locator(":focus")).toHaveAttribute("href", /docs\//);
+  const skip = page.getByRole("link", { name: "Skip to content" });
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeVisible();
+});
+
+test("pages work at phone width without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const route of ["./", "./docs/", "./docs/capabilities/", "./docs/architecture/"]) {
+    await page.goto(route);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow, route).toBeLessThanOrEqual(0);
+  }
 });

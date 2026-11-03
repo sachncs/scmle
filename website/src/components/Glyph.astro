@@ -1,0 +1,17 @@
+---
+interface Props { name: string }
+const { name } = Astro.props;
+const paths: Record<string, string> = {
+  graph: "M5 19V9m7 10V5m7 14v-7",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm5-2 4.5 4.5",
+  gauge: "M4 17a8 8 0 1 1 16 0M12 17l4-5",
+  lock: "M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z",
+  layers: "M12 4 3 9l9 5 9-5-9-5ZM3 14l9 5 9-5",
+  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v5l3 2",
+  server: "M4 6h16v5H4zM4 13h16v5H4zM8 8.5h.01M8 15.5h.01",
+  stop: "M8 3h8l5 5v8l-5 5H8l-5-5V8l5-5Zm-1 9h10",
+  eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+  puzzle: "M10 4h4v3a2 2 0 1 0 0 4v3h-4v-3a2 2 0 1 1 0-4V4ZM4 14h6v6H4zM14 14h6v6h-6z",
+};
+---
+<svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>

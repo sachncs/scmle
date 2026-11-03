@@ -29,6 +29,15 @@ function visibleText(source) {
 }
 
 const files = await htmlFiles(root);
+const home = await readFile(new URL("index.html", root), "utf8");
+if (!/In development/.test(home)) {
+  console.error("index.html: the qualification instrument must be labelled 'In development'");
+  process.exit(1);
+}
+if (/\bsealed\b|guaranteed|perfect/i.test(visibleText(home.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, "")))) {
+  console.error("index.html: contains a claim word that the honesty rules forbid (sealed, guaranteed, perfect)");
+  process.exit(1);
+}
 const failures = [];
 for (const file of files) {
   const source = await readFile(file, "utf8");
@@ -41,6 +50,41 @@ for (const file of files) {
   }
   if (countMatches(source, /<h1\b/gi) !== 1) {
     failures.push(`${label}: expected exactly one h1`);
+  }
+  if (!/<meta\s+name="viewport"[^>]*width=device-width/i.test(source)) {
+    failures.push(`${label}: missing responsive viewport meta`);
+  }
+  if (!/<meta\s+name="description"\s+content="[^"]{20,}"/i.test(source)) {
+    failures.push(`${label}: missing meta description`);
+  }
+  if (!/<link\s+rel="canonical"\s+href="https:\/\/sachncs\.github\.io\/scmle\//i.test(source)) {
+    failures.push(`${label}: missing base-aware canonical link`);
+  }
+  for (const property of ["og:title", "og:description", "og:image", "twitter:card"]) {
+    if (!new RegExp(`<meta\\s+(?:property|name)="${property}"`, "i").test(source)) {
+      failures.push(`${label}: missing ${property} meta`);
+    }
+  }
+  if (countMatches(source, /<main\b/gi) !== 1) {
+    failures.push(`${label}: expected exactly one main landmark`);
+  }
+  if (!/class="skip"\s+href="#main"/.test(source)) {
+    failures.push(`${label}: missing skip link to #main`);
+  }
+  if (/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(source)) {
+    failures.push(`${label}: loads third-party fonts`);
+  }
+  for (const labelled of source.matchAll(/aria-labelledby="([^"]+)"/g)) {
+    for (const id of labelled[1].split(/\s+/)) {
+      if (!new RegExp(`\\bid="${id}"`).test(source)) {
+        failures.push(`${label}: aria-labelledby points to missing id ${id}`);
+      }
+    }
+  }
+  for (const svg of source.matchAll(/<svg\b([^>]*)>/gi)) {
+    if (/role="img"/.test(svg[1]) && !/aria-label(?:ledby)?=/.test(svg[1])) {
+      failures.push(`${label}: svg role=img without an accessible name`);
+    }
   }
   for (const image of source.matchAll(/<img\b[^>]*>/gi)) {
     if (!/\balt=["'][^"']*["']/i.test(image[0])) {
