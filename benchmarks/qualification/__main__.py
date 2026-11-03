@@ -5,16 +5,20 @@
     python -m benchmarks.qualification --check            # certificates
     python -m benchmarks.qualification --check fdr        # claim ledger (F3)
     python -m benchmarks.qualification --write-sample F   # stand-in sample
+    python -m benchmarks.qualification --write-f5 F       # F5 certificates
 
-`--check` fails when a gating detector has no current certificate. No real
-detector may gate yet, so `GATING` is empty; Phase 4 registers detectors
-here as they are certified.
+`--check` fails when a gating detector has no current certificate. The F5
+detectors (`scmle.data.detectors`) are checked against
+`detector_certificates.json`: each must have a certificate for its current
+code, and each outcome that passed must still be accepted for gating. An
+outcome that did not pass is simply descriptive and does not fail the check.
 """
 
 import argparse
 import json
 from pathlib import Path
 
+from benchmarks.qualification import f5
 from benchmarks.qualification import ledger_checks
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
@@ -29,7 +33,9 @@ def check_certificates() -> int:
     store = certificates.CertificateStore.load(standins.SAMPLE_PATH)
     problems = standins.sample_problems(store)
     report = certificates.audit(store, GATING)
-    ok = not problems and report.ok
+    f5_store = certificates.CertificateStore.load(f5.CERT_PATH)
+    f5_problems = f5.problems(f5_store) + f5.audit_problems(f5_store)
+    ok = not problems and report.ok and not f5_problems
     print(
         json.dumps(
             {
@@ -39,6 +45,8 @@ def check_certificates() -> int:
                 "stale": list(report.stale),
                 "uncertified": list(report.uncertified),
                 "gating_detectors": len(GATING),
+                "f5_problems": f5_problems,
+                "f5_gating": [f"{d}/{t}" for d, _, t in f5.gating(f5_store)],
             },
             indent=2,
         )
@@ -58,6 +66,7 @@ def main(arguments: list[str] | None = None) -> int:
         choices=("certificates", "fdr"),
     )
     action.add_argument("--write-sample", type=Path, metavar="FILE")
+    action.add_argument("--write-f5", type=Path, metavar="FILE")
     parser.add_argument("--full", action="store_true")
     parser.add_argument("--runs", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=0)
@@ -76,6 +85,11 @@ def main(arguments: list[str] | None = None) -> int:
         return 0 if summary["ok"] else 1
     if options.check:
         return check_certificates()
+    if options.write_f5:
+        store = f5.certify_all()
+        store.save(options.write_f5)
+        print(json.dumps(f5.summary(store), indent=2))
+        return 0
     standins.certify_all().save(options.write_sample)
     print(json.dumps({"written": str(options.write_sample)}))
     return 0

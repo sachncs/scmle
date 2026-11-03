@@ -18,9 +18,17 @@ uv run python -m benchmarks.qualification --check          # certificates
 | `corpora.py`, `corpora.json` | Manifest and hash-verifying fetcher for labelled corpora. Every entry is a `candidate` until someone checks existence, licence and hash. |
 | `certify.py`, `standins.py` | Plant, detect, certify. The stand-in detectors only exercise the machinery and must never gate. |
 | `smoke.py` | The gate, including negative controls that must fail. |
+| `f5.py`, `detector_certificates.json` | Certification of the F5 detectors in `scmle/data/detectors/` (missingness, label noise, duplicates, sentinels, outlier triage). Regenerate with `--write-f5 FILE`; `--check` fails if any certificate is stale or missing. |
+| `make_f5_oracles.py` | Offline generator of the frozen cleanlab mask in `tests/fixtures/f5_oracles.json`. |
 
 ## Limits
 
+- F5 certificates use one corpus (scikit-learn breast cancer). Row detectors
+  are judged per row, which understates uncertainty because rows of one table
+  are not independent; the missingness detector is judged per replicate
+  table. A detector gates only for the defect types whose outcome passed
+  (recall lower bound 0.80, false-alarm upper bound 0.05, fixed in advance);
+  the rest stay descriptive. See the `f5.py` docstring for the full caveats.
 - Plants are synthetic, so recall measured on them is optimistic. Certificates
   are kept per defect type and are not a claim about real defects.
 - Agreement with a reference shows agreement, not truth.

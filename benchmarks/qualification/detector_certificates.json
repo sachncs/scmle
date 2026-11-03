@@ -1,0 +1,492 @@
+{
+  "certificates": [
+    {
+      "code_hash": "f75dbc1c26d8e62c76263b031a649cf8f8d5e3a031f21efa40058f9b656eabbe",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "f5-duplicates",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "duplicate_exact",
+            "detected": 285,
+            "detector_id": "f5-duplicates",
+            "false_alarms": 0,
+            "planted": 285,
+            "seed_path": [
+              0,
+              "certify.f5-duplicates",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.006705972065294502
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.986700459011742,
+            1.0
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "duplicate_near",
+            "detected": 285,
+            "detector_id": "f5-duplicates",
+            "false_alarms": 0,
+            "planted": 285,
+            "seed_path": [
+              0,
+              "certify.f5-duplicates",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.006705972065294502
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.986700459011742,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "code_hash": "828e3e48b85edf028e0095da5ce537ef137960c8ef0f2ff83ed46eb7f6d48354",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "f5-label-noise",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "label_flip_symmetric",
+            "detected": 228,
+            "detector_id": "f5-label-noise",
+            "false_alarms": 5,
+            "planted": 285,
+            "seed_path": [
+              0,
+              "certify.f5-label-noise",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0037591031606135205,
+            0.020403705950985118
+          ],
+          "passed": false,
+          "recall_interval": [
+            0.7497084578283153,
+            0.8423118175787299
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "label_flip_class_conditional",
+            "detected": 212,
+            "detector_id": "f5-label-noise",
+            "false_alarms": 5,
+            "planted": 300,
+            "seed_path": [
+              0,
+              "certify.f5-label-noise",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0037591031606135205,
+            0.020403705950985118
+          ],
+          "passed": false,
+          "recall_interval": [
+            0.6527939127218992,
+            0.755313659171955
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "code_hash": "69238b1a197c512c17bad8a466ebe8dd43ac605cf95c856f3f7468ba7b4f376b",
+      "corpus_hash": "2c64ca924c041cab2ccd41f5dab78a8c5d0dd7b4166e3080254364af03bcdb89",
+      "created": null,
+      "detector_id": "f5-missingness",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 200,
+            "defect_type": "missing_mar",
+            "detected": 200,
+            "detector_id": "f5-missingness",
+            "false_alarms": 1,
+            "planted": 200,
+            "seed_path": [
+              0,
+              "certify.f5-missingness",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0008831687156009814,
+            0.02777370439789293
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9811546736227335,
+            1.0
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 200,
+            "defect_type": "missing_mnar",
+            "detected": 200,
+            "detector_id": "f5-missingness",
+            "false_alarms": 1,
+            "planted": 200,
+            "seed_path": [
+              0,
+              "certify.f5-missingness",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0008831687156009814,
+            0.02777370439789293
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9811546736227335,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199
+      ]
+    },
+    {
+      "code_hash": "cca5e8b9953f57c4ad1721d6be06f1b4cbb58fead9d70f8d42d50611cbdedfdb",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "f5-outlier-triage",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "outlier_error",
+            "detected": 764,
+            "detector_id": "f5-outlier-triage",
+            "false_alarms": 0,
+            "planted": 768,
+            "seed_path": [
+              0,
+              "certify.f5-outlier-triage",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.006705972065294502
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9866853997985304,
+            0.9979727723100437
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "code_hash": "c00f9b07339acd9d17cda14e5d878e74e7b3d1b40125a35fdc69242b052e4c0d",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "f5-sentinel",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "sentinel",
+            "detected": 540,
+            "detector_id": "f5-sentinel",
+            "false_alarms": 13,
+            "planted": 540,
+            "seed_path": [
+              0,
+              "certify.f5-sentinel",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.013399735423753773,
+            0.0386940129619315
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9929364362381928,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "schema_version": 1
+}
