@@ -1,0 +1,154 @@
+/* SCMLE design tokens.
+   One accent, a neutral ramp, an 8-pt spacing scale and a fluid type scale.
+   Light is the default; dark follows the system unless the visitor chose a
+   theme with the toggle (html[data-theme]). */
+
+:root {
+  color-scheme: light;
+
+  /* Neutrals */
+  --bg: #fbfbfd;
+  --bg-alt: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f5f5f7;
+  --text: #1d1d1f;
+  --text-2: #4a4a50;
+  --text-3: #66666c;
+  --line: #e3e3e8;
+  --line-strong: #c9c9d0;
+
+  /* The single accent */
+  --accent: #00704f;
+  --accent-ink: #00704f;
+  --accent-soft: #e3f4ec;
+  --on-accent: #ffffff;
+  --glow: rgba(0, 112, 79, 0.1);
+
+  /* Semantic status (used only for labels in the docs tables) */
+  --warn: #7a4b00;
+  --warn-soft: #fbefd2;
+  --danger: #8c2a1a;
+  --danger-soft: #fbe3de;
+
+  /* Code surfaces stay dark in both themes */
+  --code-bg: #1d1d1f;
+  --code-text: #e8e8ed;
+  --code-muted: #9a9aa1;
+  --code-line: #38383d;
+  --code-accent: #45d9a0;
+  --inline-code-bg: #ececf0;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.04), 0 24px 64px rgba(0, 0, 0, 0.1);
+  --header-bg: rgba(251, 251, 253, 0.8);
+
+  /* Type */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --step--1: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+  --step-0: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --step-1: clamp(1.125rem, 1.05rem + 0.35vw, 1.3125rem);
+  --step-2: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+  --step-3: clamp(1.75rem, 1.35rem + 1.8vw, 2.75rem);
+  --step-4: clamp(2.125rem, 1.4rem + 3.2vw, 3.75rem);
+  --step-5: clamp(2.5rem, 1.1rem + 6vw, 5.5rem);
+
+  /* 8-pt spacing */
+  --s1: 0.5rem;
+  --s2: 1rem;
+  --s3: 1.5rem;
+  --s4: 2rem;
+  --s5: 2.5rem;
+  --s6: 3rem;
+  --s8: 4rem;
+  --s10: 5rem;
+  --s12: 6rem;
+  --section: clamp(4.5rem, 3rem + 7vw, 9rem);
+
+  --radius-s: 8px;
+  --radius: 14px;
+  --radius-l: 24px;
+  --gutter: clamp(1.25rem, 0.5rem + 3vw, 2rem);
+  --container: 1120px;
+  --header-h: 56px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0b0d;
+    --bg-alt: #111113;
+    --surface: #161618;
+    --surface-2: #1c1c1f;
+    --text: #f5f5f7;
+    --text-2: #b4b4ba;
+    --text-3: #9a9aa1;
+    --line: #26262a;
+    --line-strong: #3a3a40;
+    --accent: #45d9a0;
+    --accent-ink: #45d9a0;
+    --accent-soft: #0f2a20;
+    --on-accent: #04130d;
+    --glow: rgba(69, 217, 160, 0.12);
+    --warn: #f0c674;
+    --warn-soft: #2a2210;
+    --danger: #ff9d8c;
+    --danger-soft: #33160f;
+    --code-bg: #101012;
+    --inline-code-bg: #232327;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 64px rgba(0, 0, 0, 0.5);
+    --header-bg: rgba(11, 11, 13, 0.8);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0b0d;
+  --bg-alt: #111113;
+  --surface: #161618;
+  --surface-2: #1c1c1f;
+  --text: #f5f5f7;
+  --text-2: #b4b4ba;
+  --text-3: #9a9aa1;
+  --line: #26262a;
+  --line-strong: #3a3a40;
+  --accent: #45d9a0;
+  --accent-ink: #45d9a0;
+  --accent-soft: #0f2a20;
+  --on-accent: #04130d;
+  --glow: rgba(69, 217, 160, 0.12);
+  --warn: #f0c674;
+  --warn-soft: #2a2210;
+  --danger: #ff9d8c;
+  --danger-soft: #33160f;
+  --code-bg: #101012;
+  --inline-code-bg: #232327;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 64px rgba(0, 0, 0, 0.5);
+  --header-bg: rgba(11, 11, 13, 0.8);
+}
+
+/* An always-dark band inside either theme. */
+.tone-inverse {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #111113;
+  --surface-2: #1a1a1d;
+  --text: #f5f5f7;
+  --text-2: #b4b4ba;
+  --text-3: #9a9aa1;
+  --line: #2a2a2f;
+  --line-strong: #3d3d44;
+  --accent: #45d9a0;
+  --accent-ink: #45d9a0;
+  --accent-soft: #0f2a20;
+  --on-accent: #04130d;
+  --glow: rgba(69, 217, 160, 0.14);
+  --code-bg: #0a0a0b;
+  --inline-code-bg: #26262a;
+  background: var(--bg);
+  color: var(--text);
+}

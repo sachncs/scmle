@@ -1,0 +1,18 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<BaseLayout title="Page not found" description="The page you were looking for does not exist." path="/404.html" noindex>
+  <main id="main" class="section">
+    <div class="container" style="max-width:40rem;text-align:center">
+      <p class="kicker">404</p>
+      <h1 class="h2">This page is not part of the lifecycle.</h1>
+      <p class="sub" style="margin-inline:auto">It may have moved. Start from the home page or the documentation.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href={`${base}/`}>Go home</a>
+        <a class="btn btn-secondary" href={`${base}/docs/`}>Open the docs</a>
+      </div>
+    </div>
+  </main>
+</BaseLayout>

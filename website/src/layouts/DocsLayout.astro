@@ -1,4 +1,6 @@
 ---
+import BaseLayout from "./BaseLayout.astro";
+
 interface Props {
   title: string;
   description: string;
@@ -26,172 +28,37 @@ const links = [
   { href: `${base}/docs/migrations/`, label: "Migrations", key: "migrations" },
   { href: `${base}/docs/troubleshooting/`, label: "Troubleshooting", key: "troubleshooting" },
 ];
-const canonical = new URL(`${base}${Astro.url.pathname.replace(base, "")}`, "https://sachncs.github.io").toString();
+const path = Astro.url.pathname.startsWith(base) ? Astro.url.pathname.slice(base.length) || "/" : Astro.url.pathname;
 const currentIndex = links.findIndex((link) => link.key === current);
 const previous = currentIndex > 0 ? links[currentIndex - 1] : null;
 const next = currentIndex >= 0 && currentIndex < links.length - 1 ? links[currentIndex + 1] : null;
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
-    <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
-    <title>{title} — SCMLE docs</title>
-  </head>
-  <body>
-    <header class="docs-nav shell">
-      <a class="brand" href={`${base}/`} aria-label="SCMLE home">
-        <img class="brand-logo" src={`${base}/scmle-mark.svg`} alt="" />
-        <span>SCMLE</span>
-      </a>
-      <div class="docs-nav-label">Developer documentation</div>
-      <a class="repo-link" href="https://github.com/sachncs/scmle">GitHub ↗</a>
-    </header>
+<BaseLayout title={`${title} · Docs`} description={description} path={path} section="docs">
+  <div class="docs-shell container">
+    <aside class="sidebar" aria-label="Documentation">
+      <p class="sidebar-label">Documentation</p>
+      <div class="filter">
+        <label class="sr-only" for="doc-filter">Filter documentation pages</label>
+        <input id="doc-filter" type="search" placeholder="Filter pages  ( / )" autocomplete="off" />
+      </div>
+      <nav aria-label="Documentation pages">
+        {links.map((link, i) => (
+          <a aria-current={current === link.key ? "page" : undefined} href={link.href}>
+            <span>{String(i + 1).padStart(2, "0")}</span>{link.label}
+          </a>
+        ))}
+      </nav>
+      <p class="filter-empty" hidden>No matching pages.</p>
+      <p class="sidebar-foot">Documents the 0.1 beta line.</p>
+    </aside>
 
-    <div class="docs-shell shell">
-      <aside class="sidebar" aria-label="Documentation navigation">
-        <p class="eyebrow"><span></span> Docs</p>
-        <p class="sidebar-intro">Mathematics meets engineering for trustworthy ML systems.</p>
-        <nav>
-          {links.map((link) => (
-            <a class:list={{ active: current === link.key }} aria-current={current === link.key ? "page" : undefined} href={link.href}>
-              <span>{String(links.indexOf(link) + 1).padStart(2, "0")}</span>
-              {link.label}
-            </a>
-          ))}
-        </nav>
-        <div class="sidebar-foot">
-          <span>Current line</span>
-          <strong>0.1 beta</strong>
-        </div>
-      </aside>
-
-      <main class="docs-content">
-        <slot />
-        <nav class="docs-pager" aria-label="Documentation pages">
-          {previous ? <a href={previous.href}><span>← Previous</span><strong>{previous.label}</strong></a> : <span></span>}
-          {next ? <a class="next" href={next.href}><span>Next →</span><strong>{next.label}</strong></a> : <span></span>}
-        </nav>
-      </main>
-    </div>
-
-    <footer class="footer shell">
-      <a class="brand" href={`${base}/`}><span class="brand-mark">✳</span><span>scmle</span></a>
-      <span>Mathematics meets engineering</span>
-      <span>© 2026</span>
-    </footer>
-  </body>
-</html>
-
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
-  :global(*) { box-sizing: border-box; }
-  :global(body) { background: #f5f4ef; color: #18231f; font-family: 'DM Sans', sans-serif; margin: 0; }
-  :global(a) { color: inherit; }
-  :global(a:focus-visible) { outline: 3px solid #9eaf2e; outline-offset: 4px; }
-  .shell { margin-inline: auto; width: min(1180px, calc(100% - 64px)); }
-  .brand { align-items: center; color: #18231f; display: inline-flex; font-size: 15px; font-weight: 700; gap: 9px; letter-spacing: .04em; text-decoration: none; }
-  .brand-logo { height: 30px; width: 30px; }
-  .docs-nav { align-items: center; border-bottom: 1px solid #d9ddd2; display: flex; justify-content: space-between; min-height: 88px; }
-  .docs-nav-label, .repo-link { color: #65716c; font: 11px 'DM Mono', monospace; text-transform: uppercase; }
-  .repo-link { border-bottom: 1px solid #18231f; color: #18231f; padding-bottom: 5px; text-decoration: none; text-transform: none; }
-  .docs-shell { display: grid; gap: 105px; grid-template-columns: 225px minmax(0, 700px); padding: 78px 0 130px; }
-  .sidebar { border-right: 1px solid #d9ddd2; min-height: 660px; padding-right: 30px; position: relative; }
-  .eyebrow { align-items: center; color: #65716c; display: flex; font: 11px 'DM Mono', monospace; gap: 9px; letter-spacing: .02em; text-transform: uppercase; }
-  .eyebrow span { background: #9eaf2e; border-radius: 50%; height: 6px; width: 6px; }
-  .sidebar-intro { color: #65716c; font-size: 14px; line-height: 1.5; margin: 28px 0 36px; }
-  .sidebar nav { display: grid; gap: 4px; }
-  .sidebar nav a { align-items: center; color: #65716c; display: flex; font-size: 14px; gap: 14px; padding: 11px 0; text-decoration: none; }
-  .sidebar nav a span { color: #9eaf2e; font: 10px 'DM Mono', monospace; }
-  .sidebar nav a:hover, .sidebar nav a.active { color: #18231f; font-weight: 600; }
-  .sidebar-foot { bottom: 0; color: #9ca69f; display: grid; font: 10px 'DM Mono', monospace; gap: 8px; position: absolute; text-transform: uppercase; }
-  .sidebar-foot strong { color: #18231f; font-weight: 500; }
-  .docs-content { min-width: 0; }
-  .docs-content :global(.eyebrow) { margin-top: 0; }
-  .docs-content :global(h1) { font-size: clamp(45px, 6vw, 76px); font-weight: 500; letter-spacing: -.075em; line-height: .98; margin: 24px 0 25px; }
-  .docs-content :global(h1 em), .docs-content :global(h2 em) { color: #9eaf2e; font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; }
-  .docs-content :global(.lead) { color: #65716c; font-size: 19px; line-height: 1.55; max-width: 610px; }
-  .docs-content :global(h2) { border-top: 1px solid #d9ddd2; font-size: 28px; font-weight: 500; letter-spacing: -.05em; margin: 70px 0 20px; padding-top: 23px; }
-  .docs-content :global(h3) { font-size: 18px; font-weight: 600; letter-spacing: -.03em; margin: 35px 0 10px; }
-  .docs-content :global(p), .docs-content :global(li) { color: #52615a; font-size: 15px; line-height: 1.7; }
-  .docs-content :global(ul), .docs-content :global(ol) { padding-left: 22px; }
-  .docs-content :global(li + li) { margin-top: 8px; }
-  .docs-content :global(a) { color: #526b24; text-underline-offset: 3px; }
-  .docs-content :global(.doc-cards) { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); margin-top: 45px; }
-  .docs-content :global(.doc-card) { border: 1px solid #d9ddd2; padding: 22px; text-decoration: none; }
-  .docs-content :global(.doc-card:hover) { background: #fffffb; border-color: #9eaf2e; }
-  .docs-content :global(.doc-card small) { color: #9eaf2e; font: 10px 'DM Mono', monospace; }
-  .docs-content :global(.doc-card h3) { color: #18231f; margin: 18px 0 8px; }
-  .docs-content :global(.doc-card p) { font-size: 13px; margin: 0; }
-  .docs-content :global(.split-cards) { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); margin: 28px 0; }
-  .docs-content :global(.mini-card) { background: #eef0e7; border: 1px solid #d9ddd2; padding: 20px; }
-  .docs-content :global(.mini-card h3) { color: #18231f; margin: 12px 0 8px; }
-  .docs-content :global(.mini-card p) { font-size: 14px; margin: 0; }
-  .docs-content :global(.mini-card .note) { border-top: 1px solid #d9ddd2; color: #65716c; font-size: 12px; margin-top: 17px; padding-top: 12px; }
-  .docs-content :global(.mini-label) { color: #7e8e21; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; }
-  .docs-content :global(.callout) { background: #e8edc7; border-left: 3px solid #9eaf2e; margin: 28px 0; padding: 18px 20px; }
-  .docs-content :global(.callout p) { color: #3d4c31; margin: 0; }
-  .docs-content :global(pre) { background: #18231f; color: #e5ebdf; font: 12px/1.7 'DM Mono', monospace; overflow-x: auto; padding: 20px; }
-  .docs-content :global(code) { background: #e8ebe2; color: #31413a; font: .88em 'DM Mono', monospace; padding: 2px 5px; }
-  .docs-content :global(pre code) { background: transparent; color: inherit; padding: 0; }
-  .docs-content :global(.meta) { color: #9ca69f; font: 10px 'DM Mono', monospace; margin-top: 38px; text-transform: uppercase; }
-  .docs-pager { border-top: 1px solid #d9ddd2; display: grid; gap: 15px; grid-template-columns: 1fr 1fr; margin-top: 90px; padding-top: 22px; }
-  .docs-pager a { border: 1px solid #d9ddd2; display: grid; gap: 8px; padding: 16px; text-decoration: none; }
-  .docs-pager a:hover { background: #fffffb; border-color: #9eaf2e; }
-  .docs-pager a.next { text-align: right; }
-  .docs-pager span { color: #7e8e21; font: 10px 'DM Mono', monospace; text-transform: uppercase; }
-  .docs-pager strong { color: #18231f; font-size: 15px; font-weight: 600; }
-  .docs-content :global(.diagram) { background: #eef0e7; border: 1px solid #d9ddd2; margin: 28px 0; padding: 22px; }
-  .docs-content :global(figure) { margin-inline: 0; }
-  .docs-content :global(.diagram-caption) { align-items: baseline; display: flex; gap: 16px; justify-content: space-between; margin-bottom: 23px; }
-  .docs-content :global(.diagram-caption span), .docs-content :global(.plane span), .docs-content :global(.path-step span) { color: #7e8e21; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; }
-  .docs-content :global(.diagram-caption strong) { color: #52615a; font-size: 13px; font-weight: 500; }
-  .docs-content :global(.flow-row) { align-items: center; display: flex; gap: 9px; justify-content: space-between; }
-  .docs-content :global(.flow-node) { background: #fffffb; border: 1px solid #d9ddd2; display: grid; flex: 1; gap: 7px; min-height: 96px; padding: 14px; }
-  .docs-content :global(.flow-node.active) { background: #dfe9a4; border-color: #9eaf2e; }
-  .docs-content :global(.flow-node span) { color: #9eaf2e; font: 10px 'DM Mono', monospace; }
-  .docs-content :global(.flow-node b) { color: #18231f; font-size: 15px; }
-  .docs-content :global(.flow-node small) { color: #65716c; font: 10px 'DM Mono', monospace; }
-  .docs-content :global(.flow-arrow) { color: #9eaf2e; font-size: 20px; font-style: normal; }
-  .docs-content :global(.evidence-rail) { align-items: center; color: #65716c; display: flex; font: 10px 'DM Mono', monospace; gap: 8px; margin-top: 14px; }
-  .docs-content :global(.evidence-rail span) { color: #18231f; text-transform: uppercase; }
-  .docs-content :global(.evidence-rail i) { background: #b9c274; flex: 1; height: 1px; }
-  .docs-content :global(.planes) { display: grid; gap: 9px; }
-  .docs-content :global(.plane) { background: #fffffb; border-left: 4px solid #9eaf2e; display: grid; gap: 7px; padding: 17px 19px; }
-  .docs-content :global(.plane-execution) { border-left-color: #526b24; }
-  .docs-content :global(.plane-evidence) { border-left-color: #18231f; }
-  .docs-content :global(.plane strong) { color: #18231f; font-size: 18px; }
-  .docs-content :global(.plane p) { font: 11px 'DM Mono', monospace; margin: 0; }
-  .docs-content :global(.plane-connector) { color: #7e8e21; font: 10px 'DM Mono', monospace; padding-left: 26px; }
-  .docs-content :global(.data-path) { align-items: center; display: flex; gap: 7px; overflow-x: auto; padding: 18px; }
-  .docs-content :global(.path-step) { background: #fffffb; border: 1px solid #d9ddd2; display: grid; gap: 8px; min-width: 112px; padding: 14px; }
-  .docs-content :global(.path-step.highlighted) { background: #dfe9a4; border-color: #9eaf2e; }
-  .docs-content :global(.path-step b) { color: #18231f; font-size: 12px; line-height: 1.35; }
-  .docs-content :global(.path-line) { background: #9eaf2e; flex: 1; height: 1px; min-width: 18px; position: relative; }
-  .docs-content :global(.path-line::after) { border-bottom: 4px solid transparent; border-left: 5px solid #9eaf2e; border-top: 4px solid transparent; content: ''; position: absolute; right: -1px; top: -3px; }
-  .footer { align-items: center; border-top: 1px solid #d9ddd2; color: #9ca69f; display: flex; font: 10px 'DM Mono', monospace; justify-content: space-between; min-height: 100px; }
-  .footer .brand { font-family: 'DM Sans', sans-serif; font-size: 13px; }
-  @media (max-width: 760px) {
-    .shell { width: min(100% - 40px, 540px); }
-    .docs-nav-label { display: none; }
-    .docs-shell { display: block; padding: 45px 0 90px; }
-    .sidebar { border-bottom: 1px solid #d9ddd2; border-right: 0; min-height: auto; padding: 0 0 28px; }
-    .sidebar-intro { max-width: 310px; }
-    .sidebar nav { display: flex; flex-wrap: wrap; gap: 0 18px; }
-    .sidebar nav a { padding: 6px 0; }
-    .sidebar-foot { display: none; }
-    .docs-content { padding-top: 55px; }
-    .docs-content :global(.doc-cards) { grid-template-columns: 1fr; }
-    .docs-content :global(.split-cards) { grid-template-columns: 1fr; }
-    .docs-content :global(.flow-row) { align-items: stretch; flex-direction: column; }
-    .docs-content :global(.flow-arrow) { line-height: 12px; text-align: center; transform: rotate(90deg); }
-    .docs-content :global(.evidence-rail) { align-items: flex-start; flex-direction: column; }
-    .docs-content :global(.evidence-rail i) { flex: none; height: 12px; margin-left: 4px; width: 1px; }
-    .footer { align-items: flex-start; flex-direction: column; gap: 15px; padding: 25px 0; }
-    .docs-pager { grid-template-columns: 1fr; }
-    .docs-pager a.next { text-align: left; }
-  }
-</style>
+    <main id="main" class="docs-content">
+      <slot />
+      <nav class="docs-pager" aria-label="Previous and next page">
+        {previous ? <a class="prev" rel="prev" href={previous.href}><span>← Previous</span><strong>{previous.label}</strong></a> : <span></span>}
+        {next ? <a class="next" rel="next" href={next.href}><span>Next →</span><strong>{next.label}</strong></a> : <span></span>}
+      </nav>
+    </main>
+  </div>
+</BaseLayout>
