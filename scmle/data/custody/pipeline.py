@@ -1,0 +1,260 @@
+"""Applying custody to a split: development rows become `X`, `C` is sealed.
+
+Runs after `SplitManager.split` and before profiling, so the profiler,
+feature selection and every trial see only exploration rows. The final test
+set keeps the role it has today; `C` is a separate carve-out of the
+development rows, so confirmed claims never shape the model that `C` scores.
+"""
+
+import dataclasses
+
+import numpy as np
+import pandas as pd
+
+from scmle.contracts import errors
+from scmle.contracts import tasks
+from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import feasibility
+from scmle.data.custody import carve
+from scmle.data.custody import manifest as manifest_module
+from scmle.data.custody import sealed
+from scmle.data.splitting import duplicates
+from scmle.data.splitting import splitters
+
+TEMPORAL = frozenset({"temporal", "rolling"})
+
+
+@dataclasses.dataclass(slots=True)
+class CustodyOutcome:
+    """Everything custody produced for a run.
+
+    Attributes:
+        split: The split with development data restricted to `X`.
+        view: What exploration code may receive.
+        manifest: The v2 manifest.
+        feasibility: Whether `C` can support the promised power.
+    """
+
+    split: splitters.SplitResult
+    view: sealed.ExplorationView
+    manifest: manifest_module.CustodyManifest
+    feasibility: feasibility.Feasibility
+
+
+def minority_rows(labels: np.ndarray | None, fraction: float) -> int | None:
+    """Expected minority-class rows in `C`, or None without labels."""
+    if labels is None:
+        return None
+    counts = np.unique(labels, return_counts=True)[1]
+    return int(np.min(counts) * fraction)
+
+
+def assess(
+    charter: charter_contracts.AnalysisCharter,
+    n_rows: int,
+    minority: int | None,
+) -> feasibility.Feasibility:
+    """Feasibility of a confirmation set of `n_rows` under the charter."""
+    return feasibility.assess(
+        n_confirmation=n_rows,
+        min_effect=charter.min_effect,
+        alpha=float(charter.error_budget.confirmation.alpha_confirm),
+        k_max=charter.k_max,
+        power=charter.power,
+        n_minority=minority,
+    )
+
+
+def classes_complete(
+    labels: np.ndarray | None, carved: carve.Carve, dev_ids: np.ndarray
+) -> bool:
+    """Whether `C` holds every class that `X` holds."""
+    if labels is None:
+        return True
+    position = {int(row): index for index, row in enumerate(dev_ids)}
+    in_c = {labels[position[int(r)]] for r in carved.confirmation_ids}
+    in_x = {labels[position[int(r)]] for r in carved.exploration_ids}
+    return in_x <= in_c
+
+
+def empty_carve(
+    dev_ids: np.ndarray, folds: list[tuple[np.ndarray, np.ndarray]], note: str
+) -> carve.Carve:
+    """A carve that leaves every development row in `X`."""
+    return carve.Carve(
+        exploration_ids=dev_ids,
+        confirmation_ids=dev_ids[:0],
+        embargo_ids=dev_ids[:0],
+        folds=folds,
+        notes=(note,),
+    )
+
+
+def apply_custody(
+    *,
+    charter: charter_contracts.AnalysisCharter,
+    split: splitters.SplitResult,
+    frame: pd.DataFrame,
+    spec: tasks.ProjectSpec,
+    task: tasks.TaskType,
+    data_hash: str,
+    vault: sealed.CustodyVault,
+) -> CustodyOutcome:
+    """Carves `C` out of the development rows and seals it.
+
+    Args:
+        charter: The governing charter.
+        split: Result of the ordinary split.
+        frame: The full dataset (target included), indexed by row id.
+        spec: Project specification.
+        task: Resolved task type.
+        data_hash: Hash of the dataset.
+        vault: Where sealed sets are held.
+
+    Returns:
+        The restricted split, the exploration view, the v2 manifest and the
+        feasibility verdict. If `C` cannot be confirmed the carve is skipped:
+        all development rows stay in `X` and the scope is capped.
+    """
+    data, old = spec.data, split.manifest
+    dev_ids = np.asarray(old.train_ids, dtype=int)
+    folds = [(np.asarray(a, int), np.asarray(b, int)) for a, b in old.folds]
+    labels = (
+        frame[data.target].iloc[dev_ids].to_numpy()
+        if task.is_classification
+        else None
+    )
+    groups = (
+        frame[data.group_column].iloc[dev_ids].to_numpy()
+        if data.group_column
+        else None
+    )
+    times = (
+        frame[data.time_column].iloc[dev_ids].to_numpy()
+        if old.strategy in TEMPORAL and data.time_column
+        else None
+    )
+    columns = splitters.SplitManager(spec, task).feature_columns(frame)
+    copies = duplicates.duplicate_groups(frame, columns)[dev_ids]
+    fraction = charter.sets.confirmation_fraction
+    estimate = assess(
+        charter,
+        round(fraction * len(dev_ids)),
+        minority_rows(labels, fraction),
+    )
+    if estimate.verdict is feasibility.Verdict.INFEASIBLE:
+        carved = empty_carve(dev_ids, folds, estimate.reason)
+    else:
+        try:
+            carved = carve.carve_confirmation(
+                dev_ids,
+                folds,
+                fraction=fraction,
+                seed=charter.seed,
+                charter_hash=charter.charter_hash,
+                data_hash=data_hash,
+                labels=labels,
+                groups=groups,
+                times=times,
+                duplicates=copies,
+                embargo_rows=charter.sets.embargo_rows,
+            )
+        except errors.ConfigError as refusal:
+            # The carve refuses explicitly (for example when it would leave a
+            # validation fold empty). The run continues with no confirmation
+            # set and an unconfirmed scope, as for an infeasible size (F1/F2).
+            carved = empty_carve(
+                dev_ids, folds, f"confirmation set not carved: {refusal}"
+            )
+        if len(carved.confirmation_ids) and not classes_complete(
+            labels, carved, dev_ids
+        ):
+            carved = empty_carve(
+                dev_ids, folds, "confirmation set misses a class: not carved"
+            )
+    actual = assess(
+        charter,
+        len(carved.confirmation_ids),
+        minority_rows(labels, fraction)
+        if len(carved.confirmation_ids)
+        else None,
+    )
+    if actual.verdict is feasibility.Verdict.INFEASIBLE and len(
+        carved.confirmation_ids
+    ):
+        carved = empty_carve(dev_ids, folds, actual.reason)
+        actual = assess(charter, 0, None)
+    return finish(
+        charter, split, frame, spec, carved, dev_ids, actual, data_hash, vault
+    )
+
+
+def finish(
+    charter: charter_contracts.AnalysisCharter,
+    split: splitters.SplitResult,
+    frame: pd.DataFrame,
+    spec: tasks.ProjectSpec,
+    carved: carve.Carve,
+    dev_ids: np.ndarray,
+    report: feasibility.Feasibility,
+    data_hash: str,
+    vault: sealed.CustodyVault,
+) -> CustodyOutcome:
+    """Builds the restricted split, seals `C` and records the manifest."""
+    old = split.manifest
+    keep = np.flatnonzero(np.isin(dev_ids, carved.exploration_ids))
+    folds = tuple(
+        (tuple(int(i) for i in fit), tuple(int(i) for i in held))
+        for fit, held in carved.folds
+    )
+    exploration = tuple(int(i) for i in carved.exploration_ids)
+    isolation: list[tuple[str, str]] = [("final_test", vault.level)]
+    confirmation = tuple(int(i) for i in carved.confirmation_ids)
+    if confirmation:
+        target = spec.data.target
+        rows = np.asarray(confirmation)
+        vault.seal(
+            "C",
+            frame.drop(columns=[target]).iloc[rows].reset_index(drop=True),
+            frame[target].iloc[rows].reset_index(drop=True),
+            confirmation,
+        )
+        isolation.insert(0, ("C", vault.level))
+    notes = (*old.notes, *carved.notes)
+    restricted = splitters.SplitManifest(
+        strategy=old.strategy,
+        seed=old.seed,
+        train_ids=exploration,
+        test_ids=old.test_ids,
+        folds=folds,
+        notes=notes,
+    )
+    manifest = manifest_module.CustodyManifest(
+        strategy=old.strategy,
+        seed=charter.seed,
+        embargo_rows=charter.sets.embargo_rows,
+        charter_hash=charter.charter_hash,
+        data_hash=data_hash,
+        exploration_ids=exploration,
+        confirmation_ids=confirmation,
+        embargo_ids=tuple(int(i) for i in carved.embargo_ids),
+        final_test_ids=tuple(old.test_ids),
+        folds=folds,
+        isolation=tuple(isolation),
+        scope=report.scope,
+        notes=notes,
+    )
+    result = splitters.SplitResult(
+        restricted,
+        split.dev_features.iloc[keep].reset_index(drop=True),
+        split.dev_target.iloc[keep].reset_index(drop=True),
+        split.locked_test,
+    )
+    view = sealed.ExplorationView(
+        features=result.dev_features,
+        target=result.dev_target,
+        ids=exploration,
+        folds=folds,
+        manifest_sha256=manifest.sha256,
+    )
+    return CustodyOutcome(result, view, manifest, report)

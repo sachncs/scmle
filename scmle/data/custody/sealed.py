@@ -1,0 +1,251 @@
+"""Sealed sets, the hash-chained open log and the exploration view.
+
+Protection model (canon P6). A sealed set lives in a separate operating-system
+process (`scmle.governance.vault`): after sealing, the orchestrator keeps only
+row ids and a release token, and the rows travel to the token holder once, over
+a channel keyed by a secret that only the parent and the vault hold. Code that
+is given only an `ExplorationView` has no reference to a sealed set, a vault
+or a token, so it cannot open one by accident or by attribute access. This is
+tamper-evident custody on one machine, not adversary-proof: a process with the
+same operating-system privileges could still attach to the vault or read the
+original file. Every sealing, token issue, open and refused attempt is written
+to a hash-chained log that holds ids and counts but never row values.
+"""
+
+from collections.abc import Mapping
+import dataclasses
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from scmle.contracts import errors
+from scmle.contracts import signing
+from scmle.data.splitting import splitters
+from scmle.governance import vault as vault_module
+
+GENESIS = "0" * 64
+ORCHESTRATOR = "orchestrator"
+VAULT_LEVEL = "vault process"
+PROTOCOL_LEVEL = "in-process protocol"
+
+
+def entry_hash(body: Mapping[str, Any]) -> str:
+    """Hash of a log entry's content."""
+    return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
+
+
+class OpenLog:
+    """Append-only, hash-chained record of custody events.
+
+    Each entry stores the hash of the previous one, so editing, removing or
+    reordering any entry breaks the chain from that point on.
+    """
+
+    def __init__(self, path: str | Path | None = None) -> None:
+        """Opens the log, loading and verifying an existing file.
+
+        Args:
+            path: File to persist to (one JSON object per line), or None for
+                an in-memory log.
+
+        Raises:
+            ArtifactError: If an existing file fails verification.
+        """
+        self.path = Path(path) if path is not None else None
+        self.entries: list[dict[str, Any]] = []
+        if self.path is not None and self.path.exists():
+            self.entries = [
+                json.loads(line)
+                for line in self.path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.verify()
+
+    def append(
+        self,
+        set_id: str,
+        event: str,
+        actor: str,
+        detail: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Adds an event and persists it.
+
+        Args:
+            set_id: Set concerned (`C`, `final_test`, ...).
+            event: `sealed`, `token_issued`, `open` or `denied`.
+            actor: Who acted.
+            detail: Counts and reasons; never row values.
+
+        Returns:
+            The stored entry including its hash.
+        """
+        body = {
+            "seq": len(self.entries),
+            "set": set_id,
+            "event": event,
+            "actor": actor,
+            "detail": dict(detail or {}),
+            "prev": self.entries[-1]["hash"] if self.entries else GENESIS,
+        }
+        entry = {**body, "hash": entry_hash(body)}
+        self.entries.append(entry)
+        if self.path is not None:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, sort_keys=True) + "\n")
+        return entry
+
+    def verify(self) -> None:
+        """Checks every link of the chain.
+
+        Raises:
+            ArtifactError: At the first entry that does not verify.
+        """
+        previous = GENESIS
+        for index, entry in enumerate(self.entries):
+            body = {k: v for k, v in entry.items() if k != "hash"}
+            if (
+                entry.get("seq") != index
+                or entry.get("prev") != previous
+                or entry.get("hash") != entry_hash(body)
+            ):
+                raise errors.ArtifactError(
+                    f"custody log chain broken at entry {index}"
+                )
+            previous = entry["hash"]
+
+    @classmethod
+    def verify_file(cls, path: str | Path) -> "OpenLog":
+        """Loads a log file and verifies its chain."""
+        return cls(path)
+
+
+class SealedSet:
+    """A named set behind a one-time, token-gated release, with a log."""
+
+    def __init__(
+        self, set_id: str, locked: splitters.LockedTestSet, log: OpenLog
+    ) -> None:
+        """Wraps a locked set and records that it was sealed.
+
+        Args:
+            set_id: Name of the set.
+            locked: The locked set (a vault-backed one for real custody).
+            log: The custody log.
+        """
+        self.set_id = set_id
+        self.locked = locked
+        self.log = log
+        log.append(set_id, "sealed", ORCHESTRATOR, {"rows": len(locked)})
+
+    @property
+    def ids(self) -> tuple[int, ...]:
+        """Row ids of the set (the rows themselves are not held here)."""
+        return tuple(self.locked.ids)
+
+    @property
+    def opened(self) -> bool:
+        """Whether the rows were released."""
+        return bool(self.locked.opened)
+
+    def issue_token(self) -> str:
+        """Returns the release token; call only once selection is frozen."""
+        token = self.locked.issue_token()
+        self.log.append(self.set_id, "token_issued", ORCHESTRATOR)
+        return token
+
+    def open(
+        self, token: str, actor: str = ORCHESTRATOR
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        """Releases the rows a single time.
+
+        Args:
+            token: The token from `issue_token`.
+            actor: Who is opening (recorded).
+
+        Raises:
+            LeakageError: On a wrong token or a repeated release.
+        """
+        try:
+            rows = self.locked.open(token)
+        except errors.LeakageError as error:
+            self.log.append(
+                self.set_id, "denied", actor, {"reason": str(error)}
+            )
+            raise
+        self.log.append(self.set_id, "open", actor, {"rows": len(rows[0])})
+        return rows
+
+
+class CustodyVault:
+    """Holds every sealed set of a run and the shared custody log."""
+
+    def __init__(self, log: OpenLog, process: bool = True) -> None:
+        """Creates an empty vault.
+
+        Args:
+            log: The custody log.
+            process: Seal into a separate vault process (real custody). False
+                keeps rows in this process behind the token protocol only,
+                for tests that must not spawn processes.
+        """
+        self.log = log
+        self.process = process
+        self.sets: dict[str, SealedSet] = {}
+
+    @property
+    def level(self) -> str:
+        """Isolation level this vault gives."""
+        return VAULT_LEVEL if self.process else PROTOCOL_LEVEL
+
+    def adopt(self, set_id: str, locked: splitters.LockedTestSet) -> SealedSet:
+        """Registers an already-locked set under a name."""
+        if set_id in self.sets:
+            raise ValueError(f"set {set_id} is already sealed")
+        held = SealedSet(set_id, locked, self.log)
+        self.sets[set_id] = held
+        return held
+
+    def seal(
+        self,
+        set_id: str,
+        features: pd.DataFrame,
+        target: pd.Series,
+        ids: tuple[int, ...],
+    ) -> SealedSet:
+        """Moves rows into custody and keeps only their ids here."""
+        locked: splitters.LockedTestSet = (
+            vault_module.SealedTestSet(features, target, ids)
+            if self.process
+            else splitters.ResidentTestSet(features, target, ids)
+        )
+        return self.adopt(set_id, locked)
+
+    def close(self) -> None:
+        """Ends every vault process."""
+        for held in self.sets.values():
+            held.locked.close()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ExplorationView:
+    """Everything exploration code may receive: `X` and nothing sealed.
+
+    It holds no reference to a vault, a sealed set, a token or the log.
+
+    Attributes:
+        features: Exploration features.
+        target: Exploration labels.
+        ids: Row ids of the exploration rows.
+        folds: Cross-validation folds over positions in these rows.
+        manifest_sha256: Hash of the governing split manifest.
+    """
+
+    features: pd.DataFrame
+    target: pd.Series
+    ids: tuple[int, ...]
+    folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
+    manifest_sha256: str
