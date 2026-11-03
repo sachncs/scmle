@@ -1,0 +1,32 @@
+{
+  "alpha": 0.05,
+  "band_99": [
+    0.03224732165140968,
+    0.06775267834859033
+  ],
+  "detected": {
+    "leak_copy": 200,
+    "leak_missing_for_class": 200,
+    "leak_noisy_copy": 146,
+    "leak_threshold": 200
+  },
+  "null_replicates": 1000,
+  "plant_replicates_per_type": 200,
+  "settings": {
+    "alpha": 0.05,
+    "association_ceiling": 0.9,
+    "bootstrap": 200,
+    "confidence": 0.95,
+    "folds": 5,
+    "max_leaf_nodes": 8,
+    "min_rows": 100,
+    "min_samples_leaf": 5,
+    "n_strata": 8,
+    "permutations": 199,
+    "run_seed": 0,
+    "skill_ceiling": 0.95
+  },
+  "size_by_p_value_alone": 0.047,
+  "size_in_band": true,
+  "suspect_false_alarms": 0
+}
