@@ -152,3 +152,42 @@ def test_too_few_rows_run_unconfirmed_instead_of_failing(tmp_path):
 def test_a_missing_charter_file_is_a_config_error(binary_frame, tmp_path):
     with pytest.raises(errors.ConfigError):
         run(binary_frame, tmp_path, tmp_path / "nope.json")
+
+
+def test_a_charter_run_writes_the_ledger_control_and_claims(
+    binary_frame, tmp_path
+):
+    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    folder = pathlib.Path(result.run_dir)
+    for name in (
+        "hypothesis_ledger.jsonl",
+        "negative_control.json",
+        "confirmed_claims.json",
+    ):
+        assert (folder / name).exists(), name
+    done = event(result.run_dir, "ledger.completed")["data"]
+    claims = json.loads((folder / "confirmed_claims.json").read_text())
+    assert done["ledger_head"] == claims["ledger_head"]
+    from scmle.data.ledger import ledger as ledger_module
+
+    ledger = ledger_module.Ledger.load(
+        folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
+    )
+    # Only numeric features are candidates; the categorical one is skipped.
+    assert {h.spec.column for h in ledger.hypotheses.values()} == {"a", "b"}
+    assert claims["outcome"] == done["outcome"]
+    log = sealed.OpenLog.verify_file(folder / "custody_log.jsonl")
+    events_c = [e["event"] for e in log.entries if e["set"] == "C"]
+    if claims["outcome"] == "confirmed":
+        assert events_c.count("open") == 1
+        assert "selection_frozen" in events_c
+        assert events_c.index("selection_frozen") < events_c.index("open")
+    else:
+        assert "open" not in events_c
+
+
+def test_a_run_without_a_charter_has_no_ledger(binary_frame, tmp_path):
+    result = run(binary_frame, tmp_path)
+    folder = pathlib.Path(result.run_dir)
+    assert not (folder / "hypothesis_ledger.jsonl").exists()
+    assert all(e["kind"] != "ledger.completed" for e in events(result.run_dir))

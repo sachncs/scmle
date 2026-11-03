@@ -43,6 +43,8 @@ from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
 from scmle.data.custody import pipeline as custody_pipeline
 from scmle.data.custody import sealed as custody_sealed
+from scmle.data.ledger import budget as ledger_budget
+from scmle.data.ledger import governed as ledger_governed
 from scmle.data.profiling import label_noise
 from scmle.data.profiling import profiler
 from scmle.data.profiling import representativeness
@@ -505,6 +507,64 @@ class ProfileStage(Stage):
                 raise errors.BlockedError(
                     "unresolved leakage risk: " + "; ".join(leaks)
                 )
+        self.run_claim_ledger(context, task)
+
+    def run_claim_ledger(
+        self, context: context_module.RunContext, task: tasks.TaskType
+    ) -> None:
+        """Explores `X` under the ledger and confirms once on `C` (F3).
+
+        Runs only for a charter run. Exploration reads the exploration view;
+        the sealed confirmation set is handed to the confirmation stage as an
+        argument and is opened at most once, after the survivors are frozen
+        in the ledger. Tasks other than classification and regression are
+        recorded as skipped: their findings stay unconfirmed.
+        """
+        outcome = context.custody
+        vault = context.custody_vault
+        if outcome is None or vault is None:
+            return
+        if task not in tasks.STANDARD_TASKS:
+            context.emit(
+                "ledger.skipped",
+                f"the claim ledger does not cover {task.value} tasks; "
+                "findings stay unconfirmed",
+            )
+            return
+        spec = context.spec
+        charter = charter_sealing.read_verified(str(spec.charter_path)).charter
+        data = spec.data
+        view = outcome.view
+        run_dir = context.store.directory if context.store is not None else None
+        run = ledger_governed.run_governed(
+            charter=charter,
+            features=view.features,
+            target=view.target,
+            classification=task.is_classification,
+            source=vault.sets.get("C"),
+            run_dir=run_dir,
+            exclude=tuple(
+                c for c in (data.group_column, data.time_column) if c
+            ),
+            strata=ledger_governed.strata_labels(
+                view.features, data.group_column, data.time_column
+            ),
+            rule=spec.ledger_rule,
+            confirmation_rule=ledger_budget.MultiplicityRule(
+                spec.confirmation_rule
+            ),
+            policy=spec.confirmation_failure_policy,
+        )
+        context.emit(
+            "ledger.completed",
+            run.confirmation.reason,
+            (
+                "hypothesis_ledger.jsonl",
+                "negative_control.json",
+                "confirmed_claims.json",
+            ),
+            run.summary(),
+        )
 
     @staticmethod
     def add_quality_notes(

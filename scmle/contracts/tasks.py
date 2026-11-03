@@ -571,6 +571,13 @@ class ProjectSpec(FrozenModel):
     # Path of an analysis charter. When set, the run splits the development
     # rows into exploration and sealed confirmation sets (feature F2).
     charter_path: str | None = None
+    # Choices for the claim ledger of a charter run (feature F3). `ledger_rule`
+    # is the online FDR rule for exploration: e-LOND is valid under arbitrary
+    # dependence; LORD++ and SAFFRON assume independent p-values.
+    # `confirmation_rule` adjusts the survivors tested once on `C`.
+    ledger_rule: Literal["e-lond", "lord++", "saffron"] = "e-lond"
+    confirmation_rule: Literal["bh", "by", "holm", "bonferroni"] = "by"
+    confirmation_failure_policy: Literal["unconfirmed"] = "unconfirmed"
 
     @pydantic.model_validator(mode="before")
     @classmethod
