@@ -112,7 +112,7 @@ def test_null_p_values_are_uniform_by_a_ks_test():
     rng = np.random.default_rng(11)
     draws = [
         bv.spearman(rng.normal(size=40), rng.normal(size=40)).p
-        for _ in range(3000)
+        for draw in range(3000)
     ]
     assert stats.kstest(draws, "uniform").pvalue > 1e-3
     assert math.isclose(

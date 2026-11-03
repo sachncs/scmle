@@ -157,7 +157,7 @@ def test_multiclass_targets_use_the_kruskal_statistic():
 
 
 def test_structure_columns_and_non_numeric_features_are_not_candidates():
-    features, _target = build()
+    features = build()[0]
     features["site"] = ["x", "y"] * (len(features) // 2)
     features["const"] = 1.0
     features["entity"] = np.arange(len(features)) // 10

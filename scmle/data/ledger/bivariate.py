@@ -161,12 +161,12 @@ def code_hash(statistic: str) -> str:
     Raises:
         ValueError: On an unknown statistic.
     """
-    function = _lookup(statistic)
+    function = lookup(statistic)
     source = inspect.getsource(function).replace("\r\n", "\n")
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-def _lookup(statistic: str) -> Callable[..., Outcome]:
+def lookup(statistic: str) -> Callable[..., Outcome]:
     """The registered function, or a clear error."""
     if statistic not in STATISTICS:
         raise ValueError(f"statistic must be one of {sorted(STATISTICS)}")
@@ -187,4 +187,4 @@ def run_statistic(
     Returns:
         The outcome.
     """
-    return _lookup(statistic)(x, y, direction)
+    return lookup(statistic)(x, y, direction)

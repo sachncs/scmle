@@ -140,8 +140,7 @@ def test_empirical_error_rates_under_the_global_null_and_with_signal():
     runs, family = 3000, 20
     any_reject = {R.HOLM: 0, R.BONFERRONI: 0}
     false_proportions = {R.BH: [], R.BY: []}
-    for _ in range(runs):
-        null = rng.uniform(size=family)
+    for null in rng.uniform(size=(runs, family)):
         for rule in any_reject:
             any_reject[rule] += int(
                 any(m.adjust(null, rule, F(1, 20)).rejected)

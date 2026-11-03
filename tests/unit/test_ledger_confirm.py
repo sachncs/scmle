@@ -315,7 +315,7 @@ def test_claims_file_round_trips_and_carries_the_hashes(tmp_path):
 
 
 def test_confirmation_with_class_labels_uses_the_exploration_coding():
-    _x, y = world(400, 1)
+    y = world(400, 1)[1]
     labels = pd.Series(np.where(y > y.median(), "yes", "no"))
     codes = explore.encode_target(labels, True)
     assert set(codes.unique()) == {0.0, 1.0}

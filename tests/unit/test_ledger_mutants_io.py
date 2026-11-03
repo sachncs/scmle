@@ -128,7 +128,6 @@ def write_rows(path, rows):
 def explored_file(tmp_path, p_value=1e-6):
     path = tmp_path / ledger_module.FILE_NAME
     ledger = fresh(path)
-    _features, _target = signal_data()
     handle = ledger.register(spec("n"))
     ledger.record(handle, bivariate.Outcome(p_value, 0.1, 0.1, 100))
     return path

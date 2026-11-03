@@ -388,7 +388,7 @@ def test_resampling_modes_hand_the_right_frames_to_the_count_function():
     blocks = np.repeat(np.arange(4), 10)
     frames = []
 
-    def spy(frame, _):
+    def spy(frame, shuffled):
         assert isinstance(frame, pd.DataFrame)
         frames.append(frame.copy())
         return 0
@@ -621,7 +621,7 @@ def test_a_block_label_array_does_not_switch_the_default_mode():
     blocks = np.repeat(np.arange(6), 10)
     broken = []
 
-    def spy(frame, _):
+    def spy(frame, shuffled):
         values = frame["a"].to_numpy()
         runs = all(
             list(values[s : s + 10])
