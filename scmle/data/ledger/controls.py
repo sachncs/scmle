@@ -27,6 +27,11 @@ Two controls:
     distribution exactly and destroys the structure being controlled, which a
     resample would only do on average.
 
+The percentile is the ``ceil(0.95 * (B + 1))``-th smallest re-run count, so
+if the observed count is exchangeable with the re-run counts the gate passes
+by chance with probability at most 1/21 for B = 20 (and at most 0.05 in
+general), which is what a "95th percentile" gate is meant to give.
+
 Monte Carlo error. With `B` repeats the 95th percentile is itself an
 estimate. `ControlResult` reports an approximate distribution-free interval
 for it from order statistics and the exceedance p-value
@@ -56,15 +61,21 @@ COUNT_FUNCTION = Callable[[pd.DataFrame, pd.Series], int]
 
 
 def quantile_index(b: int, q: float = QUANTILE) -> int:
-    """0-based index of the ``ceil(q * B)``-th smallest of `b` counts."""
-    return max(0, math.ceil(q * b - 1e-9) - 1)
+    """0-based index of the ``ceil(q * (B + 1))``-th smallest of `b` counts.
+
+    Using ``B + 1`` (the observed count plus the B re-runs) makes the gate a
+    Monte Carlo test: if the observed count is exchangeable with the re-run
+    counts, ``P(observed > percentile) <= 1 - q``. With B = 20 that is the
+    largest of the 20 counts (``1/21 < 0.05``), not the 19th, which would
+    allow ``2/21 = 9.5%``.
+    """
+    return min(b, max(1, math.ceil(q * (b + 1) - 1e-9))) - 1
 
 
 def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
     """The conservative order-statistic percentile of discovery counts.
 
-    It is the ``ceil(q * B)``-th smallest value, so with B = 20 it is the 19th
-    of 20 and at most ``1 - q`` of the counts can lie above it.
+    It is the ``ceil(q * (B + 1))``-th smallest value (see `quantile_index`).
     """
     if not counts:
         raise ValueError("counts must not be empty")
@@ -148,7 +159,7 @@ class ControlResult:
         scope: `strata` (within groups or blocks) or `global`.
         observed: Discoveries on the real data.
         permuted: Discovery counts of the B re-runs.
-        p95: The 95th percentile of the permuted counts.
+        p95: The 95th percentile of the permuted counts (see `percentile`).
         p95_interval: Approximate interval for that percentile.
         exceedance_p: ``(1 + #{permuted >= observed}) / (B + 1)``.
         exceeds: Whether ``observed > p95``.

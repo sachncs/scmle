@@ -11,22 +11,27 @@ def rng(seed=0):
     return np.random.default_rng(seed)
 
 
-def test_percentile_is_the_ceil_qb_th_order_statistic():
-    twenty = tuple(range(20))
-    assert c.percentile(twenty) == 18  # the 19th of 20
-    assert c.percentile(tuple(range(21))) == 19  # ceil(19.95) = 20th
-    assert c.percentile(tuple(range(100))) == 94  # the 95th of 100
+def test_percentile_is_the_ceil_q_b_plus_1_th_order_statistic():
+    assert c.percentile(tuple(range(20))) == 19  # ceil(19.95) = 20: the max
+    assert c.percentile(tuple(range(21))) == 20  # ceil(20.9) = 21: the max
+    assert c.percentile(tuple(range(100))) == 95  # ceil(95.95) = 96th
+    assert c.percentile(tuple(range(19, -1, -1))) == 19  # unsorted input
     assert c.percentile((5,) * 20) == 5
-    assert c.quantile_index(20) == 18
+    assert c.quantile_index(20) == 19
+    assert c.quantile_index(100) == 95
+    assert c.quantile_index(19) == 18
     with pytest.raises(ValueError):
         c.percentile(())
 
 
 def test_the_gate_is_strict_at_the_percentile():
-    counts = tuple([0] * 18 + [1, 3])  # p95 = 1
-    assert c.summarize("permuted_target", "strata", 1, counts).exceeds is False
-    assert c.summarize("permuted_target", "strata", 2, counts).exceeds is True
-    assert c.summarize("permuted_target", "strata", 0, counts).p95 == 1
+    counts = tuple([0] * 19 + [3])  # p95 = 3, the largest
+    assert c.summarize("permuted_target", "strata", 3, counts).exceeds is False
+    assert c.summarize("permuted_target", "strata", 4, counts).exceeds is True
+    assert c.summarize("permuted_target", "strata", 0, counts).p95 == 3
+    flat = tuple([0] * 20)
+    assert c.summarize("permuted_target", "strata", 1, flat).exceeds is True
+    assert c.summarize("permuted_target", "strata", 0, flat).exceeds is False
 
 
 def test_exceedance_p_counts_ties_and_adds_one():

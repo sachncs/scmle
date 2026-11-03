@@ -33,7 +33,7 @@ from scmle.data.ledger import multiplicity
 from scmle.data.ledger import online_fdr
 
 CONTROL_FILE = "negative_control.json"
-DEFAULT_BLOCKS = 10
+DEFAULT_BLOCKS = 20
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -84,6 +84,9 @@ def strata_labels(
 
     Groups win over time: rows of one entity stay together. With only a time
     column the rows are cut into `blocks` contiguous blocks in time order.
+    Blocks must be short against the timescale of the drift: on random-walk
+    data 10 blocks let the control be exceeded in about 7.7% of null worlds
+    and 20 blocks in about 3.7% (see `benchmarks.qualification.ledger_checks`).
     With neither, the rows are taken as exchangeable and None is returned
     (a global permutation).
 
@@ -149,13 +152,12 @@ def run_governed(
     )
     plan = explore.plan_exploration(features, kind, exclude)
     if run_dir is None:
-        config = online_fdr.RuleConfig(
-            rule, charter.error_budget.exploration.initial
-        )
         ledger = ledger_module.Ledger.create(
             None,
             charter_hash=charter.charter_hash,
-            config=config,
+            config=online_fdr.RuleConfig(
+                rule, charter.error_budget.exploration.initial
+            ),
             alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
             seed=charter.seed,
         )
