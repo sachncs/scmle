@@ -1,0 +1,390 @@
+"""Negative controls: how many discoveries appear when there is nothing real.
+
+The whole exploration is re-run `B` times on data where the finding of
+interest has been destroyed, and the number of discoveries in each re-run is
+recorded. The gate compares the discoveries found on the real data with the
+95th percentile of those counts: if the real count does not exceed it, the
+findings do not clearly rise above the false-discovery floor and no claim is
+promoted.
+
+Two controls:
+
+``permuted_target_control``
+    Permutes the *target* within strata (entity groups, or contiguous time
+    blocks) and never globally on structured data, so the dependence between
+    rows that share a group or a time block survives while any feature-target
+    association inside a stratum is destroyed. A global permutation of grouped
+    or drifting data destroys that dependence too, which makes the floor look
+    lower than it is: the control then passes findings that are artefacts of
+    the structure. `benchmarks.qualification.controls_check` measures this.
+
+``resampling_control``
+    For findings that do not use the target (drift, shape, pairwise feature
+    structure). Each feature column is shuffled independently (within
+    strata), which breaks association between features, or the order of
+    contiguous blocks of each column is shuffled, which breaks time drift. It
+    shuffles rather than bootstraps: it keeps each column's marginal
+    distribution exactly and destroys the structure being controlled, which a
+    resample would only do on average.
+
+Monte Carlo error. With `B` repeats the 95th percentile is itself an
+estimate. `ControlResult` reports an approximate distribution-free interval
+for it from order statistics and the exceedance p-value
+``(1 + #{permuted >= observed}) / (B + 1)``, which is a valid p-value for
+"the real count is not larger than a typical null count".
+"""
+
+from collections.abc import Callable
+from collections.abc import Mapping
+import dataclasses
+import math
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+from scmle.contracts import qualification
+from scmle.core import randomness
+from scmle.data.ledger import budget as budget_module
+
+QUANTILE = 0.95
+INTERVAL_CONFIDENCE = 0.90
+PERMUTED_TARGET = "permuted_target"
+RESAMPLING = "resampling"
+COUNT_FUNCTION = Callable[[pd.DataFrame, pd.Series], int]
+
+
+def quantile_index(b: int, q: float = QUANTILE) -> int:
+    """0-based index of the ``ceil(q * B)``-th smallest of `b` counts."""
+    return max(0, math.ceil(q * b - 1e-9) - 1)
+
+
+def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
+    """The conservative order-statistic percentile of discovery counts.
+
+    It is the ``ceil(q * B)``-th smallest value, so with B = 20 it is the 19th
+    of 20 and at most ``1 - q`` of the counts can lie above it.
+    """
+    if not counts:
+        raise ValueError("counts must not be empty")
+    return sorted(counts)[quantile_index(len(counts), q)]
+
+
+def percentile_interval(
+    counts: tuple[int, ...],
+    q: float = QUANTILE,
+    confidence: float = INTERVAL_CONFIDENCE,
+) -> tuple[int, int]:
+    """Approximate distribution-free interval for the q-quantile.
+
+    Uses the binomial distribution of the number of draws below the quantile
+    to pick two order statistics. With few repeats the interval is wide and
+    reaches the largest count; that is the honest statement of the error.
+    """
+    b = len(counts)
+    if b == 0:
+        raise ValueError("counts must not be empty")
+    ordered = sorted(counts)
+    tail = (1.0 - confidence) / 2.0
+    low = int(stats.binom.ppf(tail, b, q))
+    high = int(stats.binom.ppf(1.0 - tail, b, q)) + 1
+    return ordered[min(max(low - 1, 0), b - 1)], ordered[
+        min(max(high - 1, 0), b - 1)
+    ]
+
+
+def permute_within(
+    values: np.ndarray, strata: np.ndarray | None, rng: np.random.Generator
+) -> np.ndarray:
+    """Permutes `values` within each stratum, or globally without strata.
+
+    Args:
+        values: The array to permute.
+        strata: A label per entry; entries permute only among equal labels.
+            None permutes globally, which is only right for rows that are
+            exchangeable.
+        rng: Random generator.
+
+    Returns:
+        A permuted copy.
+    """
+    out = np.array(values, copy=True)
+    if strata is None:
+        return out[rng.permutation(len(out))]
+    labels = np.asarray(strata)
+    if len(labels) != len(out):
+        raise ValueError("strata needs one label per row")
+    order = np.argsort(labels, kind="stable")
+    sorted_labels = labels[order]
+    cuts = np.flatnonzero(sorted_labels[1:] != sorted_labels[:-1]) + 1
+    for block in np.split(order, cuts):
+        out[block] = values[rng.permutation(block)]
+    return out
+
+
+def block_labels(order: np.ndarray, block_size: int) -> np.ndarray:
+    """Labels that cut rows, ordered by `order`, into contiguous blocks.
+
+    Args:
+        order: Sort key per row (for example a timestamp or row position).
+        block_size: Rows per block, at least 2.
+
+    Returns:
+        An integer block label per row; ties in `order` keep row order.
+    """
+    qualification.count(block_size, "block_size", minimum=2)
+    ranks = np.empty(len(order), dtype=int)
+    ranks[np.argsort(order, kind="stable")] = np.arange(len(order))
+    return ranks // block_size
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ControlResult:
+    """The outcome of a negative control.
+
+    Attributes:
+        kind: `permuted_target` or `resampling`.
+        scope: `strata` (within groups or blocks) or `global`.
+        observed: Discoveries on the real data.
+        permuted: Discovery counts of the B re-runs.
+        p95: The 95th percentile of the permuted counts.
+        p95_interval: Approximate interval for that percentile.
+        exceedance_p: ``(1 + #{permuted >= observed}) / (B + 1)``.
+        exceeds: Whether ``observed > p95``.
+    """
+
+    kind: str
+    scope: str
+    observed: int
+    permuted: tuple[int, ...]
+    p95: int
+    p95_interval: tuple[int, int]
+    exceedance_p: float
+    exceeds: bool
+
+    @property
+    def b(self) -> int:
+        """Number of re-runs."""
+        return len(self.permuted)
+
+    @property
+    def message(self) -> str:
+        """The sentence the report shows."""
+        if self.exceeds:
+            return (
+                f"{self.observed} discoveries exceed the 95th percentile "
+                f"({self.p95}) of {self.b} {self.kind} re-runs"
+            )
+        return (
+            "findings do not clearly exceed the false-discovery floor: "
+            f"{self.observed} discoveries, 95th percentile of {self.b} "
+            f"{self.kind} re-runs is {self.p95}"
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record (``negative_control.json``)."""
+        return {
+            "kind": self.kind,
+            "scope": self.scope,
+            "observed": self.observed,
+            "permuted": list(self.permuted),
+            "b": self.b,
+            "p95": self.p95,
+            "p95_interval": list(self.p95_interval),
+            "p95_interval_confidence": INTERVAL_CONFIDENCE,
+            "exceedance_p": self.exceedance_p,
+            "exceeds": self.exceeds,
+            "message": self.message,
+            "note": (
+                "The 95th percentile is estimated from B re-runs and has "
+                "Monte Carlo error; the interval is approximate and "
+                "distribution-free."
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> "ControlResult":
+        """Rebuilds a result from its JSON record."""
+        counts = tuple(int(c) for c in record["permuted"])
+        low, high = record["p95_interval"]
+        return cls(
+            kind=record["kind"],
+            scope=record["scope"],
+            observed=int(record["observed"]),
+            permuted=counts,
+            p95=int(record["p95"]),
+            p95_interval=(int(low), int(high)),
+            exceedance_p=float(record["exceedance_p"]),
+            exceeds=bool(record["exceeds"]),
+        )
+
+
+def summarize(
+    kind: str, scope: str, observed: int, counts: tuple[int, ...]
+) -> ControlResult:
+    """Builds the result for an observed count and the re-run counts."""
+    qualification.count(observed, "observed")
+    if len(counts) < budget_module.MIN_PERMUTATIONS:
+        raise ValueError(
+            f"a control needs at least {budget_module.MIN_PERMUTATIONS} re-runs"
+        )
+    p95 = percentile(counts)
+    as_large = sum(1 for c in counts if c >= observed)
+    return ControlResult(
+        kind=kind,
+        scope=scope,
+        observed=observed,
+        permuted=counts,
+        p95=p95,
+        p95_interval=percentile_interval(counts),
+        exceedance_p=(1 + as_large) / (len(counts) + 1),
+        exceeds=observed > p95,
+    )
+
+
+def permuted_target_control(
+    discoveries: COUNT_FUNCTION,
+    features: pd.DataFrame,
+    target: pd.Series,
+    *,
+    observed: int,
+    b: int,
+    seed: int,
+    strata: np.ndarray | None,
+    component: str = "ledger.control.permuted_target",
+) -> ControlResult:
+    """Re-runs the exploration with the target permuted within strata.
+
+    Args:
+        discoveries: Runs the *whole* exploration (registration, tests and
+            the online rule) on the given data and returns the number of
+            rejections. It must be the same function used on the real data.
+        features: Exploration features, unchanged in every re-run.
+        target: Exploration target.
+        observed: Discoveries on the real data.
+        b: Number of re-runs, at least 20.
+        seed: Run seed; re-run `i` uses stream ``(seed, component, i)``.
+        strata: Group label or time-block label per row. Pass None only for
+            rows that are exchangeable (no groups, no time order): the result
+            is then labelled `global`.
+        component: Name of the random stream.
+
+    Returns:
+        The control result.
+
+    Raises:
+        ValueError: If `b` is below the minimum or `strata` has the wrong
+            length.
+    """
+    qualification.count(b, "b", minimum=budget_module.MIN_PERMUTATIONS)
+    if strata is not None and len(strata) != len(target):
+        raise ValueError("strata needs one label per row")
+    counts = []
+    for repeat in range(b):
+        rng = randomness.component_rng(seed, component, repeat)
+        values = permute_within(target.to_numpy(), strata, rng)
+        shuffled = pd.Series(values, index=target.index, name=target.name)
+        counts.append(int(discoveries(features, shuffled)))
+    return summarize(
+        PERMUTED_TARGET,
+        "global" if strata is None else "strata",
+        observed,
+        tuple(counts),
+    )
+
+
+def shuffle_columns(
+    features: pd.DataFrame,
+    rng: np.random.Generator,
+    strata: np.ndarray | None,
+) -> pd.DataFrame:
+    """Shuffles every column independently (within strata when given)."""
+    out = {}
+    for name in features.columns:
+        column = features[name].to_numpy()
+        out[name] = permute_within(column, strata, rng)
+    return pd.DataFrame(out, index=features.index)
+
+
+def shuffle_blocks(
+    features: pd.DataFrame, blocks: np.ndarray, rng: np.random.Generator
+) -> pd.DataFrame:
+    """Shuffles the order of contiguous blocks of each column independently.
+
+    Rows are first ordered by block label; a column's values keep their order
+    inside each block but the blocks are laid out in a random order, which
+    destroys slow drift while keeping short-range structure.
+    """
+    labels = np.asarray(blocks)
+    order = np.argsort(labels, kind="stable")
+    sorted_labels = labels[order]
+    cuts = np.flatnonzero(sorted_labels[1:] != sorted_labels[:-1]) + 1
+    pieces = np.split(order, cuts)
+    out = {}
+    for name in features.columns:
+        column = features[name].to_numpy()
+        shuffled = np.array(column, copy=True)
+        sequence = np.concatenate(
+            [pieces[i] for i in rng.permutation(len(pieces))]
+        )
+        shuffled[order] = column[sequence]
+        out[name] = shuffled
+    return pd.DataFrame(out, index=features.index)
+
+
+def resampling_control(
+    discoveries: COUNT_FUNCTION,
+    features: pd.DataFrame,
+    target: pd.Series,
+    *,
+    observed: int,
+    b: int,
+    seed: int,
+    mode: str = "columns",
+    strata: np.ndarray | None = None,
+    blocks: np.ndarray | None = None,
+    component: str = "ledger.control.resampling",
+) -> ControlResult:
+    """Control for findings that do not use the target.
+
+    Args:
+        discoveries: Runs the whole exploration and returns the rejections.
+        features: Exploration features.
+        target: Exploration target, passed through unchanged.
+        observed: Discoveries on the real data.
+        b: Number of re-runs, at least 20.
+        seed: Run seed.
+        mode: `columns` (independent column shuffles, breaks association
+            between features) or `blocks` (shuffles contiguous blocks of each
+            column, breaks time drift; needs `blocks`).
+        strata: Labels within which `columns` shuffles; None is global.
+        blocks: Block label per row for `blocks` mode.
+        component: Name of the random stream.
+
+    Returns:
+        The control result (kind `resampling`).
+
+    Raises:
+        ValueError: On an unknown mode or `blocks` mode without labels.
+    """
+    qualification.count(b, "b", minimum=budget_module.MIN_PERMUTATIONS)
+    if mode not in ("columns", "blocks"):
+        raise ValueError("mode must be 'columns' or 'blocks'")
+    if mode == "blocks" and blocks is None:
+        raise ValueError("blocks mode needs block labels")
+    labels = blocks
+    counts = []
+    for repeat in range(b):
+        rng = randomness.component_rng(seed, component, repeat)
+        if labels is not None and mode == "blocks":
+            changed = shuffle_blocks(features, labels, rng)
+        else:
+            changed = shuffle_columns(features, rng, strata)
+        counts.append(int(discoveries(changed, target)))
+    scope = (
+        "blocks"
+        if mode == "blocks"
+        else ("global" if strata is None else "strata")
+    )
+    return summarize(RESAMPLING, scope, observed, tuple(counts))
