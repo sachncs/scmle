@@ -1,0 +1,125 @@
+{
+ "cases": [
+  {
+   "expected": {
+    "dof": 1.0,
+    "pvalue": 0.06115089757606777,
+    "statistic": 3.505892255892255
+   },
+   "id": "table-0",
+   "inputs": {
+    "table": [
+     [
+      10,
+      20
+     ],
+     [
+      30,
+      25
+     ]
+    ]
+   }
+  },
+  {
+   "expected": {
+    "dof": 2.0,
+    "pvalue": 0.06423321026769449,
+    "statistic": 5.49046981629452
+   },
+   "id": "table-1",
+   "inputs": {
+    "table": [
+     [
+      12,
+      5,
+      9
+     ],
+     [
+      7,
+      14,
+      8
+     ]
+    ]
+   }
+  },
+  {
+   "expected": {
+    "dof": 1.0,
+    "pvalue": 0.000636299141240206,
+    "statistic": 11.666666666666668
+   },
+   "id": "table-2",
+   "inputs": {
+    "table": [
+     [
+      50,
+      30
+     ],
+     [
+      20,
+      40
+     ]
+    ]
+   }
+  },
+  {
+   "expected": {
+    "dof": 4.0,
+    "pvalue": 0.041558918639756436,
+    "statistic": 9.933729510322646
+   },
+   "id": "table-3",
+   "inputs": {
+    "table": [
+     [
+      3,
+      9,
+      4
+     ],
+     [
+      8,
+      2,
+      11
+     ],
+     [
+      6,
+      7,
+      5
+     ]
+    ]
+   }
+  },
+  {
+   "expected": {
+    "dof": 1.0,
+    "pvalue": 0.9984227967627167,
+    "statistic": 3.9074709892886874e-06
+   },
+   "id": "table-4",
+   "inputs": {
+    "table": [
+     [
+      40,
+      41
+     ],
+     [
+      39,
+      40
+     ]
+    ]
+   }
+  }
+ ],
+ "content_sha256": "0324ab432f50963c3e4e0f405bbf2726ce29ec13fd6a8fa525edba02c400c26d",
+ "generator": "benchmarks/qualification/make_oracles.py",
+ "generator_sha256": "604f9d88bd75e386baefdf2054cde36c81502ab431e4aee3ee0c1dc9569933bb",
+ "oracle": "chi2_contingency",
+ "reference": "scipy.stats.chi2_contingency(table, correction=False)",
+ "tolerance": {
+  "rel": 1e-08
+ },
+ "tool": {
+  "numpy": "2.5.4",
+  "scipy": "1.18.1"
+ }
+}

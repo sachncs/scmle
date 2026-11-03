@@ -1,0 +1,76 @@
+{
+ "cases": [
+  {
+   "expected": {
+    "high": 0.3084971078187608,
+    "low": 0.0
+   },
+   "id": "ci-0",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 10,
+    "successes": 0
+   }
+  },
+  {
+   "expected": {
+    "high": 1.0,
+    "low": 0.6915028921812393
+   },
+   "id": "ci-1",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 10,
+    "successes": 10
+   }
+  },
+  {
+   "expected": {
+    "high": 0.8129139715526015,
+    "low": 0.18708602844739855
+   },
+   "id": "ci-2",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 10,
+    "successes": 5
+   }
+  },
+  {
+   "expected": {
+    "high": 0.39913676453195196,
+    "low": 0.22725511963383166
+   },
+   "id": "ci-3",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 120,
+    "successes": 37
+   }
+  },
+  {
+   "expected": {
+    "high": 0.05380344522855969,
+    "low": 0.0016963809882777957
+   },
+   "id": "ci-4",
+   "inputs": {
+    "confidence": 0.99,
+    "n": 200,
+    "successes": 3
+   }
+  }
+ ],
+ "content_sha256": "6cf4183228fe6d9a1fe6069b83f84cab28bef8276217f823d7fd29b882902248",
+ "generator": "benchmarks/qualification/make_oracles.py",
+ "generator_sha256": "604f9d88bd75e386baefdf2054cde36c81502ab431e4aee3ee0c1dc9569933bb",
+ "oracle": "clopper_pearson",
+ "reference": "scipy.stats.binomtest(k, n).proportion_ci(method='exact')",
+ "tolerance": {
+  "rel": 1e-08
+ },
+ "tool": {
+  "numpy": "2.5.4",
+  "scipy": "1.18.1"
+ }
+}

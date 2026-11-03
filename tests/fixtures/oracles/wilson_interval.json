@@ -1,0 +1,136 @@
+{
+ "cases": [
+  {
+   "expected": {
+    "high": 0.27753279986288926,
+    "low": 0.0
+   },
+   "id": "ci-0",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 10,
+    "successes": 0
+   }
+  },
+  {
+   "expected": {
+    "high": 0.4041500267952385,
+    "low": 0.017876213095072896
+   },
+   "id": "ci-1",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 10,
+    "successes": 1
+   }
+  },
+  {
+   "expected": {
+    "high": 0.7634069094874361,
+    "low": 0.236593090512564
+   },
+   "id": "ci-2",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 10,
+    "successes": 5
+   }
+  },
+  {
+   "expected": {
+    "high": 1.0,
+    "low": 0.7224672001371109
+   },
+   "id": "ci-3",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 10,
+    "successes": 10
+   }
+  },
+  {
+   "expected": {
+    "high": 0.3958299772380067,
+    "low": 0.23272736988916295
+   },
+   "id": "ci-4",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 120,
+    "successes": 37
+   }
+  },
+  {
+   "expected": {
+    "high": 0.42455728939891313,
+    "low": 0.21219370709039861
+   },
+   "id": "ci-5",
+   "inputs": {
+    "confidence": 0.99,
+    "n": 120,
+    "successes": 37
+   }
+  },
+  {
+   "expected": {
+    "high": 0.27317735263098764,
+    "low": 0.22817176898889255
+   },
+   "id": "ci-6",
+   "inputs": {
+    "confidence": 0.9,
+    "n": 1000,
+    "successes": 250
+   }
+  },
+  {
+   "expected": {
+    "high": 0.04316572879269026,
+    "low": 0.00511423779325831
+   },
+   "id": "ci-7",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 200,
+    "successes": 3
+   }
+  },
+  {
+   "expected": {
+    "high": 0.9726173543992361,
+    "low": 0.910421851861224
+   },
+   "id": "ci-8",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 200,
+    "successes": 190
+   }
+  },
+  {
+   "expected": {
+    "high": 1.0,
+    "low": 0.20654931437723745
+   },
+   "id": "ci-9",
+   "inputs": {
+    "confidence": 0.95,
+    "n": 1,
+    "successes": 1
+   }
+  }
+ ],
+ "content_sha256": "91e3fb2c835bb00ab57bfc00052c5f6c0987ac5364bbdfdad935935612c5e510",
+ "generator": "benchmarks/qualification/make_oracles.py",
+ "generator_sha256": "604f9d88bd75e386baefdf2054cde36c81502ab431e4aee3ee0c1dc9569933bb",
+ "oracle": "wilson_interval",
+ "reference": "scipy.stats.binomtest(k, n).proportion_ci(method='wilson')",
+ "tolerance": {
+  "rel": 1e-08
+ },
+ "tool": {
+  "numpy": "2.5.4",
+  "scipy": "1.18.1"
+ }
+}

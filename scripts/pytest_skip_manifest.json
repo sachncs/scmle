@@ -34,6 +34,10 @@
       "pattern": "^OpenML unavailable: .+$"
     },
     {
+      "category": "environment",
+      "pattern": "^corpus '[a-z0-9-]+' is not available locally$"
+    },
+    {
       "category": "test-condition",
       "pattern": "^final estimator hides the graph step$"
     }

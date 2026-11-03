@@ -1,0 +1,131 @@
+{
+  "certificates": [
+    {
+      "code_hash": "470c6dd4b4b467ba574521420e27b7e11a375f170f47b45c11695d02a7fe8a9f",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "standin-duplicate",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "duplicate_exact",
+            "detected": 171,
+            "detector_id": "standin-duplicate",
+            "false_alarms": 0,
+            "planted": 171,
+            "seed_path": [
+              0,
+              "certify.standin-duplicate",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.006705972065294502
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9780289020315618,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.1,
+        "recall_floor": 0.5
+      },
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "code_hash": "90de10a2212c5aa02002660968613c9ba9d9a5bfd3898db425321dafd559cd0d",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "standin-label-flip",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "label_flip",
+            "detected": 117,
+            "detector_id": "standin-label-flip",
+            "false_alarms": 4,
+            "planted": 171,
+            "seed_path": [
+              0,
+              "certify.standin-label-flip",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0027370789478418133,
+            0.017934362754496
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.611144391351165,
+            0.7491820462394104
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.1,
+        "recall_floor": 0.5
+      },
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "code_hash": "58412c0933f9f4cbdc101a13fc26de6511d179cd9dfde57c6e288bdff0cadc07",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "standin-sentinel",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "sentinel",
+            "detected": 320,
+            "detector_id": "standin-sentinel",
+            "false_alarms": 0,
+            "planted": 320,
+            "seed_path": [
+              0,
+              "certify.standin-sentinel",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.006705972065294502
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9881378411686904,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.1,
+        "recall_floor": 0.5
+      },
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "schema_version": 1
+}

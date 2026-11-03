@@ -33,6 +33,8 @@ jobs:
           uv run coverage report
           --include=scmle/contracts/*,scmle/data/*,scmle/evaluation/*,scmle/governance/*,scmle/inference/*,scmle/monitoring/*
           --fail-under=85
+      - name: Run the long qualification simulations
+        run: uv run python -m benchmarks.qualification --smoke --full
       - name: Enforce critical mutation score
         run: |
           uv run mutmut run --max-children 4

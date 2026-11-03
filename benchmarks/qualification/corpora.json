@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "corpora": [
+    {
+      "id": "titanic-boat-body",
+      "name": "Titanic passenger records with the lifeboat and body fields",
+      "source_url": null,
+      "licence": null,
+      "sha256": null,
+      "size_bytes": null,
+      "ground_truth_file": null,
+      "adjudication_source": null,
+      "intended_use": "certificate",
+      "status": "candidate",
+      "notes": "candidate: existence, licence and hash to be verified. README.md describes boat and body as outcome-dependent recording (a leakage hypothesis); no source has been chosen."
+    },
+    {
+      "id": "human-adjudicated-label-errors",
+      "name": "A public classification benchmark whose label errors were adjudicated by human reviewers",
+      "source_url": null,
+      "licence": null,
+      "sha256": null,
+      "size_bytes": null,
+      "ground_truth_file": null,
+      "adjudication_source": null,
+      "intended_use": "certificate",
+      "status": "candidate",
+      "notes": "candidate: no dataset has been chosen; existence, licence and hash to be verified before use."
+    },
+    {
+      "id": "tabarena-v0pt1-tasks",
+      "name": "TabArena v0.1 task list (51 tasks)",
+      "source_url": null,
+      "licence": null,
+      "sha256": null,
+      "size_bytes": null,
+      "ground_truth_file": null,
+      "adjudication_source": null,
+      "intended_use": "backtest",
+      "status": "candidate",
+      "notes": "candidate: the task list is committed at benchmarks/sota/tasks_tabarena_v0pt1.csv; the task data are fetched through OpenML by benchmarks/sota and are not vendored. Existence, licence and hash of each task are to be verified."
+    }
+  ]
+}
