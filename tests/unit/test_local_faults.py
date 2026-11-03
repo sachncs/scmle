@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import pytest
 
@@ -33,7 +34,7 @@ def test_local_executor_passes_every_declared_scenario(tmp_path):
             for evidence in plan.evidence
         )
         assert all(
-            Path(urlparse(evidence.artifact_uri).path).exists()
+            Path(url2pathname(urlparse(evidence.artifact_uri).path)).exists()
             for evidence in plan.evidence
         )
 
