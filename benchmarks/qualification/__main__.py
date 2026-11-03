@@ -3,6 +3,7 @@
     python -m benchmarks.qualification --smoke            # the Phase 1 gate
     python -m benchmarks.qualification --smoke --full     # nightly, longer
     python -m benchmarks.qualification --check            # certificates
+    python -m benchmarks.qualification --check fdr        # claim ledger (F3)
     python -m benchmarks.qualification --write-sample F   # stand-in sample
 
 `--check` fails when a gating detector has no current certificate. No real
@@ -14,6 +15,7 @@ import argparse
 import json
 from pathlib import Path
 
+from benchmarks.qualification import ledger_checks
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
 from scmle.data.detectors import certificates
@@ -49,16 +51,29 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--smoke", action="store_true")
-    action.add_argument("--check", action="store_true")
+    action.add_argument(
+        "--check",
+        nargs="?",
+        const="certificates",
+        choices=("certificates", "fdr"),
+    )
     action.add_argument("--write-sample", type=Path, metavar="FILE")
     parser.add_argument("--full", action="store_true")
     parser.add_argument("--runs", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--repeats", type=int, default=400)
     options = parser.parse_args(arguments)
     if options.smoke:
         report = smoke.run_smoke(options.runs, options.seed, options.full)
         print(json.dumps(report.to_dict(), indent=2))
         return 0 if report.ok else 1
+    if options.check == "fdr":
+        findings = ledger_checks.run_all(
+            options.runs, options.seed, options.repeats
+        )
+        summary = ledger_checks.report(findings)
+        print(json.dumps(summary, indent=2))
+        return 0 if summary["ok"] else 1
     if options.check:
         return check_certificates()
     standins.certify_all().save(options.write_sample)

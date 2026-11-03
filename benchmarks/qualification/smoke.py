@@ -16,6 +16,7 @@ from sklearn.datasets import load_diabetes
 
 from benchmarks.qualification import corpora
 from benchmarks.qualification import inject
+from benchmarks.qualification import ledger_checks
 from benchmarks.qualification import oracles
 from benchmarks.qualification import simulate
 from benchmarks.qualification import standins
@@ -273,6 +274,14 @@ def check_certificates() -> list[SmokeCheck]:
     ]
 
 
+def check_ledger(seed: int) -> list[SmokeCheck]:
+    """The claim ledger: vectorized tester, uniform p, FDR bound and power."""
+    return [
+        SmokeCheck(f.name, f.ok, f.detail)
+        for f in ledger_checks.smoke_findings(seed)
+    ]
+
+
 def check_power_and_fdr(seed: int) -> list[SmokeCheck]:
     """Full mode only: a power curve and a pipeline false-discovery rate."""
     data = load_diabetes(as_frame=True)
@@ -350,6 +359,7 @@ def run_smoke(
     checks.append(check_oracles())
     checks.append(check_corpora())
     checks += check_certificates()
+    checks += check_ledger(seed)
     if full:
         checks += check_power_and_fdr(seed)
     return SmokeReport(tuple(checks))
