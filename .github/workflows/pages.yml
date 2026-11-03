@@ -59,6 +59,12 @@ jobs:
           python3 -m http.server 4173 --directory website/dist > /tmp/scmle-pages.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
+          # The server starts in the background; wait until it accepts
+          # connections instead of racing it (curl exit 7 otherwise).
+          for _ in $(seq 1 50); do
+            curl --silent --output /dev/null "http://127.0.0.1:4173/" && break
+            sleep 0.2
+          done
           for route in / /docs/ /docs/quickstart/ /docs/data/ /docs/modalities/ /docs/capabilities/ /docs/modeling/ /docs/evidence/ /docs/workflows/ /docs/api/ /docs/architecture/ /docs/cards/ /docs/operations/ /docs/security/ /docs/recovery/ /docs/migrations/ /docs/troubleshooting/; do
             curl --fail --silent --show-error "http://127.0.0.1:4173${route}" > /dev/null
           done
