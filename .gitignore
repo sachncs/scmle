@@ -13,3 +13,5 @@ mlruns/
 coverage.xml
 htmlcov/
 results.json.tmp
+# mutmut writes a full copy of the mutated tree here
+mutants/
