@@ -22,6 +22,8 @@ from scmle.contracts import tasks
 from scmle.core import limits
 from scmle.core import resource_observation
 from scmle.core import scheduler
+from scmle.data.custody import pipeline as custody_pipeline
+from scmle.data.custody import sealed as custody_sealed
 from scmle.data.readers import streaming
 from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
@@ -352,6 +354,8 @@ class RunContext:
         task: Resolved task type.
         profile: Dataset profile.
         split: Split result with development data and locked test.
+        custody: Three-way split outcome when a charter governs the run.
+        custody_vault: Holds the sealed confirmation set of a charter run.
         plan: Experiment plan.
         recommendations: Advice for the user derived from the profile.
         metric: Primary metric.
@@ -422,6 +426,8 @@ class RunContext:
     task: tasks.TaskType | None = None
     profile: data_contracts.DatasetProfile | None = None
     split: splitters.SplitResult | None = None
+    custody: custody_pipeline.CustodyOutcome | None = None
+    custody_vault: custody_sealed.CustodyVault | None = None
     plan: experiments.ExperimentPlan | None = None
     recommendations: tuple[recommendations_module.Recommendation, ...] = ()
     metric: metric_contracts.Metric | None = None
@@ -495,6 +501,8 @@ class RunContext:
         """
         if self.split is not None:
             self.split.locked_test.close()
+        if self.custody_vault is not None:
+            self.custody_vault.close()
 
     def write_json(self, relative: str, payload: Any) -> None:
         """Writes a JSON artifact if the run is persisted."""

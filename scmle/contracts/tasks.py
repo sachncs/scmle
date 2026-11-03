@@ -568,6 +568,9 @@ class ProjectSpec(FrozenModel):
     fairness: FairnessSpec = pydantic.Field(default_factory=FairnessSpec)
     problem: ProblemSpec = pydantic.Field(default_factory=ProblemSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
+    # Path of an analysis charter. When set, the run splits the development
+    # rows into exploration and sealed confirmation sets (feature F2).
+    charter_path: str | None = None
 
     @pydantic.model_validator(mode="before")
     @classmethod

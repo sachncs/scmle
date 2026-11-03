@@ -519,6 +519,7 @@ class MLProject:
         estimand: parameter_estimation.EstimandSpec | None = None,
         estimation_policy: parameter_estimation.EstimationPolicy | None = None,
         leakage_policy: LeakagePolicy = "warn",
+        charter: str | pathlib.Path | None = None,
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -625,6 +626,10 @@ class MLProject:
             decision: Threshold optimization for binary tasks (objective
                 f1, accuracy, balanced_accuracy or an explicit cost).
             leakage_policy: `warn` or `block` on leakage hypotheses.
+            charter: Path of an analysis charter (`scmle charter init`).
+                When given, the development rows are split into exploration
+                rows and a sealed confirmation set the exploration stages
+                cannot read; the charter is checked before any profiling.
             checkpoints: Approval gates after planning and selection (the
                 latter fires before the test set is opened).
             output_dir: Parent directory for run directories.
@@ -699,6 +704,7 @@ class MLProject:
             fairness=fairness or tasks.FairnessSpec(),
             problem=problem or tasks.ProblemSpec(),
             leakage_policy=leakage_policy,
+            charter_path=None if charter is None else str(charter),
         )
         self.output_dir = pathlib.Path(output_dir)
         if (estimand is None) != (estimation_policy is None):

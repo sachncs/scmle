@@ -37,8 +37,12 @@ from scmle.contracts import tasks
 from scmle.core import compiler
 from scmle.core import context as context_module
 from scmle.core import state as run_state
+from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import sealing as charter_sealing
 from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
+from scmle.data.custody import pipeline as custody_pipeline
+from scmle.data.custody import sealed as custody_sealed
 from scmle.data.profiling import label_noise
 from scmle.data.profiling import profiler
 from scmle.data.profiling import representativeness
@@ -605,6 +609,79 @@ class ProfileStage(Stage):
             f"(weights from {weights.min():.2f} to {weights.max():.2f})",
         )
 
+    def apply_charter_custody(
+        self,
+        context: context_module.RunContext,
+        task: tasks.TaskType,
+        frame: pd.DataFrame,
+        split: splitters.SplitResult,
+    ) -> splitters.SplitResult:
+        """Carves and seals the confirmation set under the charter.
+
+        The charter is verified (hash, and signature when a key is
+        configured) before any row is partitioned. The returned split holds
+        exploration rows only, so the profiler and every trial that follows
+        read nothing from the confirmation set.
+
+        Limits (canon P6): the vault is a separate process on this machine.
+        This process drops its own reference to the sealed rows, but the
+        caller's DataFrame or the original file still holds every row.
+        """
+        path = str(context.spec.charter_path)
+        verified = charter_sealing.read_verified(path)
+        charter = verified.charter
+        log = custody_sealed.OpenLog(
+            context.store.directory / "custody_log.jsonl"
+            if context.store is not None
+            else None
+        )
+        vault_set = custody_sealed.CustodyVault(log)
+        data_hash = (
+            context.manifest.data_hash
+            if context.manifest is not None
+            else hashlib.sha256(
+                pd.util.hash_pandas_object(frame).to_numpy().tobytes()
+            ).hexdigest()
+        )
+        outcome = custody_pipeline.apply_custody(
+            charter=charter,
+            split=split,
+            frame=frame,
+            spec=context.spec,
+            task=task,
+            data_hash=data_hash,
+            vault=vault_set,
+        )
+        context.custody = outcome
+        context.custody_vault = vault_set
+        context.write_json(
+            "analysis_charter.json", charter_contracts.load_json(path)
+        )
+        context.write_json("error_budget.json", charter.error_budget.to_dict())
+        context.write_json("feasibility.json", outcome.feasibility.to_dict())
+        context.write_json("split_manifest.json", outcome.manifest.to_dict())
+        context.emit(
+            "custody.sealed",
+            outcome.feasibility.reason,
+            (
+                "analysis_charter.json",
+                "split_manifest.json",
+                "feasibility.json",
+                "custody_log.jsonl",
+            ),
+            {
+                "charter_hash": charter.charter_hash,
+                "charter_signed": verified.signed,
+                "manifest_sha256": outcome.manifest.sha256,
+                "scope": outcome.manifest.scope,
+                "exploration_rows": len(outcome.manifest.exploration_ids),
+                "confirmation_rows": len(outcome.manifest.confirmation_ids),
+                "embargo_rows": len(outcome.manifest.embargo_ids),
+                "isolation": dict(outcome.manifest.isolation),
+            },
+        )
+        return outcome.split
+
     def make_split(
         self,
         context: context_module.RunContext,
@@ -625,9 +702,14 @@ class ProfileStage(Stage):
                 len(data.targets),
                 data.seasonal_period,
             )
+        chartered = bool(context.spec.charter_path)
+        if chartered:
+            split = self.apply_charter_custody(context, task, frame, split)
         self.apply_reweighing(context, task, split)
         isolation = "in-process protocol"
-        if context.resource_governor.hard:
+        # A charter requests custody regardless of the resource-enforcement
+        # mode: sealing the rows must not depend on trial supervision.
+        if context.resource_governor.hard or chartered:
             split.locked_test = self.seal(split.locked_test)
             context.frame = split.dev_features.assign(
                 **{context.spec.data.target: split.dev_target}

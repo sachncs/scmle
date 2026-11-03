@@ -21,8 +21,12 @@ from scmle import durability
 from scmle.api import project
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
+from scmle.contracts import signing
 from scmle.contracts import tasks
 from scmle.core import config
+from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import feasibility as charter_feasibility
+from scmle.data.charter import sealing as charter_sealing
 from scmle.data.readers import tabular
 from scmle.inference import mapping as mapping_module
 from scmle.inference import serving
@@ -190,6 +194,11 @@ class ProjectCommand(Command):
             "--leakage-policy", choices=["warn", "block"], default="warn"
         )
         parser.add_argument(
+            "--charter",
+            help="analysis charter (see `scmle charter init`): splits off a "
+            "sealed confirmation set the exploration stages cannot read",
+        )
+        parser.add_argument(
             "--config",
             help="JSON file with the nested sections `search`, `strategies`, "
             "`ensemble`, `feature_graph`, `selection` and `decision` "
@@ -260,6 +269,7 @@ class ProjectCommand(Command):
             unavailable_at_prediction=args.unavailable_at_prediction,
             enforcement=args.enforcement,
             leakage_policy=args.leakage_policy,
+            charter=args.charter,
             output_dir=args.output_dir,
             **sections,
         )
@@ -543,6 +553,93 @@ class PackageCommand(Command):
         return EXIT_OK
 
 
+class CharterCommand(Command):
+    """Creates, checks and signs the analysis charter."""
+
+    name = "charter"
+    help = "create, check or sign an analysis charter"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the `init`, `check` and `sign` actions."""
+        actions = parser.add_subparsers(dest="charter_action", required=True)
+        init = actions.add_parser("init", help="write a template charter")
+        init.add_argument("path")
+        init.add_argument("--force", action="store_true")
+        check = actions.add_parser("check", help="validate a charter")
+        check.add_argument("path")
+        check.add_argument(
+            "--rows",
+            type=int,
+            help="development rows, to report confirmation feasibility",
+        )
+        sign = actions.add_parser("sign", help="sign a validated charter")
+        sign.add_argument("path")
+        sign.add_argument("--output", help="default: rewrite the input")
+        sign.add_argument(
+            "--key-file",
+            help="file holding the key; default: SCMLE_SIGNING_KEY",
+        )
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Runs the chosen action."""
+        action = getattr(self, f"run_{args.charter_action}")
+        return action(args)
+
+    @staticmethod
+    def run_init(args: argparse.Namespace) -> int:
+        """Writes a template that fails `check` until it is filled in."""
+        path = pathlib.Path(args.path)
+        if path.exists() and not args.force:
+            raise errors.ConfigError(f"{path} exists; pass --force")
+        path.write_text(
+            json.dumps(charter_contracts.template(), indent=2) + "\n"
+        )
+        LOGGER.info("wrote template charter %s", path)
+        return EXIT_OK
+
+    @staticmethod
+    def run_check(args: argparse.Namespace) -> int:
+        """Validates the charter, its hash and (if present) its signature."""
+        loaded = charter_sealing.read_verified(args.path)
+        charter = loaded.charter
+        LOGGER.info(
+            "charter %s %s",
+            loaded.charter_hash,
+            "signature verified" if loaded.signed else "unsigned or unchecked",
+        )
+        if args.rows is not None:
+            report = charter_feasibility.assess(
+                n_confirmation=int(
+                    args.rows * charter.sets.confirmation_fraction
+                ),
+                min_effect=charter.min_effect,
+                alpha=float(charter.error_budget.confirmation.alpha_confirm),
+                k_max=charter.k_max,
+                power=charter.power,
+            )
+            LOGGER.info("feasibility: %s (%s)", report.verdict, report.reason)
+        return EXIT_OK
+
+    @staticmethod
+    def run_sign(args: argparse.Namespace) -> int:
+        """Signs the charter with a key from a file or the environment."""
+        key = (
+            pathlib.Path(args.key_file).read_text().strip()
+            if args.key_file
+            else None
+        )
+        if signing.resolve_key(key) is None:
+            raise errors.ConfigError(
+                "no signing key: set SCMLE_SIGNING_KEY or pass --key-file"
+            )
+        charter = charter_contracts.read_charter(args.path)
+        output = charter_sealing.write_charter(
+            args.output or args.path, charter, signing_key=key
+        )
+        LOGGER.info("signed %s", output)
+        return EXIT_OK
+
+
 COMMANDS: tuple[Command, ...] = (
     PlanCommand(),
     RunCommand(),
@@ -552,6 +649,7 @@ COMMANDS: tuple[Command, ...] = (
     ServeCommand(),
     ExportOnnxCommand(),
     PackageCommand(),
+    CharterCommand(),
 )
 
 
