@@ -1,24 +1,38 @@
 """`fsync` needs a writable descriptor on Windows (it fails with EBADF).
 
 POSIX lets a read-only descriptor be flushed, so the bug only showed on the
-Windows CI jobs. A strict `fsync` reproduces the Windows rule everywhere.
+Windows CI jobs. On POSIX a strict `fsync` reproduces the Windows rule; on
+Windows the real `os.fsync` is already strict, so the same tests run as is.
 """
 
 import errno
 import os
 import pathlib
 import re
+import stat
+import sys
 
 import pytest
 
 from scmle import durability
 
-fcntl = pytest.importorskip("fcntl")
+POSIX_ONLY = pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows handles are not file descriptors"
+)
+
+
+def is_directory(descriptor: int) -> bool:
+    """Whether the descriptor refers to a directory."""
+    return stat.S_ISDIR(os.fstat(descriptor).st_mode)
 
 
 @pytest.fixture
 def strict_fsync(monkeypatch):
     """`os.fsync` that rejects read-only files, as Windows does."""
+    if sys.platform == "win32":
+        return
+    import fcntl
+
     real = os.fsync
 
     def fsync(descriptor: int) -> None:
@@ -30,13 +44,7 @@ def strict_fsync(monkeypatch):
     monkeypatch.setattr(os, "fsync", fsync)
 
 
-def is_directory(descriptor: int) -> bool:
-    """Whether the descriptor refers to a directory."""
-    import stat
-
-    return stat.S_ISDIR(os.fstat(descriptor).st_mode)
-
-
+@POSIX_ONLY
 def test_strict_fsync_really_rejects_read_only_files(tmp_path, strict_fsync):
     target = tmp_path / "file.bin"
     target.write_bytes(b"data")
