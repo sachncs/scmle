@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import pathlib
 from pathlib import Path
 from typing import cast
 
@@ -138,7 +139,7 @@ def test_modality_project_preserves_extension_identity_and_status(tmp_path):
     assert declaration.modality == ExtensionTextAdapter.modality
     assert declaration.status is modalities.ModalityStatus.EXTENSION_ONLY
     assert declaration.complete
-    assert report.package.path.endswith("/model")
+    assert pathlib.PurePath(report.package.path).name == "model"
 
 
 def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
