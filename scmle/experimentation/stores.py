@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS trials (
 """
 
 
+# SQLite waits this long for a competing writer before "database is locked".
+# The 5 s default is too short for threads that each fsync on every commit.
+BUSY_TIMEOUT_SECONDS = 30.0
+
+
 class ExperimentStore(abc.ABC):
     """Persists runs, trials and lineage."""
 
@@ -208,7 +213,7 @@ class SqliteExperimentStore(ExperimentStore):
 
     def connect(self) -> sqlite3.Connection:
         """Opens a short-lived connection with row access by name."""
-        connection = sqlite3.connect(self.path)
+        connection = sqlite3.connect(self.path, timeout=BUSY_TIMEOUT_SECONDS)
         connection.row_factory = sqlite3.Row
         return connection
 

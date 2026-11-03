@@ -115,3 +115,22 @@ def test_a_failed_update_rolls_back_and_still_closes(tmp_path):
     with pytest.raises(ValueError):
         store.update_run("r", bogus=1)
     assert store.runs()[0]["state"] == "CREATED"
+
+
+def test_store_connections_wait_for_a_busy_database(tmp_path):
+    """Concurrent writers queue instead of failing with 'database is locked'.
+
+    SQLite's default wait is 5 s, which Windows runners exceed when several
+    threads commit (each commit fsyncs) to one file.
+    """
+    from scmle.experimentation import stores
+
+    store = stores.SqliteExperimentStore(tmp_path / "tracking.sqlite")
+    connection = store.connect()
+    try:
+        waited_ms = connection.execute("PRAGMA busy_timeout").fetchone()[0]
+    finally:
+        connection.close()
+
+    assert waited_ms == int(stores.BUSY_TIMEOUT_SECONDS * 1000)
+    assert waited_ms >= 30_000
