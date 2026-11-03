@@ -289,7 +289,9 @@ def test_project_run_rejects_valid_digest_for_tampered_report(
 
 def test_estimation_fails_closed_without_both_declarations(tmp_path):
     """Undeclared estimation cannot silently infer a scientific policy."""
-    project = scmle.MLProject(estimation_frame(), "outcome", output_dir=tmp_path)
+    project = scmle.MLProject(
+        estimation_frame(), "outcome", output_dir=tmp_path
+    )
 
     with pytest.raises(errors.ConfigError, match="declare both"):
         project.estimate_parameters()
