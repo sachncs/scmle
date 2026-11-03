@@ -25,6 +25,22 @@
   hash-chained `custody_log.jsonl`. The `MLProject` signature snapshot was
   regenerated for the new optional `charter` argument. Custody is
   tamper-evident on one machine, not adversary-proof; see `docs/SECURITY.md`.
+* Claim ledger and confirmation (charter runs): hash-chained append-only
+  `hypothesis_ledger.jsonl`, online FDR rules (e-LOND default, valid under
+  arbitrary dependence; LORD++ and SAFFRON labelled independence-only),
+  permuted-target negative controls, and one-time confirmation of exploration
+  survivors by BY (default), BH, Holm or Bonferroni. New artifacts:
+  `negative_control.json`, `confirmed_claims.json`. `--check fdr` runs the
+  simulation gate. Thresholdout is not implemented.
+* Admissibility and provenance (`scmle.data.admissibility`): field provenance,
+  as-of reconstruction, admissibility rules by estimand, falsify-only DAG
+  checks, leakage tests and reconciliation, with certificates in
+  `benchmarks/qualification/f4_certificates.json`. The leakage skill test stays
+  descriptive until noisy-copy leaks are certified.
+* Detectors with certificates (`scmle.data.detectors`): missingness, label
+  noise, sentinels, duplicates and outlier triage. `--write-f5` regenerates
+  `detector_certificates.json`; `--check` verifies it. Certificates cover one
+  corpus; label-noise detection is descriptive.
 * Thread safety: the estimator and metric registries, experiment store, model
   registry, key registry, monitoring journals, shadow evaluator and bundle
   history are safe to use from several threads in one process (see
