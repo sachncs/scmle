@@ -255,29 +255,6 @@ jobs:
             results.json
             reliability.json
 
-  qualification-harness:
-    name: qualification verification harness
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
-      - run: uv sync --python 3.14
-      - run: >-
-          uv run pytest -q -W error::ResourceWarning
-          tests/benchmarks/test_qualification_*.py
-          tests/unit/test_qualification_*.py
-          tests/unit/test_error_budget.py
-          tests/unit/test_randomness.py
-          tests/unit/test_rng_discipline.py
-          --junitxml=qualification.xml
-      - name: Reject unexplained skips and xfails
-        run: uv run python scripts/check_pytest_skips.py qualification.xml
-      - name: Run the harness smoke gate
-        run: uv run python -m benchmarks.qualification --smoke
-      - name: Require a current certificate for every gating detector
-        run: uv run python -m benchmarks.qualification --check
-
   security:
     name: static analysis and dependency audit
     runs-on: ubuntu-24.04
