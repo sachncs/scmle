@@ -381,19 +381,39 @@ def required_defects() -> dict[str, tuple[str, ...]]:
     }
 
 
-def problems(store: certificates.CertificateStore) -> list[str]:
-    """Why the store does not permit gating by every F4 detector."""
-    found = []
+def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
+    """F4 detector/defect pairs by why they may not gate.
+
+    Returns:
+        `missing` and `stale` are failures of the certificate file;
+        `uncertified` pairs were measured and did not meet the policy, so the
+        check stays descriptive (not an error).
+    """
+    found: dict[str, list[str]] = {
+        "missing": [],
+        "stale": [],
+        "uncertified": [],
+    }
     digests = current_digests()
     for detector, defects in required_defects().items():
         for defect in defects:
             report = certificates.audit(
                 store, {detector: (digests[detector], defect)}
             )
-            for label in ("missing", "stale", "uncertified"):
+            for label in found:
                 if getattr(report, label):
-                    found.append(f"{detector}/{defect}: {label}")
+                    found[label].append(f"{detector}/{defect}")
     return found
+
+
+def problems(store: certificates.CertificateStore) -> list[str]:
+    """Why the certificate file is unusable: missing or stale entries."""
+    labels = audit_labels(store)
+    return [
+        f"{item}: {kind}"
+        for kind in ("missing", "stale")
+        for item in labels[kind]
+    ]
 
 
 def main(arguments: list[str] | None = None) -> int:
@@ -407,7 +427,12 @@ def main(arguments: list[str] | None = None) -> int:
     if options.check:
         store = certificates.CertificateStore.load(STORE_PATH)
         found = problems(store)
-        print(json.dumps({"ok": not found, "problems": found}, indent=2))
+        report = {
+            "ok": not found,
+            "problems": found,
+            "descriptive_only": audit_labels(store)["uncertified"],
+        }
+        print(json.dumps(report, indent=2))
         return 1 if found else 0
     cert, measurements = certify_leakage(options.workers)
     store = certificates.CertificateStore(

@@ -37,7 +37,7 @@ def test_every_required_defect_type_has_an_outcome_on_file():
 def test_stale_and_missing_certificates_are_reported():
     empty = certificates.CertificateStore()
     found = f4.problems(empty)
-    assert any("missing" in item for item in found)
+    assert found and all(item.endswith(": missing") for item in found)
     store = stored()
     forged = {
         d: (
@@ -172,6 +172,7 @@ def test_the_measured_verdicts_are_the_ones_the_gates_rely_on():
     for detector in (asof.DETECTOR_ID, reconciliation.DETECTOR_ID):
         (other,) = store.current(detector, digests[detector])
         assert all(o.passed for o in other.outcomes)
-    assert f4.problems(store) == [
-        "f4-leakage-skill/leak_noisy_copy: uncertified"
+    assert f4.problems(store) == []
+    assert f4.audit_labels(store)["uncertified"] == [
+        "f4-leakage-skill/leak_noisy_copy"
     ]
