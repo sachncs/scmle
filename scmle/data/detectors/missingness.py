@@ -203,7 +203,7 @@ def em_normal(
     mean = np.nanmean(values, axis=0)
     variance = np.nanvar(values, axis=0)
     covariance = np.diag(np.where(variance > 0, variance, 1.0))
-    groups = _patterns(seen)
+    groups = row_patterns(seen)
     converged = False
     iterations = 0
     for step in range(1, max_iter + 1):
@@ -211,7 +211,7 @@ def em_normal(
         total = np.zeros(p)
         second = np.zeros((p, p))
         for observed, rows in groups:
-            filled, extra = _expect(
+            filled, extra = expect_block(
                 values[np.ix_(rows, observed)], observed, mean, covariance, p
             )
             total += filled.sum(axis=0)
@@ -231,7 +231,7 @@ def em_normal(
     return EmResult(mean, covariance, iterations, converged)
 
 
-def _patterns(seen: np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
+def row_patterns(seen: np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
     """Groups row positions by which columns are observed."""
     keys: dict[bytes, list[int]] = {}
     for row, flags in enumerate(seen):
@@ -243,7 +243,7 @@ def _patterns(seen: np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
     return groups
 
 
-def _expect(
+def expect_block(
     block: np.ndarray,
     observed: np.ndarray,
     mean: np.ndarray,
@@ -282,7 +282,7 @@ def little_statistic(values: np.ndarray, fit: EmResult) -> tuple[float, int]:
     p = values.shape[1]
     statistic = 0.0
     observed_total = 0
-    for observed, rows in _patterns(seen):
+    for observed, rows in row_patterns(seen):
         if len(observed) == 0:
             continue
         gap = values[np.ix_(rows, observed)].mean(axis=0) - fit.mean[observed]
@@ -348,7 +348,7 @@ def little_mcar_test(
         statistic=statistic,
         df=df,
         p_value=float(stats.chi2.sf(statistic, df)),
-        patterns=len(_patterns(~np.isnan(values))),
+        patterns=len(row_patterns(~np.isnan(values))),
         rows=len(values),
         columns=tuple(str(n) for n in names),
         converged=fit.converged,
@@ -371,7 +371,7 @@ def oof_linear_scores(
     scores = np.zeros(len(target))
     for held in folds:
         fit = np.setdiff1d(np.arange(len(target)), held)
-        coefficients, *_ = np.linalg.lstsq(design[fit], target[fit], rcond=None)
+        coefficients = np.linalg.lstsq(design[fit], target[fit], rcond=None)[0]
         scores[held] = design[held] @ coefficients
     return scores
 
@@ -420,8 +420,8 @@ def indicator_model_test(
     target = flag.astype(float)
     observed = auc_from_ranks(oof_linear_scores(design, target, parts), flag)
     beaten = 0
-    for _ in range(permutations):
-        shuffled = rng.permutation(flag)
+    shuffles = [rng.permutation(flag) for count in range(permutations)]
+    for shuffled in shuffles:
         null = auc_from_ranks(
             oof_linear_scores(design, shuffled.astype(float), parts), shuffled
         )
@@ -680,9 +680,10 @@ def imputation_errors(
     errors: dict[str, float] = {}
     for strategy in STRATEGIES:
         scores = []
-        for index, (_, held, imputer) in enumerate(
+        for index, fold in enumerate(
             fold_imputers(values, strategy, seed, folds)
         ):
+            held, imputer = fold[1], fold[2]
             block = values[held].copy()
             rows, cols = draw_holdout(block, seed, index, share)
             if len(rows) == 0:

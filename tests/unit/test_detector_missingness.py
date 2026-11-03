@@ -92,7 +92,9 @@ def test_little_statistic_matches_naive_formula_at_brute_force_mle():
     result = m.little_mcar_test(frame, transform="none")
     mean, cov = brute_force_mle(values)
     d2, pj = 0.0, 0
-    for _, group in frame.groupby(frame.isna().apply(tuple, axis=1)):
+    for group in dict(
+        list(frame.groupby(frame.isna().apply(tuple, axis=1)))
+    ).values():
         seen = ~group.isna().iloc[0].to_numpy()
         gap = group.to_numpy()[:, seen].mean(axis=0) - mean[seen]
         d2 += len(group) * gap @ np.linalg.inv(cov[np.ix_(seen, seen)]) @ gap
@@ -141,10 +143,10 @@ def test_little_validates_arguments():
 
 
 def test_little_p_values_are_uniform_under_mcar_normal_data():
-    rng = np.random.default_rng(11)
     cov = np.array([[1.0, 0.5, 0.2], [0.5, 1.0, 0.3], [0.2, 0.3, 1.0]])
     ps = []
-    for _ in range(300):
+    for rep in range(300):
+        rng = np.random.default_rng(rep)
         x = rng.multivariate_normal(np.zeros(3), cov, size=120)
         x[rng.random(120) < 0.2, 1] = np.nan
         x[rng.random(120) < 0.2, 2] = np.nan
@@ -344,7 +346,7 @@ def test_imputation_errors_and_selection():
     rng = np.random.default_rng(0)
     base = rng.normal(size=(200, 1))
     values = np.hstack(
-        [base + 0.05 * rng.normal(size=(200, 1)) for _ in range(4)]
+        [base + 0.05 * rng.normal(size=(200, 1)) for col in range(4)]
     )
     values[rng.random(values.shape) < 0.1] = np.nan
     errors = m.imputation_errors(values, seed=0)

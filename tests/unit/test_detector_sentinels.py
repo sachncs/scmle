@@ -107,7 +107,7 @@ def test_recode_sets_missing_logs_and_keeps_the_original():
 def test_integer_column_becomes_float_on_recode():
     frame = pd.DataFrame({"n": [999] * 10 + list(range(60))})
     report = s.find_sentinels(frame, numeric_codes=[999])
-    out, _ = s.recode_missing(frame, report)
+    out = s.recode_missing(frame, report)[0]
     assert out["n"].isna().sum() == 10 and out["n"].dtype == "float64"
 
 

@@ -39,7 +39,7 @@ def test_committed_certificates_meet_the_planted_count_requirement(committed):
 
 
 def test_gating_lists_only_passing_outcomes(committed):
-    registered = {(d, t) for d, _, t in f5.gating(committed)}
+    registered = {(g[0], g[2]) for g in f5.gating(committed)}
     for row in f5.summary(committed):
         key = (row["detector"], row["defect_type"])
         assert (key in registered) is bool(row["gates"])

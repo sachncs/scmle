@@ -385,7 +385,7 @@ def detect(
                 audit.to_numpy(),
                 index=[remap[int(p)] for p in audit.index],
             )
-    _, codes = encode(labels)
+    codes = encode(labels)[1]
     probabilities = out_of_fold_probabilities(features, codes, seed)
     cl_flags, thresholds = confident_learning_flags(probabilities, codes)
     aum_flags = margin_flags(features, codes, seed)

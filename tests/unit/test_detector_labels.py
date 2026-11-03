@@ -68,14 +68,15 @@ def test_ppi_mean_matches_independent_formula():
 
 
 def test_ppi_interval_covers_the_true_mean_at_nominal_rate():
-    rng = np.random.default_rng(1)
     truth, covered, reps = 0.2, 0, 600
-    for _ in range(reps):
+    for rep in range(reps):
+        rng = np.random.default_rng(rep)
         y = rng.random(400) < truth
         f = y ^ (rng.random(400) < 0.15)
         audit = rng.choice(400, 80, replace=False)
         rest = np.setdiff1d(np.arange(400), audit)
-        _, (low, high) = lab.ppi_mean(f[rest], f[audit], y[audit], 0.95)
+        interval = lab.ppi_mean(f[rest], f[audit], y[audit], 0.95)[1]
+        low, high = interval
         covered += low <= y.mean() <= high
     assert covered / reps == pytest.approx(0.95, abs=0.04)
 
@@ -188,10 +189,10 @@ def test_detect_requires_agreement_and_reports_overlap():
 
 
 def test_detect_declines_small_or_single_class_data():
-    x, y, _ = separable(n=lab.MIN_ROWS - 1)
+    x, y = separable(n=lab.MIN_ROWS - 1)[:2]
     with pytest.raises(ValueError, match="50"):
         lab.detect(x, y)
-    x, y, _ = separable(n=lab.MIN_ROWS)
+    x, y = separable(n=lab.MIN_ROWS)[:2]
     lab.detect(x, y)
     with pytest.raises(ValueError, match="two classes"):
         lab.detect(x, pd.Series(np.zeros(len(x), dtype=int)))

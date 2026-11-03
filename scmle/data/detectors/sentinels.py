@@ -125,11 +125,12 @@ def expected_share(others: np.ndarray, value: float, spacing: float) -> float:
 
 def numeric_spikes(
     column: str, series: pd.Series, min_count: int = MIN_COUNT
-) -> list[tuple[SentinelFinding, int]]:
-    """Candidate spikes of one numeric column with their test sizes.
+) -> list[SentinelFinding]:
+    """Candidate spikes of one numeric column.
 
     Returns:
-        (finding, n) pairs; the caller applies the multiplicity correction.
+        Findings with their uncorrected p-values; the caller applies the
+        multiplicity correction.
     """
     values = series.to_numpy(dtype=float)
     values = values[np.isfinite(values)]
@@ -153,16 +154,13 @@ def numeric_spikes(
             stats.binomtest(int(count), len(values), share, "greater").pvalue
         )
         found.append(
-            (
-                SentinelFinding(
-                    column,
-                    float(value),
-                    int(count),
-                    share * len(values),
-                    p_value,
-                    "spike",
-                ),
-                len(values),
+            SentinelFinding(
+                column,
+                float(value),
+                int(count),
+                share * len(values),
+                p_value,
+                "spike",
             )
         )
     return found
@@ -218,7 +216,7 @@ def find_sentinels(
         if pd.api.types.is_bool_dtype(series):
             continue
         if pd.api.types.is_numeric_dtype(series):
-            candidates += [f for f, _ in numeric_spikes(str(name), series)]
+            candidates += numeric_spikes(str(name), series)
             numbers = series.to_numpy(dtype=float)
             for code in declared:
                 hits = int((numbers == code).sum())
