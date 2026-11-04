@@ -6,6 +6,7 @@
     python -m benchmarks.qualification --check fdr        # claim ledger (F3)
     python -m benchmarks.qualification --check ingest     # ingestion (F9)
     python -m benchmarks.qualification --check framing    # framing (F8)
+    python -m benchmarks.qualification --check loop       # closed loop (F13)
     python -m benchmarks.qualification --write-sample F   # stand-in sample
     python -m benchmarks.qualification --write-f5 F       # F5 certificates
 
@@ -31,6 +32,11 @@ against `framing_certificates.json` and `framing_measurements.json`: stale
 code, a `MIN_CLUSTERS` that differs from the measured minimum, or an accepted
 malformed charter fails; a method that missed its floor is listed as
 descriptive.
+The F13 closed-loop gates (`loop_certify.py`) are checked by `--check loop`
+against `loop_certificates.json`: a certificate is stale when the code or the
+simulator it measured changed; a gate that missed its floor (today the
+detection delay of the alarm, H2 and H10) is listed as descriptive and does not
+fail the check, and the loop then does not let an alarm retrain by itself.
 """
 
 import argparse
@@ -43,6 +49,7 @@ from benchmarks.qualification import f6_certify
 from benchmarks.qualification import framing_certify
 from benchmarks.qualification import ingest_certify
 from benchmarks.qualification import ledger_checks
+from benchmarks.qualification import loop_certify
 from benchmarks.qualification import screen_certify
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
@@ -121,7 +128,13 @@ def main(arguments: list[str] | None = None) -> int:
         "--check",
         nargs="?",
         const="certificates",
-        choices=("certificates", "fdr", "framing", "ingest"),
+        choices=(
+            "certificates",
+            "fdr",
+            "framing",
+            "ingest",
+            "loop",
+        ),
     )
     action.add_argument("--write-sample", type=Path, metavar="FILE")
     action.add_argument("--write-f5", type=Path, metavar="FILE")
@@ -141,6 +154,10 @@ def main(arguments: list[str] | None = None) -> int:
         summary = ledger_checks.report(findings)
         print(json.dumps(summary, indent=2))
         return 0 if summary["ok"] else 1
+    if options.check == "loop":
+        looped = loop_certify.check()
+        print(json.dumps(looped, indent=2))
+        return 0 if looped["ok"] else 1
     if options.check == "framing":
         found = framing_certify.check()
         print(json.dumps(found, indent=2))
