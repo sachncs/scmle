@@ -101,7 +101,7 @@ def residualise(
     design = np.column_stack([np.ones(len(controls)), controls])
     out = []
     for column in columns:
-        coef, *_ = np.linalg.lstsq(design, column, rcond=None)
+        coef = np.linalg.lstsq(design, column, rcond=None)[0]
         out.append(column - design @ coef)
     return out
 

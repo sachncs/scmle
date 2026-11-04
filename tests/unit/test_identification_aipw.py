@@ -32,7 +32,7 @@ def test_the_att_score_equals_the_hand_computed_toy_table():
     m1 = np.zeros(4)
     # raw: 2, 3.5, -(1*0)=0, -(1/3 * 0.5) = -1/6; p = 0.5
     expected = (2 + 3.5 + 0 - 0.5 / 3) / 4 / 0.5
-    theta, _ = aipw.scores("ATT", t, y, e, m0, m1)
+    theta = aipw.scores("ATT", t, y, e, m0, m1)[0]
     assert theta == pytest.approx(expected, abs=1e-12)
 
 

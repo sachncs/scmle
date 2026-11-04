@@ -126,7 +126,7 @@ def ols_fit(
     dof = n - full.shape[1]
     if dof < 3:
         raise ValueError("too few rows for the regression")
-    coef, *_ = np.linalg.lstsq(full, y, rcond=None)
+    coef = np.linalg.lstsq(full, y, rcond=None)[0]
     resid = y - full @ coef
     sigma2 = float(resid @ resid) / dof
     cov = sigma2 * np.linalg.inv(full.T @ full)
@@ -137,7 +137,7 @@ def ols_fit(
         t_y = float(coef[2 + j] / math.sqrt(cov[2 + j, 2 + j]))
         r2y = partial_r2(t_y, dof)
         design = np.column_stack([np.ones(n), x])
-        cd, *_ = np.linalg.lstsq(design, d, rcond=None)
+        cd = np.linalg.lstsq(design, d, rcond=None)[0]
         rd = d - design @ cd
         dof_d = n - design.shape[1]
         cov_d = float(rd @ rd) / dof_d * np.linalg.inv(design.T @ design)

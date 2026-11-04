@@ -23,10 +23,9 @@ def test_an_empty_battery_is_not_a_pass():
 
 
 def test_the_false_alarm_rate_is_at_most_alpha():
-    rng = np.random.default_rng(0)
     alpha, runs, flagged = 0.05, 4000, 0
-    for _ in range(runs):
-        draws = rng.standard_normal(3)
+    for seed in range(runs):
+        draws = np.random.default_rng(seed).standard_normal(3)
         tests = [
             battery.wald_test(f"t{i}", "placebo", float(d), 1.0)
             for i, d in enumerate(draws)

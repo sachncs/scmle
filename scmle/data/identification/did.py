@@ -188,7 +188,7 @@ def estimate(
             value += np.cov(control_vars[e], control_vars[f])[0, 1] / n_never
             covariance[a, b] = value
     post_cells = [(g, j) for g in groups for j in range(index[g], len(periods))]
-    weights = np.array([sizes[g] for g, _ in post_cells], dtype=float)
+    weights = np.array([sizes[cell[0]] for cell in post_cells], dtype=float)
     weights /= weights.sum()
     theta_parts = []
     treated_unit: dict[Any, np.ndarray] = {}

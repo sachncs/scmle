@@ -146,12 +146,13 @@ def random_spec(rng: np.random.Generator, eligible: bool) -> causal.CausalSpec:
 
 
 def test_ineligible_charters_all_refuse_and_eligible_ones_do_not():
-    rng = np.random.default_rng(10)
-    for _ in range(200):
+    for trial in range(200):
+        rng = np.random.default_rng(trial)
         plan = select.select(random_spec(rng, eligible=False))
         assert plan.status == select.NOT_IDENTIFIED
         assert plan.to_dict()["estimate"] is None
-    for _ in range(200):
+    for trial in range(200):
+        rng = np.random.default_rng(1000 + trial)
         plan = select.select(random_spec(rng, eligible=True))
         assert plan.status == select.IDENTIFIED
 

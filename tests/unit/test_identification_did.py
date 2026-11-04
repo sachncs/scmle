@@ -22,9 +22,10 @@ def panel(
     rows = []
     groups = [(adopt, n_treated)] + ([(adopt + 1, n_treated)] if second else [])
     units = [(g, n) for g, n in groups] + [(None, n_never)]
-    uid = 0
+    first = 0
     for g, n in units:
-        for _ in range(n):
+        for unit_row in range(n):
+            uid = first + unit_row
             level = rng.normal()
             for t in range(periods):
                 y = level + 0.3 * t + rng.normal(scale=0.7)
@@ -33,7 +34,7 @@ def panel(
                     if t >= g:
                         y += tau
                 rows.append((uid, t, g if g is not None else np.nan, y))
-            uid += 1
+        first += n
     return pd.DataFrame(rows, columns=["id", "t", "g", "y"])
 
 

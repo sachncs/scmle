@@ -213,7 +213,7 @@ class BackdoorAdapter(Adapter):
             self.seed,
             self.learner,
         )
-        e, _, _ = self.nuisances.predict(self.x)
+        e = self.nuisances.predict(self.x)[0]
         t = aipw.binary(self.x[spec.treatment], spec.treatment)
         matrix = self.nuisances.scaler.transform(
             self.nuisances.design.matrix(self.x)
@@ -1049,7 +1049,7 @@ def design_only(
     plan = select.select(spec, dag)
     if plan.primary is None:
         return refusal_outcome(plan, spec)
-    _, alpha_falsify = alphas(error_budget)
+    alpha_falsify = alphas(error_budget)[1]
     strategy = plan.primary
     adapter = ADAPTERS[strategy](spec, x, seed, learner, alpha_falsify)
     try:
