@@ -33,6 +33,17 @@ defines only those.
 | F11 | [Decision layer](features/F11-decision-layer.md) | Cost-optimal thresholds, off-policy evaluation, A/B design, anytime-valid promote and rollback. |
 | F12 | [Uncertainty and breadth](features/F12-uncertainty-and-breadth.md) | Coverage-guaranteed intervals and sets; forecasting, ranking, survival and other problem types. |
 | F13 | [Closed loop and escalation](features/F13-closed-loop-and-escalation.md) | Drift to retrain to gated promotion, label bias, and a measured rule for when to ask a human. |
+| F14 | [Cloud portability and production operation](features/F14-cloud-portability-and-production-operation.md) | One lifecycle on local, AWS and GCP: hardened artifacts, security, serving, infrastructure, release gates, observability, recovery. |
+| F15 | [Operational lifecycle and qualified breadth](features/F15-operational-lifecycle-and-qualified-breadth.md) | Traceable business trail from question to outcome; further task families and modalities, one qualified slice at a time. |
+
+## Production standard
+
+The product may claim production-qualified deployment on AWS and GCP only
+when F14 items 1 to 13 have passed their acceptance on both providers, with
+the exact application, model, data and configuration versions, the cloud
+environment tested, the evidence and the responsible approver recorded. A
+running container, a successful request, a registered model or an
+infrastructure manifest is not that claim.
 
 ## Autonomy standard
 

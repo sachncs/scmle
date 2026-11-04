@@ -42,6 +42,11 @@ sign-off. See [`validation-referents.md`](validation-referents.md).
 | 11 | [phase-11-decision-layer.md](phase-11-decision-layer.md) | F11: decisions, OPE, A/B, rollout | 8, 10 |
 | 12 | [phase-12-uncertainty-and-breadth.md](phase-12-uncertainty-and-breadth.md) | F12: coverage guarantees, problem types (partly built: library methods and simulation gates; run wiring and outside-data gates open) | 7 |
 | 13 | [phase-13-closed-loop-and-escalation.md](phase-13-closed-loop-and-escalation.md) | F13: production loop, escalation | 11, 12 |
+| 14 | [phase-14-portable-core.md](phase-14-portable-core.md) | F14 items 1, 2, 5: local environment, hardened artifact, serving contract | none |
+| 15 | [phase-15-security-data-training-orchestration.md](phase-15-security-data-training-orchestration.md) | F14 items 4, 6, 7, 8: security, governed data, portable training, orchestration | 14 |
+| 16 | [phase-16-infrastructure-and-release.md](phase-16-infrastructure-and-release.md) | F14 items 3, 9, 10: infrastructure as code, CI/CD gates, registry bound to the runtime | 14, 15 |
+| 17 | [phase-17-operate-and-qualify.md](phase-17-operate-and-qualify.md) | F14 items 11, 12, 13: observability, continuous evaluation, recovery; the production claim | 16, 13 |
+| 18 | [phase-18-lifecycle-evidence-and-breadth.md](phase-18-lifecycle-evidence-and-breadth.md) | F15: business trail, qualified breadth | 17 (item 14 may start earlier) |
 | 6 | [phase-6-external-validation-and-release.md](phase-6-external-validation-and-release.md) | F7: backtest, red team, replication, release | overlaps all |
 
 ```
@@ -51,6 +56,12 @@ sign-off. See [`validation-referents.md`](validation-referents.md).
     +--> 12 -----------------+
                     6 (external gates, throughout; release last)
 ```
+
+Cloud track (independent of 8 to 13 except where noted): 14 → 15 → 16 → 17 →
+18. Phases 14 and 15 are verifiable without a cloud account; 16 and 17 need
+sandbox accounts, a spending cap and a named approver, and are not marked
+done on local evidence. "Production-qualified on AWS and GCP" is claimed only
+when F14 items 1 to 13 pass on both providers.
 
 Parallel lanes: after 7, phases 8, 9 and 12 run concurrently. Phase 6's gates
 need people outside the project, so they start early and finish last.

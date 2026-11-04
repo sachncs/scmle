@@ -110,6 +110,8 @@ provenance, F5 detectors with certificates, F6 robustness and shift.
 | F11 | `F11-decision-layer.md` |
 | F12 | `F12-uncertainty-and-breadth.md` |
 | F13 | `F13-closed-loop-and-escalation.md` |
+| F14 | `F14-cloud-portability-and-production-operation.md` (local, AWS and GCP: artifacts, security, serving, infrastructure, release, operation, recovery) |
+| F15 | `F15-operational-lifecycle-and-qualified-breadth.md` (business trail, further task families and modalities) |
 
 ## Phases (plan/)
 
@@ -123,6 +125,14 @@ provenance, F5 detectors with certificates, F6 robustness and shift.
 | 11 | `phase-11-decision-layer.md` | F11 |
 | 12 | `phase-12-uncertainty-and-breadth.md` | F12 |
 | 13 | `phase-13-closed-loop-and-escalation.md` | F13 |
+| 14 | `phase-14-portable-core.md` | F14 items 1, 2, 5 |
+| 15 | `phase-15-security-data-training-orchestration.md` | F14 items 4, 6, 7, 8 |
+| 16 | `phase-16-infrastructure-and-release.md` | F14 items 3, 9, 10 |
+| 17 | `phase-17-operate-and-qualify.md` | F14 items 11, 12, 13 |
+| 18 | `phase-18-lifecycle-evidence-and-breadth.md` | F15 |
+
+Cloud track: 14 first (no cloud account needed), then 15, 16, 17; 18 after
+17. Cloud acceptance needs accounts, a budget cap and an approver.
 
 Dependencies: 7 first (closes the built instrument). 8 and 9 in parallel after
 7. 10 needs 9 (point-in-time data) and 8 (the charter's causal fields). 11
