@@ -66,6 +66,7 @@ from scmle.evaluation import bias_variance
 from scmle.evaluation import confidence
 from scmle.evaluation import conformal
 from scmle.evaluation import criteria
+from scmle.evaluation import cv_plus
 from scmle.evaluation import diagnostics
 from scmle.evaluation import fit_health
 from scmle.evaluation import learning_curve
@@ -2516,6 +2517,7 @@ class PackageStage(Stage):
         )
         held_labels: list[Any] = []
         held_scores: list[Any] = []
+        fold_models: list[Any] = []
         classes = list(bundle.classes or ())
         for fit_positions, evaluate_positions in split.manifest.folds:
             reason = context.resource_governor.skip_reason(first=False)
@@ -2531,6 +2533,7 @@ class PackageStage(Stage):
             held_labels.extend(split.dev_target.iloc[evaluate])
             if task is tasks.TaskType.REGRESSION:
                 held_scores.extend(candidate.predict(rows))
+                fold_models.append(candidate)
                 continue
             known = list(candidate.classes_)
             probabilities = candidate.predict_proba(rows)
@@ -2549,11 +2552,57 @@ class PackageStage(Stage):
             )
             return None
         if task is tasks.TaskType.REGRESSION:
+            self.keep_cv_plus(
+                context,
+                bundle,
+                fold_models,
+                np.asarray(held_labels, dtype=float),
+                np.asarray(held_scores, dtype=float),
+            )
             return conformal.ConformalCalibrator.for_regression(
                 held_labels, held_scores
             )
         return conformal.ConformalCalibrator.for_classification(
             held_labels, np.asarray(held_scores), classes
+        )
+
+    def keep_cv_plus(
+        self,
+        context: context_module.RunContext,
+        bundle: bundle_module.ModelBundle,
+        models: list[Any],
+        observed: np.ndarray,
+        predicted: np.ndarray,
+    ) -> None:
+        """Stores the fold models for CV+ intervals when the rule applies.
+
+        CV+ needs each calibration row held out in exactly one fold; with
+        `MIN_ROWS_FOR_SPLIT` or more rows the pooled margin is used instead,
+        and a model set above `MAX_BYTES` is not kept. The reason is
+        emitted either way.
+        """
+        split = require(context.split, "split")
+        held = [fold[1] for fold in split.manifest.folds]
+        folds = cv_plus.partition_folds(held, len(split.dev_features))
+        reason = None
+        if folds is None or len(folds) != len(observed):
+            reason = "held-out folds overlap; no CV+ ensemble"
+        elif len(observed) >= cv_plus.MIN_ROWS_FOR_SPLIT:
+            reason = (
+                f"{len(observed)} calibration rows; pooled margin is used "
+                f"from {cv_plus.MIN_ROWS_FOR_SPLIT}"
+            )
+        elif cv_plus.serialized_size(models) > cv_plus.MAX_BYTES:
+            reason = f"fold models exceed {cv_plus.MAX_BYTES} bytes"
+        if reason is not None or folds is None:
+            context.emit(
+                "cv_plus.skipped",
+                f"CV+ ensemble not stored: {reason}",
+                data={"reason": reason},
+            )
+            return
+        bundle.cv_plus = cv_plus.CvPlusEnsemble(
+            tuple(models), folds, np.abs(observed - predicted)
         )
 
     def quantile_intervals(

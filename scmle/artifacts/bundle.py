@@ -36,6 +36,7 @@ from scmle.contracts import tasks
 from scmle.data.readers import interchange
 from scmle.data.readers import tabular
 from scmle.evaluation import conformal as conformal_module
+from scmle.evaluation import cv_plus as cv_plus_module
 from scmle.evaluation import dirichlet
 from scmle.evaluation import quantile as quantile_module
 from scmle.evaluation import reliability
@@ -60,6 +61,7 @@ REFERENCE_FILE = "reference.json"
 CALIBRATOR_FILE = "calibrator.joblib"
 CONFORMAL_FILE = "conformal.json"
 QUANTILE_FILE = "quantile.joblib"
+CV_PLUS_FILE = "cv_plus.joblib"
 NOVELTY_FILE = "novelty.joblib"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
@@ -314,6 +316,9 @@ class ModelBundle:
         self.conformal = conformal
         self.novelty = novelty
         self.quantile = quantile
+        # The fold models behind `predict_interval(method="cv_plus")`; set
+        # by the run or by `load`, kept out of the constructor signature.
+        self.cv_plus: cv_plus_module.CvPlusEnsemble | None = None
         # Serializes `remember`, which rewrites `history` from itself.
         self.history_lock = threading.RLock()
 
@@ -709,6 +714,10 @@ class ModelBundle:
             quantile_path = root / QUANTILE_FILE
             joblib.dump(self.quantile, quantile_path)
             files[QUANTILE_FILE] = file_sha256(quantile_path)
+        if self.cv_plus is not None:
+            cv_plus_path = root / CV_PLUS_FILE
+            joblib.dump(self.cv_plus, cv_plus_path)
+            files[CV_PLUS_FILE] = file_sha256(cv_plus_path)
         if self.history is not None:
             history_path = root / HISTORY_FILE
             self.history.to_parquet(history_path, index=False)
@@ -964,7 +973,18 @@ class ModelBundle:
                     "checksum mismatch: quantile models were modified"
                 )
             intervals = joblib.load(quantile_path)
-        return cls(
+        cv_plus_models = None
+        if CV_PLUS_FILE in info.files:
+            cv_plus_path = root / CV_PLUS_FILE
+            if (
+                not cv_plus_path.exists()
+                or file_sha256(cv_plus_path) != info.files[CV_PLUS_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: CV+ fold models were modified"
+                )
+            cv_plus_models = joblib.load(cv_plus_path)
+        loaded = cls(
             joblib.load(model_path),
             schema,
             info,
@@ -975,6 +995,8 @@ class ModelBundle:
             detector,
             intervals,
         )
+        loaded.cv_plus = cv_plus_models
+        return loaded
 
     @property
     def features(self) -> list[str]:
@@ -1167,7 +1189,10 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
             method: `residual` for a margin of the same width everywhere, or
                 `quantile` for conformalized quantile regression, whose
-                width follows how noisy each row's neighbourhood is.
+                width follows how noisy each row's neighbourhood is, or
+                `cv_plus` for the CV+ interval from the stored fold models
+                (present when the run had fewer than 1000 calibration rows
+                held out once each).
 
         Returns:
             Columns `prediction`, `lower` and `upper`.
@@ -1191,10 +1216,24 @@ class ModelBundle:
                     "upper": np.maximum(upper, predictions),
                 }
             )
+        if method == "cv_plus":
+            if self.cv_plus is None:
+                raise errors.ArtifactError(
+                    "this bundle has no CV+ fold models; the run stores them "
+                    "for regression with fewer than "
+                    f"{cv_plus_module.MIN_ROWS_FOR_SPLIT} calibration rows "
+                    "held out once each (see the cv_plus.skipped event)"
+                )
+            frame = self.prepare_frame(data, mapping)
+            lower, upper = self.cv_plus.interval(frame, coverage)
+            predictions = np.asarray(self.pipeline.predict(frame), dtype=float)
+            return pd.DataFrame(
+                {"prediction": predictions, "lower": lower, "upper": upper}
+            )
         if method != "residual":
             raise errors.ArtifactError(
-                f"unknown interval method '{method}'; use 'residual' or "
-                "'quantile'"
+                f"unknown interval method '{method}'; use 'residual', "
+                "'quantile' or 'cv_plus'"
             )
         calibrator = self.require_conformal("regression")
         predictions = np.asarray(self.predict(data, mapping), dtype=float)
