@@ -40,7 +40,7 @@ sign-off. See [`validation-referents.md`](validation-referents.md).
 | 9 | [phase-9-raw-data-ingestion.md](phase-9-raw-data-ingestion.md) | F9: raw data, grain, joins, point-in-time features | 7 |
 | 10 | [phase-10-causal-identification.md](phase-10-causal-identification.md) | F10: causal identification | 8, 9 |
 | 11 | [phase-11-decision-layer.md](phase-11-decision-layer.md) | F11: decisions, OPE, A/B, rollout | 8, 10 |
-| 12 | [phase-12-uncertainty-and-breadth.md](phase-12-uncertainty-and-breadth.md) | F12: coverage guarantees, problem types | 7 |
+| 12 | [phase-12-uncertainty-and-breadth.md](phase-12-uncertainty-and-breadth.md) | F12: coverage guarantees, problem types (partly built: library methods and simulation gates; run wiring and outside-data gates open) | 7 |
 | 13 | [phase-13-closed-loop-and-escalation.md](phase-13-closed-loop-and-escalation.md) | F13: production loop, escalation | 11, 12 |
 | 6 | [phase-6-external-validation-and-release.md](phase-6-external-validation-and-release.md) | F7: backtest, red team, replication, release | overlaps all |
 

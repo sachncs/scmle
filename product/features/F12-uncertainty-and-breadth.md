@@ -52,10 +52,16 @@ escalates it.
 | Calibration of probabilities | `scmle/evaluation/reliability.py:11` (top-label curve, 10 bins) | Descriptive; no confidence interval on bins. |
 | Shift diagnostic | `scmle/evaluation/shift.py:26-31` (`AdversarialValidation`), `:93` (verdict) | An AUC and most-shifted features. It does not output density-ratio weights. |
 
-Not found anywhere under `scmle/` (grep of `jackknife`, `mondrian`, `cqr`,
-`weighted conformal`, `crps`, `pinball`, `winkler`): jackknife+/CV+,
-class-conditional conformal, covariate-shift-weighted conformal, any
-probabilistic-forecast score.
+Built since this section was written (library code, simulation gates in
+`benchmarks/qualification/uncertainty_certificates.json`, see `CHANGELOG.md`):
+class-conditional conformal sets (`ConformalCalibrator.class_margins`),
+weighted conformal and clipped-odds shift weights, `cv_plus_bounds`, measured
+coverage with Clopper-Pearson and Holm slice flags (`evaluation/coverage.py`),
+proper scores, covariate-dependent IPCW, MinT, query-bootstrap NDCG, the task
+gate status file. **Still not in the run:** the bundle serves pooled
+out-of-fold scores with a refit (the table row above is still true), fold
+models are not stored, there is no `coverage_report` stage, and the seven task
+types above still get no interval.
 
 ### Problem-type breadth
 
@@ -264,29 +270,28 @@ encoder behind the `multimodal` extra for images, to be chosen and
 license-checked at phase start). Metric and gate: see below. Cut:
 fine-tuning, detection, segmentation, generation, OCR.
 
-## Gates: measured operating characteristic and external referent
+## Gates still open
 
-All "R" are replicate counts; every interval is exact binomial or bootstrap
-as stated. Thresholds are fixed before the gate run (hash of this file and
-seeds recorded).
+Thresholds are fixed before a gate run; seeds and a hash of this file are
+recorded. Gates G1, G2 (simulation), G4, G6, G9 (simulation), G11(i) and
+G13 (simulation) are in the certificate file. Open:
 
-| # | Quantity | Operating characteristic measured | Pass criterion | External referent |
-|---|---|---|---|---|
-| G1 | Split-conformal marginal coverage | `R = 2000` replicates, `n_cal = 500`, `a = 0.1`, test set 20,000 per replicate, scores continuous. Mean conditional coverage. | Mean in `[0.9 - 3*se, 0.9 + 1/(n+1) + 3*se]`; with the Beta law above, `se` is about `0.0003` (derived by hand from the formula; recompute in the harness). Per-replicate coverage vs `Beta(451, 50)`: KS `p > 0.001`. | Closed-form coverage law (above, to be checked against the paper that states it). |
-| G2 | CV+ marginal coverage | Same design, K = 10, then 5. Worst-case world: unstable learner (1-NN). | Empirical coverage `>= 1 - a - 3*se`. The `1 - 2a` worst-case bound is not the pass criterion. | Differential: intervals equal MAPIE's CV+ (existence and version to be verified) on frozen data to `1e-9`; the jackknife+ paper's datasets if retrievable. |
-| G3 | CQR | Heteroscedastic simulation (noise sd varies 5x across `x`); R = 2000. | Marginal coverage as G1; coverage in the highest-noise decile `>= 1 - a - 0.03`, and split-conformal with constant width shown to undercover there (documents why CQR). | Romano et al. benchmark datasets (names from memory, **unverified**). |
-| G4 | Class-conditional sets | Imbalanced 5-class simulation, minority prior 2%; R = 2000. | Per-class coverage `>= 1 - a - 3*se` for classes with `n_k >=` the minimum; pooled-margin sets shown to under-cover the minority class. | Sadinle et al. construction; scikit-learn-compatible reference (MAPIE, if its class-conditional mode exists; to verify). |
-| G5 | Slice flag | (i) Homoscedastic exchangeable worlds, 8 slices: familywise false-flag rate. (ii) A world with one slice at 3x noise: recall by slice `n`. | (i) `<= 0.05 + 2*sqrt(0.05*0.95/R)` (about 0.0597 at R = 2000). (ii) Recall lower bound `>= 0.80` at the smallest `n` that achieves it; slice flag gates only for `n` above that, below it is descriptive. | Exact binomial test (scipy); Holm per textbook. |
-| G6 | Weighted conformal | Gaussian mean shift in 3 features, density ratio known in closed form; then ratio estimated by classifier. R = 2000. | Known ratio: coverage on the shifted test `>= 1 - a - 3*se`; unweighted shown to undercover by a reported margin. Estimated ratio: coverage reported with interval; claim tier follows A5 (if below, `unverified`). | Closed-form ratio; Tibshirani et al. paper. |
-| G7 | Coverage claim on real data | 5 public regression and 3 classification datasets with a time-ordered or grouped structure where available; coverage on `C`/`F`. | Report. Gate only on: no `confirmed` coverage claim whose realised coverage on `F` is below `1 - a - tol`; any violation is a published miss (validation-referents section 3). | Held-out `F` set; the datasets themselves. |
-| G8 | Forecast | M4 subset (Hourly and Daily frequencies; sizes and horizons to be read from the M4 data release) and M5 (hierarchy, 9 quantiles). First, reproduce the **official benchmark scores of Naive and Seasonal-naive** with our MASE/sMAPE/WIS implementations. | Metric implementation matches published benchmark scores to the precision the organisers published (target 3 decimals, to be confirmed). Then: the system's WIS and OWA are reported with a series-bootstrap interval; gate is "interval upper limit of (system minus best of Naive/Seasonal-naive/Theta) `< 0`" for the frequencies where the charter asks for forecasting; otherwise the forecast is released as `unverified`. | M4 competition data and published benchmark table (Makridakis et al., Int. J. Forecasting 2020) and M5 (Makridakis et al. 2022): **dataset names, scores and years from memory, unverified; a WebFetch to the publisher returned HTTP 403 for M5 in this session.** Verify at phase start. |
-| G9 | Reconciliation | Hierarchical simulation with known covariance structure; and the M5 hierarchy. | MinT WIS `<=` bottom-up WIS on the simulation where the covariance is non-diagonal; coherent forecasts (aggregation constraint residual `< 1e-8`). | `hts`/`fable` (R) reconciliation outputs on frozen inputs (to verify availability). |
-| G10 | Ranking | One public LTR set (MSLR-WEB10K or Yahoo LTR or LETOR; **names unverified**) with the standard folds. | NDCG@10 implementation equals the reference (`sklearn.metrics.ndcg_score` on frozen lists, `1e-9`); the system's NDCG@10 interval vs the published LambdaMART/LightGBM figures reported, no claim of beating them. | Published LTR results; sklearn. |
-| G11 | Survival | (i) Weibull proportional-hazards simulation with covariate-dependent censoring where the true C and true Brier are computable. (ii) GBSG2 / Rotterdam and METABRIC style data (names from memory, **unverified**). | (i) Bias of the covariate-censoring IPCW C-index relative to the true truncated C within Monte Carlo error; marginal-KM version shown biased when censoring depends on covariates. (ii) Agreement of our estimates with `scikit-survival` `concordance_index_ipcw` and R `survival`/`pec` to `1e-6` on frozen inputs. | scikit-survival, R `survival`, `pec` (versions and availability to verify). |
-| G12 | Multilabel | Public multilabel sets (Yeast, Scene; **unverified**) and a simulated one with known label dependence. | Per-label coverage per A3; macro-F1 interval; thresholded vs 0.5 reported. | `scikit-multilearn`/`scikit-learn` reference metrics. |
-| G13 | Panel | Random-intercept simulation; exact prediction interval for a new entity is known in closed form. | Row-wise calibration shown to be anti-conservative for `new_entity` (same logic as F3 criterion 5); entity-wise calibration within `3*se` of nominal. | Closed-form random-effects predictive distribution. |
-| G14 | Near-duplicate split | Plant `p` in `{1%, 5%, 20%}` near-duplicates across a random split on an image and a text set. | Measure score inflation from the leak; the duplicate grouper recovers `>= 0.95` of planted pairs at false-merge rate `<= 0.01`; grouped split removes the inflation to within bootstrap error. | Planted truth; published near-duplicate audits (CIFAR duplicate studies; **unverified**). |
-| G15 | Image/text baseline | Frozen encoder + linear head on one public image set and one text set. | Within a stated margin of the encoder's published linear-probe accuracy (figure from the encoder's model card, to be recorded with hash); no claim beyond that. | The encoder's published result. |
+| # | What is open | External referent |
+|---|---|---|
+| G2 | Differential: CV+ intervals equal MAPIE's (not installed; existence and version to verify) on three frozen datasets to `1e-9`; the jackknife+ paper's datasets. | MAPIE; the paper. |
+| G3 | **Missed**: CQR in the highest-noise decile covered 0.864 (floor 0.87, 150 replicates). Re-register a design before it claims conditional coverage. | Romano et al. datasets (names unverified). |
+| G4 | Differential against a class-conditional reference (MAPIE mode, if any). | Sadinle et al. construction. |
+| G5 | **Missed**: familywise false-flag 0.0755 (bound 0.0597). Redesign and re-certify before the flag gates; recall was 1.0 from 30 rows in the 3x-noise world. | Exact binomial test; Holm. |
+| G6 | Real covariate-shift data; tier of the estimated-ratio claim follows A5. | Closed-form ratio; the paper. |
+| G7 | 5 regression and 3 classification datasets with time or group structure; coverage on `C`/`F`; gate only on "no `confirmed` claim below `1 - a - tol` on `F`"; every violation a published miss. | Held-out `F`. |
+| G8 | Reproduce the official Naive and Seasonal-naive scores on an M4 subset (MASE, sMAPE, WIS) to the published precision; then system minus best baseline with a series bootstrap, upper limit `< 0` or the forecast is `unverified`. M5 with 9 quantiles. | M4/M5 data and published tables (details unverified). |
+| G9 | MinT on the M5 hierarchy and WIS (simulation used squared error); `hts`/`fable` outputs on frozen inputs. | R reconciliation packages. |
+| G10 | NDCG@10 equal to `sklearn.metrics.ndcg_score` on frozen lists to `1e-9`, and the interval beside published LambdaMART/LightGBM figures on one public LTR set. | Published results; sklearn. |
+| G11 | (ii) GBSG2/Rotterdam and METABRIC-style data: agreement with `scikit-survival` `concordance_index_ipcw` and R `survival`/`pec` to `1e-6`. | scikit-survival; R. |
+| G12 | Multilabel sets (Yeast, Scene; unverified): per-label coverage, macro-F1 interval, thresholded versus 0.5. | `scikit-multilearn`/sklearn metrics. |
+| G13 | Wire entity-level calibration; the simulation did not show row-wise calibration to be anti-conservative, so that claim is unsupported. | Random-effects predictive law. |
+| G14 | Plant duplicates in an image and a text set; recovery `>= 0.95` at false-merge `<= 0.01`; leak inflation removed by the grouped split. | Planted truth; published duplicate audits (unverified). |
+| G15 | Frozen encoder + linear head within a stated margin of the model card's linear-probe figure. | The encoder's published result. |
 
 ## Decision map (what each check does)
 
@@ -344,32 +349,24 @@ seeds recorded).
   name) writing `uncertainty_certificates.json`, same pattern as
   `f6_certify.py`/`f6_certificates.json`.
 
-## Acceptance criteria (machine-checkable)
+## Acceptance criteria still open (machine-checkable)
 
-1. G1 passes at `R = 2000`; the pass is a unit test with the seed recorded.
-2. G2: CV+ intervals equal the reference implementation's on three frozen
-   datasets to `1e-9` (or the documented tie-handling difference), and the
-   worst-case world meets its bound.
-3. G3 and G4 show the baseline (constant width; pooled margin) failing where
-   the new method passes. A gate with no failing control is not accepted.
-4. G5 certificate file lists false-flag and recall with intervals by slice
-   size; the slice check refuses to gate below its certified size.
-5. G6 coverage under known shift is within tolerance; unweighted shown
-   worse. Estimated-ratio run records effective sample size.
-6. A coverage claim is registered before `C` is read; a second read of `C`
+1. G2 and G4 differentials pass against a reference implementation, or the
+   documented tie-handling difference.
+2. A coverage claim is registered before `C` is read; a second read of `C`
    raises (F2/F3 mechanism, reused).
-7. `ModelBundle` round-trip preserves fold-model hashes; tamper on one fold
-   model fails verification (extends the existing checksum at
-   `bundle.py:933-945`).
-8. G8: our MASE, sMAPE and WIS reproduce the official Naive and Seasonal-
-   naive scores on the M4 subset; mismatch fails the build.
-9. G10-G13 differential tests pass against their references; G11(i) shows
-   the marginal-KM IPCW biased under covariate-dependent censoring.
-10. G14: planted duplicates are recovered; leak inflation is shown, then
-    removed by the grouped split.
-11. Every task type has a row in `task_gate_status.json` (`passed`,
-    `failed`, or `no_referent`); a type not `passed` yields only
-    `unverified` outputs (enforced by a test over `TaskType`).
+3. `ModelBundle` round-trip preserves fold-model hashes; tamper on one fold
+   model fails verification (extends the checksum in `bundle.py`).
+4. G8: our MASE, sMAPE and WIS reproduce the official Naive and Seasonal-naive
+   scores on the M4 subset; mismatch fails the build.
+5. G10, G11(ii), G12 differential tests pass against their references.
+6. G14: planted duplicates are recovered; leak inflation is shown, then
+   removed by the grouped split.
+7. The slice check refuses to gate below its certified size once G5 is
+   redesigned and passes.
+8. A type not `passed` in `task_gate_status.json` yields only `unverified`
+   outputs *from the run* (`task_gate.tier_ceiling` exists and is tested over
+   `TaskType`, but no run output calls it yet).
 
 ## External referent
 
@@ -387,16 +384,17 @@ choose them.
 
 ## Verification status of literature claims
 
-Read in this session (2026-11-04, arXiv abstract pages): 1905.02928
-(jackknife+), 1905.03222 (CQR), 1904.06019 (weighted conformal), 2202.13415
-(beyond exchangeability), 2106.00170 (adaptive conformal inference),
-1609.00451 (least-ambiguous sets), 2005.12881 (WIS). Only abstracts were
-read, so **no theorem statement or constant was verified**. From memory and
-unverified: the `1 - 2a` jackknife+/CV+ bound; the Beta law of split-
-conformal coverage and the `1/(n+1)` upper bound; the impossibility of
-distribution-free conditional coverage; CRPS propriety (Gneiting and
-Raftery 2007); MinT (Wickramasuriya et al. 2019); Uno et al. 2011; M4/M5
-details and scores; every named dataset above.
+Read (abstract pages only): 1905.02928 (jackknife+), 1905.03222 (CQR),
+1904.06019 (weighted conformal), 2202.13415 (beyond exchangeability),
+2106.00170 (adaptive conformal inference), 1609.00451 (least-ambiguous sets),
+2005.12881 (WIS). **No theorem statement or constant was verified.** From
+memory and unverified: the `1 - 2a` jackknife+/CV+ bound; the Beta law of
+split-conformal coverage (G1 now measures it: mean in the derived band and
+Kolmogorov-Smirnov `p` above 0.001 against `Beta(451, 50)`, in simulation);
+the impossibility of distribution-free conditional coverage; CRPS propriety;
+MinT (the shrinkage intensity and the formulas are written from memory);
+Uno et al. 2011 (the pair weights are derived, not copied; checked by G11(i)
+only); M4/M5 details and scores; every named dataset.
 
 ## Cut, and why
 
