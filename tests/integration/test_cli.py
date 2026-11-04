@@ -93,6 +93,7 @@ def test_commands_are_polymorphic():
         "export-onnx",
         "package",
         "charter",
+        "frame",
     ]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
 
