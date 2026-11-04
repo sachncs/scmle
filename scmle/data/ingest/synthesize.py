@@ -24,6 +24,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
@@ -373,7 +374,8 @@ def evaluate(
         return reduce_rows(
             rows, spec.primitive, spec.value, spec.window_days, count
         )
-    assert spec.nest is not None and spec.inner is not None
+    if spec.nest is None or spec.inner is None:
+        raise errors.ScmleError("nested feature lacks nest or inner")
     nest = nests[spec.nest]
     if spec.window_days is not None:
         rows = rows.loc[

@@ -994,7 +994,8 @@ class Loop:
             self.naive_flag = True
         if not labels.permits_action(estimate.mechanism):
             return True
-        assert estimate.mean is not None
+        if estimate.mean is None:
+            raise errors.ScmleError("estimate has no mean")
         self.alarm.update(estimate.mean)
         answered = (status == escalation.ANSWERED) & model_cases
         if int(observed[answered].sum()) > 0:

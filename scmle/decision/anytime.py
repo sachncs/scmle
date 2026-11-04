@@ -55,6 +55,7 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import special
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.ledger import online_fdr
 
@@ -145,7 +146,8 @@ def log_wealth(
     for lam in grid:
         path = np.cumsum(np.log1p(lam * centred), axis=-1)
         total = path if total is None else np.logaddexp(total, path)
-    assert total is not None
+    if total is None:
+        raise errors.ScmleError("the bet grid is empty")
     result: NDArray[np.float64] = total - math.log(len(grid))
     return result
 
@@ -201,7 +203,8 @@ class EProcess:
             return self.log_e
         null_unit = self.stream.rescaled_null()
         grid = bet_grid(null_unit, self.size)
-        assert self.totals is not None
+        if self.totals is None:
+            raise errors.ScmleError("bet totals are not initialised")
         steps = np.log1p(np.outer(unit - null_unit, grid))
         paths = self.totals + np.cumsum(steps, axis=0)
         mixed = special.logsumexp(paths, axis=1) - math.log(len(grid))

@@ -31,6 +31,7 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.evaluation import sequential
 
@@ -400,6 +401,7 @@ def fit_threshold_policy(
         objective = float(np.mean(np.where(treat, gain - penalty, 0.0)))
         if best is None or objective > best.objective:
             best = ThresholdPolicy(float(cut), objective, penalty)
-    assert best is not None
+    if best is None:
+        raise errors.ScmleError("no candidate threshold")
     none = ThresholdPolicy(float(np.max(effect)), 0.0, penalty)
     return best if best.objective > none.objective else none

@@ -30,6 +30,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 from scmle.data.ingest import profile
@@ -195,7 +196,10 @@ class AsOfView:
             delay = self.rule.delta_rec_days
             fallback = event + (np.inf if delay is None else delay)
             if self.rule.mode == TRANSACTION:
-                assert self.rule.known_column is not None
+                if self.rule.known_column is None:
+                    raise errors.ScmleError(
+                        "transaction rule has no known column"
+                    )
                 recorded = to_days(rows[self.rule.known_column])
                 known = np.where(np.isnan(recorded), fallback, recorded)
             else:
