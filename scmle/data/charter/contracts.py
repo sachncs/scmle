@@ -25,9 +25,11 @@ from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
+from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
+OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
 
@@ -295,6 +297,9 @@ class AnalysisCharter:
         error_budget: Alpha, exploration wealth, permutations, tolerances.
         multiverse: Defensible choices declared in advance.
         seed: Seed of every random draw the charter governs.
+        cost_model: Costs of acting and not acting (F8), fixed before `C`
+            is opened; None for a charter that does not claim a decision
+            benefit. Format 1 charters have none and load unchanged.
     """
 
     question: str
@@ -310,6 +315,7 @@ class AnalysisCharter:
     error_budget: budget_module.ErrorBudget
     multiverse: tuple[Choice, ...]
     seed: int
+    cost_model: costs.DecisionCostModel | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint."""
@@ -373,7 +379,7 @@ class AnalysisCharter:
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record; fractions are written as ``"p/q"`` strings."""
-        return {
+        record = {
             "question": self.question,
             "estimand": self.estimand.to_dict(),
             "unit": self.unit,
@@ -388,11 +394,16 @@ class AnalysisCharter:
             "multiverse": [c.to_dict() for c in self.multiverse],
             "seed": self.seed,
         }
+        if self.cost_model is not None:
+            record["cost_model"] = self.cost_model.to_dict()
+        return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the charter, rejecting unknown or missing fields."""
+        record = {"cost_model": None, **record}
         qualification.require_fields(cls, record)
+        cost = record["cost_model"]
         return cls(
             question=record["question"],
             estimand=AnalysisEstimand.from_dict(record["estimand"]),
@@ -411,6 +422,11 @@ class AnalysisCharter:
             ),
             multiverse=tuple(Choice.from_dict(c) for c in record["multiverse"]),
             seed=record["seed"],
+            cost_model=(
+                None
+                if cost is None
+                else costs.DecisionCostModel.from_dict(cost)
+            ),
         )
 
 
