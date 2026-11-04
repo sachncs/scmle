@@ -149,6 +149,17 @@
   streams, Python 3.11 ledger replay. `ModelMonitor.performance` takes
   optional `propensity` and `maturity`, and fresh retraining rows are held out
   by time or by group instead of a random shuffle.
+* Closed loop wiring, 2026-11-05. A halt writes an `incident` ledger row
+  (`Loop.record_incident`; `Hooks.open_incident` still runs after it).
+  `Loop.check_feedback` runs `labels.bypass_test` on next-period features of
+  the bypass slice, records it in the ledger and `label_mechanism.json`, and
+  escalates on a detected loop. `ModelRegistryStore(guard=, scope=)` and
+  `attach_guard` (also `Loop.guard_registry`) put the never-list guard in front
+  of every champion move, so `LifecycleManager.promote_challenger`,
+  `check_rollback` and `register_run(promote=True)` need an attestation first;
+  without a guard nothing changes. `ModelRegistryStore.promote` gained the
+  optional `guard_detail`. `alarm_gates_retrain` still defaults to False (H2
+  and H10 missed their floors; not retuned).
 * Instrument residuals closed in code, 2026-11-04. The confirmation binds the
   release of `C` to the hash of the family it tests and the ledger head
   before opening it (`SealedSet.commit`, R1 C7; a set bound to another

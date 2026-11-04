@@ -88,6 +88,9 @@ like the other qualification modules. A `LoopPolicy` does not let an alarm
 retrain unless `alarm_gates_retrain` is set, and it should be set only when
 `python -m benchmarks.qualification --check loop` lists the detection-delay
 gate H2 as passed for the policy's settings (today it is descriptive).
+`ModelRegistryStore` gained the optional `guard` and `scope` arguments, the
+method `attach_guard` and the optional `guard_detail` of `promote`; without a
+guard behaviour is unchanged.
 
 Causal identification (F10). No entry of the pinned surface changed.
 `scmle.data.charter.contracts.AnalysisEstimand` gained the optional field

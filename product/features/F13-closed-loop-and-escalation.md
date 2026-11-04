@@ -42,11 +42,11 @@ gates in `benchmarks/qualification/loop_certify.py`:
 | L2 gated promotion: paired e-process, e-LOND across challengers, decided in registration order | `sequential_tests.py` (`PairedEProcess`, `PromotionSequence`), `governance/loop.py` | H4 passed (trivially in the world measured) |
 | L3 rollback: reverse e-process; `tau` tightened | same, `Loop.watch_rollback` | H5 passed (false rollback 0; power only at a loss gap of 0.1) |
 | L4 delayed, partial, selected labels: maturity by prediction time, Horvitz-Thompson loss, audit slice, unverified path | `monitoring/labels.py`, `ModelMonitor.performance` | H6, H7 passed |
-| L5 feedback: bypass-slice comparison | `labels.bypass_test` (not called by `Loop`) | H8 passed |
+| L5 feedback: bypass-slice comparison | `labels.bypass_test`, called by `Loop.check_feedback` (next-period features supplied by the caller) | H8 passed |
 | E1 selective prediction: fixed-sequence threshold, risk-coverage curve, Chow cross-check, capacity routing, halt | `governance/escalation.py`, `Loop` | H9 passed, **H10 missed** |
 | E2 system-level escalation triggers | `Loop.decide` | unit tests only |
 | E3 attestation rows, reply protocol, timeouts | `governance/deployment_ledger.py`, `Loop.reply` | unit tests, ledger tamper tests |
-| Never-list: eleven guards | `governance/never_list.py`, `Loop` wrappers | a test per item (11 of 11); items 1 and 2 also stay behind the registry's signed approval and the vault's one-time open (tested) |
+| Never-list: eleven guards | `governance/never_list.py`, `Loop` wrappers, and a registry with an attached guard (`LifecycleManager` promotions and rollbacks) | a test per item (11 of 11); items 1 and 2 also stay behind the registry's signed approval and the vault's one-time open (tested) |
 | Fresh retraining rows held out by time or group | `governance/lifecycle.split_fresh` | unit tests |
 
 Artifacts: `deployment_ledger.jsonl`, `loop_state.json`, `risk_coverage.json`,
@@ -126,6 +126,7 @@ set (the SOTA protocol's rule, `benchmarks/sota/PROTOCOL.md`, applies).
 | Calibration set too small for `r*` at `delta` | `tau = +infinity` (everything escalates). |
 | Human unavailable | The escalation closes at `reply_timeout` with the proposed default; the outcome is `unverified`. |
 | Ledger verification fails, or state does not match the ledger | Halted; no action until a person reviews. |
+| Any halt | An `incident` row (status `open`) is written to the ledger; `Hooks.open_incident` is called after it. |
 | Replay corpus unavailable | H11 and replay metrics do not run; the loop stays `unverified` for production. |
 | Challenger evidence never reaches threshold | No promotion; an escalation at the label budget. |
 

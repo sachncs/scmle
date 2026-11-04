@@ -280,7 +280,9 @@ class Hooks:
 
     Attributes:
         retrain: Trains and stages a challenger, returns its name.
-        open_incident: Called with a reason when the loop halts.
+        open_incident: Called with a reason when the loop halts, after the
+            loop has written its own `incident` ledger row (the default
+            implementation, `Loop.record_incident`; it needs no hook).
     """
 
     retrain: Callable[[], str | None] | None = None
@@ -339,6 +341,8 @@ class Loop:
         self.halted_by_state = False
         self.naive_flag = False
         self.calibrated = False
+        self.feedback: dict[str, Any] | None = None
+        self.guard.on_write = self.save_state
         self.build_monitors()
 
     # ------------------------------------------------------------------ open
@@ -511,6 +515,7 @@ class Loop:
             "halt_reason": self.halt_reason,
             "naive_flag": self.naive_flag,
             "calibrated": self.calibrated,
+            "feedback": self.feedback,
             "consecutive_rollbacks": self.consecutive_rollbacks,
             "escalation_batch": self.escalation_batch,
             "queue": self.queue,
@@ -557,6 +562,7 @@ class Loop:
         self.halt_reason = state["halt_reason"]
         self.naive_flag = state["naive_flag"]
         self.calibrated = state["calibrated"]
+        self.feedback = state.get("feedback")
         self.consecutive_rollbacks = state["consecutive_rollbacks"]
         self.escalation_batch = dict(state["escalation_batch"])
         self.queue = list(state["queue"])
@@ -678,8 +684,21 @@ class Loop:
             },
         )
         self.halt_reason = reason
+        self.record_incident(reason)
         if self.hooks.open_incident is not None:
             self.hooks.open_incident(reason)
+
+    def record_incident(self, reason: str) -> None:
+        """Default incident: an `incident` ledger row with status ``open``.
+
+        It records that a person must look; it is not the SLO incident
+        workflow of `scmle.monitoring.incidents`, which needs an SLO
+        evaluation that a halt does not have.
+        """
+        self.ledger.commit(
+            ledger_module.INCIDENT,
+            {"status": "open", "reason": reason, "batch": self.batch},
+        )
 
     # --------------------------------------------------------------- observe
 
@@ -1291,6 +1310,60 @@ class Loop:
         self.save_state()
         return result
 
+    def check_feedback(
+        self,
+        bypass_features: pd.DataFrame,
+        model_features: pd.DataFrame,
+    ) -> qualification.Check:
+        """Tests whether the model's decisions shift the next-period features.
+
+        Runs `labels.bypass_test` on the next-period features of the
+        randomized bypass slice against those of model-decided cases, records
+        the result in the ledger and in `label_mechanism.json`, and escalates
+        if a feedback loop is detected. The test is not run by `step`: the
+        next-period features are the caller's to supply.
+
+        Args:
+            bypass_features: Next-period features of the bypass slice.
+            model_features: Next-period features of model-decided cases.
+
+        Returns:
+            The check.
+
+        Raises:
+            ValueError: If the policy declares no bypass slice.
+        """
+        if self.policy.bypass_rate <= 0.0:
+            raise ValueError(
+                "no bypass slice is declared (policy.bypass_rate is 0): "
+                "feedback cannot be tested"
+            )
+        check = labels.bypass_test(
+            bypass_features, model_features, seed=len(self.ledger.rows)
+        )
+        verdict = labels.feedback_verdict(self.policy.bypass_rate, check)
+        self.feedback = {
+            "verdict": verdict,
+            "p_value": check.p_value,
+            "statistic": check.statistic,
+            "n_bypass": len(bypass_features),
+            "n_model": len(model_features),
+            "batch": self.batch,
+        }
+        self.ledger.commit(
+            ledger_module.OBSERVE_SUMMARY,
+            {"feedback_test": json_ready(self.feedback)},
+        )
+        if verdict == "loop_detected":
+            self.escalate(
+                "feedback_loop_detected",
+                {"p_value": check.p_value, "batch": self.batch},
+                proposed_default=self.policy.safe_default,
+            )
+        self.write_label_mechanism()
+        self.save_state()
+        return check
+
     def write_label_mechanism(self) -> None:
         """Writes `label_mechanism.json`."""
         record = {
@@ -1301,8 +1374,13 @@ class Loop:
             "feedback": (
                 labels.UNVERIFIED
                 if self.policy.bypass_rate <= 0.0
-                else "bypass slice declared"
+                else (
+                    "bypass slice declared"
+                    if self.feedback is None
+                    else self.feedback["verdict"]
+                )
             ),
+            "feedback_test": self.feedback,
             "feedback_note": (
                 labels.FEEDBACK_UNVERIFIED
                 if self.policy.bypass_rate <= 0.0
@@ -1402,6 +1480,16 @@ class Loop:
             )
         finally:
             self.save_state()
+
+    def guard_registry(self, registry: Any) -> None:
+        """Routes every champion move of `registry` through this guard.
+
+        `promote_challenger`, `check_rollback` and `register_run(promote=True)`
+        of a `LifecycleManager` over this registry then need an attestation,
+        as `move_champion` does. Moving the alias by editing the registry's
+        files is not stopped.
+        """
+        registry.attach_guard(self.guard, self.policy.scope)
 
     def move_champion(
         self,

@@ -31,6 +31,11 @@ Row kinds (``open`` first and only once):
 ``halt``
     Entering (``phase = "enter"``) or leaving (``phase = "release"``) the
     state in which every case is escalated.
+``incident``
+    An incident opened because of a halt: the reason, the batch and the
+    status ``open``. It is a record that a person must look, not an incident
+    workflow (`scmle.monitoring.incidents` wants an SLO evaluation, which a
+    halt does not have).
 """
 
 from collections.abc import Callable
@@ -63,6 +68,7 @@ ROLLBACK_PROPOSAL = "rollback_proposal"
 ESCALATION = "escalation"
 ATTESTATION = "attestation"
 HALT = "halt"
+INCIDENT = "incident"
 KINDS = (
     OPEN,
     OBSERVE_SUMMARY,
@@ -74,6 +80,7 @@ KINDS = (
     ESCALATION,
     ATTESTATION,
     HALT,
+    INCIDENT,
 )
 REGISTERED = "registered"
 DECIDED = "decided"

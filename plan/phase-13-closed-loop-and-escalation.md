@@ -86,15 +86,11 @@ against 0.119; the best-observed-risk cut 0.464).
   certify it (H9 measured the unweighted case only).
 
 **WP-13.6a Reach of the guards**
-- The guards cover the entry points on `Loop` (`move_champion`,
-  `execute_rollback`, `reopen_sealed`, `rewrite_ledger`, `act_on_unverified`,
-  `silence_alert`, `change_label_policy`, `delete_or_send`, `amend_policy`,
-  `perform`) and routing for item 7. `LifecycleManager.promote_challenger`,
-  `rollback`, the registry and the custody API are not routed through them;
-  wire them or document the bypass. An attestation stays valid for the
-  identical question until it expires (no single-use marker).
-- The feedback test (`labels.bypass_test`) is not called by `Loop`; wire it
-  to the bypass slice and write `escalation_audit.json`.
+- The custody API is not routed through the guards (documented in
+  `never_list.py`). An attestation stays valid for the identical question
+  until it expires (no single-use marker).
+- `Loop.check_feedback` needs next-period features from the caller; `step`
+  does not supply them. `escalation_audit.json` is still not written (H11).
 
 **WP-13.7 Replay and domain-owner audit** (one agent plus one external person)
 - Hash-fix the held-out incident set before any tuning; run replays with
@@ -106,8 +102,9 @@ against 0.119; the best-observed-risk cut 0.464).
   is).
 
 **WP-13.8a Wiring left**
-- Open an incident (`incidents.py`) on `halt` (`Hooks.open_incident` exists;
-  the incident workflow wants an SLO evaluation, which a halt does not have).
+- A halt writes an `incident` ledger row only; connecting it to
+  `monitoring/incidents.py` needs an SLO evaluation, which a halt does not
+  have.
 - Run the ledger replay on Python 3.11 (only 3.14 ran here).
 - Include `loop_certificates.json` in the release evidence index.
 

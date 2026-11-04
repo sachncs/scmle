@@ -236,7 +236,13 @@ class LifecycleManager:
         approval: registry_module.PromotionApproval,
         signing_key: str | bytes | None = None,
     ) -> registry_module.VersionRecord:
-        """Promotes the staged challenger after independent review."""
+        """Promotes the staged challenger after independent review.
+
+        With a guarded registry (`ModelRegistryStore.attach_guard`, e.g. via
+        `Loop.guard_registry`) it also needs a human attestation for the exact
+        model and version, else `AttestationRequired` is raised and nothing
+        moves.
+        """
         record = self.registry.resolve(self.model, registry_module.CHALLENGER)
         self.registry.promote(
             self.model,
@@ -386,6 +392,11 @@ class LifecycleManager:
             policy: Evidence required; defaults to `RollbackPolicy()`.
             approval: Independent approval for the rollback promotion.
             signing_key: HMAC key for the approval signature.
+
+        With a guarded registry the rollback also needs a human attestation
+        naming this rollback (never-list item 1); without one
+        `AttestationRequired` is raised after the evidence is audited and the
+        champion stays.
         """
         rule = policy or RollbackPolicy()
         aliases = self.registry.aliases(self.model)
@@ -433,6 +444,13 @@ class LifecycleManager:
             previous,
             approval=approval,
             signing_key=signing_key,
+            guard_detail={
+                "rollback": {
+                    "model": self.model,
+                    "from_version": aliases[registry_module.CHAMPION],
+                    "to_version": previous,
+                }
+            },
         )
         return RollbackOutcome(
             True,

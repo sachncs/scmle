@@ -7,6 +7,7 @@ Layout under the registry root:
     <model>/v<N>/            the model bundle of each version
 """
 
+from collections.abc import Mapping
 import dataclasses
 import enum
 import hmac
@@ -21,6 +22,7 @@ from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.governance import attestation
+from scmle.governance import never_list
 
 INDEX_FILE = "registry.json"
 AUDIT_FILE = "audit.jsonl"
@@ -180,19 +182,40 @@ def content_id_of(bundle_directory: str | pathlib.Path) -> str:
 class ModelRegistryStore:
     """Versioned model storage with promotion by alias."""
 
-    def __init__(self, root: str | pathlib.Path) -> None:
+    def __init__(
+        self,
+        root: str | pathlib.Path,
+        guard: never_list.Guard | None = None,
+        scope: str = "stream",
+    ) -> None:
         """Opens (creating if needed) a registry.
 
         Changes take a per-directory lock shared by every store object over
         the same root, so threads of one process never interleave a
         read-modify-write. Separate processes are not coordinated.
 
+        A registry created with a `guard` asks it for a human attestation
+        (never-list item 1) before the champion alias moves, whatever calls
+        `promote`. Without a guard the registry behaves as before and only
+        the signed approval protects the alias. The guard sits in front of
+        this class: a person or process that edits `registry.json` directly
+        passes neither check.
+
         Args:
             root: Registry directory.
+            guard: Optional never-list guard (see `attach_guard`).
+            scope: Model version hash and stream id attestations must name.
         """
         self.root = pathlib.Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock = durability.path_lock(self.root)
+        self.guard = guard
+        self.scope = scope
+
+    def attach_guard(self, guard: never_list.Guard | None, scope: str) -> None:
+        """Routes champion moves through `guard` (None removes it)."""
+        self.guard = guard
+        self.scope = scope
 
     def read_index(self) -> dict[str, Any]:
         """Loads the registry index (empty when new)."""
@@ -330,6 +353,7 @@ class ModelRegistryStore:
         alias: str = CHAMPION,
         approval: PromotionApproval | None = None,
         signing_key: str | bytes | None = None,
+        guard_detail: Mapping[str, Any] | None = None,
     ) -> None:
         """Points `alias` at `version`.
 
@@ -342,11 +366,23 @@ class ModelRegistryStore:
                 traffic and may be moved without approval.
             signing_key: HMAC key for the approval signature. Defaults to
                 ``$SCMLE_SIGNING_KEY``.
+            guard_detail: What the attestation must name when the registry
+                has a guard and `alias` is the champion; defaults to the
+                model and version. A rollback names itself here.
 
         Raises:
             ArtifactError: If the model or version does not exist, or if a
                 champion promotion lacks valid independent approval.
+            AttestationRequired: If the registry has a guard and the champion
+                move has no valid attestation (an escalation is written and
+                nothing is moved).
         """
+        if alias == CHAMPION and self.guard is not None:
+            self.guard.require(
+                never_list.NeverAction.MOVE_CHAMPION,
+                dict(guard_detail or {"model": model, "version": version}),
+                self.scope,
+            )
         with self.lock:
             self.promote_locked(model, version, alias, approval, signing_key)
 

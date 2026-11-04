@@ -14,10 +14,18 @@ performed. A valid attestation is one that
   guard holds one; and
 * was not signed with a key the system holds (the ledger refuses such rows).
 
-An attestation stays valid for the identical question until it expires. The
+An attestation stays valid for the identical question until it expires (there
+is no single-use marker). The
 registry's own signed-approval check for the champion alias and the custody
 log's one-time open of a sealed set stay in force underneath; the guard only
 adds the deployment ledger's attestation in front of them.
+
+Reach. `Loop`'s wrappers, a `ModelRegistryStore` with an attached guard (so
+`LifecycleManager.promote_challenger`, `check_rollback` and
+`register_run(promote=True)` too) and nothing else. The custody API
+(`scmle.data.custody`) is not routed through the guard: its own one-time open
+of a sealed set stays the only check there, and `Loop.reopen_sealed` is the
+wrapper for callers who want the attestation in front of it.
 
 Limits. The guard is code around the entry points of this package. It cannot
 stop a person or a process with file or interpreter access from calling the
@@ -101,6 +109,7 @@ class Guard:
         self.ledger = ledger
         self.today = today
         self.verification_keys = dict(verification_keys or {})
+        self.on_write: Callable[[], None] | None = None
 
     def valid_attestation(
         self, question: Mapping[str, Any]
@@ -183,6 +192,8 @@ class Guard:
                     "never_list_item": ITEM_NUMBER[action],
                 },
             )
+            if self.on_write is not None:
+                self.on_write()
         raise AttestationRequired(action, pending)
 
     def perform(
