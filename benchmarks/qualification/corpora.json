@@ -4,15 +4,15 @@
     {
       "id": "titanic-boat-body",
       "name": "Titanic passenger records with the lifeboat and body fields",
-      "source_url": null,
-      "licence": null,
-      "sha256": null,
-      "size_bytes": null,
+      "source_url": "https://openml.org/data/v1/download/16826755/Titanic.arff",
+      "licence": "Public (as recorded in the OpenML metadata of dataset 40945, version 1)",
+      "sha256": "1c9aa0613181550ef9cd5b133ec8c5eb42a82f81952ebd8804ea6aeeb58dfef2",
+      "size_bytes": 37998,
       "ground_truth_file": null,
       "adjudication_source": null,
       "intended_use": "certificate",
       "status": "candidate",
-      "notes": "candidate: existence, licence and hash to be verified. README.md describes boat and body as outcome-dependent recording (a leakage hypothesis); no source has been chosen."
+      "notes": "Frozen extract of OpenML dataset 40945 (1309 rows) at tests/fixtures/titanic_extract.csv with the columns survived, pclass, sex, age, sibsp, parch, fare, embarked, boat and body; names, tickets, cabins and home destinations are dropped. The sha256 is that of the CSV, not of the ARFF at source_url. Used by tests/unit/test_titanic_extract.py. Stays candidate (licence to be verified by a person): the file has no defect labels (ground_truth_file, adjudication_source), and the licence line is the OpenML metadata, not a legal check."
     },
     {
       "id": "human-adjudicated-label-errors",
