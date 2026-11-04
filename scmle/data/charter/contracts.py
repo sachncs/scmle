@@ -26,11 +26,12 @@ from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
 from scmle.data.charter import causal as causal_module
+from scmle.data.charter import decision as decision_module
 from scmle.data.charter import rules as rules_module
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 4
+FORMAT_VERSION = 5
 OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
@@ -323,6 +324,9 @@ class AnalysisCharter:
             policy and stability thresholds (format 3); None for a charter
             that does not fix them, which serialises, hashes and loads
             exactly as a format 1 or 2 charter did.
+        decision: The decision layer (format 5): how the cost model is used,
+            fairness constraints and the rollout plan; None for a charter
+            that makes no decision claim. It needs a `cost_model`.
     """
 
     question: str
@@ -340,6 +344,7 @@ class AnalysisCharter:
     seed: int
     cost_model: costs.DecisionCostModel | None = None
     rules: rules_module.RunRules | None = None
+    decision: decision_module.DecisionLayer | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint."""
@@ -360,6 +365,8 @@ class AnalysisCharter:
         if len(set(names)) != len(names):
             raise ValueError("duplicate name in multiverse")
         self.check_decision_map()
+        if self.decision is not None and self.cost_model is None:
+            raise ValueError("a decision layer needs a cost_model")
 
     def check_decision_map(self) -> None:
         """Every gating check has exactly one row and a certificate id."""
@@ -422,11 +429,18 @@ class AnalysisCharter:
             record["cost_model"] = self.cost_model.to_dict()
         if self.rules is not None:
             record["rules"] = self.rules.to_dict()
+        if self.decision is not None:
+            record["decision"] = self.decision.to_dict()
         return record
 
     @property
     def format_version(self) -> int:
-        """Oldest format that carries this charter (2, 3 rules, 4 causal)."""
+        """Oldest format that carries this charter.
+
+        2; 3 with rules; 4 with a causal block; 5 with a decision layer.
+        """
+        if self.decision is not None:
+            return 5
         if self.estimand.causal is not None:
             return 4
         return 2 if self.rules is None else 3
@@ -434,10 +448,11 @@ class AnalysisCharter:
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the charter, rejecting unknown or missing fields."""
-        record = {"cost_model": None, "rules": None, **record}
+        record = {"cost_model": None, "rules": None, "decision": None, **record}
         qualification.require_fields(cls, record)
         cost = record["cost_model"]
         chosen = record["rules"]
+        layer = record["decision"]
         return cls(
             question=record["question"],
             estimand=AnalysisEstimand.from_dict(record["estimand"]),
@@ -465,6 +480,11 @@ class AnalysisCharter:
                 None
                 if chosen is None
                 else rules_module.RunRules.from_dict(chosen)
+            ),
+            decision=(
+                None
+                if layer is None
+                else decision_module.DecisionLayer.from_dict(layer)
             ),
         )
 

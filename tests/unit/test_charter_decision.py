@@ -93,3 +93,85 @@ def test_the_plan_builds_its_budget_and_rejects_unknown_fields():
         d.RolloutPlan.from_dict(
             {k: v for k, v in record.items() if k != "salt"}
         )
+
+
+# --- the block inside the charter ---------------------------------------
+
+
+def with_cost_model():
+    from scmle.data.framing import costs
+
+    return costs.DecisionCostModel(
+        0.0,
+        100.0,
+        5.0,
+        0.0,
+        0.02,
+        0.15,
+        (costs.CostSource.HUMAN,) * 4,
+        costs.CostSource.HUMAN,
+    )
+
+
+def layer():
+    return d.DecisionLayer(
+        d.DecisionModel("EUR per case"),
+        rollout=plan(),
+    )
+
+
+def test_a_charter_without_the_layer_keeps_its_hash_and_format():
+    from tests.unit.test_charter_contracts import make_charter
+    from tests.unit.test_charter_rules import FROZEN_HASH
+
+    charter = make_charter()
+    assert charter.decision is None
+    assert charter.charter_hash == FROZEN_HASH
+    assert "decision" not in charter.to_dict()
+    assert charter.format_version == 2
+
+
+def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
+    import json
+
+    from scmle.data.charter import contracts as c
+    from tests.unit.test_charter_contracts import make_charter
+
+    base = make_charter(cost_model=with_cost_model())
+    charter = make_charter(cost_model=with_cost_model(), decision=layer())
+    assert charter.charter_hash != base.charter_hash
+    assert charter.format_version == 5
+    record = json.loads(json.dumps(charter.to_dict()))
+    assert c.AnalysisCharter.from_dict(record) == charter
+    other = make_charter(
+        cost_model=with_cost_model(),
+        decision=d.DecisionLayer(
+            d.DecisionModel("EUR per case", calibration_level=0.05),
+            rollout=plan(),
+        ),
+    )
+    assert other.charter_hash != charter.charter_hash
+
+
+def test_a_layer_without_a_cost_model_is_refused():
+    from tests.unit.test_charter_contracts import make_charter
+
+    with pytest.raises(ValueError, match="needs a cost_model"):
+        make_charter(decision=layer())
+
+
+def test_a_layer_in_an_older_format_is_refused(tmp_path):
+    import json
+
+    from scmle.contracts import errors
+    from scmle.data.charter import sealing
+    from tests.unit.test_charter_contracts import make_charter
+
+    charter = make_charter(cost_model=with_cost_model(), decision=layer())
+    wrapper = sealing.envelope(charter, "k")
+    assert wrapper["format"] == 5
+    wrapper["format"] = 4
+    path = tmp_path / "charter.json"
+    path.write_text(json.dumps(wrapper))
+    with pytest.raises(errors.ConfigError, match="decision"):
+        sealing.read_verified(path, signing_key="k")
