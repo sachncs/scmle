@@ -12,6 +12,8 @@ detectors (`scmle.data.detectors`) are checked against
 `detector_certificates.json`: each must have a certificate for its current
 code, and each outcome that passed must still be accepted for gating. An
 outcome that did not pass is simply descriptive and does not fail the check.
+The F6 checks (`scmle.data.robustness`) are checked the same way against
+`f6_certificates.json`.
 """
 
 import argparse
@@ -19,6 +21,7 @@ import json
 from pathlib import Path
 
 from benchmarks.qualification import f5
+from benchmarks.qualification import f6_certify
 from benchmarks.qualification import ledger_checks
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
@@ -35,7 +38,9 @@ def check_certificates() -> int:
     report = certificates.audit(store, GATING)
     f5_store = certificates.CertificateStore.load(f5.CERT_PATH)
     f5_problems = f5.problems(f5_store) + f5.audit_problems(f5_store)
-    ok = not problems and report.ok and not f5_problems
+    f6_store = certificates.CertificateStore.load(f6_certify.STORE_PATH)
+    f6_problems = f6_certify.problems(f6_store)
+    ok = not problems and report.ok and not f5_problems and not f6_problems
     print(
         json.dumps(
             {
@@ -47,6 +52,10 @@ def check_certificates() -> int:
                 "gating_detectors": len(GATING),
                 "f5_problems": f5_problems,
                 "f5_gating": [f"{d}/{t}" for d, _, t in f5.gating(f5_store)],
+                "f6_problems": f6_problems,
+                "f6_descriptive_only": f6_certify.audit_labels(f6_store)[
+                    "uncertified"
+                ],
             },
             indent=2,
         )

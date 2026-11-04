@@ -10,6 +10,7 @@ from collections.abc import Callable
 import dataclasses
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from scipy import stats
 from sklearn.datasets import load_diabetes
@@ -23,6 +24,7 @@ from benchmarks.qualification import standins
 from scmle.contracts import qualification
 from scmle.data.detectors import certificates
 from scmle.data.ledger import budget
+from scmle.data.robustness import shift
 
 ALPHA = 0.05
 SMOKE_ROWS = 300
@@ -30,6 +32,10 @@ ORACLE_REL_TOL = 1e-8
 FULL_RUNS = 20000
 POWER_RUNS = 400
 FDR_RUNS = 300
+SHIFT_RUNS = 100
+SHIFT_ROWS = 60
+SHIFT_PERMUTATIONS = 99
+SHIFT_LEVEL = 0.01
 SABOTAGES = (None, "size")
 
 
@@ -166,6 +172,70 @@ def check_size(runs: int, seed: int, sabotage: str | None) -> list[SmokeCheck]:
             "biased test falls outside the band",
             not biased.within_size_band,
             f"liberal size {biased.rate:.4f}",
+        ),
+    ]
+
+
+def shift_pair(seed: int, delta: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Two Gaussian samples; the second is shifted by `delta` in one column."""
+    rng = np.random.default_rng(seed)
+    names = ["a", "b"]
+    first = pd.DataFrame(rng.normal(size=(SHIFT_ROWS, 2)), columns=names)
+    second = pd.DataFrame(rng.normal(size=(SHIFT_ROWS, 2)), columns=names)
+    second["a"] += delta
+    return first, second
+
+
+def uniform_p_value(pvalues: list[float]) -> float:
+    """KS p-value of permutation p-values against the uniform law.
+
+    The p-values live on a grid of ``1 / (B + 1)``; they are jittered inside
+    their cell so the grid itself is not read as non-uniformity.
+    """
+    rng = np.random.default_rng(0)
+    cells = SHIFT_PERMUTATIONS + 1
+    jittered = (
+        np.asarray(pvalues) * cells - rng.uniform(size=len(pvalues))
+    ) / cells
+    return float(stats.kstest(jittered, "uniform").pvalue)
+
+
+def check_shift(seed: int) -> list[SmokeCheck]:
+    """The kernel two-sample test: uniform null p-values, power and a control.
+
+    The control squares every p-value, which makes the test liberal and
+    non-uniform; the uniformity check must reject it.
+    """
+    null = [
+        shift.mmd_test(
+            *shift_pair(seed * 1000 + k, 0.0),
+            seed + k,
+            permutations=SHIFT_PERMUTATIONS,
+        ).p_value
+        for k in range(SHIFT_RUNS)
+    ]
+    planted = shift.mmd_test(
+        *shift_pair(seed, 1.5), seed, permutations=SHIFT_PERMUTATIONS
+    )
+    values = [float(p or 1.0) for p in null]
+    planted_p = float(planted.p_value or 1.0)
+    honest = uniform_p_value(values)
+    broken = uniform_p_value([p**2 for p in values])
+    return [
+        SmokeCheck(
+            "shift test p-values are uniform under the null",
+            honest > SHIFT_LEVEL,
+            f"KS p {honest:.3f} over {SHIFT_RUNS} same-distribution pairs",
+        ),
+        SmokeCheck(
+            "shift test detects a planted shift",
+            planted_p <= ALPHA,
+            f"p {planted_p:.3f} at a shift of 1.5 sd",
+        ),
+        SmokeCheck(
+            "uniformity check rejects a liberal test",
+            broken <= SHIFT_LEVEL,
+            f"KS p {broken:.2e} when p-values are squared",
         ),
     ]
 
@@ -360,6 +430,7 @@ def run_smoke(
     checks.append(check_corpora())
     checks += check_certificates()
     checks += check_ledger(seed)
+    checks += check_shift(seed)
     if full:
         checks += check_power_and_fdr(seed)
     return SmokeReport(tuple(checks))
