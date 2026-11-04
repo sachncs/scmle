@@ -27,12 +27,12 @@ from scmle.core import config
 from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import feasibility as charter_feasibility
 from scmle.data.charter import sealing as charter_sealing
-from scmle.data.ingest import budget as ingest_budget
-from scmle.data.ingest import grain as ingest_grain
-from scmle.data.ingest import plan as ingest_plan
 from scmle.data.framing import costs as framing_costs
 from scmle.data.framing import draft as framing_draft
 from scmle.data.framing import refusal as framing_refusal
+from scmle.data.ingest import budget as ingest_budget
+from scmle.data.ingest import grain as ingest_grain
+from scmle.data.ingest import plan as ingest_plan
 from scmle.data.readers import tabular
 from scmle.inference import mapping as mapping_module
 from scmle.inference import serving

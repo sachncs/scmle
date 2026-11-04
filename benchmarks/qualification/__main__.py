@@ -65,9 +65,7 @@ def check_certificates() -> int:
     uncertainty_problems = uncertainty_certify.problems()
     screen_store = certificates.CertificateStore.load(screen_certify.STORE_PATH)
     screen_problems = screen_certify.problems(screen_store)
-    ingest_store = certificates.CertificateStore.load(
-        ingest_certify.STORE_PATH
-    )
+    ingest_store = certificates.CertificateStore.load(ingest_certify.STORE_PATH)
     ingest_problems = ingest_certify.problems(ingest_store)
     ok = (
         not problems
