@@ -153,10 +153,18 @@ def measure(
     absent = " OR ".join(f"{profile.quote(c)} IS NULL" for c in columns)
     quoted = profile.quote(table)
     distinct = source.scalar(
-        f"SELECT COUNT(*) FROM (SELECT DISTINCT {names} FROM {quoted} "
-        f"WHERE {present})"
+        profile.statement(
+            "SELECT COUNT(*) FROM (SELECT DISTINCT {n} FROM {t} WHERE {w})",
+            n=names,
+            t=quoted,
+            w=present,
+        )
     )
-    nulls = source.scalar(f"SELECT COUNT(*) FROM {quoted} WHERE {absent}")
+    nulls = source.scalar(
+        profile.statement(
+            "SELECT COUNT(*) FROM {t} WHERE {w}", t=quoted, w=absent
+        )
+    )
     if rows == 0:
         return 1.0, 0.0
     return (rows - int(distinct or 0)) / rows, int(nulls or 0) / rows

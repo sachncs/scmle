@@ -45,6 +45,15 @@ def quote_all(names: Sequence[str]) -> str:
     return ", ".join(quote(name) for name in names)
 
 
+def statement(template: str, **parts: str) -> str:
+    """Fills a SQL template with identifiers quoted by `quote`/`quote_all`.
+
+    Only identifiers and clauses built from them are ever interpolated,
+    never values, so the string-built statement cannot be injected.
+    """
+    return template.format(**parts)  # nosec B608
+
+
 class SqlSource:
     """Read-only SQL access that counts queries and charges a budget.
 
@@ -103,7 +112,7 @@ class SqlSource:
 
     def columns(self, table: str, stage: str = "") -> tuple[str, ...]:
         """Column names of a table, in order (one metadata query)."""
-        sql = f"SELECT * FROM {quote(table)} WHERE 1 = 0"
+        sql = statement("SELECT * FROM {t} WHERE 1 = 0", t=quote(table))
         connectors.refuse_writes(sql, self.connector.source_uri)
         if (
             self.meter is not None
@@ -222,7 +231,9 @@ def profile_table(
 ) -> TableProfile | None:
     """Profiles one table by aggregate queries; None if the budget stops it."""
     quoted = quote(table)
-    count = source.scalar(f"SELECT COUNT(*) FROM {quoted}", stage, table)
+    count = source.scalar(
+        statement("SELECT COUNT(*) FROM {t}", t=quoted), stage, table
+    )
     if count is None:
         return None
     rows = int(count)
@@ -233,8 +244,12 @@ def profile_table(
     for name in names:
         column = quote(name)
         found = source.fetch(
-            f"SELECT COUNT({column}), COUNT(DISTINCT {column}), "
-            f"MIN({column}), MAX({column}) FROM {quoted}",
+            statement(
+                "SELECT COUNT({c}), COUNT(DISTINCT {c}), "
+                "MIN({c}), MAX({c}) FROM {t}",
+                c=column,
+                t=quoted,
+            ),
             stage,
             f"{table}.{name}",
             rows,

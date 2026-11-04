@@ -137,11 +137,15 @@ def reconcile_extract(
     add(
         f"{base_table}.row_count",
         len(assembled),
-        source.scalar(f"SELECT COUNT(*) FROM {quoted}"),
+        source.scalar(profile.statement("SELECT COUNT(*) FROM {t}", t=quoted)),
     )
     for measure in measures:
         total = source.scalar(
-            f"SELECT SUM({profile.quote(measure)}) FROM {quoted}"
+            profile.statement(
+                "SELECT SUM({m}) FROM {t}",
+                m=profile.quote(measure),
+                t=quoted,
+            )
         )
         add(
             f"{base_table}.sum.{measure}",

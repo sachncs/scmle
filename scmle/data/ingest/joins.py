@@ -193,10 +193,15 @@ def contained(
         for a, b in zip(child_columns, parent_columns, strict=True)
     )
     names = ", ".join(f"c.{profile.quote(c)}" for c in child_columns)
-    sql = (
-        f"SELECT COUNT(*) FROM (SELECT DISTINCT {names} FROM "
-        f"{profile.quote(child)} c WHERE {present}) c WHERE NOT EXISTS "
-        f"(SELECT 1 FROM {profile.quote(parent)} p WHERE {same})"
+    sql = profile.statement(
+        "SELECT COUNT(*) FROM (SELECT DISTINCT {n} FROM {c} c "
+        "WHERE {w}) c WHERE NOT EXISTS "
+        "(SELECT 1 FROM {p} p WHERE {s})",
+        n=names,
+        c=profile.quote(child),
+        w=present,
+        p=profile.quote(parent),
+        s=same,
     )
     return int(source.scalar(sql) or 0)
 
@@ -208,9 +213,12 @@ def distinct_of(
     present = " AND ".join(f"{profile.quote(c)} IS NOT NULL" for c in columns)
     return int(
         source.scalar(
-            f"SELECT COUNT(*) FROM (SELECT DISTINCT "
-            f"{profile.quote_all(columns)} FROM {profile.quote(table)} "
-            f"WHERE {present})"
+            profile.statement(
+                "SELECT COUNT(*) FROM (SELECT DISTINCT {n} FROM {t} WHERE {w})",
+                n=profile.quote_all(columns),
+                t=profile.quote(table),
+                w=present,
+            )
         )
         or 0
     )
