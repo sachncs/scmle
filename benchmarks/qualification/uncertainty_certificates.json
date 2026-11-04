@@ -1,0 +1,293 @@
+{
+  "dev_seed_base": 10000,
+  "gates": {
+    "G1": {
+      "band": [
+        0.8991025919818261,
+        0.902893416002206
+      ],
+      "code_hash": "bfb3f7e6b14510fee4068b0209eaf5bf7d3f3329e76ea7f97e014f912ae659c1",
+      "design": {
+        "alpha": 0.1,
+        "beta": [
+          451,
+          50
+        ],
+        "n_cal": 500
+      },
+      "ks_p": 0.2951625776368181,
+      "mean": 0.899917687245659,
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "G11i": {
+      "code_hash": "1701ca8645bf3fb5b374c9b28a16e643494785c2ea32c6ba1bdc3fa5cd775589",
+      "covariate_censoring_bias": -0.002747989662342687,
+      "marginal_km_bias": -0.017488983865733942,
+      "mean_floored_share": 0.005306666666666667,
+      "passed": true,
+      "replicates": 100,
+      "se": [
+        0.0011521879127655839,
+        0.0009329378474867952
+      ],
+      "seeds": [
+        0,
+        100
+      ],
+      "tau": 1.250895466477202,
+      "true_concordance": 0.7278883739673585
+    },
+    "G13": {
+      "code_hash": "512630332dba80ba8d7eaf861dc677ced865330e0183de5d462ff07ed2396a63",
+      "entities": 30,
+      "entity_wise": {
+        "floor": 0.8916955966712079,
+        "mean": 0.905961125,
+        "meets_floor": true,
+        "se": 0.0027681344429307
+      },
+      "passed": true,
+      "replicates": 2000,
+      "row_wise": {
+        "floor": 0.8921653517632298,
+        "mean": 0.900181125,
+        "meets_floor": true,
+        "se": 0.002611549412256738
+      },
+      "rows_per_entity": 40,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "G2": {
+      "code_hash": "eaec834f23ae8896d0d14e183423190e3f84a612627d6dfd47992cb35dfbd455",
+      "passed": true,
+      "replicates": 200,
+      "seeds": [
+        0,
+        2000
+      ],
+      "worlds": {
+        "knn1_K10": {
+          "cv_plus": {
+            "floor": 0.8957340502104708,
+            "mean": 0.9334225,
+            "meets_floor": true,
+            "se": 0.0014219832631763875
+          },
+          "pooled_refit_control": 0.8962875
+        },
+        "knn1_K5": {
+          "cv_plus": {
+            "floor": 0.8965072490899582,
+            "mean": 0.9489150000000001,
+            "meets_floor": true,
+            "se": 0.0011642503033472745
+          },
+          "pooled_refit_control": 0.8980925000000001
+        },
+        "linear_K10": {
+          "cv_plus": {
+            "floor": 0.8951863611149852,
+            "mean": 0.9014325000000001,
+            "meets_floor": true,
+            "se": 0.0016045462950049377
+          },
+          "pooled_refit_control": 0.9012749999999999
+        },
+        "linear_K5": {
+          "cv_plus": {
+            "floor": 0.8950822250404513,
+            "mean": 0.9019400000000001,
+            "meets_floor": true,
+            "se": 0.001639258319849553
+          },
+          "pooled_refit_control": 0.9015925
+        }
+      }
+    },
+    "G3": {
+      "code_hash": "c7c6a9df31744d434d023dbdc1dd81019122443a2d4b72b1a1263cb91ca755f7",
+      "constant_width_marginal": 0.9004366666666666,
+      "constant_width_top_decile": 0.72125,
+      "cqr_marginal": {
+        "floor": 0.8968112523760267,
+        "mean": 0.90014,
+        "meets_floor": true,
+        "se": 0.0010629158746577987
+      },
+      "cqr_top_decile": 0.8637166666666667,
+      "passed": false,
+      "replicates": 150,
+      "seeds": [
+        0,
+        150
+      ]
+    },
+    "G4": {
+      "class_conditional": [
+        {
+          "floor": 0.8978677510618643,
+          "mean": 0.9003258140728944,
+          "meets_floor": true,
+          "se": 0.0007107496460452377
+        },
+        {
+          "floor": 0.8976236601640271,
+          "mean": 0.8993926646946697,
+          "meets_floor": true,
+          "se": 0.0007921132786576498
+        },
+        {
+          "floor": 0.8972837859688829,
+          "mean": 0.900907105424728,
+          "meets_floor": true,
+          "se": 0.0009054046770390259
+        },
+        {
+          "floor": 0.8958445069354668,
+          "mean": 0.9040627560605052,
+          "meets_floor": true,
+          "se": 0.0013851643548444155
+        },
+        {
+          "floor": 0.8910188203771717,
+          "mean": 0.907433341398022,
+          "meets_floor": true,
+          "se": 0.002993726540942771
+        }
+      ],
+      "code_hash": "a48f6dc0146b39c3e1ef4c661cd44ba85c13bfc9fc1fd61f01714ef3aa73cce6",
+      "passed": true,
+      "pooled_control": [
+        {
+          "floor": 0.8993618268843976,
+          "mean": 0.9787777184392354,
+          "meets_floor": true,
+          "se": 0.00021272437186748734
+        },
+        {
+          "floor": 0.8986829688941028,
+          "mean": 0.946181130937727,
+          "meets_floor": true,
+          "se": 0.00043901036863241364
+        },
+        {
+          "floor": 0.897953036710143,
+          "mean": 0.8819667411677647,
+          "meets_floor": false,
+          "se": 0.0006823210966189815
+        },
+        {
+          "floor": 0.8947221781374014,
+          "mean": 0.6023876999232034,
+          "meets_floor": false,
+          "se": 0.0017592739541995462
+        },
+        {
+          "floor": 0.9,
+          "mean": 0.0,
+          "meets_floor": false,
+          "se": 0.0
+        }
+      ],
+      "replicates": 300,
+      "seeds": [
+        0,
+        300
+      ]
+    },
+    "G5": {
+      "code_hash": "8e71cf4906c3e04fa823438d35209b49ae0870cf7e19ac5705ec57329feabefd",
+      "false_flag_bound": 0.059746794344808965,
+      "familywise_false_flag": 0.0755,
+      "min_certified_rows": 30,
+      "passed": false,
+      "recall_by_slice_rows": {
+        "100": {
+          "recall": 1.0,
+          "wilson_lower": 0.9980829527187469
+        },
+        "200": {
+          "recall": 1.0,
+          "wilson_lower": 0.9980829527187469
+        },
+        "30": {
+          "recall": 1.0,
+          "wilson_lower": 0.9980829527187469
+        },
+        "400": {
+          "recall": 1.0,
+          "wilson_lower": 0.9980829527187469
+        },
+        "50": {
+          "recall": 1.0,
+          "wilson_lower": 0.9980829527187469
+        }
+      },
+      "replicates": 2000,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "G6": {
+      "code_hash": "eef7a8d8be020d86d36f8a1d427a51c18c92def6d2b7769d457dd405ddaf4b38",
+      "estimated_passed": true,
+      "estimated_ratio": {
+        "effective_size_mean": 269.6513654196562,
+        "replicates": 200,
+        "unweighted": 0.7350216666666666,
+        "weighted": {
+          "floor": 0.8945467271479418,
+          "mean": 0.899845,
+          "meets_floor": true,
+          "se": 0.0018177576173527329
+        }
+      },
+      "known_ratio": {
+        "replicates": 2000,
+        "unweighted": 0.7325436666666667,
+        "weighted": {
+          "floor": 0.8979846919619773,
+          "mean": 0.9052551666666666,
+          "meets_floor": true,
+          "se": 0.0006717693460075795
+        }
+      },
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "G9": {
+      "code_hash": "d5e5d9ab173629d7ddf078ba72fc18f1e9a2b4bf61c337934cf1d1130f9e950d",
+      "coherence_residual": 7.105427357601002e-15,
+      "mean_difference": -4.36372182482358,
+      "passed": true,
+      "replicates": 2000,
+      "seeds": [
+        0,
+        2000
+      ],
+      "upper_95": -4.316301681093023
+    }
+  },
+  "not_measured": [
+    "G7 real datasets",
+    "G8 M4/M5 forecast",
+    "G10 public ranking set",
+    "G11ii scikit-survival differential",
+    "G12 multilabel sets",
+    "G14 near-duplicate split",
+    "G15 encoder baseline",
+    "MAPIE differential for G2/G4"
+  ],
+  "version": 1
+}
