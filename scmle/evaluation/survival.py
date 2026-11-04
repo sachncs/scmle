@@ -37,6 +37,17 @@ def censoring_probability(
     return np.maximum(found, MIN_CENSORING_PROBABILITY)
 
 
+def floored_count(duration: np.ndarray, event: np.ndarray) -> int:
+    """Rows whose censoring probability is below the floor at their time.
+
+    Their weight is capped at `1 / MIN_CENSORING_PROBABILITY`, a bias that
+    the Brier and AUC scores do not otherwise show. Report it with them.
+    """
+    moments, values = censoring_curve(duration, event)
+    found = estimators.step_lookup(moments, values, duration, 1.0)
+    return int((found < MIN_CENSORING_PROBABILITY).sum())
+
+
 def time_grid(duration: np.ndarray, event: np.ndarray) -> np.ndarray:
     """Evaluation times between the 10th and 90th percentile of event times."""
     observed = duration[np.asarray(event, dtype=bool)]

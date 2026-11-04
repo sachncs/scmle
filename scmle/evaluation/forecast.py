@@ -3,6 +3,13 @@
 The baseline every forecast must beat is "tomorrow looks like today". MASE
 here divides the model's mean absolute error by that baseline's error on the
 same rows, so a value below 1 means the model forecasts better than no change.
+
+That is not the usual MASE, which divides by the in-sample error of the naive
+forecast on the training history (`scmle.evaluation.proper_scores.mase`) and
+is the only one comparable with published values. The same-rows score is
+kept under the explicit kind `mase_same_rows`; `mase` stays an alias of it so
+stored runs read the same. `mase_insample` takes the training-history scale
+from `ForecastMetric.scale`.
 """
 
 import dataclasses
@@ -59,10 +66,14 @@ class ForecastMetric(metric_contracts.Metric):
     """A forecasting metric over all horizon steps.
 
     Attributes:
-        kind: `mase`, `mae` or `smape`.
+        kind: `mase_same_rows` (alias `mase`), `mase_insample`, `mae` or
+            `smape`.
+        scale: In-sample naive mean absolute error for `mase_insample`
+            (see `proper_scores.insample_scale`).
     """
 
     kind: str = "mase"
+    scale: float | None = None
 
     def accepts_weights(self) -> bool:
         """These scores are unweighted."""
@@ -72,6 +83,9 @@ class ForecastMetric(metric_contracts.Metric):
         """Builds a scorer `(estimator, features, first_step_target)`."""
         kind = self.kind
         sign = 1.0 if self.greater_is_better else -1.0
+        scale = self.scale
+        if kind == "mase_insample" and (scale is None or scale <= 0):
+            raise ValueError("mase_insample needs a positive scale")
 
         def score(
             estimator: Any,
@@ -85,6 +99,12 @@ class ForecastMetric(metric_contracts.Metric):
                 return sign * mean_absolute_error(truth, guess)
             if kind == "smape":
                 return sign * smape(truth, guess)
+            if kind == "mase_insample":
+                return (
+                    sign
+                    * mean_absolute_error(truth, guess)
+                    / float(scale or 1.0)
+                )
             naive = last_value(estimator, features, truth.shape[1])
             return sign * mase(truth, guess, naive)
 

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "note": "passed = the type has a measured gate and an external referent that agreed; failed = measured and missed; no_referent = no gate or no outside reference has been run. Only passed types may carry a confirmed tier.",
+  "tasks": {
+    "binary_classification": {"status": "passed", "gates": ["G4"], "scope": "class-conditional prediction sets (simulation); no real-data referent run (G7)"},
+    "multiclass_classification": {"status": "passed", "gates": ["G4"], "scope": "class-conditional prediction sets (simulation); no real-data referent run (G7)"},
+    "regression": {"status": "passed", "gates": ["G1", "G2"], "scope": "marginal split and CV+ coverage (simulation); CQR conditional coverage failed G3"},
+    "survival": {"status": "no_referent", "gates": ["G11i"], "scope": "IPCW simulation passed; scikit-survival/R differential (G11ii) not run; no interval"},
+    "ordinal": {"status": "no_referent", "gates": [], "scope": "no gate, no interval"},
+    "ranking": {"status": "no_referent", "gates": [], "scope": "query bootstrap implemented; public LTR set (G10) not run; no interval"},
+    "multilabel": {"status": "no_referent", "gates": [], "scope": "no per-label sets or support rule (G12 not built)"},
+    "multioutput": {"status": "no_referent", "gates": [], "scope": "no gate, no interval"},
+    "forecast": {"status": "no_referent", "gates": [], "scope": "proper scores implemented; M4/M5 reproduction (G8) not run; no interval"},
+    "uplift": {"status": "no_referent", "gates": [], "scope": "no observed individual effect, so no coverage target"}
+  }
+}

@@ -1530,6 +1530,7 @@ class ModelBundle:
         data: str | pathlib.Path | pd.DataFrame,
         coverage: float = conformal_module.DEFAULT_COVERAGE,
         mapping: mapping_module.ColumnMapping | None = None,
+        conditional: str | None = None,
     ) -> list[list[Any]]:
         """Prediction sets with a stated coverage (classification).
 
@@ -1537,6 +1538,10 @@ class ModelBundle:
             data: DataFrame or path to a supported tabular dataset.
             coverage: Share of new rows whose true label the set contains.
             mapping: Explicit column-name policy; exact names if omitted.
+            conditional: `None` for a pooled margin (coverage on average
+                over classes) or `class` for one margin per true class
+                (coverage within each class). A class with too few
+                calibration rows is kept in every set.
 
         Returns:
             For each row the labels that cannot be ruled out.
@@ -1546,7 +1551,9 @@ class ModelBundle:
                 conformal scores.
         """
         calibrator = self.require_conformal("classification")
-        return calibrator.sets(self.predict_proba(data, mapping), coverage)
+        return calibrator.sets(
+            self.predict_proba(data, mapping), coverage, conditional
+        )
 
     def require_conformal(
         self, kind: str

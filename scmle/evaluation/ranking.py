@@ -45,6 +45,72 @@ def mean_ndcg(
     return float(np.mean(values)) if values else float("nan")
 
 
+def per_query_ndcg(
+    relevance: np.ndarray,
+    scores: np.ndarray,
+    queries: Any,
+    cutoff: int = CUTOFF,
+) -> tuple[np.ndarray, int]:
+    """NDCG of every scorable query and the number of excluded queries.
+
+    A query with nothing relevant (or a single document) is excluded and
+    counted, not scored as zero.
+    """
+    values = []
+    excluded = 0
+    for rows in query_groups(queries):
+        truth = np.asarray(relevance, dtype=float)[rows]
+        if len(rows) < MIN_DOCUMENTS or truth.max() <= 0:
+            excluded += 1
+            continue
+        values.append(
+            sk_metrics.ndcg_score(
+                truth[None, :],
+                np.asarray(scores, dtype=float)[rows][None, :],
+                k=cutoff,
+            )
+        )
+    return np.asarray(values, dtype=float), excluded
+
+
+def query_bootstrap_ndcg(
+    relevance: np.ndarray,
+    scores: np.ndarray,
+    queries: Any,
+    cutoff: int = CUTOFF,
+    replicates: int = 1000,
+    level: float = 0.95,
+    seed: int = 0,
+) -> dict[str, float]:
+    """Mean NDCG with a percentile interval from resampling whole queries.
+
+    Documents of one query are not independent, so queries are the
+    resampling unit. Returns the mean, the limits, the number of scored
+    queries and the number excluded for having nothing relevant.
+    """
+    values, excluded = per_query_ndcg(relevance, scores, queries, cutoff)
+    if values.size == 0:
+        nan = float("nan")
+        return {
+            "mean": nan,
+            "lower": nan,
+            "upper": nan,
+            "queries": 0,
+            "excluded": excluded,
+        }
+    generator = np.random.default_rng(seed)
+    draws = generator.integers(0, values.size, size=(replicates, values.size))
+    means = values[draws].mean(axis=1)
+    tail = (1.0 - level) / 2.0
+    return {
+        "mean": float(values.mean()),
+        "lower": float(np.quantile(means, tail)),
+        "upper": float(np.quantile(means, 1.0 - tail)),
+        "queries": int(values.size),
+        "excluded": excluded,
+    }
+
+
 def mean_average_precision(
     relevance: np.ndarray,
     scores: np.ndarray,

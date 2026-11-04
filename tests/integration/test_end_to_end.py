@@ -414,6 +414,15 @@ def test_classification_bundles_return_prediction_sets_that_survive_saving(
 
     assert covered > 0.85
     assert sets == result.bundle.predict_set(rows, coverage=0.9)
+    by_class = reloaded.predict_set(rows, coverage=0.9, conditional="class")
+    for label in sorted(set(binary_frame["y"])):
+        rows_of_class = (binary_frame["y"] == label).to_numpy()
+        inside = [
+            label in s
+            for s, keep in zip(by_class, rows_of_class, strict=True)
+            if keep
+        ]
+        assert np.mean(inside) > 0.8
     with pytest.raises(errors.ArtifactError, match="regression"):
         reloaded.predict_interval(rows)
 
