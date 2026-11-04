@@ -1,0 +1,9 @@
+{
+  "verdict": "feasible",
+  "scope": "confirmatory",
+  "n_confirmation": 113,
+  "n_required": 42,
+  "mde": 0.3043797413874846,
+  "power_at_min_effect": 0.9982559721517281,
+  "reason": "113 rows >= 42 needed for power 0.8"
+}

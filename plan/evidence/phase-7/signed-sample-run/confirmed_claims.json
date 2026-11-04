@@ -1,0 +1,859 @@
+{
+  "alpha_confirm": "1/20",
+  "checks": [
+    {
+      "check_id": "h000001:C",
+      "decision": "warn",
+      "effect": -0.7556589746009146,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean radius is not monotonically associated with the target",
+      "p_value": 3.956959131883281e-22,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        0
+      ],
+      "set_id": "C",
+      "statistic": -0.7556589746009146,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000002:C",
+      "decision": "warn",
+      "effect": -0.4056176364397126,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean texture is not monotonically associated with the target",
+      "p_value": 8.312766188609389e-06,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        1
+      ],
+      "set_id": "C",
+      "statistic": -0.4056176364397126,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000003:C",
+      "decision": "warn",
+      "effect": -0.7612667511016904,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean perimeter is not monotonically associated with the target",
+      "p_value": 1.292644575966906e-22,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        2
+      ],
+      "set_id": "C",
+      "statistic": -0.7612667511016904,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000004:C",
+      "decision": "warn",
+      "effect": -0.7576160357380131,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean area is not monotonically associated with the target",
+      "p_value": 2.687145211630658e-22,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        3
+      ],
+      "set_id": "C",
+      "statistic": -0.7576160357380131,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000005:C",
+      "decision": "warn",
+      "effect": -0.4303213997263009,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean smoothness is not monotonically associated with the target",
+      "p_value": 1.9633426416370542e-06,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        4
+      ],
+      "set_id": "C",
+      "statistic": -0.4303213997263009,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000006:C",
+      "decision": "warn",
+      "effect": -0.5905968227912919,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean compactness is not monotonically associated with the target",
+      "p_value": 5.768753764113918e-12,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        5
+      ],
+      "set_id": "C",
+      "statistic": -0.5905968227912919,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000007:C",
+      "decision": "warn",
+      "effect": -0.6818291974054099,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean concavity is not monotonically associated with the target",
+      "p_value": 9.307843420479697e-17,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        6
+      ],
+      "set_id": "C",
+      "statistic": -0.6818291974054099,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000008:C",
+      "decision": "warn",
+      "effect": -0.7601423581987918,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean concave points is not monotonically associated with the target",
+      "p_value": 1.621681879132797e-22,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        7
+      ],
+      "set_id": "C",
+      "statistic": -0.7601423581987918,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000009:C",
+      "decision": "warn",
+      "effect": -0.3143933324367608,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "mean symmetry is not monotonically associated with the target",
+      "p_value": 0.0006956011092288063,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        8
+      ],
+      "set_id": "C",
+      "statistic": -0.3143933324367608,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000011:C",
+      "decision": "warn",
+      "effect": -0.6366385552444426,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "radius error is not monotonically associated with the target",
+      "p_value": 3.484355369613069e-14,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        9
+      ],
+      "set_id": "C",
+      "statistic": -0.6366385552444426,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000013:C",
+      "decision": "warn",
+      "effect": -0.6461771449681014,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "perimeter error is not monotonically associated with the target",
+      "p_value": 1.0834449129555602e-14,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        10
+      ],
+      "set_id": "C",
+      "statistic": -0.6461771449681014,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000014:C",
+      "decision": "warn",
+      "effect": -0.7351613647254155,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "area error is not monotonically associated with the target",
+      "p_value": 1.8515491230649822e-20,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        11
+      ],
+      "set_id": "C",
+      "statistic": -0.7351613647254155,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000016:C",
+      "decision": "warn",
+      "effect": -0.3216850600058403,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "compactness error is not monotonically associated with the target",
+      "p_value": 0.0005120645563444189,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        12
+      ],
+      "set_id": "C",
+      "statistic": -0.3216850600058403,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000017:C",
+      "decision": "warn",
+      "effect": -0.40814227732369385,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "concavity error is not monotonically associated with the target",
+      "p_value": 7.210190870929482e-06,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        13
+      ],
+      "set_id": "C",
+      "statistic": -0.40814227732369385,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000018:C",
+      "decision": "warn",
+      "effect": -0.5468084615108001,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "concave points error is not monotonically associated with the target",
+      "p_value": 3.708855994586305e-10,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        14
+      ],
+      "set_id": "C",
+      "statistic": -0.5468084615108001,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000021:C",
+      "decision": "warn",
+      "effect": -0.36014279961759604,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst texture is not monotonically associated with the target",
+      "p_value": 8.924141113260227e-05,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        15
+      ],
+      "set_id": "C",
+      "statistic": -0.36014279961759604,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000022:C",
+      "decision": "warn",
+      "effect": -0.8005635175712537,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst area is not monotonically associated with the target",
+      "p_value": 1.9368730927422696e-26,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        16
+      ],
+      "set_id": "C",
+      "statistic": -0.8005635175712537,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000023:C",
+      "decision": "warn",
+      "effect": -0.3351650520998728,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst smoothness is not monotonically associated with the target",
+      "p_value": 0.00028475873818200974,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        17
+      ],
+      "set_id": "C",
+      "statistic": -0.3351650520998728,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000024:C",
+      "decision": "warn",
+      "effect": -0.49796622726907563,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst compactness is not monotonically associated with the target",
+      "p_value": 2.0006333895477307e-08,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        18
+      ],
+      "set_id": "C",
+      "statistic": -0.49796622726907563,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000025:C",
+      "decision": "warn",
+      "effect": -0.601547949789952,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst concavity is not monotonically associated with the target",
+      "p_value": 1.842182616862e-12,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        19
+      ],
+      "set_id": "C",
+      "statistic": -0.601547949789952,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000026:C",
+      "decision": "warn",
+      "effect": -0.7609923774677114,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst concave points is not monotonically associated with the target",
+      "p_value": 1.3663491799561314e-22,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        20
+      ],
+      "set_id": "C",
+      "statistic": -0.7609923774677114,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000027:C",
+      "decision": "warn",
+      "effect": -0.2981054305153764,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst symmetry is not monotonically associated with the target",
+      "p_value": 0.0013416802057661405,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        21
+      ],
+      "set_id": "C",
+      "statistic": -0.2981054305153764,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000028:C",
+      "decision": "pass",
+      "effect": -0.1490530251859522,
+      "interval": null,
+      "n": 113,
+      "null_hypothesis": "worst fractal dimension is not monotonically associated with the target",
+      "p_value": 0.11510562206291736,
+      "seed_path": [
+        7,
+        "confirm.spearman",
+        22
+      ],
+      "set_id": "C",
+      "statistic": -0.1490530251859522,
+      "tier": "unverified"
+    }
+  ],
+  "claims": [
+    {
+      "adjusted_p_value": 5.664301576765227e-21,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000001:X",
+        "h000001:C"
+      ],
+      "claim_id": "h000001",
+      "effect": -0.7556589746009146,
+      "statement": "mean radius~target: evidence against 'mean radius is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 4.199839534534095e-05,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000002:X",
+        "h000002:C"
+      ],
+      "claim_id": "h000002",
+      "effect": -0.4056176364397126,
+      "statement": "mean texture~target: evidence against 'mean texture is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 3.482103903084152e-21,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000003:X",
+        "h000003:C"
+      ],
+      "claim_id": "h000003",
+      "effect": -0.7612667511016904,
+      "statement": "mean perimeter~target: evidence against 'mean perimeter is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 4.615908434311008e-21,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000004:X",
+        "h000004:C"
+      ],
+      "claim_id": "h000004",
+      "effect": -0.7576160357380131,
+      "statement": "mean area~target: evidence against 'mean area is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 1.1241930432030764e-05,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000005:X",
+        "h000005:C"
+      ],
+      "claim_id": "h000005",
+      "effect": -0.4303213997263009,
+      "statement": "mean smoothness~target: evidence against 'mean smoothness is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 4.128923240418831e-11,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000006:X",
+        "h000006:C"
+      ],
+      "claim_id": "h000006",
+      "effect": -0.5905968227912919,
+      "statement": "mean compactness~target: evidence against 'mean compactness is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 9.992982693091564e-16,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000007:X",
+        "h000007:C"
+      ],
+      "claim_id": "h000007",
+      "effect": -0.6818291974054099,
+      "statement": "mean concavity~target: evidence against 'mean concavity is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 3.482103903084152e-21,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000008:X",
+        "h000008:C"
+      ],
+      "claim_id": "h000008",
+      "effect": -0.7601423581987918,
+      "statement": "mean concave points~target: evidence against 'mean concave points is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 0.002844965633228647,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000009:X",
+        "h000009:C"
+      ],
+      "claim_id": "h000009",
+      "effect": -0.3143933324367608,
+      "statement": "mean symmetry~target: evidence against 'mean symmetry is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 2.992667696021864e-13,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000011:X",
+        "h000011:C"
+      ],
+      "claim_id": "h000011",
+      "effect": -0.6366385552444426,
+      "statement": "radius error~target: evidence against 'radius error is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 1.0339520027460431e-13,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000013:X",
+        "h000013:C"
+      ],
+      "claim_id": "h000013",
+      "effect": -0.6461771449681014,
+      "statement": "perimeter error~target: evidence against 'perimeter error is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 2.271816513861464e-19,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000014:X",
+        "h000014:C"
+      ],
+      "claim_id": "h000014",
+      "effect": -0.7351613647254155,
+      "statement": "area error~target: evidence against 'area error is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 0.002199028074768224,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000016:X",
+        "h000016:C"
+      ],
+      "claim_id": "h000016",
+      "effect": -0.3216850600058403,
+      "statement": "compactness error~target: evidence against 'compactness error is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 3.8704622183777454e-05,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000017:X",
+        "h000017:C"
+      ],
+      "claim_id": "h000017",
+      "effect": -0.40814227732369385,
+      "statement": "concavity error~target: evidence against 'concavity error is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 2.450375673060193e-09,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000018:X",
+        "h000018:C"
+      ],
+      "claim_id": "h000018",
+      "effect": -0.5468084615108001,
+      "statement": "concave points error~target: evidence against 'concave points error is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 0.0004258238451493004,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000021:X",
+        "h000021:C"
+      ],
+      "claim_id": "h000021",
+      "effect": -0.36014279961759604,
+      "statement": "worst texture~target: evidence against 'worst texture is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 1.6635552121043932e-24,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000022:X",
+        "h000022:C"
+      ],
+      "claim_id": "h000022",
+      "effect": -0.8005635175712537,
+      "statement": "worst area~target: evidence against 'worst area is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 0.0012872399573747484,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000023:X",
+        "h000023:C"
+      ],
+      "claim_id": "h000023",
+      "effect": -0.3351650520998728,
+      "statement": "worst smoothness~target: evidence against 'worst smoothness is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 1.2273700751275327e-07,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000024:X",
+        "h000024:C"
+      ],
+      "claim_id": "h000024",
+      "effect": -0.49796622726907563,
+      "statement": "worst compactness~target: evidence against 'worst compactness is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 1.4383879898586244e-11,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000025:X",
+        "h000025:C"
+      ],
+      "claim_id": "h000025",
+      "effect": -0.601547949789952,
+      "statement": "worst concavity~target: evidence against 'worst concavity is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 3.482103903084152e-21,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000026:X",
+        "h000026:C"
+      ],
+      "claim_id": "h000026",
+      "effect": -0.7609923774677114,
+      "statement": "worst concave points~target: evidence against 'worst concave points is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 0.005237962503121459,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000027:X",
+        "h000027:C"
+      ],
+      "claim_id": "h000027",
+      "effect": -0.2981054305153764,
+      "statement": "worst symmetry~target: evidence against 'worst symmetry is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 0.42983794734792236,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 23 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000028:X",
+        "h000028:C"
+      ],
+      "claim_id": "h000028",
+      "effect": -0.1490530251859522,
+      "statement": "worst fractal dimension~target: evidence against 'worst fractal dimension is not monotonically associated with the target'",
+      "tier": "unverified"
+    }
+  ],
+  "custody_head": "240893ea91acc1b3a98e1662e8a93eca6b12dcd9040eec6e8e9b12e145cab97c",
+  "guarantee": "FDR <= alpha * m0 / m under arbitrary dependence",
+  "ledger_head": "a6540e6c39bdbf2ab0c74f3773a0c78fe0568e4e761e92200a9dd44110e48021",
+  "negative_control": {
+    "b": 20,
+    "exceedance_p": 0.047619047619047616,
+    "exceeds": true,
+    "kind": "permuted_target",
+    "message": "23 discoveries exceed the 95th percentile (0) of 20 permuted_target re-runs",
+    "note": "The 95th percentile is estimated from B re-runs and has Monte Carlo error; the interval is approximate and distribution-free.",
+    "observed": 23,
+    "p95": 0,
+    "p95_interval": [
+      0,
+      0
+    ],
+    "p95_interval_confidence": 0.9,
+    "permuted": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scope": "global",
+    "sha256": "d4393a4a46894dbef69e13127922f183d2ee6038320044e1579df3d0ddfdab6a"
+  },
+  "note": "Only claims with tier 'confirmed' carry the FDR/FWER guarantee, and only under the assumptions listed on them. Exploration findings that are not confirmed do not change feature admission or preprocessing.",
+  "outcome": "confirmed",
+  "reason": "22 of 23 survivors confirmed on C by by at 0.05",
+  "rule": "by",
+  "survivors_sha256": "48d1b9fcbcabe43d25aaba129b59fcb57225b54e97409023605298e6f61c228d"
+}

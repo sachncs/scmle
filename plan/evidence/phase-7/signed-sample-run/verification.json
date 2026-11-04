@@ -1,0 +1,7 @@
+{
+  "charter_signature": "valid",
+  "custody_log_chain_and_macs": "valid, 4 entries",
+  "ledger_chain_and_head": "valid, 28 hypotheses",
+  "outcome": "confirmed",
+  "split_manifest_hash": "valid, sha256 70a1a867c9b6151039a32b019db784f63f400c66b4691c466883a7f75ecaf656"
+}

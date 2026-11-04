@@ -1,0 +1,38 @@
+{
+  "b": 20,
+  "exceedance_p": 0.047619047619047616,
+  "exceeds": true,
+  "kind": "permuted_target",
+  "message": "23 discoveries exceed the 95th percentile (0) of 20 permuted_target re-runs",
+  "note": "The 95th percentile is estimated from B re-runs and has Monte Carlo error; the interval is approximate and distribution-free.",
+  "observed": 23,
+  "p95": 0,
+  "p95_interval": [
+    0,
+    0
+  ],
+  "p95_interval_confidence": 0.9,
+  "permuted": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "scope": "global"
+}

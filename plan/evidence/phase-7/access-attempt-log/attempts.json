@@ -1,0 +1,22 @@
+[
+  {
+    "attempt": "guessed token",
+    "outcome": "refused: test set is locked: invalid token"
+  },
+  {
+    "attempt": "right token, no binding",
+    "outcome": "refused: test set is locked: binding mismatch"
+  },
+  {
+    "attempt": "right token, other ledger state",
+    "outcome": "refused: test set is locked: binding mismatch"
+  },
+  {
+    "attempt": "right token and binding",
+    "outcome": "released"
+  },
+  {
+    "attempt": "second open, same token and binding",
+    "outcome": "refused: test set was already used for final evaluation"
+  }
+]
