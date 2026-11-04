@@ -14,6 +14,10 @@ code, and each outcome that passed must still be accepted for gating. An
 outcome that did not pass is simply descriptive and does not fail the check.
 The F6 checks (`scmle.data.robustness`) are checked the same way against
 `f6_certificates.json`.
+The F12 coverage and breadth gates (`uncertainty_certify.py`) are checked
+against `uncertainty_certificates.json`: a certificate is stale when the code it
+measured changed. A gate that missed its floor is listed as descriptive and
+does not fail the check.
 """
 
 import argparse
@@ -25,6 +29,7 @@ from benchmarks.qualification import f6_certify
 from benchmarks.qualification import ledger_checks
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
+from benchmarks.qualification import uncertainty_certify
 from scmle.data.detectors import certificates
 
 # Detector id -> (current code hash, defect type it gates on).
@@ -40,7 +45,14 @@ def check_certificates() -> int:
     f5_problems = f5.problems(f5_store) + f5.audit_problems(f5_store)
     f6_store = certificates.CertificateStore.load(f6_certify.STORE_PATH)
     f6_problems = f6_certify.problems(f6_store)
-    ok = not problems and report.ok and not f5_problems and not f6_problems
+    uncertainty_problems = uncertainty_certify.problems()
+    ok = (
+        not problems
+        and report.ok
+        and not f5_problems
+        and not f6_problems
+        and not uncertainty_problems
+    )
     print(
         json.dumps(
             {
@@ -52,6 +64,10 @@ def check_certificates() -> int:
                 "gating_detectors": len(GATING),
                 "f5_problems": f5_problems,
                 "f5_gating": [f"{d}/{t}" for d, _, t in f5.gating(f5_store)],
+                "uncertainty_problems": uncertainty_problems,
+                "uncertainty_descriptive_only": (
+                    uncertainty_certify.descriptive_only()
+                ),
                 "f6_problems": f6_problems,
                 "f6_descriptive_only": f6_certify.audit_labels(f6_store)[
                     "uncertified"

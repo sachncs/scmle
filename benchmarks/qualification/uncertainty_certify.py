@@ -615,6 +615,15 @@ def passed_gates(document: dict[str, Any]) -> list[str]:
     return [k for k, v in document["gates"].items() if v["passed"]]
 
 
+def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
+    """Gates that missed their floors; their methods stay descriptive."""
+    if document is None:
+        if not STORE_PATH.exists():
+            return list(GATES)
+        document = json.loads(STORE_PATH.read_text(encoding="utf-8"))
+    return [k for k, v in document["gates"].items() if not v["passed"]]
+
+
 def main(arguments: list[str] | None = None) -> int:
     """Writes or checks the certificate file."""
     parser = argparse.ArgumentParser(description=__doc__)
