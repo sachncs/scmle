@@ -44,6 +44,7 @@ from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
 from scmle.data.custody import pipeline as custody_pipeline
 from scmle.data.custody import sealed as custody_sealed
+from scmle.data.framing import draft as framing_draft
 from scmle.data.ledger import budget as ledger_budget
 from scmle.data.ledger import explore as ledger_explore
 from scmle.data.ledger import governed as ledger_governed
@@ -573,6 +574,7 @@ class ProfileStage(Stage):
             run.summary(),
         )
         self.assess_robustness(context, task, charter, view, run, structure)
+        self.assess_framing(context, charter, view)
 
     def assess_robustness(
         self,
@@ -642,6 +644,30 @@ class ProfileStage(Stage):
                 "shift_reason": shift_document["reason"],
                 "forward": found.forward.status,
             },
+        )
+
+    def assess_framing(
+        self,
+        context: context_module.RunContext,
+        charter: charter_contracts.AnalysisCharter,
+        view: Any,
+    ) -> None:
+        """Checks that the charter's words name real columns (F8).
+
+        Reads the column names of the exploration view and the target
+        column, never row values. Writes `framing_link.json`. The result is
+        descriptive: a name that matches no column is `unresolved`, and
+        nothing in the run is gated on it.
+        """
+        data = context.spec.data
+        columns = [*view.features.columns, data.target]
+        document = framing_draft.link_report(charter, columns)
+        context.write_json("framing_link.json", document)
+        context.emit(
+            "framing.completed",
+            "the charter's target, moment and unit were matched to columns",
+            ("framing_link.json",),
+            {k: v["status"] for k, v in document["fields"].items()},
         )
 
     def qualify_exploration(
