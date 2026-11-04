@@ -115,10 +115,13 @@ class SensitivitySpec:
             `fixed` gives the partial R-squared of the confounder with the
             treatment and with the outcome directly (`strength`).
         strength: The multiplier, or the partial R-squared in (0, 1).
+        m_max: For difference in differences, the largest multiple `M` of the
+            biggest pre-period change that the claim must survive.
     """
 
     benchmark: str = "strongest_observed"
     strength: float = 1.0
+    m_max: float = 1.0
 
     def __post_init__(self) -> None:
         """Validates the record."""
@@ -129,6 +132,8 @@ class SensitivitySpec:
             raise ValueError("strength must be positive")
         if self.benchmark == "fixed" and value >= 1:
             raise ValueError("a fixed strength is a partial R2 below 1")
+        if qualification.finite(self.m_max, "m_max") < 0:
+            raise ValueError("m_max must not be negative")
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record."""

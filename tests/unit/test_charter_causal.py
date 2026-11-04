@@ -105,6 +105,14 @@ def test_covariates_are_read_from_the_attestation():
     assert causal.covariates_of(["unconfoundedness_given:none"]) == ()
 
 
+def test_m_max_is_part_of_the_hash_and_must_not_be_negative():
+    one = causal_charter(sensitivity=causal.SensitivitySpec(m_max=1.0))
+    two = causal_charter(sensitivity=causal.SensitivitySpec(m_max=2.0))
+    assert one.charter_hash != two.charter_hash
+    with pytest.raises(ValueError, match="m_max"):
+        causal.SensitivitySpec(m_max=-1.0)
+
+
 def test_a_fixed_benchmark_is_a_partial_r2():
     with pytest.raises(ValueError, match="below 1"):
         causal.SensitivitySpec("fixed", 1.5)
