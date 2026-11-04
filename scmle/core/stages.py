@@ -36,6 +36,7 @@ from scmle.contracts import reliability
 from scmle.contracts import tasks
 from scmle.core import compiler
 from scmle.core import context as context_module
+from scmle.core import randomness
 from scmle.core import state as run_state
 from scmle.data.admissibility import attestations
 from scmle.data.admissibility import qualify
@@ -956,6 +957,15 @@ class ProfileStage(Stage):
         path = str(context.spec.charter_path)
         verified = charter_sealing.read_verified(path)
         charter = verified.charter
+        if (
+            charter.unit_of_prediction == charter_contracts.NEW_ENTITY
+            and not context.spec.data.group_column
+        ):
+            raise errors.ConfigError(
+                "the charter's unit_of_prediction is new_entity, which needs "
+                "data.group_column so that entities are split and calibrated "
+                "as units"
+            )
         log = custody_sealed.OpenLog(
             context.store.directory / "custody_log.jsonl"
             if context.store is not None
@@ -2517,8 +2527,10 @@ class PackageStage(Stage):
         )
         held_labels: list[Any] = []
         held_scores: list[Any] = []
+        held_entities: list[Any] = []
         fold_models: list[Any] = []
         classes = list(bundle.classes or ())
+        entity_column = self.entity_calibration_column(context)
         for fit_positions, evaluate_positions in split.manifest.folds:
             reason = context.resource_governor.skip_reason(first=False)
             if reason:
@@ -2531,6 +2543,8 @@ class PackageStage(Stage):
             )
             rows = split.dev_features.iloc[evaluate]
             held_labels.extend(split.dev_target.iloc[evaluate])
+            if entity_column is not None:
+                held_entities.extend(rows[entity_column].astype(str))
             if task is tasks.TaskType.REGRESSION:
                 held_scores.extend(candidate.predict(rows))
                 fold_models.append(candidate)
@@ -2544,10 +2558,27 @@ class PackageStage(Stage):
                 ]
                 for i in range(len(rows))
             )
+        if entity_column is not None:
+            chosen = conformal.one_row_per_entity(
+                held_entities,
+                randomness.component_rng(
+                    context.spec.validation.seed, "conformal.entity", 0
+                ),
+            )
+            held_labels = [held_labels[i] for i in chosen]
+            held_scores = [held_scores[i] for i in chosen]
+            fold_models = []
+            context.emit(
+                "conformal.entity_wise",
+                f"calibrated on one score for each of {len(chosen)} "
+                "entities (unit_of_prediction: new_entity)",
+                data={"entities": len(chosen)},
+            )
         if len(held_labels) < conformal.MIN_CALIBRATION_ROWS:
             self.note_conformal_skipped(
                 context,
-                f"only {len(held_labels)} held-out rows; need "
+                f"only {len(held_labels)} "
+                f"{'entities' if entity_column else 'held-out rows'}; need "
                 f"{conformal.MIN_CALIBRATION_ROWS}",
             )
             return None
@@ -2565,6 +2596,24 @@ class PackageStage(Stage):
         return conformal.ConformalCalibrator.for_classification(
             held_labels, np.asarray(held_scores), classes
         )
+
+    def entity_calibration_column(
+        self, context: context_module.RunContext
+    ) -> str | None:
+        """The group column when the charter's unit is a new entity.
+
+        Intervals for a new entity treat one score per entity as the
+        exchangeable unit (F12 B5), so calibration keeps one random held-out
+        row of each entity. Returns None without a charter or for any other
+        unit, and the row-wise calibration applies.
+        """
+        path = context.spec.charter_path
+        if not path:
+            return None
+        charter = charter_sealing.read_verified(str(path)).charter
+        if charter.unit_of_prediction != charter_contracts.NEW_ENTITY:
+            return None
+        return context.spec.data.group_column
 
     def keep_cv_plus(
         self,

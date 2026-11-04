@@ -177,6 +177,32 @@ def cv_plus_bounds(
     return lower, upper
 
 
+def one_row_per_entity(
+    entities: Sequence[Any], rng: np.random.Generator
+) -> list[int]:
+    """Positions of one randomly chosen row of each entity, in entity order.
+
+    For a new entity the exchangeable unit is the entity, not the row: rows of
+    one entity share a random effect, so pooling them overstates how many
+    independent scores there are. Taking one row per entity gives scores that
+    are exchangeable with the score of a new entity (`gate_g13` measures it).
+
+    Args:
+        entities: Entity label of each calibration row.
+        rng: Source of the choice.
+
+    Returns:
+        Positions into `entities`, one per distinct entity, ordered by the
+        entity's first appearance.
+    """
+    positions: dict[Any, list[int]] = {}
+    for index, entity in enumerate(entities):
+        positions.setdefault(entity, []).append(index)
+    return [
+        int(rows[int(rng.integers(len(rows)))]) for rows in positions.values()
+    ]
+
+
 @dataclasses.dataclass(frozen=True)
 class ConformalCalibrator:
     """Calibration scores for intervals (regression) or sets (classification).
