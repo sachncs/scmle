@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from scmle.contracts import qualification
 from scmle.data.admissibility import dag as dag_module
 from scmle.data.charter import causal
 from scmle.data.identification import aipw
@@ -830,7 +831,7 @@ def assemble(
         "action": decision.action,
         "assumptions": {a: (attestors or {}).get(a, "") for a in needed},
         "certified_gates_used": sorted(certified),
-        "hashes": hashes,
+        "hashes": dict(hashes),
         "limits": LIMITS,
     }
     documents["causal_claims.json"] = claims
@@ -1020,6 +1021,70 @@ def identify(
         needed,
         attestors,
         certified,
+    )
+
+
+NOT_ESTIMATED = (
+    "the confirmation set is opened once by the claim ledger and the causal "
+    "estimate is not part of that opening, so no estimate was computed: the "
+    "claim is unverified. `identify` computes it when it is given the "
+    "confirmation rows."
+)
+
+
+def design_only(
+    spec: causal.CausalSpec,
+    x: pd.DataFrame,
+    error_budget: budget_module.ErrorBudget,
+    dag: dag_module.Dag | None = None,
+    seed: int = 0,
+    learner: str = "linear",
+) -> Outcome:
+    """Selection and design diagnostics on `X`, with no estimate.
+
+    Used by the pipeline stage, which never hands `C` to this module: the
+    plan, the refusal if there is one, the design diagnostics and a claim
+    file at tier `unverified`.
+    """
+    plan = select.select(spec, dag)
+    if plan.primary is None:
+        return refusal_outcome(plan, spec)
+    _, alpha_falsify = alphas(error_budget)
+    strategy = plan.primary
+    adapter = ADAPTERS[strategy](spec, x, seed, learner, alpha_falsify)
+    try:
+        adapter.prepare()
+    except ValueError as error:
+        return refusal_outcome(
+            plan, spec, f"design could not be assessed: {error}"
+        )
+    if adapter.refusal:
+        return refusal_outcome(plan, spec, adapter.refusal)
+    report = {
+        "status": select.IDENTIFIED,
+        "strategy": strategy,
+        "estimand": spec.estimand,
+        "estimate": None,
+        "design": adapter.design,
+        "multiverse_not_run": list(plan.multiverse),
+        "notes": [NOT_ESTIMATED],
+    }
+    decision = tier.TierDecision(
+        qualification.Tier.UNVERIFIED,
+        "identified",
+        dict.fromkeys(tier.CONDITIONS, False),
+        (NOT_ESTIMATED,),
+        "downgrade_tier",
+    )
+    return assemble(
+        plan,
+        spec,
+        report,
+        {"ran": False, "note": NOT_ESTIMATED},
+        {"holds": None, "note": NOT_ESTIMATED},
+        decision,
+        strategy,
+        needed_assumptions(strategy, spec),
     )
 
 

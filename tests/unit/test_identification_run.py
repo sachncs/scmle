@@ -367,3 +367,15 @@ def test_c_is_only_used_after_the_design_step():
 def test_alphas_split_the_confirmation_level_four_to_one():
     primary, falsify = run.alphas(BUDGET)
     assert primary == pytest.approx(0.04) and falsify == pytest.approx(0.01)
+
+
+def test_design_only_never_estimates_and_is_unverified():
+    out = run.design_only(block(), observational(1500, 20), BUDGET)
+    claims = out.documents["causal_claims.json"]
+    report = out.documents["identification_report.json"]
+    assert report["estimate"] is None and report["design"]["overlap_on_x"]
+    assert claims["tier"] == "unverified" and claims["status"] == "identified"
+    refused = run.design_only(
+        block(assumptions=("positivity",)), observational(500, 21), BUDGET
+    )
+    assert refused.documents["causal_claims.json"]["status"] == "not_identified"
