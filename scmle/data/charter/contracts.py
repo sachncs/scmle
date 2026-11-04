@@ -25,11 +25,12 @@ from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
+from scmle.data.charter import causal as causal_module
 from scmle.data.charter import rules as rules_module
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 3
+FORMAT_VERSION = 4
 OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
@@ -44,6 +45,7 @@ class DecisionAction(enum.StrEnum):
     SWITCH_SPLIT = "switch_split"
     BLOCK_RUN = "block_run"
     DOWNGRADE_TIER = "downgrade_tier"
+    REFUSE_CLAIM = "refuse_claim"
 
 
 def texts(values: Iterable[Any], name: str) -> tuple[str, ...]:
@@ -91,6 +93,9 @@ class AnalysisEstimand:
         intercurrent_events: Events and the strategy for each (at least one;
             declare "none" with strategy "not applicable" if there are none).
         summary_measure: How the target is summarised (for example "ROC AUC").
+        causal: The causal block (format 4); None for a predictive estimand
+            and for every charter written before format 4, which serialise
+            and hash as they did.
     """
 
     kind: str
@@ -99,6 +104,7 @@ class AnalysisEstimand:
     prediction_moment: str
     intercurrent_events: tuple[IntercurrentEvent, ...]
     summary_measure: str
+    causal: causal_module.CausalSpec | None = None
 
     def __post_init__(self) -> None:
         """Validates the estimand."""
@@ -116,10 +122,12 @@ class AnalysisEstimand:
                 "intercurrent_events must not be empty: state a strategy "
                 "for each event, or declare 'none' as not applicable"
             )
+        if self.causal is not None and self.kind != "causal":
+            raise ValueError("a causal block needs kind='causal'")
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record."""
-        return {
+        record: dict[str, Any] = {
             "kind": self.kind,
             "population": self.population,
             "target": self.target,
@@ -129,11 +137,16 @@ class AnalysisEstimand:
             ],
             "summary_measure": self.summary_measure,
         }
+        if self.causal is not None:
+            record["causal"] = self.causal.to_dict()
+        return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the estimand, rejecting unknown or missing fields."""
+        record = {"causal": None, **record}
         qualification.require_fields(cls, record)
+        block = record["causal"]
         return cls(
             kind=record["kind"],
             population=record["population"],
@@ -144,6 +157,11 @@ class AnalysisEstimand:
                 for e in record["intercurrent_events"]
             ),
             summary_measure=record["summary_measure"],
+            causal=(
+                None
+                if block is None
+                else causal_module.CausalSpec.from_dict(block)
+            ),
         )
 
 
@@ -408,7 +426,9 @@ class AnalysisCharter:
 
     @property
     def format_version(self) -> int:
-        """Oldest format that can carry this charter (2 or, with rules, 3)."""
+        """Oldest format that carries this charter (2, 3 rules, 4 causal)."""
+        if self.estimand.causal is not None:
+            return 4
         return 2 if self.rules is None else 3
 
     @classmethod

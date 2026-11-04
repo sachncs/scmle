@@ -127,6 +127,7 @@ def test_decision_action_is_a_closed_set():
         "switch_split",
         "block_run",
         "downgrade_tier",
+        "refuse_claim",
     }
 
 
