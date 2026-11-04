@@ -351,7 +351,11 @@ class ModelMonitor:
         )
 
     def performance(
-        self, data: pd.DataFrame, outcomes: pd.Series
+        self,
+        data: pd.DataFrame,
+        outcomes: pd.Series,
+        propensity: pd.Series | None = None,
+        maturity: pd.Series | None = None,
     ) -> PerformanceReport:
         """Scores the model on rows whose outcome is already known.
 
@@ -359,9 +363,26 @@ class ModelMonitor:
             data: Served rows.
             outcomes: Observed outcomes aligned to `data`; missing values
                 mean the label has not arrived yet.
+            propensity: Optional logged probability that each row's label was
+                observed (``1 / propensity`` is the Horvitz-Thompson weight).
+                When given, the labelled rows are resampled with probability
+                proportional to ``1 / propensity`` before the metrics are
+                computed, which approximates the weighted metric; the
+                resample is seeded, so the report is reproducible. Without
+                it the metrics are computed on the labelled rows unweighted
+                (the previous behaviour), which is biased if labels were
+                selected.
+            maturity: Optional boolean per row; only rows marked True count
+                (a row whose outcome window has not elapsed is treated like
+                a missing label, even if a label has arrived).
+
+        Raises:
+            ValueError: If a labelled row has a propensity outside ``(0, 1]``.
         """
         frame = self.bundle.prepare_frame(data)
         known = outcomes.reset_index(drop=True).notna().to_numpy()
+        if maturity is not None:
+            known = known & maturity.reset_index(drop=True).to_numpy(bool)
         labeled = int(known.sum())
         rows = len(frame)
         coverage = labeled / max(rows, 1)
@@ -379,6 +400,16 @@ class ModelMonitor:
         task = tasks.TaskType(self.bundle.schema.task)
         target = outcomes.reset_index(drop=True)[known].reset_index(drop=True)
         features = frame.reset_index(drop=True)[known].reset_index(drop=True)
+        if propensity is not None:
+            chosen = propensity.reset_index(drop=True)[known].to_numpy(float)
+            if not np.all((chosen > 0.0) & (chosen <= 1.0)):
+                raise ValueError("propensity must be above 0 and at most 1")
+            weight = 1.0 / chosen
+            rows_drawn = np.random.default_rng(0).choice(
+                labeled, size=labeled, p=weight / weight.sum()
+            )
+            target = target.iloc[rows_drawn].reset_index(drop=True)
+            features = features.iloc[rows_drawn].reset_index(drop=True)
         scores = metrics.CATALOG.evaluate(
             self.bundle.pipeline, features, target, task
         )
