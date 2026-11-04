@@ -53,12 +53,13 @@ floors. Nothing below was run on real data.
   version (it is not installed in the development environment).
 
 **WP-12.1 Proper conformal core in the run*
-- Store the K fold models and serve CV+ (`conformal.cv_plus_bounds` exists);
-  plain split conformal when `n_cal >= 1000`. Replace the pooled
-  out-of-fold scores with a separate refit at `core/stages.py`
-  (`conformal_calibration`, `quantile_intervals`); extend the bundle checksum
-  to fold-model hashes and test tamper on one fold model. Charter size cap
-  with fallback.
+- Built 2026-11-04: the K fold models and residuals are stored and served
+  as CV+ (`evaluation/cv_plus.py`, `predict_interval(method="cv_plus")`) for
+  regression with disjoint held-out folds and fewer than 1000 calibration
+  rows; they are checksummed and a changed file is refused. Open: replace the
+  pooled out-of-fold scores with a separate refit when `n_cal >= 1000` (the
+  pooled scores are still used there), and a charter size cap (the cap is a
+  module constant, `cv_plus.MAX_BYTES`, with a skipped-event fallback).
 - Tie the CQR base levels to the requested level (`quantile.py` fixes
   0.05/0.95).
 - Differential test against MAPIE on three frozen datasets (`1e-9`).
@@ -67,16 +68,21 @@ floors. Nothing below was run on real data.
   observed individual effect). All still return `None`.
 
 **WP-12.2 Coverage report in the run**
-- `coverage_report.json` and `coverage_claim.json` produced by a stage on
-  `C`/`F` through custody, registered as a claim before `C` is read, read
-  once; `ModelBundle.coverage_report`; extend `SliceReport` (`slices.py`).
+- Built 2026-11-04: `coverage_report.json` and `ModelBundle.coverage_report`,
+  measured on the final test rows that the evaluation opens (read once, no
+  second read), for every interval method the bundle holds and for pooled and
+  class-conditional sets. Open: `coverage_claim.json` registered as a claim
+  before the rows are read; coverage on `C`; slices (the report has the
+  per-class split only); extend `SliceReport` (`slices.py`).
 - Decide the G5 redesign above before the slice flag may gate.
 
 **WP-12.3 Shift weights in the bundle**
-- `ModelBundle.predict_interval(..., shift_weights=)` and calibration weights
-  stored; extend `AdversarialValidation` (`shift.py`) to emit the same odds;
-  ESS refusal wired to F13 escalation. (`shift_weights.py` and the gate G6
-  exist.)
+- Built 2026-11-04: `ModelBundle.attach_shift_weights` stores the calibration
+  weights and discriminator (checksummed) and `predict_interval(shift=True)`
+  serves weighted conformal intervals; a small effective sample is refused.
+  Open: the run itself has no target covariates, so weights are attached by
+  the user from rows in score order; extend `AdversarialValidation`
+  (`shift.py`) to emit the same odds; wire the refusal to F13 escalation.
 
 **WP-12.4 Forecast protocol**
 - Per-horizon calibrated quantile forecasts; WIS reporting in the run;
@@ -97,9 +103,12 @@ floors. Nothing below was run on real data.
 
 **WP-12.7 Ranking, multilabel, panel**
 - G10 against one public LTR set with published figures; per-label support
-  rule and per-label thresholds and sets (G12); `unit_of_prediction` charter
-  field and entity-level calibration wired into the run (the entity-wise
-  score selection of G13 is a simulation only).
+  rule and per-label thresholds and sets (G12). Built 2026-11-04: the
+  `unit_of_prediction` charter field (format 6) and entity-wise calibration
+  (one random held-out row per entity) for `new_entity`. Open:
+  `known_entity_future` has no protocol of its own yet (it changes nothing
+  in the run), cluster-bootstrap metric intervals, and the check that the
+  entity-wise choice does not under-cover in a real panel.
 
 **WP-12.8 Near-duplicate grouping and text/image encoders** (not started)
 - Duplicate grouper (hash + embedding cosine), group split; one frozen image

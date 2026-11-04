@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+* Instrument residuals closed in code, 2026-11-04. The confirmation binds the
+  release of `C` to the hash of the family it tests and the ledger head
+  before opening it (`SealedSet.commit`, R1 C7; a set bound to another
+  ledger state is refused). The MMD shift test is certified on 5000 null
+  worlds (259 false alarms, upper bound 0.0583 against 0.075; the dated
+  amendment precedes the re-run, floors unchanged; R1 A4). A frozen,
+  hash-checked Titanic extract (`tests/fixtures/titanic_extract.csv`) shows
+  the shipped screen blocks `boat` and `body` (R1 A3). The F5 detectors were
+  measured on wine, iris and digits (`f5_corpora.py`): label noise misses the
+  floor on the two small tables and the sentinel detector flags clean rows on
+  all three, so those two certificates are not read as general (R1 A5, A6).
+* Uncertainty wiring (Phase 12): fold models stored in the bundle with CV+
+  intervals (`predict_interval(method="cv_plus")`), shift weights attached to
+  a bundle (`attach_shift_weights`, `shift=True`), `coverage_report.json`
+  measured on the final test rows, and the charter field `unit_of_prediction`
+  (format 6; charters without it keep their hash) with entity-wise
+  calibration for `new_entity`.
+
 * Custody residuals and evidence artifacts (R1 C4-C10, D1-D4). Canary and
   `gc` tests (`tests/leakage/test_custody_canary.py`,
   `test_custody_memory.py`) and an import-graph test over `detectors/`,
@@ -9,8 +27,8 @@
   build if a sealed row or the custody modules become reachable. A sealed
   set's single release can be bound to a claims hash and a ledger hash
   (`SealedSet.commit`, `open(..., claims_hash, ledger_hash)`; the vault
-  refuses any other pair); the confirmation stage does not call `commit` yet,
-  so charter runs are not bound. Every custody log entry carries an HMAC when
+  refuses any other pair); the confirmation stage calls `commit` before it
+  opens `C` (see the entry above). Every custody log entry carries an HMAC when
   a signing key is available (`SCMLE_SIGNING_KEY` or an explicit key); without
   a key the log is a checksum. The split manifest records a Merkle root over
   the canonical row content of `X`, `C` and the final set (`row_roots`; the

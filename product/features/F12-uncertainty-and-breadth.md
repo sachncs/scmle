@@ -58,10 +58,16 @@ class-conditional conformal sets (`ConformalCalibrator.class_margins`),
 weighted conformal and clipped-odds shift weights, `cv_plus_bounds`, measured
 coverage with Clopper-Pearson and Holm slice flags (`evaluation/coverage.py`),
 proper scores, covariate-dependent IPCW, MinT, query-bootstrap NDCG, the task
-gate status file. **Still not in the run:** the bundle serves pooled
-out-of-fold scores with a refit (the table row above is still true), fold
-models are not stored, there is no `coverage_report` stage, and the seven task
-types above still get no interval.
+gate status file. **In the run since 2026-11-04:** the fold models and
+residuals are stored for regression with fewer than 1000 calibration rows
+(`method="cv_plus"`, `evaluation/cv_plus.py`), shift weights can be attached
+to a bundle (`shift=True`), a `coverage_report.json` is measured on the final
+test rows (`evaluation/coverage_run.py`), and `unit_of_prediction:
+new_entity` in the charter calibrates on one score per entity. **Still not
+in the run:** the pooled out-of-fold scores are still the default and the
+only source above 1000 rows (the table row above is still true), the coverage
+claim is not registered before the rows are read, and the seven task types
+above still get no interval.
 
 ### Problem-type breadth
 
@@ -83,8 +89,9 @@ Proposed interface (extends `ModelBundle`, `scmle/artifacts/bundle.py`):
 bundle.predict_interval(data, coverage=0.9, method="cv_plus")  # regression
 bundle.predict_interval(data, coverage=0.9, method="cqr")  # exists
 bundle.predict_set(data, coverage=0.9, conditional="class")  # Mondrian
-bundle.predict_interval(data, coverage=0.9, shift_weights=w)  # weighted
-report = bundle.coverage_report(frame_c, target_c, slices=...)  # on C, once
+bundle.attach_shift_weights(calibration_rows, target_rows)  # built
+bundle.predict_interval(data, coverage=0.9, shift=True)  # weighted, built
+bundle.coverage_report  # dict set by the run from the final test rows
 ```
 
 Artifacts: `coverage_report.json` (per nominal level: marginal coverage,
