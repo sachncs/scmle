@@ -7,6 +7,7 @@ import pytest
 
 from scmle.data.charter import rules
 from scmle.data.charter import sealing
+from scmle.data.ledger import budget as budget_module
 from scmle.data.ledger import online_fdr
 from tests.unit.test_charter_contracts import make_charter
 
@@ -82,3 +83,80 @@ def test_an_amendment_that_loosens_any_one_of_the_three_is_refused():
         )
     assert sealing.tighter(5, 5) is True
     assert sealing.tighter(5, 6) is False
+
+
+def test_an_amendment_may_tighten_alpha_or_wealth_but_not_loosen_either():
+    old = make_charter(error_budget=budget_module.ErrorBudget.create(0.05, 0.1))
+    for tighter in (
+        budget_module.ErrorBudget.create(0.04, 0.1),
+        budget_module.ErrorBudget.create(0.05, 0.05),
+        budget_module.ErrorBudget.create(0.04, 0.05),
+    ):
+        sealing.check_amendment(old, make_charter(error_budget=tighter))
+    for looser in (
+        budget_module.ErrorBudget.create(0.06, 0.1),
+        budget_module.ErrorBudget.create(0.05, 0.2),
+    ):
+        with pytest.raises(Exception, match="may only tighten"):
+            sealing.check_amendment(old, make_charter(error_budget=looser))
+
+
+def test_an_amendment_that_changes_another_budget_field_is_refused():
+    old = make_charter(error_budget=budget_module.ErrorBudget.create(0.05, 0.1))
+    other = make_charter(
+        error_budget=budget_module.ErrorBudget.create(
+            0.05, 0.1, permutations_b=old.error_budget.permutations_b + 100
+        )
+    )
+    with pytest.raises(Exception, match="may only tighten"):
+        sealing.check_amendment(old, other)
+
+
+def test_read_verified_reports_signed_or_not_with_the_recomputed_hash(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
+    charter = make_charter()
+    bare = tmp_path / "bare.json"
+    bare.write_text(json.dumps(charter.to_dict()))
+    plain = sealing.read_verified(bare)
+    assert plain.charter == charter
+    assert plain.charter_hash == charter.charter_hash
+    assert plain.signed is False
+    signed_path = sealing.write_charter(tmp_path / "s.json", charter, "k")
+    signed = sealing.read_verified(signed_path, signing_key="k")
+    assert signed.charter == charter and signed.signed is True
+    assert signed.charter_hash == charter.charter_hash
+    with pytest.raises(Exception) as caught:
+        sealing.read_verified(bare, require_signature=True)
+    assert str(caught.value) == f"charter {bare} is unsigned"
+
+
+def test_the_format_errors_name_the_file(tmp_path):
+    charter = make_charter()
+    path = sealing.write_charter(tmp_path / "c.json", charter, "k")
+    record = json.loads(path.read_text())
+    record["format"] = 99
+    path.write_text(json.dumps(record))
+    with pytest.raises(Exception) as caught:
+        sealing.read_verified(path, signing_key="k")
+    assert str(caught.value).startswith(f"charter {path} has format 99; ")
+    record["format"] = 2
+    record["charter"]["rules"] = {}
+    path.write_text(json.dumps(record))
+    with pytest.raises(Exception) as caught:
+        sealing.read_verified(path, signing_key="k")
+    assert str(caught.value) == (
+        f"charter {path} declares format 2 but carries 'rules', "
+        f"which need format {sealing.RULES_FORMAT}"
+    )
+    record["format"] = 2
+    del record["charter"]["rules"]
+    sealing.check_format(path, {"format": 2})
+    sealing.check_format(path, {"format": 2, "charter": {"x": 1}})
+
+
+def test_a_nan_power_is_named():
+    assert message(partial(make_charter, power=float("nan"))) == (
+        "power must be a finite number"
+    )

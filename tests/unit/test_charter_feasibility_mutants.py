@@ -216,6 +216,7 @@ def test_the_record_of_a_verdict_names_its_verdict_and_nulls_non_finite():
         power=0.8,
     )
     record = report.to_dict()
+    assert type(record["verdict"]) is str
     assert record["verdict"] == "infeasible"
     assert "VERDICT" not in record
     assert record["n_confirmation"] == 5

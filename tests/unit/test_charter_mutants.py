@@ -284,3 +284,9 @@ def test_load_errors_are_whole_messages(tmp_path):
     assert message(
         partial(attestations.load, tmp_path / "none.json")
     ).startswith(f"cannot read attestations {tmp_path / 'none.json'}: ")
+
+
+def test_every_text_slot_of_the_template_is_empty_and_named():
+    estimand = c.template()["estimand"]
+    for key in ("population", "target", "prediction_moment", "summary_measure"):
+        assert estimand[key] == "", key
