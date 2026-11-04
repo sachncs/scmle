@@ -38,6 +38,7 @@ from scmle.core import causal_claim
 from scmle.core import compiler
 from scmle.core import context as context_module
 from scmle.core import decision_reports
+from scmle.core import ingest_stage
 from scmle.core import randomness
 from scmle.core import state as run_state
 from scmle.data.admissibility import attestations
@@ -416,6 +417,7 @@ class ProfileStage(Stage):
                 f"success criteria name unreported metrics {unknown}; "
                 f"available: {sorted(context.catalog.report_names[task])}"
             )
+        frame = self.synthesize_features(context, frame)
         split = self.make_split(context, task, frame)
         spec = context.spec  # reweighing may have set the weight column
         development = split.dev_features.assign(
@@ -530,6 +532,66 @@ class ProfileStage(Stage):
                 )
         self.run_claim_ledger(context, task)
 
+    def synthesize_features(
+        self, context: context_module.RunContext, frame: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Adds the F9 synthesized features before the data are split.
+
+        Runs when the data spec names an `ingest_plan`, which needs a charter
+        with an `ingest` block. The plan reads the database through the as-of
+        views, so no feature uses a fact recorded after its row's cutoff; the
+        confirmation set does not exist yet. A unit verdict that does not
+        match stops the run.
+
+        Raises:
+            ConfigError: If only one of the plan and the charter block is set,
+                or a synthesized name collides with a column.
+            BlockedError: If the unit verdict is `coarser` or `unknown`.
+        """
+        data = context.spec.data
+        path = context.spec.charter_path
+        block = (
+            charter_sealing.read_verified(str(path)).charter.ingest
+            if path
+            else None
+        )
+        if not data.ingest_plan:
+            if block is not None:
+                raise errors.ConfigError(
+                    "the charter has an ingest block but data.ingest_plan is "
+                    "not set"
+                )
+            return frame
+        if block is None:
+            raise errors.ConfigError(
+                "data.ingest_plan needs a charter with an ingest block"
+            )
+        result = ingest_stage.run(
+            ingest_stage.load_plan(data.ingest_plan),
+            block,
+            frame,
+            context.store.directory if context.store is not None else None,
+        )
+        clash = sorted(set(result.features.columns) & set(frame.columns))
+        if clash:
+            raise errors.ConfigError(
+                f"synthesized features collide with columns: {clash}"
+            )
+        merged = pd.concat(
+            [frame.reset_index(drop=True), result.features], axis=1
+        )
+        context.frame = merged
+        context.ingest = result
+        for name, document in result.documents.items():
+            context.write_json(name, document)
+        context.emit(
+            "ingest.completed",
+            f"{result.declared} features synthesized through the as-of views",
+            (ingest_stage.MANIFEST, ingest_stage.PROVENANCE),
+            result.summary,
+        )
+        return merged
+
     def run_claim_ledger(
         self, context: context_module.RunContext, task: tasks.TaskType
     ) -> None:
@@ -619,6 +681,7 @@ class ProfileStage(Stage):
             claim_runner=runner,
         )
         self.write_registered_claims(context, run, runner)
+        self.check_ingest_family(context, run, found)
         context.emit(
             "ledger.completed",
             run.confirmation.reason,
@@ -708,6 +771,35 @@ class ProfileStage(Stage):
             selection=selection.to_dict(),
             ceiling=ceiling,
             seed=charter.seed,
+        )
+
+    def check_ingest_family(
+        self,
+        context: context_module.RunContext,
+        run: ledger_governed.GovernedRun,
+        found: qualify.Qualification,
+    ) -> None:
+        """Requires the ledger to hold exactly the declared synthesized family.
+
+        Raises:
+            BlockedError: If the declared family size and the registered
+                hypotheses differ.
+        """
+        result = context.ingest
+        if result is None:
+            return
+        columns = tuple(str(c) for c in result.features.columns)
+        registered = {
+            h.spec.column
+            for h in run.ledger.hypotheses.values()
+            if h.spec.column
+        }
+        skipped = {column for column, ignored in run.plan.skipped}
+        ingest_stage.check_multiplicity(
+            result.declared,
+            columns,
+            registered,
+            set(found.quarantined) | skipped,
         )
 
     def write_registered_claims(
@@ -1003,6 +1095,7 @@ class ProfileStage(Stage):
             scope=charter.charter_hash,
             causal=charter.estimand.causal,
             dag=graph,
+            declared=() if context.ingest is None else context.ingest.records,
         )
         written: list[str] = []
         if found.table is not None:

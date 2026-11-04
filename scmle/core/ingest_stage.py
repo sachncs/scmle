@@ -1,0 +1,264 @@
+"""The ingest plan stage of a charter run (F9).
+
+A charter with an `ingest` block and a data spec that names `ingest_plan` read
+their features from a database through the as-of views instead of from the
+table alone. The stage runs before the data are split, so nothing it reads
+depends on the confirmation set:
+
+1. profile the tables, infer the grain and discover the links under the
+   charter's budget (`IngestPlan`); a unit verdict of `coarser` or `unknown`
+   stops the run with the questions a person must settle;
+2. read each table once through a consistent (snapshot-checked) read and wrap
+   it in an `AsOfView` with its declared time rule;
+3. synthesize the feature family for the run table's rows, at the cutoff
+   `moment - lag`, capped at `B_feat`; the declared family size is fixed here;
+4. return the feature columns, the manifest and the provenance table, which
+   the caller joins to the table and hands to the admissibility stage.
+
+The plan file (JSON) names the database and the views; the charter fixes the
+budget, windows, lag and tolerances, so they are hashed and signed:
+
+    {"database": "warehouse.sqlite",
+     "key": "customer_id", "moment": "moment",       # columns of the run table
+     "tables": ["customers", "orders"],
+     "unit": "customer", "target_table": "customers",
+     "declared": [{"child": ..., "child_columns": [...], "parent": ...,
+                   "parent_columns": [...]}],
+     "views": [{"name": "orders", "table": "orders", "order_by": "order_id",
+                "key": "customer_id", "target_key": "customer_id",
+                "role": "child", "event_time": "created", "permissive": false,
+                "rule": {"mode": "transaction", "known_column": "recorded",
+                         "delta_rec_days": 0.0,
+                         "attestation": {"name_or_id": ..., ...}}}],
+     "nests": [{"mid": 0, "table": "events", "order_by": "order_id, created",
+                "key": "order_id", "mid_id": "order_id", ...same view keys}]}
+
+Not done here: entity resolution (the resolved entity does not become the
+split's group column) and extract reconciliation against source totals.
+"""
+
+import dataclasses
+import json
+from pathlib import Path
+import re
+import tempfile
+from typing import Any
+
+import pandas as pd
+
+from scmle.contracts import errors
+from scmle.data.admissibility import provenance
+from scmle.data.charter import ingest as charter_ingest
+from scmle.data.ingest import asof_view
+from scmle.data.ingest import budget as budgets
+from scmle.data.ingest import plan as ingest_plan
+from scmle.data.ingest import profile
+from scmle.data.ingest import synthesize
+from scmle.data.readers import connectors
+
+MANIFEST = "feature_manifest.json"
+PROVENANCE = "ingest_field_provenance.json"
+IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+ORDER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(, ?[A-Za-z_][A-Za-z0-9_]*)*$")
+BATCH_ROWS = 1000
+
+
+@dataclasses.dataclass(frozen=True)
+class IngestResult:
+    """What the stage produced.
+
+    Attributes:
+        features: One column per kept feature, indexed like the run table.
+        declared: The declared family size (kept features).
+        records: Field provenance of the kept features, for F4.
+        documents: File name to JSON-ready content (the plan's own files are
+            written by `IngestPlan`).
+        summary: Verdict, link count and budget state for the run event.
+    """
+
+    features: pd.DataFrame
+    declared: int
+    records: tuple[provenance.FieldProvenance, ...]
+    documents: dict[str, dict[str, Any]]
+    summary: dict[str, Any]
+
+
+def load_plan(path: str) -> dict[str, Any]:
+    """Reads the plan file.
+
+    Raises:
+        ConfigError: If it cannot be read or lacks a required key.
+    """
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise errors.ConfigError(
+            f"cannot read ingest plan {path}: {error}"
+        ) from error
+    needed = ("database", "key", "moment", "tables", "views")
+    if not isinstance(document, dict) or any(k not in document for k in needed):
+        raise errors.ConfigError(f"ingest plan {path} needs keys {needed}")
+    return document
+
+
+def identifier(value: Any, what: str) -> str:
+    """A bare SQL identifier."""
+    if not isinstance(value, str) or not IDENTIFIER.match(value):
+        raise errors.ConfigError(f"ingest plan {what} {value!r} is not a name")
+    return value
+
+
+def rule_of(
+    record: dict[str, Any], spec: charter_ingest.IngestSpec
+) -> asof_view.TimeRule:
+    """The time rule a view declares."""
+    note = record.get("attestation")
+    delay = record.get("delta_rec_days", spec.delta_rec)
+    return asof_view.TimeRule(
+        record["mode"],
+        record.get("known_column"),
+        None if record["mode"] == asof_view.NON_VERSIONED else float(delay),
+        None if note is None else provenance.Attestation(**note),
+    )
+
+
+def read_view(
+    entry: dict[str, Any],
+    factory: Any,
+    spec: charter_ingest.IngestSpec,
+) -> asof_view.AsOfView:
+    """One table as an as-of view, read once with a snapshot check."""
+    table = identifier(entry["table"], "table")
+    order = str(entry["order_by"])
+    if not ORDER.match(order):
+        raise errors.ConfigError(f"ingest plan order_by {order!r} is invalid")
+    query = f"SELECT * FROM {table} ORDER BY {order}"  # nosec B608
+    connector = connectors.DbApiConnector("sqlite://ingest", query, factory)
+    frame = profile.consistent_read(connector, BATCH_ROWS).frame
+    return asof_view.AsOfView(
+        frame,
+        entry["key"],
+        rule_of(entry["rule"], spec),
+        entry.get("event_time"),
+        entry.get("name", table),
+        bool(entry.get("permissive", False)),
+    )
+
+
+def run(
+    plan_document: dict[str, Any],
+    spec: charter_ingest.IngestSpec,
+    frame: pd.DataFrame,
+    run_dir: Path | None,
+) -> IngestResult:
+    """Runs the plan, then synthesizes features for the rows of `frame`.
+
+    Raises:
+        BlockedError: If the unit verdict is `coarser` or `unknown`.
+        ConfigError: If the plan names a column the table lacks.
+    """
+    key, moment = plan_document["key"], plan_document["moment"]
+    missing = [c for c in (key, moment) if c not in frame.columns]
+    if missing:
+        raise errors.ConfigError(f"ingest plan names columns {missing} absent")
+    factory = ingest_plan.sqlite_factory(plan_document["database"])
+    settings = ingest_plan.IngestSettings(
+        tables=tuple(plan_document["tables"]),
+        unit=plan_document.get("unit"),
+        target_table=plan_document.get("target_table"),
+        eps_key=spec.eps_key,
+        eps_null=spec.eps_null,
+        eps_fk=spec.eps_fk,
+        declared=ingest_plan.declared_from_json(
+            plan_document.get("declared", [])
+        ),
+    )
+    limits = budgets.IngestBudget(
+        spec.max_queries,
+        spec.max_rows_scanned,
+        spec.max_seconds,
+        spec.feature_budget,
+    )
+    with tempfile.TemporaryDirectory() as scratch:
+        folder = run_dir if run_dir is not None else Path(scratch)
+        plan = ingest_plan.IngestPlan(folder, factory, settings, limits)
+        summary = plan.run_all()
+    verdict = plan.verdict
+    if verdict is not None and verdict.blocks:
+        raise errors.BlockedError(
+            f"the charter unit {verdict.unit!r} does not match the grain of "
+            f"the target table ({verdict.verdict}): {verdict.reason}",
+            {"questions": list(verdict.questions)},
+        )
+    views = [read_view(v, factory, spec) for v in plan_document["views"]]
+    sources = [
+        synthesize.Source(
+            view,
+            entry.get("target_key", entry["key"]),
+            entry.get("role", synthesize.CHILD),
+        )
+        for view, entry in zip(views, plan_document["views"], strict=True)
+    ]
+    leaves = [
+        read_view(n, factory, spec) for n in plan_document.get("nests", [])
+    ]
+    nests = [
+        synthesize.Nest(sources[n["mid"]], leaf, n["mid_id"])
+        for leaf, n in zip(leaves, plan_document.get("nests", []), strict=True)
+    ]
+    targets = frame[[key, moment]].reset_index(drop=True)
+    found = synthesize.synthesize(
+        targets,
+        moment,
+        sources,
+        nests,
+        lag_days=spec.lag,
+        windows=spec.windows,
+        max_features=spec.feature_budget,
+        strict=spec.strict,
+    )
+    table = synthesize.feature_provenance(found, spec.lag, [*views, *leaves])
+    documents = {
+        MANIFEST: found.to_dict(),
+        PROVENANCE: table.to_dict(),
+    }
+    return IngestResult(
+        found.frame,
+        found.declared_family_size,
+        table.fields,
+        documents,
+        {
+            **summary,
+            "declared_family_size": found.declared_family_size,
+            "proposed": len(found.manifest),
+        },
+    )
+
+
+def check_multiplicity(
+    declared: int,
+    synthesized: tuple[str, ...],
+    registered_columns: set[str],
+    excluded: set[str],
+) -> None:
+    """Fails the run when the ledger did not register the declared family.
+
+    Every synthesized feature that was not quarantined or excluded must be a
+    registered hypothesis of the ledger, and nothing else may be counted.
+
+    Raises:
+        BlockedError: If the registered count differs from the expected one.
+    """
+    if declared != len(synthesized):
+        raise errors.BlockedError(
+            f"declared family size {declared} but {len(synthesized)} "
+            "synthesized columns reached the table"
+        )
+    expected = {c for c in synthesized if c not in excluded}
+    registered = {c for c in synthesized if c in registered_columns}
+    if registered != expected:
+        raise errors.BlockedError(
+            f"the ledger registered {len(registered)} synthesized "
+            f"hypotheses but {len(expected)} features were declared and kept",
+            {"missing": sorted(expected - registered)},
+        )

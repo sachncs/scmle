@@ -454,6 +454,7 @@ class RunContext:
     fairness_mitigation: dict[str, Any] | None = None
     ordinal_labels: tuple[Any, ...] | None = None
     unlabeled: pd.DataFrame | None = None
+    ingest: Any = None
     semi_supervised: dict[str, Any] | None = None
     evaluation: dict[str, Any] | None = None
     bundle: bundle_module.ModelBundle | None = None

@@ -284,6 +284,11 @@ class DataSpec(FrozenModel):
             A rule is frozen on the exploration rows and the claim that it
             beats the current process is registered in the ledger and tested
             once on the confirmation set (`baseline_report.json`).
+        ingest_plan: Path of an ingest plan (JSON) that names a database and
+            the as-of views to synthesize features from. Needs a charter with
+            an `ingest` block (format 7); the table then needs the plan's key
+            and moment columns. The synthesized columns are added before the
+            split.
         logged_action_column: With a charter decision block, the 0/1 action
             the current process logged. Never a feature.
         propensity_column: With a charter decision block and
@@ -332,6 +337,7 @@ class DataSpec(FrozenModel):
     framing_draft: str | None = None
     propensity_column: str | None = None
     logged_action_column: str | None = None
+    ingest_plan: str | None = None
 
 
 class ValidationSpec(FrozenModel):

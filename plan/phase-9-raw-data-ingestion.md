@@ -48,20 +48,12 @@ warehouse.
 
 **WP-9.9 Wiring into a run** (after WP-9.8 only for the gates; the plumbing
 can start now)
-- Charter fields (format bump of `scmle/data/charter/contracts.py`):
-  `ingest_budget`, `feature_budget` (`B_feat`), window set, `lag`,
-  `delta_rec`, tolerance fields. The charter format moved to 2 for F8; add
-  these in the next bump.
-- A stage hook before `custody` in `scmle/core/stages.py` that runs the plan,
-  stops or asks on a `coarser` or `unknown` verdict, and fails the run when
-  the declared family size differs from the registered `synthesized`
-  hypotheses.
-- Set the split's group column from the resolved entity and test that the
-  chosen splitter receives it; export the provenance table of the synthesized
-  features to F4 and apply strict-mode exclusion there.
-- Acceptance criterion 14 (end to end, identical on Python 3.11 and 3.14)
-  through a charter run, not only through the library as in
-  `tests/integration/test_ingest_pipeline.py`.
+- Set the split's group column from the resolved entity (`entities.resolve`
+  is not called by the stage) and test that the chosen splitter receives it.
+- Run the extract reconciliation in the stage.
+- Acceptance criterion 14 on Python 3.11 and 3.14: a charter run exists
+  (`tests/integration/test_ingest_charter_run.py`, SQLite, one interpreter);
+  identity across interpreters and a non-SQLite source are not measured.
 
 **Smaller open items**
 - `--check ingest` runs a small live check; the full 500/1000/10,000-case

@@ -20,18 +20,16 @@ This file keeps only what is not yet true.
 
 ## What is missing
 
-1. **Connectors are not called by a charter run.** `scmle ingest` and
-   `IngestPlan` read a database; `scmle run` still reads a file. No charter
-   field carries the budget, `B_feat`, windows, `lag`, `delta_rec` or the
-   tolerances, and there is no stage before `custody`.
+1. **Only SQLite is exercised in a charter run.** The stage reads any DB-API
+   source through `sqlite_factory`; other drivers have no factory and no test.
 2. **No external referent for three gates.** Key and foreign-key precision
    and recall on schemas with declared constraints, and entity-resolution
    precision and recall on labelled benchmarks, have not been measured, so the
    grain, join and entity gates are descriptive (P1). The synthetic numbers in
    `ingest_measurements.json` show the mechanisms work on worlds we built; they
    say nothing about prevalence in real warehouses.
-3. **The resolved entity does not reach the split**, and the synthesized
-   features' provenance table is not exported to F4 by a run.
+3. **The resolved entity does not reach the split**: the stage does not call
+   entity resolution, so the group column is the caller's.
 4. **No real known-time.** The view's guarantee is about the code and holds
    only if the recorded time is true. No serving-time feature log has been
    compared with the view's output.

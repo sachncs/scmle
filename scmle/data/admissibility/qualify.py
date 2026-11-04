@@ -321,6 +321,7 @@ def run(
     today: datetime.date | None = None,
     causal: causal_module.CausalSpec | None = None,
     dag: dag_module.Dag | None = None,
+    declared: Sequence[provenance.FieldProvenance] = (),
 ) -> Qualification:
     """Runs leakage, admissibility and the detector pipeline on `X`.
 
@@ -343,6 +344,9 @@ def run(
             current date.
         causal: The charter's causal block, for a causal estimand.
         dag: The DAG hypothesis the causal block declares, already loaded.
+        declared: Provenance records for columns the run derived (the F9
+            synthesized features); a column not among the candidates is
+            ignored. The others stay undeclared.
 
     Returns:
         The results. A causal estimand with a causal block and a declared
@@ -406,8 +410,18 @@ def run(
             notes.append(
                 f"attestation for '{column}' unused: the screen did not flag it"
             )
+    attested = {i.field().name for i in used.values()}
+    names = {str(c) for c in candidates}
     records = provenance.ProvenanceTable.covering(
-        [str(c) for c in candidates], [i.field() for i in used.values()]
+        [str(c) for c in candidates],
+        [
+            *(i.field() for i in used.values()),
+            *(
+                f
+                for f in declared
+                if f.name in names and f.name not in attested
+            ),
+        ],
     )
     gates = {f.feature: certificates.GateStatus.GATING for f in report.blocking}
     table = rules.build_table(

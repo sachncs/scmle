@@ -69,6 +69,12 @@ was regenerated for the `MLProject` entry alone. `scmle claims list` prints
 claims registered by hash after the bivariate ones, and `scmle claims verify`
 gained one step, present only when a claim was registered.
 
+`MLProject` gained the optional keyword `ingest_plan` (default `None`),
+`DataSpec` the field of the same name, and the CLI the flag `--ingest-plan`;
+the charter gained the optional field `ingest` (format 7) and a charter
+without it keeps its hash. `tests/fixtures/public_api.json` was regenerated
+for the `MLProject` entry alone.
+
 `MLProject` gained the optional keywords `logged_action_column` and
 `propensity_column` (default `None`), `DataSpec` the fields of the same names,
 and the CLI the flags `--logged-action-column` and `--propensity-column`;

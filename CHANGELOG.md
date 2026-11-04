@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+* Ingestion in a charter run (F9; `scmle.core.ingest_stage`, charter format 7).
+  The charter gained the optional `ingest` block (`IngestSpec`): source budget
+  (queries, rows scanned, seconds), `B_feat`, windows, lag, `delta_rec` and the
+  key and foreign-key tolerances, plus `strict`. It is omitted when unset, so
+  charters of format 1 to 6 keep their hash and signature (a test pins the hash
+  of a charter without it); a wrapper below format 7 that carries it is
+  refused. With `data.ingest_plan` (CLI `--ingest-plan`, `MLProject(ingest_plan=)`),
+  a JSON file naming the database and the as-of views, a stage before the split
+  runs `IngestPlan` under the charter budget, stops with the questions when the
+  unit verdict is `coarser` or `unknown`, reads each table once through a
+  snapshot-checked read, synthesizes the feature family at the cutoff
+  `moment - lag`, joins the columns to the table, and writes
+  `feature_manifest.json`, `ingest_field_provenance.json` and the plan's own
+  files. The provenance records go to the admissibility stage, so the
+  synthesized features carry their tiers, and after the ledger run the stage
+  fails the run when the registered hypotheses differ from the declared family.
+  Not done: the resolved entity does not become the split's group column,
+  extract reconciliation is not run, and the run was tested on SQLite only.
 * F11 reports in a charter run (`scmle.core.decision_reports`). With a decision
   block on a binary task, `FinalEvaluationStage` now writes, once, from the
   locked rows: `policy_value.json` (self-normalised IPW of the frozen rule with

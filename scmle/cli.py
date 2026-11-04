@@ -95,6 +95,7 @@ class ProjectCommand(Command):
         parser.add_argument("--framing-draft")
         parser.add_argument("--propensity-column")
         parser.add_argument("--logged-action-column")
+        parser.add_argument("--ingest-plan")
         parser.add_argument("--memory-budget-gb", type=float)
         parser.add_argument(
             "--training", choices=["sample", "stream"], default="sample"
@@ -295,6 +296,7 @@ class ProjectCommand(Command):
             framing_draft=args.framing_draft,
             propensity_column=args.propensity_column,
             logged_action_column=args.logged_action_column,
+            ingest_plan=args.ingest_plan,
             output_dir=args.output_dir,
             **sections,
         )

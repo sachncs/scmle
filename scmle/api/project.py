@@ -525,6 +525,7 @@ class MLProject:
         framing_draft: str | pathlib.Path | None = None,
         propensity_column: str | None = None,
         logged_action_column: str | None = None,
+        ingest_plan: str | pathlib.Path | None = None,
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -646,6 +647,9 @@ class MLProject:
                 exploration rows and the claim that it beats the current
                 process over the cost range is registered in the ledger and
                 tested once on the confirmation set (`baseline_report.json`).
+            ingest_plan: Path of an ingest plan (JSON); needs a charter with
+                an `ingest` block. Features are synthesized through the as-of
+                views of the plan's database before the data are split.
             logged_action_column: With a charter decision block, the 0/1
                 action the current process logged; never a feature.
             propensity_column: With `logged_action_column`, the recorded
@@ -701,6 +705,7 @@ class MLProject:
                 baseline_column=baseline_column,
                 propensity_column=propensity_column,
                 logged_action_column=logged_action_column,
+                ingest_plan=None if ingest_plan is None else str(ingest_plan),
                 framing_draft=(
                     None if framing_draft is None else str(framing_draft)
                 ),

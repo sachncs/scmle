@@ -27,11 +27,12 @@ from scmle.contracts import qualification
 from scmle.contracts import signing
 from scmle.data.charter import causal as causal_module
 from scmle.data.charter import decision as decision_module
+from scmle.data.charter import ingest as ingest_module
 from scmle.data.charter import rules as rules_module
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 6
+FORMAT_VERSION = 7
 OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
@@ -338,6 +339,10 @@ class AnalysisCharter:
             the charter does not say, which serialises, hashes and loads as
             a format 1-5 charter did. `new_entity` needs a group column in
             the data and makes interval calibration use one score per entity.
+        ingest: The ingestion block (format 7): source budget, `B_feat`,
+            windows, lag, reconciliation delay and key tolerances; None for
+            a charter that reads a file, which serialises, hashes and loads
+            as a format 1-6 charter did.
     """
 
     question: str
@@ -357,6 +362,7 @@ class AnalysisCharter:
     rules: rules_module.RunRules | None = None
     decision: decision_module.DecisionLayer | None = None
     unit_of_prediction: str | None = None
+    ingest: ingest_module.IngestSpec | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint."""
@@ -452,6 +458,8 @@ class AnalysisCharter:
             record["decision"] = self.decision.to_dict()
         if self.unit_of_prediction is not None:
             record["unit_of_prediction"] = self.unit_of_prediction
+        if self.ingest is not None:
+            record["ingest"] = self.ingest.to_dict()
         return record
 
     @property
@@ -459,8 +467,10 @@ class AnalysisCharter:
         """Oldest format that carries this charter.
 
         2; 3 with rules; 4 with a causal block; 5 with a decision layer; 6
-        with a unit of prediction.
+        with a unit of prediction; 7 with an ingest block.
         """
+        if self.ingest is not None:
+            return 7
         if self.unit_of_prediction is not None:
             return 6
         if self.decision is not None:
@@ -477,12 +487,14 @@ class AnalysisCharter:
             "rules": None,
             "decision": None,
             "unit_of_prediction": None,
+            "ingest": None,
             **record,
         }
         qualification.require_fields(cls, record)
         cost = record["cost_model"]
         chosen = record["rules"]
         layer = record["decision"]
+        block = record["ingest"]
         return cls(
             question=record["question"],
             estimand=AnalysisEstimand.from_dict(record["estimand"]),
@@ -517,6 +529,11 @@ class AnalysisCharter:
                 else decision_module.DecisionLayer.from_dict(layer)
             ),
             unit_of_prediction=record["unit_of_prediction"],
+            ingest=(
+                None
+                if block is None
+                else ingest_module.IngestSpec.from_dict(block)
+            ),
         )
 
 
