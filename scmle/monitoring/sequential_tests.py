@@ -253,6 +253,23 @@ class RiskAlarm:
         self.scale = scale
         self.test = BettingTest(null, GREATER, alpha)
 
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready state."""
+        return {"scale": self.scale, "test": self.test.to_dict()}
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> "RiskAlarm":
+        """Rebuilds an alarm from `to_dict`."""
+        state = record["test"]
+        alarm = cls(
+            state["null_mean"] * record["scale"],
+            0.0,
+            state["alpha"],
+            record["scale"],
+        )
+        alarm.test = BettingTest.from_dict(state)
+        return alarm
+
     def update(self, mean_loss: float) -> bool:
         """Feeds the mean loss of one matured batch; True when alarming."""
         self.test.update(min(max(mean_loss / self.scale, 0.0), 1.0))
@@ -269,15 +286,20 @@ class PairedEProcess:
     least `margin`". For rollback (the reverse process) the serving model is
     the new champion, the other is the previous one, and the null is "the new
     champion is not worse by more than `margin`", which is the same bet on
-    ``(difference + 1) / 2`` with the roles read that way.
+    ``(difference / scale + 1) / 2`` with the roles read that way.
+
+    With propensity-weighted losses a batch difference lies in ``[-scale,
+    scale]`` where ``scale = bound / epsilon``; pass it as `scale` and feed
+    `update_gap`.
     """
 
-    def __init__(self, margin: float, alpha: float) -> None:
+    def __init__(self, margin: float, alpha: float, scale: float = 1.0) -> None:
         """Creates the process; `alpha` is the level of one proposal."""
-        if not -1.0 < margin < 1.0:
-            raise ValueError("margin must be strictly between -1 and 1")
+        if scale <= 0.0 or not -scale < margin < scale:
+            raise ValueError("margin must lie strictly within (-scale, scale)")
         self.margin = margin
-        self.test = BettingTest((margin + 1.0) / 2.0, GREATER, alpha)
+        self.scale = scale
+        self.test = BettingTest((margin / scale + 1.0) / 2.0, GREATER, alpha)
 
     def update(self, champion_loss: Any, other_loss: Any) -> bool:
         """Feeds the mean paired losses of one matured batch.
@@ -298,8 +320,18 @@ class PairedEProcess:
         second = validate_unit(other_loss, "other_loss")
         if first.shape != second.shape or first.size == 0:
             raise ValueError("paired losses must be non-empty and aligned")
-        gap = float(np.mean(first - second))
-        self.test.update((gap + 1.0) / 2.0)
+        return self.update_gap(float(np.mean(first - second)))
+
+    def update_gap(self, gap: float) -> bool:
+        """Feeds a batch's mean loss difference, in loss units.
+
+        Args:
+            gap: Mean of first minus second, within ``[-scale, scale]``.
+        """
+        if not np.isfinite(gap) or abs(gap) > self.scale + 1e-12:
+            raise ValueError("gap must be finite and within [-scale, scale]")
+        unit = min(max((gap / self.scale + 1.0) / 2.0, 0.0), 1.0)
+        self.test.update(unit)
         return bool(self.test.crossed)
 
     @property
@@ -311,6 +343,22 @@ class PairedEProcess:
     def crossed(self) -> bool:
         """Whether the process is at or above ``1 / alpha``."""
         return bool(self.test.crossed)
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready state."""
+        return {
+            "margin": self.margin,
+            "scale": self.scale,
+            "test": self.test.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> "PairedEProcess":
+        """Rebuilds a process from `to_dict`."""
+        state = record["test"]
+        process = cls(record["margin"], state["alpha"], record["scale"])
+        process.test = BettingTest.from_dict(state)
+        return process
 
 
 class PromotionSequence:

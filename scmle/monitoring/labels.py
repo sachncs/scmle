@@ -121,7 +121,7 @@ def classify(
         return Mechanism.COMPLETE
     if propensity is not None and epsilon > 0.0:
         values = np.asarray(propensity, dtype=float)
-        if np.all(np.isfinite(values)) and np.all(values >= epsilon):
+        if np.all(np.isfinite(values)) and np.all(values >= epsilon - 1e-12):
             return Mechanism.LOGGED_PROPENSITY
     if audit is not None and epsilon > 0.0 and bool(np.any(audit)):
         return Mechanism.AUDIT_SLICE
@@ -135,6 +135,7 @@ def estimate_batch(
     audit: np.ndarray | None,
     epsilon: float,
     bound: float = 1.0,
+    signed: bool = False,
 ) -> BatchEstimate:
     """Horvitz-Thompson mean loss of one matured batch.
 
@@ -146,6 +147,7 @@ def estimate_batch(
         audit: Whether each case was in the audit slice, or None.
         epsilon: Smallest propensity (and audit rate) declared by the policy.
         bound: Upper bound of a loss.
+        signed: Allow values in ``[-bound, bound]`` (paired differences).
 
     Returns:
         The estimate. For `audit_slice` the cases outside the slice are
@@ -163,7 +165,12 @@ def estimate_batch(
     if audit is not None and np.shape(audit) != seen.shape:
         raise ValueError("audit must be aligned with the cases")
     used = losses[seen]
-    if np.any(~np.isfinite(used)) or np.any(used < 0) or np.any(used > bound):
+    floor = -bound if signed else 0.0
+    if (
+        np.any(~np.isfinite(used))
+        or np.any(used < floor)
+        or np.any(used > bound)
+    ):
         raise ValueError("observed losses must be finite and within [0, bound]")
     mechanism = classify(seen, propensity, audit, epsilon)
     cases = int(seen.size)

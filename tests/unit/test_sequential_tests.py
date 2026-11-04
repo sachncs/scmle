@@ -138,3 +138,22 @@ def test_invalid_arguments_are_refused(bad):
 def test_observations_outside_the_unit_interval_are_refused():
     with pytest.raises(ValueError, match="within"):
         seq.BettingTest(0.5, seq.GREATER, 0.05).update(1.5)
+
+
+def test_scaled_gaps_and_state_round_trip_for_processes_and_alarms():
+    process = seq.PairedEProcess(0.0, 0.05, scale=10.0)
+    for gap in (2.0, 3.0, -1.0):
+        process.update_gap(gap)
+    again = seq.PairedEProcess.from_dict(process.to_dict())
+    assert again.e_value == pytest.approx(process.e_value)
+    with pytest.raises(ValueError, match="gap"):
+        process.update_gap(11.0)
+    with pytest.raises(ValueError, match="margin"):
+        seq.PairedEProcess(10.0, 0.05, scale=10.0)
+    alarm = seq.RiskAlarm(0.1, 0.05, 0.05, scale=2.0)
+    alarm.update(0.5)
+    restored = seq.RiskAlarm.from_dict(alarm.to_dict())
+    assert restored.update(0.9) == alarm.update(0.9)
+    assert float(restored.test.log_capital) == pytest.approx(
+        float(alarm.test.log_capital)
+    )
