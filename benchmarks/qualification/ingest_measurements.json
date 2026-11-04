@@ -11,12 +11,12 @@
     "within_budget": 100
   },
   "code_hashes": {
-    "budget": "66970cc7b6d3fdd04270746396077195ea7ac13fe9657d822b1b0776a6be0ca1",
+    "budget": "aa9c713475314c37e0ee1cab85c41aced138d369c3ceca8eccb39e2c3016198b",
     "entities": "29baca222bb7591a9cf2b41ac95be06495c87691bc3a53bde1af13d6930bfc17",
-    "grain": "d7b104cb60522c2923bcef6248a20765b4dbe8dc925b44456b9b6326a047354b",
-    "joins": "8c35e710864deb04d03cb25db217e0e431aecac285b8a477d80c45f0784e7b84",
-    "point_in_time": "11d195af2e6f09052d9b4fb0b175d3f0e3c9efaf9eaa4cb171ecb47e503a8b59",
-    "reconcile": "2a5df5babbf7b78e6b889e6517e2c0608b9bd61a743e6c8b15aa2723cf40671e",
+    "grain": "96a67e86e170fec0a20b02f509a12c6c0e6107c5fb0b6d737ebce5afd95ed3fc",
+    "joins": "70464dccbfa157865c3858e7ccfa155d0ff712de589f7cc26ccffb20f7ffa821",
+    "point_in_time": "76f6dd8f1cb5b1eaac1266148e12262fbb0c29034c5e9878c88020befe16b359",
+    "reconcile": "0b981814c6da7322eed7183d40cfd41c67ebefcf9d424de3df8186c2ef9ce1a0",
     "torn_read": "2b0cf34ada24996152c727298d250ccc3e6378469178fa650739c5d538fe300f"
   },
   "development_seed_base": 10000,
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 29.9,
+  "seconds": 111.9,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,

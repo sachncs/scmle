@@ -5,7 +5,7 @@
       "code_hash": "0d1795b23c0fc154e19959dd108c569a29817a1a2a72da999836c079375e776b",
       "passed": true,
       "replicates": 200,
-      "seconds": 7.0,
+      "seconds": 7.7,
       "seeds": [
         0,
         200
@@ -74,7 +74,7 @@
         "1.6": 1.0
       },
       "replicates": 2000,
-      "seconds": 2.7,
+      "seconds": 3.2,
       "seeds": [
         0,
         2000
@@ -100,7 +100,7 @@
       "code_hash": "a8d1e0b4dfb3d3a263e71b563b0eaf273361da888048ee277d047603c041d240",
       "passed": false,
       "replicates": 2000,
-      "seconds": 105.9,
+      "seconds": 193.5,
       "seeds": [
         0,
         2000
@@ -185,7 +185,7 @@
         "1.5": 0.9133333333333333
       },
       "replicates": 2000,
-      "seconds": 38.7,
+      "seconds": 55.1,
       "seeds": [
         0,
         2000
@@ -283,7 +283,7 @@
         }
       },
       "replicates": 2000,
-      "seconds": 2.4,
+      "seconds": 3.4,
       "seeds": [
         0,
         2000
@@ -291,7 +291,7 @@
       "truth": 0.425
     },
     "A6": {
-      "code_hash": "d5f165d7abb928f495fb13ecec3afc8012cbac17ef727e9ab8ccf8b6c8ebb747",
+      "code_hash": "4043df92fbc00c57c2d5cfbed68345810bd706cb538d869d5d04b13c3cf1d434",
       "not_run": "set SCMLE_HILLSTROM to the verified data file",
       "passed": false,
       "seconds": 0.0,
@@ -371,7 +371,7 @@
       },
       "passed": true,
       "replicates": 2000,
-      "seconds": 12.1,
+      "seconds": 16.4,
       "seeds": [
         0,
         2000
@@ -390,7 +390,7 @@
         "q95": 0.004483527626684906
       },
       "replicates": 20,
-      "seconds": 57.0,
+      "seconds": 100.8,
       "seeds": [
         0,
         20
@@ -408,7 +408,7 @@
         "equalized_odds/predictive_parity": 100
       },
       "runs_each": 100,
-      "seconds": 0.1,
+      "seconds": 0.2,
       "seeds": [
         0,
         100
@@ -420,7 +420,7 @@
         "agree": 100,
         "runs": 100
       },
-      "code_hash": "6c0a9a6c37d7c1715d1e87767a0c6da7c282ea25b904493791e31f925adbff36",
+      "code_hash": "3c4294f41df8a04b3fc73d9a7dcd79f9612a470ffc37ab85317aea4f5dde43ad",
       "compare_arms": {
         "false_adopt": 10,
         "interval": [
@@ -440,7 +440,7 @@
       "passed": true,
       "rate": 0.0037,
       "replicates": 10000,
-      "seconds": 163.9,
+      "seconds": 228.4,
       "seeds": [
         0,
         10000
@@ -456,7 +456,7 @@
       "passed": true,
       "repeat_equal": true,
       "replicates": 2,
-      "seconds": 0.1,
+      "seconds": 0.3,
       "seeds": [
         0,
         2
@@ -464,7 +464,7 @@
     },
     "B2": {
       "bound": 0.02395979797464467,
-      "code_hash": "b2093490a51e865b096f7aecd20fcd83b0f0025f6bfca11dacc512e2d059304c",
+      "code_hash": "c9ca6c5818f2f1c2709691e332365d9ce8dfc0adee8ec38f8666e904c330b540",
       "interval": [
         0.0005500831677591556,
         0.002615776292629832
@@ -473,7 +473,7 @@
       "promotions": 6,
       "rate": 0.0012,
       "replicates": 5000,
-      "seconds": 11.6,
+      "seconds": 19.3,
       "seeds": [
         0,
         5000
@@ -498,11 +498,11 @@
         "ratio_to_null_shifted": 1.677921338912134,
         "ratio_to_zero_null": null
       },
-      "code_hash": "378c963859c46397d45ee95da2310e3f7652caa7f6e475576fb030b984cc76d4",
+      "code_hash": "bbeceb160c524f0d7ba2ba64fc5198dda508bc106d681c0f0943d6f26255d3a1",
       "floor": "none: reported",
       "passed": true,
       "replicates": 500,
-      "seconds": 3.9,
+      "seconds": 6.7,
       "seeds": [
         0,
         500
@@ -510,7 +510,7 @@
     },
     "B4": {
       "bound": 0.01198997487421324,
-      "code_hash": "dca6434eb0feb5009db3d61cd36e61742fa44e62d3d4b7561ff2278267f5214a",
+      "code_hash": "4818196744ef72ba0717475ef9e5feb27823df10b325686911ecf106417e4979",
       "detection_delay": {
         "2tau": {
           "detected_share": 0.557,
@@ -531,7 +531,7 @@
       "passed": true,
       "rate": 0.0019,
       "replicates": 10000,
-      "seconds": 15.0,
+      "seconds": 23.8,
       "seeds": [
         0,
         10000
@@ -541,7 +541,7 @@
       "code_hash": "94028f5d638d18c2d87fb2ed8b00d09f88538fbfcf2e419ff3eab49df540e417",
       "passed": true,
       "replicates": 2000,
-      "seconds": 0.6,
+      "seconds": 1.2,
       "seeds": [
         0,
         2000
@@ -566,7 +566,7 @@
         ]
       },
       "replicates": 1000,
-      "seconds": 5.8,
+      "seconds": 10.2,
       "seeds": [
         0,
         1000
@@ -586,7 +586,7 @@
       "size_bound": 0.01629285308902091
     },
     "B7": {
-      "code_hash": "1d4270629f1a2216f2821bdca08428a54647ac81906293397cfd003536070e06",
+      "code_hash": "c5960373059fac5e2b24b9707bd979ef60eb82a9105ecdc38f57cf7486da7e63",
       "not_run": "set SCMLE_HILLSTROM to the verified data file",
       "passed": false,
       "seconds": 0.0,
@@ -596,7 +596,7 @@
       ]
     },
     "B8": {
-      "code_hash": "578caab2942410fe42458c1c72796077e24f46807c1ea673b34ccdb1a11ccf4a",
+      "code_hash": "a7eab51444abc6bd2a0e2f6d412497c3d8cca5ba1c9d45d4c2a46a4024d6636d",
       "not_run": "set SCMLE_HILLSTROM to the verified data file",
       "passed": false,
       "seconds": 0.0,
@@ -615,7 +615,7 @@
         ],
         "rate": 0.001
       },
-      "code_hash": "3f44466ccff6527ee7a11057d91ebfae8baab4107ecad4e7a830d44ca37594d0",
+      "code_hash": "e0d7084dc37d51993c7375d189c30f699c9aac63519fe13c07fbd95c0d59276d",
       "false_rollback": {
         "interval": [
           8.826773070546787e-05,
@@ -637,7 +637,7 @@
       "promote_bound": 0.026260990336999412,
       "replicates": 2000,
       "rollback_bound": 0.014449719092257398,
-      "seconds": 8.5,
+      "seconds": 14.1,
       "seeds": [
         0,
         2000
