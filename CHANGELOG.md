@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+* Closed loop and escalation (Phase 13, F13), 2026-11-04. A hash-chained
+  deployment ledger (`scmle.governance.deployment_ledger`), anytime-valid
+  monitors (`scmle.monitoring.sequential_tests`: betting alarm mixed over
+  restarts, paired e-processes, e-LOND across challengers), label maturity,
+  Horvitz-Thompson losses and audit and bypass slices
+  (`scmle.monitoring.labels`), selective prediction with a fixed-sequence
+  threshold (`scmle.governance.escalation`), the eleven never-list guards
+  (`scmle.governance.never_list`) and `scmle.governance.loop.Loop` with
+  `scmle loop`. Measured on simulated streams only
+  (`benchmarks/qualification/loop_certify.py`, `python -m
+  benchmarks.qualification --check loop`): the false-alarm, false-promotion,
+  false-rollback, selection, maturity, feedback and threshold gates passed;
+  the detection delay of the alarm did not (a rise of twice the tolerance is
+  found in a median 76 batches, the pre-registered limit was 50), so a policy
+  does not let an alarm retrain by itself (`alarm_gates_retrain`). Not
+  measured: agreement with a domain owner's signed audit, replay of recorded
+  streams, Python 3.11 ledger replay. `ModelMonitor.performance` takes
+  optional `propensity` and `maturity`, and fresh retraining rows are held out
+  by time or by group instead of a random shuffle.
 * Instrument residuals closed in code, 2026-11-04. The confirmation binds the
   release of `C` to the hash of the family it tests and the ledger head
   before opening it (`SealedSet.commit`, R1 C7; a set bound to another

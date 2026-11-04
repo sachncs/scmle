@@ -72,6 +72,23 @@ not comparable with published values. Use `proper_scores.mase` or
 `mase_insample` for that. The `interval_coverage` reliability check now
 requires coverage of at least 0.88 instead of 0.85.
 
+Closed loop (F13). No entry of the pinned surface changed.
+`ModelMonitor.performance` gained the optional arguments `propensity` and
+`maturity` (default `None`, the previous behaviour). With a propensity, the
+labelled rows are resampled with probability proportional to `1 / propensity`
+before the metrics are computed, a seeded approximation of a weighted metric;
+with a maturity mask only matured rows count. The retraining step of
+`LifecycleManager` now holds fresh rows out by time (the schema's time column)
+or by whole groups when the champion's schema has them, instead of a random
+shuffle; plain tables are shuffled as before. `scmle.monitoring.sequential_tests`,
+`scmle.monitoring.labels`, `scmle.governance.escalation`,
+`scmle.governance.deployment_ledger`, `scmle.governance.never_list`,
+`scmle.governance.loop` and the command `scmle loop` are extension surfaces
+like the other qualification modules. A `LoopPolicy` does not let an alarm
+retrain unless `alarm_gates_retrain` is set, and it should be set only when
+`python -m benchmarks.qualification --check loop` lists the detection-delay
+gate H2 as passed for the policy's settings (today it is descriptive).
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 
