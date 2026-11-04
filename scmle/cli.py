@@ -27,6 +27,9 @@ from scmle.core import config
 from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import feasibility as charter_feasibility
 from scmle.data.charter import sealing as charter_sealing
+from scmle.data.ingest import budget as ingest_budget
+from scmle.data.ingest import grain as ingest_grain
+from scmle.data.ingest import plan as ingest_plan
 from scmle.data.framing import costs as framing_costs
 from scmle.data.framing import draft as framing_draft
 from scmle.data.framing import refusal as framing_refusal
@@ -556,6 +559,69 @@ class PackageCommand(Command):
         return EXIT_OK
 
 
+class IngestCommand(Command):
+    """Profiles a SQLite source: catalog, keys, unit verdict and joins."""
+
+    name = "ingest"
+    help = "profile a relational source: tables, keys, grain and joins"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds source, scope, tolerance and budget options."""
+        parser.add_argument("--sqlite", required=True, help="database file")
+        parser.add_argument(
+            "--tables", required=True, help="comma-separated table names"
+        )
+        parser.add_argument("--output", default="ingest")
+        parser.add_argument("--unit", help="charter unit text to check")
+        parser.add_argument("--target-table", help="table the unit describes")
+        parser.add_argument("--eps-key", type=float, default=0.0)
+        parser.add_argument("--eps-null", type=float, default=0.0)
+        parser.add_argument("--eps-fk", type=float, default=0.0)
+        parser.add_argument(
+            "--max-key-size", type=int, default=ingest_grain.LEVELS
+        )
+        parser.add_argument("--max-queries", type=int)
+        parser.add_argument("--max-rows-scanned", type=int)
+        parser.add_argument("--max-seconds", type=float)
+        parser.add_argument(
+            "--foreign-keys",
+            help="JSON file: [{child, child_columns, parent, parent_columns}]",
+        )
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Runs the stages and prints a summary; 2 if the unit blocks."""
+        declared: tuple[ingest_plan.joins.DeclaredKey, ...] = ()
+        if args.foreign_keys:
+            declared = ingest_plan.declared_from_json(
+                json.loads(pathlib.Path(args.foreign_keys).read_text())
+            )
+        settings = ingest_plan.IngestSettings(
+            tables=tuple(t for t in args.tables.split(",") if t),
+            unit=args.unit,
+            target_table=args.target_table,
+            eps_key=args.eps_key,
+            eps_null=args.eps_null,
+            eps_fk=args.eps_fk,
+            max_key_size=args.max_key_size,
+            declared=declared,
+        )
+        plan = ingest_plan.IngestPlan(
+            pathlib.Path(args.output),
+            ingest_plan.sqlite_factory(args.sqlite),
+            settings,
+            ingest_budget.IngestBudget(
+                args.max_queries, args.max_rows_scanned, args.max_seconds
+            ),
+        )
+        summary = plan.run_all()
+        print(json.dumps(summary, indent=2))
+        if plan.verdict is not None and plan.verdict.blocks:
+            raise errors.BlockedError(
+                f"unit verdict {plan.verdict.verdict}: {plan.verdict.reason}"
+            )
+        return EXIT_OK
+
+
 class CharterCommand(Command):
     """Creates, checks and signs the analysis charter."""
 
@@ -726,6 +792,7 @@ COMMANDS: tuple[Command, ...] = (
     ServeCommand(),
     ExportOnnxCommand(),
     PackageCommand(),
+    IngestCommand(),
     CharterCommand(),
     FrameCommand(),
 )
