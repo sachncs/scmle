@@ -5,23 +5,18 @@ Names follow [`00-canon.md`](00-canon.md). Open items:
 
 The charter block, selector and refusal, the five strategies, the battery,
 replication, sensitivity, the tier rule, the stage that writes the report
-files and the simulation certificates (`f10_certificates.json`, pre-registered
-floors, misses published) are built; `CHANGELOG.md` has the record. The phase
-is not closed: the estimate is not yet computed inside the single opening of
-`C`, and the gold-standard and reference-output evidence needs data and tools
-that are not in the repository.
+files, the estimate on `C` inside the single opening and the simulation
+certificates (`f10_certificates.json`, pre-registered floors, misses
+published) are built; `CHANGELOG.md` has the record. The phase is not closed:
+the gold-standard and reference-output evidence needs data and tools that are
+not in the repository.
 
 ## Work packages still open
 
-**WP-10.6 remainder: the estimate on `C`** (one agent)
-- Hook the confirmation function so the one released frame goes to
-  `run.identify`; register the primary and subgroup hypotheses; hash the five
-  report files into the ledger head; `scmle claims` prints the identification
-  status; load a declared DAG; replace the admissibility skip
-  (`qualify.py:157-166`).
-- Done when: a charter run on a semi-synthetic table with a planted effect
-  reports an estimate on `C` and a tier from the report files, and acceptance
-  8 (held-out alone is not `confirmed`) holds end to end.
+**WP-10.6 remainder** (one agent)
+- Subgroup hypotheses paying the confirmation rule, and attestors in the
+  charter so a run can reach `attested`. The estimate on `C`, the file hashes,
+  the DAG load and the admissibility coupling are done.
 
 **WP-10.7a: corpora** (one agent, can start at once)
 - NSW with CPS and PSID comparison groups, Tennessee STAR, ACIC generators,

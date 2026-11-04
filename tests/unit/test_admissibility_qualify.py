@@ -5,8 +5,10 @@ import pandas as pd
 import pytest
 
 from scmle.contracts import qualification
+from scmle.data.admissibility import dag as dag_module
 from scmle.data.admissibility import qualify
 from scmle.data.admissibility import screen
+from scmle.data.charter import causal as causal_module
 from scmle.data.detectors import certificates
 from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
@@ -158,6 +160,120 @@ def test_a_causal_estimand_without_a_graph_skips_admissibility():
     assert found.table is None and found.leakage is None
     assert found.checks == ()
     assert any("graph" in note for note in found.notes)
+
+
+def causal_world(rows=500, seed=0):
+    rng = np.random.default_rng(seed)
+    x1 = rng.normal(size=rows)
+    t = (rng.uniform(size=rows) < 1 / (1 + np.exp(-x1))).astype(float)
+    after = t + rng.normal(size=rows)  # a descendant of the treatment
+    y = pd.Series(2 * t + x1 + rng.normal(size=rows), name="y")
+    return pd.DataFrame({"x1": x1, "t": t, "after": after}), y
+
+
+def spec(assumptions):
+    return causal_module.CausalSpec(
+        treatment="t",
+        outcome="y",
+        estimand="ATE",
+        assumptions=assumptions,
+        strategies=("backdoor_aipw",),
+    )
+
+
+def graph():
+    return dag_module.Dag(
+        ("after", "t", "x1", "y"),
+        (("t", "after"), ("t", "y"), ("x1", "t"), ("x1", "y")),
+        (),
+        "test",
+        "none",
+    )
+
+
+def test_a_causal_estimand_with_a_graph_applies_the_graph_rules():
+    features, target = causal_world()
+
+    found = qualify.run(
+        features,
+        target,
+        kind="causal",
+        classification=False,
+        seed=0,
+        causal=spec(("unconfoundedness_given:x1", "positivity")),
+        dag=graph(),
+    )
+
+    assert found.table is not None and found.table.kind == "causal"
+    assert set(found.quarantined) == {"after"}
+    assert "descendant of the treatment" in found.quarantined["after"]
+    assert found.dag["dag_hash"] == graph().digest()
+    assert found.dag["adjustment_members_refused"] == {}
+    assert found.dag["falsification"]["ran"] is True
+    assert not any("graph" in note for note in found.notes)
+
+
+def test_a_refused_adjustment_member_is_reported_and_called_ineligible():
+    features, target = causal_world()
+
+    found = qualify.run(
+        features,
+        target,
+        kind="causal",
+        classification=False,
+        seed=0,
+        causal=spec(("unconfoundedness_given:x1,after", "positivity")),
+        dag=graph(),
+    )
+
+    assert set(found.dag["adjustment_members_refused"]) == {"after"}
+    assert any("backdoor_aipw is ineligible" in n for n in found.notes)
+
+
+def test_a_graph_that_names_missing_columns_cannot_be_tested_but_runs():
+    features, target = causal_world()
+    wide = dag_module.Dag(
+        ("t", "u", "x1", "y"),
+        (("t", "y"), ("u", "y"), ("x1", "t")),
+        (),
+        "test",
+        "none",
+    )
+
+    found = qualify.run(
+        features,
+        target,
+        kind="causal",
+        classification=False,
+        seed=0,
+        causal=spec(("unconfoundedness_given:x1", "positivity")),
+        dag=wide,
+    )
+
+    assert found.dag["falsification"]["ran"] is False
+    assert any("could not be tested" in n for n in found.notes)
+
+
+def test_many_candidates_without_a_declared_set_say_the_claim_is_attested_at_best():
+    rng = np.random.default_rng(1)
+    columns = {f"c{i}": rng.normal(size=300) for i in range(17)}
+    columns["t"] = rng.integers(0, 2, 300).astype(float)
+    features = pd.DataFrame(columns)
+    target = pd.Series(rng.normal(size=300), name="y")
+    nodes = tuple(sorted([*columns, "y"]))
+    edges = tuple(sorted([("t", "y"), *[(f"c{i}", "y") for i in range(17)]]))
+
+    found = qualify.run(
+        features,
+        target,
+        kind="causal",
+        classification=False,
+        seed=0,
+        causal=spec(("positivity",)),
+        dag=dag_module.Dag(nodes, edges, (), "test", "none"),
+    )
+
+    assert any("attested at best" in n for n in found.notes)
 
 
 def test_structure_columns_are_not_candidates():

@@ -232,7 +232,8 @@ class BackdoorAdapter(Adapter):
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
         """The primary estimate on `C`."""
-        assert self.nuisances is not None
+        if self.nuisances is None:
+            raise ValueError("prepare() must run first")
         spec = self.spec
         result = aipw.estimate(
             self.nuisances,
@@ -328,7 +329,8 @@ class BackdoorAdapter(Adapter):
             }
         if not self.covariates:
             return {"holds": None, "note": "benchmarking needs a covariate"}
-        assert self.nuisances is not None
+        if self.nuisances is None:
+            raise ValueError("prepare() must run first")
         design = self.nuisances.design
         matrix = design.matrix(c)
         names = [f"x{j}" for j in range(matrix.shape[1])]
@@ -404,7 +406,8 @@ class DidAdapter(Adapter):
     def columns(self) -> tuple[str, str, str]:
         """The panel column names."""
         s = self.spec
-        assert s.unit and s.time and s.adoption
+        if not (s.unit and s.time and s.adoption):
+            raise ValueError("did needs unit, time and adoption")
         return s.unit, s.time, s.adoption
 
     def prepare(self) -> None:
@@ -510,7 +513,8 @@ class IvAdapter(Adapter):
     ) -> iv.IvResult:
         """Fits the estimator on `c` or `frame`."""
         spec = self.spec
-        assert spec.instrument
+        if not spec.instrument:
+            raise ValueError("iv needs an instrument")
         return iv.estimate(
             frame,
             spec.treatment,
@@ -595,7 +599,8 @@ class RdAdapter(Adapter):
     def prepare(self) -> None:
         """Design diagnostics and frozen quantities from `X` only."""
         spec = self.spec
-        assert spec.running_variable and spec.cutoff is not None
+        if not spec.running_variable or spec.cutoff is None:
+            raise ValueError("rd needs a running variable and cutoff")
         fit = rd.estimate(
             self.x,
             spec.running_variable,
@@ -626,7 +631,8 @@ class RdAdapter(Adapter):
     ) -> rd.RdResult:
         """Fits the estimator on `c` or `frame`."""
         spec = self.spec
-        assert spec.running_variable and spec.cutoff is not None
+        if not spec.running_variable or spec.cutoff is None:
+            raise ValueError("rd needs a running variable and cutoff")
         return rd.estimate(
             c,
             spec.running_variable,
@@ -717,7 +723,8 @@ class SynthAdapter(Adapter):
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
         """The primary estimate on `C`."""
         spec = self.spec
-        assert spec.unit and spec.time
+        if not (spec.unit and spec.time):
+            raise ValueError("synth needs unit and time")
         frame = self.x
         flag = frame[spec.treatment].to_numpy(dtype=float) > 0
         treated_units = frame.loc[flag, spec.unit].unique()
@@ -769,11 +776,14 @@ def refusal_outcome(
     plan: select.Plan,
     spec: causal.CausalSpec,
     reason: str | None = None,
+    dag_checks: Mapping[str, Any] | None = None,
 ) -> Outcome:
     """The five documents of a claim that is not identified."""
     report = dict(select.refusal(plan, spec))
     if reason:
         report["reason"] = reason
+    if dag_checks is not None:
+        report["dag"] = dict(dag_checks)
     decision = tier.decide(
         tier.TierInputs(
             False,
@@ -885,6 +895,7 @@ def identify(
     seed: int = 0,
     learner: str = "linear",
     certified: tuple[str, ...] | None = None,
+    dag_checks: Mapping[str, Any] | None = None,
 ) -> Outcome:
     """Selects, estimates, falsifies, assesses and tiers a causal claim.
 
@@ -900,13 +911,17 @@ def identify(
         learner: `linear` or `boosted` nuisance learners.
         certified: Gates with a current passing certificate; None loads the
             shipped certificate file, and an empty tuple certifies nothing.
+        dag_checks: What the admissibility stage found about the declared DAG
+            on `X` (its hash, the conditional-independence falsification, the
+            adjustment members the graph rules refused); copied into the
+            identification report.
 
     Returns:
         The five documents, their hashes and the tier decision.
     """
     plan = select.select(spec, dag)
     if plan.primary is None:
-        return refusal_outcome(plan, spec)
+        return refusal_outcome(plan, spec, dag_checks=dag_checks)
     if certified is None:
         from scmle.data.identification import certified as loader
 
@@ -919,14 +934,14 @@ def identify(
         adapter.prepare()
     except ValueError as error:
         return refusal_outcome(
-            plan, spec, f"design could not be assessed: {error}"
+            plan, spec, f"design could not be assessed: {error}", dag_checks
         )
     if adapter.refusal:
-        return refusal_outcome(plan, spec, adapter.refusal)
+        return refusal_outcome(plan, spec, adapter.refusal, dag_checks)
     try:
         primary = adapter.estimate(c, level)
     except ValueError as error:
-        return refusal_outcome(plan, spec, str(error))
+        return refusal_outcome(plan, spec, str(error), dag_checks)
     tests: list[battery.Test] = []
     notes: list[str] = []
     try:
@@ -1005,6 +1020,8 @@ def identify(
         "notes": notes,
         "verdict": verdict,
     }
+    if dag_checks is not None:
+        report["dag"] = dict(dag_checks)
     falsification = {
         **report_battery.to_dict(),
         "replication": rep,
@@ -1025,10 +1042,10 @@ def identify(
 
 
 NOT_ESTIMATED = (
-    "the confirmation set is opened once by the claim ledger and the causal "
-    "estimate is not part of that opening, so no estimate was computed: the "
-    "claim is unverified. `identify` computes it when it is given the "
-    "confirmation rows."
+    "no estimate was computed on the confirmation set: it was not available "
+    "to the run, or the claim could not be registered, so the claim is "
+    "unverified. `identify` computes the estimate on the single opening of C "
+    "when the ledger hands it the released rows (`scmle.core.causal_claim`)."
 )
 
 
@@ -1039,6 +1056,7 @@ def design_only(
     dag: dag_module.Dag | None = None,
     seed: int = 0,
     learner: str = "linear",
+    dag_checks: Mapping[str, Any] | None = None,
 ) -> Outcome:
     """Selection and design diagnostics on `X`, with no estimate.
 
@@ -1048,7 +1066,7 @@ def design_only(
     """
     plan = select.select(spec, dag)
     if plan.primary is None:
-        return refusal_outcome(plan, spec)
+        return refusal_outcome(plan, spec, dag_checks=dag_checks)
     alpha_falsify = alphas(error_budget)[1]
     strategy = plan.primary
     adapter = ADAPTERS[strategy](spec, x, seed, learner, alpha_falsify)
@@ -1056,10 +1074,10 @@ def design_only(
         adapter.prepare()
     except ValueError as error:
         return refusal_outcome(
-            plan, spec, f"design could not be assessed: {error}"
+            plan, spec, f"design could not be assessed: {error}", dag_checks
         )
     if adapter.refusal:
-        return refusal_outcome(plan, spec, adapter.refusal)
+        return refusal_outcome(plan, spec, adapter.refusal, dag_checks)
     report = {
         "status": select.IDENTIFIED,
         "strategy": strategy,
@@ -1069,6 +1087,8 @@ def design_only(
         "multiverse_not_run": list(plan.multiverse),
         "notes": [NOT_ESTIMATED],
     }
+    if dag_checks is not None:
+        report["dag"] = dict(dag_checks)
     decision = tier.TierDecision(
         qualification.Tier.UNVERIFIED,
         "identified",

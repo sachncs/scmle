@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+* The causal estimate on `C` in a charter run (F10; `scmle.core.causal_claim`).
+  The primary hypothesis `theta = 0` is registered in the ledger by the hash of
+  the causal block, the strategy, the DAG hash, the confirmation level and the
+  exploration row count, and `run.identify` is called on the frame `C` releases
+  for the confirmation, in the same opening: the run now reports the estimate,
+  the falsification battery, replication, sensitivity and the tier. The five
+  report files are hashed into the confirmation row and so into the ledger
+  head, and the sealed set is bound to the registered claim. A charter whose
+  `dag` path names a stored DAG loads it (`ConfigError` on a bad file) and
+  passes it to the selector, so back-door claims can pass the adjustment check.
+  `qualify.run` no longer skips admissibility for a causal estimand that has a
+  causal block and a graph: it applies `rules.decide_causal` to every
+  candidate (descendants of the treatment and colliders are quarantined),
+  reports declared adjustment members the graph refused (back-door is then
+  ineligible), tests the graph's implied independences on `X`
+  (`identification_report.json` key `dag`) and says when more than 16
+  candidates and no declared set leave the claim `attested` at best.
+  `scmle claims list` prints the identification status and `claims verify`
+  checks the five files against the sealed ledger. A charter no strategy
+  identifies still gets the refusal files from `X` and `C` is not opened for
+  it. The `bandit` B101 asserts in `stages.py` and `identification/run.py` are
+  explicit raises. Not done: subgroup hypotheses, and attestors (every run
+  claim is `unverified`).
 * The F8 baseline claim in a charter run (`scmle.data.framing.claim`). With
   `data.baseline_column` (CLI `--baseline-column`, `MLProject(baseline_column=)`)
   on a binary task whose charter has a `cost_model`, a rule is frozen on the

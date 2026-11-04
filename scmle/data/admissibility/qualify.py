@@ -35,9 +35,12 @@ import pandas as pd
 
 from scmle.contracts import qualification
 from scmle.data.admissibility import attestations as attestations_module
+from scmle.data.admissibility import dag as dag_module
+from scmle.data.admissibility import independence
 from scmle.data.admissibility import provenance
 from scmle.data.admissibility import rules
 from scmle.data.admissibility import screen
+from scmle.data.charter import causal as causal_module
 from scmle.data.detectors import certificates
 from scmle.data.detectors import pipeline
 
@@ -47,6 +50,8 @@ STORE_DIRECTORY = (
 F5_STORE = "detector_certificates.json"
 SCREEN_STORE = "screen_certificates.json"
 ATTESTATION_SOURCE = "f4-leakage-attestation"
+DAG_SOURCE = "f4-dag-falsification"
+DAG_ALPHA = 0.05
 
 
 @dataclasses.dataclass(frozen=True)
@@ -98,6 +103,10 @@ class Qualification:
         notes: Plain statements of what was not run or not certified.
         diagnostics: Ledger records (source, check) of the screen and of
             every attestation that overrode a block.
+        dag: For a causal estimand with a declared DAG: its hash, the
+            conditional-independence falsification on `X`, and the members of
+            the declared adjustment set the graph rules refused. None
+            otherwise.
     """
 
     table: rules.AdmissibilityTable | None
@@ -106,6 +115,7 @@ class Qualification:
     f5_store: certificates.CertificateStore | None
     notes: tuple[str, ...]
     diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
+    dag: dict[str, object] | None = None
 
     @property
     def leakage_gate(self) -> certificates.GateStatus:
@@ -209,6 +219,92 @@ def attestation_check(
     )
 
 
+def causal_admissibility(
+    frame: pd.DataFrame,
+    candidates: Sequence[str],
+    spec: causal_module.CausalSpec,
+    graph: dag_module.Dag,
+    seed: int,
+    day: datetime.date,
+    result: pipeline.PipelineResult,
+    store: certificates.CertificateStore | None,
+    notes: list[str],
+) -> Qualification:
+    """Graph rules on every candidate and the falsification of the graph.
+
+    Each candidate gets `rules.decide_causal` (descendants of the treatment
+    and colliders are quarantined), the declared adjustment set is checked
+    member by member, and the graph's implied independences are tested on
+    `X` only. More candidates than `MAX_SEARCH_CANDIDATES` with no declared
+    adjustment set leaves the claim `attested` at best, and says so.
+    """
+    records = provenance.ProvenanceTable.covering([str(c) for c in candidates])
+    members = causal_module.covariates_of(spec.assumptions) or ()
+    try:
+        table: rules.AdmissibilityTable | None = rules.build_table(
+            records,
+            "causal",
+            rules.Mode.PERMISSIVE,
+            today=day,
+            graph=graph,
+            treatment=spec.treatment,
+            outcome=spec.outcome,
+        )
+    except ValueError as error:
+        table = None
+        notes.append(f"graph rules were not applied: {error}")
+    refused = {
+        d.name: "; ".join(d.reasons)
+        for d in (() if table is None else table.decisions)
+        if d.name in members and d.admission is rules.Admission.QUARANTINE
+    }
+    if refused:
+        notes.append(
+            "backdoor_aipw is ineligible: the declared adjustment set holds "
+            + ", ".join(sorted(refused))
+        )
+    if not members and len(candidates) > dag_module.MAX_SEARCH_CANDIDATES:
+        notes.append(
+            f"more than {dag_module.MAX_SEARCH_CANDIDATES} candidate "
+            "covariates and no declared adjustment set: the charter must "
+            "supply the set, and the claim is attested at best"
+        )
+    report: dict[str, object] = {
+        "dag_hash": graph.digest(),
+        "adjustment_members_refused": refused,
+    }
+    diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
+    try:
+        found = independence.falsify(
+            graph, frame, alpha=DAG_ALPHA, run_seed=seed
+        )
+    except (ValueError, KeyError) as error:
+        report["falsification"] = {"ran": False, "reason": str(error)}
+        notes.append(f"the declared DAG could not be tested on X: {error}")
+    else:
+        report["falsification"] = {
+            "ran": True,
+            "alpha": found.alpha,
+            "level": found.level,
+            "tested": sum(
+                o.verdict is not independence.Verdict.SKIPPED
+                for o in found.outcomes
+            ),
+            "falsified": [o.statement.text() for o in found.falsified],
+            "skipped_nodes": list(found.skipped_nodes),
+            "note": "a graph can only survive, never be confirmed",
+        }
+        diagnostics = tuple((DAG_SOURCE, check) for check in found.checks)
+        if found.falsified:
+            notes.append(
+                f"{len(found.falsified)} implication(s) of the declared DAG "
+                "were falsified on X"
+            )
+    return Qualification(
+        table, None, result, store, tuple(notes), diagnostics, report
+    )
+
+
 def run(
     features: pd.DataFrame,
     target: pd.Series,
@@ -223,6 +319,8 @@ def run(
     attestations: Sequence[attestations_module.LeakageAttestation] = (),
     scope: str = "",
     today: datetime.date | None = None,
+    causal: causal_module.CausalSpec | None = None,
+    dag: dag_module.Dag | None = None,
 ) -> Qualification:
     """Runs leakage, admissibility and the detector pipeline on `X`.
 
@@ -243,10 +341,14 @@ def run(
         scope: Charter hash the attestations must name.
         today: Day on which attestations must be valid; defaults to the
             current date.
+        causal: The charter's causal block, for a causal estimand.
+        dag: The DAG hypothesis the causal block declares, already loaded.
 
     Returns:
-        The results. A causal estimand has no declared graph in a charter,
-        so its admissibility table is skipped and said so in `notes`.
+        The results. A causal estimand with a causal block and a declared
+        graph gets the graph rules (`rules.decide_causal`) on every candidate
+        and the falsification of the graph on `X`; without both, its
+        admissibility table is skipped and said so in `notes`.
     """
     notes: list[str] = []
     f5 = load_store(F5_STORE, directory)
@@ -256,12 +358,17 @@ def run(
         frame, str(target.name), f5.store, seed, provenance=None
     )
     candidates = [c for c in features.columns if c not in set(structure)]
-    if kind != "predictive":
-        notes.append(
-            f"{kind} estimand without a declared graph: admissibility not run"
-        )
-        return Qualification(None, None, result, f5.store, tuple(notes))
     day = today or datetime.date.today()
+    if kind != "predictive":
+        if causal is None or dag is None:
+            notes.append(
+                f"{kind} estimand without a declared graph: admissibility "
+                "not run"
+            )
+            return Qualification(None, None, result, f5.store, tuple(notes))
+        return causal_admissibility(
+            frame, candidates, causal, dag, seed, day, result, f5.store, notes
+        )
     task = "classification" if classification else "regression"
     store = (
         screen.shipped_store()

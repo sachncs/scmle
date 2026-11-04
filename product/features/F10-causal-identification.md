@@ -16,39 +16,18 @@ causal claim is in the canon. This file keeps only what is missing. Statements
 about existing code carry `path` references read in the repo on the date of
 writing.
 
-## Open: the estimate on `C` inside the single opening
+## Open: what the single opening does not yet do
 
-A charter run writes the plan, the design diagnostics on `X` and a claim at
-tier `unverified` (`run.design_only`, `Stages.assess_identification`). The
-estimate, the falsification battery, the replication, the sensitivity gate and
-the tier are computed by `run.identify`, which must be given the confirmation
-rows, and nothing in the pipeline gives it those rows because the claim ledger
-opens `C` once (`Stages.run_claim_ledger`, `ledger/confirm.py`) and the causal
-estimate is not part of that opening. Needed:
+The estimate, battery, replication, sensitivity and tier are computed on the
+frame `C` releases (`scmle/core/causal_claim.py`). Left:
 
-- a hook in the confirmation function that hands the one released frame to
-  `run.identify` (after the survivors are frozen), with the primary hypothesis
-  `theta = 0` registered through `Ledger.register` and the heterogeneity or
-  subgroup hypotheses paying the confirmation multiplicity rule;
-- the five report files hashed into the ledger head like the confirmation
-  files, and `scmle claims` printing the identification status and tier;
-- the sealed set's `commit` bound to the causal claim hash (the confirmation
-  stage does not call `commit` yet; R1);
-- a charter with a declared `dag` path loads the graph (`Dag.from_artifact`)
-  and passes it to the selector; the stage passes none today, so back-door
-  claims stay `attested` at best ("adjustment set not checked").
-
-## Open: admissibility coupling
-
-The skip at `scmle/data/admissibility/qualify.py:157-166` ("causal estimand
-without a declared graph") is unchanged. Replace it by a call into the
-selector when the estimand has a causal block, and apply
-`rules.decide_causal` (`rules.py:214`) to every member of the declared
-adjustment set: a descendant of the treatment or a collider makes
-`backdoor_aipw` ineligible. Report the CI falsification
-(`independence.falsify`) in `identification_report.json`. More than 16
-candidate covariates (`dag.py:38`) means the charter must supply the set and
-the claim is `attested` at best; the message is not written yet.
+- Subgroup and heterogeneity hypotheses are not registered or computed; the
+  replication over `strata` is only a falsifier.
+- The charter has no field for attestors, so a run reports every causal claim
+  at `unverified` ("no named attestor"); `identify` takes the names, the run
+  does not supply them.
+- `Dag.from_artifact` loads the DAG the charter's `dag` path names; whether
+  that file is the one the analyst meant is not checked beyond its hash.
 
 ## Open: method gaps (each needs its own certificate before it may gate)
 

@@ -144,3 +144,31 @@ def test_registering_twice_with_the_same_hash_is_idempotent():
     assert ledger.register_claim("c1", "baseline", "s", SHA) is first
     with pytest.raises(ledger_module.LedgerError):
         ledger.register_claim("c1", "baseline", "s", "b" * 64)
+
+
+def test_merged_runners_share_the_one_frame_and_fail_separately():
+    calls = []
+
+    def second(name, boom=False):
+        def run(features, target):
+            calls.append(name)
+            if boom:
+                raise ValueError("no")
+            return confirm.ClaimRun({name: "ok"}, {f"{name}.json": {"k": 1}})
+
+        return confirm.ClaimRunner(
+            (confirm.RegisteredClaim(name, "baseline", name, SHA),), run
+        )
+
+    merged = confirm.merge_runners(
+        None, second("a"), second("b", boom=True), second("c")
+    )
+    result = go(merged)
+
+    assert calls == ["a", "b", "c"]
+    states = {k: v["status"] for k, v in result.confirmation.registered.items()}
+    assert states == {"a": "ok", "b": confirm.FAILED, "c": "ok"}
+    assert set(result.confirmation.documents) == {"a.json", "c.json"}
+    assert confirm.merge_runners(None, None) is None
+    with pytest.raises(ValueError, match="unique"):
+        confirm.merge_runners(second("a"), second("a"))

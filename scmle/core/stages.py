@@ -34,6 +34,7 @@ from scmle.contracts import explanations
 from scmle.contracts import lineage
 from scmle.contracts import reliability
 from scmle.contracts import tasks
+from scmle.core import causal_claim
 from scmle.core import compiler
 from scmle.core import context as context_module
 from scmle.core import randomness
@@ -561,8 +562,10 @@ class ProfileStage(Stage):
             for c in (data.group_column, data.time_column, data.baseline_column)
             if c
         )
+        block = charter.estimand.causal
+        graph = causal_claim.load_dag(block.dag) if block is not None else None
         found = self.qualify_exploration(
-            context, task, charter, view, structure
+            context, task, charter, view, structure, graph
         )
         rules = charter.rules
         stage = robustness_prefilter.StabilityStage(
@@ -573,8 +576,11 @@ class ProfileStage(Stage):
             rows=len(view.features),
             seed=charter.seed,
         )
-        runner = self.baseline_runner(
-            context, task, charter, view, structure, signed=verified.signed
+        runner = ledger_confirm.merge_runners(
+            self.baseline_runner(
+                context, task, charter, view, structure, signed=verified.signed
+            ),
+            self.causal_runner(context, charter, view, graph, found),
         )
         run = ledger_governed.run_governed(
             charter=charter,
@@ -627,7 +633,7 @@ class ProfileStage(Stage):
         )
         self.assess_robustness(context, charter, run, stage)
         self.assess_framing(context, charter, view)
-        self.assess_identification(context, charter, view)
+        self.assess_identification(context, charter, view, run, graph, found)
 
     def baseline_runner(
         self,
@@ -862,25 +868,75 @@ class ProfileStage(Stage):
             {k: v["status"] for k, v in document["fields"].items()},
         )
 
+    def causal_runner(
+        self,
+        context: context_module.RunContext,
+        charter: charter_contracts.AnalysisCharter,
+        view: Any,
+        graph: Any,
+        found: qualify.Qualification,
+    ) -> ledger_confirm.ClaimRunner | None:
+        """Registers the primary causal hypothesis for the one opening (F10).
+
+        The strategy is chosen from the charter and the declared DAG alone.
+        The estimate, the falsification battery, the replication, the
+        sensitivity assessment and the tier are computed on the frame the
+        confirmation releases, in the same opening that tests the bivariate
+        family; nothing opens `C` for them. None for a predictive charter and
+        for a charter no strategy identifies (no estimate can exist).
+        """
+        block = charter.estimand.causal
+        if block is None:
+            return None
+        frame = view.features.copy()
+        frame[context.spec.data.target] = view.target
+        return causal_claim.build_runner(
+            block,
+            frame,
+            context.spec.data.target,
+            charter.error_budget,
+            dag=graph,
+            seed=charter.seed,
+            dag_report=found.dag,
+        )
+
     def assess_identification(
         self,
         context: context_module.RunContext,
         charter: charter_contracts.AnalysisCharter,
         view: Any,
+        run: ledger_governed.GovernedRun,
+        graph: Any,
+        found: qualify.Qualification,
     ) -> None:
-        """Selects the identification strategy for a causal charter (F10).
+        """Reports the identification of a causal charter (F10).
 
-        Runs only when the charter's estimand carries a causal block. It
-        reads the exploration view only: the strategy is chosen from the
-        charter, the design is diagnosed on `X`, and a charter that no
-        strategy identifies is refused (`not_identified`, no estimate). The
-        causal estimate on `C` is not computed here because the claim ledger
-        has already opened `C` once; the claim is therefore `unverified` and
-        says so. `identification_run.identify` computes the estimate, the
-        falsification battery and the tier when given the confirmation rows.
+        Runs only when the charter's estimand carries a causal block. When the
+        confirmation evaluated the registered claim, its five report files
+        were written with the other registered claims, bound to the ledger
+        head, and only the event is emitted here. Otherwise (no strategy
+        identifies the charter, no confirmation set exists, or the claim could
+        not be evaluated) the strategy is chosen from the charter, the design
+        is diagnosed on `X`, and the claim is `unverified` or
+        `not_identified` with no estimate.
         """
         block = charter.estimand.causal
         if block is None:
+            return
+        documents = run.confirmation.documents
+        if causal_claim.CLAIM_FILE in documents:
+            claims = documents[causal_claim.CLAIM_FILE]
+            context.emit(
+                "identification.completed",
+                f"causal claim status {claims['status']}, tier {claims['tier']}"
+                " (estimated on the single opening of C)",
+                tuple(causal_claim.DOCUMENTS),
+                {
+                    "status": claims["status"],
+                    "tier": claims["tier"],
+                    "estimated_on_c": True,
+                },
+            )
             return
         frame = view.features.copy()
         frame[context.spec.data.target] = view.target
@@ -888,7 +944,9 @@ class ProfileStage(Stage):
             block,
             frame,
             charter.error_budget,
+            dag=graph,
             seed=charter.seed,
+            dag_checks=found.dag,
         )
         for name, document in outcome.documents.items():
             context.write_json(name, document)
@@ -897,7 +955,11 @@ class ProfileStage(Stage):
             "identification.completed",
             f"causal claim status {claims['status']}, tier {claims['tier']}",
             tuple(outcome.documents),
-            {"status": claims["status"], "tier": claims["tier"]},
+            {
+                "status": claims["status"],
+                "tier": claims["tier"],
+                "estimated_on_c": False,
+            },
         )
 
     def qualify_exploration(
@@ -907,6 +969,7 @@ class ProfileStage(Stage):
         charter: charter_contracts.AnalysisCharter,
         view: Any,
         structure: tuple[str, ...],
+        graph: Any = None,
     ) -> qualify.Qualification:
         """Runs the F4 admissibility tests and F5 detectors on `X` only.
 
@@ -937,6 +1000,8 @@ class ProfileStage(Stage):
                 else ()
             ),
             scope=charter.charter_hash,
+            causal=charter.estimand.causal,
+            dag=graph,
         )
         written: list[str] = []
         if found.table is not None:
@@ -1792,7 +1857,8 @@ def chartered_threshold(
     """
     layer = charter.decision
     model = charter.cost_model
-    assert layer is not None and model is not None
+    if layer is None or model is None:
+        raise errors.ScmleError("the charter has no decision layer")
     chosen = decision_threshold.choose_threshold(
         probabilities,
         actual.astype(float),
@@ -1802,7 +1868,8 @@ def chartered_threshold(
         seed=seed,
     )
     cut = chosen.rule.raw_threshold
-    assert cut is not None
+    if cut is None:
+        raise errors.ScmleError("the chosen rule has no raw threshold")
     description = {
         "objective": "chartered_cost",
         "threshold": cut,
@@ -1834,7 +1901,8 @@ def chartered_net_benefit(
     if charter is None or decision is None or "f11" not in decision:
         return None
     model = charter.cost_model
-    assert model is not None
+    if model is None:
+        raise errors.ScmleError("the charter has no cost model")
     positive = pipeline.classes_[1]
     split = require(context.split, "split")
     clusters = (

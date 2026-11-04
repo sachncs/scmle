@@ -233,6 +233,41 @@ class ClaimRunner:
     run: Callable[[pd.DataFrame, pd.Series], ClaimRun]
 
 
+def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
+    """One runner for several: all are evaluated on the same released frame.
+
+    Returns None when there is none. A document name two runners produce is
+    refused when it is evaluated, never overwritten silently.
+    """
+    chosen = [r for r in runners if r is not None]
+    if not chosen:
+        return None
+    if len(chosen) == 1:
+        return chosen[0]
+    registered = tuple(item for r in chosen for item in r.registered)
+    names = [item.claim_id for item in registered]
+    if len(set(names)) != len(names):
+        raise ValueError("claim ids must be unique across runners")
+
+    def run_all(features: pd.DataFrame, target: pd.Series) -> ClaimRun:
+        statuses: dict[str, str] = {}
+        documents: dict[str, Mapping[str, Any]] = {}
+        for runner in chosen:
+            try:
+                found = runner.run(features, target)
+            except Exception:
+                statuses.update({i.claim_id: FAILED for i in runner.registered})
+                continue
+            clash = set(documents) & set(found.documents)
+            if clash:
+                raise ValueError(f"two claims wrote {sorted(clash)}")
+            statuses.update(found.statuses)
+            documents.update(found.documents)
+        return ClaimRun(statuses, documents)
+
+    return ClaimRunner(registered, run_all)
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Confirmation:
     """The outcome of the confirmation stage.
