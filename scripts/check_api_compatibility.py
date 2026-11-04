@@ -10,6 +10,29 @@ from pathlib import Path
 from typing import Any
 
 import scmle
+from scmle.deploy import contract as deploy_contract
+
+# Extension surfaces: documented contracts below the top-level API. Their
+# signatures are pinned too, without changing any `scmle.__all__` entry.
+EXTENSION_SURFACES = {
+    "scmle.deploy.contract": (
+        deploy_contract,
+        (
+            "Architecture",
+            "BundleRef",
+            "DeploymentEnvironment",
+            "DeploymentSpec",
+            "HealthSpec",
+            "ImageRef",
+            "ProviderAdapter",
+            "Resources",
+            "RuntimeReport",
+            "SecretRef",
+            "SecretSource",
+            "conformance_problems",
+        ),
+    ),
+}
 
 
 def stable_value(value: Any) -> Any:
@@ -91,10 +114,22 @@ def current_snapshot() -> dict[str, Any]:
                 "kind": "class" if inspect.isclass(value) else "callable",
                 "signature_sha256": signature_digest(value),
             }
+    extensions: dict[str, Any] = {}
+    for module_name, (module, names) in EXTENSION_SURFACES.items():
+        extensions[module_name] = {
+            name: {
+                "kind": "class"
+                if inspect.isclass(getattr(module, name))
+                else "callable",
+                "signature_sha256": signature_digest(getattr(module, name)),
+            }
+            for name in sorted(names)
+        }
     return {
         "schema_version": 1,
         "release": scmle.__version__,
         "exports": exports,
+        "extension_surfaces": extensions,
     }
 
 
@@ -119,6 +154,21 @@ def differences(
             differences_found.append(f"export added: {name}")
         elif expected_exports[name] != observed_exports[name]:
             differences_found.append(f"export contract changed: {name}")
+    expected_extensions = expected.get("extension_surfaces", {})
+    observed_extensions = observed.get("extension_surfaces", {})
+    for module_name in sorted(
+        set(expected_extensions) | set(observed_extensions)
+    ):
+        before = expected_extensions.get(module_name, {})
+        after = observed_extensions.get(module_name, {})
+        for name in sorted(set(before) | set(after)):
+            label = f"{module_name}.{name}"
+            if name not in after:
+                differences_found.append(f"extension removed: {label}")
+            elif name not in before:
+                differences_found.append(f"extension added: {label}")
+            elif before[name] != after[name]:
+                differences_found.append(f"extension contract changed: {label}")
     return differences_found
 
 

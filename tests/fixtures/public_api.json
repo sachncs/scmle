@@ -173,6 +173,58 @@
       "signature_sha256": "fe0fd9428b7396a18a2f9240650f0dc4c56f5371ac4b9f56163fae9135fe6b8e"
     }
   },
+  "extension_surfaces": {
+    "scmle.deploy.contract": {
+      "Architecture": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "BundleRef": {
+        "kind": "class",
+        "signature_sha256": "f36c4df7d1633d5788bcc619931ae3be4eb0ec090b741f35e73c8c0e20c78704"
+      },
+      "DeploymentEnvironment": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "DeploymentSpec": {
+        "kind": "class",
+        "signature_sha256": "5f562707958fc30835e2d1aa51c1cbd3d3194e65a605538e3c9176b5089d1098"
+      },
+      "HealthSpec": {
+        "kind": "class",
+        "signature_sha256": "c872e18c3a96428229922c05a849fd88642dfd9a651ce09bdf8c36ef3b9ea548"
+      },
+      "ImageRef": {
+        "kind": "class",
+        "signature_sha256": "91fdbe4cb912fd44fc769a4da2d78b6f6f57a8cb5d830b8ec7d6ea2b37dcadcc"
+      },
+      "ProviderAdapter": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      },
+      "Resources": {
+        "kind": "class",
+        "signature_sha256": "191ea8346bf5b744bd8fe5d93a9050ff13b5dbd1faa992d4aea7f20619e2d909"
+      },
+      "RuntimeReport": {
+        "kind": "class",
+        "signature_sha256": "7e935c714a963fb3c5a7e2bb66612407a87f37818ba62fea5e3b699099853f1e"
+      },
+      "SecretRef": {
+        "kind": "class",
+        "signature_sha256": "310fe1c38c626bf71f28172233da9f81af6ed01590af31dfbfbb9025a0137e41"
+      },
+      "SecretSource": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "conformance_problems": {
+        "kind": "callable",
+        "signature_sha256": "930c30c0dd0681f2b0fa82a9df84c9a892051a01444545223a9f5fe9a1981311"
+      }
+    }
+  },
   "release": "0.1.0b1",
   "schema_version": 1
 }

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+* Deployment contract (F14 item 1; `scmle.deploy.contract`). One typed,
+  versioned `DeploymentSpec` (image by digest, bundle by manifest digest,
+  configuration, secret references, resources, health, version) that a
+  provider adapter must satisfy, and `conformance_problems`, which compares a
+  platform's `RuntimeReport` with the spec on digests and limits. A secret is a
+  reference and never a value; a secret-looking configuration key, key
+  material, `SCMLE_TRUSTED=1` in production and an unsigned production bundle
+  are refused. It is an extension surface: the snapshot in
+  `tests/fixtures/public_api.json` gained an `extension_surfaces` block and no
+  existing entry changed. No adapter for a real platform exists yet.
 * Ingestion in a charter run (F9; `scmle.core.ingest_stage`, charter format 7).
   The charter gained the optional `ingest` block (`IngestSpec`): source budget
   (queries, rows scanned, seconds), `B_feat`, windows, lag, `delta_rec` and the

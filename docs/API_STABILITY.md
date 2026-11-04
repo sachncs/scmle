@@ -135,6 +135,19 @@ before. `evaluation.json` gained the keys `net_benefit` (null without a block)
 and, inside `decision`, `f11`. `scmle.data.ledger.budget` gained
 `DecisionBudget`, `assign_experiment` and `start_rollback_monitor`.
 
+## Deployment contract
+
+`scmle.deploy.contract` is an extension surface, not a top-level export. It
+holds the typed spec every provider adapter must satisfy (`DeploymentSpec`
+with `ImageRef`, `BundleRef`, `SecretRef`, `Resources`, `HealthSpec`),
+`RuntimeReport`, `conformance_problems` and the `ProviderAdapter` base class.
+Because it sits below `scmle.__all__`, no entry of `exports` in
+`tests/fixtures/public_api.json` changed; the snapshot gained a separate
+`extension_surfaces` block that pins the signature of each name above, and
+`scripts/check_api_compatibility.py` reports `extension added`, `extension
+removed` and `extension contract changed` for it. The spec format is
+versioned (`SPEC_FORMAT`); `from_dict` refuses any other format.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 
