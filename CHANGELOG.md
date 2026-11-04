@@ -301,3 +301,25 @@ First public beta.
   constants `LEAK_ASSOCIATION`, `MISSINGNESS_LEAK` and the `LEAKAGE_MARKER`
   string match remain: they still drive `leakage_policy="block"` for runs
   without a charter.
+* Robustness and shift (`scmle.data.robustness`; runs without a charter are
+  unchanged). A charter run re-runs each exploration survivor over the
+  multiverse the charter declared (imputation, outlier rule, inclusion; other
+  declared choices are reported as not run) with bootstrap perturbation
+  intervals, a survival rule (sign, size band, interval) and a permutation test
+  of the whole specification curve, and compares `X` with the `reference`
+  sample by a classifier two-sample test and a kernel MMD test with permutation
+  p-values, per-feature KS or chi-square under BH, and subgroup coverage. New
+  artifacts: `stability_report.json` and `shift_report.json`. Without a
+  deployment sample the shift status is `unverifiable`, never `pass`. The
+  forward-in-time check on the holdout is implemented (`forward.forward_check`,
+  opens the set once) but a run reports it as skipped, because the final test
+  set is opened only by the final evaluation. Certificates are in
+  `benchmarks/qualification/f6_certificates.json` (`f6_certify.py`): the
+  classifier test is certified (false alarms 24 in 1000 nulls, power 0.94 at a
+  planted AUC of 0.60 with 2000 rows a side); the MMD test is measured and
+  stays descriptive because its false-alarm upper bound (0.0765) is just over
+  the pre-registered 0.075; the stability rule is certified on semi-synthetic
+  plants only. Stability verdicts do not yet remove findings from the
+  confirmation set, per-period drift and calibrated PSI are not implemented,
+  and the per-feature p-values are adjusted within the report, not entered in
+  the ledger. The old `0.65` representativeness constant is unchanged.
