@@ -25,10 +25,11 @@ from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
+from scmle.data.charter import rules as rules_module
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
@@ -300,6 +301,10 @@ class AnalysisCharter:
         cost_model: Costs of acting and not acting (F8), fixed before `C`
             is opened; None for a charter that does not claim a decision
             benefit. Format 1 charters have none and load unchanged.
+        rules: Pre-registered ledger rule, confirmation rule, failure
+            policy and stability thresholds (format 3); None for a charter
+            that does not fix them, which serialises, hashes and loads
+            exactly as a format 1 or 2 charter did.
     """
 
     question: str
@@ -316,6 +321,7 @@ class AnalysisCharter:
     multiverse: tuple[Choice, ...]
     seed: int
     cost_model: costs.DecisionCostModel | None = None
+    rules: rules_module.RunRules | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint."""
@@ -396,14 +402,22 @@ class AnalysisCharter:
         }
         if self.cost_model is not None:
             record["cost_model"] = self.cost_model.to_dict()
+        if self.rules is not None:
+            record["rules"] = self.rules.to_dict()
         return record
+
+    @property
+    def format_version(self) -> int:
+        """Oldest format that can carry this charter (2 or, with rules, 3)."""
+        return 2 if self.rules is None else 3
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the charter, rejecting unknown or missing fields."""
-        record = {"cost_model": None, **record}
+        record = {"cost_model": None, "rules": None, **record}
         qualification.require_fields(cls, record)
         cost = record["cost_model"]
+        chosen = record["rules"]
         return cls(
             question=record["question"],
             estimand=AnalysisEstimand.from_dict(record["estimand"]),
@@ -426,6 +440,11 @@ class AnalysisCharter:
                 None
                 if cost is None
                 else costs.DecisionCostModel.from_dict(cost)
+            ),
+            rules=(
+                None
+                if chosen is None
+                else rules_module.RunRules.from_dict(chosen)
             ),
         )
 

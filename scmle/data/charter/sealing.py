@@ -17,6 +17,7 @@ from scmle.contracts import signing
 from scmle.data.charter import contracts
 
 SIGNATURE_FIELD = "signature"
+RULES_FORMAT = 3
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -40,7 +41,7 @@ def envelope(
     """The JSON wrapper stored on disk."""
     key = signing.resolve_key(signing_key)
     return {
-        "format": contracts.FORMAT_VERSION,
+        "format": charter.format_version,
         "charter": charter.to_dict(),
         "charter_hash": charter.charter_hash,
         "algorithm": signing.SIGNATURE_ALGORITHM,
@@ -77,6 +78,29 @@ def write_charter(
     return target
 
 
+def check_format(path: str | Path, record: dict[str, Any]) -> None:
+    """Refuses a wrapper from a newer format, or a field its format lacks.
+
+    A wrapper without a `format` is read as format 1. Format 3 added `rules`;
+    an older wrapper that carries it was edited or mislabelled.
+
+    Raises:
+        ConfigError: If the format is newer than this code reads, or an
+            older format carries a field it cannot have.
+    """
+    declared = record.get("format", contracts.OLDEST_READABLE_FORMAT)
+    if not isinstance(declared, int) or declared > contracts.FORMAT_VERSION:
+        raise errors.ConfigError(
+            f"charter {path} has format {declared!r}; this version reads "
+            f"formats up to {contracts.FORMAT_VERSION}"
+        )
+    if declared < RULES_FORMAT and "rules" in record.get("charter", {}):
+        raise errors.ConfigError(
+            f"charter {path} declares format {declared} but carries 'rules', "
+            f"which need format {RULES_FORMAT}"
+        )
+
+
 def read_verified(
     path: str | Path,
     signing_key: str | bytes | None = None,
@@ -104,6 +128,7 @@ def read_verified(
         return VerifiedCharter(charter, charter.charter_hash, False)
     if record.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise errors.ArtifactError(f"charter {path}: unknown algorithm")
+    check_format(path, record)
     charter = contracts.charter_from_record(record["charter"])
     if record.get("charter_hash") != charter.charter_hash:
         raise errors.ArtifactError(
