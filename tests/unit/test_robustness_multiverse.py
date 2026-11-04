@@ -125,7 +125,7 @@ def test_the_time_budget_skips_and_records_the_rest():
     )
     assert 0 < len(run.results) < 6
     assert len(run.results) + len(run.skipped) == 6
-    assert all(reason == "time budget spent" for _, reason in run.skipped)
+    assert all(item[1] == "time budget spent" for item in run.skipped)
 
 
 def test_the_run_is_deterministic_under_a_fixed_seed():

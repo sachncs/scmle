@@ -141,7 +141,7 @@ def test_the_semi_synthetic_worlds_plant_what_they_say():
         stats.spearmanr(rev_x[half:][second], rev_y[half:][second]).statistic
         < -0.2
     )
-    out_x, _ = f6.stability_world(stability.DEFECT_OUTLIER, 0)
+    out_x = f6.stability_world(stability.DEFECT_OUTLIER, 0)[0]
     assert (np.abs(out_x[np.isfinite(out_x)]) >= f6.EXTREME_SIGMAS).sum() > 20
     with pytest.raises(ValueError, match="unknown kind"):
         f6.stability_world("other", 0)
