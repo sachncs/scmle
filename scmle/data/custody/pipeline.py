@@ -91,6 +91,30 @@ def empty_carve(
     )
 
 
+def measured_embargo(
+    frame: pd.DataFrame,
+    dev_ids: np.ndarray,
+    data: tasks.DataSpec,
+    times: np.ndarray | None,
+    task: tasks.TaskType,
+) -> int:
+    """Embargo rows measured from the target's autocorrelation, or 0.
+
+    Only temporal strategies carry an embargo. The target is read in time
+    order over the development rows; a target that is not numeric gives 0.
+    """
+    if times is None:
+        return 0
+    target = frame[data.target].iloc[dev_ids]
+    if task.is_classification:
+        target = pd.Series(pd.factorize(target)[0], index=target.index)
+    values = pd.to_numeric(target, errors="coerce").to_numpy(dtype=float)
+    ordered = values[np.argsort(times, kind="stable")]
+    if np.isnan(ordered).any():
+        return 0
+    return carve.acf_embargo(ordered)
+
+
 def apply_custody(
     *,
     charter: charter_contracts.AnalysisCharter,
@@ -135,6 +159,15 @@ def apply_custody(
         if old.strategy in TEMPORAL and data.time_column
         else None
     )
+    embargo_rows = charter.sets.embargo_rows
+    measured = measured_embargo(frame, dev_ids, data, times, task)
+    acf_note = None
+    if measured > embargo_rows:
+        acf_note = (
+            f"embargo raised from {embargo_rows} to {measured} rows: "
+            "measured autocorrelation of the target"
+        )
+        embargo_rows = measured
     columns = splitters.SplitManager(spec, task).feature_columns(frame)
     copies = duplicates.duplicate_groups(frame, columns)[dev_ids]
     fraction = charter.sets.confirmation_fraction
@@ -158,7 +191,7 @@ def apply_custody(
                 groups=groups,
                 times=times,
                 duplicates=copies,
-                embargo_rows=charter.sets.embargo_rows,
+                embargo_rows=embargo_rows,
             )
         except errors.ConfigError as refusal:
             # The carve refuses explicitly (for example when it would leave a
@@ -185,8 +218,21 @@ def apply_custody(
     ):
         carved = empty_carve(dev_ids, folds, actual.reason)
         actual = assess(charter, 0, None)
+    if not len(carved.confirmation_ids):
+        embargo_rows = charter.sets.embargo_rows
+    elif acf_note:
+        carved = dataclasses.replace(carved, notes=(*carved.notes, acf_note))
     return finish(
-        charter, split, frame, spec, carved, dev_ids, actual, data_hash, vault
+        charter,
+        split,
+        frame,
+        spec,
+        carved,
+        dev_ids,
+        actual,
+        data_hash,
+        vault,
+        embargo_rows,
     )
 
 
@@ -200,6 +246,7 @@ def finish(
     report: feasibility.Feasibility,
     data_hash: str,
     vault: sealed.CustodyVault,
+    embargo_rows: int,
 ) -> CustodyOutcome:
     """Builds the restricted split, seals `C` and records the manifest."""
     old = split.manifest
@@ -233,7 +280,7 @@ def finish(
     manifest = manifest_module.CustodyManifest(
         strategy=old.strategy,
         seed=charter.seed,
-        embargo_rows=charter.sets.embargo_rows,
+        embargo_rows=embargo_rows,
         charter_hash=charter.charter_hash,
         data_hash=data_hash,
         exploration_ids=exploration,

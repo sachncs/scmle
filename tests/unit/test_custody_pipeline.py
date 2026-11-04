@@ -197,3 +197,53 @@ def test_the_manifest_commits_to_the_row_content_of_each_set():
     edited.loc[manifest.confirmation_ids[0], "x"] += 1e-9
     with pytest.raises(errors.ArtifactError, match="confirmation"):
         manifest.verify_rows(edited)
+
+
+def temporal_frame(phi, rows=1500):
+    rng = np.random.default_rng(4)
+    noise = rng.normal(size=rows)
+    target = np.zeros(rows)
+    for i in range(1, rows):
+        target[i] = phi * target[i - 1] + noise[i]
+    return pd.DataFrame(
+        {"t": np.arange(rows), "x": rng.normal(size=rows), "y": target}
+    )
+
+
+def run_temporal(frame, charter):
+    spec = tasks.ProjectSpec(
+        data=tasks.DataSpec(uri="m", target="y", time_column="t"),
+        validation=tasks.ValidationSpec(strategy="temporal", seed=5),
+    )
+    task = tasks.TaskType.REGRESSION
+    split = splitters.SplitManager(spec, task).split(frame)
+    vault = sealed.CustodyVault(sealed.OpenLog(), process=False)
+    outcome = pipeline.apply_custody(
+        charter=charter,
+        split=split,
+        frame=frame,
+        spec=spec,
+        task=task,
+        data_hash=DATA_HASH,
+        vault=vault,
+    )
+    return outcome
+
+
+def test_a_serially_dependent_target_raises_the_embargo_above_the_charter():
+    outcome = run_temporal(
+        temporal_frame(0.9), make_charter(min_effect=0.3, k_max=5)
+    )
+    manifest = outcome.manifest
+    assert manifest.confirmation_ids
+    assert manifest.embargo_rows > 0
+    assert manifest.embargo_ids
+    assert any("autocorrelation" in note for note in manifest.notes)
+
+
+def test_an_independent_target_keeps_the_charter_embargo():
+    outcome = run_temporal(
+        temporal_frame(0.0), make_charter(min_effect=0.3, k_max=5)
+    )
+    assert outcome.manifest.embargo_rows == 0
+    assert not any("autocorrelation" in n for n in outcome.manifest.notes)

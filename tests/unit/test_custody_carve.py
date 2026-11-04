@@ -187,3 +187,52 @@ def test_regression_small_temporal_carve_refuses_explicitly():
             times=np.arange(60),
             embargo_rows=5,
         )
+
+
+def ar1(size, phi, seed=0):
+    rng = np.random.default_rng(seed)
+    noise = rng.normal(size=size)
+    out = np.zeros(size)
+    for i in range(1, size):
+        out[i] = phi * out[i - 1] + noise[i]
+    return out
+
+
+def test_the_autocorrelation_matches_a_direct_computation():
+    values = np.array([1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 5.0, 8.0])
+    centred = values - values.mean()
+    expected = [
+        sum(centred[: len(centred) - k] * centred[k:]) / sum(centred**2)
+        for k in (1, 2, 3)
+    ]
+    assert np.allclose(carve.autocorrelation(values, 3), expected)
+    assert np.allclose(carve.autocorrelation(np.ones(10), 3), 0.0)
+
+
+def test_white_noise_measures_no_embargo():
+    assert carve.acf_embargo(ar1(2000, 0.0, seed=1)) == 0
+
+
+def test_a_persistent_series_needs_a_longer_embargo_than_a_weak_one():
+    weak = carve.acf_embargo(ar1(4000, 0.3, seed=2))
+    strong = carve.acf_embargo(ar1(4000, 0.9, seed=2))
+    assert 1 <= weak < strong
+
+
+def test_an_ar1_embargo_is_near_the_lag_where_phi_k_meets_the_band():
+    # phi**k drops inside 1.96/sqrt(n) at k = log(band)/log(phi).
+    size, phi = 4000, 0.8
+    band = 1.96 / np.sqrt(size)
+    expected = np.log(band) / np.log(phi)
+    measured = carve.acf_embargo(ar1(size, phi, seed=3))
+    assert abs(measured - expected) <= 8
+
+
+def test_short_and_constant_series_measure_zero():
+    assert carve.acf_embargo(np.arange(7.0)) == 0
+    assert carve.acf_embargo(np.ones(100)) == 0
+
+
+def test_a_trend_never_falls_inside_the_band_and_is_capped():
+    assert carve.acf_embargo(np.arange(400.0)) == 100
+    assert carve.acf_embargo(np.arange(400.0), max_lag=10) == 10

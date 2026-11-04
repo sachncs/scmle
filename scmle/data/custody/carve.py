@@ -158,6 +158,52 @@ def embargo_mask(in_c: np.ndarray, order: np.ndarray, rows: int) -> np.ndarray:
     return mask
 
 
+def autocorrelation(values: np.ndarray, max_lag: int) -> np.ndarray:
+    """Sample autocorrelation at lags 1..max_lag (biased, mean-removed).
+
+    Returns zeros for a constant series.
+    """
+    series = np.asarray(values, dtype=float)
+    series = series - series.mean()
+    variance = float(series @ series)
+    if variance == 0.0:
+        return np.zeros(max_lag)
+    return np.array(
+        [
+            float(series[:-lag] @ series[lag:]) / variance
+            for lag in range(1, max_lag + 1)
+        ]
+    )
+
+
+def acf_embargo(values: np.ndarray, max_lag: int | None = None) -> int:
+    """Embargo length from the measured serial dependence of a series.
+
+    `values` must be in time order. The embargo is the number of leading
+    lags whose autocorrelation lies outside the large-sample 95 percent band
+    for white noise, +-1.96/sqrt(n): the first lag inside the band ends it.
+    Dependence that returns at a later lag (a seasonal peak) is not counted,
+    and a series with no significant lag-1 autocorrelation measures 0. The
+    band is a rule of thumb for a stationary series, not a guarantee that
+    rows beyond the embargo are independent.
+
+    Args:
+        values: Numeric series in time order.
+        max_lag: Largest lag examined; defaults to a quarter of the length,
+            at most 1000.
+
+    Returns:
+        The embargo in rows (0 for fewer than 8 values or a constant series).
+    """
+    size = len(values)
+    if size < 8:
+        return 0
+    limit = min(max_lag or size // 4, size // 2, 1000)
+    band = 1.96 / math.sqrt(size)
+    inside = np.abs(autocorrelation(values, limit)) <= band
+    return int(np.argmax(inside)) if inside.any() else limit
+
+
 def restrict_folds(
     folds: list[tuple[np.ndarray, np.ndarray]],
     dev_ids: np.ndarray,
