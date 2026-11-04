@@ -1,0 +1,839 @@
+{
+  "dev_seed_base": 10000,
+  "gates": {
+    "battery_nco": {
+      "alpha_falsify": 0.01,
+      "code_hash": "11355b8ce06c2346a4e170a06c5a6d8509362ef33c0018defdc55083818e3c48",
+      "curve": {
+        "0.0": {
+          "hits": 20,
+          "n": 2000,
+          "rate": 0.01,
+          "wilson": [
+            0.006482767876552687,
+            0.015395938459075187
+          ]
+        },
+        "0.1": {
+          "hits": 3,
+          "n": 500,
+          "rate": 0.006,
+          "wilson": [
+            0.0020425962719602363,
+            0.01749025210405338
+          ]
+        },
+        "0.2": {
+          "hits": 15,
+          "n": 500,
+          "rate": 0.03,
+          "wilson": [
+            0.018263213197913384,
+            0.04890366683594573
+          ]
+        },
+        "0.3": {
+          "hits": 107,
+          "n": 500,
+          "rate": 0.214,
+          "wilson": [
+            0.18030299998759533,
+            0.2520581227564126
+          ]
+        },
+        "0.5": {
+          "hits": 473,
+          "n": 500,
+          "rate": 0.946,
+          "wilson": [
+            0.9225734384893529,
+            0.9626256498189425
+          ]
+        },
+        "0.8": {
+          "hits": 500,
+          "n": 500,
+          "rate": 1.0,
+          "wilson": [
+            0.9923756595384479,
+            1.0
+          ]
+        }
+      },
+      "delta_min": 0.5,
+      "false_alarm": {
+        "hits": 20,
+        "n": 2000,
+        "rate": 0.01,
+        "wilson": [
+          0.006482767876552687,
+          0.015395938459075187
+        ]
+      },
+      "false_alarm_bound": 0.014449719092257398,
+      "method_hash": "923becdbefd471e1faec2c2983cf3505025bc9bd1ec69b9d404733d505ceeb05",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "battery_pretrend": {
+      "alpha_falsify": 0.01,
+      "code_hash": "f558231c56f3f35006a55309db6e271a6e74c2e928ae09d263adfe3cb60b7942",
+      "curve": {
+        "0.0": {
+          "hits": 21,
+          "n": 2000,
+          "rate": 0.0105,
+          "wilson": [
+            0.006877887380873443,
+            0.015998901907473176
+          ]
+        },
+        "0.05": {
+          "hits": 25,
+          "n": 500,
+          "rate": 0.05,
+          "wilson": [
+            0.034093745243849435,
+            0.0727681611715476
+          ]
+        },
+        "0.1": {
+          "hits": 86,
+          "n": 500,
+          "rate": 0.172,
+          "wilson": [
+            0.1414541198436514,
+            0.20754744749912687
+          ]
+        },
+        "0.15": {
+          "hits": 213,
+          "n": 500,
+          "rate": 0.426,
+          "wilson": [
+            0.38338257836675194,
+            0.46974582402155785
+          ]
+        },
+        "0.2": {
+          "hits": 365,
+          "n": 500,
+          "rate": 0.73,
+          "wilson": [
+            0.6894413425907917,
+            0.7670514607968943
+          ]
+        },
+        "0.3": {
+          "hits": 495,
+          "n": 500,
+          "rate": 0.99,
+          "wilson": [
+            0.9768069002442693,
+            0.9957212461034096
+          ]
+        }
+      },
+      "delta_min": 0.3,
+      "false_alarm": {
+        "hits": 21,
+        "n": 2000,
+        "rate": 0.0105,
+        "wilson": [
+          0.006877887380873443,
+          0.015998901907473176
+        ]
+      },
+      "false_alarm_bound": 0.014449719092257398,
+      "method_hash": "0438d301457828af4ef2b056b58138e4a841811411bdf9a2ed091c8cc4b75d16",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "battery_rd": {
+      "alpha_falsify": 0.01,
+      "code_hash": "60e420d3933f10d089b7ea7b25828a96254af58eeee64a7f7bf228fa7d74b0f4",
+      "curve": {
+        "0.0": {
+          "hits": 15,
+          "n": 1000,
+          "rate": 0.015,
+          "wilson": [
+            0.009110978804081668,
+            0.024600976926906798
+          ]
+        },
+        "0.05": {
+          "hits": 12,
+          "n": 250,
+          "rate": 0.048,
+          "wilson": [
+            0.02766820153069461,
+            0.08201230121318728
+          ]
+        },
+        "0.1": {
+          "hits": 35,
+          "n": 250,
+          "rate": 0.14,
+          "wilson": [
+            0.1024162573102742,
+            0.1884797183264459
+          ]
+        },
+        "0.2": {
+          "hits": 149,
+          "n": 250,
+          "rate": 0.596,
+          "wilson": [
+            0.5341653599169152,
+            0.6549290465799593
+          ]
+        },
+        "0.3": {
+          "hits": 227,
+          "n": 250,
+          "rate": 0.908,
+          "wilson": [
+            0.8657382427250239,
+            0.9379129848866933
+          ]
+        },
+        "0.5": {
+          "hits": 248,
+          "n": 250,
+          "rate": 0.992,
+          "wilson": [
+            0.9713054704167919,
+            0.9978033628796906
+          ]
+        }
+      },
+      "delta_min": 0.3,
+      "false_alarm": {
+        "hits": 15,
+        "n": 1000,
+        "rate": 0.015,
+        "wilson": [
+          0.009110978804081668,
+          0.024600976926906798
+        ]
+      },
+      "false_alarm_bound": 0.01629285308902091,
+      "method_hash": "1bd4940f8e764d9056ae1fa857fd6f68d0cd65353d13e2db2be0c431e414d09b",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "coverage_aipw": {
+      "code_hash": "d11edb834d8582c4591a19993897a1e9babdd9620317efd5d94f7d9d677239b9",
+      "method_hash": "5be674b2923ac4e259f36e0f9f20afbc8299ecf46affc667bec6659906a27b95",
+      "passed": false,
+      "seeds": [
+        0,
+        2000
+      ],
+      "worlds": {
+        "boosted_ate": {
+          "hits": 469,
+          "mean_z": -0.09947458507836089,
+          "meets_floor": false,
+          "n": 500,
+          "rate": 0.938,
+          "wilson": [
+            0.9133402868983618,
+            0.9559807908573184
+          ],
+          "z_within_0.1": true
+        },
+        "linear_ate": {
+          "hits": 1888,
+          "mean_z": 0.02955959015073281,
+          "meets_floor": true,
+          "n": 2000,
+          "rate": 0.944,
+          "wilson": [
+            0.9330459959530119,
+            0.9532516660612355
+          ],
+          "z_within_0.1": true
+        },
+        "linear_att": {
+          "hits": 1896,
+          "mean_z": 0.037030432345826106,
+          "meets_floor": true,
+          "n": 2000,
+          "rate": 0.948,
+          "wilson": [
+            0.9373820458455553,
+            0.956900279790442
+          ],
+          "z_within_0.1": true
+        }
+      }
+    },
+    "coverage_did": {
+      "code_hash": "91d9177d1aaea84686575a923907fa124e7113b1bf4ff25bf744612a8e7090a9",
+      "method_hash": "6d0feb6a9d9c5fc3ba1cd20aeda6233cac5412033b0aa12ec8a72729749149ff",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ],
+      "worlds": {
+        "single_group": {
+          "hits": 1888,
+          "mean_z": -0.02166048889084521,
+          "meets_floor": true,
+          "n": 2000,
+          "rate": 0.944,
+          "wilson": [
+            0.9330459959530119,
+            0.9532516660612355
+          ],
+          "z_within_0.1": true
+        },
+        "staggered": {
+          "hits": 951,
+          "mean_z": -0.02926291399763592,
+          "meets_floor": true,
+          "n": 1000,
+          "rate": 0.951,
+          "wilson": [
+            0.9358092984933898,
+            0.9627389653526394
+          ],
+          "z_within_0.1": true
+        }
+      }
+    },
+    "coverage_iv": {
+      "code_hash": "aa068d6cd305be67f5e5fe29ea352caddc043058bacb820d09f3f721de2709fc",
+      "coverage": {
+        "hits": 1914,
+        "meets_floor": true,
+        "n": 2000,
+        "rate": 0.957,
+        "wilson": [
+          0.9471988913295474,
+          0.9650489274553872
+        ]
+      },
+      "method_hash": "3ca8c701d9c2c276d25d35b51497950b619e12a9fc850d8b6472f496b59fc26a",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ],
+      "weak_flags": 0
+    },
+    "coverage_randomized": {
+      "code_hash": "0412c3a526e5ddfa0f560dd14fab85eada0e0934e7f68015d0a0665eb1a79553",
+      "coverage": {
+        "hits": 1891,
+        "meets_floor": true,
+        "n": 2000,
+        "rate": 0.9455,
+        "wilson": [
+          0.9346702670259668,
+          0.9546216438464368
+        ]
+      },
+      "method_hash": "1de8498d8182d810ed97074f1d8bedd81242548501cd0bf67ae6bf8f02bbfc15",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "coverage_rd": {
+      "code_hash": "2fdf24db96cd19bbdfc3c92653620ed5d3b9212d4bbc8fbd575830335b947d16",
+      "coverage": {
+        "hits": 1906,
+        "mean_z": -0.01160965707746099,
+        "meets_floor": true,
+        "n": 2000,
+        "rate": 0.953,
+        "wilson": [
+          0.9428245575283534,
+          0.9614385976348314
+        ],
+        "z_within_0.1": true
+      },
+      "method_hash": "c60d3c2b470685ea56d06d960f910cea9861f1e2aed7479613f4a4c6010fc13b",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "density_rd": {
+      "alpha_falsify": 0.01,
+      "code_hash": "24093c9a498e43a4c121dff1f2e199e5af633c3d422fa5b88c14a64bea4cf02a",
+      "curve": {
+        "0.0": {
+          "hits": 20,
+          "n": 2000,
+          "rate": 0.01,
+          "wilson": [
+            0.006482767876552687,
+            0.015395938459075187
+          ]
+        },
+        "0.1": {
+          "hits": 34,
+          "n": 500,
+          "rate": 0.068,
+          "wilson": [
+            0.04906650742490687,
+            0.0935209227338743
+          ]
+        },
+        "0.2": {
+          "hits": 160,
+          "n": 500,
+          "rate": 0.32,
+          "wilson": [
+            0.28061775068949024,
+            0.3621270118766686
+          ]
+        },
+        "0.3": {
+          "hits": 309,
+          "n": 500,
+          "rate": 0.618,
+          "wilson": [
+            0.5746652808852669,
+            0.6595353747658067
+          ]
+        },
+        "0.5": {
+          "hits": 481,
+          "n": 500,
+          "rate": 0.962,
+          "wilson": [
+            0.9414152274693561,
+            0.9755398819441696
+          ]
+        },
+        "0.7": {
+          "hits": 499,
+          "n": 500,
+          "rate": 0.998,
+          "wilson": [
+            0.9887592932948532,
+            0.9996468636054407
+          ]
+        }
+      },
+      "delta_min": 0.5,
+      "false_alarm": {
+        "hits": 20,
+        "n": 2000,
+        "rate": 0.01,
+        "wilson": [
+          0.006482767876552687,
+          0.015395938459075187
+        ]
+      },
+      "false_alarm_bound": 0.014449719092257398,
+      "method_hash": "083b11bac8f3c3ab8a56801326b7b9d038eeffc74636453a788b4528d307dca9",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "false_confirm": {
+      "code_hash": "f7a52489da83befec07266a08b39c199e032ed3008655fb27a0a4d3b3bc65f5d",
+      "method_hash": "f612297bf715b4113e805db098f27a143c91f59f2673e13425ccdec926b05b89",
+      "note": "all other gates were marked certified for this run; the unshared-confounder row is the known blind spot",
+      "passed": true,
+      "replicates": 300,
+      "seeds": [
+        0,
+        1800
+      ],
+      "worlds": {
+        "clean": {
+          "attested": {
+            "hits": 5,
+            "n": 300,
+            "rate": 0.016666666666666666,
+            "wilson": [
+              0.00713947735063333,
+              0.0384153948330945
+            ]
+          },
+          "confirmed": {
+            "hits": 291,
+            "n": 300,
+            "rate": 0.97,
+            "wilson": [
+              0.9439774608583589,
+              0.9841381461905676
+            ]
+          }
+        },
+        "shared_confounder": {
+          "attested": {
+            "hits": 0,
+            "n": 300,
+            "rate": 0.0,
+            "wilson": [
+              0.0,
+              0.012642971224546034
+            ]
+          },
+          "confirmed": {
+            "hits": 0,
+            "n": 300,
+            "rate": 0.0,
+            "wilson": [
+              0.0,
+              0.012642971224546034
+            ]
+          }
+        },
+        "unshared_confounder": {
+          "attested": {
+            "hits": 5,
+            "n": 300,
+            "rate": 0.016666666666666666,
+            "wilson": [
+              0.00713947735063333,
+              0.0384153948330945
+            ]
+          },
+          "confirmed": {
+            "hits": 293,
+            "n": 300,
+            "rate": 0.9766666666666667,
+            "wilson": [
+              0.9526280277317246,
+              0.9886523397008747
+            ]
+          }
+        }
+      }
+    },
+    "iv_strength": {
+      "code_hash": "9881d1f34646e96a5eedcd556431a8dffbd43cef9a67ff629685de4759e78413",
+      "method_hash": "8a4180a627d974c76809f5bed21d1ee70a8a1c000ed956745ebd1e05f3d50bc7",
+      "passed": true,
+      "seeds": [
+        0,
+        2000
+      ],
+      "strong_world_false_weak": {
+        "hits": 0,
+        "n": 2000,
+        "rate": 0.0,
+        "wilson": [
+          0.0,
+          0.001917047281252934
+        ]
+      },
+      "weak_flag_recall": {
+        "hits": 1964,
+        "n": 2000,
+        "rate": 0.982,
+        "wilson": [
+          0.9751819578651543,
+          0.9869700085557177
+        ]
+      },
+      "weak_world_headline_coverage": {
+        "hits": 1899,
+        "meets_floor": true,
+        "n": 2000,
+        "rate": 0.9495,
+        "wilson": [
+          0.9390120477558316,
+          0.958264526738322
+        ]
+      }
+    },
+    "overlap": {
+      "code_hash": "9c092f6aa6a5478fa7c28bcb7386924f4c770e52777638e707719080849fb8db",
+      "curves": {
+        "0.005": {
+          "coverage_when_untrimmed": {
+            "hits": 479,
+            "n": 500,
+            "rate": 0.958,
+            "wilson": [
+              0.9366484142456699,
+              0.9723676898915483
+            ]
+          },
+          "gate_fires": {
+            "hits": 500,
+            "n": 500,
+            "rate": 1.0,
+            "wilson": [
+              0.9923756595384479,
+              1.0
+            ]
+          },
+          "mean_ess_treated_over_n": 0.10730889174357656,
+          "mean_min_estimated_propensity": 0.00022146567005298012
+        },
+        "0.02": {
+          "coverage_when_untrimmed": {
+            "hits": 477,
+            "n": 500,
+            "rate": 0.954,
+            "wilson": [
+              0.9319222072317267,
+              0.9691548916291838
+            ]
+          },
+          "gate_fires": {
+            "hits": 500,
+            "n": 500,
+            "rate": 1.0,
+            "wilson": [
+              0.9923756595384479,
+              1.0
+            ]
+          },
+          "mean_ess_treated_over_n": 0.1479399901697862,
+          "mean_min_estimated_propensity": 0.001769525893675179
+        },
+        "0.1": {
+          "coverage_when_untrimmed": {
+            "hits": 474,
+            "n": 500,
+            "rate": 0.948,
+            "wilson": [
+              0.9248988560621544,
+              0.9642697348842947
+            ]
+          },
+          "gate_fires": {
+            "hits": 3,
+            "n": 500,
+            "rate": 0.006,
+            "wilson": [
+              0.0020425962719602363,
+              0.01749025210405338
+            ]
+          },
+          "mean_ess_treated_over_n": 0.30721015844589544,
+          "mean_min_estimated_propensity": 0.02169470878378835
+        },
+        "0.5": {
+          "coverage_when_untrimmed": {
+            "hits": 475,
+            "n": 500,
+            "rate": 0.95,
+            "wilson": [
+              0.9272318388284524,
+              0.9659062547561506
+            ]
+          },
+          "gate_fires": {
+            "hits": 0,
+            "n": 500,
+            "rate": 0.0,
+            "wilson": [
+              0.0,
+              0.007624340461552241
+            ]
+          },
+          "mean_ess_treated_over_n": 0.4849000083155769,
+          "mean_min_estimated_propensity": 0.25882151055548114
+        }
+      },
+      "eps": 0.05,
+      "false_refuse_worst": 0.006,
+      "method_hash": "83c440acbc922fc05a1847db443e6737532b10d2b48f561eeadb7b8b5b9fee1f",
+      "passed": true,
+      "recall_wilson_lower_worst": 0.9923756595384479,
+      "replicates": 500,
+      "seeds": [
+        0,
+        2000
+      ],
+      "share_gate": 0.05
+    },
+    "selector": {
+      "accepts_when_eligible": {
+        "hits": 200,
+        "n": 200,
+        "rate": 1.0,
+        "wilson": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
+      "code_hash": "3c3454a04bc630e9f21a1a898289d9c0cdb147b2753a6014755b296af62d6978",
+      "method_hash": "03de4a53316b12d3f6803337e79a85ad43dbf1e99f3858f346fe02e26618724e",
+      "passed": true,
+      "refuses_when_none_eligible": {
+        "hits": 200,
+        "n": 200,
+        "rate": 1.0,
+        "wilson": [
+          0.9811546736227335,
+          1.0
+        ]
+      },
+      "replicates": 200,
+      "seeds": [
+        0,
+        200
+      ]
+    },
+    "sensitivity_bound": {
+      "code_hash": "7ba49bc003e4170cd5e8ad2f07cd73b666a290b53ea6a65ad2777b7e84e44e14",
+      "method_hash": "b1d2d5ebca3839e6fe7311d428475472e5ad7e4a127995bbd415bd0bd9975ae1",
+      "passed": true,
+      "replicates": 500,
+      "seeds": [
+        0,
+        1000
+      ],
+      "worlds": {
+        "beyond_2x": {
+          "claim_still_holds": {
+            "hits": 500,
+            "n": 500,
+            "rate": 1.0,
+            "wilson": [
+              0.9923756595384479,
+              1.0
+            ]
+          },
+          "coverage": {
+            "hits": 0,
+            "n": 500,
+            "rate": 0.0,
+            "wilson": [
+              0.0,
+              0.007624340461552241
+            ]
+          }
+        },
+        "boundary": {
+          "claim_still_holds": {
+            "hits": 500,
+            "n": 500,
+            "rate": 1.0,
+            "wilson": [
+              0.9923756595384479,
+              1.0
+            ]
+          },
+          "coverage": {
+            "hits": 400,
+            "n": 500,
+            "rate": 0.8,
+            "wilson": [
+              0.7627108946948261,
+              0.8327145010282427
+            ]
+          }
+        },
+        "inside_half": {
+          "claim_still_holds": {
+            "hits": 376,
+            "n": 500,
+            "rate": 0.752,
+            "wilson": [
+              0.7123215407533253,
+              0.7878357916540525
+            ]
+          },
+          "coverage": {
+            "hits": 500,
+            "n": 500,
+            "rate": 1.0,
+            "wilson": [
+              0.9923756595384479,
+              1.0
+            ]
+          }
+        }
+      }
+    },
+    "sensitivity_did": {
+      "code_hash": "be9e71b2d6fa611eb547344c44e3dc5fa341df1c393f776daf78bd941cdb6455",
+      "drift_per_period": 0.1,
+      "m0_coverage": {
+        "hits": 56,
+        "n": 125,
+        "rate": 0.448,
+        "wilson": [
+          0.36366890453732625,
+          0.5354318964083398
+        ]
+      },
+      "m1_coverage": {
+        "hits": 122,
+        "meets_floor": true,
+        "n": 125,
+        "rate": 0.976,
+        "wilson": [
+          0.9318110017162228,
+          0.9918047434734504
+        ]
+      },
+      "method_hash": "03f3c10b28df65c7b14b461307165906fc3b91cdae4ed8a22a9f7632e6556162",
+      "passed": true,
+      "replicates": 125,
+      "seeds": [
+        0,
+        500
+      ]
+    },
+    "size_synth": {
+      "code_hash": "e5ef30fc1855471294e1d8b740b1e339f61bc3f42db3cd24342e275e6c8d62fc",
+      "method_hash": "7dab972e2938737fbea86e516306a776fffd031717db88cf1a8feb0679958a9a",
+      "passed": true,
+      "power_at_effect_3": {
+        "hits": 60,
+        "n": 60,
+        "rate": 1.0,
+        "wilson": [
+          0.93982814785791,
+          1.0
+        ]
+      },
+      "replicates": 125,
+      "seeds": [
+        0,
+        500
+      ],
+      "size": {
+        "hits": 5,
+        "n": 125,
+        "rate": 0.04,
+        "wilson": [
+          0.017204609071915906,
+          0.09022555313974442
+        ]
+      },
+      "size_bound": 0.08898717737923587
+    }
+  },
+  "not_measured": [
+    "real-covariate worlds (plan A3: planted effect on real X)",
+    "NSW with CPS/PSID comparison groups and Tennessee STAR",
+    "ACIC and IHDP generators",
+    "frozen reference outputs: rdrobust, sensemakr, EValue, did, HonestDiD",
+    "outside-party replication of the gold-standard table",
+    "battery_iv: no falsification test for a just-identified instrument",
+    "battery_synth: placebo-in-space is the inference itself",
+    "bit-identical reports on Python 3.11 and 3.14"
+  ],
+  "version": 1
+}
