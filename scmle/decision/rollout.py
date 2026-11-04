@@ -28,6 +28,10 @@ After a promotion the `RollbackMonitor` tests `H0_rb: Delta_new_vs_old >=
 over the monitoring lifetime. The converse error is described by the
 detection delay, which the certificates measure.
 
+The pseudo-outcomes are centred by the running mean of earlier outcomes
+(`anytime.running_center`), which leaves their mean unchanged and cuts the
+variance the e-process has to overcome.
+
 Assumptions, stated in every record: randomized assignment with the recorded
 probability, no interference between units, and a stationary effect (under
 drift the confidence sequence covers the running average of `Delta_t`). A
@@ -100,16 +104,18 @@ def metric_stream(
     plan: charter_decision.RolloutPlan,
     guard: charter_decision.Guardrail | None,
 ) -> anytime.Stream:
-    """The pseudo-outcome stream and null of the primary or a guardrail."""
+    """The centred pseudo-outcome stream and null of the primary or a guardrail.
+
+    A higher-is-worse guardrail tests whether the harm reaches its margin (a
+    `less` test); a lower-is-worse one negates its values and does the same.
+    """
     q = plan.assignment_prob
     if guard is None:
-        scale = plan.high - plan.low
-        return anytime.difference_stream(q, plan.delta_min / scale)
-    scale = guard.high - guard.low
-    margin = guard.margin / scale
-    if guard.higher_is_worse:
-        return anytime.difference_stream(q, margin, "less")
-    return anytime.Stream(-1.0 / q, 1.0 / (1.0 - q), margin, "less")
+        return anytime.centered_stream(
+            q, plan.delta_min / (plan.high - plan.low)
+        )
+    margin = guard.margin / (guard.high - guard.low)
+    return anytime.centered_stream(q, margin, "less")
 
 
 def metric_values(
@@ -117,16 +123,23 @@ def metric_values(
     guard: charter_decision.Guardrail | None,
     arm: NDArray[np.float64],
     outcome: ArrayLike,
-) -> NDArray[np.float64]:
-    """Pseudo-outcomes of one metric, negated for a lower-is-worse guardrail."""
+    carry: tuple[float, int] = (0.0, 0),
+) -> tuple[NDArray[np.float64], tuple[float, int]]:
+    """Centred pseudo-outcomes of one metric and the updated centre state.
+
+    The centre of each unit is the shrunken mean of the outcomes seen before
+    it, so the values stay a valid stream however the batches are cut.
+    """
     low, high = (
         (plan.low, plan.high) if guard is None else (guard.low, guard.high)
     )
     y = (np.asarray(outcome, dtype=float) - low) / (high - low)
-    z = anytime.pseudo_outcomes(arm, y, plan.assignment_prob)
+    z = anytime.pseudo_outcomes(
+        arm, y, plan.assignment_prob, anytime.running_center(y, carry=carry)
+    )
     if guard is not None and not guard.higher_is_worse:
-        return -z
-    return z
+        z = -z
+    return z, (carry[0] + float(y.sum()), carry[1] + len(y))
 
 
 class Rollout:
@@ -159,6 +172,9 @@ class Rollout:
             name: anytime.EProcess(metric_stream(plan, guard))
             for name, guard in zip(names, self.guards, strict=True)
         }
+        self.carry: dict[str, tuple[float, int]] = dict.fromkeys(
+            names, (0.0, 0)
+        )
         self.primary_z: list[NDArray[np.float64]] = []
         self.units = 0
         self.challenger_units = 0
@@ -192,8 +208,12 @@ class Rollout:
         paths = []
         for name, guard in zip(self.names, self.guards, strict=True):
             raw = primary if guard is None else supplied[name]
-            values = metric_values(
-                self.plan, guard, a, np.asarray(raw, dtype=float)[:room]
+            values, self.carry[name] = metric_values(
+                self.plan,
+                guard,
+                a,
+                np.asarray(raw, dtype=float)[:room],
+                self.carry[name],
             )
             self.processes[name].update(values)
             paths.append(self.processes[name].path)
@@ -263,9 +283,10 @@ class RollbackMonitor:
         self.low, self.high = low, high
         self.new_prob = new_prob
         self.target = -math.log(alpha_rollback)
-        self.stream = anytime.difference_stream(
+        self.stream = anytime.centered_stream(
             new_prob, -tolerance / scale, "less"
         )
+        self.carry = (0.0, 0)
         self.process = anytime.EProcess(self.stream)
         self.alpha = alpha_rollback
         self.units = 0
@@ -280,8 +301,12 @@ class RollbackMonitor:
             self.high - self.low
         )
         z = anytime.pseudo_outcomes(
-            np.asarray(arm, dtype=float), y, self.new_prob
+            np.asarray(arm, dtype=float),
+            y,
+            self.new_prob,
+            anytime.running_center(y, carry=self.carry),
         )
+        self.carry = (self.carry[0] + float(y.sum()), self.carry[1] + len(y))
         self.process.update(z)
         hit = self.process.path >= self.target
         if hit.any():

@@ -188,6 +188,22 @@ class ThresholdRule:
         return (risk >= self.threshold).astype(float)
 
     @property
+    def raw_threshold(self) -> float | None:
+        """The equivalent cut on the raw probability, or None.
+
+        A Platt map with a positive slope is increasing, so acting when the
+        recalibrated probability reaches `t` is acting when the raw one
+        reaches the returned cut. A non-increasing map has no such cut.
+        """
+        r = self.recalibrator
+        if r is None:
+            return self.threshold
+        if r.slope <= 0:
+            return None
+        score = np.log(self.threshold / (1.0 - self.threshold))
+        return float(1.0 / (1.0 + np.exp(-(score - r.intercept) / r.slope)))
+
+    @property
     def digest(self) -> str:
         """Hash identifying the frozen rule (not its actions anywhere)."""
         r = self.recalibrator
@@ -325,10 +341,9 @@ def choose_threshold(
         recheck = calibration_check(
             cross_fitted(risk, labels, seed), labels, level
         )
-        if recheck.calibrated:
-            rule = ThresholdRule(
-                target, "recalibrated", fit_recalibrator(risk, labels)
-            )
+        platt = fit_recalibrator(risk, labels)
+        if recheck.calibrated and platt.slope > 0:
+            rule = ThresholdRule(target, "recalibrated", platt)
         else:
             cut, _ = grid_thresholds.optimize_threshold(
                 risk,

@@ -135,12 +135,8 @@ def simulate_stopping(
     y = (rng.random((runs, plan.n_max)) < p_control + effect * arm).astype(
         float
     )
-    z = anytime.pseudo_outcomes(arm.ravel(), y.ravel(), q).reshape(
-        runs, plan.n_max
-    )
     scaled = plan.delta_min / (plan.high - plan.low)
-    stream = anytime.difference_stream(q, scaled)
-    paths = anytime.log_wealth_paths(z, stream)
+    paths = anytime.centered_paths(arm, y, q, scaled)
     hit = paths >= -math.log(chosen)
     crossed = hit.any(axis=1)
     when = np.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)

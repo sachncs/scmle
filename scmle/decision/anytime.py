@@ -36,6 +36,15 @@ in `[0, 1]`, the pseudo-outcome
 has mean equal to the mean difference and lies in `[-1/(1 - q), 1/q]`. It is
 bounded because the assignment probability is known, and its mean is the
 effect because assignment is randomized.
+
+The raw pseudo-outcome carries the level of `y` in its variance, which makes
+the e-process slow for a metric whose mean is far from zero. Subtracting any
+centre `c_i` that is fixed before unit `i`'s outcome (for example the running
+mean of earlier outcomes) leaves the mean unchanged, because
+`E[a c / q - (1 - a) c / (1 - q)] = c - c = 0` when `a` is Bernoulli(`q`)
+independent of the past, and with `y` and `c` in `[0, 1]` the centred value
+lies in `[-M, M]`, `M = max(1/q, 1/(1 - q))`. `running_center` and
+`centered_stream` implement it; the uncentred pair stays for comparison.
 """
 
 import dataclasses
@@ -229,30 +238,102 @@ def positive_level(level: float) -> float:
 
 
 def pseudo_outcomes(
-    arm: ArrayLike, outcome: ArrayLike, assignment_prob: float
+    arm: ArrayLike,
+    outcome: ArrayLike,
+    assignment_prob: float,
+    center: ArrayLike | None = None,
 ) -> NDArray[np.float64]:
-    """`z = a y / q - (1 - a) y / (1 - q)`, mean difference per unit.
+    """`z = a (y - c) / q - (1 - a) (y - c) / (1 - q)`, mean difference.
 
     Args:
         arm: 1 for the challenger, 0 for the champion.
         outcome: The metric rescaled to `[0, 1]`.
         assignment_prob: The recorded probability `q` of the challenger arm.
+        center: Per-unit centres in `[0, 1]` fixed before each outcome, or
+            None for no centring.
 
     Returns:
-        Pseudo-outcomes in `[-1 / (1 - q), 1 / q]`.
+        Pseudo-outcomes with the mean difference as their mean; without a
+        centre they lie in `[-1 / (1 - q), 1 / q]`.
     """
     q = qualification.finite(assignment_prob, "assignment_prob")
     if not 0.0 < q < 1.0:
         raise ValueError("assignment_prob must be strictly between 0 and 1")
     a = np.asarray(arm, dtype=float)
     y = np.asarray(outcome, dtype=float)
-    if a.shape != y.shape or a.ndim != 1:
-        raise ValueError("arm and outcome must be 1-d arrays of equal length")
+    if a.shape != y.shape or a.ndim not in (1, 2):
+        raise ValueError(
+            "arm and outcome must be arrays of equal shape (1-d or 2-d)"
+        )
     if not np.isin(a, (0.0, 1.0)).all():
         raise ValueError("arm must hold only 0 and 1")
     if (y < 0).any() or (y > 1).any() or not np.isfinite(y).all():
         raise ValueError("outcome must lie in [0, 1]")
-    return a * y / q - (1.0 - a) * y / (1.0 - q)
+    c = np.zeros_like(y) if center is None else np.asarray(center, dtype=float)
+    if c.shape != y.shape or (c < 0).any() or (c > 1).any():
+        raise ValueError("center must lie in [0, 1] and match the outcome")
+    shifted = y - c
+    result: NDArray[np.float64] = a * shifted / q - (1.0 - a) * shifted / (
+        1.0 - q
+    )
+    return result
+
+
+def running_center(
+    outcome: ArrayLike,
+    prior: float = 0.5,
+    strength: float = 2.0,
+    carry: tuple[float, int] = (0.0, 0),
+) -> NDArray[np.float64]:
+    """Centres that use only earlier outcomes: a shrunken running mean.
+
+    `c_i = (prior * strength + sum_{j < i} y_j) / (strength + (i - 1))`, along
+    the last axis; `carry` is the `(sum, count)` of outcomes seen in earlier
+    batches. Each centre is fixed before its own unit is observed, which is
+    all the validity argument needs.
+    """
+    y = np.asarray(outcome, dtype=float)
+    total, seen = carry
+    before = np.cumsum(y, axis=-1) - y + total
+    count = np.arange(y.shape[-1], dtype=float) + seen
+    result: NDArray[np.float64] = (prior * strength + before) / (
+        strength + count
+    )
+    return result
+
+
+def centered_stream(
+    assignment_prob: float, null: float, direction: str = "greater"
+) -> Stream:
+    """The stream of centred pseudo-outcomes, bounded in `[-M, M]`."""
+    q = assignment_prob
+    bound = max(1.0 / q, 1.0 / (1.0 - q))
+    return Stream(-bound, bound, null, direction)
+
+
+def centered_paths(
+    arm: ArrayLike,
+    outcome: ArrayLike,
+    assignment_prob: float,
+    null: float,
+    direction: str = "greater",
+    sign: float = 1.0,
+) -> NDArray[np.float64]:
+    """Log e-process paths of the centred pseudo-outcomes, `(T,)` or `(R, T)`.
+
+    Args:
+        arm: 1 for the challenger, 0 for the champion.
+        outcome: The metric rescaled to `[0, 1]`.
+        assignment_prob: The recorded probability of the challenger arm.
+        null: The null mean of the (signed) difference in rescaled units.
+        direction: `greater` or `less`.
+        sign: `-1` to test the negated difference (a lower-is-worse metric).
+    """
+    y = np.asarray(outcome, dtype=float)
+    z = sign * pseudo_outcomes(arm, y, assignment_prob, running_center(y))
+    return log_wealth_paths(
+        z, centered_stream(assignment_prob, null, direction)
+    )
 
 
 def difference_stream(

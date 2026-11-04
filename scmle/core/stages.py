@@ -63,6 +63,8 @@ from scmle.data.robustness import report as robustness_report
 from scmle.data.robustness import stability as robustness_stability
 from scmle.data.splitting import splitters
 from scmle.data.validation import target as target_module
+from scmle.decision import netbenefit as decision_netbenefit
+from scmle.decision import threshold as decision_threshold
 from scmle.evaluation import backtest
 from scmle.evaluation import bias_variance
 from scmle.evaluation import confidence
@@ -1636,6 +1638,107 @@ def reference_scores(
     return pd.Series(predicted, name="prediction")
 
 
+def chartered_decision_model(
+    context: context_module.RunContext,
+) -> charter_contracts.AnalysisCharter | None:
+    """The charter when it declares a decision layer (F11), else None."""
+    path = context.spec.charter_path
+    if path is None:
+        return None
+    charter = charter_sealing.read_verified(str(path)).charter
+    if charter.decision is None or charter.cost_model is None:
+        return None
+    return charter
+
+
+def chartered_threshold(
+    fitted: Any,
+    probabilities: np.ndarray,
+    actual: np.ndarray,
+    charter: charter_contracts.AnalysisCharter,
+    seed: int,
+    rows: int,
+) -> tuple[Any, dict[str, Any]]:
+    """Thresholds from the chartered cost model with the calibration gate.
+
+    The rule is chosen on out-of-fold development probabilities only and is
+    frozen; a recalibrating rule is expressed as the equivalent cut on the raw
+    probability, so the served classifier needs no extra stage.
+    """
+    layer = charter.decision
+    model = charter.cost_model
+    assert layer is not None and model is not None
+    chosen = decision_threshold.choose_threshold(
+        probabilities,
+        actual.astype(float),
+        model,
+        level=layer.model.calibration_level,
+        replicates=charter.error_budget.permutations_b,
+        seed=seed,
+    )
+    cut = chosen.rule.raw_threshold
+    assert cut is not None
+    description = {
+        "objective": "chartered_cost",
+        "threshold": cut,
+        "validation_rows": rows,
+        "f11": chosen.to_dict(),
+        "cost_model_hash": model.model_hash,
+    }
+    return thresholds.ThresholdClassifier.around_fitted(fitted, cut), (
+        description
+    )
+
+
+def chartered_net_benefit(
+    context: context_module.RunContext,
+    pipeline: Any,
+    features: pd.DataFrame,
+    target: pd.Series,
+    decision: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Net benefit of the frozen rule on the locked test set, once (F11).
+
+    Registered by the rule's hash before the table is read; the guard refuses
+    a second call. The band is simultaneous over the chartered range of
+    threshold probabilities and clustered by the group column of a grouped
+    split. The claim is `useful` or `not_useful_in_range`; it is tiered
+    `attested` when every cost came from a person and `unverified` otherwise.
+    """
+    charter = chartered_decision_model(context)
+    if charter is None or decision is None or "f11" not in decision:
+        return None
+    model = charter.cost_model
+    assert model is not None
+    positive = pipeline.classes_[1]
+    split = require(context.split, "split")
+    clusters = (
+        features[context.spec.data.group_column]
+        if split.manifest.strategy == "group" and context.spec.data.group_column
+        else None
+    )
+    guard = decision_netbenefit.FinalNetBenefit(decision["f11"]["rule_hash"])
+    report = guard.evaluate(
+        decision["f11"]["rule_hash"],
+        (target == positive).to_numpy(dtype=float),
+        (np.asarray(pipeline.predict(features)) == positive).astype(float),
+        (model.t_lo, model.t_hi),
+        clusters=clusters,
+        alpha=float(charter.error_budget.confirmation.alpha_confirm),
+        replicates=max(charter.error_budget.permutations_b, 500),
+        seed=charter.seed,
+    )
+    tier = "unverified" if model.unverified_entries else "attested"
+    return {
+        **report.to_dict(),
+        "tier": "unverified"
+        if decision["f11"]["tier"] == "unverified"
+        else tier,
+        "cost_model_hash": model.model_hash,
+        "rule_hash": decision["f11"]["rule_hash"],
+    }
+
+
 def choose_decision_threshold(
     context: context_module.RunContext, fitted: Any
 ) -> tuple[Any, dict[str, Any] | None]:
@@ -1655,8 +1758,9 @@ def choose_decision_threshold(
     """
     decision = context.spec.decision
     task = require(context.task, "task")
-    if decision.threshold_objective == "none" or task is not (
-        tasks.TaskType.BINARY
+    chartered = chartered_decision_model(context)
+    if task is not tasks.TaskType.BINARY or (
+        decision.threshold_objective == "none" and chartered is None
     ):
         return fitted, None
     split = require(context.split, "split")
@@ -1673,6 +1777,10 @@ def choose_decision_threshold(
     )
     positive = fitted.classes_[1]
     actual = (split.dev_target.iloc[positions] == positive).to_numpy()
+    if chartered is not None:
+        return chartered_threshold(
+            fitted, probabilities, actual, chartered, seed, len(positions)
+        )
     kind = thresholds.OBJECTIVES[decision.threshold_objective]
     objective = (
         kind(decision.false_positive_cost, decision.false_negative_cost)
@@ -2159,6 +2267,9 @@ class FinalEvaluationStage(Stage):
             "split_fingerprint": split.manifest.fingerprint,
             "split_strategy": split.manifest.strategy,
             "decision": decision,
+            "net_benefit": chartered_net_benefit(
+                context, pipeline, test_features, test_target, decision
+            ),
             "resources": usage.to_dict(),
             "resource_limits": context.resource_governor.report(),
             "test_set_opened": locked.opened,

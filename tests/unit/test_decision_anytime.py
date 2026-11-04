@@ -130,3 +130,73 @@ def test_the_confidence_bound_covers_and_tightens_with_data():
 def test_bad_inputs_are_refused(call):
     with pytest.raises(ValueError):
         call()
+
+
+# --- centred pseudo-outcomes -------------------------------------------------
+
+
+def test_the_running_centre_uses_only_earlier_outcomes():
+    y = np.array([1.0, 0.0, 1.0, 1.0])
+    centres = anytime.running_center(y, prior=0.5, strength=2.0)
+    # (0.5 * 2 + sum so far) / (2 + units so far)
+    assert centres.tolist() == pytest.approx([0.5, 2 / 3, 0.5, 0.6])
+    later = anytime.running_center(y[2:], carry=(1.0, 2))
+    assert later.tolist() == pytest.approx(centres[2:].tolist())
+    changed = y.copy()
+    changed[3] = 0.0
+    assert anytime.running_center(changed)[:3].tolist() == pytest.approx(
+        centres[:3].tolist()
+    )
+
+
+def test_a_centred_pseudo_outcome_keeps_the_mean_difference_exactly():
+    q, length = 0.4, 6
+    cells = np.array(
+        list(itertools.product([0.0, 1.0], repeat=2 * length)), dtype=float
+    )
+    arm, y = cells[:, :length], cells[:, length:]
+    p_arm, p_y = (0.4, 0.3)
+    weight = (q ** arm.sum(1) * (1 - q) ** (length - arm.sum(1))) * (
+        p_y ** y.sum(1) * (1 - p_y) ** (length - y.sum(1))
+    )
+    z = anytime.pseudo_outcomes(arm, y, q, anytime.running_center(y))
+    # arm and outcome independent: the difference in means is zero
+    assert float((weight * z[:, -1]).sum()) == pytest.approx(0.0, abs=1e-12)
+    assert p_arm == q
+    assert z.min() >= -max(1 / q, 1 / (1 - q)) - 1e-12
+    assert z.max() <= max(1 / q, 1 / (1 - q)) + 1e-12
+
+
+def test_the_centred_e_process_has_mean_one_at_the_boundary_null():
+    q, length, p0 = 0.5, 5, 0.3
+    effect = 0.1
+    cells = np.array(
+        list(itertools.product([0.0, 1.0], repeat=2 * length)), dtype=float
+    )
+    arm, y = cells[:, :length], cells[:, length:]
+    p_y = p0 + effect * arm
+    like = np.prod(np.where(y == 1, p_y, 1 - p_y), axis=1) * (
+        q ** arm.sum(1) * (1 - q) ** (length - arm.sum(1))
+    )
+    paths = anytime.centered_paths(arm, y, q, effect)
+    assert float(like @ np.exp(paths[:, -1])) == pytest.approx(1.0, abs=1e-9)
+
+
+def test_centring_shortens_the_time_to_find_an_effect_on_a_high_mean_metric():
+    rng = np.random.default_rng(10)
+    runs, n = 200, 6000
+    arm = (rng.random((runs, n)) < 0.5).astype(float)
+    y = np.where(
+        arm == 1,
+        rng.beta(2.4, 7.6, arm.shape),
+        rng.beta(2.0, 8.0, arm.shape),
+    )
+    target = math.log(50)
+    plain = anytime.log_wealth_paths(
+        anytime.pseudo_outcomes(arm, y, 0.5),
+        anytime.difference_stream(0.5, 0.02),
+    )
+    centred = anytime.centered_paths(arm, y, 0.5, 0.02)
+    assert (centred.max(axis=1) >= target).mean() > (
+        (plain.max(axis=1) >= target).mean() + 0.3
+    )
