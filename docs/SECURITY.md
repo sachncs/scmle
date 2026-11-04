@@ -44,6 +44,27 @@ holds every row. Custody against a hostile operator needs separation: another
 operating-system user, a service, or a write-once object store. Do not describe
 a confirmation set as sealed beyond this.
 
+Accepted limit, recorded 2026-11-04: the caller's copy of the data (item C3)
+stays. The library cannot delete a DataFrame or file that its caller holds.
+The option that would close it is a CLI that reads the file inside the
+orchestrator and never returns the full frame to the caller; it is not built.
+
+### What is tested about custody, and what is not
+
+| Guarantee | Test | Stated limit |
+|---|---|---|
+| No artifact of a full charter run contains the canary value of a sealed row (`C` or the final test set) | `tests/leakage/test_custody_canary.py` | Text search for decimal spellings of each value; a function of several rows, or another encoding, is not searched |
+| After custody, no pandas object tracked by the garbage collector holds a canary of `C` or the final test set | `tests/leakage/test_custody_memory.py` | The caller's own copy is dropped by the test (see above); buffers outside Python, the page cache and swap are not inspected |
+| Detectors, admissibility and robustness modules do not import custody, the vault, the splitters module or the orchestrator, directly or through any scmle import | `tests/leakage/test_exploration_imports.py` | Static imports only; a runtime `importlib` call would not be seen |
+| The one release can be bound to a claims hash and a ledger hash; the vault refuses a release for any other pair | `tests/unit/test_vault.py`, `tests/unit/test_custody_sealed.py`, `tests/leakage/test_custody_access.py` | Available as `SealedSet.commit` and `open(..., claims_hash, ledger_hash)`. The confirmation stage does not call `commit` yet, so charter runs are not bound; the vault enforces the binding only if someone sets it |
+| Every custody log entry carries an HMAC of its hash when a signing key is available (explicit or `SCMLE_SIGNING_KEY`); a forger who recomputes the hash chain fails the MAC | `tests/unit/test_custody_sealed.py` | Without a key the log is a checksum only. Removing the newest entries is not detected by the chain or the MACs; compare `OpenLog.head` with a copy kept elsewhere |
+| The split manifest carries a Merkle root over the canonical content of the rows of `X`, `C` and the final set; a changed value inside a row changes the root | `tests/unit/test_custody_merkle.py`, `tests/unit/test_custody_manifest.py` | Embargo rows have no root; manifests written before this change have none |
+| For a temporal split the embargo is at least the number of leading autocorrelation lags of the target outside +-1.96/sqrt(n) | `tests/unit/test_custody_carve.py`, `tests/unit/test_custody_pipeline.py` | A rule of thumb for a stationary series; later (seasonal) dependence is not counted; only the target is measured, not the features |
+| Two fixtures (grouped, temporal) have pinned manifest hashes | `tests/unit/test_custody_golden.py` | Pinned on macOS arm64 only; equality on Windows and under lowest dependencies depends on the CI jobs passing and has not been observed from this machine |
+
+Mutation survivors for the custody, charter, vault and attestation modules are
+listed in `tests/unit/MUTANTS_custody.md`.
+
 ## Guidance for operators
 
 1. Set `SCMLE_SIGNING_KEY` wherever bundles are produced and verified.
