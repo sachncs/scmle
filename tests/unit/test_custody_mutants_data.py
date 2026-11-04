@@ -351,6 +351,8 @@ def test_the_view_and_split_carry_what_the_manifest_says():
     assert split.locked_test is original.locked_test
     assert isinstance(split.dev_features.index, pd.RangeIndex)
     assert isinstance(split.dev_target.index, pd.RangeIndex)
+    assert list(split.dev_features.columns) == ["x", "z"]
+    assert isinstance(split.dev_target, pd.Series)
     assert view.target.equals(split.dev_target)
     assert view.folds == manifest.folds
     assert view.manifest_sha256 == manifest.sha256
