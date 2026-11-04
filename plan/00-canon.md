@@ -65,9 +65,19 @@ person cannot supply is reported as `unverified`, never silently assumed.
 
 ## Tier readings added for the new features
 
-- Causal claims: `confirmed` only when the five conditions in F10 ("What
-  `confirmed` means for a causal claim") hold; the held-out set alone never
-  confirms a causal effect.
+- Causal claims (built; `scmle/data/identification/tier.py`): `confirmed`
+  only when all five hold: (1) the estimate and its interval were computed on
+  `C`, opened once; (2) every design diagnostic passed at a certified
+  threshold; (3) the pre-registered falsification battery ran and passed with
+  at least one negative control declared; (4) the estimate replicated in at
+  least two strata with one sign and no heterogeneity; (5) the sensitivity
+  gate holds at the declared strength. `attested` means every assumption has a
+  named attestor and the design passed but a condition above is missing (no
+  negative control, one treated unit, a weak instrument, an uncertified gate,
+  an unchecked adjustment set); `unverified` means an attestor is missing, a
+  design diagnostic failed or a falsification test rejected. `confirmed` does
+  not say the assumptions are true; the held-out set alone never confirms a
+  causal effect.
 - Decision claims: tiered as F11 ("Tiers for decision claims") specifies; an
   estimate that rests on non-randomized data inherits the F10 tier of the
   effect.

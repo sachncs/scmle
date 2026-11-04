@@ -2,6 +2,76 @@
 
 ## Unreleased
 
+* Causal identification (F10; `scmle/data/identification/`, charter format 4).
+  An estimand may carry a causal block (`CausalSpec`, `NegativeControl`,
+  `SensitivitySpec` in `scmle.data.charter.causal`): treatment, outcome,
+  estimand, design columns, attested assumptions from a closed vocabulary,
+  strategy priority, negative controls, strata, sensitivity benchmark and a
+  trimming rule. It is omitted when unset, so charters of format 1 to 3 keep
+  their hash and signature; `DecisionAction` gained `refuse_claim`. The
+  selector (`select.select`) is a function of the charter and an optional DAG
+  only and imports no estimator; when nothing is eligible the claim is
+  `not_identified`, with the missing assumptions per strategy, no estimate and
+  the action `refuse_claim`. Strategies, numpy and scipy only: `aipw`
+  (nuisances fitted on `X` and frozen, score on `C`; ATE and ATT, overlap
+  report, declared trimming that names the changed estimand), `randomized_diff`,
+  `did` (group-time ATT against never-treated units, event study, a simplified
+  relative-magnitudes sensitivity bound, not HonestDiD), `iv` (just-identified
+  2SLS, robust first-stage F, Anderson-Rubin set as headline below F = 10),
+  `rd` (local linear with a bias-corrected interval, cross-validated bandwidth,
+  binomial density check, placebo cutoffs, covariate balance, bandwidth
+  sensitivity) and `synth` (simplex weights, placebo-in-space, refusal below
+  19 donors at 0.05; one treated unit, so at most `attested`). `battery`
+  (Holm at `alpha_falsify`, one fifth of the confirmation level via
+  `split_budget`) and stratum replication (sign and Cochran's Q) can only
+  falsify. `sensitivity` has the E-value and the Cinelli-Hazlett robustness
+  value and benchmarked partial-R2 bounds. `tier.decide` applies the five
+  conditions of the canon as a pure function of the report facts, and a gate
+  counts only with a current passing certificate. `run.identify` writes
+  `identification_plan.json`, `identification_report.json`,
+  `falsification_report.json`, `sensitivity_report.json` and
+  `causal_claims.json` (which hashes the other four). In a charter run the
+  stage writes the plan, the design diagnostics on `X` and an `unverified`
+  claim with `estimate` null (`run.design_only`): the estimate on `C` is NOT
+  wired into the single opening by the claim ledger, so no pipeline run yet
+  reports a causal estimate; `identify` does it when given the confirmation
+  rows. A declared DAG is not loaded by the stage either, so back-door claims
+  are capped at `attested`. The admissibility skip for causal estimands
+  without a graph is unchanged.
+  Certificates: `benchmarks/qualification/f10_certify.py` (floors written in
+  its docstring before the first run, seeds 0 to R-1, Wilson 95 percent),
+  `f10_certificates.json`, `python -m benchmarks.qualification --check f10`.
+  Measured on simulated worlds only (`f10_generators.py`, synthetic
+  covariates): refusal worlds 200/200 and 200/200; coverage of the 95 percent
+  interval 0.944 (AIPW ATE, linear), 0.948 (ATT), 0.945 (difference in means),
+  0.944 and 0.951 (DiD single and staggered), 0.957 (IV, strong), 0.953 (RD);
+  weak-instrument headline set 0.950, weak flag recall 0.982, false weak 0;
+  placebo-in-space size 0.040 (bound 0.089); the overlap gate fires 0.006 at
+  minimum propensity 0.1 and 1.0 at 0.02 and 0.005. Falsification false-alarm
+  rates sit at alpha_falsify = 0.01 and the smallest planted violations with
+  power of at least 0.8 (Wilson lower) are: shared hidden confounder 0.5
+  (negative-control outcome), trend slope 0.3 per period (pre-trend Wald),
+  sorting share 0.5 (density), covariate jump 0.3 (balance and placebo
+  cutoffs). Sensitivity bound: 100 percent coverage for a confounder at half
+  the strongest observed covariate's strength, 80 percent AT the benchmark
+  (the bound is not conservative there) and 0 percent at twice it, both
+  reported, not gated. MISSED FLOOR: `coverage_aipw` (boosted learners on a
+  nonlinear surface, 469 of 500 covered, Wilson lower 0.913 against the
+  pre-registered 0.93; the floor at R = 500 is hard to reach even at exact
+  nominal coverage, and it was not retuned), so that gate is descriptive and
+  the shipped package certifies no back-door claim as `confirmed` until it is
+  re-measured; the two linear worlds passed. The end-to-end false-confirm gate
+  passed (0 of 300 runs `confirmed` with a hidden confounder shared with the
+  negative control), but the blind spot is large: with a confounder the
+  negative control does not share, and a declared DAG that omits it, 97.7
+  percent of runs reached `confirmed` (clean world 97.0 percent). NOT
+  measured here: worlds on real covariates, the NSW/STAR/ACIC/IHDP gold
+  standards, frozen `rdrobust`/`sensemakr`/`EValue`/`did`/`HonestDiD`
+  outputs, Python 3.11 versus 3.14 bit-identity, an outside-party
+  replication. The Cinelli-Hazlett benchmark conversions and the literature
+  claims behind the DiD, IV and RD methods are from memory and unverified
+  against the papers (`product/features/F10-causal-identification.md`).
+
 * Decision layer (Phase 11, F11), 2026-11-04. `scmle.decision`: cost-optimal
   thresholds with a calibration gate (`threshold`: binned chi-square check,
   Platt recalibration fitted on development data, the existing grid search as

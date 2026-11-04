@@ -89,6 +89,16 @@ retrain unless `alarm_gates_retrain` is set, and it should be set only when
 `python -m benchmarks.qualification --check loop` lists the detection-delay
 gate H2 as passed for the policy's settings (today it is descriptive).
 
+Causal identification (F10). No entry of the pinned surface changed.
+`scmle.data.charter.contracts.AnalysisEstimand` gained the optional field
+`causal` (`scmle.data.charter.causal.CausalSpec`, with `NegativeControl` and
+`SensitivitySpec`); it is omitted from the record when unset, so charters of
+format 1 to 3 keep their hash and signature, and a charter that carries it is
+format 4 (an older wrapper carrying it is refused). `DecisionAction` gained the
+member `refuse_claim`. `scmle.data.identification` (`select`, `aipw`, `did`,
+`iv`, `rd`, `synth`, `sensitivity`, `battery`, `tier`, `run`, `certified`) is
+an extension surface like the other qualification modules.
+
 Decision layer (F11). `scmle.decision` and `scmle.data.charter.decision` are
 extension surfaces like the other qualification modules; nothing was added to
 `scmle.__all__` and `tests/fixtures/public_api.json` is unchanged. The charter
