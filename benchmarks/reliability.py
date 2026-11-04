@@ -42,6 +42,7 @@ from sklearn import base
 import scmle
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.evaluation import coverage
 from scmle.monitoring import monitor
 
 LOGGER = logging.getLogger(__name__)
@@ -288,8 +289,9 @@ def check_interval_coverage(directory: pathlib.Path) -> CheckRecord:
     """Prediction intervals contain at least the stated share of new rows."""
     record = CheckRecord(
         "interval_coverage",
-        "A 90% conformal interval covers at least 85% of fresh rows.",
-        threshold="empirical coverage >= 0.85",
+        "A 90% conformal interval covers at least 88% of fresh rows "
+        "(nominal minus the 0.02 charter tolerance).",
+        threshold="empirical coverage >= 0.88",
     )
     train = regression_data(800, seed=1)
     result = fast_project(train, "y", directory / "run").run()
@@ -298,9 +300,15 @@ def check_interval_coverage(directory: pathlib.Path) -> CheckRecord:
         fresh.drop(columns="y"), coverage=0.9
     )
     inside = (fresh.y >= intervals["lower"]) & (fresh.y <= intervals["upper"])
-    covered = float(inside.mean())
-    record.measured = {"coverage": covered}
-    record.passed = covered >= 0.85
+    hits = int(inside.sum())
+    covered = hits / len(inside)
+    low, high = coverage.clopper_pearson(hits, len(inside))
+    record.measured = {
+        "coverage": covered,
+        "clopper_pearson_95": [low, high],
+        "nominal": 0.9,
+    }
+    record.passed = covered >= 0.9 - coverage.DEFAULT_TOLERANCE
     return record
 
 
