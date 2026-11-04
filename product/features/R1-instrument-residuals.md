@@ -82,12 +82,11 @@ custody was built. Status of its stated gaps, verified by reading `scmle/data/cu
 |---|---|---|
 | C1 | Custody coupled to the supervision flag | Closed for charter runs (`stages.py:850-890`, `apply_charter_custody`; CHANGELOG). Still coupled for non-charter runs (`stages.py:629-635`); that path has no `C` |
 | C2 | `C` and `F` have custody | Closed for `C` and `final_test` (`pipeline.py:211-222`). For temporal data `F` is the final test set (`manifest.py:50`) |
-| C7 | Unlock bound to `claims_hash` and `ledger_hash` | **Built, not wired.** `SealedSet.commit(claims_hash, ledger_hash)` binds the single release and the vault refuses any other pair (`vault.py`, `sealed.py`; tests in `test_vault.py`, `test_custody_sealed.py`, `test_custody_access.py`). `scmle/data/ledger/confirm.py` does not call `commit`, so a charter run is not bound. Closing criterion: `confirm.py` commits the survivors digest and the ledger head before it opens `C`, with a test that a changed ledger is refused |
 | C11 | Identical manifest on three platforms | **Pinned on one platform.** `tests/unit/test_custody_golden.py` pins the manifest hash of a grouped and a temporal fixture (macOS arm64, Python 3.14.7). The `cross-platform` and `minimal-dependencies` CI jobs run `tests/unit`; their result has not been observed from this machine. Closes when those jobs pass |
 
-Closed or accepted on 2026-11-04 and removed: C3 (accepted limit, recorded in `docs/SECURITY.md`), C4 and C5 (canary and `gc` tests), C6 (import-graph test over `detectors/`, `admissibility/`, `robustness/`), C8 (HMAC on every custody log entry when a key is available), C9 (Merkle root over row content in the manifest), C10 (autocorrelation-based embargo) and C12 (custody, charter, vault, attestation and Merkle modules are in the mutation scope; survivors in `tests/unit/MUTANTS_custody.md`). The statements each test establishes, and their limits, are in `docs/SECURITY.md`.
+Closed or accepted on 2026-11-04 and removed: C3 (accepted limit, recorded in `docs/SECURITY.md`), C4 and C5 (canary and `gc` tests), C6 (import-graph test over `detectors/`, `admissibility/`, `robustness/`), C8 (HMAC on every custody log entry when a key is available), C9 (Merkle root over row content in the manifest), C10 (autocorrelation-based embargo), C7 (`confirm.py` binds the release to the family hash and the ledger head before `C` opens; a set bound to another ledger state is refused) and C12 (custody, charter, vault, attestation and Merkle modules are in the mutation scope; survivors in `tests/unit/MUTANTS_custody.md`). The statements each test establishes, and their limits, are in `docs/SECURITY.md`.
 
-Closing criterion for the rest of the group: C7 and C11 as stated above.
+Closing criterion for the rest of the group: C11 as stated above.
 
 ## D. Evidence artifacts: what the generated ones are not
 

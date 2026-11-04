@@ -117,10 +117,14 @@ def test_selection_is_frozen_and_logged_before_c_opens():
     assert events == [
         "sealed",
         "selection_frozen",
+        "bound",
         "token_issued",
         "open",
     ]
     frozen = source.log.entries[1]["detail"]
+    bound = source.log.entries[2]["detail"]
+    assert bound["claims_hash"] == ledger.survivor_set.sha256
+    assert bound["ledger_hash"] == frozen["ledger_head"]
     assert frozen["survivors_sha256"] == ledger.survivor_set.sha256
     survivors_row = next(r for r in ledger.rows if r["kind"] == "survivors")
     assert frozen["ledger_head"] == survivors_row["hash"]
@@ -128,6 +132,16 @@ def test_selection_is_frozen_and_logged_before_c_opens():
     assert result.ledger_head == ledger.head
     source.log.verify()
     ledger.verify()
+
+
+def test_a_set_bound_to_another_ledger_state_is_refused():
+    ledger = explored()
+    source = source_with(*c_rows())
+    source.commit(ledger.freeze().sha256, "0" * 64)
+    with pytest.raises(errors.LeakageError):
+        cf.confirm(ledger, source, alpha_confirm=ALPHA)
+    assert not source.opened
+    assert source.log.entries[-1]["event"] == "denied"
 
 
 def test_a_second_confirmation_raises_and_is_logged():
@@ -240,11 +254,12 @@ def test_a_crash_while_opening_is_a_failure_not_an_exception():
 
     class Broken:
         log = sealed.OpenLog()
+        committed = True
 
         def issue_token(self):
             return "t"
 
-        def open(self, token, actor="x"):
+        def open(self, token, actor="x", claims_hash=None, ledger_hash=None):
             raise OSError("vault died")
 
     result = cf.confirm(ledger, Broken(), alpha_confirm=ALPHA)

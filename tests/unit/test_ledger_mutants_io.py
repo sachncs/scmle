@@ -363,11 +363,12 @@ def test_no_survivors_reason_and_crash_reasons():
 
     class Dies:
         log = sealed.OpenLog()
+        committed = True
 
         def issue_token(self):
             return "t"
 
-        def open(self, token, actor="x"):
+        def open(self, token, actor="x", claims_hash=None, ledger_hash=None):
             raise OSError("gone")
 
     result = cf.confirm(explored_ledger(), Dies(), alpha_confirm=F(1, 20))
@@ -588,11 +589,12 @@ def test_a_crash_records_the_custody_head_and_the_level():
 
     class Dies:
         log = sealed.OpenLog()
+        committed = True
 
         def issue_token(self):
             return "t"
 
-        def open(self, token, actor="x"):
+        def open(self, token, actor="x", claims_hash=None, ledger_hash=None):
             raise OSError("gone")
 
     dying = Dies()

@@ -6,8 +6,11 @@ from this stage:
 1. The survivors, selected on `X` only, are frozen in the ledger with a hash.
 2. If the negative-control gate fails, there is nothing to promote and `C` is
    not opened. With no survivors, `C` is not opened either.
-3. The selection is written to the custody log, then `C` is opened exactly
-   once through the custody API.
+3. The selection is written to the custody log, the release is bound to the
+   family's hash and the ledger head (`SealedSet.commit`), then `C` is opened
+   exactly once through the custody API. A set already bound to another
+   claim set or ledger state is refused by the vault, so a ledger edited
+   after the binding cannot unlock `C`.
 4. Each survivor's statistic runs on `C`; the family of survivors is adjusted
    by BH, BY (default) or Holm at ``alpha_confirm``; claims are written.
 
@@ -109,12 +112,20 @@ class ConfirmationSource(Protocol):
     """A sealed set that opens once (the custody `SealedSet`)."""
 
     log: Any
+    committed: bool
 
     def issue_token(self) -> str:
         """Returns the release token."""
 
+    def commit(self, claims_hash: str, ledger_hash: str) -> str:
+        """Binds the single release to a claim set and a ledger state."""
+
     def open(
-        self, token: str, actor: str = ...
+        self,
+        token: str,
+        actor: str = ...,
+        claims_hash: str | None = ...,
+        ledger_hash: str | None = ...,
     ) -> tuple[pd.DataFrame, pd.Series]:
         """Releases the rows a single time."""
 
@@ -643,8 +654,19 @@ def confirm(
             ),
         },
     )
+    claims_hash = (
+        survivors.sha256 if record is None else record["family_sha256"]
+    )
+    ledger_hash = ledger.head
     try:
-        rows = source.open(source.issue_token(), actor=ACTOR)
+        if not source.committed:
+            source.commit(claims_hash, ledger_hash)
+        rows = source.open(
+            source.issue_token(),
+            actor=ACTOR,
+            claims_hash=claims_hash,
+            ledger_hash=ledger_hash,
+        )
     except errors.LeakageError:
         raise
     except Exception as failure:
