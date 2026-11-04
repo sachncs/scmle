@@ -160,3 +160,22 @@ def test_a_nan_power_is_named():
     assert message(partial(make_charter, power=float("nan"))) == (
         "power must be a finite number"
     )
+
+
+def test_a_signed_charter_read_without_a_key_is_unsigned_not_an_error(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
+    charter = make_charter()
+    path = sealing.write_charter(tmp_path / "s.json", charter, "k")
+    seen = sealing.read_verified(path)
+    assert seen.charter == charter and seen.signed is False
+    assert seen.charter_hash == charter.charter_hash
+    with pytest.raises(Exception) as caught:
+        sealing.read_verified(path, require_signature=True)
+    assert str(caught.value) == (
+        f"charter {path} is signed but no signing key is configured"
+    )
+    with pytest.raises(Exception) as caught:
+        sealing.read_verified(path, signing_key="wrong")
+    assert str(caught.value) == f"charter signature does not verify for {path}"

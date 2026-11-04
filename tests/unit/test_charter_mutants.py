@@ -290,3 +290,9 @@ def test_every_text_slot_of_the_template_is_empty_and_named():
     estimand = c.template()["estimand"]
     for key in ("population", "target", "prediction_moment", "summary_measure"):
         assert estimand[key] == "", key
+
+
+def test_apply_names_the_date_argument_in_its_error():
+    assert message(partial(attestations.apply, (), "S", "not-a-date")) == (
+        "today must be an ISO date (YYYY-MM-DD)"
+    )
