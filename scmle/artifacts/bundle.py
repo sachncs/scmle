@@ -5,6 +5,7 @@ so only load bundles from sources you trust. Checksums detect corruption or
 tampering after saving, not malice at the source.
 """
 
+from collections.abc import Sequence
 import contextlib
 import dataclasses
 import hashlib
@@ -40,6 +41,7 @@ from scmle.evaluation import cv_plus as cv_plus_module
 from scmle.evaluation import dirichlet
 from scmle.evaluation import quantile as quantile_module
 from scmle.evaluation import reliability
+from scmle.evaluation import shift_weights as shift_weights_module
 from scmle.explainability import counterfactual as counterfactual_module
 from scmle.explainability import local
 from scmle.features import feature_graph
@@ -62,6 +64,7 @@ CALIBRATOR_FILE = "calibrator.joblib"
 CONFORMAL_FILE = "conformal.json"
 QUANTILE_FILE = "quantile.joblib"
 CV_PLUS_FILE = "cv_plus.joblib"
+SHIFT_WEIGHTS_FILE = "shift_weights.joblib"
 NOVELTY_FILE = "novelty.joblib"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
@@ -319,6 +322,11 @@ class ModelBundle:
         # The fold models behind `predict_interval(method="cv_plus")`; set
         # by the run or by `load`, kept out of the constructor signature.
         self.cv_plus: cv_plus_module.CvPlusEnsemble | None = None
+        # Calibration weights for covariate shift, attached on demand by
+        # `attach_shift_weights`.
+        self.shift_weights: shift_weights_module.StoredShiftWeights | None = (
+            None
+        )
         # Serializes `remember`, which rewrites `history` from itself.
         self.history_lock = threading.RLock()
 
@@ -718,6 +726,10 @@ class ModelBundle:
             cv_plus_path = root / CV_PLUS_FILE
             joblib.dump(self.cv_plus, cv_plus_path)
             files[CV_PLUS_FILE] = file_sha256(cv_plus_path)
+        if self.shift_weights is not None:
+            shift_path = root / SHIFT_WEIGHTS_FILE
+            joblib.dump(self.shift_weights, shift_path)
+            files[SHIFT_WEIGHTS_FILE] = file_sha256(shift_path)
         if self.history is not None:
             history_path = root / HISTORY_FILE
             self.history.to_parquet(history_path, index=False)
@@ -984,6 +996,17 @@ class ModelBundle:
                     "checksum mismatch: CV+ fold models were modified"
                 )
             cv_plus_models = joblib.load(cv_plus_path)
+        stored_weights = None
+        if SHIFT_WEIGHTS_FILE in info.files:
+            shift_path = root / SHIFT_WEIGHTS_FILE
+            if (
+                not shift_path.exists()
+                or file_sha256(shift_path) != info.files[SHIFT_WEIGHTS_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: shift weights were modified"
+                )
+            stored_weights = joblib.load(shift_path)
         loaded = cls(
             joblib.load(model_path),
             schema,
@@ -996,6 +1019,7 @@ class ModelBundle:
             intervals,
         )
         loaded.cv_plus = cv_plus_models
+        loaded.shift_weights = stored_weights
         return loaded
 
     @property
@@ -1180,6 +1204,7 @@ class ModelBundle:
         coverage: float = conformal_module.DEFAULT_COVERAGE,
         mapping: mapping_module.ColumnMapping | None = None,
         method: str = "residual",
+        shift: bool = False,
     ) -> pd.DataFrame:
         """Prediction intervals with a stated coverage (regression).
 
@@ -1193,6 +1218,10 @@ class ModelBundle:
                 `cv_plus` for the CV+ interval from the stored fold models
                 (present when the run had fewer than 1000 calibration rows
                 held out once each).
+            shift: Use the weighted conformal interval for covariate shift
+                with the weights attached by `attach_shift_weights`
+                (`residual` method only). The ratio is estimated, so the
+                coverage is approximate and is reported that way.
 
         Returns:
             Columns `prediction`, `lower` and `upper`.
@@ -1201,6 +1230,10 @@ class ModelBundle:
             ArtifactError: For classification models, unknown methods, or
                 bundles saved without the needed calibration.
         """
+        if shift and method != "residual":
+            raise errors.ArtifactError(
+                "shift-weighted intervals exist for the 'residual' method only"
+            )
         if method == "quantile":
             if self.quantile is None:
                 raise errors.ArtifactError(
@@ -1236,8 +1269,95 @@ class ModelBundle:
                 "'quantile' or 'cv_plus'"
             )
         calibrator = self.require_conformal("regression")
+        if shift:
+            return self.shifted_interval(calibrator, data, coverage, mapping)
         predictions = np.asarray(self.predict(data, mapping), dtype=float)
         lower, upper = calibrator.interval(predictions, coverage)
+        return pd.DataFrame(
+            {"prediction": predictions, "lower": lower, "upper": upper}
+        )
+
+    def attach_shift_weights(
+        self,
+        calibration_rows: pd.DataFrame,
+        target_rows: pd.DataFrame,
+        columns: Sequence[str] | None = None,
+        clip: float = shift_weights_module.DEFAULT_CLIP,
+    ) -> shift_weights_module.StoredShiftWeights:
+        """Estimates and stores likelihood ratios for weighted conformal.
+
+        Args:
+            calibration_rows: The rows the stored conformal scores came from,
+                in score order (development rows in the order of the
+                held-out positions of the split's folds).
+            target_rows: Unlabeled rows of the population to predict for.
+            columns: Numeric feature columns for the discriminator; all
+                numeric schema features if omitted.
+            clip: Upper bound on the ratio.
+
+        Returns:
+            The stored weights (also kept on the bundle and saved with it).
+
+        Raises:
+            ArtifactError: Without a regression conformal calibration, on a
+                row count that differs from the stored scores, or on
+                columns that are not numeric features of the schema.
+            WeightRefusedError: When the effective sample size is below
+                `MIN_EFFECTIVE_SIZE`; no weights are stored then.
+        """
+        calibrator = self.require_conformal("regression")
+        if len(calibration_rows) != len(calibrator.scores):
+            raise errors.ArtifactError(
+                f"{len(calibration_rows)} calibration rows given but "
+                f"{len(calibrator.scores)} conformal scores are stored"
+            )
+        chosen = tuple(
+            columns
+            if columns is not None
+            else (
+                c
+                for c in self.features
+                if pd.api.types.is_numeric_dtype(calibration_rows[c])
+            )
+        )
+        if not chosen or any(
+            c not in self.features
+            or not pd.api.types.is_numeric_dtype(calibration_rows[c])
+            for c in chosen
+        ):
+            raise errors.ArtifactError(
+                "shift weights need numeric feature columns of the schema"
+            )
+        found = shift_weights_module.estimate_weights(
+            calibration_rows[list(chosen)].to_numpy(float),
+            target_rows[list(chosen)].to_numpy(float),
+            clip,
+        )
+        self.shift_weights = shift_weights_module.StoredShiftWeights(
+            found, chosen
+        )
+        return self.shift_weights
+
+    def shifted_interval(
+        self,
+        calibrator: conformal_module.ConformalCalibrator,
+        data: str | pathlib.Path | pd.DataFrame,
+        coverage: float,
+        mapping: mapping_module.ColumnMapping | None,
+    ) -> pd.DataFrame:
+        """Weighted conformal intervals with the stored shift weights."""
+        if self.shift_weights is None:
+            raise errors.ArtifactError(
+                "this bundle has no shift weights; call attach_shift_weights"
+            )
+        frame = self.prepare_frame(data, mapping)
+        predictions = np.asarray(self.pipeline.predict(frame), dtype=float)
+        lower, upper = calibrator.weighted_interval(
+            predictions,
+            self.shift_weights.weights.calibration,
+            self.shift_weights.test_weights(frame),
+            coverage,
+        )
         return pd.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
         )

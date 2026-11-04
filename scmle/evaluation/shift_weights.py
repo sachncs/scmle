@@ -93,3 +93,20 @@ def estimate_weights(
             f"{minimum:.0f}; weighted conformal is refused"
         )
     return result
+
+
+@dataclasses.dataclass(frozen=True)
+class StoredShiftWeights:
+    """Shift weights as a bundle keeps them.
+
+    Attributes:
+        weights: The estimated ratios and the fitted discriminator.
+        columns: Numeric feature columns the discriminator reads, in order.
+    """
+
+    weights: ShiftWeights
+    columns: tuple[str, ...]
+
+    def test_weights(self, frame: Any) -> np.ndarray:
+        """Likelihood ratios of new rows, read from `columns`."""
+        return self.weights.ratio(frame[list(self.columns)].to_numpy(float))
