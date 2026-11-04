@@ -65,6 +65,8 @@ class TierInputs:
         single_unit: One treated unit (nothing to hold out).
         weak_instrument: The first stage failed its threshold.
         certified: Gates with a current passing certificate.
+        adjustment_checked: The back-door adjustment set was verified against
+            a declared DAG (True for strategies that have no such set).
     """
 
     identified: bool
@@ -84,6 +86,7 @@ class TierInputs:
     single_unit: bool
     weak_instrument: bool
     certified: Collection[str]
+    adjustment_checked: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -135,6 +138,7 @@ def decide(facts: TierInputs) -> TierDecision:
     conditions = {
         "estimated_on_c": facts.estimated_on_c and not facts.single_unit,
         "design_diagnostics": facts.design_passed
+        and facts.adjustment_checked
         and gates_ok
         and facts.interval_gate in certified
         and not facts.weak_instrument,
@@ -175,6 +179,11 @@ def decide(facts: TierInputs) -> TierDecision:
         )
     if facts.weak_instrument:
         reasons.append("weak instrument: only the robust interval is valid")
+    if not facts.adjustment_checked:
+        reasons.append(
+            "the adjustment set is an unchecked attestation (no declared "
+            "DAG confirms it)"
+        )
     if not gates_ok or facts.interval_gate not in certified:
         reasons.append("a design gate has no passing certificate")
     if not facts.battery_ran or not facts.negative_control_declared:

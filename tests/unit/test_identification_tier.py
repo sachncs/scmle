@@ -59,6 +59,7 @@ def test_not_identified_has_no_tier_and_refuses():
         ({"sensitivity_holds": False}, "sensitivity gate failed"),
         ({"single_unit": True}, "nothing to hold out"),
         ({"weak_instrument": True}, "weak instrument"),
+        ({"adjustment_checked": False}, "unchecked attestation"),
         ({"estimated_on_c": False}, "did not use C"),
         ({"certified": GATES - {"overlap"}}, "design gate"),
         ({"certified": GATES - {"coverage_aipw"}}, "design gate"),

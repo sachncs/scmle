@@ -49,6 +49,7 @@ import pandas as pd
 from scipy import stats
 
 D_TO_RR = 0.91
+INFEASIBLE = 0.999
 
 
 def evalue(rr: float) -> float:
@@ -270,8 +271,8 @@ def assess(
             try:
                 a, b = benchmark_strength(r2d, r2y, strength, strength)
             except ValueError:
-                a, b = 0.999, 0.999
-            width = bias_bound(fit, min(a, 0.999), min(b, 0.999))
+                a, b = INFEASIBLE, INFEASIBLE
+            width = bias_bound(fit, min(a, INFEASIBLE), min(b, INFEASIBLE))
             if width > best:
                 best, r2yz, r2dz, chosen = width, a, b, name
         words = (
@@ -279,7 +280,12 @@ def assess(
             "observed covariate with the widest bound (an assumption about "
             "the unobserved)"
         )
-    r2yz, r2dz = min(r2yz, 0.999), min(r2dz, 0.999)
+    if INFEASIBLE in (r2yz, r2dz):
+        words += (
+            "; the multiple exceeds what the data allow for that covariate, "
+            f"so both strengths are set to {INFEASIBLE} and the gate fails"
+        )
+    r2yz, r2dz = min(r2yz, INFEASIBLE), min(r2dz, INFEASIBLE)
     low, high = adjusted_interval(fit, r2yz, r2dz, level)
     return SensitivityReport(
         estimate=fit.estimate,
