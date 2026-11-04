@@ -2,6 +2,64 @@
 
 ## Unreleased
 
+* Decision layer (Phase 11, F11), 2026-11-04. `scmle.decision`: cost-optimal
+  thresholds with a calibration gate (`threshold`: binned chi-square check,
+  Platt recalibration fitted on development data, the existing grid search as
+  the labelled fallback, a cluster-bootstrap cost interval), net benefit of a
+  frozen rule against treat none, treat all and the incumbent with a
+  simultaneous cluster-bootstrap band over the chartered range of cost ratios
+  and a one-shot guard (`netbenefit`), off-policy evaluation by IPW, SNIPS and
+  doubly robust estimators with influence-function intervals, declared
+  clipping, a support gate and an effective-sample-size gate that refuse
+  instead of estimating (`ope`; non-randomized logs are not `confirmed`),
+  fairness constraints with an upper-bound satisfaction test, group
+  thresholds, `not_assessable` small groups and refusal of incompatible
+  criteria at measured base rates (`constraints`), and an anytime-valid
+  engine (`anytime`): a fixed-grid betting mixture e-process for a bounded
+  mean, with pseudo-outcomes centred by a running mean fixed before each unit,
+  Ville's inequality for the error rate and a time-uniform bound. On top of it
+  `design` (salted-hash assignment, fixed-horizon size, simulated expected
+  sample number, an exact and an anytime sample-ratio check) and `rollout`
+  (promote, hold, `hold_final`, `hold_invalid` by intersection-union over the
+  primary and guardrail e-processes; a rollback monitor per promoted
+  champion; a hash-chained decision log). `DecisionBudget` in
+  `scmle.data.ledger.budget` keeps exact `Fraction` levels: promotion levels
+  by the discount-only rule (valid by the union bound; the e-LOND rejection
+  boost is not used because its guarantee for overlapping experiments was not
+  checked), a rollback level per champion. The charter gained an optional
+  `decision` block (`scmle.data.charter.decision`: decision model, fairness
+  constraints with an attestation for group thresholds, rollout plan) under
+  format 5; it needs a `cost_model`, and a charter without it hashes, signs
+  and loads exactly as before. In a charter run with a decision block the
+  threshold comes from the chartered cost model, `evaluation.json` carries the
+  calibration path and rule hash under `decision.f11`, and `net_benefit`
+  holds the band computed once on the locked test set. Runs without the block
+  are unchanged. Certificates: `benchmarks/qualification/f11_certify.py` with
+  floors written in its docstring before the run, results in
+  `f11_certificates.json`, `python -m benchmarks.qualification --check f11`.
+  Measured: 19 of 20 gates met their floors. The net benefit band missed its
+  floor in one setting (independent rows, n = 2000: coverage 0.9375, Wilson
+  interval 0.926 to 0.947 against a lower bound floor of 0.93), so `A3` is
+  descriptive and was not retuned. Other numbers: ever-promote under peeking
+  at every unit at the boundary null 37 in 10000 (floor 0.02 plus tolerance;
+  the rule is conservative); `abtest.compare_arms` called at 6 looks under
+  no effect adopted in 10 of 100 runs (Wilson 0.055 to 0.174), published, not
+  gated; false rollback 19 in 10000; the expected sample number to promote at
+  twice the minimum effect is 1.15 times a null-shifted fixed-horizon size for
+  a binary metric and 1.68 times for a bounded metric; the sample-ratio checks
+  rejected 1 (anytime) and 2 (exact) of 1000 correct allocations at level
+  0.001 and all of 1000 with a 2 percent distortion at n = 100000. Net benefit power is low: at n = 2000 the band calls a
+  rule useful in 91 percent of worlds for a score separation of 1.5 and in
+  none at 1.0. Hillstrom e-mail data (randomized, hash recorded, not
+  committed) gave the A/A false promotion rate 2 in 1000 and promoted the
+  real Men's e-mail arm in all 200 stream orders; its fixed policy treats
+  98 percent of rows, so the biased-subsample check (coverage 0.975 of 200)
+  says little about policy value differences. Not done: outside-party
+  reproduction, the Criteo and Open Bandit referents, reference outputs from
+  R `dcurves` and Open Bandit Pipeline, the `LifecycleManager` hook, the
+  migration of `DecisionSpec` costs, and the report files other than the
+  evaluation fields above (see the plan).
+
 * Closed loop and escalation (Phase 13, F13), 2026-11-04. A hash-chained
   deployment ledger (`scmle.governance.deployment_ledger`), anytime-valid
   monitors (`scmle.monitoring.sequential_tests`: betting alarm mixed over
