@@ -43,6 +43,24 @@ the no-change error on the evaluation rows); it is not the usual MASE and is
 not comparable with published values. Use `proper_scores.mase` or
 `mase_insample` for that. The `interval_coverage` reliability check now
 requires coverage of at least 0.88 instead of 0.85.
+## Leakage screen
+
+The profiler's fixed leakage cutoffs (`LEAK_ASSOCIATION`, `MISSINGNESS_LEAK`,
+the `leakage_findings` method and the `"leakage"` string match that drove
+`leakage_policy="block"`) are gone. `leakage_policy` keeps its values and its
+meaning at the top level (`MLProject(...)` and the snapshot in
+`tests/fixtures/public_api.json` are unchanged); what blocks is now a typed
+result, `DatasetProfile.blocking_leaks`, from the permutation screen in
+`scmle.data.admissibility.screen`. Behaviour changes that users may notice:
+blocking needs a passing certificate for the mechanism (binary
+classification only; regression and multiclass targets get warnings with
+p-values), the screen also reports a value recorded only for some outcomes
+when most rows are blank, and `DatasetProfile` gained the optional field
+`leakage` (default empty) and its `to_dict` key. The fingerprint keeps its
+keys: `target_association` is still computed as a descriptive statistic with
+no cutoff, and `risk.leakage_hypotheses` now counts screen suspects instead of
+cutoff hits, so stored fingerprints of data that crossed a retired cutoff can
+differ in that one count.
 
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.

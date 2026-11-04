@@ -96,6 +96,35 @@ Profiling, feature selection, leakage detection and the dataset fingerprint
 use the development partition alone; `tests/leakage` checks that a leak
 present only in the test rows is not a profile finding.
 
+### Leakage screen
+
+Leakage suspicion comes from `scmle.data.admissibility.screen`, not from a
+fixed cutoff, and it also runs when there is no charter (the development rows
+are then all it has). Per candidate column it computes a cross-fitted
+held-out skill (AUC, or R^2 for a continuous target) with an exact permutation
+p-value, permuting within groups or time blocks when they are known; a
+missing-value test against the target (Fisher or chi-square with Cramer's V,
+or the permutation scheme with groups); and a record-purity test for a value
+captured only for some outcomes. All p-values form one family adjusted by
+Benjamini-Yekutieli at `alpha = 0.05` (exact arithmetic). A column is a
+*suspect* only if it is significant and the lower confidence bound of its
+effect size exceeds the pre-registered ceiling (0.95 for skill, 0.9 for the
+association measures); significance alone is not leakage, because strong
+legitimate predictors are significant.
+
+Guaranteed: under the null of no association, and conditional on the model and
+fold choices, the chance of any false alarm is at most `alpha`, and the false
+discovery rate of the significant list is at most `alpha` under arbitrary
+dependence between columns. Not guaranteed: telling a legitimate strong
+predictor from a leak (that needs provenance), power below the ceiling,
+detection of leaks that need several columns together. `leakage_policy="block"`
+blocks only suspects whose mechanism has a current, passing certificate
+(`scmle/data/admissibility/screen_certificates.json`, produced by
+`python -m benchmarks.qualification.screen_certify --write`); a regression or
+multiclass target, or any change of the settings, makes the screen descriptive:
+the suspect is reported with its p-values as a warning and nothing is blocked.
+The result is in `dataset_profile.json` under `leakage`.
+
 ## Extension points and polymorphism
 
 Add a focused implementation of a contract; no core edits are needed. The

@@ -23,7 +23,7 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 | --- | --- |
 | `config.json` | The complete project specification; `scmle resume` and `scmle run --config` read the same format. |
 | `execution_plan.json` | The plan: resolved task, metric, validation strategy, candidate models. |
-| `dataset_manifest.json`, `dataset_profile.json`, `dataset_card.json` | Row and column counts, hashes, resolved column kinds and findings. |
+| `dataset_manifest.json`, `dataset_profile.json`, `dataset_card.json` | Row and column counts, hashes, resolved column kinds and findings. `dataset_profile.json` has a `leakage` object: the Benjamini-Yekutieli level, family size, permutations, the pre-registered ceilings, the suspects, which of them may block, and every significant test with its p-values, adjusted p-value and effect-size lower bound. A suspect is a suspicion, not proof. |
 | `source_registry.json` | Source identities and the snapshots seen. |
 | `curation_report.json` | What curation found and changed (missingness, duplicates, drift, representativeness). |
 | `validation_manifest.json` | Which rows went to development folds and to the locked test set. |

@@ -73,8 +73,10 @@ The hosted documentation is available at
 ## What it does
 
 1. **Profiles** the data: task resolution, column kinds, a full dataset
-   fingerprint, and leakage *hypotheses* (including outcome-dependent
-   recording such as Titanic's `boat` / `body`).
+   fingerprint, and leakage *suspicions* from a permutation screen with
+   Benjamini-Yekutieli error control (including outcome-dependent recording
+   such as Titanic's `boat` / `body`). A suspicion is not proof; only
+   mechanisms with a passing certificate may block a run.
 2. **Splits** without leakage (stratified / random / group / temporal) behind
    a locked test set that opens once.
 3. **Engineers features** declaratively (`FeatureGraphSpec`: ratios, bins,
@@ -152,7 +154,9 @@ wine, whose locked test set has only 36 rows so one confident mistake
 dominates log loss, and kc1, where the selected stack trails the reference on
 the locked test rows by about 0.026 PR-AUC (a 15%-positive set with few
 positives in the test rows, so the score is noisy). Titanic's near-perfect score comes from leaked columns (`boat`,
-`body`): the profiler flags both, and `leakage_policy="block"` refuses to
+`body`): the leakage screen flags both (`boat` by skill, missingness and record
+purity; `body` by record purity only, because it is recorded for 9% of
+passengers, all of whom died), and `leakage_policy="block"` refuses to
 proceed. Choosing the best of many trials carries a mild optimism bias, which
 is why the locked-test score is the number to trust.
 

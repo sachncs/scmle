@@ -158,6 +158,40 @@
   fold-model bundle storage, intervals for survival, ordinal, ranking,
   multilabel, multioutput, forecast and uplift (still `None`), and the
   temporal-data retrain shuffle (Phase 13).
+* Leakage screen with error control, for runs with and without a charter
+  (`scmle.data.admissibility.screen`). It replaces the profiler's fixed
+  cutoffs (`LEAK_ASSOCIATION = 0.98`, `MISSINGNESS_LEAK = 0.9`,
+  `DatasetProfiler.leakage_findings`) and the `"leakage"` string matches in
+  `core/stages.py` and `intelligence/recommendations.py`. For every candidate
+  column of the training rows: a cross-fitted held-out skill (AUC, or R^2) with
+  an exact permutation p-value `(b+1)/(B+1)` (within groups or time blocks when
+  known), Cramer's V of missingness with Fisher or chi-square (permutation with
+  groups), and a record-purity test for a value captured only for some
+  outcomes; all in one Benjamini-Yekutieli family at 0.05 in exact
+  arithmetic. A column is a suspect only if it is significant and the lower
+  confidence bound of its effect size exceeds the pre-registered ceiling
+  (skill 0.95, association 0.9): significance alone is not leakage. Guarantee:
+  under the null, and conditional on the model and fold choices, the chance of
+  any false alarm is at most 0.05 and the FDR of the significant list is at
+  most 0.05 under arbitrary dependence; it cannot tell a strong legitimate
+  predictor from a leak without provenance. The cross-fitted AUC is counted
+  within folds, because pooling predictions across folds orders same-level rows
+  against their labels (on the first version of this screen, a 2 percent noisy
+  copy was found in 144 of 200 plants with the pooled AUC and 199 of 200
+  within folds). `leakage_policy="block"` now blocks on a
+  typed result (`DatasetProfile.blocking_leaks`) and only for mechanisms with a
+  current passing certificate, shipped in
+  `scmle/data/admissibility/screen_certificates.json`
+  (`benchmarks/qualification/screen_certify.py`; measurements in
+  `screen_measurements.json`). Binary classification is certified; regression
+  and multiclass targets get warnings with p-values and never block. Behaviour
+  changes: `dataset_profile.json` has a `leakage` object; Titanic `body` is now
+  flagged by record purity (it is recorded only for passengers who died) and
+  not by a missingness score; `risk.leakage_hypotheses` in the fingerprint now
+  counts screen suspects (`target_association` stays a descriptive statistic
+  with no cutoff); `DatasetProfile` gained the optional field `leakage`. The
+  charter path (`admissibility.qualify`) still uses the earlier
+  `admissibility.leakage` scan, unchanged.
 * Data qualification foundations (no behavior change to existing runs): record
   types `Check`, `Claim` and `Certificate` with evidence tiers
   (`scmle.contracts.qualification`), an exact-arithmetic error budget that keeps
@@ -453,10 +487,9 @@ First public beta.
   `benchmarks/qualification/`, which the installed package does not ship; when
   the files are missing every detector is descriptive. The shipped leakage
   certificate is not gating (the noisy-copy leak type is descriptive), so a
-  suspicion is reported but quarantines nothing yet. The old profiler
-  constants `LEAK_ASSOCIATION`, `MISSINGNESS_LEAK` and the `LEAKAGE_MARKER`
-  string match remain: they still drive `leakage_policy="block"` for runs
-  without a charter.
+  suspicion is reported but quarantines nothing yet. (The profiler's old fixed
+  cutoffs, which this entry once said remained, are replaced; see the leakage
+  screen entry below.)
 * Robustness and shift (`scmle.data.robustness`; runs without a charter are
   unchanged). A charter run re-runs each exploration survivor over the
   multiverse the charter declared (imputation, outlier rule, inclusion; other
