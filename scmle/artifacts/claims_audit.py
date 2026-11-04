@@ -210,18 +210,18 @@ def check_charter(
     run_dir: Path,
     ledger: ledger_module.Ledger,
     signing_key: str | bytes | None,
-) -> tuple[list[Finding], Any]:
+) -> list[Finding]:
     """The charter file verifies and is the ledger's charter."""
     path = run_dir / CHARTER_FILE
     name = "charter verifies and matches the ledger"
     if not path.exists():
-        return [step(name, SKIPPED, f"{CHARTER_FILE} is not in the run")], None
+        return [step(name, SKIPPED, f"{CHARTER_FILE} is not in the run")]
     try:
         loaded = charter_sealing.read_verified(path, signing_key=signing_key)
     except errors.ScmleError as error:
-        return [step(name, FAIL, str(error))], None
+        return [step(name, FAIL, str(error))]
     if loaded.charter_hash != ledger.header.get("charter_hash"):
-        return [step(name, FAIL, "the ledger names another charter hash")], None
+        return [step(name, FAIL, "the ledger names another charter hash")]
     how = "signature verified" if loaded.signed else "hash only, not signed"
     findings = [step(name, PASS, f"{loaded.charter_hash[:12]} ({how})")]
     rules = loaded.charter.rules
@@ -248,7 +248,7 @@ def check_charter(
             findings.append(
                 step(rule_step, PASS, f"{used} and {rules.confirmation_rule}")
             )
-    return findings, loaded.charter
+    return findings
 
 
 def check_claims_against_ledger(
@@ -447,8 +447,7 @@ def verify(
         findings.append(step("claims file reads", FAIL, str(error)))
         return Verification(str(folder), tuple(findings))
     findings.append(check_ledger_head(document, ledger))
-    charter_findings, _ = check_charter(folder, ledger, signing_key)
-    findings.extend(charter_findings)
+    findings.extend(check_charter(folder, ledger, signing_key))
     findings.append(check_claims_against_ledger(document, ledger))
     findings.append(check_replay(document))
     findings.append(check_stage_two(document, ledger))
