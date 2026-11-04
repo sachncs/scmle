@@ -343,7 +343,9 @@ def build_table(
     declared_lag_seconds: float = 0.0,
     today: datetime.date | None = None,
     suspects: Mapping[str, bool] | None = None,
-    leakage_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
+    leakage_gate: (
+        certificates.GateStatus | Mapping[str, certificates.GateStatus]
+    ) = certificates.GateStatus.DESCRIPTIVE,
     graph: dag_module.Dag | None = None,
     treatment: str | None = None,
     outcome: str | None = None,
@@ -357,7 +359,8 @@ def build_table(
         declared_lag_seconds: Declared delay before the moment.
         today: Day on which attestations must be valid, or None.
         suspects: Leakage suspicion per field name; absent means no.
-        leakage_gate: Whether the leakage detector may gate.
+        leakage_gate: Whether the leakage detector may gate, for every field
+            or, as a mapping, per field (absent means descriptive).
         graph: DAG hypothesis; required for `causal`, ignored for
             `predictive`.
         treatment: Treatment node; required for `causal`.
@@ -373,6 +376,12 @@ def build_table(
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {KINDS}")
     flags = suspects or {}
+
+    def gate_of(name: str) -> certificates.GateStatus:
+        if isinstance(leakage_gate, Mapping):
+            return leakage_gate.get(name, certificates.GateStatus.DESCRIPTIVE)
+        return leakage_gate
+
     if kind == "predictive":
         decisions = tuple(
             decide_predictive(
@@ -381,7 +390,7 @@ def build_table(
                 declared_lag_seconds,
                 today,
                 flags.get(f.name, False),
-                leakage_gate,
+                gate_of(f.name),
             )
             for f in table.fields
         )
@@ -398,7 +407,7 @@ def build_table(
             declared_lag_seconds,
             today,
             flags.get(f.name, False),
-            leakage_gate,
+            gate_of(f.name),
         )
         for f in table.fields
     )

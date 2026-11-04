@@ -225,3 +225,17 @@ def test_decisions_round_trip():
     assert r.FieldDecision.from_dict(d.to_dict()) == d
     with pytest.raises(ValueError, match="unexpected"):
         r.FieldDecision.from_dict({**d.to_dict(), "x": 1})
+
+
+def test_a_gate_per_field_blocks_only_the_field_it_names():
+    table = p.ProvenanceTable.covering(["a", "b"])
+    out = r.build_table(
+        table,
+        "predictive",
+        r.Mode.PERMISSIVE,
+        suspects={"a": True, "b": True},
+        leakage_gate={"a": GATING},
+    )
+    assert out.names(Q) == ("a",)
+    assert out.names(F) == ("b",)
+    assert all(d.suspicion_kept for d in out.decisions)
