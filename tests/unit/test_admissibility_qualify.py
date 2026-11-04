@@ -103,9 +103,9 @@ def test_a_certified_suspect_is_quarantined_and_ledgered():
     assert found.leakage_gate is certificates.GateStatus.GATING
     assert set(found.quarantined) == {"copy"}
     assert "leakage suspicion" in found.quarantined["copy"]
-    sources = {source for source, _ in found.checks}
+    sources = {source for source, check in found.checks}
     assert sources == {screen.DETECTOR_ID}
-    by_id = {check.check_id: check for _, check in found.checks}
+    by_id = {check.check_id: check for source, check in found.checks}
     assert by_id["leakage.screen.skill:copy"].decision is (
         qualification.Decision.QUARANTINE
     )
@@ -130,7 +130,9 @@ def test_an_uncertified_mechanism_only_warns(monkeypatch):
 
     assert found.suspects == {"copy": True}
     assert found.quarantined == {}
-    copy = next(c for _, c in found.checks if c.check_id.endswith("skill:copy"))
+    copy = next(
+        c for source, c in found.checks if c.check_id.endswith("skill:copy")
+    )
     assert copy.decision is qualification.Decision.WARN
 
 
