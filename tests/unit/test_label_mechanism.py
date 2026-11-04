@@ -127,16 +127,15 @@ def test_randomization_check_flags_a_slice_at_the_wrong_rate():
 
 
 def test_bypass_test_finds_a_loop_and_stays_quiet_without_one():
+    def groups(stream):
+        frame = pd.DataFrame({"z": stream.next_z.reshape(-1)})
+        flags = stream.bypass.reshape(-1)
+        return frame[flags].iloc[:300], frame[~flags].iloc[:300]
+
     loop = streams.feedback_stream(100, 100, gamma=0.8, bypass=0.3, seed=1)
     free = streams.feedback_stream(100, 100, gamma=0.0, bypass=0.3, seed=1)
-
-    def groups(stream):
-        shifted = stream.z[1:].reshape(-1)
-        flags = stream.bypass[1:].reshape(-1)
-        frame = pd.DataFrame({"z": shifted})
-        return frame[flags].iloc[:400], frame[~flags].iloc[:400]
-
-    assert groups(loop)[0].shape[0] > 100
+    found = labels.bypass_test(*groups(loop)[::-1], seed=0)
     quiet = labels.bypass_test(*groups(free)[::-1], seed=0)
+    assert labels.feedback_verdict(0.3, found) == "loop_detected"
     assert labels.feedback_verdict(0.3, quiet) == "no_loop_detected"
     assert labels.feedback_verdict(0.0, None) == labels.UNVERIFIED

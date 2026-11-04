@@ -91,11 +91,26 @@ def test_invalid_specs_are_refused():
         streams.StreamSpec(labels="sometimes")
 
 
-def test_feedback_loop_moves_covariates_only_with_gamma():
-    loop = streams.feedback_stream(300, 200, gamma=0.5, bypass=0.2, seed=1)
+def test_feedback_loop_separates_bypass_and_model_groups_only_with_gamma():
+    loop = streams.feedback_stream(300, 200, gamma=0.8, bypass=0.2, seed=1)
     free = streams.feedback_stream(300, 200, gamma=0.0, bypass=0.2, seed=1)
-    assert abs(free.z.mean()) < 0.05
-    assert loop.z.std() > free.z.std()
+    spread = {}
+    for name, stream in (("loop", loop), ("free", free)):
+        model = stream.next_z[~stream.bypass].std()
+        coin = stream.next_z[stream.bypass].std()
+        spread[name] = abs(model - coin)
+    assert spread["loop"] > 0.15
+    assert spread["free"] < 0.05
+
+
+def test_dependence_ties_the_loss_to_the_covariate_without_moving_the_mean():
+    stream = streams.simulate(
+        streams.StreamSpec(dependence=0.4, batches=400, size=100, seed=3)
+    )
+    high = stream.loss[stream.z > 1].mean()
+    low = stream.loss[stream.z < -1].mean()
+    assert high > low + 0.1
+    assert stream.loss.mean() == pytest.approx(0.10, abs=0.01)
 
 
 def test_challengers_are_dependent_and_have_the_stated_advantage():

@@ -67,6 +67,10 @@ class StreamSpec:
         slow: Extra delay of a loss of 1 (0 means outcome independent).
         epsilon: Fraction of cases labelled by the uniform audit slice.
         floor: Smallest selection probability of the MAR rule.
+        dependence: How much a case's loss probability moves with its
+            covariate: `p = clip(r_t + dependence * (logistic(z) - 0.5))`.
+            The mean over the unshifted covariate is `r_t`; with a nonzero
+            value, selecting labels on `z` biases the naive mean.
         seed: Seed of the stream.
     """
 
@@ -83,6 +87,7 @@ class StreamSpec:
     slow: int = 0
     epsilon: float = 0.0
     floor: float = 0.1
+    dependence: float = 0.0
     seed: int = 0
 
     def __post_init__(self) -> None:
@@ -174,7 +179,10 @@ def simulate(spec: StreamSpec) -> Stream:
     shape = (spec.batches, spec.size)
     risk = risk_path(spec)
     z = covariate_path(spec)[:, None] + rng.standard_normal(shape)
-    loss = (rng.random(shape) < risk[:, None]).astype(float)
+    chance = np.clip(
+        risk[:, None] + spec.dependence * (logistic(z) - 0.5), 0.0, 1.0
+    )
+    loss = (rng.random(shape) < chance).astype(float)
     audit = rng.random(shape) < spec.epsilon
     if spec.labels == "full":
         true_pi = np.ones(shape)
@@ -201,16 +209,18 @@ def simulate(spec: StreamSpec) -> Stream:
 
 @dataclasses.dataclass(frozen=True)
 class FeedbackStream:
-    """An approval loop in which the model's decisions move later covariates.
+    """An approval loop in which decisions change a case's next features.
 
     Attributes:
-        z: Covariate scores, shape `(batches, size)`.
+        z: Covariate scores at decision time, shape `(batches, size)`.
+        next_z: The same cases' features one period later.
         bypass: Cases that skipped the model (random decision).
         approved: Decisions taken.
         gamma: True strength of the loop (0 means no loop).
     """
 
     z: np.ndarray
+    next_z: np.ndarray
     bypass: np.ndarray
     approved: np.ndarray
     gamma: float
@@ -225,11 +235,13 @@ def feedback_stream(
 ) -> FeedbackStream:
     """Draws an approval loop.
 
-    Batch `t` has a covariate mean proportional to `gamma` times the approval
-    share of batch `t - 1` above one half.
     A model-decided case is approved when `z > 0`; a bypass case by a coin
-    flip, so the next-period covariates of bypass cases do not feed the model
-    (the bypass group is the unaffected comparison).
+    flip, independent of `z` (the randomized, logged slice). An approval moves
+    the case's next-period feature by `gamma`: `next_z = z + gamma * approved
+    + noise`. With `gamma = 0` decisions do not touch the data and the bypass
+    and model-decided groups have the same next-period distribution; with
+    `gamma > 0` they differ, because the model approves selectively and the
+    coin does not.
 
     Args:
         batches: Number of batches.
@@ -241,17 +253,11 @@ def feedback_stream(
     rng = np.random.default_rng(seed)
     shape = (batches, size)
     skipped = rng.random(shape) < bypass
-    z = np.zeros(shape)
-    approved = np.zeros(shape, dtype=bool)
-    share = 0.5
-    for step in range(batches):
-        mean = gamma * (share - 0.5) * 2.0 * 3.0
-        base = rng.standard_normal(size)
-        z[step] = mean + base
-        coin = rng.random(size) < 0.5
-        approved[step] = np.where(skipped[step], coin, z[step] > 0)
-        share = float(approved[step].mean())
-    return FeedbackStream(z, skipped, approved, gamma)
+    z = rng.standard_normal(shape)
+    coin = rng.random(shape) < 0.5
+    approved = np.where(skipped, coin, z > 0)
+    next_z = z + gamma * approved + 0.5 * rng.standard_normal(shape)
+    return FeedbackStream(z, next_z, skipped, approved, gamma)
 
 
 @dataclasses.dataclass(frozen=True)
