@@ -1,0 +1,77 @@
+{
+  "development_seed_base": 10000,
+  "f6-shift-c2st": {
+    "alpha": 0.05,
+    "band_99": [
+      0.03224732165140968,
+      0.06775267834859033
+    ],
+    "decision_false_alarms": 24,
+    "null_replicates": 1000,
+    "permutations": 199,
+    "planted_bayes_auc": 0.6,
+    "planted_replicates": 300,
+    "power": 0.9366666666666666,
+    "rows_per_side": 2000,
+    "seed_offset": 0,
+    "size_by_p_value_alone": 0.046,
+    "size_in_band": true
+  },
+  "f6-shift-mmd": {
+    "alpha": 0.05,
+    "band_99": [
+      0.03224732165140968,
+      0.06775267834859033
+    ],
+    "decision_false_alarms": 60,
+    "null_replicates": 1000,
+    "permutations": 199,
+    "planted_bayes_auc": 0.6,
+    "planted_replicates": 300,
+    "power": 1.0,
+    "rows_per_side": 2000,
+    "seed_offset": 0,
+    "size_by_p_value_alone": 0.06,
+    "size_in_band": true
+  },
+  "f6-stability": {
+    "bootstrap": 100,
+    "by_defect": {
+      "fragile_inclusion_reversal": {
+        "detected": 200,
+        "planted": 200,
+        "statuses": {
+          "fragile": 200
+        }
+      },
+      "fragile_outlier_driven": {
+        "detected": 195,
+        "planted": 200,
+        "statuses": {
+          "fragile": 195,
+          "stable": 5
+        }
+      },
+      "no_effect": {
+        "detected": 200,
+        "planted": 200,
+        "statuses": {
+          "fragile": 200
+        }
+      }
+    },
+    "genuine_effects": 300,
+    "genuine_labelled_stable": 300,
+    "genuine_statuses": {
+      "stable": 300
+    },
+    "rule": {
+      "band": 0.5,
+      "q_min": 0.8,
+      "s_min": 0.8
+    },
+    "seed_offset": 0,
+    "specifications": 18
+  },
+  "seconds": 113.6
+}

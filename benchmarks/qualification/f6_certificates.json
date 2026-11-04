@@ -1,0 +1,173 @@
+{
+  "certificates": [
+    {
+      "code_hash": "f1f286a175cd2007901c778181f9f9b21df1bcef7c378e78bd354abf72f36a93",
+      "corpus_hash": "d6e45e01f17b9687767038bba7b219f3897742851613e3cc59e82ed59264a87b",
+      "created": null,
+      "detector_id": "f6-shift-c2st",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 1000,
+            "defect_type": "mean_shift_auc060",
+            "detected": 281,
+            "detector_id": "f6-shift-c2st",
+            "false_alarms": 24,
+            "planted": 300,
+            "seed_path": [
+              0,
+              "f6.certify.f6-shift-c2st",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.016180168466636995,
+            0.03546290561161149
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9032086875144784,
+            0.9590831176160847
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.075,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0
+      ]
+    },
+    {
+      "code_hash": "f1f286a175cd2007901c778181f9f9b21df1bcef7c378e78bd354abf72f36a93",
+      "corpus_hash": "d6e45e01f17b9687767038bba7b219f3897742851613e3cc59e82ed59264a87b",
+      "created": null,
+      "detector_id": "f6-shift-mmd",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 1000,
+            "defect_type": "mean_shift_auc060",
+            "detected": 300,
+            "detector_id": "f6-shift-mmd",
+            "false_alarms": 60,
+            "planted": 300,
+            "seed_path": [
+              0,
+              "f6.certify.f6-shift-mmd",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.04689647267593196,
+            0.07647107479135655
+          ],
+          "passed": false,
+          "recall_interval": [
+            0.9873570287754538,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.075,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0
+      ]
+    },
+    {
+      "code_hash": "dd61e79f18adc420eaeb54c5a46df7c98f0ca03143ec82c118c3deb43af3f25c",
+      "corpus_hash": "16777a18ecd00b1e2e3001461d7aabf87f71bad0c32ef8a402bef23c04f66fe0",
+      "created": null,
+      "detector_id": "f6-stability",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 300,
+            "defect_type": "fragile_outlier_driven",
+            "detected": 195,
+            "detector_id": "f6-stability",
+            "false_alarms": 0,
+            "planted": 200,
+            "seed_path": [
+              0,
+              "f6.certify.stability",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.012642971224546034
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.942821659593358,
+            0.9892752803482386
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 300,
+            "defect_type": "fragile_inclusion_reversal",
+            "detected": 200,
+            "detector_id": "f6-stability",
+            "false_alarms": 0,
+            "planted": 200,
+            "seed_path": [
+              0,
+              "f6.certify.stability",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.012642971224546034
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9811546736227335,
+            1.0
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 300,
+            "defect_type": "no_effect",
+            "detected": 200,
+            "detector_id": "f6-stability",
+            "false_alarms": 0,
+            "planted": 200,
+            "seed_path": [
+              0,
+              "f6.certify.stability",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.012642971224546034
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9811546736227335,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.1,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0
+      ]
+    }
+  ],
+  "schema_version": 1
+}
