@@ -71,15 +71,10 @@ requests, coverage, refusal precision and question precision and recall.
    >= 0.8, false-question rate <= 0.1. The synthetic version passes.
 10. Byte-identical charter hash on Python 3.11 and 3.14 from the stored draft
     (only one interpreter has been run).
-11. In a run: a claim that depends on an unsigned `llm` field is capped at
-    `unverified`. `provenance.claim_tier` does this and is tested on a
-    fixture; the run does not read `framing_draft.json` yet.
-
 ### Wiring not done
 
-- The baseline claim is not registered in the F3 ledger (its hypotheses are
-  single-feature statistics) and is not run by `scmle run`; there is no data-
-  spec field for the baseline decision column and the frozen rule.
+- The baseline claim in a run concerns a linear rule frozen on `X`, not the
+  model the run selects afterwards.
 - The charter's `unit`, `deployment_population` and estimand text are free
   text; a charter run only reports whether target, moment and unit match
   column names (`framing_link.json`, descriptive).

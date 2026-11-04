@@ -83,7 +83,9 @@ family (survivors minus withdrawn) and its hash are consistent and no
 withdrawn survivor was tested on `C`, that the custody log verifies, froze the
 selection before `C` opened and opened `C` at most once, that the charter
 verifies (signature checked when a key is configured) and, if it fixes rules,
-that the ledger and claims used them, and that `negative_control.json` is the
+that the ledger and claims used them, that the claims registered by hash
+(baseline, causal primary) are stated by the sealed ledger and their report
+files hash to the values it holds, and that `negative_control.json` is the
 control the ledger recorded. A step whose input is absent is reported
 `skipped`, never `pass`. This proves the artifacts agree; it does not
 recompute statistics from data, and a party who can rewrite every file

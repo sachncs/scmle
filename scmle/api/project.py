@@ -521,6 +521,8 @@ class MLProject:
         leakage_policy: LeakagePolicy = "warn",
         charter: str | pathlib.Path | None = None,
         leakage_attestations: str | pathlib.Path | None = None,
+        baseline_column: str | None = None,
+        framing_draft: str | pathlib.Path | None = None,
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -636,6 +638,15 @@ class MLProject:
                 Used only with `charter`; each counts only for that charter
                 and while valid, and is recorded in the ledger at tier
                 `attested`.
+            baseline_column: Used with `charter` on a binary task whose
+                charter has a cost model: the 0/1 decisions of the current
+                process. It is never a feature. A rule is frozen on the
+                exploration rows and the claim that it beats the current
+                process over the cost range is registered in the ledger and
+                tested once on the confirmation set (`baseline_report.json`).
+            framing_draft: The `framing_draft.json` written by `scmle frame`
+                for the charter; a claim that depends on an LLM-filled field
+                of an unsigned charter stays `unverified`.
             checkpoints: Approval gates after planning and selection (the
                 latter fires before the test set is opened).
             output_dir: Parent directory for run directories.
@@ -680,6 +691,10 @@ class MLProject:
                 reference_uri=reference,
                 pseudo_label_confidence=pseudo_label_confidence,
                 monotonic_constraints=monotonic_constraints or {},
+                baseline_column=baseline_column,
+                framing_draft=(
+                    None if framing_draft is None else str(framing_draft)
+                ),
             ),
             task=task,
             metric=metric,

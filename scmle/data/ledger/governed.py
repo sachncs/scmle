@@ -162,6 +162,8 @@ def run_governed(
             the caller builds holds no `C`. Its diagnostics are logged
             without wealth before the survivors are frozen, and the
             withdrawn survivors are not tested on `C`.
+        claim_runner: Claims registered in the ledger and evaluated on the
+            same opening of `C` (see `confirm.confirm`).
 
     Returns:
         The governed run; artifacts are written when `run_dir` is given.

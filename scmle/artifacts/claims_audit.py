@@ -13,6 +13,9 @@ the files agree with each other, from the files alone:
 * the second-stage accounting (family and its hash) is consistent, no
   withdrawn survivor was tested on `C`, and the custody log recorded the
   family hash before `C` opened, and `C` opened at most once;
+* the claims registered by hash (the F8 baseline comparison, the F10 primary
+  causal hypothesis) are stated by the confirmation row, and the report
+  files they produced hash to the values the sealed ledger holds;
 * the charter file verifies, matches the ledger's charter hash and, when it
   fixes rules, the ledger and the claims used them.
 
@@ -40,6 +43,8 @@ from scmle.data.ledger import multiplicity
 CHARTER_FILE = "analysis_charter.json"
 CUSTODY_FILE = "custody_log.jsonl"
 CONTROL_FILE = "negative_control.json"
+BASELINE_FILE = "baseline_report.json"
+CAUSAL_FILE = "causal_claims.json"
 PASS = "pass"
 FAIL = "fail"
 SKIPPED = "skipped"
@@ -140,7 +145,7 @@ def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
     ledger = read_ledger(run_dir)
     stage_two = document.get("stage_two") or {}
     withdrawn = stage_two.get("withdrawn", {})
-    return [
+    listed = [
         {
             "claim_id": claim["claim_id"],
             "feature": column_of(ledger, claim["claim_id"]),
@@ -151,6 +156,55 @@ def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
         }
         for claim in document["claims"]
     ]
+    return listed + registered_rows(run_dir, ledger)
+
+
+def registered_rows(
+    run_dir: str | Path, ledger: ledger_module.Ledger
+) -> list[dict[str, Any]]:
+    """One row per claim registered by hash (baseline, causal primary).
+
+    The tier and status come from the report files the sealed ledger binds;
+    a file that is missing is reported as such rather than guessed.
+    """
+    folder = Path(run_dir)
+    stated = (ledger.confirmation or {}).get("claims", {})
+    rows = []
+    for claim_id, item in ledger.claims.items():
+        record = stated.get(claim_id, {})
+        tier: str | None = None
+        detail: str | None = None
+        if item["kind"] == "baseline":
+            report = read_optional(folder / BASELINE_FILE)
+            tier = ((report or {}).get("claim") or {}).get("tier")
+            detail = (report or {}).get("status")
+        elif item["kind"] == "causal_primary":
+            report = read_optional(folder / CAUSAL_FILE)
+            tier = (report or {}).get("tier")
+            detail = (report or {}).get("status")
+        rows.append(
+            {
+                "claim_id": claim_id,
+                "feature": None,
+                "kind": item["kind"],
+                "tier": tier or "unverified",
+                "status": record.get("status", "not_stated"),
+                "identification": detail,
+                "adjusted_p_value": None,
+                "effect": None,
+                "withdrawn": False,
+            }
+        )
+    return rows
+
+
+def read_optional(path: Path) -> dict[str, Any] | None:
+    """A JSON object file, or None when it is missing or unreadable."""
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return loaded if isinstance(loaded, dict) else None
 
 
 def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
@@ -161,6 +215,12 @@ def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
     """
     document = read_claims(run_dir)
     ledger = read_ledger(run_dir)
+    if claim_id in ledger.claims:
+        return {
+            "registered": ledger.claims[claim_id],
+            "status": (document.get("registered_claims") or {}).get(claim_id),
+            "outcome": document["outcome"],
+        }
     claim = next(
         (c for c in document["claims"] if c["claim_id"] == claim_id), None
     )
@@ -404,6 +464,45 @@ def check_custody(
     return step(name, PASS, f"{len(log.entries)} entries, chain verified")
 
 
+def check_registered(
+    run_dir: Path, document: dict[str, Any], ledger: ledger_module.Ledger
+) -> Finding:
+    """Registered claims are stated at the seal and their files match it."""
+    name = "registered claims: files hash to the sealed ledger"
+    sealed_row = ledger.confirmation or {}
+    attachments = sealed_row.get("attachments", {})
+    problems = []
+    if document.get("registered_claims") != sealed_row.get("claims"):
+        problems.append("claims file and confirmation row differ")
+    for claim_id, item in ledger.claims.items():
+        stated = (sealed_row.get("claims") or {}).get(claim_id)
+        if stated is None or stated.get("sha256") != item["sha256"]:
+            problems.append(f"{claim_id}: registration hash differs")
+    for file_name, expected in sorted(attachments.items()):
+        found = read_optional(run_dir / file_name)
+        if found is None:
+            problems.append(f"{file_name}: missing")
+        elif ledger_module.digest(found) != expected:
+            problems.append(f"{file_name}: differs from the sealed hash")
+    if document.get("attachments") != attachments:
+        problems.append("attachment hashes differ from the claims file")
+    baseline_doc = read_optional(run_dir / BASELINE_FILE)
+    for claim_id, item in ledger.claims.items():
+        if (
+            item["kind"] == "baseline"
+            and baseline_doc is not None
+            and baseline_doc.get("registration_hash") != item["sha256"]
+        ):
+            problems.append(f"{claim_id}: report names another registration")
+    if problems:
+        return step(name, FAIL, "; ".join(problems))
+    return step(
+        name,
+        PASS,
+        f"{len(ledger.claims)} claim(s), {len(attachments)} file(s) bound",
+    )
+
+
 def check_control(run_dir: Path, ledger: ledger_module.Ledger) -> Finding:
     """The negative-control file is the one the ledger recorded."""
     name = "negative control matches the ledger"
@@ -452,5 +551,7 @@ def verify(
     findings.append(check_replay(document))
     findings.append(check_stage_two(document, ledger))
     findings.append(check_custody(folder, document, signing_key))
+    if ledger.claims:
+        findings.append(check_registered(folder, document, ledger))
     findings.append(check_control(folder, ledger))
     return Verification(str(folder), tuple(findings))

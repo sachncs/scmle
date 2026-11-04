@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+* The F8 baseline claim in a charter run (`scmle.data.framing.claim`). With
+  `data.baseline_column` (CLI `--baseline-column`, `MLProject(baseline_column=)`)
+  on a binary task whose charter has a `cost_model`, a rule is frozen on the
+  exploration rows (standardised ridge logistic regression on the numeric
+  features, acting at the cost model's implied threshold, its fitted
+  parameters hashed), the claim that it beats the current process over the
+  cost range is registered in the ledger by the `BaselineGuard` registration
+  hash, and `C` tests both ends of the range on the one opening with the
+  cluster-robust intersection-union test (`baseline_report.json`). The column
+  is never a model feature. Selective labels are checked on `X` plus the rows
+  set aside for a missing target; a flag there makes the claim `not_issued`
+  without a test. `data.framing_draft` (CLI `--framing-draft`) names the
+  `framing_draft.json` that `scmle frame` wrote, and `provenance.claim_tier`
+  now caps the claim from it: an unsigned charter with an LLM-filled field, or
+  a cost that came from data or a template, leaves it `unverified`
+  (`framing_provenance.json`). The claim is about the frozen rule, not the
+  model the run later selects; its level is `alpha_confirm` spent on this one
+  claim, with no joint correction against the bivariate family.
+  `scmle claims list` prints registered claims and `scmle claims verify`
+  checks that their report files hash to the values the sealed ledger holds.
+  A charter run without the column is unchanged.
 * Registered claims in the F3 ledger (`scmle.data.ledger`). A new row kind
   `claim` registers a claim that is not a single-feature statistic (the F8
   baseline comparison, the F10 primary causal hypothesis) by the hash of its

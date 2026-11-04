@@ -46,9 +46,12 @@ from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
 from scmle.data.custody import pipeline as custody_pipeline
 from scmle.data.custody import sealed as custody_sealed
+from scmle.data.framing import baseline as framing_baseline
+from scmle.data.framing import claim as framing_claim
 from scmle.data.framing import draft as framing_draft
 from scmle.data.identification import run as identification_run
 from scmle.data.ledger import budget as ledger_budget
+from scmle.data.ledger import confirm as ledger_confirm
 from scmle.data.ledger import explore as ledger_explore
 from scmle.data.ledger import governed as ledger_governed
 from scmle.data.profiling import label_noise
@@ -548,11 +551,16 @@ class ProfileStage(Stage):
             )
             return
         spec = context.spec
-        charter = charter_sealing.read_verified(str(spec.charter_path)).charter
+        verified = charter_sealing.read_verified(str(spec.charter_path))
+        charter = verified.charter
         data = spec.data
         view = outcome.view
         run_dir = context.store.directory if context.store is not None else None
-        structure = tuple(c for c in (data.group_column, data.time_column) if c)
+        structure = tuple(
+            c
+            for c in (data.group_column, data.time_column, data.baseline_column)
+            if c
+        )
         found = self.qualify_exploration(
             context, task, charter, view, structure
         )
@@ -564,6 +572,9 @@ class ProfileStage(Stage):
             requested=bool(rules and rules.stability_filter),
             rows=len(view.features),
             seed=charter.seed,
+        )
+        runner = self.baseline_runner(
+            context, task, charter, view, structure, signed=verified.signed
         )
         run = ledger_governed.run_governed(
             charter=charter,
@@ -598,7 +609,9 @@ class ProfileStage(Stage):
             ),
             diagnostics=found.checks,
             second_stage=stage,
+            claim_runner=runner,
         )
+        self.write_registered_claims(context, run, runner)
         context.emit(
             "ledger.completed",
             run.confirmation.reason,
@@ -615,6 +628,118 @@ class ProfileStage(Stage):
         self.assess_robustness(context, charter, run, stage)
         self.assess_framing(context, charter, view)
         self.assess_identification(context, charter, view)
+
+    def baseline_runner(
+        self,
+        context: context_module.RunContext,
+        task: tasks.TaskType,
+        charter: charter_contracts.AnalysisCharter,
+        view: Any,
+        structure: tuple[str, ...],
+        *,
+        signed: bool,
+    ) -> ledger_confirm.ClaimRunner | None:
+        """Freezes the baseline rule on `X` and registers the claim (F8).
+
+        Runs when the data spec names `baseline_column`. The rule is fitted
+        on the exploration rows, the selection of outcomes is checked on those
+        rows and on the rows set aside for a missing target, and the claim is
+        handed to the ledger, which registers it by hash and has it tested on
+        the one opening of `C`.
+
+        Raises:
+            ConfigError: If the charter has no cost model, the task is not
+                binary or the column is missing.
+        """
+        data = context.spec.data
+        column = data.baseline_column
+        if not column:
+            return None
+        model = charter.cost_model
+        if model is None or task is not tasks.TaskType.BINARY:
+            raise errors.ConfigError(
+                "data.baseline_column needs a binary task and a charter with "
+                "a cost_model"
+            )
+        if column not in view.features.columns:
+            raise errors.ConfigError(
+                f"baseline column '{column}' is not in the exploration rows"
+            )
+        classes = sorted(view.target.dropna().unique(), key=str)
+        outcome = ledger_explore.encode_target(view.target, True, classes)
+        plan = require(context.profile, "profile").feature_plan
+        numeric = [
+            c
+            for c in plan.numeric
+            if c in view.features.columns and c not in structure
+        ]
+        rule = framing_claim.freeze_rule(
+            view.features,
+            list(outcome.to_numpy(float)),
+            numeric,
+            model.threshold,
+            charter.seed,
+        )
+        decisions = view.features[column].to_numpy(dtype=float)
+        seen = np.ones(len(decisions), dtype=bool)
+        if context.unlabeled is not None and column in context.unlabeled:
+            extra = context.unlabeled[column].to_numpy(dtype=float)
+            decisions = np.concatenate([decisions, extra])
+            seen = np.concatenate([seen, np.zeros(len(extra), dtype=bool)])
+        selection = framing_baseline.selective_labels(seen, decisions)
+        ceiling, why = framing_claim.source_ceiling(
+            data.framing_draft, charter.charter_hash, model, signed=signed
+        )
+        context.write_json(framing_claim.PROVENANCE, why)
+        return framing_claim.build_runner(
+            rule=rule,
+            model=model,
+            alpha=float(charter.error_budget.confirmation.alpha_confirm),
+            baseline_column=column,
+            group_column=data.group_column,
+            classes=classes,
+            selection=selection.to_dict(),
+            ceiling=ceiling,
+            seed=charter.seed,
+        )
+
+    def write_registered_claims(
+        self,
+        context: context_module.RunContext,
+        run: ledger_governed.GovernedRun,
+        runner: ledger_confirm.ClaimRunner | None,
+    ) -> None:
+        """Writes the report files of the registered claims.
+
+        A claim that `C` could not test (no confirmation set, or a failure)
+        is written as not evaluated, never left out.
+        """
+        if runner is None:
+            return
+        documents = dict(run.confirmation.documents)
+        status = {
+            claim_id: record["status"]
+            for claim_id, record in (run.confirmation.registered or {}).items()
+        }
+        if framing_claim.DOCUMENT not in documents and any(
+            i.kind == framing_claim.KIND for i in runner.registered
+        ):
+            documents[framing_claim.DOCUMENT] = {
+                "schema_version": 1,
+                "status": ledger_confirm.NOT_EVALUATED,
+                "issued": False,
+                "reasons": [
+                    "the confirmation set was not available to test the claim"
+                ],
+            }
+        for name, document in documents.items():
+            context.write_json(name, document)
+        context.emit(
+            "claims.registered",
+            "registered claims were evaluated on the one opening of C",
+            tuple(documents),
+            {"status": status},
+        )
 
     def run_robustness(
         self,

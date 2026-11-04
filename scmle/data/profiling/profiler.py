@@ -107,6 +107,10 @@ class DatasetProfiler:
             roles[data.treatment_column] = (
                 "treatment indicator (used by uplift models only)"
             )
+        if data.baseline_column:
+            roles[data.baseline_column] = (
+                "current process decision (used by the baseline claim only)"
+            )
         if data.query_column:
             roles[data.query_column] = "query identifier (ranking only)"
         if data.event_column:

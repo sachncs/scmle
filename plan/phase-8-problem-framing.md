@@ -37,16 +37,9 @@ can do it)
   release says so.
 
 **WP-8.7 (remainder) Wiring**
-- Register the baseline claim in the F3 ledger (one hypothesis per endpoint on
-  `C`, rule frozen from `X` first). The ledger's hypotheses are single-feature
-  bivariate statistics (`confirm.run_confirmation`), so this needs a ledger
-  extension; today `BaselineGuard` enforces register-then-evaluate-once on its
-  own and is a library call, not part of `scmle run`.
-- A data-spec field for the baseline decision column and the frozen rule, so a
-  charter run produces `baseline_report.json` on `C`.
-- Call `provenance.claim_tier` from the run so a claim depending on an
-  unsigned LLM field cannot exceed `unverified` (criterion 11 is tested on a
-  fixture only; a run does not read `framing_draft.json`).
+- The baseline claim in a run is about a plain linear rule frozen on `X`, not
+  about the model the run selects later; testing the selected model's rule on
+  `C` needs the model before `C` opens, which the stage order does not give.
 - Reproducibility on Python 3.11 (criterion 10 was checked on one interpreter
   only).
 

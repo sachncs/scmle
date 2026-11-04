@@ -61,6 +61,14 @@ the earlier cross-fitted skill scan, so a charter run and a run without one
 flag the same columns, and a certified suspect is quarantined unless a valid
 attestation keeps it.
 
+`MLProject` gained the optional keywords `baseline_column` and `framing_draft`
+(both default `None`, so every existing call is unchanged), `DataSpec` the
+fields of the same names, and the CLI the flags `--baseline-column` and
+`--framing-draft` on `plan`, `run` and `resume`; `tests/fixtures/public_api.json`
+was regenerated for the `MLProject` entry alone. `scmle claims list` prints
+claims registered by hash after the bivariate ones, and `scmle claims verify`
+gained one step, present only when a claim was registered.
+
 Uncertainty (F12). `ModelBundle.predict_set` gained the optional argument
 `conditional` (default `None`, the previous behaviour). `conformal.json` gained
 `class_scores`; bundles saved earlier load and answer pooled queries, and

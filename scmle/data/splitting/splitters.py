@@ -800,6 +800,7 @@ class SplitManager:
         roles = {
             data.target,
             data.treatment_column,
+            data.baseline_column,
             *data.targets,
             data.group_column,
             data.time_column,

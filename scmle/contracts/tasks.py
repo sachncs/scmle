@@ -279,6 +279,14 @@ class DataSpec(FrozenModel):
         sensitive_columns: Columns describing groups of people (for example
             sex or age band). They are not hidden from the model unless also
             excluded; the fairness report compares outcomes across them.
+        baseline_column: With a charter that has a cost model and a binary
+            task, the 0/1 decisions of the current process. Never a feature.
+            A rule is frozen on the exploration rows and the claim that it
+            beats the current process is registered in the ledger and tested
+            once on the confirmation set (`baseline_report.json`).
+        framing_draft: Path of the `framing_draft.json` that `scmle frame`
+            wrote for the charter. A claim that depends on an LLM-filled field
+            of an unsigned charter stays `unverified`.
     """
 
     uri: str
@@ -312,6 +320,8 @@ class DataSpec(FrozenModel):
     reference_uri: str | None = None
     unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"
     pseudo_label_confidence: float = pydantic.Field(default=0.9, gt=0.5, lt=1.0)
+    baseline_column: str | None = None
+    framing_draft: str | None = None
 
 
 class ValidationSpec(FrozenModel):

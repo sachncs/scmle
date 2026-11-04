@@ -91,6 +91,8 @@ class ProjectCommand(Command):
         parser.add_argument("--event-column")
         parser.add_argument("--query-column")
         parser.add_argument("--treatment-column")
+        parser.add_argument("--baseline-column")
+        parser.add_argument("--framing-draft")
         parser.add_argument("--memory-budget-gb", type=float)
         parser.add_argument(
             "--training", choices=["sample", "stream"], default="sample"
@@ -287,6 +289,8 @@ class ProjectCommand(Command):
             leakage_policy=args.leakage_policy,
             charter=args.charter,
             leakage_attestations=args.leakage_attestations,
+            baseline_column=args.baseline_column,
+            framing_draft=args.framing_draft,
             output_dir=args.output_dir,
             **sections,
         )
@@ -928,6 +932,17 @@ class ClaimsCommand(Command):
             print(json.dumps(rows, indent=2))
             return EXIT_OK
         for row in rows:
+            if row.get("kind"):
+                print(
+                    f"{row['claim_id']}  {row['tier']:<10}  "
+                    f"registered {row['kind']}  status={row['status']}"
+                    + (
+                        f"  identification={row['identification']}"
+                        if row["identification"]
+                        else ""
+                    )
+                )
+                continue
             adjusted = row["adjusted_p_value"]
             print(
                 f"{row['claim_id']}  {row['tier']:<10}  "
