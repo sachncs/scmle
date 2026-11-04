@@ -35,10 +35,7 @@ def test_seed_ranges_do_not_overlap():
         certify.DIFFERENTIAL_CASES,
         certify.METAMORPHIC_CASES,
     )
-    assert (
-        certified < worlds.DEV_SEED_BASE + 1
-        or certify.METAMORPHIC_CASES == (worlds.DEV_SEED_BASE)
-    )
+    assert certified <= worlds.DEV_SEED_BASE
 
 
 def test_live_check_passes():
