@@ -1,44 +1,48 @@
-# Product: the SCMLE qualification instrument
+# Product: from a qualification instrument to an autonomous data scientist
 
 Canonical names and principles: [`../plan/00-canon.md`](../plan/00-canon.md).
 
-## What it is
+## Where the product stands
 
-A data-stage instrument that turns a signed charter into confirmed,
-tier-labelled claims about a dataset, with every detector carrying a measured
-certificate. It runs unattended; a human is needed only to supply facts the
-data cannot (field provenance, as-of times, domain sign-off), and the product
-degrades visibly when they are absent.
+Built: a leakage-safe ML lifecycle with a data-stage qualification instrument
+(signed charter, custody-controlled sets, hash-chained hypothesis ledger with
+online FDR and one-time confirmation, admissibility and provenance, certified
+detectors, robustness and shift checks). It runs unattended on a framed,
+prepared table and degrades visibly when a person's facts are missing.
+
+Not built: the parts of a data scientist's job around that. This folder
+defines only those.
 
 ## What it is not
 
-- Not a larger EDA tool. A check that cannot change an action, or has no
-  measured operating characteristic, is shown but never gates.
 - Not a proof of correctness. Guarantees are probabilistic and conditional on
   recorded assumptions.
+- Not a replacement for a data scientist today. The measured evidence is its
+  own benchmarks, which are not a head-to-head with people (see F7).
 - Not adversary-proof custody on a single machine.
 
-## Features
+## Features still to build
 
 | ID | Feature | One line |
 |---|---|---|
-| F1 | [Charter and decision map](features/F1-charter-and-decision-map.md) | Question, estimand, unit, population, feasibility, error budget, signed. |
-| F2 | [Custody and splits](features/F2-custody-and-splits.md) | Exploration / confirmation / forward sets, hashed manifest, sealed access. |
-| F3 | [Claim ledger and confirmation](features/F3-claim-ledger-and-confirmation.md) | Online FDR ledger, negative controls, unlock-once confirmation. |
-| F4 | [Admissibility and provenance](features/F4-admissibility-and-provenance.md) | As-of facts, field provenance, leakage tests, DAG falsification. |
-| F5 | [Detectors with certificates](features/F5-detectors-with-certificates.md) | Missingness, labels, duplicates, sentinels, outliers, each with measured size and recall. |
-| F6 | [Robustness and shift](features/F6-robustness-and-shift.md) | Multiverse stability, two-sample shift tests, forward check. |
-| F7 | [Verification harness](features/F7-verification-harness.md) | Corpora, differential tests, mutation tests, predictive-validity backtest, red team. |
+| R1 | [Instrument residuals](features/R1-instrument-residuals.md) | Open items of the built instrument: uncertified detectors, unwired checks, custody gaps, missing evidence. |
+| F7 | [Verification harness](features/F7-verification-harness.md) | Predictive-validity backtest, red team, replication, TabArena campaign, mutation floor. |
+| F8 | [Problem framing](features/F8-problem-framing.md) | Plain-language request to a draft charter, decision-cost model and baseline, asking only what the data cannot answer. |
+| F9 | [Raw-data ingestion](features/F9-raw-data-ingestion.md) | Source systems to a point-in-time-correct table: grain, keys, joins, entity resolution, feature synthesis. |
+| F10 | [Causal identification](features/F10-causal-identification.md) | Estimand-driven strategies, diagnostics, sensitivity, and refusal when not identified. |
+| F11 | [Decision layer](features/F11-decision-layer.md) | Cost-optimal thresholds, off-policy evaluation, A/B design, anytime-valid promote and rollback. |
+| F12 | [Uncertainty and breadth](features/F12-uncertainty-and-breadth.md) | Coverage-guaranteed intervals and sets; forecasting, ranking, survival and other problem types. |
+| F13 | [Closed loop and escalation](features/F13-closed-loop-and-escalation.md) | Drift to retrain to gated promotion, label bias, and a measured rule for when to ask a human. |
 
-## Outputs of a run
+## Autonomy standard
 
-`analysis_charter.json`, `split_manifest.json`, `error_budget.json`,
-`hypothesis_ledger.jsonl`, `detector_certificates.json`,
-`admissibility_table.json`, `stability_report.json`, `shift_report.json`,
-`confirmed_claims.json`, `decision_log.jsonl`, `eda_report.html`, and the
-modelling specification handed to the existing pipeline.
+The product may claim autonomy for a task only at the strength a prospective,
+pre-registered head-to-head against practitioners on unseen raw problems
+supports (F7). Until then each feature states its own measured operating
+characteristic and nothing more.
 
 ## Evidence tiers
 
 `confirmed` > `attested` > `unverified`. Shown on every claim, in the CLI
-summary and in the report header.
+summary and in the report header. The causal and decision readings are in the
+canon.
