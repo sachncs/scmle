@@ -15,6 +15,7 @@ to a hash-chained log that holds ids and counts but never row values.
 from collections.abc import Mapping
 import dataclasses
 import hashlib
+import hmac
 import json
 from pathlib import Path
 from typing import Any
@@ -46,24 +47,41 @@ def entry_hash(body: Mapping[str, Any]) -> str:
     return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
 
 
+def entry_mac(entry_hash_value: str, key: bytes) -> str:
+    """HMAC-SHA256 of an entry's hash under the log key."""
+    return hmac.new(key, entry_hash_value.encode(), hashlib.sha256).hexdigest()
+
+
 class OpenLog:
     """Append-only, hash-chained record of custody events.
 
     Each entry stores the hash of the previous one, so editing, removing or
-    reordering any entry breaks the chain from that point on.
+    reordering any entry breaks the chain from that point on. With a key,
+    each entry also carries an HMAC of its hash: someone who edits an entry
+    and recomputes the chain still cannot produce the MAC without the key.
+    The chain alone is a checksum, not an authentication. Neither detects
+    the removal of the newest entries; compare `head` with a copy kept
+    elsewhere (the confirmation record stores one) to detect that.
     """
 
-    def __init__(self, path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        path: str | Path | None = None,
+        signing_key: str | bytes | None = None,
+    ) -> None:
         """Opens the log, loading and verifying an existing file.
 
         Args:
             path: File to persist to (one JSON object per line), or None for
                 an in-memory log.
+            signing_key: HMAC key; the environment key is used when None.
+                Without any key the log is hash-chained but not MAC-ed.
 
         Raises:
             ArtifactError: If an existing file fails verification.
         """
         self.path = Path(path) if path is not None else None
+        self.key = signing.resolve_key(signing_key)
         self.entries: list[dict[str, Any]] = []
         if self.path is not None and self.path.exists():
             self.entries = [
@@ -99,7 +117,10 @@ class OpenLog:
             "detail": dict(detail or {}),
             "prev": self.entries[-1]["hash"] if self.entries else GENESIS,
         }
-        entry = {**body, "hash": entry_hash(body)}
+        digest = entry_hash(body)
+        entry = {**body, "hash": digest}
+        if self.key is not None:
+            entry["mac"] = entry_mac(digest, self.key)
         self.entries.append(entry)
         if self.path is not None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -115,7 +136,7 @@ class OpenLog:
         """
         previous = GENESIS
         for index, entry in enumerate(self.entries):
-            body = {k: v for k, v in entry.items() if k != "hash"}
+            body = {k: v for k, v in entry.items() if k not in ("hash", "mac")}
             if (
                 entry.get("seq") != index
                 or entry.get("prev") != previous
@@ -124,12 +145,25 @@ class OpenLog:
                 raise errors.ArtifactError(
                     f"custody log chain broken at entry {index}"
                 )
+            if self.key is not None and not hmac.compare_digest(
+                str(entry.get("mac", "")), entry_mac(entry["hash"], self.key)
+            ):
+                raise errors.ArtifactError(
+                    f"custody log MAC invalid at entry {index}"
+                )
             previous = entry["hash"]
 
+    @property
+    def head(self) -> str:
+        """Hash of the newest entry, or the genesis value when empty."""
+        return str(self.entries[-1]["hash"]) if self.entries else GENESIS
+
     @classmethod
-    def verify_file(cls, path: str | Path) -> "OpenLog":
-        """Loads a log file and verifies its chain."""
-        return cls(path)
+    def verify_file(
+        cls, path: str | Path, signing_key: str | bytes | None = None
+    ) -> "OpenLog":
+        """Loads a log file and verifies its chain and, with a key, its MACs."""
+        return cls(path, signing_key)
 
 
 class SealedSet:
