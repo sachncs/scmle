@@ -290,6 +290,8 @@ def reduce_rows(
         A float (or object, for `last` of non-numeric values) series indexed
         by target row `0..count-1`.
     """
+    if primitive not in PRIMITIVES:
+        raise ValueError(f"unknown primitive: {primitive}")
     if window is not None:
         rows = rows.loc[
             rows[asof_view.EVENT_COLUMN]

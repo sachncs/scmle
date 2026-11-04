@@ -341,3 +341,41 @@ def test_today_default_does_not_change_tier_of_unexpired_attestation():
     rule = attested_rule()
     assert rule.tier(datetime.date(2025, 1, 1)) is qualification.Tier.ATTESTED
     assert rule.tier(datetime.date(2100, 1, 1)) is qualification.Tier.UNVERIFIED
+
+
+def test_evidence_and_expressions_are_stated_exactly():
+    view = small_view()
+    assert view.evidence() == {
+        "table": "events",
+        "mode": "transaction",
+        "known_column": "rec",
+        "delta_rec_days": None,
+        "tier": "unverified",
+    }
+    aggregate = synthesize.FeatureSpec("f", "aggregate", 0, "sum", "val", 7.0)
+    assert aggregate.expression() == "sum(val) over 7d"
+    free = synthesize.FeatureSpec("f", "aggregate", 0, "count", None, None)
+    assert free.expression() == "count(*) over all"
+    nested = synthesize.FeatureSpec(
+        "f", "nested", 0, "mean", "q", 30.0, nest=0, inner="sum"
+    )
+    assert nested.expression() == "mean(per-row sum(q) in 30d)"
+    assert synthesize.window_label(None) == "all"
+    assert synthesize.window_label(90.0) == "90d"
+
+
+def test_weakest_tier_and_unknown_inputs():
+    tiers = [qualification.Tier.CONFIRMED, qualification.Tier.ATTESTED]
+    assert asof_view.weakest(tiers) is qualification.Tier.ATTESTED
+    assert asof_view.weakest([]) is qualification.Tier.UNVERIFIED
+    with pytest.raises(ValueError):
+        synthesize.Source(small_view(), "cid", role="sibling")
+    with pytest.raises(ValueError):
+        synthesize.synthesize(
+            pd.DataFrame({"cid": [1], "moment": [1.0]}),
+            "moment",
+            [synthesize.Source(small_view(), "cid")],
+            lag_days=-1.0,
+        )
+    with pytest.raises(ValueError):
+        synthesize.reduce_rows(small_view().reader(), "median", "val", None, 1)
