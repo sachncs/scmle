@@ -41,6 +41,15 @@ stable at least 0.90), 95 percent intervals. The grid is the 18
 specifications in `GRID_CHOICES`. The plants are built to be found by that
 grid; the certificate says nothing about spec-dependence of other kinds.
 
+Amendment 2026-11-04 (made before the re-run, policy unchanged). The first
+certificate of `f6-shift-mmd` (1000 nulls) had 60 false alarms and a Wilson
+upper bound of 0.0765 against the ceiling 0.075: the observed rate sat inside
+the ceiling and the interval was too wide to say so. The number of null
+replicates for the MMD test is raised to `MMD_NULL` (5000, seeds 0 up to
+4999, which include the first 1000). The recall floor, the false-alarm
+ceiling, the confidence, the world and the test are not changed. The result
+is filed whichever way it falls.
+
 Seeds. Development seeds start at `DEV_SEED_BASE`; certification uses seeds
 0 up to the replicate count. The two ranges never overlap. A replicate with
 seed k draws its data and its test with seed k.
@@ -79,6 +88,7 @@ Z_99 = 2.5758293035489004
 SHIFT_ROWS = 2000
 SHIFT_COLUMNS = 5
 SHIFT_NULL = 1000
+MMD_NULL = 5000
 SHIFT_PLANTED = 300
 PLANTED_AUC = 0.60
 SHIFT_POLICY = certificates.CertificationPolicy(0.80, 0.075, 0.95)
@@ -206,9 +216,10 @@ def shift_certificate(
     test: str, offset: int, workers: int
 ) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
     """Measures one two-sample test on nulls and planted shifts."""
+    null_count = MMD_NULL if test == shift.MMD_ID else SHIFT_NULL
     nulls = run_jobs(
         shift_replicate,
-        [(test, False, offset + s) for s in range(SHIFT_NULL)],
+        [(test, False, offset + s) for s in range(null_count)],
         workers,
     )
     plants = run_jobs(
@@ -224,7 +235,7 @@ def shift_certificate(
         defect_type=shift.DEFECT_TYPE,
         planted=SHIFT_PLANTED,
         detected=detected,
-        clean_rows=SHIFT_NULL,
+        clean_rows=null_count,
         false_alarms=false_alarms,
         seed_path=randomness.seed_path(offset, f"f6.certify.{test}", 0),
     )
@@ -247,10 +258,10 @@ def shift_certificate(
         [result],
         SHIFT_POLICY,
     )
-    low, high = band_99(shift.ALPHA, SHIFT_NULL)
-    rate = p_alone / SHIFT_NULL
+    low, high = band_99(shift.ALPHA, null_count)
+    rate = p_alone / null_count
     measurements = {
-        "null_replicates": SHIFT_NULL,
+        "null_replicates": null_count,
         "planted_replicates": SHIFT_PLANTED,
         "rows_per_side": SHIFT_ROWS,
         "planted_bayes_auc": PLANTED_AUC,
