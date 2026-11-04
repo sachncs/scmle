@@ -1,0 +1,253 @@
+"""Sharp regression discontinuity at a cutoff (F10).
+
+Estimator. Triangular-kernel local polynomial fits on each side of the
+cutoff. The conventional estimate is the difference of the two local-linear
+intercepts. The reported interval is bias-corrected: it uses the difference
+of the local-quadratic intercepts at the same bandwidth and the
+heteroskedasticity-robust variance of that fit. This is the Calonico,
+Cattaneo and Titiunik (2014) construction with the bias bandwidth equal to
+the estimation bandwidth (their `rho = 1`), where the bias-corrected
+estimator is exactly the local quadratic intercept; the reference package
+`rdrobust` was not available here, so agreement with it is not claimed.
+
+Bandwidth. Chosen by one-sided leave-out cross-validation (in the manner of
+Imbens and Lemieux 2008, from memory): each of up to 40 evaluation points
+among the nearest half of a side is predicted by a local-linear fit that uses
+only the points on the same side that lie farther from the cutoff than the
+evaluation point, which mimics estimation at a boundary. The grid is fixed
+(`GRID`, quantiles of the distance to the cutoff) and the larger of the two
+sides' choices is used. It is not the CCT mean-squared-error-optimal
+bandwidth.
+
+Diagnostics. A binomial test of the counts just left and right of the cutoff
+within the bandwidth (a crude density check, valid when the density is flat
+across the window; it is not the McCrary or Cattaneo-Jansson-Ma test), placebo
+cutoffs at the median of each side (estimated with that side's data only),
+covariate discontinuities, and the estimate at multiples of the bandwidth.
+
+The estimand is the effect at the cutoff for units at the cutoff; it is never
+extended further. Continuity and absence of manipulation are not checked
+beyond the diagnostics above.
+"""
+
+import dataclasses
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+GRID = (0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0)
+CV_POINTS = 40
+MIN_SIDE = 15
+SENSITIVITY_MULTIPLES = (0.5, 0.75, 1.25, 1.5)
+
+
+@dataclasses.dataclass(frozen=True)
+class Fit:
+    """Intercept of a weighted polynomial fit and its robust variance."""
+
+    intercept: float
+    variance: float
+    n: int
+
+
+def local_fit(x: np.ndarray, y: np.ndarray, h: float, order: int) -> Fit | None:
+    """Triangular-kernel polynomial fit at 0 (x already centred)."""
+    weight = np.clip(1.0 - np.abs(x) / h, 0.0, None)
+    keep = weight > 0
+    if keep.sum() < order + 3:
+        return None
+    xs, ys, ws = x[keep], y[keep], weight[keep]
+    design = np.vander(xs, order + 1, increasing=True)
+    gram = design.T @ (design * ws[:, None])
+    try:
+        bread = np.linalg.inv(gram)
+    except np.linalg.LinAlgError:
+        return None
+    coef = bread @ (design.T @ (ws * ys))
+    resid = ys - design @ coef
+    meat = (design * (ws * resid)[:, None]).T @ (design * (ws * resid)[:, None])
+    n, k = len(xs), order + 1
+    variance = float((bread @ meat @ bread)[0, 0]) * n / max(n - k, 1)
+    return Fit(float(coef[0]), variance, n)
+
+
+def cv_bandwidth(x: np.ndarray, y: np.ndarray) -> float:
+    """Leave-out cross-validated bandwidth for one signed side of the cutoff.
+
+    `x` holds distances from the cutoff, positive, nearest first after
+    sorting; evaluation points are the `CV_POINTS` evenly spread among the
+    nearest half.
+    """
+    order = np.argsort(x)
+    x, y = x[order], y[order]
+    pool = max(len(x) // 2, 5)
+    picks = np.unique(np.linspace(2, pool - 1, CV_POINTS).astype(int))
+    best, best_error = float(np.quantile(x, 0.5)), np.inf
+    for fraction in GRID:
+        h = float(np.quantile(x, fraction))
+        errors = []
+        for i in picks:
+            far = np.arange(len(x)) > i
+            if h <= 0 or far.sum() < 3:
+                continue
+            near = far & (x - x[i] < h)
+            if near.sum() < 3:
+                continue
+            fit = local_fit(x[near] - x[i], y[near], h, 1)
+            if fit is not None:
+                errors.append((y[i] - fit.intercept) ** 2)
+        if len(errors) >= 5 and np.mean(errors) < best_error:
+            best, best_error = h, float(np.mean(errors))
+    return best
+
+
+@dataclasses.dataclass(frozen=True)
+class RdResult:
+    """A regression discontinuity fit.
+
+    Attributes:
+        estimate: Conventional (local linear) estimate.
+        bias_corrected: Local quadratic estimate (the interval's centre).
+        se: Robust standard error of the bias-corrected estimate.
+        low: Lower interval limit.
+        high: Upper interval limit.
+        level: Confidence level.
+        bandwidth: The bandwidth used on both sides.
+        n_left: Rows inside the bandwidth to the left.
+        n_right: Rows inside the bandwidth to the right.
+        density_p: Binomial p-value of the left/right counts.
+        placebos: Placebo cutoff to its estimate, interval and p-value.
+        balance: Covariate to its discontinuity, interval and p-value.
+        sensitivity: Bandwidth multiple to estimate and interval.
+    """
+
+    estimate: float
+    bias_corrected: float
+    se: float
+    low: float
+    high: float
+    level: float
+    bandwidth: float
+    n_left: int
+    n_right: int
+    density_p: float
+    placebos: dict[str, dict[str, float]]
+    balance: dict[str, dict[str, float]]
+    sensitivity: dict[str, dict[str, float]]
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return dataclasses.asdict(self)
+
+
+def discontinuity(
+    x: np.ndarray,
+    y: np.ndarray,
+    cutoff: float,
+    h: float,
+    level: float,
+) -> dict[str, float] | None:
+    """Conventional and bias-corrected jump at `cutoff` for bandwidth `h`."""
+    left = x < cutoff
+    pieces = {}
+    for name, mask in (("left", left), ("right", ~left)):
+        linear = local_fit(x[mask] - cutoff, y[mask], h, 1)
+        quadratic = local_fit(x[mask] - cutoff, y[mask], h, 2)
+        if linear is None or quadratic is None:
+            return None
+        pieces[name] = (linear, quadratic)
+    conventional = pieces["right"][0].intercept - pieces["left"][0].intercept
+    corrected = pieces["right"][1].intercept - pieces["left"][1].intercept
+    se = float(
+        np.sqrt(pieces["right"][1].variance + pieces["left"][1].variance)
+    )
+    z = float(stats.norm.ppf(0.5 + level / 2))
+    return {
+        "estimate": float(conventional),
+        "bias_corrected": float(corrected),
+        "se": se,
+        "low": float(corrected - z * se),
+        "high": float(corrected + z * se),
+        "p": float(2 * stats.norm.sf(abs(corrected) / se)) if se > 0 else 1.0,
+    }
+
+
+def estimate(
+    frame: pd.DataFrame,
+    running: str,
+    outcome: str,
+    cutoff: float,
+    level: float = 0.95,
+    bandwidth: float | None = None,
+    covariates: tuple[str, ...] = (),
+) -> RdResult:
+    """Fits the discontinuity, its diagnostics and bandwidth sensitivity.
+
+    Args:
+        frame: Rows with the running variable and outcome.
+        running: Running variable column.
+        outcome: Outcome column.
+        cutoff: The threshold; treatment is assigned at `running >= cutoff`.
+        level: Confidence level.
+        bandwidth: A fixed bandwidth, or None to cross-validate.
+        covariates: Predetermined covariates to test for a jump.
+
+    Raises:
+        ValueError: If a side has too few rows or a fit is degenerate.
+    """
+    x = frame[running].to_numpy(dtype=float)
+    y = frame[outcome].to_numpy(dtype=float)
+    if not (np.isfinite(x).all() and np.isfinite(y).all()):
+        raise ValueError("RD columns must not hold missing values")
+    left = x < cutoff
+    if min(left.sum(), (~left).sum()) < MIN_SIDE:
+        raise ValueError(f"each side needs at least {MIN_SIDE} rows")
+    if bandwidth is None:
+        h = max(
+            cv_bandwidth(cutoff - x[left], y[left]),
+            cv_bandwidth(x[~left] - cutoff, y[~left]),
+        )
+    else:
+        h = float(bandwidth)
+    main = discontinuity(x, y, cutoff, h, level)
+    if main is None:
+        raise ValueError("too few rows inside the bandwidth to fit")
+    inside_left = int(((x < cutoff) & (x > cutoff - h)).sum())
+    inside_right = int(((x >= cutoff) & (x < cutoff + h)).sum())
+    total = inside_left + inside_right
+    density_p = float(stats.binomtest(inside_right, total, 0.5).pvalue)
+    placebos = {}
+    for name, mask in (("left_median", left), ("right_median", ~left)):
+        point = float(np.median(x[mask]))
+        found = discontinuity(x[mask], y[mask], point, h, level)
+        if found is not None:
+            placebos[name] = {"cutoff": point, **found}
+    balance = {}
+    for name in covariates:
+        found = discontinuity(
+            x, frame[name].to_numpy(dtype=float), cutoff, h, level
+        )
+        if found is not None:
+            balance[name] = found
+    sensitivity = {}
+    for multiple in SENSITIVITY_MULTIPLES:
+        found = discontinuity(x, y, cutoff, h * multiple, level)
+        if found is not None:
+            sensitivity[str(multiple)] = found
+    return RdResult(
+        estimate=main["estimate"],
+        bias_corrected=main["bias_corrected"],
+        se=main["se"],
+        low=main["low"],
+        high=main["high"],
+        level=level,
+        bandwidth=h,
+        n_left=inside_left,
+        n_right=inside_right,
+        density_p=density_p,
+        placebos=placebos,
+        balance=balance,
+        sensitivity=sensitivity,
+    )
