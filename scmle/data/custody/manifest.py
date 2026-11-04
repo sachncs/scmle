@@ -14,10 +14,13 @@ import hashlib
 from typing import Any
 from typing import Self
 
+import pandas as pd
+
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
+from scmle.data.custody import merkle
 from scmle.data.splitting import splitters
 
 MANIFEST_VERSION = 2
@@ -53,6 +56,9 @@ class CustodyManifest:
         isolation: Isolation level per sealed set, as `(set, level)` pairs.
         scope: `confirmatory` or `exploratory_unconfirmed`.
         notes: Adjustments made while splitting.
+        row_roots: Merkle root over the row content of each set, as
+            `(set, root)` pairs. Empty for manifests written before roots
+            existed; their hash is unchanged.
     """
 
     strategy: str
@@ -68,6 +74,7 @@ class CustodyManifest:
     isolation: tuple[tuple[str, str], ...]
     scope: str
     notes: tuple[str, ...] = ()
+    row_roots: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         """Validates the manifest."""
@@ -94,10 +101,11 @@ class CustodyManifest:
         qualification.require_tuple(self.folds, "folds")
         qualification.require_tuple(self.isolation, "isolation")
         qualification.require_tuple(self.notes, "notes")
+        qualification.require_tuple(self.row_roots, "row_roots")
 
     def body(self) -> dict[str, Any]:
         """The hashed content: everything except the hash itself."""
-        return {
+        body: dict[str, Any] = {
             "manifest_version": MANIFEST_VERSION,
             "strategy": self.strategy,
             "seed": self.seed,
@@ -115,6 +123,9 @@ class CustodyManifest:
             "scope": self.scope,
             "notes": list(self.notes),
         }
+        if self.row_roots:
+            body["row_roots"] = [list(pair) for pair in self.row_roots]
+        return body
 
     @property
     def sha256(self) -> str:
@@ -126,6 +137,33 @@ class CustodyManifest:
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record including the hash."""
         return {**self.body(), HASH_FIELD: self.sha256}
+
+    def set_ids(self) -> dict[str, tuple[int, ...]]:
+        """Row ids of each set that carries a content root."""
+        return {
+            "exploration": self.exploration_ids,
+            "confirmation": self.confirmation_ids,
+            "final_test": self.final_test_ids,
+        }
+
+    def verify_rows(self, frame: pd.DataFrame) -> None:
+        """Checks the content of the rows against the recorded roots.
+
+        Args:
+            frame: The full dataset, indexed by position as the ids are.
+
+        Raises:
+            ArtifactError: If the manifest holds no roots or a root differs,
+                which means a value inside a row changed.
+        """
+        if not self.row_roots:
+            raise errors.ArtifactError("manifest holds no row content roots")
+        ids_of = self.set_ids()
+        for name, root in self.row_roots:
+            if merkle.frame_root(frame, ids_of[name]) != root:
+                raise errors.ArtifactError(
+                    f"rows of {name} differ from the manifest: a value changed"
+                )
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
@@ -140,7 +178,12 @@ class CustodyManifest:
         if values.pop("manifest_version", None) != MANIFEST_VERSION:
             raise errors.ArtifactError("unsupported split manifest version")
         qualification.require_fields(
-            cls, {**values, "notes": values.get("notes", ())}
+            cls,
+            {
+                **values,
+                "notes": values.get("notes", ()),
+                "row_roots": values.get("row_roots", ()),
+            },
         )
         manifest = cls(
             strategy=values["strategy"],
@@ -158,6 +201,7 @@ class CustodyManifest:
             isolation=tuple(tuple(pair) for pair in values["isolation"]),
             scope=values["scope"],
             notes=tuple(values["notes"]),
+            row_roots=tuple(tuple(p) for p in values.get("row_roots", ())),
         )
         if claimed != manifest.sha256:
             raise errors.ArtifactError(

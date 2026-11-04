@@ -4,6 +4,7 @@ import typing
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -181,3 +182,18 @@ def test_a_refused_carve_becomes_a_run_with_no_confirmation_set(monkeypatch):
     assert ran.outcome.split.manifest.folds == ran.original.manifest.folds
     assert not ran.vault.sets
     ran.vault.close()
+
+
+def test_the_manifest_commits_to_the_row_content_of_each_set():
+    frame = make_frame()
+    manifest = run(frame).outcome.manifest
+    assert [name for name, _ in manifest.row_roots] == [
+        "exploration",
+        "confirmation",
+        "final_test",
+    ]
+    manifest.verify_rows(frame)
+    edited = frame.copy()
+    edited.loc[manifest.confirmation_ids[0], "x"] += 1e-9
+    with pytest.raises(errors.ArtifactError, match="confirmation"):
+        manifest.verify_rows(edited)

@@ -17,6 +17,7 @@ from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import feasibility
 from scmle.data.custody import carve
 from scmle.data.custody import manifest as manifest_module
+from scmle.data.custody import merkle
 from scmle.data.custody import sealed
 from scmle.data.splitting import duplicates
 from scmle.data.splitting import splitters
@@ -243,6 +244,14 @@ def finish(
         isolation=tuple(isolation),
         scope=report.scope,
         notes=notes,
+        row_roots=tuple(
+            (name, merkle.frame_root(frame, members))
+            for name, members in (
+                ("exploration", exploration),
+                ("confirmation", confirmation),
+                ("final_test", tuple(old.test_ids)),
+            )
+        ),
     )
     result = splitters.SplitResult(
         restricted,

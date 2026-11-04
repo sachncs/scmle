@@ -3,10 +3,12 @@
 import dataclasses
 import json
 
+import pandas as pd
 import pytest
 
 from scmle.contracts import errors
 from scmle.data.custody import manifest as m
+from scmle.data.custody import merkle
 from scmle.data.splitting import splitters
 
 
@@ -122,3 +124,57 @@ def test_manifest_is_frozen():
 def test_scope_is_a_closed_set():
     with pytest.raises(ValueError, match="scope"):
         make(scope="whatever")
+
+
+def table():
+    return pd.DataFrame({"a": [float(i) for i in range(8)], "y": [0, 1] * 4})
+
+
+def rooted(frame=None):
+    frame = table() if frame is None else frame
+    manifest = make()
+    roots = tuple(
+        (name, merkle.frame_root(frame, members))
+        for name, members in manifest.set_ids().items()
+    )
+    return make(row_roots=roots)
+
+
+def test_a_manifest_without_roots_keeps_its_hash_and_body():
+    assert "row_roots" not in make().body()
+    assert make().sha256 == make(row_roots=()).sha256
+
+
+def test_the_roots_are_hashed_and_round_trip():
+    manifest = rooted()
+    assert manifest.sha256 != make().sha256
+    record = json.loads(json.dumps(manifest.to_dict()))
+    assert m.load_manifest(record) == manifest
+    record["row_roots"][0][1] = "0" * 64
+    with pytest.raises(errors.ArtifactError, match="hash"):
+        m.load_manifest(record)
+
+
+def test_verify_rows_passes_on_the_original_rows():
+    rooted().verify_rows(table())
+
+
+@pytest.mark.parametrize("row,name", [(1, "exploration"), (4, "confirmation")])
+def test_a_changed_value_inside_a_row_is_caught_though_ids_are_equal(row, name):
+    manifest = rooted()
+    edited = table()
+    edited.loc[row, "a"] += 0.001
+    assert manifest.sha256 == rooted().sha256
+    with pytest.raises(errors.ArtifactError, match=name):
+        manifest.verify_rows(edited)
+
+
+def test_a_change_in_the_embargo_rows_is_not_covered():
+    # Embargo rows belong to no set and carry no root: stated limit.
+    manifest = make(embargo_ids=(), confirmation_ids=(4, 5))
+    assert "embargo" not in manifest.set_ids()
+
+
+def test_verify_rows_refuses_a_manifest_with_no_roots():
+    with pytest.raises(errors.ArtifactError, match="no row content"):
+        make().verify_rows(table())
