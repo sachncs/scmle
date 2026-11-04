@@ -33,6 +33,17 @@ snapshot was regenerated for that single entry. The charter and custody
 modules (`scmle.data.charter`, `scmle.data.custody`) are extension surfaces
 like the other qualification modules.
 
+Uncertainty (F12). `ModelBundle.predict_set` gained the optional argument
+`conditional` (default `None`, the previous behaviour). `conformal.json` gained
+`class_scores`; bundles saved earlier load and answer pooled queries, and
+`conditional="class"` raises for them. `ForecastMetric` gained the field
+`scale` and the kinds `mase_same_rows` and `mase_insample`. The metric named
+`mase` is unchanged and is the same-rows score (the model's error divided by
+the no-change error on the evaluation rows); it is not the usual MASE and is
+not comparable with published values. Use `proper_scores.mase` or
+`mase_insample` for that. The `interval_coverage` reliability check now
+requires coverage of at least 0.88 instead of 0.85.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

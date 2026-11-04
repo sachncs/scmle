@@ -2,6 +2,58 @@
 
 ## Unreleased
 
+* Uncertainty and problem-type breadth (F12), the parts that could be built
+  and measured without outside data. New in `scmle.evaluation`: per-class
+  (Mondrian) conformal margins stored beside the pooled scores
+  (`ConformalCalibrator.class_margins`, `sets(..., conditional="class")`,
+  `ModelBundle.predict_set(..., conditional="class")`; a class with fewer than
+  `ceil(1/(1-coverage)) - 1` calibration rows is kept in every set and listed
+  by `thin_classes`); weighted conformal for covariate shift
+  (`weighted_quantile`, `weighted_margins`, `ConformalCalibrator.
+  weighted_interval`, and `shift_weights` for clipped discriminator odds with
+  an effective-sample-size refusal below 50); `cv_plus_bounds` (CV+ from
+  stored fold models; the served bundle still uses pooled out-of-fold scores
+  and a refit, so no theorem covers the served interval and the stage was not
+  changed); `coverage` (Clopper-Pearson, Holm-corrected slice flags, class
+  coverage, the coverage tier of F12 A5); `proper_scores` (pinball, interval
+  score, WIS, CRPS from a quantile grid, standard MASE with the in-sample
+  scale); `ipcw` (censoring weights from a Cox model on covariates, pair
+  weights `1/(G(T_i|x_i) G(T_i|x_j))`, Uno-style truncated concordance, the
+  number of floored weights); `survival.floored_count`; `reconcile` (bottom-up
+  and MinT with a shrunk covariance); `ranking.query_bootstrap_ndcg` (queries
+  are the resampling unit; queries with nothing relevant are excluded and
+  counted); `task_gate` and `task_gate_status.json` (every task type is
+  `passed`, `failed` or `no_referent`; only `passed` types may keep a
+  `confirmed` tier). Measured gates are in
+  `benchmarks/qualification/uncertainty_certificates.json`
+  (`uncertainty_certify.py`, `--check` fails when stale): G1 split conformal
+  (mean coverage in the derived band, Kolmogorov-Smirnov against
+  `Beta(451, 50)`), G2 CV+ with 1-NN and linear learners at K = 10 and 5, G4
+  class-conditional sets (the pooled margin covers the 2 percent class 0
+  percent of the time), G6 weighted conformal (known ratio passes, unweighted
+  covers 0.73; estimated ratio also passes), G9 MinT against bottom-up, G11(i)
+  covariate-dependent IPCW (unbiased; the marginal Kaplan-Meier version is
+  biased by -0.017), G13 entity-wise calibration. Two gates missed their
+  pre-registered floors and are published as misses, their methods
+  descriptive: G3 (CQR in the highest-noise decile covers 0.864, floor 0.87;
+  constant width 0.72) and G5 (familywise false-flag rate of the slice flag
+  0.0755 against a bound of 0.0597). G13 did not show row-wise calibration to
+  be anti-conservative in this world. Not run, for lack of outside data or
+  tools: real-data coverage (G7), M4/M5 (G8), the MAPIE, scikit-survival and
+  R differentials, a public ranking set, multilabel (G12), near-duplicate
+  grouping (G14) and encoder baselines (G15). Behaviour changes:
+  `conformal.json` gains `class_scores` (old bundles load; class-conditional
+  sets then raise); `ModelBundle.predict_set` gained `conditional`;
+  `ForecastMetric` gained `scale` and the kinds `mase_same_rows` and
+  `mase_insample` (`mase` remains the same-rows score, which divides by the
+  no-change error on the evaluation rows and is not comparable with published
+  MASE); `benchmarks/reliability.py` `interval_coverage` now needs observed
+  coverage >= 0.88 (nominal minus the 0.02 tolerance) instead of 0.85 and
+  records the Clopper-Pearson interval. Not changed: the covariate-free IPCW
+  floor of 0.05 in `survival.brier_scores` (its count is now available), the
+  fold-model bundle storage, intervals for survival, ordinal, ranking,
+  multilabel, multioutput, forecast and uplift (still `None`), and the
+  temporal-data retrain shuffle (Phase 13).
 * Data qualification foundations (no behavior change to existing runs): record
   types `Check`, `Claim` and `Certificate` with evidence tiers
   (`scmle.contracts.qualification`), an exact-arithmetic error budget that keeps

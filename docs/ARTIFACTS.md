@@ -48,7 +48,8 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 
 `model/` is the signed, checksummed bundle:
 `pipeline.joblib` (fitted preprocessing and estimator), `schema.json`,
-`reference.json` (monitoring reference profile), `conformal.json`,
+`reference.json` (monitoring reference profile), `conformal.json` (pooled
+and per-class calibration scores),
 `novelty.joblib` and `model_manifest.json` (checksums and signature).
 Bundles are pickle-based; read the loading rules in [`SECURITY.md`](SECURITY.md).
 Use `result.save(directory, signing_key=...)` to export one for deployment.

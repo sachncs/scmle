@@ -16,9 +16,18 @@ next to the threshold.
 | `leak_detection` | A planted leaked column is found. | flagged, and `leakage_policy="block"` stops the run |
 | `bundle_roundtrip` | A saved signed bundle predicts identically. | difference is exactly 0 |
 | `tamper_detection` | Wrong key or modified file is refused. | both raise `ArtifactError` |
-| `interval_coverage` | A 90% interval covers fresh rows. | observed coverage >= 0.85 |
+| `interval_coverage` | A 90% interval covers fresh rows. | observed coverage >= 0.88 (nominal minus the 0.02 tolerance); the exact interval is recorded |
 | `drift_detection` | A +3 sigma shift is flagged; clean data is not. | shifted != `none`, clean == `none` |
 | `failure_isolation` | A crashing candidate does not sink the run. | run `COMPLETED`, crashing trial not `ok` |
+
+The coverage and problem-type methods have their own measured gates in
+`benchmarks/qualification/uncertainty_certify.py`, written to
+`benchmarks/qualification/uncertainty_certificates.json` and checked by
+`python -m benchmarks.qualification --check` (stale when the code changed).
+Two gates missed their pre-registered floors and are listed as descriptive:
+CQR conditional coverage in the highest-noise decile and the slice flag's
+familywise false-flag rate. Gates that need outside data or tools have not
+run and are listed under `not_measured` in the file.
 
 These complement, and do not replace, `tests/leakage`, the mutation gate and
 the operational rehearsal ([`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md)).
