@@ -565,9 +565,10 @@ First public beta.
   `benchmarks/qualification/`, which the installed package does not ship; when
   the files are missing every detector is descriptive. The shipped leakage
   certificate is not gating (the noisy-copy leak type is descriptive), so a
-  suspicion is reported but quarantines nothing yet. (The profiler's old fixed
-  cutoffs, which this entry once said remained, are replaced; see the leakage
-  screen entry below.)
+  suspicion is reported but quarantines nothing yet. The old profiler
+  constants `LEAK_ASSOCIATION`, `MISSINGNESS_LEAK` and the `LEAKAGE_MARKER`
+  string match remain: they still drive `leakage_policy="block"` for runs
+  without a charter.
 * Robustness and shift (`scmle.data.robustness`; runs without a charter are
   unchanged). A charter run re-runs each exploration survivor over the
   multiverse the charter declared (imputation, outlier rule, inclusion; other
