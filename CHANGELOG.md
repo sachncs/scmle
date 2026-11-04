@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+* Charter format 3 and a pre-registered second stage (R1 B1, B6, B9).
+  `AnalysisCharter.rules` (`scmle.data.charter.rules.RunRules`) fixes the
+  ledger rule, the confirmation rule, the failure policy, `stability_filter`
+  and the stability thresholds under the charter hash and signature. The field
+  is omitted when unset, so charters of format 1 and 2 keep their hash and
+  signature and load unchanged (a test pins the hash of one); a wrapper from a
+  newer format, or an older one carrying `rules`, is refused. A run
+  specification that contradicts a chartered rule is refused, and a charter
+  without rules reports `"rules": "not chartered"`. With
+  `stability_filter` true, survivors that the stability rule calls `fragile`
+  are withdrawn from the family tested on `C` before it opens
+  (`confirm.Withdrawal`, `robustness.prefilter.StabilityStage`). The ledger
+  still freezes and hashes the full survivor set; the withdrawal has its own
+  accounting (`stage_two`: family, family hash, rule, certificate state),
+  written to the custody log before `C` opens and to the sealed confirmation
+  row. The error-control statement is in `confirm.py` and is tested by a
+  simulation: the filter is a function of the exploration set only, so the
+  confirmation rule keeps its guarantee over the remaining family; it spends
+  no alpha, can only cost power, and does not show a withdrawn finding false.
+  It acts only while the stability rule has a current certificate for the
+  chartered thresholds (the certificate covers `DEFAULT_RULE` only);
+  otherwise it is recorded as requested and not applied. In a charter run the
+  robustness stage now runs between the negative control and the opening of
+  `C`, and its stability checks, the two overall shift checks and the
+  per-column shift p-values are wealth-free ledger diagnostics.
+* `scmle claims list|show|verify RUN_DIR` (`scmle.artifacts.claims_audit`).
+  `verify` checks the ledger chain and replay, that the claims file agrees
+  with the sealed ledger, the multiplicity rule replayed on the p-values on
+  `C`, the second-stage family and hash, the custody log order and single open
+  of `C`, the charter and chartered rules, and the negative control; a missing
+  input is `skipped`, never `pass`; exit code 1 on any failure. The `MLProject`
+  snapshot and public API fixture are unchanged. Mutation scope gained
+  `charter/rules.py`, `robustness/prefilter.py` and `artifacts/claims_audit.py`
+  (the mutation run itself was not made).
 * Charter runs use the certified leakage screen (R1 B11).
   `admissibility.qualify` no longer calls the earlier
   `leakage.scan`; it runs `screen.screen_table` on the exploration set, so a
