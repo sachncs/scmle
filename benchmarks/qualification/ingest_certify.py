@@ -129,7 +129,7 @@ def run_jobs(
 def torn_detected(seed: int, noisy: bool) -> bool:
     """Whether a read of one world was rejected as torn."""
     kind = ingest_worlds.TORN_KINDS[seed % 4] if noisy else None
-    connector, __ = ingest_worlds.torn_world(seed, kind)
+    connector = ingest_worlds.torn_world(seed, kind)[0]
     try:
         profile.consistent_read(connector, 5, attempts=1)
     except profile.TornReadError:
@@ -466,7 +466,7 @@ def er_world(seed: int) -> dict[str, Any]:
         reviewer="benchmark truth",
         seed=seed,
     )
-    pairs, __ = entities.candidate_pairs(frame, ER_PASSES)
+    pairs = entities.candidate_pairs(frame, ER_PASSES)[0]
     quality = entities.measure_quality(truth.tolist(), result, pairs)
     return {
         "true_pairs": quality.true_pairs,

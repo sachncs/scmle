@@ -38,10 +38,10 @@ def test_blocking_passes_union_and_skip_oversized_blocks():
     pairs, skipped = entities.candidate_pairs(frame, PASSES)
     assert pairs == sorted(set(pairs))
     assert skipped == 0
-    __, skipped = entities.candidate_pairs(
+    coarse = entities.candidate_pairs(
         frame, [entities.Pass("dob", "prefix", 1)], max_block=3
     )
-    assert skipped > 0
+    assert coarse[1] > 0
 
 
 def test_resolution_with_labels_reports_pair_completeness_and_recall():
@@ -55,7 +55,7 @@ def test_resolution_with_labels_reports_pair_completeness_and_recall():
         reviewer="benchmark truth",
         seed=2,
     )
-    pairs, __ = entities.candidate_pairs(frame, PASSES)
+    pairs = entities.candidate_pairs(frame, PASSES)[0]
     quality = entities.measure_quality(truth, result, pairs)
     assert result.tier is qualification.Tier.ATTESTED
     assert quality.pair_completeness >= 0.95
@@ -73,7 +73,7 @@ def test_unlabelled_resolution_is_unverified_and_groups_more_not_less():
     result = entities.resolve(frame, FIELDS, PASSES)
     assert result.tier is qualification.Tier.UNVERIFIED
     assert result.estimate is None
-    pairs, __ = entities.candidate_pairs(frame, PASSES)
+    pairs = entities.candidate_pairs(frame, PASSES)[0]
     assert entities.measure_quality(truth, result, pairs).link_recall >= 0.8
 
 

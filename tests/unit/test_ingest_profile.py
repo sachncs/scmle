@@ -71,7 +71,7 @@ def test_budget_stops_profile_at_a_table_boundary():
 
 
 def test_consistent_read_on_static_data_is_verified_and_complete():
-    connector, __ = worlds.torn_world(1, None)
+    connector = worlds.torn_world(1, None)[0]
     read = profile.consistent_read(connector, 5)
     assert read.verified
     assert read.attempts == 1
@@ -81,7 +81,7 @@ def test_consistent_read_on_static_data_is_verified_and_complete():
 
 @pytest.mark.parametrize("kind", worlds.TORN_KINDS)
 def test_torn_read_is_detected(kind):
-    connector, __ = worlds.torn_world(2, kind)
+    connector = worlds.torn_world(2, kind)[0]
     with pytest.raises(profile.TornReadError):
         profile.consistent_read(connector, 5, attempts=1)
 

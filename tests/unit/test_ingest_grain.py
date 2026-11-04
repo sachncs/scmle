@@ -41,7 +41,7 @@ def test_single_and_composite_keys_are_found_minimal():
             "c": np.arange(n) % 3,
         }
     )
-    __, __, scan = scan_of(frame)
+    scan = scan_of(frame)[2]
     assert [k.columns for k in scan.keys] == [("a", "b")]
     assert scan.keys[0].g3 == 0.0
     assert scan.levels_done == 3
@@ -52,9 +52,9 @@ def test_three_column_key_needs_level_three():
         [(a, b, c) for a in range(4) for b in range(4) for c in range(4)],
         columns=["a", "b", "c"],
     )
-    __, __, scan = scan_of(frame, size=3)
+    scan = scan_of(frame, size=3)[2]
     assert [k.columns for k in scan.keys] == [("a", "b", "c")]
-    __, __, short = scan_of(frame, size=2)
+    short = scan_of(frame, size=2)[2]
     assert short.keys == []
 
 
@@ -63,30 +63,30 @@ def test_near_key_flips_at_the_threshold_to_one_row(duplicates):
     n = 1000
     values = np.arange(n)
     values[:duplicates] = values[n - duplicates :]
-    __, __, scan = scan_of(pd.DataFrame({"k": values}), eps_key=0.01)
+    scan = scan_of(pd.DataFrame({"k": values}), eps_key=0.01)[2]
     assert bool(scan.keys) == (duplicates <= 10)
-    measured_g3, __ = scan.measured[("k",)]
+    measured_g3 = scan.measured[("k",)][0]
     assert measured_g3 == pytest.approx(duplicates / n)
 
 
 def test_null_rate_disqualifies_a_key():
     frame = pd.DataFrame({"k": [1.0, 2.0, 3.0, None, 5.0]})
-    __, __, strict = scan_of(frame, eps_key=0.5, eps_null=0.0)
+    strict = scan_of(frame, eps_key=0.5, eps_null=0.0)[2]
     assert strict.keys == []
-    __, __, loose = scan_of(frame, eps_key=0.5, eps_null=0.3)
+    loose = scan_of(frame, eps_key=0.5, eps_null=0.3)[2]
     assert [k.columns for k in loose.keys] == [("k",)]
 
 
 def test_ties_are_listed_not_broken():
     frame = pd.DataFrame({"a": np.arange(20), "b": np.arange(20)[::-1]})
-    __, __, scan = scan_of(frame)
+    scan = scan_of(frame)[2]
     assert scan.ties() == [[("a",), ("b",)]]
     assert all(k.small_n for k in scan.keys)
 
 
 def test_hopeless_sets_cost_no_query():
     frame = pd.DataFrame({"a": [0, 1] * 50, "b": [0, 1, 2, 3] * 25})
-    source, table, __ = scan_of(frame)
+    source, table = scan_of(frame)[:2]
     before = source.queries
     assert not grain.bound_ok(table, ("a", "b"), 0.0)
     grain.infer_keys(source, table)
@@ -154,7 +154,7 @@ def test_coarser_is_never_match_across_tolerances():
 
 
 def test_invalid_tolerances_are_rejected():
-    source, table, __ = scan_of(pd.DataFrame({"a": [1, 2]}))
+    source, table = scan_of(pd.DataFrame({"a": [1, 2]}))[:2]
     with pytest.raises(ValueError):
         grain.infer_keys(source, table, eps_key=1.5)
     with pytest.raises(ValueError):

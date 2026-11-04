@@ -43,7 +43,7 @@ def find(graph, column):
 
 def test_named_exact_containment_is_accepted():
     db = two_tables()
-    __, __, __, graph = graph_of(db, ["customer", "fact"])
+    graph = graph_of(db, ["customer", "fact"])[3]
     link = find(graph, "customer_id")[0]
     assert link.decision == joins.ACCEPTED
     assert link.cardinality == joins.MANY_TO_ONE
@@ -52,7 +52,7 @@ def test_named_exact_containment_is_accepted():
 
 def test_coincidental_inclusion_stays_a_candidate():
     db = two_tables(child_col="qty")
-    __, __, __, graph = graph_of(db, ["customer", "fact"])
+    graph = graph_of(db, ["customer", "fact"])[3]
     link = find(graph, "qty")[0]
     assert link.decision == joins.CANDIDATE
     assert not link.joinable
@@ -62,9 +62,9 @@ def test_coincidental_inclusion_stays_a_candidate():
 def test_partial_containment_is_candidate_or_absent():
     values = np.arange(1, 101) % 60 + 1  # 41..60 have no parent
     db = two_tables(child_values=values)
-    __, __, __, strict = graph_of(db, ["customer", "fact"], eps_fk=0.0)
+    strict = graph_of(db, ["customer", "fact"], eps_fk=0.0)[3]
     assert find(strict, "customer_id") == []
-    __, __, __, loose = graph_of(db, ["customer", "fact"], eps_fk=0.5)
+    loose = graph_of(db, ["customer", "fact"], eps_fk=0.5)[3]
     link = find(loose, "customer_id")[0]
     assert link.decision == joins.CANDIDATE
     assert 0.5 < link.containment < 1.0
@@ -73,12 +73,12 @@ def test_partial_containment_is_candidate_or_absent():
 def test_declared_key_is_accepted_and_violation_is_flagged():
     declared = (joins.DeclaredKey("fact", ("qty",), "customer", ("id",)),)
     db = two_tables(child_col="qty")
-    __, __, __, graph = graph_of(db, ["customer", "fact"], declared)
+    graph = graph_of(db, ["customer", "fact"], declared)[3]
     link = find(graph, "qty")[0]
     assert link.declared and link.decision == joins.ACCEPTED
     bad = two_tables(child_values=np.arange(1, 101) + 30)
     broken = (joins.DeclaredKey("fact", ("customer_id",), "customer", ("id",)),)
-    __, __, __, graph = graph_of(bad, ["customer", "fact"], broken)
+    graph = graph_of(bad, ["customer", "fact"], broken)[3]
     link = find(graph, "customer_id")[0]
     assert link.decision == joins.VIOLATED
 
@@ -98,7 +98,7 @@ def test_twin_parents_are_resolved_by_table_name_or_asked():
             }
         ),
     )
-    __, __, __, graph = graph_of(db, ["user", "account", "fact"])
+    graph = graph_of(db, ["user", "account", "fact"])[3]
     named = find(graph, "user_id")
     assert {link.parent: link.decision for link in named} == {
         "user": joins.ACCEPTED,
@@ -149,7 +149,7 @@ def test_surrogate_worlds_have_no_spurious_accepts():
     spurious = 0
     for seed in range(30):
         jw = worlds.surrogate_world(seed)
-        __, __, __, graph = graph_of(jw.db, jw.tables)
+        graph = graph_of(jw.db, jw.tables)[3]
         spurious += sum(
             (link.child, link.child_columns[0], link.parent) not in jw.truth
             for link in graph.accepted()
