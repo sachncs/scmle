@@ -61,6 +61,21 @@ tracking database.
 * **Replay verification** (`MLProject.verify_replay`) classifies a rerun as
   `exact`, `comparable` or `different`.
 
+## Raw-data ingestion
+
+`scmle.data.ingest` sits before the single table that the run starts from.
+Statistics about tables (counts, distinct counts, keys, inclusion) are
+aggregate queries run in the source, because a sample cannot confirm a
+universal statement. Rows are pulled only by `profile.consistent_read`, which
+needs a total order and rejects a read whose snapshot token or rows changed.
+Another table is read only through `asof_view.AsOfView.visible`, which
+returns rows recorded at or before the target row's cutoff; `synthesize`
+imports no connector or reader and never sees a frame. What the view cannot
+know is whether the recorded time is true, so every feature carries the
+weakest tier among the tables it reads. Keys, links and entity matches are
+statements about the snapshot read, with their measures; an unlabelled entity
+resolution is `unverified`. The package is not yet called from a charter run.
+
 ## Leakage guarantees
 
 * The test partition is held by `LockedTestSet`; it opens once, with a token

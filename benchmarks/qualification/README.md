@@ -20,6 +20,7 @@ uv run python -m benchmarks.qualification --check          # certificates
 | `smoke.py` | The gate, including negative controls that must fail. |
 | `f5.py`, `detector_certificates.json` | Certification of the F5 detectors in `scmle/data/detectors/` (missingness, label noise, duplicates, sentinels, outlier triage). Regenerate with `--write-f5 FILE`; `--check` fails if any certificate is stale or missing. |
 | `make_f5_oracles.py` | Offline generator of the frozen cleanlab mask in `tests/fixtures/f5_oracles.json`. |
+| `ingest_certify.py`, `ingest_worlds.py`, `ingest_checks.py`, `ingest_naive.py` | F9 ingestion: planted torn-read, fan-out, dropped-row, late-arrival, grain, join and entity worlds; certificates for the torn-read check and the extract reconciliation (`ingest_certificates.json`); floors on the other methods in `ingest_measurements.json`; and the row-by-row as-of reference the vectorised code is compared with. `--check ingest` fails when either file was measured on other code. |
 
 ## Limits
 

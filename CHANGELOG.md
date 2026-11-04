@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+* Raw-data ingestion and feature construction (F9), the parts that could be
+  built and measured without outside parties or data. New package
+  `scmle.data.ingest`, used by `scmle ingest` and `IngestPlan`: `profile`
+  (table catalog by aggregate queries run in the source, and
+  `consistent_read`, which needs an `ORDER BY`, compares a snapshot token
+  before and after and rejects a torn read), `grain` (a level-wise search to
+  `L = 3` for approximate keys by the `g3` error, ties listed as questions,
+  and a `match` / `finer` / `coarser` / `unknown` verdict on the charter
+  unit), `joins` (exact inclusion by anti-join counts; a link is accepted
+  only when declared, or exact with agreeing names and no competing parent;
+  many-to-many is reported and never joined), `entities` (Fellegi-Sunter with
+  multi-pass blocking, EM, and precision and recall from a stratified
+  clerical sample; unlabelled results are `unverified`), `asof_view` and
+  `synthesize` (the view is the only read path to another table: a row is
+  visible only if its recorded time is at or before `moment - lag`; ten
+  primitives in declared windows, parent lookups and depth-2 nesting; the cap
+  `B_feat` and the family size are declared before exploration and every kept
+  feature is registered in the ledger as a `synthesized` hypothesis; each
+  feature carries the weakest tier of the tables it reads), `reconcile`
+  (row count, conserved sums, join fan-out and end-of-data feature totals
+  against pushed-down source queries) and `budget` (queries, rows scanned,
+  wall time, deterministic stop at a table or level boundary, partial output
+  marked). Artifacts: `ingest_catalog.json`, `grain_report.json`,
+  `join_graph.json`, `ingest_budget.json`. Fixed three defects of the
+  connectors: `DbApiConnector` batches are now checked against a running
+  digest of the rows before each offset (`source_changed`) instead of
+  silently overlapping or skipping, and `snapshot_token()` / `snapshot_query`
+  give a before-and-after token; read-only is enforced (a textual statement
+  allow-list at construction, a query-only session on sqlite3, an optional
+  `read_only_statement`) instead of stated in a docstring;
+  `IncrementalEvent` gains an optional `ingest_time` (omitted from the record
+  when empty, so stored events load unchanged); `WarehouseConnector` accepts
+  a `snapshot_reader` callback. Measured in
+  `benchmarks/qualification/ingest_measurements.json` and
+  `ingest_certificates.json` (`ingest_certify.py`; `python -m
+  benchmarks.qualification --check ingest` fails when stale): torn reads
+  detected in 500 of 500 mutated worlds and 0 of 500 static ones; planted
+  fan-out, dropped rows and torn extracts detected in 500 of 500 each and 0
+  of 500 clean extracts flagged (certificates `ingest-torn-read`,
+  `ingest-reconcile`); 0 rows leaked by the view over 500 late-arrival and
+  backfill worlds where an event-time-only filter leaked in all 500; equality
+  to the independent row-by-row reference `ingest_naive.py` (to a relative
+  1e-9) on 1000 random schemas and 0 failures in 10,000 metamorphic rewrites;
+  200 of 200 synthetic unit verdicts correct with no `coarser` reported as
+  `match`, and a planted near key flipping within one row of its threshold;
+  0 spurious auto-accepted links in 200 surrogate-key schemas; pair
+  completeness and link recall 0.9986 on ten synthetic registries; spend
+  within budget and identical stop points on 100 randomized budgets. Plants
+  and registries are our own, so these are optimistic and the key, join and
+  entity numbers have no external referent: **those gates stay descriptive.**
+  **Not built, blocked on outside parties or on shared files:** the
+  declared-key relational corpus and the labelled ER benchmarks (not
+  registered in `corpora.json`), so key and foreign-key precision and recall
+  on real schemas, and entity-resolution precision on a public benchmark, are
+  unmeasured; the independent author of the as-of reference is a separate
+  agent, not a person outside the project; serving-time feature logs; a
+  data-engineering reviewer. Not wired into a charter run: the charter
+  fields (`ingest_budget`, `feature_budget`, windows, `lag`, `delta_rec`), the
+  stage hook before `custody`, the hand-off of the resolved entity as the
+  split's group column and of the provenance table to F4 are open.
 * Problem framing and the decision-cost model (F8), the parts that could be
   built and measured without outside parties. New package
   `scmle.data.framing`: `DecisionCostModel` (four costs, a threshold range,

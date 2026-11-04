@@ -37,6 +37,19 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 
 | `framing_link.json` | With `--charter`: whether the charter's target, prediction moment and unit name real columns (`resolved`) or not (`unresolved`). Names are matched to column names only; free text that matches nothing is reported, never rejected, and nothing is gated on it. Reads column names, never values. |
 
+### Raw-data ingestion (`scmle ingest`)
+
+`scmle ingest --sqlite FILE --tables a,b` (read-only connection) or `IngestPlan` writes into `--output`:
+
+| Path | Contents |
+| --- | --- |
+| `ingest_catalog.json` | Per table: rows and, per column, kind, non-null and distinct counts, minimum and maximum, all from aggregate queries run in the source, plus a fingerprint of those aggregates. `partial` when the budget stopped profiling. |
+| `grain_report.json` | Minimal approximate keys per table with `g3`, null rate, `small_n` flag and ties, and the verdict on the charter unit (`match`, `finer`, `coarser`, `unknown`) with the columns it matched and any questions. A `coarser` or `unknown` verdict exits 2. |
+| `join_graph.json` | Measured links with containment, cardinality, whether declared or name-supported, and the decision (`accepted`, `candidate`, `many_to_many`, `declared_violated`); candidates are listed as questions. |
+| `ingest_budget.json` | Queries, rows scanned and seconds spent against the limits, source queries counted, and where each stage stopped. |
+
+Entity resolution (`entity_resolution.json`), the feature manifest (`feature_manifest.json`) and the reconciliation (`reconciliation.json`, extended) come from `scmle.data.ingest.entities`, `synthesize` and `reconcile` and are written by the caller; a charter run does not produce them yet.
+
 ### Problem framing (`scmle frame`)
 
 `scmle frame` reads a request, a source description and exploration rows only, and writes into `--output`:
