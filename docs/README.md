@@ -18,6 +18,7 @@ Pick the page that matches what you are trying to do.
 | --- | --- |
 | How the system is built and extended | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | How evidence and feedback drive changes | [`OPERATING_LOOP.md`](OPERATING_LOOP.md) |
+| Which cited methods were checked against their papers | [`LITERATURE_CHECK.md`](LITERATURE_CHECK.md) |
 | How well it works, and how we check | [`BENCHMARKS.md`](BENCHMARKS.md) and [`../benchmarks/`](../benchmarks/README.md) |
 
 ## Operate and release it

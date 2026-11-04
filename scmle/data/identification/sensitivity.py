@@ -19,9 +19,15 @@ and `df` the residual degrees of freedom, `f = t / sqrt(df)`:
     |bias|     = se sqrt(df) sqrt(R2yz R2dz / (1 - R2dz)),
     se_adj     = se sqrt((1 - R2yz) / (1 - R2dz)) sqrt(df / (df - 1)).
 
-The formulas reproduce the sensemakr README example as recalled (estimate
-0.0973, `t = 4.184`, `df = 783`: partial R2 0.0219, `RV_1 = 0.1388`,
-`RV_{1,0.05} = 0.0762`); the R package itself was not run here.
+The formulas of the robustness value (eq. 18 to 20), the standard-error
+adjustment (eq. 12) and the bound were read in the paper on 2026-11-05 and
+agree. The paper's Table 1 for the same example (estimate 0.097, `t = 4.18`,
+`df = 783`: partial R2 2.2%, `RV_1 = 13.9%`, `RV_{1,0.05} = 7.6%`) is
+reproduced to the printed digits; the R package itself was not run here. One
+rule of the paper is NOT implemented: when `RV_{q,a} <= 1 - 1/f_q^2` (which
+needs `f_q > 1`) the paper sets `RV_{q,a} = (f_q^2 - f*^2) / (1 + f_q^2)`
+with `f* = t*_{a,df-1} / sqrt(df - 1)`, so that no weaker confounder
+overturns the conclusion; the code applies eq. 20 unchanged.
 
 Benchmarking against an observed covariate `x_j`: the confounder is allowed
 to be `kd` times as strongly related to the treatment and `ky` times as
@@ -32,8 +38,13 @@ strongly related to the outcome as `x_j`. The conversions used are
     R2yz   = ((sqrt(ky) + sqrt(R2zxj)) / sqrt(1 - R2zxj))^2
              * R2_{Y~xj|D,X} / (1 - R2_{Y~xj|D,X}),
 
-written from memory of the paper and package and NOT verified against them;
-the simulation certificate (A6) measures whether the resulting bound covers
+checked on 2026-11-05 against the paper's Supplement B (eq. 76 to 84:
+`eta = (sqrt(kY) + f_KD f_D) / sqrt(1 - f_KD^2 f_D^2)`, `R2zxj` equal to
+`f_KD^2 f_D^2`, and the bound on `R2yz` equal to `eta^2` times the covariate's
+partial Cohen's f^2) and found to agree algebraically; the paper defines `kD`
+and `kY` on the partial R2 of `Xj` given `X-j` (eq. 21) and states the bound
+as an upper bound that is tight. The package was not run. The simulation
+certificate (A6) measures whether the resulting bound covers
 the truth, and a failure there is published, not tuned away. Benchmarking is
 an assumption about the unobserved, and the report says so. The bound applies
 to the linear-model coefficient of `D`; for an AIPW estimate it is a

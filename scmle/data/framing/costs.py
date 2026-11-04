@@ -11,10 +11,15 @@ rule is
 with `TP` and `FP` rates over all rows, `P` the prevalence and
 `t = c_FP / (c_FP + c_FN)`. Minimising expected cost is therefore the same
 problem as maximising the net benefit of Vickers and Elkin (2006), up to the
-positive scale `c_FN`. The identity is checked numerically in the tests; the
-published definition was recalled, not re-read, and the R packages named as
-references were not available, so the reference used by the tests is an
-independent loop implementation of the same definition.
+positive scale `c_FN`. The identity is checked numerically in the tests. The
+definition was read in the author manuscript of Vickers and Elkin (Med Decis
+Making 26(6), PMC2577036) on 2026-11-05: net benefit is
+`TP/n - FP/n * pt/(1 - pt)`, and their eq. 1 gives the weight as the odds
+of the threshold, equal to the ratio of the harm of a false positive to the
+harm of a false negative, so
+`pt = c_FP / (c_FP + c_FN)` as used here. The R packages named as references
+were not available, so the reference used by the tests is an independent loop
+implementation of the same definition.
 """
 
 from collections.abc import Mapping

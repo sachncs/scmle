@@ -197,6 +197,14 @@
   without a guard nothing changes. `ModelRegistryStore.promote` gained the
   optional `guard_detail`. `alarm_gates_retrain` still defaults to False (H2
   and H10 missed their floors; not retuned).
+* Citations re-read, 2026-11-05 (`docs/LITERATURE_CHECK.md`). Docstrings of
+  the betting monitors, the selective threshold, CV+ and weighted conformal,
+  MinT, net benefit, the robustness value and entity resolution now say what
+  the sources support: the plug-in bet is the paper's empirical-Bernstein
+  plug-in used one-sided here, Learn then Test assumes an i.i.d. calibration
+  set, the CV+ worst-case coverage is `1 - 2 alpha - sqrt(2/n)`, and the
+  paper's rule for `RV_{q,a} <= 1 - 1/f_q^2` is not implemented. No code
+  changed.
 * Instrument residuals closed in code, 2026-11-04. The confirmation binds the
   release of `C` to the hash of the family it tests and the ledger head
   before opening it (`SealedSet.commit`, R1 C7; a set bound to another

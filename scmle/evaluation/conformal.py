@@ -16,10 +16,20 @@ every set; the report of that is the caller's duty (`thin_classes`).
 `weighted_quantile` is the weighted conformal quantile for covariate shift
 with a known or estimated likelihood ratio (Tibshirani, Barber, Candes and
 Ramdas, arXiv:1904.06019). `cv_plus_bounds` is the CV+ interval of Barber,
-Candes, Ramdas and Tibshirani (arXiv:1905.02928) from stored fold models. The
-coverage statements of both papers are quoted from their abstracts only; the
-measured coverage in `benchmarks/qualification/uncertainty_certify.py` is
-what this package relies on.
+Candes, Ramdas and Tibshirani (arXiv:1905.02928) from stored fold models. Both
+papers were read on 2026-11-05. Weighted conformal (their Corollary 1) gives
+coverage at least `1 - alpha` under covariate shift when the weights are the
+exact likelihood ratio `dP_test(x) / dP_train(x)` (or proportional to it), with
+the test point's mass at plus infinity as here; label shift or an estimated
+ratio is not covered by that statement. CV+ (Theorem 4) guarantees coverage
+at least `1 - 2 alpha - min(2 (1 - 1/K) / (n/K + 1), (1 - K/n) / (K + 1))`,
+hence at least `1 - 2 alpha - sqrt(2/n)`, for exchangeable data and an
+algorithm that treats training points symmetrically; the paper constructs
+examples showing the factor 2 cannot be removed for the jackknife+ without
+further assumptions, and "near `1 - alpha`" is its empirical expectation, not
+a theorem. The measured coverage in
+`benchmarks/qualification/uncertainty_certify.py` is what this package relies
+on.
 """
 
 from collections.abc import Sequence

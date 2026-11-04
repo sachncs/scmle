@@ -48,7 +48,8 @@ can do it)
   Vickers' published code on fixed inputs (unavailable here; the tests use an
   independent loop implementation of the same definition, which checks the
   code against the stated formula, not the formula against the literature).
-- Check the Vickers-Elkin and Berger citations against the papers.
+- Check the Berger citation against the paper (Vickers-Elkin was read on
+  2026-11-05, `docs/LITERATURE_CHECK.md`).
 - Statistician review of the 0.90 factor in criterion 7 before the gate is
   enabled.
 - Weaker selection than the certified plants (outcome observed for 70 percent

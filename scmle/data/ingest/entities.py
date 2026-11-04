@@ -3,7 +3,13 @@
 Records are compared on a field vector. For comparison level `k` of a field,
 `m_k = Pr(level | match)` and `u_k = Pr(level | non-match)`; the pair weight is
 `sum log2(m_k / u_k)` under conditional independence (Fellegi and Sunter 1969),
-parameters by EM on the blocked pairs (Winkler's approach). Blocking limits
+parameters by EM on the blocked pairs (Winkler's approach). Not verified
+against the primary sources: Fellegi and Sunter (JASA 64, 1969) could not be
+retrieved and Winkler's EM paper could not be read. A search on 2026-11-05
+found secondary descriptions (Winkler's census working papers, an ABS note)
+that write the field weight as `log2(m / u)` summed over fields and classify
+with an upper cutoff and a clerical-review band; the conditional-independence
+assumption and the EM details are from memory. Blocking limits
 comparisons to pairs sharing a key in at least one of several passes and
 reports the reduction ratio and, where truth is known, pair completeness.
 

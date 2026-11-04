@@ -40,13 +40,13 @@ floors. Nothing below was run on real data.
 ## Work packages still open
 
 **WP-12.0 Reference pinning** (one agent; blocks the items marked *)
-- Read the theorems, not only abstracts, for Barber et al. (1905.02928),
-  Romano et al. (1905.03222), Tibshirani et al. (1904.06019); record exact
-  statements in the docstrings (`conformal.py` quotes the abstracts only).
+- Read the theorems for Romano et al. (1905.03222); Barber et al.
+  (1905.02928) and Tibshirani et al. (1904.06019) were read and recorded on
+  2026-11-05 (`docs/LITERATURE_CHECK.md`).
 - Locate and read: the source of the Beta coverage law (G1 measured it, did
   not cite it), the impossibility result for conditional coverage, Uno et al.
   2011 (`ipcw.py` is written from memory), Wickramasuriya et al. 2019
-  (`reconcile.py` from memory), Gneiting and Raftery 2007, M4 and M5 papers.
+  (JASA text; the working paper was read), Gneiting and Raftery 2007, M4 and M5 papers.
 - Confirm existence, licence and SHA-256 of M4, M5, one LTR set, GBSG2 or
   Rotterdam, METABRIC, Yeast, Scene; update `corpora.json` from `candidate`.
   Confirm MAPIE implements CV+, CQR and class-conditional sets, record the

@@ -57,13 +57,10 @@ against 0.119; the best-observed-risk cut 0.464).
 ## Work packages still open
 
 **WP-13.0 Reference reading** (one agent)
-- Read, not only abstracts: Waudby-Smith and Ramdas (2010.09686) for the
-  assumptions on the loss sequence and the exact confidence-sequence
-  statement (`sequential_tests.py` rests on the martingale argument only);
-  Geifman and El-Yaniv (1705.08500); El-Yaniv and Wiener (JMLR 2010);
-  "Learn then Test"; Begg and Greenes; Chow. Replace each "recalled" in the
-  docstrings of `sequential_tests.py`, `labels.py` and `escalation.py` with a
-  citation or list it in an appendix.
+- Read Begg and Greenes (1983) and Chow (1957, 1970); the other sources of
+  `sequential_tests.py` and `escalation.py` were read on 2026-11-05
+  (`docs/LITERATURE_CHECK.md`). Replace the remaining "from memory" in
+  `labels.py` and the Chow note in `escalation.py` with a citation.
 - Pin an independent implementation of the betting bound (library and
   version) or derive a brute-force reference for a differential test (the
   unit tests compare only with a plain loop of the same recurrence).

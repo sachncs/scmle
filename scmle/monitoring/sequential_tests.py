@@ -8,19 +8,35 @@ supermartingales under their null, so by Ville's inequality
 costs nothing in validity.
 
 Construction (betting for bounded means, after Waudby-Smith and Ramdas,
-arXiv:2010.09686; the paper's formal coverage statement has not been read by
-the author of this module, the validity used here is only the martingale
-argument below). For observations ``x_t`` in ``[0, 1]`` and a null "the mean is
-at most ``m0``" the capital
+arXiv:2010.09686, whose Sections 3 and 4, Theorems 1 to 3 and Proposition 2
+were read in full on 2026-11-05). For observations ``x_t`` in ``[0, 1]`` and a
+null "the mean is at most ``m0``" the capital
 
     K_t = prod_{i <= t} (1 + lambda_i * (x_i - m0)),  0 <= lambda_i < 1 / m0
 
 has ``E[K_t | past] <= K_{t-1}`` whenever ``lambda_i`` is a function of the
-past only, and stays positive. The mirror null "the mean is at least ``m0``"
-uses ``1 - lambda_i * (x_i - m0)`` with ``lambda_i < 1 / (1 - m0)``. The bet
-size is the predictable plug-in of the paper,
-``lambda_t = sqrt(2 log(1 / alpha) / (s2_{t-1} * t * log(1 + t)))`` with a
-running variance ``s2``, capped at ``cap`` times the positivity bound.
+past only, and stays positive (the paper's capital process, eq. 23, with a
+``(-1/(1-m), 1/m)``-valued predictable sequence; Proposition 2 shows it is a
+test martingale when the conditional mean is exactly ``m``). The mirror null
+"the mean is at least ``m0``" uses ``1 - lambda_i * (x_i - m0)`` with
+``lambda_i < 1 / (1 - m0)``. Ville's inequality for a test supermartingale is
+quoted in the paper (stated right after Theorem 1):
+``P(exists t: K_t >= 1/alpha) <= alpha``.
+
+The bet size is ``lambda_t = sqrt(2 log(1 / alpha) / (s2_{t-1} * t * log(1 +
+t)))`` with the running variance ``s2_t = (1/4 + sum (x_i - mu_i)^2) / (t +
+1)`` and ``mu_i = (1/2 + sum_{j <= i} x_j) / (i + 1)``, capped at ``cap`` times
+the positivity bound. What the paper supports and what it does not: that
+formula for ``lambda`` is the paper's recommended plug-in for the
+*empirical-Bernstein* confidence sequence (Theorem 2, eq. 15), where it has
+``log(2 / alpha)`` for a two-sided interval and a cap ``c`` in ``(0, 1)``
+(default 1/2 or 3/4); the hedged capital sequence (Theorem 3, caps ``c/m`` and
+``c/(1-m)``) is valid for any predictable bet. Using the Theorem 2 plug-in as
+the bet of a one-sided capital with ``log(1 / alpha)`` is this module's
+adaptation, not a result of the paper: validity here rests only on the bet
+being predictable and below the positivity bound. The paper's coverage
+statement is for conditionally mean-``mu`` observations; the one-sided
+supermartingale argument above covers a conditional mean at most ``m0``.
 
 Unit of observation. Losses are bounded, not necessarily independent inside a
 batch (cases of one group share a cause). The monitors therefore take one

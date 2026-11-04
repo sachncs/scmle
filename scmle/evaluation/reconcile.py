@@ -3,14 +3,19 @@
 A hierarchy is a summing matrix `S` (all series by bottom series) so that
 every aggregate equals the sum of its bottom series. Base forecasts of all
 series rarely satisfy that. Bottom-up keeps the bottom forecasts and sums
-them. MinT (Wickramasuriya, Athanasopoulos and Hyndman, 2019; recalled from
-memory and not re-read here) picks the linear map
-`G = (S' W^-1 S)^-1 S' W^-1` that minimises the trace of the reconciled
-forecast-error covariance when `W` is the base-forecast error covariance, and
+them. MinT (Wickramasuriya, Athanasopoulos and Hyndman, JASA 114(526), 2019;
+the working-paper version of 23 January 2018 was read on 2026-11-05: Theorem
+1, eq. 9, and the covariance estimators of Section 3) picks the linear map
+`G = (S' W^-1 S)^-1 S' W^-1` (the paper writes `P`) that minimises the trace
+of the reconciled forecast-error covariance among the unbiased maps (those
+with `S G S = S`), where `W` is the base-forecast error covariance, and
 returns `S G y_hat`. `W` is estimated from in-sample one-step residuals with a
 shrinkage of the off-diagonal terms toward zero, because the sample covariance
 is singular or unstable when there are many series. The shrinkage intensity
-is the Schaefer-Strimmer plug-in, also from memory; the measurement that
+is the Schaefer-Strimmer plug-in as the paper describes it (intensity
+`sum Var(r_ij) / sum r_ij^2` over the off-diagonal sample correlations); the
+paper states it under a constant-variance assumption, and its source
+(Schaefer and Strimmer 2005) was not read. The measurement that
 matters is gate G9 (`uncertainty_certify.py`), where MinT must not be worse
 than bottom-up on a world with a non-diagonal covariance.
 

@@ -132,17 +132,13 @@ set (the SOTA protocol's rule, `benchmarks/sota/PROTOCOL.md`, applies).
 
 ## Verification status of literature claims
 
-Read in this session (2026-11-04, abstracts only): arXiv:2010.09686
-(betting confidence sequences; time-uniform), arXiv:1705.08500 (selective
-classification with a risk guarantee "with high probability"), JMLR 11 (2010)
-El-Yaniv and Wiener (risk-coverage trade-off). From the repo, read by an
-earlier author and recorded in `online_fdr.py:12-90`: e-LOND Theorem 1 and
-the p-to-e calibration. **From memory and unverified:** Ville's inequality
-as the basis of anytime validity (the monitors rest only on the martingale
-argument written in `sequential_tests.py`); the predictable plug-in bet size
-of the betting paper; Begg and Greenes 1983; "Learn then Test" (Angelopoulos
-et al. 2021) and its fixed-sequence use; Chow's rule (1970); every dataset
-named in the replay section; confidence-sequence library availability.
+Read in full on 2026-11-05 (`docs/LITERATURE_CHECK.md`): arXiv:2010.09686,
+arXiv:1705.08500, JMLR 11 (2010) El-Yaniv and Wiener, arXiv:2110.01052 ("Learn
+then Test"). Two claims were corrected: the plug-in bet size is the paper's
+empirical-Bernstein plug-in, used here as a one-sided adaptation, and "Learn
+then Test" assumes an i.i.d. calibration set. **Still unverified:** Begg and
+Greenes 1983; Chow's rule (1970; only a secondary description was read); every
+dataset named in the replay section; confidence-sequence library availability.
 
 ## Cut, and why
 

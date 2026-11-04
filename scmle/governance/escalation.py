@@ -4,8 +4,12 @@ Cases are routed to a human when a score ``g`` is below a threshold ``tau``.
 Coverage is ``phi(tau) = P(g >= tau)`` and selective risk
 ``R(tau) = E[loss | g >= tau]``; the trade-off between them is the object of
 El-Yaniv and Wiener (JMLR 11, 2010) and, for deep classifiers, Geifman and
-El-Yaniv (arXiv:1705.08500). Neither paper was read in full by the author of
-this module.
+El-Yaniv (arXiv:1705.08500). Both were read on 2026-11-05: coverage is the
+mean of the selection function, the selective risk is the risk over the
+accepted region, and Geifman and El-Yaniv's guarantee is that the selective
+risk is at most the target ``r*`` with probability at least ``1 - delta`` over
+an i.i.d. labelled sample (their Theorem 3.2; an i.i.d. assumption, not only
+exchangeability).
 
 Score. `set_size_score` turns the F12 conformal set size and the novelty flag
 into ``g = 1 / |set|`` (0 for an empty or unbounded set, or a novel case). The
@@ -18,9 +22,17 @@ conservative ``tau`` (answer only the top score) to the least, test
 ``H: R(tau) > r*`` with the exact binomial p-value
 ``P(Bin(n, r*) <= errors)``, stop at the first non-rejection and take the
 least conservative ``tau`` whose hypothesis was rejected. That controls
-``P(R(tau_hat) > r*) <= delta`` when the calibration cases are exchangeable
-with the deployment cases and the losses are 0 or 1 (the structure of "Learn
-then Test", Angelopoulos et al. 2021, recalled, not read). With weights the
+``P(R(tau_hat) > r*) <= delta`` when the calibration cases are i.i.d. draws
+from the deployment distribution and the losses are 0 or 1. This is the
+fixed-sequence procedure of "Learn then Test" (Angelopoulos, Bates, Candes,
+Jordan and Lei, arXiv:2110.01052, read on 2026-11-05): test hypotheses in a
+fixed order from the most promising value and stop at the first
+non-rejection (Section 2.3.1, Proposition 3: family-wise error control),
+with, for selective classification, the exact binomial tail as p-value
+(Section 4). The paper states an i.i.d. calibration set; the random number of
+answered cases (the denominator of the selective risk) is how the paper's
+selective-classification experiment is set up, and this module repeats it
+without re-deriving it. With weights the
 sample is replaced by its Kish effective size and the weighted error count is
 rounded up; that is an approximation and is reported as such. With no ``tau``
 rejected the answer is ``+inf``: everything is escalated.
@@ -329,7 +341,15 @@ def chow_check(
     error_cost: float,
     tolerance: float = 0.1,
 ) -> ChowCheck:
-    """Cross-checks ``tau`` against Chow's rule (1970, recalled, not read).
+    """Cross-checks ``tau`` against Chow's rule.
+
+    Chow (1957, 1970) was not available to the author. What El-Yaniv and
+    Wiener (JMLR 11, Section 10, read) say of it is that it is the Bayes-optimal
+    reject rule under 0-1 loss when the distribution is completely known, that
+    it rejects when no posterior is sufficiently distinct, and that with
+    posteriors estimated with error it need not be optimal (Fumera et al.
+    2000). The reading ``c_h / c_e`` of the cut as a normalised reject cost is
+    this module's own and was not checked against Chow.
 
     With calibrated probabilities, abstain when ``1 - max_y p(y|x) > c_h /
     c_e``. A large disagreement with the score rule means the calibration or
