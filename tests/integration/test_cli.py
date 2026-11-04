@@ -96,6 +96,7 @@ def test_commands_are_polymorphic():
         "charter",
         "claims",
         "frame",
+        "loop",
     ]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
 
