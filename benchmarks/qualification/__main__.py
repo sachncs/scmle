@@ -4,8 +4,8 @@
     python -m benchmarks.qualification --smoke --full     # nightly, longer
     python -m benchmarks.qualification --check            # certificates
     python -m benchmarks.qualification --check fdr        # claim ledger (F3)
-    python -m benchmarks.qualification --check framing    # framing (F8)
     python -m benchmarks.qualification --check ingest     # ingestion (F9)
+    python -m benchmarks.qualification --check framing    # framing (F8)
     python -m benchmarks.qualification --write-sample F   # stand-in sample
     python -m benchmarks.qualification --write-f5 F       # F5 certificates
 
@@ -15,23 +15,22 @@ detectors (`scmle.data.detectors`) are checked against
 code, and each outcome that passed must still be accepted for gating. An
 outcome that did not pass is simply descriptive and does not fail the check.
 The F6 checks (`scmle.data.robustness`) are checked the same way against
-`f6_certificates.json`.
+`f6_certificates.json`. The leakage screen (`scmle.data.admissibility.screen`,
+the test behind `leakage_policy="block"`) ships its certificates inside the
+package (`screen_certificates.json`) and is checked the same way. The F9
+ingestion detectors (torn-read check, extract reconciliation) are checked
+against `ingest_certificates.json`; `--check ingest` also verifies that
+`ingest_measurements.json` was measured on the current code and re-runs a
+small live point-in-time and torn-read check.
 The F12 coverage and breadth gates (`uncertainty_certify.py`) are checked
-against `uncertainty_certificates.json`: a certificate is stale when the code it
-measured changed. A gate that missed its floor is listed as descriptive and
+against `uncertainty_certificates.json`: a certificate is stale when the code
+it measured changed. A gate that missed its floor is listed as descriptive and
 does not fail the check.
 The F8 framing methods (`framing_certify.py`) are checked by `--check framing`
 against `framing_certificates.json` and `framing_measurements.json`: stale
 code, a `MIN_CLUSTERS` that differs from the measured minimum, or an accepted
 malformed charter fails; a method that missed its floor is listed as
 descriptive.
-The leakage screen (`scmle.data.admissibility.screen`,
-the test behind `leakage_policy="block"`) ships its certificates inside the
-package (`screen_certificates.json`) and is checked the same way.
-The F9 ingestion detectors (torn-read check, extract reconciliation) are checked
-against `ingest_certificates.json`; `--check ingest` also verifies that
-`ingest_measurements.json` was measured on the current code and re-runs a
-small live point-in-time and torn-read check.
 """
 
 import argparse
@@ -62,19 +61,18 @@ def check_certificates() -> int:
     f5_problems = f5.problems(f5_store) + f5.audit_problems(f5_store)
     f6_store = certificates.CertificateStore.load(f6_certify.STORE_PATH)
     f6_problems = f6_certify.problems(f6_store)
-    uncertainty_problems = uncertainty_certify.problems()
     screen_store = certificates.CertificateStore.load(screen_certify.STORE_PATH)
     screen_problems = screen_certify.problems(screen_store)
     ingest_store = certificates.CertificateStore.load(ingest_certify.STORE_PATH)
     ingest_problems = ingest_certify.problems(ingest_store)
+    uncertainty_problems = uncertainty_certify.problems()
     ok = (
         not problems
         and report.ok
         and not f5_problems
         and not f6_problems
-        and not uncertainty_problems
         and not screen_problems
-        and not ingest_problems
+        and not uncertainty_problems
     )
     print(
         json.dumps(
@@ -139,14 +137,14 @@ def main(arguments: list[str] | None = None) -> int:
         summary = ledger_checks.report(findings)
         print(json.dumps(summary, indent=2))
         return 0 if summary["ok"] else 1
-    if options.check == "ingest":
-        ingested = ingest_certify.check()
-        print(json.dumps(ingested, indent=2))
-        return 0 if ingested["ok"] else 1
     if options.check == "framing":
         found = framing_certify.check()
         print(json.dumps(found, indent=2))
         return 0 if found["ok"] else 1
+    if options.check == "ingest":
+        ingested = ingest_certify.check()
+        print(json.dumps(ingested, indent=2))
+        return 0 if ingested["ok"] else 1
     if options.check:
         return check_certificates()
     if options.write_f5:
