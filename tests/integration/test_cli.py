@@ -92,6 +92,7 @@ def test_commands_are_polymorphic():
         "serve",
         "export-onnx",
         "package",
+        "ingest",
         "charter",
         "frame",
     ]
