@@ -79,9 +79,16 @@ class IncrementalEvent:
     sequence: int
     event_time: str
     payload: Mapping[str, Any]
+    ingest_time: str = ""
 
     def __post_init__(self) -> None:
-        """Validate event identity, ordering, time, and payload shape."""
+        """Validate event identity, ordering, time, and payload shape.
+
+        ``ingest_time`` is when the system recorded the event (transaction
+        time). It is empty when the source does not report it; a point-in-
+        time reader must then fall back to ``event_time`` plus a declared
+        delay and say so.
+        """
         if not isinstance(self.event_id, str) or not self.event_id.strip():
             raise ValueError("event_id must not be empty")
         if isinstance(self.sequence, bool) or not isinstance(
@@ -91,18 +98,23 @@ class IncrementalEvent:
         if self.sequence < 1:
             raise ValueError("sequence must be a positive integer")
         parse_timestamp(self.event_time, "event_time")
+        if self.ingest_time:
+            parse_timestamp(self.ingest_time, "ingest_time")
         if not isinstance(self.payload, Mapping):
             raise TypeError("payload must be a mapping")
         object.__setattr__(self, "payload", dict(self.payload))
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible event record."""
-        return {
+        record: dict[str, Any] = {
             "event_id": self.event_id,
             "sequence": self.sequence,
             "event_time": self.event_time,
             "payload": dict(self.payload),
         }
+        if self.ingest_time:
+            record["ingest_time"] = self.ingest_time
+        return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
@@ -112,6 +124,7 @@ class IncrementalEvent:
             sequence=int(record["sequence"]),
             event_time=str(record["event_time"]),
             payload=dict(record["payload"]),
+            ingest_time=str(record.get("ingest_time", "")),
         )
 
 

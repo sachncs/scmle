@@ -10,6 +10,7 @@ cloud SDK import.
 import abc
 import base64
 from collections.abc import Callable
+from collections.abc import Iterator
 from collections.abc import Mapping
 from collections.abc import Sequence
 import contextlib
@@ -19,6 +20,8 @@ import io
 import json
 import math
 import pathlib
+import re
+import sqlite3
 import time
 from typing import Any
 from typing import TypeVar
@@ -419,6 +422,78 @@ def execute_with_retries(
     raise AssertionError("retry loop must return or raise")
 
 
+WRITE_KEYWORDS = frozenset(
+    {
+        "alter",
+        "attach",
+        "call",
+        "copy",
+        "create",
+        "delete",
+        "detach",
+        "drop",
+        "exec",
+        "execute",
+        "grant",
+        "insert",
+        "into",
+        "merge",
+        "pragma",
+        "reindex",
+        "revoke",
+        "truncate",
+        "update",
+        "vacuum",
+    }
+)
+READ_STARTS = frozenset({"select", "with", "values"})
+LITERALS_AND_COMMENTS = re.compile(
+    r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|--[^\n]*|/\*.*?\*/", re.DOTALL
+)
+WORD = re.compile(r"[A-Za-z]+")
+
+
+def refuse_writes(query: str, source_uri: str) -> None:
+    """Rejects a statement that is not a single read-only query.
+
+    The allow-list is textual and deliberately strict: after comments and
+    quoted text are removed the statement must be one ``SELECT``, ``WITH``
+    or ``VALUES`` statement that contains no data-definition, data-change,
+    ``INTO`` or session-control keyword. It refuses some harmless text (a
+    column named ``update`` must be quoted) and is a guard against mistakes,
+    not a sandbox: a database role without write privilege is the real
+    control and cannot be verified from here.
+
+    Raises:
+        ConnectorError: ``write_statement_refused`` with the reason.
+    """
+    cleaned = LITERALS_AND_COMMENTS.sub(" ", query).strip().rstrip(";").strip()
+    words = [word.lower() for word in WORD.findall(cleaned)]
+    reason = ""
+    if ";" in cleaned:
+        reason = "more than one statement"
+    elif not words or words[0] not in READ_STARTS:
+        reason = "statement does not start with SELECT, WITH or VALUES"
+    else:
+        found = sorted(WRITE_KEYWORDS.intersection(words))
+        if found:
+            reason = f"contains write keyword(s) {found}"
+    if reason:
+        raise ConnectorError(
+            "write_statement_refused",
+            f"query refused by the read-only allow-list: {reason}",
+            source_uri,
+            {"reason": reason},
+        )
+
+
+def digest_rows(hasher: Any, rows: Sequence[Sequence[Any]]) -> None:
+    """Feeds rows into a hash in a canonical text form."""
+    for row in rows:
+        hasher.update(repr(tuple(row)).encode("utf-8"))
+        hasher.update(b"\n")
+
+
 class SourceConnector(abc.ABC):
     """Public polymorphic contract for bounded source retrieval."""
 
@@ -600,6 +675,18 @@ class DbApiConnector(SourceConnector):
     The factory is called for each operation and must return a DB-API 2.0
     connection. This keeps the connector dependency-free and makes lifecycle,
     retry, and failure behavior explicit to the caller.
+
+    The query is checked against a read-only allow-list at construction
+    (``refuse_writes``) and, for ``sqlite3`` connections, the session is put
+    in ``query_only`` mode while it runs. Other drivers can pass
+    ``read_only_statement`` (for example ``SET TRANSACTION READ ONLY``),
+    which runs before the query. A database role without write privilege is
+    still the only complete control.
+
+    Batches re-execute the query. Every batch carries a digest of the rows
+    before its offset in ``SourceCheckpoint.content_sha256`` and the next
+    batch refuses to continue (``source_changed``) when the rows it skips no
+    longer hash to that digest. Use an ``ORDER BY`` so the order is total.
     """
 
     supported_schemes = ("dbapi", "sqlite")
@@ -610,6 +697,9 @@ class DbApiConnector(SourceConnector):
         query: str,
         connection_factory: Callable[[], Any],
         retry_budget: RetryBudget | None = None,
+        read_only: bool = True,
+        read_only_statement: str | None = None,
+        snapshot_query: str | None = None,
     ) -> None:
         """Initializes a DB-API connector.
 
@@ -618,10 +708,18 @@ class DbApiConnector(SourceConnector):
             query: Read-only SQL query whose rows form the source.
             connection_factory: Callable returning a fresh DB-API connection.
             retry_budget: Per-operation retry policy.
+            read_only: Enforce the read-only allow-list and session mode.
+                Only ``True`` is supported for new code.
+            read_only_statement: Optional statement run before the query to
+                start a read-only transaction on drivers that support it.
+            snapshot_query: Optional cheap query whose result identifies the
+                state of the source (a version counter, a maximum id). Without
+                it the token is a digest of the whole query result.
 
         Raises:
             UnsupportedUriSchemeError: If the URI scheme is not supported.
             ValueError: If the query or factory is invalid.
+            ConnectorError: If a query is not a read-only statement.
         """
         value = source_uri.strip()
         parsed = urlsplit(value)
@@ -634,12 +732,35 @@ class DbApiConnector(SourceConnector):
             raise ValueError("query must not be empty")
         if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        if read_only:
+            refuse_writes(query, value)
+            if snapshot_query is not None:
+                refuse_writes(snapshot_query, value)
         self.query = query
         self.connection_factory = connection_factory
+        self.read_only = read_only
+        self.read_only_statement = read_only_statement
+        self.snapshot_query = snapshot_query
         super().__init__(value, retry_budget)
         self.source_identity = source_identity(
             f"{self.source_uri}|query={self.query}"
         )
+
+    @contextlib.contextmanager
+    def session(self, sql: str) -> Iterator[Any]:
+        """Yields a cursor that has executed ``sql`` in a read-only session."""
+        connection = self.connection_factory()
+        cursor: Any | None = None
+        try:
+            if self.read_only and isinstance(connection, sqlite3.Connection):
+                connection.execute("PRAGMA query_only = ON")
+            cursor = connection.cursor()
+            if self.read_only_statement:
+                cursor.execute(self.read_only_statement)
+            cursor.execute(sql)
+            yield cursor
+        finally:
+            self.close_resources(cursor, connection)
 
     def schema(self) -> SourceSchema:
         """Executes the query and returns DB-API column metadata."""
@@ -652,14 +773,29 @@ class DbApiConnector(SourceConnector):
 
     def retrieve_schema(self) -> SourceSchema:
         """Performs one non-retried DB-API schema operation."""
-        connection = self.connection_factory()
-        cursor: Any | None = None
-        try:
-            cursor = connection.cursor()
-            cursor.execute(self.query)
+        with self.session(self.query) as cursor:
             return self.schema_from_description(cursor.description)
-        finally:
-            self.close_resources(cursor, connection)
+
+    def snapshot_token(self) -> str:
+        """Returns a token that changes when the source content changes.
+
+        With ``snapshot_query`` the token digests that query's rows; without
+        it, every row of the main query (a full scan).
+        """
+        return execute_with_retries(
+            self.retrieve_token,
+            "snapshot_token",
+            self.source_uri,
+            self.retry_budget,
+        )
+
+    def retrieve_token(self) -> str:
+        """Performs one non-retried token computation."""
+        hasher = hashlib.sha256()
+        with self.session(self.snapshot_query or self.query) as cursor:
+            while rows := cursor.fetchmany(10_000):
+                digest_rows(hasher, rows)
+        return hasher.hexdigest()
 
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
@@ -677,25 +813,37 @@ class DbApiConnector(SourceConnector):
     def retrieve_rows(
         self, checkpoint: SourceCheckpoint, limit: int
     ) -> RowBatch:
-        """Performs one non-retried DB-API row operation."""
-        connection = self.connection_factory()
-        cursor: Any | None = None
-        try:
-            cursor = connection.cursor()
-            cursor.execute(self.query)
+        """Performs one non-retried DB-API row operation.
+
+        Raises:
+            CheckpointError: ``source_changed`` when the rows before the
+                checkpoint offset no longer match the checkpoint digest.
+        """
+        with self.session(self.query) as cursor:
             schema = self.schema_from_description(cursor.description)
-            self.skip_rows(cursor, checkpoint.offset, limit)
+            hasher = hashlib.sha256()
+            self.skip_rows(cursor, checkpoint.offset, limit, hasher)
+            expected = checkpoint.content_sha256
+            if expected is not None and hasher.hexdigest() != expected:
+                raise CheckpointError(
+                    self.source_uri,
+                    "source_changed",
+                    "rows before the checkpoint changed since the last batch",
+                    {"offset": checkpoint.offset},
+                )
             fetched = cursor.fetchmany(limit + 1)
             rows = tuple(tuple(row) for row in fetched[:limit])
-            next_checkpoint = checkpoint.advance(len(rows))
+            digest_rows(hasher, rows)
+            next_checkpoint = dataclasses.replace(
+                checkpoint.advance(len(rows)),
+                content_sha256=hasher.hexdigest(),
+            )
             return RowBatch(
                 schema=schema,
                 rows=rows,
                 checkpoint=next_checkpoint,
                 has_more=len(fetched) > limit,
             )
-        finally:
-            self.close_resources(cursor, connection)
 
     def schema_from_description(
         self, description: Sequence[Sequence[Any]] | None
@@ -715,13 +863,26 @@ class DbApiConnector(SourceConnector):
             )
         )
 
-    def skip_rows(self, cursor: Any, offset: int, batch_size: int) -> None:
-        """Consumes rows before a checkpoint without assuming SQL syntax."""
+    def skip_rows(
+        self, cursor: Any, offset: int, batch_size: int, hasher: Any
+    ) -> None:
+        """Consumes and hashes rows before a checkpoint.
+
+        Raises:
+            CheckpointError: ``source_changed`` when fewer than ``offset``
+                rows remain, which means rows were deleted.
+        """
         remaining = offset
         while remaining:
             skipped = cursor.fetchmany(min(remaining, batch_size))
             if not skipped:
-                return
+                raise CheckpointError(
+                    self.source_uri,
+                    "source_changed",
+                    "source has fewer rows than the checkpoint offset",
+                    {"offset": offset, "missing": remaining},
+                )
+            digest_rows(hasher, skipped)
             remaining -= len(skipped)
 
     def close_resources(self, cursor: Any, connection: Any) -> None:
@@ -754,6 +915,7 @@ class WarehouseConnector(SourceConnector):
             [str, int, int], tuple[SourceSchema, Sequence[Row], bool]
         ],
         retry_budget: RetryBudget | None = None,
+        snapshot_reader: Callable[[str], str] | None = None,
     ) -> None:
         """Initialize a warehouse connector around injected query callbacks.
 
@@ -763,6 +925,12 @@ class WarehouseConnector(SourceConnector):
             schema_reader: Callback returning the source schema for ``query``.
             batch_reader: Callback accepting query, row offset, and row limit.
             retry_budget: Per-operation retry policy.
+            snapshot_reader: Optional callback returning a token for the
+                state of ``query`` (a table version, ``AS OF`` timestamp or
+                content hash). When given, a resumed read whose token
+                differs from the one the checkpoint was bound to is refused
+                (``source_changed``). Without it the connector cannot tell
+                that the source changed between batches.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
@@ -777,6 +945,7 @@ class WarehouseConnector(SourceConnector):
         self.query = query
         self.schema_reader = schema_reader
         self.batch_reader = batch_reader
+        self.snapshot_reader = snapshot_reader
         super().__init__(value, retry_budget)
         self.source_identity = source_identity(
             f"{self.source_uri}|query={self.query}"
@@ -806,6 +975,24 @@ class WarehouseConnector(SourceConnector):
 
     def read_batch(self, checkpoint: SourceCheckpoint, limit: int) -> RowBatch:
         """Validate one callback result and bind its next checkpoint."""
+        token = (
+            hashlib.sha256(
+                self.snapshot_reader(self.query).encode()
+            ).hexdigest()
+            if self.snapshot_reader
+            else None
+        )
+        if (
+            token is not None
+            and checkpoint.content_sha256 is not None
+            and checkpoint.content_sha256 != token
+        ):
+            raise CheckpointError(
+                self.source_uri,
+                "source_changed",
+                "warehouse snapshot token changed since the last batch",
+                {"offset": checkpoint.offset},
+            )
         schema, raw_rows, has_more = self.batch_reader(
             self.query, checkpoint.offset, limit
         )
@@ -833,10 +1020,13 @@ class WarehouseConnector(SourceConnector):
                 self.source_uri,
                 {"expected": width},
             )
+        after = checkpoint.advance(len(rows))
+        if token is not None:
+            after = dataclasses.replace(after, content_sha256=token)
         return RowBatch(
             schema=schema,
             rows=rows,
-            checkpoint=checkpoint.advance(len(rows)),
+            checkpoint=after,
             has_more=has_more,
         )
 
