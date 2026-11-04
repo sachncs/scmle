@@ -1,0 +1,286 @@
+{
+  "code_hashes": {
+    "f5-duplicates": "f75dbc1c26d8e62c76263b031a649cf8f8d5e3a031f21efa40058f9b656eabbe",
+    "f5-label-noise": "7c65064a9a9d9cab91586551f21b75d442205dc1a674d34236a7bf962f87fd45",
+    "f5-missingness": "efb27ad3dc14e08f75c162fd5d92d4ff5ddffb98ea8ec3c3f4753bbedd00864a",
+    "f5-outlier-triage": "cca5e8b9953f57c4ad1721d6be06f1b4cbb58fead9d70f8d42d50611cbdedfdb",
+    "f5-sentinel": "5534f52efedcdc0c5fd5f6bd7591ab9d19a6e5e966b1ea537840fd9081246db7"
+  },
+  "policy": {
+    "confidence": 0.95,
+    "false_alarm_ceiling": 0.05,
+    "recall_floor": 0.8
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "tables": {
+    "digits": {
+      "corpus_sha256": "d61454e414558cdd19e94c01f8a12790c5cca67e5cffa5d83de7c8e25f0d2fdd",
+      "features": 61,
+      "outcomes": [
+        {
+          "clean_rows": 1797,
+          "defect_type": "sentinel",
+          "detected": 1689,
+          "detector": "f5-sentinel",
+          "false_alarm_upper": 1.0,
+          "false_alarms": 1797,
+          "passes_floor": false,
+          "planted": 1689,
+          "recall_lower": 0.9977
+        },
+        {
+          "clean_rows": 1797,
+          "defect_type": "duplicate_exact",
+          "detected": 900,
+          "detector": "f5-duplicates",
+          "false_alarm_upper": 0.0021,
+          "false_alarms": 0,
+          "passes_floor": true,
+          "planted": 900,
+          "recall_lower": 0.9957
+        },
+        {
+          "clean_rows": 1797,
+          "defect_type": "duplicate_near",
+          "detected": 900,
+          "detector": "f5-duplicates",
+          "false_alarm_upper": 0.0021,
+          "false_alarms": 0,
+          "passes_floor": true,
+          "planted": 900,
+          "recall_lower": 0.9957
+        },
+        {
+          "clean_rows": 1797,
+          "defect_type": "label_flip_symmetric",
+          "detected": 785,
+          "detector": "f5-label-noise",
+          "false_alarm_upper": 0.0057,
+          "false_alarms": 4,
+          "passes_floor": true,
+          "planted": 900,
+          "recall_lower": 0.8488
+        },
+        {
+          "clean_rows": 1797,
+          "defect_type": "label_flip_class_conditional",
+          "detected": 500,
+          "detector": "f5-label-noise",
+          "false_alarm_upper": 0.0057,
+          "false_alarms": 4,
+          "passes_floor": true,
+          "planted": 585,
+          "recall_lower": 0.8238
+        },
+        {
+          "clean_rows": 1797,
+          "defect_type": "outlier_error",
+          "detected": 2102,
+          "detector": "f5-outlier-triage",
+          "false_alarm_upper": 0.0021,
+          "false_alarms": 0,
+          "passes_floor": true,
+          "planted": 2433,
+          "recall_lower": 0.8498
+        }
+      ],
+      "rows": 1797
+    },
+    "iris": {
+      "corpus_sha256": "2c7887af0cd720e53fc6b535b8c0cb28a38cbacbe284ecd2544ddd0815d83d8b",
+      "features": 4,
+      "outcomes": [
+        {
+          "clean_rows": 150,
+          "defect_type": "sentinel",
+          "detected": 141,
+          "detector": "f5-sentinel",
+          "false_alarm_upper": 0.2639,
+          "false_alarms": 29,
+          "passes_floor": false,
+          "planted": 141,
+          "recall_lower": 0.9735
+        },
+        {
+          "clean_rows": 150,
+          "defect_type": "duplicate_exact",
+          "detected": 75,
+          "detector": "f5-duplicates",
+          "false_alarm_upper": 0.0368,
+          "false_alarms": 1,
+          "passes_floor": true,
+          "planted": 75,
+          "recall_lower": 0.9513
+        },
+        {
+          "clean_rows": 150,
+          "defect_type": "duplicate_near",
+          "detected": 75,
+          "detector": "f5-duplicates",
+          "false_alarm_upper": 0.0368,
+          "false_alarms": 1,
+          "passes_floor": true,
+          "planted": 75,
+          "recall_lower": 0.9513
+        },
+        {
+          "clean_rows": 150,
+          "defect_type": "label_flip_symmetric",
+          "detected": 58,
+          "detector": "f5-label-noise",
+          "false_alarm_upper": 0.025,
+          "false_alarms": 0,
+          "passes_floor": false,
+          "planted": 75,
+          "recall_lower": 0.6666
+        },
+        {
+          "clean_rows": 150,
+          "defect_type": "label_flip_class_conditional",
+          "detected": 51,
+          "detector": "f5-label-noise",
+          "false_alarm_upper": 0.025,
+          "false_alarms": 0,
+          "passes_floor": false,
+          "planted": 70,
+          "recall_lower": 0.6146
+        },
+        {
+          "clean_rows": 150,
+          "defect_type": "outlier_error",
+          "detected": 199,
+          "detector": "f5-outlier-triage",
+          "false_alarm_upper": 0.025,
+          "false_alarms": 0,
+          "passes_floor": true,
+          "planted": 199,
+          "recall_lower": 0.9811
+        }
+      ],
+      "rows": 150
+    },
+    "wine": {
+      "corpus_sha256": "912f5007fe6bcde317b293ddf0d1d3ae988ecce64b4babb54d636d178961b891",
+      "features": 13,
+      "outcomes": [
+        {
+          "clean_rows": 178,
+          "defect_type": "sentinel",
+          "detected": 168,
+          "detector": "f5-sentinel",
+          "false_alarm_upper": 0.255,
+          "false_alarms": 34,
+          "passes_floor": false,
+          "planted": 168,
+          "recall_lower": 0.9776
+        },
+        {
+          "clean_rows": 178,
+          "defect_type": "duplicate_exact",
+          "detected": 90,
+          "detector": "f5-duplicates",
+          "false_alarm_upper": 0.0211,
+          "false_alarms": 0,
+          "passes_floor": true,
+          "planted": 90,
+          "recall_lower": 0.9591
+        },
+        {
+          "clean_rows": 178,
+          "defect_type": "duplicate_near",
+          "detected": 90,
+          "detector": "f5-duplicates",
+          "false_alarm_upper": 0.0211,
+          "false_alarms": 0,
+          "passes_floor": true,
+          "planted": 90,
+          "recall_lower": 0.9591
+        },
+        {
+          "clean_rows": 178,
+          "defect_type": "label_flip_symmetric",
+          "detected": 55,
+          "detector": "f5-label-noise",
+          "false_alarm_upper": 0.0211,
+          "false_alarms": 0,
+          "passes_floor": false,
+          "planted": 90,
+          "recall_lower": 0.5078
+        },
+        {
+          "clean_rows": 178,
+          "defect_type": "label_flip_class_conditional",
+          "detected": 40,
+          "detector": "f5-label-noise",
+          "false_alarm_upper": 0.0211,
+          "false_alarms": 0,
+          "passes_floor": false,
+          "planted": 90,
+          "recall_lower": 0.3462
+        },
+        {
+          "clean_rows": 178,
+          "defect_type": "outlier_error",
+          "detected": 247,
+          "detector": "f5-outlier-triage",
+          "false_alarm_upper": 0.0211,
+          "false_alarms": 0,
+          "passes_floor": true,
+          "planted": 247,
+          "recall_lower": 0.9847
+        }
+      ],
+      "rows": 178
+    }
+  },
+  "tally": [
+    {
+      "defect_type": "duplicate_exact",
+      "detector": "f5-duplicates",
+      "table_level_wilson_lower": 0.4385,
+      "tables": 3,
+      "tables_passing": 3
+    },
+    {
+      "defect_type": "duplicate_near",
+      "detector": "f5-duplicates",
+      "table_level_wilson_lower": 0.4385,
+      "tables": 3,
+      "tables_passing": 3
+    },
+    {
+      "defect_type": "label_flip_class_conditional",
+      "detector": "f5-label-noise",
+      "table_level_wilson_lower": 0.0615,
+      "tables": 3,
+      "tables_passing": 1
+    },
+    {
+      "defect_type": "label_flip_symmetric",
+      "detector": "f5-label-noise",
+      "table_level_wilson_lower": 0.0615,
+      "tables": 3,
+      "tables_passing": 1
+    },
+    {
+      "defect_type": "outlier_error",
+      "detector": "f5-outlier-triage",
+      "table_level_wilson_lower": 0.4385,
+      "tables": 3,
+      "tables_passing": 3
+    },
+    {
+      "defect_type": "sentinel",
+      "detector": "f5-sentinel",
+      "table_level_wilson_lower": 0.0,
+      "tables": 3,
+      "tables_passing": 0
+    }
+  ]
+}

@@ -38,6 +38,7 @@ import json
 from pathlib import Path
 
 from benchmarks.qualification import f5
+from benchmarks.qualification import f5_corpora
 from benchmarks.qualification import f6_certify
 from benchmarks.qualification import framing_certify
 from benchmarks.qualification import ingest_certify
@@ -66,8 +67,10 @@ def check_certificates() -> int:
     ingest_store = certificates.CertificateStore.load(ingest_certify.STORE_PATH)
     ingest_problems = ingest_certify.problems(ingest_store)
     uncertainty_problems = uncertainty_certify.problems()
+    corpora_stale = f5_corpora.stale()
     ok = (
-        not problems
+        not corpora_stale
+        and not problems
         and report.ok
         and not f5_problems
         and not f6_problems
@@ -85,6 +88,7 @@ def check_certificates() -> int:
                 "gating_detectors": len(GATING),
                 "f5_problems": f5_problems,
                 "f5_gating": [f"{d}/{t}" for d, _, t in f5.gating(f5_store)],
+                "f5_corpora_stale": corpora_stale,
                 "uncertainty_problems": uncertainty_problems,
                 "uncertainty_descriptive_only": (
                     uncertainty_certify.descriptive_only()

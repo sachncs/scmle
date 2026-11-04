@@ -112,7 +112,10 @@ class ConfirmationSource(Protocol):
     """A sealed set that opens once (the custody `SealedSet`)."""
 
     log: Any
-    committed: bool
+
+    @property
+    def committed(self) -> bool:
+        """Whether the release is already bound to a claim set."""
 
     def issue_token(self) -> str:
         """Returns the release token."""

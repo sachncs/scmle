@@ -20,12 +20,16 @@ uv run python -m benchmarks.qualification --check          # certificates
 | `smoke.py` | The gate, including negative controls that must fail. |
 | `screen_certify.py`, `screen_measurements.json`, `scmle/data/admissibility/screen_certificates.json` | Certification of the leakage screen behind `leakage_policy="block"`: 1000 null worlds (a false alarm is any suspect among the whole family), 200 plants per leak type, Wilson bounds, and the retired profiler cutoffs scored on the same worlds. The certificate file ships inside the package so an installed copy can gate. Regenerate with `--write --workers N`; `--check` fails when it is stale. |
 | `f5.py`, `detector_certificates.json` | Certification of the F5 detectors in `scmle/data/detectors/` (missingness, label noise, duplicates, sentinels, outlier triage). Regenerate with `--write-f5 FILE`; `--check` fails if any certificate is stale or missing. |
+| `f5_corpora.py`, `f5_corpora_measurements.json` | The F5 plants and detectors repeated on wine, iris and digits with the same floors. Evidence about robustness to the table, not a certificate; it never gates and `--check` fails only when the detector code changed since the file was written. Regenerate with `python -m benchmarks.qualification.f5_corpora --write`. |
 | `make_f5_oracles.py` | Offline generator of the frozen cleanlab mask in `tests/fixtures/f5_oracles.json`. |
 | `ingest_certify.py`, `ingest_worlds.py`, `ingest_checks.py`, `ingest_naive.py` | F9 ingestion: planted torn-read, fan-out, dropped-row, late-arrival, grain, join and entity worlds; certificates for the torn-read check and the extract reconciliation (`ingest_certificates.json`); floors on the other methods in `ingest_measurements.json`; and the row-by-row as-of reference the vectorised code is compared with. `--check ingest` fails when either file was measured on other code. |
 
 ## Limits
 
-- F5 certificates use one corpus (scikit-learn breast cancer). Row detectors
+- F5 certificates use one corpus (scikit-learn breast cancer). On three
+  other tables (`f5_corpora.py`) the sentinel detector flags the clean rows
+  and label noise misses its recall floor on the two small tables; see R1
+  A5 and A6. Row detectors
   are judged per row, which understates uncertainty because rows of one table
   are not independent; the missingness detector is judged per replicate
   table. A detector gates only for the defect types whose outcome passed
