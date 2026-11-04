@@ -35,7 +35,7 @@ sign-off. See [`validation-referents.md`](validation-referents.md).
 
 | Phase | File | Feature | Depends on |
 |---|---|---|---|
-| 7 | [phase-7-instrument-residuals.md](phase-7-instrument-residuals.md) | R1: open items of the built instrument | none |
+| 7 | [phase-7-instrument-residuals.md](phase-7-instrument-residuals.md) | R1: open items of the built instrument (in progress: leakage screen wired into charter runs, attestations built; A3-A6, B, C, D, E open) | none |
 | 8 | [phase-8-problem-framing.md](phase-8-problem-framing.md) | F8: framing and the decision-cost model (partly built: cost model, baseline claim, drafter, questions; gold corpus, LLM gate and run wiring open) | 7 |
 | 9 | [phase-9-raw-data-ingestion.md](phase-9-raw-data-ingestion.md) | F9: raw data, grain, joins, point-in-time features (library built; corpus gates and run wiring open) | 7 |
 | 10 | [phase-10-causal-identification.md](phase-10-causal-identification.md) | F10: causal identification | 8, 9 |
