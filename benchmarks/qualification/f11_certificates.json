@@ -2,10 +2,10 @@
   "dev_seed_base": 10000,
   "gates": {
     "A1": {
-      "code_hash": "5797b444fedd076b6db42224a947e04390c35100349f86c04d59c453da5a4b54",
+      "code_hash": "0d1795b23c0fc154e19959dd108c569a29817a1a2a72da999836c079375e776b",
       "passed": true,
       "replicates": 200,
-      "seconds": 7.6,
+      "seconds": 7.0,
       "seeds": [
         0,
         200
@@ -74,7 +74,7 @@
         "1.6": 1.0
       },
       "replicates": 2000,
-      "seconds": 2.9,
+      "seconds": 2.7,
       "seeds": [
         0,
         2000
@@ -100,7 +100,7 @@
       "code_hash": "a8d1e0b4dfb3d3a263e71b563b0eaf273361da888048ee277d047603c041d240",
       "passed": false,
       "replicates": 2000,
-      "seconds": 111.6,
+      "seconds": 105.9,
       "seeds": [
         0,
         2000
@@ -185,14 +185,14 @@
         "1.5": 0.9133333333333333
       },
       "replicates": 2000,
-      "seconds": 39.6,
+      "seconds": 38.7,
       "seeds": [
         0,
         2000
       ]
     },
     "A5": {
-      "code_hash": "c43e34634a83d91b299d518e977b5278c702e965adb91992fc3f0f298d0fe1b8",
+      "code_hash": "f48dabdbaeefbdcb1031d407d8aba97d5d6781fa7074c8d94ed6bebe4171923c",
       "dr_floor_met": true,
       "estimators": {
         "dr": {
@@ -283,7 +283,7 @@
         }
       },
       "replicates": 2000,
-      "seconds": 2.6,
+      "seconds": 2.4,
       "seeds": [
         0,
         2000
@@ -291,31 +291,17 @@
       "truth": 0.425
     },
     "A6": {
-      "code_hash": "63010d792cfe8522d2cca38b03dc786cc1795d585b05c267e3ee9a22fb29bbf9",
-      "coverage": 0.975,
-      "data_sha256": "0e5893329d8b93cefecc571777672028290ab69865718020c78c7284f291aece",
-      "interval": [
-        0.942821659593358,
-        0.9892752803482386
-      ],
-      "mean_kept_rows": 11829.47,
-      "passed": true,
-      "policy_cut": 0.0025853714707231596,
-      "reference_interval": [
-        0.010892317087791151,
-        0.015185807972501793
-      ],
-      "reference_value": 0.013039062530146472,
-      "replicates": 200,
-      "seconds": 0.4,
+      "code_hash": "d5f165d7abb928f495fb13ecec3afc8012cbac17ef727e9ab8ccf8b6c8ebb747",
+      "not_run": "set SCMLE_HILLSTROM to the verified data file",
+      "passed": false,
+      "seconds": 0.0,
       "seeds": [
         0,
         200
-      ],
-      "treated_share": 0.9816492232599615
+      ]
     },
     "A7": {
-      "code_hash": "d027fd318515bc3b3826e76b454ac356a3f9d65463a610836def73b458357e0c",
+      "code_hash": "137586d12871d1c7e324eb93a0cb7e93f90788ee5c9a6f793fd97c73dfad928e",
       "gaps": {
         "0.0": {
           "bound_cover_interval": [
@@ -385,14 +371,14 @@
       },
       "passed": true,
       "replicates": 2000,
-      "seconds": 13.4,
+      "seconds": 12.1,
       "seeds": [
         0,
         2000
       ]
     },
     "A7b": {
-      "code_hash": "82f4da320b6012e1f0a2e97a4e2bea72ab8a249ab3622ea4043a787a929ca3fd",
+      "code_hash": "18f1de157c55f3dbe3d1e3f630353a8ade918ae4c52bfd35e94d9214abb2f54f",
       "oracle_net_benefit": 0.15607519226292352,
       "passed": true,
       "relative_loss": {
@@ -404,7 +390,7 @@
         "q95": 0.004483527626684906
       },
       "replicates": 20,
-      "seconds": 65.5,
+      "seconds": 57.0,
       "seeds": [
         0,
         20
@@ -454,7 +440,7 @@
       "passed": true,
       "rate": 0.0037,
       "replicates": 10000,
-      "seconds": 176.3,
+      "seconds": 163.9,
       "seeds": [
         0,
         10000
@@ -487,7 +473,7 @@
       "promotions": 6,
       "rate": 0.0012,
       "replicates": 5000,
-      "seconds": 12.6,
+      "seconds": 11.6,
       "seeds": [
         0,
         5000
@@ -516,7 +502,7 @@
       "floor": "none: reported",
       "passed": true,
       "replicates": 500,
-      "seconds": 4.4,
+      "seconds": 3.9,
       "seeds": [
         0,
         500
@@ -545,17 +531,17 @@
       "passed": true,
       "rate": 0.0019,
       "replicates": 10000,
-      "seconds": 16.3,
+      "seconds": 15.0,
       "seeds": [
         0,
         10000
       ]
     },
     "B5": {
-      "code_hash": "db4d632dcd0548f8644b53519c325e90da4389535274154d20543b37a85b7487",
+      "code_hash": "94028f5d638d18c2d87fb2ed8b00d09f88538fbfcf2e419ff3eab49df540e417",
       "passed": true,
       "replicates": 2000,
-      "seconds": 0.7,
+      "seconds": 0.6,
       "seeds": [
         0,
         2000
@@ -580,7 +566,7 @@
         ]
       },
       "replicates": 1000,
-      "seconds": 6.3,
+      "seconds": 5.8,
       "seeds": [
         0,
         1000
@@ -600,46 +586,20 @@
       "size_bound": 0.01629285308902091
     },
     "B7": {
-      "bound": 0.028854377448471462,
       "code_hash": "1d4270629f1a2216f2821bdca08428a54647ac81906293397cfd003536070e06",
-      "data_sha256": "0e5893329d8b93cefecc571777672028290ab69865718020c78c7284f291aece",
-      "delta_min": 0.001,
-      "false_promotions": 2,
-      "interval": [
-        0.000548643588120728,
-        0.007262807863492177
-      ],
-      "n_max": 20000,
-      "passed": true,
-      "rate": 0.002,
-      "replicates": 1000,
-      "seconds": 4.5,
+      "not_run": "set SCMLE_HILLSTROM to the verified data file",
+      "passed": false,
+      "seconds": 0.0,
       "seeds": [
         0,
         1000
       ]
     },
     "B8": {
-      "assignment_share": 0.5000117335085538,
-      "code_hash": "7a98f20360f2791d5e64f5a34e18fb28fe0fa6cea727801e699c14ca1d66510f",
-      "data_sha256": "0e5893329d8b93cefecc571777672028290ab69865718020c78c7284f291aece",
-      "delta_min": 0.002,
-      "full_sample_lower_bound": 0.0035286334268233373,
-      "median_stop": 17660.5,
-      "passed": true,
-      "promoted_share": 1.0,
-      "reference_fixed_sample": {
-        "difference": 0.006805006519615695,
-        "interval_95": [
-          0.005000138215573684,
-          0.008609874823657705
-        ],
-        "p_value_one_sided": 9.043003651251292e-08,
-        "z_against_delta_min": 5.218005522816002
-      },
-      "replicates": 200,
-      "rows": 42613,
-      "seconds": 2.1,
+      "code_hash": "578caab2942410fe42458c1c72796077e24f46807c1ea673b34ccdb1a11ccf4a",
+      "not_run": "set SCMLE_HILLSTROM to the verified data file",
+      "passed": false,
+      "seconds": 0.0,
       "seeds": [
         0,
         200
@@ -677,7 +637,7 @@
       "promote_bound": 0.026260990336999412,
       "replicates": 2000,
       "rollback_bound": 0.014449719092257398,
-      "seconds": 9.1,
+      "seconds": 8.5,
       "seeds": [
         0,
         2000
