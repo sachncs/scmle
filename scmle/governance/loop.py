@@ -1,0 +1,1465 @@
+"""The closed loop: drift, retrain, gated promotion and asking a person (F13).
+
+    loop = Loop.open(deploy_dir, charter, policy)
+    routing = loop.observe(batch, predictions, decisions)
+    loop.mature(losses)                    # outcomes arrive, with delay
+    result = loop.step()                   # alarms, proposals, escalations
+    pending = loop.pending_escalations()
+    loop.reply(pending[0].id, attestation)  # a person's signed reply
+
+What the loop does by itself, and how each rule behaves:
+
+* L1. A betting alarm on the matured, propensity-weighted mean loss
+  (`RiskAlarm`): false alarm probability at most ``alpha_alarm`` over all time
+  for the first alarm of an episode. On an alarm with a verified label
+  mechanism it records a `retrain` request (and calls the `retrain` hook, if
+  given, which must train and stage a challenger and return its name). With an
+  unverified mechanism it halts and escalates; it never retrains.
+* L2. Each challenger is registered in the ledger before it is scored, scored
+  by an e-process on paired losses, and decided in registration order by
+  e-LOND. A crossing becomes a `promotion_proposal`; the signed approval of
+  the registry is still needed to move the champion alias.
+* L3. After a promotion, a reverse e-process (`watch_rollback`) on the new
+  champion against the previous one can create a `rollback_proposal` and
+  tightens `tau`.
+* E1. Cases below the calibrated threshold, and any case beyond the model's
+  reach, are escalated. If the selective risk of answered cases is evidenced
+  above ``r*`` the loop halts: every case is escalated until a recalibration
+  passes. Escalations beyond ``c_max`` get the safe default action.
+* E2. System-level triggers write an `escalation` row with the question, the
+  evidence and the proposed default before anything waits.
+
+What it cannot do: see `scmle.governance.never_list`. The decision on the
+champion alias, the sealed sets, the charter and the other listed actions
+needs a person's attestation; `Loop.reply` records it. Key custody for that
+signature is a deployment requirement the software cannot enforce.
+
+State. The ledger holds what happened; `loop_state.json` holds the monitors'
+running state and the batches awaiting maturity. State is saved after every
+public call and carries the ledger head: if they disagree at `open`, the loop
+starts halted rather than guess.
+"""
+
+from collections.abc import Callable
+from collections.abc import Mapping
+from collections.abc import Sequence
+import dataclasses
+import datetime
+from fractions import Fraction
+import json
+import math
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from scmle.contracts import errors
+from scmle.contracts import qualification
+from scmle.contracts import signing
+from scmle.governance import deployment_ledger as ledger_module
+from scmle.governance import escalation
+from scmle.governance import never_list
+from scmle.monitoring import labels
+from scmle.monitoring import sequential_tests
+
+STATE_FILE = "loop_state.json"
+RISK_COVERAGE_FILE = "risk_coverage.json"
+LABEL_MECHANISM_FILE = "label_mechanism.json"
+STATE_VERSION = 1
+OK = "ok"
+HALTED = "halted"
+INSUFFICIENT_LABELS = "insufficient_labels"
+HALT_LEDGER = "ledger_verification_failed"
+HALT_STATE = "state_does_not_match_ledger"
+HALT_SELECTIVE = "selective_risk_above_target"
+HALT_UNVERIFIED = "alarm_on_unverified_label_mechanism"
+LOOSER = "looser"
+TIGHTER = "tighter"
+NUMERIC_ORIENTATION = {
+    # field: +1 if a larger value is stricter, -1 if a smaller one is.
+    "r_star": -1,
+    "delta": -1,
+    "c_max": -1,
+    "alpha_alarm": -1,
+    "alpha_rb": -1,
+    "tolerance": -1,
+    "delta_rb": -1,
+    "delta_promo": 1,
+    "coverage_target": 1,
+}
+
+
+class ReplyRefused(errors.ArtifactError):
+    """A reply was not recorded, and why."""
+
+
+@dataclasses.dataclass(frozen=True)
+class LoopPolicy:
+    """Pre-registered inputs of the loop (fixed before the run).
+
+    Rates and tolerances are in loss units; times are in batches.
+
+    Attributes:
+        reference_risk: Reference risk `r_ref` of the bundle.
+        tolerance: `Delta`, the rise over `r_ref` that is worth an alarm.
+        alpha_alarm: Level of the L1 alarm.
+        delta_promo: Margin the challenger must beat the champion by.
+        alpha_promo: FDR level of e-LOND over challengers, as ``"p/q"``.
+        alpha_rb: Level of the rollback process.
+        delta_rb: Margin by which the new champion must be worse.
+        r_star: Target selective risk.
+        delta: Confidence ``1 - delta`` of the threshold.
+        c_max: Largest escalated share of a batch.
+        max_delay: `D_max`, batches within which a `2 * tolerance` change
+            must be detected for the alarm to gate a retrain (certified).
+        outcome_window: Batches after which a prediction has matured.
+        epsilon: Smallest propensity, also the audit-slice rate; 0 requires
+            complete labels.
+        bypass_rate: Declared share of cases that skip the model.
+        loss_bound: Upper bound of a loss.
+        safe_default: Action for cases the model must not answer.
+        reply_timeout: Batches after which an unanswered escalation closes
+            with the safe default.
+        min_matured: Fewest matured cases a batch needs to be used.
+        challenger_budget: Matured batches a challenger gets.
+        coverage_target: Nominal coverage of the conformal sets, or None.
+        novelty_bound: Largest tolerated share of out-of-support cases.
+        high_impact_actions: Decision values the charter classes high impact.
+        tighten_step: Amount `tau` rises by on a rollback proposal.
+        initial_tau: Starting threshold; None escalates everything until
+            `Loop.calibrate`.
+        scope: Model version hash and stream id that attestations name.
+    """
+
+    reference_risk: float
+    tolerance: float = 0.05
+    alpha_alarm: float = 0.05
+    delta_promo: float = 0.0
+    alpha_promo: str = "1/20"
+    alpha_rb: float = 0.05
+    delta_rb: float = 0.01
+    r_star: float = 0.05
+    delta: float = 0.1
+    c_max: float = 0.2
+    max_delay: int = 50
+    outcome_window: int = 1
+    epsilon: float = 0.0
+    bypass_rate: float = 0.0
+    loss_bound: float = 1.0
+    safe_default: str = "defer"
+    reply_timeout: int = 100
+    min_matured: int = 30
+    challenger_budget: int = 200
+    coverage_target: float | None = None
+    novelty_bound: float = 0.05
+    high_impact_actions: tuple[str, ...] = ()
+    tighten_step: float = 0.05
+    initial_tau: float | None = None
+    scope: str = "stream"
+
+    def __post_init__(self) -> None:
+        """Validates ranges."""
+        for name in ("alpha_alarm", "alpha_rb", "r_star", "delta"):
+            if not 0.0 < getattr(self, name) < 1.0:
+                raise ValueError(f"{name} must be strictly between 0 and 1")
+        if not 0.0 <= self.epsilon < 1.0 or not 0.0 <= self.c_max <= 1.0:
+            raise ValueError("epsilon must be in [0, 1) and c_max in [0, 1]")
+        if self.loss_bound <= 0.0 or self.outcome_window < 0:
+            raise ValueError("loss_bound must be positive, window >= 0")
+        if not 0.0 < self.reference_risk + self.tolerance < self.scale:
+            raise ValueError("reference_risk + tolerance must be in (0, scale)")
+        if not self.safe_default.strip() or not self.scope.strip():
+            raise ValueError("safe_default and scope are required")
+
+    @property
+    def promo_level(self) -> float:
+        """`alpha_promo` as a float."""
+        return float(Fraction(self.alpha_promo))
+
+    @property
+    def scale(self) -> float:
+        """Upper bound of a (propensity-weighted) batch mean loss."""
+        if self.epsilon > 0.0:
+            return self.loss_bound / self.epsilon
+        return self.loss_bound
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        record = dataclasses.asdict(self)
+        record["high_impact_actions"] = list(self.high_impact_actions)
+        return record
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> "LoopPolicy":
+        """Rebuilds a policy from `to_dict`."""
+        values = dict(record)
+        values["high_impact_actions"] = tuple(values["high_impact_actions"])
+        return cls(**values)
+
+
+@dataclasses.dataclass(frozen=True)
+class Escalation:
+    """A question waiting for a person.
+
+    Attributes:
+        id: Escalation id (``esc-<row>``).
+        question: The question, JSON-ready.
+        question_hash: Its hash; a reply must carry it.
+        evidence: References to the evidence.
+        proposed_default: What happens if nobody answers.
+    """
+
+    id: str
+    question: Mapping[str, Any]
+    question_hash: str
+    evidence: tuple[str, ...]
+    proposed_default: str
+
+
+@dataclasses.dataclass(frozen=True)
+class Observation:
+    """What `observe` decided for a batch.
+
+    Attributes:
+        batch: Batch index.
+        routing: Per-case routing.
+        actions: Per case: the decision (answered), `escalate` or the safe
+            default.
+    """
+
+    batch: int
+    routing: escalation.Routing
+    actions: tuple[Any, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class StepResult:
+    """What a `step` found and did.
+
+    Attributes:
+        status: `ok`, `halted` or `insufficient_labels`.
+        events: Ledger rows written by this step, as (kind, summary).
+        escalation: The newest escalation opened by this step, if any.
+        mechanism: The label mechanism of the newest usable batch;
+            `unverified` means no retrain, promotion or rollback rests on
+            this stream.
+    """
+
+    status: str
+    events: tuple[tuple[str, str], ...]
+    escalation: Escalation | None
+    mechanism: labels.Mechanism
+
+
+@dataclasses.dataclass(frozen=True)
+class ReplyOutcome:
+    """What recording a reply means for the dependent decision.
+
+    Attributes:
+        tier: `attested` when the person allowed the action; `unverified`
+            when the reply rejects or cannot decide (the safe default
+            applies).
+        decision: The person's decision.
+        safe_default_applies: Whether the proposed default is taken.
+    """
+
+    tier: qualification.Tier
+    decision: ledger_module.ReplyDecision
+    safe_default_applies: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class Hooks:
+    """Callbacks that act in the world; all optional.
+
+    Attributes:
+        retrain: Trains and stages a challenger, returns its name.
+        open_incident: Called with a reason when the loop halts.
+    """
+
+    retrain: Callable[[], str | None] | None = None
+    open_incident: Callable[[str], None] | None = None
+
+
+def json_ready(value: Any) -> Any:
+    """Converts numpy scalars and arrays inside a structure for JSON."""
+    if isinstance(value, np.ndarray):
+        return [json_ready(item) for item in value.tolist()]
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(k): json_ready(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [json_ready(v) for v in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+class Loop:
+    """One deployment's closed loop (see the module docstring)."""
+
+    def __init__(
+        self,
+        directory: Path,
+        ledger: ledger_module.DeploymentLedger,
+        policy: LoopPolicy,
+        guard: never_list.Guard,
+        hooks: Hooks,
+        verification_keys: Mapping[str, str | bytes],
+        today: Callable[[], datetime.date],
+    ) -> None:
+        """Use `Loop.open`."""
+        self.directory = directory
+        self.ledger = ledger
+        self.policy = policy
+        self.guard = guard
+        self.hooks = hooks
+        self.verification_keys = dict(verification_keys)
+        self.today = today
+        self.batch = 0
+        self.tau = (
+            math.inf if policy.initial_tau is None else policy.initial_tau
+        )
+        self.pending_batches: list[dict[str, Any]] = []
+        self.escalation_batch: dict[str, int] = {}
+        self.consecutive_rollbacks = 0
+        self.stopped: dict[str, float] = {}
+        self.queue: list[str] = []
+        self.active: dict[str, dict[str, Any]] = {}
+        self.rollback_watch: dict[str, Any] | None = None
+        self.mechanism = labels.Mechanism.COMPLETE
+        self.halt_reason: str | None = None
+        self.halted_by_state = False
+        self.naive_flag = False
+        self.calibrated = False
+        self.build_monitors()
+
+    # ------------------------------------------------------------------ open
+
+    @classmethod
+    def open(
+        cls,
+        deploy_dir: str | Path,
+        charter: Any,
+        policy: LoopPolicy,
+        *,
+        hooks: Hooks | None = None,
+        verification_keys: Mapping[str, str | bytes] | None = None,
+        system_keys: Sequence[str | bytes] = (),
+        today: Callable[[], datetime.date] = datetime.date.today,
+    ) -> "Loop":
+        """Opens the loop of a deployment, creating its ledger on first use.
+
+        Args:
+            deploy_dir: Directory of `deployment_ledger.jsonl` and
+                `loop_state.json`.
+            charter: Anything with a `charter_hash` (the analysis charter).
+            policy: The pre-registered inputs.
+            hooks: Optional callbacks.
+            verification_keys: Map from key id (`key_fingerprint`) to the
+                key that verifies a person's attestation. The system must not
+                hold the signing side of these keys (canon P6).
+            system_keys: Keys the system itself holds; attestations signed
+                with them (or with `SCMLE_SIGNING_KEY`) are refused.
+            today: Clock, replaceable in tests.
+
+        Raises:
+            DeploymentLedgerError: If an existing ledger fails verification
+                or belongs to another charter or policy.
+        """
+        directory = Path(deploy_dir)
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / ledger_module.FILE_NAME
+        fingerprints = [ledger_module.key_fingerprint(k) for k in system_keys]
+        environment = signing.resolve_key(None)
+        if environment is not None:
+            fingerprints.append(ledger_module.key_fingerprint(environment))
+        keys = dict(verification_keys or {})
+        if path.exists():
+            ledger = ledger_module.DeploymentLedger.load(path)
+            header = ledger.header
+            if header["charter_hash"] != charter.charter_hash:
+                raise ledger_module.DeploymentLedgerError(
+                    "ledger belongs to a different charter"
+                )
+            effective = dict(header["policy"])
+            for row in ledger.rows:
+                body = row["body"]
+                if row["kind"] == ledger_module.OBSERVE_SUMMARY:
+                    effective.update(body.get("policy_amendment", {}))
+            if effective != json_ready(policy.to_dict()):
+                raise ledger_module.DeploymentLedgerError(
+                    "ledger was opened with a different policy"
+                )
+        else:
+            ledger = ledger_module.DeploymentLedger.create(
+                path,
+                charter_hash=charter.charter_hash,
+                policy=json_ready(policy.to_dict()),
+                alpha_promo=policy.alpha_promo,
+                system_keys=sorted(set(fingerprints)),
+            )
+        guard = never_list.Guard(ledger, today, keys)
+        loop = cls(
+            directory, ledger, policy, guard, hooks or Hooks(), keys, today
+        )
+        loop.load_state()
+        loop.save_state()
+        return loop
+
+    def build_monitors(self) -> None:
+        """Creates fresh monitors from the policy."""
+        policy = self.policy
+        self.alarm = sequential_tests.RiskAlarm(
+            policy.reference_risk,
+            policy.tolerance,
+            policy.alpha_alarm,
+            policy.scale,
+        )
+        self.naive_alarm = sequential_tests.RiskAlarm(
+            policy.reference_risk,
+            policy.tolerance,
+            policy.alpha_alarm,
+            policy.loss_bound,
+        )
+        self.selective = sequential_tests.RiskAlarm(
+            policy.r_star, 0.0, policy.delta, policy.scale
+        )
+        self.coverage_test: sequential_tests.BettingTest | None = (
+            None
+            if policy.coverage_target is None
+            else sequential_tests.BettingTest(
+                policy.coverage_target,
+                sequential_tests.LESS,
+                policy.alpha_alarm,
+            )
+        )
+        self.novelty_test = sequential_tests.BettingTest(
+            min(max(policy.novelty_bound, 1e-6), 1 - 1e-6),
+            sequential_tests.GREATER,
+            policy.alpha_alarm,
+        )
+
+    # ----------------------------------------------------------------- state
+
+    @property
+    def state_path(self) -> Path:
+        """The state file."""
+        return self.directory / STATE_FILE
+
+    def save_state(self) -> None:
+        """Writes the running state with the ledger head it belongs to."""
+        challengers = {
+            name: {
+                "process": item["process"].to_dict(),
+                "batches": item["batches"],
+            }
+            for name, item in self.active.items()
+        }
+        state = {
+            "version": STATE_VERSION,
+            "ledger_head": self.ledger.head,
+            "batch": self.batch,
+            "tau": None if math.isinf(self.tau) else self.tau,
+            "mechanism": self.mechanism.value,
+            "halt_reason": self.halt_reason,
+            "naive_flag": self.naive_flag,
+            "calibrated": self.calibrated,
+            "consecutive_rollbacks": self.consecutive_rollbacks,
+            "escalation_batch": self.escalation_batch,
+            "queue": self.queue,
+            "stopped": self.stopped,
+            "alarm": self.alarm.to_dict(),
+            "naive_alarm": self.naive_alarm.to_dict(),
+            "selective": self.selective.to_dict(),
+            "coverage_test": (
+                None
+                if self.coverage_test is None
+                else self.coverage_test.to_dict()
+            ),
+            "novelty_test": self.novelty_test.to_dict(),
+            "active": challengers,
+            "rollback_watch": (
+                None
+                if self.rollback_watch is None
+                else {
+                    "previous": self.rollback_watch["previous"],
+                    "process": self.rollback_watch["process"].to_dict(),
+                }
+            ),
+            "pending_batches": self.pending_batches,
+        }
+        temporary = self.state_path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(json_ready(state), sort_keys=True), encoding="utf-8"
+        )
+        temporary.replace(self.state_path)
+
+    def load_state(self) -> None:
+        """Reads the state file; halts if it does not match the ledger."""
+        if not self.state_path.exists():
+            self.halted_by_state = self.ledger.halted
+            return
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        if state["ledger_head"] != self.ledger.head:
+            self.halted_by_state = True
+            self.halt_reason = HALT_STATE
+            return
+        self.batch = state["batch"]
+        self.tau = math.inf if state["tau"] is None else state["tau"]
+        self.mechanism = labels.Mechanism(state["mechanism"])
+        self.halt_reason = state["halt_reason"]
+        self.naive_flag = state["naive_flag"]
+        self.calibrated = state["calibrated"]
+        self.consecutive_rollbacks = state["consecutive_rollbacks"]
+        self.escalation_batch = dict(state["escalation_batch"])
+        self.queue = list(state["queue"])
+        self.stopped = dict(state["stopped"])
+        self.alarm = sequential_tests.RiskAlarm.from_dict(state["alarm"])
+        self.naive_alarm = sequential_tests.RiskAlarm.from_dict(
+            state["naive_alarm"]
+        )
+        self.selective = sequential_tests.RiskAlarm.from_dict(
+            state["selective"]
+        )
+        if state["coverage_test"] is not None:
+            self.coverage_test = sequential_tests.BettingTest.from_dict(
+                state["coverage_test"]
+            )
+        self.novelty_test = sequential_tests.BettingTest.from_dict(
+            state["novelty_test"]
+        )
+        self.active = {
+            name: {
+                "process": sequential_tests.PairedEProcess.from_dict(
+                    item["process"]
+                ),
+                "batches": item["batches"],
+            }
+            for name, item in state["active"].items()
+        }
+        watch = state["rollback_watch"]
+        if watch is not None:
+            self.rollback_watch = {
+                "previous": watch["previous"],
+                "process": sequential_tests.PairedEProcess.from_dict(
+                    watch["process"]
+                ),
+            }
+        self.pending_batches = state["pending_batches"]
+        self.halted_by_state = self.ledger.halted
+
+    @property
+    def halted(self) -> bool:
+        """Whether every case is escalated."""
+        return self.ledger.halted or self.halted_by_state
+
+    # --------------------------------------------------------------- helpers
+
+    def verify_ledger(self) -> bool:
+        """Re-checks the ledger file; enters a halt (in memory) if it fails."""
+        try:
+            self.ledger.verify()
+        except ledger_module.DeploymentLedgerError:
+            self.halted_by_state = True
+            self.halt_reason = HALT_LEDGER
+            return False
+        return True
+
+    def pending_escalations(self) -> list[Escalation]:
+        """Escalations with no reply and no timeout, oldest first."""
+        return [
+            Escalation(
+                id=str(row["id"]),
+                question=row["question"],
+                question_hash=str(row["question_hash"]),
+                evidence=tuple(row["evidence"]),
+                proposed_default=str(row["proposed_default"]),
+            )
+            for row in self.ledger.pending()
+        ]
+
+    def escalate(
+        self,
+        action: never_list.NeverAction | str,
+        detail: Mapping[str, Any],
+        evidence: tuple[str, ...] = (),
+        proposed_default: str | None = None,
+    ) -> Escalation | None:
+        """Writes an escalation row for a system-level question (E2).
+
+        Returns None if an identical question is already pending.
+        """
+        name = (
+            action.value
+            if isinstance(action, never_list.NeverAction)
+            else action
+        )
+        question = {
+            "action": name,
+            "detail": json_ready(dict(detail)),
+            "scope": self.policy.scope,
+        }
+        if self.guard.pending_for(question) is not None:
+            return None
+        identity = f"esc-{len(self.ledger.rows)}"
+        self.ledger.commit(
+            ledger_module.ESCALATION,
+            {
+                "phase": ledger_module.PHASE_OPEN,
+                "id": identity,
+                "question": question,
+                "question_hash": ledger_module.question_hash(question),
+                "evidence": list(evidence),
+                "proposed_default": proposed_default
+                or self.policy.safe_default,
+            },
+        )
+        self.escalation_batch[identity] = self.batch
+        return next(e for e in self.pending_escalations() if e.id == identity)
+
+    def enter_halt(self, reason: str, detail: Mapping[str, Any]) -> None:
+        """Enters the halted state once and opens an incident, if hooked."""
+        if self.ledger.halted:
+            return
+        self.ledger.commit(
+            ledger_module.HALT,
+            {
+                "phase": ledger_module.ENTER,
+                "reason": reason,
+                "batch": self.batch,
+                "detail": json_ready(dict(detail)),
+            },
+        )
+        self.halt_reason = reason
+        if self.hooks.open_incident is not None:
+            self.hooks.open_incident(reason)
+
+    # --------------------------------------------------------------- observe
+
+    def observe(
+        self,
+        batch: pd.DataFrame,
+        predictions: Sequence[Any],
+        decisions: Sequence[Any],
+    ) -> Observation:
+        """Routes a batch of served cases and logs what was decided.
+
+        Args:
+            batch: One row per case. Optional columns: `case_id`; `set_size`
+                (size of the conformal set; absent means a singleton);
+                `score` (use instead of `set_size`); `novel` and
+                `under_covered` (bool flags); `propensity` (logged probability
+                that the case's label will be observed); `audit` (case is in
+                the uniform audit slice); `bypass` (case skipped the model).
+            predictions: The model's output per case.
+            decisions: The action the model would take per case.
+
+        Returns:
+            The routing and the action taken per case. While halted, every
+            case is escalated. Cases beyond `c_max` get the safe default.
+        """
+        size = len(batch)
+        if len(predictions) != size or len(decisions) != size or size == 0:
+            raise ValueError("batch, predictions and decisions must align")
+        self.verify_ledger()
+        frame = batch.reset_index(drop=True)
+        ids = (
+            [str(v) for v in frame["case_id"]]
+            if "case_id" in frame
+            else [f"b{self.batch}-{i}" for i in range(size)]
+        )
+        novel = self.flag(frame, "novel")
+        under = self.flag(frame, "under_covered")
+        if "score" in frame:
+            score = np.asarray(frame["score"], dtype=float)
+        else:
+            sizes = frame["set_size"] if "set_size" in frame else np.ones(size)
+            score = escalation.set_size_score(sizes, novel)
+        high = np.isin(
+            np.asarray(decisions, dtype=object),
+            list(self.policy.high_impact_actions),
+        )
+        blocked = (novel | under) & high
+        routing = escalation.route(
+            score, self.tau, self.policy.c_max, self.halted, blocked
+        )
+        actions = tuple(
+            decisions[i]
+            if routing.status[i] == escalation.ANSWERED
+            else (
+                self.policy.safe_default
+                if routing.status[i] == escalation.SAFE_DEFAULT
+                else "escalate"
+            )
+            for i in range(size)
+        )
+        record = {
+            "index": self.batch,
+            "ids": ids,
+            "score": score,
+            "status": routing.status.tolist(),
+            "propensity": (
+                np.asarray(frame["propensity"], dtype=float)
+                if "propensity" in frame
+                else None
+            ),
+            "audit": self.flag(frame, "audit"),
+            "bypass": self.flag(frame, "bypass"),
+            "novel": novel,
+            "labels": {},
+            "covered": {},
+            "challenger_losses": {},
+        }
+        self.pending_batches.append(json_ready(record))
+        self.novelty_test.update(float(novel.mean()))
+        self.ledger.commit(
+            ledger_module.OBSERVE_SUMMARY,
+            {
+                "batch": self.batch,
+                "cases": size,
+                "answered": int(routing.answered.sum()),
+                "escalated": int(
+                    (routing.status == escalation.ESCALATED).sum()
+                ),
+                "safe_default": routing.backlog,
+                "blocked_high_impact": int(blocked.sum()),
+                "tau": None if math.isinf(self.tau) else self.tau,
+                "halted": self.halted,
+                "novel_rate": float(novel.mean()),
+            },
+        )
+        self.batch += 1
+        self.save_state()
+        return Observation(self.batch - 1, routing, actions)
+
+    @staticmethod
+    def flag(frame: pd.DataFrame, name: str) -> np.ndarray:
+        """A boolean column, or all False."""
+        if name in frame:
+            return np.asarray(frame[name], dtype=bool)
+        return np.zeros(len(frame), dtype=bool)
+
+    # ---------------------------------------------------------------- mature
+
+    def mature(
+        self,
+        losses: Mapping[str, float] | pd.Series,
+        covered: Mapping[str, float] | pd.Series | None = None,
+        challengers: Mapping[str, Mapping[str, float] | pd.Series]
+        | None = None,
+    ) -> int:
+        """Stores outcomes that arrived; they count once their window elapsed.
+
+        Args:
+            losses: Loss in ``[0, loss_bound]`` of the deployed model, by
+                case id.
+            covered: 1 if the case's outcome was inside its conformal set,
+                by case id.
+            challengers: For each registered challenger (and the previous
+                champion under a rollback watch), its loss by case id on the
+                same cases.
+
+        Returns:
+            Number of cases that matched a pending batch.
+        """
+        index: dict[str, dict[str, Any]] = {}
+        for record in self.pending_batches:
+            for identity in record["ids"]:
+                index[identity] = record
+        matched = 0
+        for identity, value in dict(losses).items():
+            found = index.get(str(identity))
+            if found is not None:
+                found["labels"][str(identity)] = float(value)
+                matched += 1
+        for identity, value in dict(covered or {}).items():
+            found = index.get(str(identity))
+            if found is not None:
+                found["covered"][str(identity)] = float(value)
+        for name, mapping in (challengers or {}).items():
+            for identity, value in dict(mapping).items():
+                found = index.get(str(identity))
+                if found is not None:
+                    store = found["challenger_losses"].setdefault(name, {})
+                    store[str(identity)] = float(value)
+        self.save_state()
+        return matched
+
+    # ------------------------------------------------------------ challengers
+
+    def register_challenger(self, name: str) -> int:
+        """Registers a challenger in the ledger before it is scored."""
+        self.ledger.commit(
+            ledger_module.CHALLENGER_RESULT,
+            {
+                "name": name,
+                "phase": ledger_module.REGISTERED,
+                "batch": self.batch,
+            },
+        )
+        policy = self.policy
+        self.active[name] = {
+            "process": sequential_tests.PairedEProcess(
+                policy.delta_promo,
+                policy.promo_level,
+                policy.scale,
+            ),
+            "batches": 0,
+        }
+        self.queue.append(name)
+        self.save_state()
+        return len(self.queue)
+
+    def watch_rollback(self, previous: str) -> None:
+        """Starts the reverse e-process after a promotion.
+
+        Args:
+            previous: Name under which the previous champion's losses are
+                passed to `mature`.
+        """
+        policy = self.policy
+        self.rollback_watch = {
+            "previous": previous,
+            "process": sequential_tests.PairedEProcess(
+                policy.delta_rb, policy.alpha_rb, policy.scale
+            ),
+        }
+        self.save_state()
+
+    # ------------------------------------------------------------------ step
+
+    def estimate(
+        self,
+        record: dict[str, Any],
+        losses: np.ndarray,
+        observed: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> labels.BatchEstimate:
+        """Horvitz-Thompson estimate of a matured batch (or a subset)."""
+        keep = np.ones(len(observed), dtype=bool) if mask is None else mask
+        propensity = record["propensity"]
+        audit = record["audit"]
+        return labels.estimate_batch(
+            losses[keep],
+            observed[keep],
+            None if propensity is None else np.asarray(propensity, float)[keep],
+            None if audit is None else np.asarray(audit, bool)[keep],
+            self.policy.epsilon,
+            self.policy.loss_bound,
+        )
+
+    def estimate_signed(
+        self,
+        record: dict[str, Any],
+        values: np.ndarray,
+        observed: np.ndarray,
+        mask: np.ndarray,
+    ) -> labels.BatchEstimate:
+        """Like `estimate`, for values in ``[-loss_bound, loss_bound]``."""
+        propensity = record["propensity"]
+        audit = record["audit"]
+        return labels.estimate_batch(
+            values[mask],
+            observed[mask],
+            None if propensity is None else np.asarray(propensity, float)[mask],
+            None if audit is None else np.asarray(audit, bool)[mask],
+            self.policy.epsilon,
+            self.policy.loss_bound,
+            signed=True,
+        )
+
+    def step(self) -> StepResult:
+        """Processes matured batches and applies the decision map.
+
+        Returns:
+            The result: status, ledger events written, the newest escalation
+            opened (if any) and the label mechanism of the newest usable
+            batch.
+        """
+        if not self.verify_ledger():
+            self.save_state()
+            return StepResult(
+                HALTED, (("halt", HALT_LEDGER),), None, self.mechanism
+            )
+        first_row = len(self.ledger.rows)
+        now = self.batch - 1
+        keep: list[dict[str, Any]] = []
+        used = False
+        for record in self.pending_batches:
+            window = self.policy.outcome_window
+            if labels.is_matured(record["index"], now, window):
+                used |= self.process_batch(record)
+            else:
+                keep.append(record)
+        self.pending_batches = keep
+        newest = self.decide()
+        newest = self.time_out() or newest
+        events = tuple(
+            (
+                row["kind"],
+                str(row["body"].get("reason", row["body"].get("rule", ""))),
+            )
+            for row in self.ledger.rows[first_row:]
+            if row["kind"] != ledger_module.OBSERVE_SUMMARY
+        )
+        self.write_label_mechanism()
+        self.save_state()
+        status = (
+            HALTED if self.halted else (OK if used else INSUFFICIENT_LABELS)
+        )
+        return StepResult(status, events, newest, self.mechanism)
+
+    def process_batch(self, record: dict[str, Any]) -> bool:
+        """Feeds one matured batch to the monitors; False if unusable."""
+        ids = record["ids"]
+        stored = record["labels"]
+        observed = np.array([i in stored for i in ids])
+        losses = np.array([stored.get(i, math.nan) for i in ids], dtype=float)
+        bypass = np.asarray(record["bypass"], dtype=bool)
+        status = np.asarray(record["status"])
+        model_cases = ~bypass
+        if int(observed[model_cases].sum()) < self.policy.min_matured:
+            return False
+        estimate = self.estimate(record, losses, observed, model_cases)
+        self.mechanism = estimate.mechanism
+        naive = float(np.mean(losses[observed & model_cases]))
+        crossed = self.naive_alarm.update(naive)
+        if crossed and not labels.permits_action(estimate.mechanism):
+            self.naive_flag = True
+        if not labels.permits_action(estimate.mechanism):
+            return True
+        assert estimate.mean is not None
+        self.alarm.update(estimate.mean)
+        answered = (status == escalation.ANSWERED) & model_cases
+        if int(observed[answered].sum()) > 0:
+            selective = self.estimate(record, losses, observed, answered)
+            if selective.mean is not None:
+                self.selective.update(selective.mean)
+        if self.coverage_test is not None and record["covered"]:
+            values = list(record["covered"].values())
+            self.coverage_test.update(float(np.mean(values)))
+        self.update_challengers(record, ids, losses, observed, model_cases)
+        return True
+
+    def update_challengers(
+        self,
+        record: dict[str, Any],
+        ids: list[str],
+        losses: np.ndarray,
+        observed: np.ndarray,
+        model_cases: np.ndarray,
+    ) -> None:
+        """Feeds the e-processes with Horvitz-Thompson paired differences."""
+        needed = observed & model_cases
+        for name, other in record["challenger_losses"].items():
+            holder: Any
+            if name in self.active:
+                holder = self.active[name]
+            elif (
+                self.rollback_watch is not None
+                and name == self.rollback_watch["previous"]
+            ):
+                holder = self.rollback_watch
+            else:
+                continue
+            paired = np.array([i in other for i in ids])
+            if not paired[needed].all():
+                continue
+            second = np.array(
+                [other.get(i, math.nan) for i in ids], dtype=float
+            )
+            gap = np.where(needed, losses - second, 0.0)
+            estimate = self.estimate_signed(record, gap, observed, model_cases)
+            if estimate.mean is None:
+                continue
+            scale = self.policy.scale
+            holder["process"].update_gap(min(max(estimate.mean, -scale), scale))
+            if "batches" in holder:
+                holder["batches"] += 1
+
+    # -------------------------------------------------------------- decisions
+
+    def decide(self) -> Escalation | None:
+        """Applies the decision map to what the monitors now say."""
+        newest: Escalation | None = None
+        batch = self.batch - 1
+        verified = labels.permits_action(self.mechanism)
+        if self.naive_flag and not verified:
+            self.naive_flag = False
+            self.ledger.commit(
+                ledger_module.ALARM,
+                {"rule": "L1_naive", "reason": HALT_UNVERIFIED, "batch": batch},
+            )
+            self.enter_halt(HALT_UNVERIFIED, {"batch": batch})
+            newest = (
+                self.escalate(
+                    "l1_alarm_unverified_label_mechanism",
+                    {"batch": batch, "mechanism": self.mechanism.value},
+                )
+                or newest
+            )
+        if verified and bool(self.alarm.test.crossed):
+            self.ledger.commit(
+                ledger_module.ALARM,
+                {
+                    "rule": "L1",
+                    "reason": "mean loss above reference plus tolerance",
+                    "batch": batch,
+                    "e_value": float(self.alarm.test.e_value),
+                    "mechanism": self.mechanism.value,
+                },
+            )
+            name = None
+            skipped = None
+            if self.queue:
+                skipped = "a challenger is already pending"
+            elif self.hooks.retrain is not None:
+                name = self.hooks.retrain()
+            body = {"reason": "L1 alarm", "batch": batch, "challenger": name}
+            if skipped is not None:
+                body["skipped"] = skipped
+            self.ledger.commit(ledger_module.RETRAIN, body)
+            if name is not None and name not in self.ledger.registered:
+                self.register_challenger(name)
+            self.alarm = sequential_tests.RiskAlarm(
+                self.policy.reference_risk,
+                self.policy.tolerance,
+                self.policy.alpha_alarm,
+                self.policy.scale,
+            )
+        if verified and bool(self.selective.test.crossed):
+            self.ledger.commit(
+                ledger_module.ALARM,
+                {
+                    "rule": "selective_risk",
+                    "reason": HALT_SELECTIVE,
+                    "batch": batch,
+                },
+            )
+            self.enter_halt(HALT_SELECTIVE, {"batch": batch})
+            newest = (
+                self.escalate("halt_selective_risk", {"batch": batch}) or newest
+            )
+            self.selective = sequential_tests.RiskAlarm(
+                self.policy.r_star, 0.0, self.policy.delta, self.policy.scale
+            )
+        if self.coverage_test is not None and bool(self.coverage_test.crossed):
+            newest = (
+                self.escalate("coverage_below_nominal", {"batch": batch})
+                or newest
+            )
+            self.coverage_test = sequential_tests.BettingTest(
+                self.policy.coverage_target or 0.9,
+                sequential_tests.LESS,
+                self.policy.alpha_alarm,
+            )
+        if bool(self.novelty_test.crossed):
+            newest = (
+                self.escalate(
+                    "out_of_support_rate_above_bound", {"batch": batch}
+                )
+                or newest
+            )
+            self.novelty_test = sequential_tests.BettingTest(
+                min(max(self.policy.novelty_bound, 1e-6), 1 - 1e-6),
+                sequential_tests.GREATER,
+                self.policy.alpha_alarm,
+            )
+        if verified:
+            newest = self.decide_rollback() or newest
+            newest = self.decide_queue() or newest
+        return newest
+
+    def decide_rollback(self) -> Escalation | None:
+        """Turns a crossed reverse process into a rollback proposal."""
+        watch = self.rollback_watch
+        if watch is None or not watch["process"].crossed:
+            return None
+        self.ledger.commit(
+            ledger_module.ROLLBACK_PROPOSAL,
+            {
+                "previous": watch["previous"],
+                "e_value": watch["process"].e_value,
+                "batch": self.batch - 1,
+                "tau_before": None if math.isinf(self.tau) else self.tau,
+            },
+        )
+        self.tau = min(1.0, self.tau + self.policy.tighten_step)
+        self.rollback_watch = None
+        self.consecutive_rollbacks += 1
+        if self.consecutive_rollbacks >= 2:
+            return self.escalate(
+                "two_consecutive_rollbacks", {"batch": self.batch - 1}
+            )
+        return None
+
+    def decide_queue(self) -> Escalation | None:
+        """Decides challengers in registration order with e-LOND."""
+        newest: Escalation | None = None
+        sequence = self.ledger.require_promotion()
+        while self.queue:
+            name = self.queue[0]
+            item = self.active[name]
+            level = sequence.rule.level(sequence.state)
+            value = min(item["process"].e_value, 1e300)
+            reached = Fraction(value) * level >= 1
+            exhausted = item["batches"] >= self.policy.challenger_budget
+            if not (reached or exhausted):
+                break
+            step = sequence.rule.step(
+                sequence.state,
+                ledger_module.sequential_tests.online_fdr.Evidence(e=value),
+            )
+            self.ledger.commit(
+                ledger_module.CHALLENGER_RESULT,
+                {
+                    "name": name,
+                    "phase": ledger_module.DECIDED,
+                    "e_value": value,
+                    "level": str(step.level),
+                    "rejected": step.rejected,
+                    "wealth_after": str(step.wealth_after),
+                    "matured_batches": item["batches"],
+                    "mechanism": self.mechanism.value,
+                },
+            )
+            self.queue.pop(0)
+            del self.active[name]
+            if step.rejected:
+                self.consecutive_rollbacks = 0
+                self.ledger.commit(
+                    ledger_module.PROMOTION_PROPOSAL,
+                    {
+                        "name": name,
+                        "e_value": value,
+                        "level": str(step.level),
+                        "wealth_after": str(step.wealth_after),
+                        "matured_batches": item["batches"],
+                        "needs": "signed registry approval and attestation",
+                    },
+                )
+            elif not reached:
+                newest = (
+                    self.escalate(
+                        "challenger_evidence_insufficient",
+                        {"name": name, "matured_batches": item["batches"]},
+                    )
+                    or newest
+                )
+        return newest
+
+    def time_out(self) -> Escalation | None:
+        """Closes unanswered escalations with the safe default."""
+        for row in list(self.ledger.pending()):
+            identity = str(row["id"])
+            opened = self.escalation_batch.setdefault(identity, self.batch)
+            if self.batch - opened >= self.policy.reply_timeout:
+                self.ledger.commit(
+                    ledger_module.ESCALATION,
+                    {
+                        "phase": ledger_module.PHASE_TIMEOUT,
+                        "id": identity,
+                        "applied": row["proposed_default"],
+                        "tier": qualification.Tier.UNVERIFIED.value,
+                    },
+                )
+        return None
+
+    # ------------------------------------------------------------ calibration
+
+    def calibrate(
+        self,
+        score: Any,
+        loss: Any,
+        weights: Any = None,
+        confidence: np.ndarray | None = None,
+    ) -> escalation.ThresholdResult:
+        """Selects `tau` on matured calibration cases and applies it.
+
+        The first calibration, and any raise of `tau`, is free. Lowering `tau`
+        after the first calibration relaxes the rule and needs an attestation
+        (never-list item 5), except as the recalibration that ends a halt,
+        which must itself pass the fixed-sequence test (`tau` finite).
+
+        Returns:
+            The result, also written to the ledger and `risk_coverage.json`.
+        """
+        result = escalation.select_threshold(
+            score, loss, self.policy.r_star, self.policy.delta, weights
+        )
+        curve = escalation.risk_coverage(score, loss, weights)
+        (self.directory / RISK_COVERAGE_FILE).write_text(
+            json.dumps(
+                json_ready(
+                    {"curve": curve.to_dict(), "threshold": result.to_dict()}
+                )
+            ),
+            encoding="utf-8",
+        )
+        released = False
+        if self.ledger.halted and not result.everything_escalates:
+            self.ledger.commit(
+                ledger_module.HALT,
+                {
+                    "phase": ledger_module.RELEASE,
+                    "recalibration": json_ready(result.to_dict()),
+                    "batch": self.batch,
+                },
+            )
+            self.halt_reason = None
+            released = True
+        elif result.tau < self.tau and self.calibrated:
+            self.guard.require(
+                never_list.NeverAction.RELAX_THRESHOLD,
+                {"tau_from": self.tau, "tau_to": result.tau},
+                self.policy.scope,
+            )
+        if not released:
+            self.ledger.commit(
+                ledger_module.OBSERVE_SUMMARY,
+                {
+                    "calibration": json_ready(result.to_dict()),
+                    "batch": self.batch,
+                },
+            )
+        if not self.ledger.halted or released:
+            self.tau = result.tau
+        self.calibrated = True
+        self.halted_by_state = (
+            self.halted_by_state and released is False and False
+        )
+        self.save_state()
+        return result
+
+    def write_label_mechanism(self) -> None:
+        """Writes `label_mechanism.json`."""
+        record = {
+            "mechanism": self.mechanism.value,
+            "actions_permitted": labels.permits_action(self.mechanism),
+            "epsilon": self.policy.epsilon,
+            "bypass_rate": self.policy.bypass_rate,
+            "feedback": (
+                labels.UNVERIFIED
+                if self.policy.bypass_rate <= 0.0
+                else "bypass slice declared"
+            ),
+            "feedback_note": (
+                labels.FEEDBACK_UNVERIFIED
+                if self.policy.bypass_rate <= 0.0
+                else ""
+            ),
+            "outcome_window": self.policy.outcome_window,
+        }
+        (self.directory / LABEL_MECHANISM_FILE).write_text(
+            json.dumps(record, sort_keys=True), encoding="utf-8"
+        )
+
+    # ------------------------------------------------------------------ reply
+
+    def reply(
+        self,
+        escalation_id: str,
+        attestation: ledger_module.Attestation,
+        key: str | bytes | None = None,
+    ) -> ReplyOutcome:
+        """Records a person's signed reply to a pending escalation.
+
+        Args:
+            escalation_id: The escalation answered.
+            attestation: The signed reply.
+            key: Key that verifies the signature; defaults to the one
+                registered for the reply's `key_id` at `open`.
+
+        Returns:
+            The tier of the dependent decision: `attested` if the person
+            allowed the action, `unverified` (safe default) otherwise.
+
+        Raises:
+            ReplyRefused: If the escalation is not pending, the reply is
+                bound to another escalation, question or scope, is expired
+                or dated in the future, does not verify, or was signed with a
+                key the system holds.
+        """
+        pending = {e.id: e for e in self.pending_escalations()}
+        target = pending.get(escalation_id)
+        if target is None:
+            raise ReplyRefused(f"{escalation_id!r} is not a pending escalation")
+        if attestation.escalation_id != escalation_id:
+            raise ReplyRefused("the reply answers a different escalation")
+        if attestation.question_hash != target.question_hash:
+            raise ReplyRefused("the reply is bound to a different question")
+        if attestation.scope != target.question["scope"]:
+            raise ReplyRefused("the reply names a different scope")
+        if attestation.key_id in self.ledger.system_keys:
+            raise ReplyRefused(
+                "the reply is signed with a key the system holds"
+            )
+        verifier = (
+            key
+            if key is not None
+            else self.verification_keys.get(attestation.key_id)
+        )
+        if verifier is None:
+            raise ReplyRefused("no verification key for the reply's key id")
+        if ledger_module.key_fingerprint(verifier) in self.ledger.system_keys:
+            raise ReplyRefused("the verification key is one the system holds")
+        if not attestation.verify(verifier):
+            raise ReplyRefused("the reply's signature does not verify")
+        today = self.today()
+        issued = ledger_module.parse_date(attestation.date, "date")
+        expires = ledger_module.parse_date(attestation.expires, "expires")
+        if not issued <= today <= expires:
+            raise ReplyRefused("the reply is expired or dated in the future")
+        self.ledger.commit(ledger_module.ATTESTATION, attestation.to_dict())
+        self.save_state()
+        allowed = attestation.decision in never_list.ALLOWING
+        return ReplyOutcome(
+            qualification.Tier.ATTESTED
+            if allowed
+            else qualification.Tier.UNVERIFIED,
+            attestation.decision,
+            not allowed,
+        )
+
+    # -------------------------------------------------------------- never list
+
+    def perform(
+        self,
+        action: never_list.NeverAction,
+        detail: Mapping[str, Any],
+        do: Callable[[], Any],
+        proposed_default: str = "action_not_performed",
+    ) -> Any:
+        """Runs `do()` only with a valid attestation for this exact action.
+
+        Raises:
+            AttestationRequired: Without one; an escalation row is written
+                and `do` is not called.
+        """
+        try:
+            return self.guard.perform(
+                action, detail, self.policy.scope, do, proposed_default
+            )
+        finally:
+            self.save_state()
+
+    def move_champion(
+        self,
+        registry: Any,
+        model: str,
+        version: int,
+        approval: Any,
+        signing_key: str | bytes | None = None,
+    ) -> Any:
+        """Item 1: moves the champion alias.
+
+        The registry still checks its own signed approval underneath.
+        """
+        return self.perform(
+            never_list.NeverAction.MOVE_CHAMPION,
+            {"model": model, "version": version},
+            lambda: registry.promote(
+                model, version, approval=approval, signing_key=signing_key
+            ),
+        )
+
+    def execute_rollback(
+        self, do: Callable[[], Any], detail: Mapping[str, Any]
+    ) -> Any:
+        """Item 1: executes a rollback."""
+        return self.perform(
+            never_list.NeverAction.MOVE_CHAMPION, {"rollback": dict(detail)}, do
+        )
+
+    def reopen_sealed(
+        self, do: Callable[[], Any], detail: Mapping[str, Any]
+    ) -> Any:
+        """Item 2: opens `C` or `F` again, or touches a sealed set."""
+        return self.perform(
+            never_list.NeverAction.REOPEN_SEALED, dict(detail), do
+        )
+
+    def rewrite_ledger(
+        self, do: Callable[[], Any], detail: Mapping[str, Any]
+    ) -> Any:
+        """Item 4: edits, deletes, reorders or truncates ledger rows."""
+        return self.perform(
+            never_list.NeverAction.EDIT_LEDGER, dict(detail), do
+        )
+
+    def act_on_unverified(self, kind: str, do: Callable[[], Any]) -> Any:
+        """Item 6: retrains, promotes or rolls back on an unverified stream."""
+        return self.perform(
+            never_list.NeverAction.ACT_ON_UNVERIFIED, {"kind": kind}, do
+        )
+
+    def silence_alert(self, name: str, do: Callable[[], Any]) -> Any:
+        """Item 8: suppresses, silences or reroutes an alert or incident."""
+        return self.perform(
+            never_list.NeverAction.SUPPRESS_ALERT, {"alert": name}, do
+        )
+
+    def change_label_policy(
+        self, change: Mapping[str, Any], do: Callable[[], Any]
+    ) -> Any:
+        """Item 9: changes the labelling or randomization policy."""
+        return self.perform(
+            never_list.NeverAction.CHANGE_LABEL_POLICY, dict(change), do
+        )
+
+    def delete_or_send(self, what: str, do: Callable[[], Any]) -> Any:
+        """Item 10: deletes data, models, artifacts, or sends something out."""
+        return self.perform(
+            never_list.NeverAction.DELETE_OR_EXTERNAL, {"what": what}, do
+        )
+
+    def amend_policy(self, **changes: Any) -> LoopPolicy:
+        """Changes the policy: tightening is free, anything else is gated.
+
+        A numeric tolerance moved to a stricter value needs no attestation
+        (item 5 allows tightening). A looser value needs one (item 5), and so
+        does any other field (item 3: safe defaults, high-impact actions,
+        scope). The change is recorded in the ledger and restarts the
+        monitors.
+
+        Raises:
+            AttestationRequired: For a gated change without an attestation.
+            ValueError: For an unknown field.
+        """
+        names = {f.name for f in dataclasses.fields(LoopPolicy)}
+        unknown = set(changes) - names
+        if unknown:
+            raise ValueError(f"unknown policy fields: {sorted(unknown)}")
+        for field, new in changes.items():
+            old = getattr(self.policy, field)
+            orientation = NUMERIC_ORIENTATION.get(field)
+            if orientation is not None and new is not None:
+                if (new - old) * orientation >= 0:
+                    continue
+                action = never_list.NeverAction.RELAX_THRESHOLD
+            else:
+                action = never_list.NeverAction.CHANGE_CHARTER
+            self.guard.require(
+                action,
+                {
+                    "field": field,
+                    "from": json_ready(old),
+                    "to": json_ready(new),
+                },
+                self.policy.scope,
+            )
+        updated = dataclasses.replace(self.policy, **changes)
+        self.ledger.commit(
+            ledger_module.OBSERVE_SUMMARY,
+            {
+                "policy_amendment": json_ready(changes),
+                "batch": self.batch,
+            },
+        )
+        self.policy = updated
+        self.build_monitors()
+        self.save_state()
+        return updated
