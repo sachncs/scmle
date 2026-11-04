@@ -20,6 +20,47 @@ HOLDOUT_FRACTION = 0.3
 STATE_SUFFIX = ".lifecycle.json"
 
 
+def split_fresh(
+    fresh: pd.DataFrame, schema: Any
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Splits fresh rows into training and holdout rows.
+
+    Temporal data are split out of time (the newest `HOLDOUT_FRACTION` of the
+    rows, by the schema's time column, are the holdout), grouped data by whole
+    groups (a group is never on both sides), and other data by a seeded
+    shuffle. A random shuffle of temporal or grouped rows would leak the
+    holdout into training and overstate the challenger.
+
+    Args:
+        fresh: The labelled fresh rows.
+        schema: The champion's schema (`time_column`, `group_column`).
+
+    Returns:
+        The training and holdout frames.
+    """
+    time_name = getattr(schema, "time_column", None)
+    group_name = getattr(schema, "group_column", None)
+    if time_name and time_name in fresh.columns:
+        order = pd.to_datetime(fresh[time_name], errors="coerce")
+        ordered = fresh.iloc[order.argsort(kind="stable")].reset_index(
+            drop=True
+        )
+        cut = int(len(ordered) * (1 - HOLDOUT_FRACTION))
+        return ordered.iloc[:cut], ordered.iloc[cut:]
+    if group_name and group_name in fresh.columns:
+        names = pd.Series(fresh[group_name].astype(str).unique())
+        names = names.sample(frac=1.0, random_state=0).reset_index(drop=True)
+        held = set(names.iloc[int(len(names) * (1 - HOLDOUT_FRACTION)) :])
+        mask = fresh[group_name].astype(str).isin(held)
+        if mask.any() and not mask.all():
+            return fresh[~mask].reset_index(drop=True), fresh[mask].reset_index(
+                drop=True
+            )
+    shuffled = fresh.sample(frac=1.0, random_state=0).reset_index(drop=True)
+    cut = int(len(shuffled) * (1 - HOLDOUT_FRACTION))
+    return shuffled.iloc[:cut], shuffled.iloc[cut:]
+
+
 @dataclasses.dataclass(frozen=True)
 class RetrainPolicy:
     """When a drifting model may be retrained, so checks do not pile up.
@@ -287,9 +328,7 @@ class LifecycleManager:
             reasons=notes,
         )
         self.write_state({"last_digest": digest, "rows_since_attempt": 0})
-        shuffled = fresh.sample(frac=1.0, random_state=0).reset_index(drop=True)
-        cut = int(len(shuffled) * (1 - HOLDOUT_FRACTION))
-        train, holdout = shuffled.iloc[:cut], shuffled.iloc[cut:]
+        train, holdout = split_fresh(fresh, current.schema)
         options = dict(project_options or {})
         options.setdefault("task", current.schema.task)
         options.setdefault("metric", current.info.metric)
