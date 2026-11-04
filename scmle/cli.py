@@ -20,6 +20,7 @@ from scmle import DatasetCatalog
 from scmle import durability
 from scmle.api import project
 from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import claims_audit
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
@@ -716,6 +717,95 @@ class CharterCommand(Command):
         return EXIT_OK
 
 
+class ClaimsCommand(Command):
+    """Lists, shows and verifies the claims of a charter run."""
+
+    name = "claims"
+    help = "list, show or verify the claims and ledger of a charter run"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the `list`, `show` and `verify` actions."""
+        actions = parser.add_subparsers(dest="claims_action", required=True)
+        listing = actions.add_parser("list", help="one row per claim")
+        listing.add_argument("run_dir")
+        listing.add_argument("--tier", choices=["confirmed", "unverified"])
+        listing.add_argument("--json", action="store_true")
+        show = actions.add_parser("show", help="everything about one claim")
+        show.add_argument("run_dir")
+        show.add_argument("claim_id")
+        verify = actions.add_parser(
+            "verify",
+            help="check the ledger chain and replay, the claims file, the "
+            "second-stage accounting, the custody log and the charter",
+        )
+        verify.add_argument("run_dir")
+        verify.add_argument("--json", action="store_true")
+        verify.add_argument(
+            "--key-file",
+            help="file holding the signing key; default: SCMLE_SIGNING_KEY",
+        )
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Runs the chosen action."""
+        action = getattr(self, f"run_{args.claims_action}")
+        return action(args)
+
+    @staticmethod
+    def run_list(args: argparse.Namespace) -> int:
+        """Prints the claims of a run."""
+        rows = claims_audit.list_claims(args.run_dir)
+        if args.tier:
+            rows = [r for r in rows if r["tier"] == args.tier]
+        if args.json:
+            print(json.dumps(rows, indent=2))
+            return EXIT_OK
+        for row in rows:
+            adjusted = row["adjusted_p_value"]
+            print(
+                f"{row['claim_id']}  {row['tier']:<10}  "
+                f"{row['feature']!s:<24}  "
+                f"adj.p={'-' if adjusted is None else f'{adjusted:.4g}'}  "
+                f"effect={row['effect']:.4g}"
+                + ("  withdrawn before C" if row["withdrawn"] else "")
+            )
+        print(f"{len(rows)} claim(s)")
+        return EXIT_OK
+
+    @staticmethod
+    def run_show(args: argparse.Namespace) -> int:
+        """Prints one claim with its hypothesis and checks."""
+        print(
+            json.dumps(
+                claims_audit.show_claim(args.run_dir, args.claim_id),
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return EXIT_OK
+
+    @staticmethod
+    def run_verify(args: argparse.Namespace) -> int:
+        """Verifies the run's artifacts; a failed step makes the exit code 1."""
+        key = (
+            pathlib.Path(args.key_file).read_text().strip()
+            if args.key_file
+            else None
+        )
+        result = claims_audit.verify(args.run_dir, key)
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        else:
+            for found in result.findings:
+                print(f"{found.status.upper():<8}{found.name}: {found.detail}")
+            print(
+                f"{result.verified} of {len(result.findings)} steps passed"
+                + ("" if result.ok else "; verification FAILED")
+            )
+        if not result.ok:
+            raise errors.ArtifactError("claims verification failed")
+        return EXIT_OK
+
+
 class FrameCommand(Command):
     """Drafts a charter, cost model and questions from a plain request."""
 
@@ -801,6 +891,7 @@ COMMANDS: tuple[Command, ...] = (
     PackageCommand(),
     IngestCommand(),
     CharterCommand(),
+    ClaimsCommand(),
     FrameCommand(),
 )
 

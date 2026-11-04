@@ -14,6 +14,7 @@ The `scmle` command mirrors the Python API. Global option:
 | `scmle export-onnx BUNDLE` | Export an ONNX graph (needs the `onnx` extra). |
 | `scmle package BUNDLE` | Write a ready-to-run service folder with a Dockerfile. |
 | `scmle charter init\|check\|sign PATH` | Create, validate or sign an analysis charter (see below). |
+| `scmle claims list\|show\|verify RUN_DIR` | List the claims of a charter run, show one with its hypothesis and checks, or verify the run's ledger and claims (see below). `verify` exits 1 when any step fails. |
 | `scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md). |
 
 `plan` and `run` take the same options; `scmle run --help` lists them all.
@@ -52,6 +53,41 @@ signature; a one-byte edit fails verification. The signature proves possession
 of the key, not the signer's identity. If the confirmation set is too small to
 support the promised power the run still completes: the scope becomes
 `exploratory_unconfirmed` and `feasibility.json` reports the detectable effect.
+
+Format 3 charters may carry a `rules` object that fixes, before data, the
+online rule of the ledger (`ledger_rule`), the confirmation rule
+(`confirmation_rule`), the failure policy, whether `fragile` survivors are
+withdrawn before `C` opens (`stability_filter`) and the stability thresholds
+(`s_min`, `band`, `q_min`). The charter hash and signature cover them. A
+charter without `rules` is hashed, signed and loaded exactly as before and the
+run uses the defaults, reporting `"rules": "not chartered"`. A run
+specification that names a different non-default rule than the charter is
+refused. The filter acts only if the stability rule has a current passing
+certificate for the chartered thresholds; otherwise it is recorded as
+requested and not applied, and the verdicts stay warnings.
+
+## Claims of a charter run
+
+```bash
+scmle claims list runs/run_x [--tier confirmed] [--json]
+scmle claims show runs/run_x h000003
+SCMLE_SIGNING_KEY=... scmle claims verify runs/run_x [--json]
+```
+
+`verify` reads the run directory only. It checks that the ledger's hash chain
+verifies and every recorded decision replays, that `confirmed_claims.json`
+names the ledger head, the survivor hash, the outcome and the confirmed set of
+the sealed ledger, that the multiplicity rule replayed on the recorded p-values
+on `C` gives the recorded adjusted p-values and tiers, that the second-stage
+family (survivors minus withdrawn) and its hash are consistent and no
+withdrawn survivor was tested on `C`, that the custody log verifies, froze the
+selection before `C` opened and opened `C` at most once, that the charter
+verifies (signature checked when a key is configured) and, if it fixes rules,
+that the ledger and claims used them, and that `negative_control.json` is the
+control the ledger recorded. A step whose input is absent is reported
+`skipped`, never `pass`. This proves the artifacts agree; it does not
+recompute statistics from data, and a party who can rewrite every file
+consistently can pass it (custody is tamper-evident, not adversary-proof).
 
 ## Examples
 
