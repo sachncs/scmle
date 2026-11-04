@@ -32,12 +32,12 @@ def test_an_explicit_level_may_not_overspend():
     assert level == Fraction(1, 100)
     with pytest.raises(b.BudgetExhaustedError):
         b.assign_experiment(budget, "b", Fraction(1, 99))
-    budget, _ = b.assign_experiment(budget, "b", Fraction(1, 100))
+    budget, ignored = b.assign_experiment(budget, "b", Fraction(1, 100))
     assert budget.remaining == 0
 
 
 def test_an_experiment_id_is_used_once_and_a_level_is_positive():
-    budget, _ = b.assign_experiment(fresh(), "a")
+    budget, ignored = b.assign_experiment(fresh(), "a")
     with pytest.raises(ValueError, match="already has a level"):
         b.assign_experiment(budget, "a")
     with pytest.raises(ValueError, match="positive"):

@@ -37,7 +37,7 @@ def test_vector_test_equals_scalar_tests():
     rng = np.random.default_rng(2)
     data = rng.random((40, 3))
     vector = seq.BettingTest(np.full(3, 0.4), seq.GREATER, 0.05)
-    scalars = [seq.BettingTest(0.4, seq.GREATER, 0.05) for _ in range(3)]
+    scalars = [seq.BettingTest(0.4, seq.GREATER, 0.05) for ignored in range(3)]
     for row in data:
         vector.update(row)
         for index, scalar in enumerate(scalars):
@@ -50,7 +50,7 @@ def test_vector_test_equals_scalar_tests():
 def test_false_alarm_rate_is_below_the_level_at_every_look():
     rng = np.random.default_rng(3)
     test = seq.BettingTest(np.full(1000, 0.15), seq.GREATER, 0.05)
-    for _ in range(1500):
+    for ignored in range(1500):
         test.update(rng.binomial(50, 0.15, 1000) / 50)
     assert test.ever_crossed.mean() <= 0.05
 
@@ -58,7 +58,7 @@ def test_false_alarm_rate_is_below_the_level_at_every_look():
 def test_a_rise_is_detected():
     rng = np.random.default_rng(4)
     alarm = seq.RiskAlarm(0.10, 0.05, 0.05)
-    fired = [alarm.update(rng.binomial(50, 0.25) / 50) for _ in range(60)]
+    fired = [alarm.update(rng.binomial(50, 0.25) / 50) for ignored in range(60)]
     assert any(fired)
 
 
@@ -66,7 +66,7 @@ def test_confidence_sequence_covers_and_tightens():
     rng = np.random.default_rng(5)
     sequence = seq.ConfidenceSequence(0.05)
     widths = []
-    for _ in range(200):
+    for ignored in range(200):
         low, high = sequence.update(rng.binomial(50, 0.3) / 50)
         widths.append(high - low)
     assert low <= 0.3 <= high
@@ -77,7 +77,7 @@ def test_paired_process_proposes_for_a_better_challenger_only():
     rng = np.random.default_rng(6)
     better = seq.PairedEProcess(0.0, 0.05)
     same = seq.PairedEProcess(0.0, 0.05)
-    for _ in range(80):
+    for ignored in range(80):
         latent = rng.random(200)
         champion = (latent < 0.2).astype(float)
         better.update(champion, (latent < 0.1).astype(float))
@@ -90,7 +90,7 @@ def test_paired_process_proposes_for_a_better_challenger_only():
 def test_reverse_process_flags_a_worse_new_champion():
     rng = np.random.default_rng(7)
     process = seq.PairedEProcess(0.0, 0.05)
-    for _ in range(80):
+    for ignored in range(80):
         latent = rng.random(200)
         process.update(
             (latent < 0.3).astype(float), (latent < 0.1).astype(float)
@@ -162,7 +162,7 @@ def test_scaled_gaps_and_state_round_trip_for_processes_and_alarms():
 def test_mixture_false_alarm_rate_is_below_the_level():
     rng = np.random.default_rng(11)
     test = seq.MixtureTest(np.full(600, 0.15), seq.GREATER, 0.05, stride=10)
-    for _ in range(800):
+    for ignored in range(800):
         test.update(rng.binomial(50, 0.15, 600) / 50)
     assert test.ever_crossed.mean() <= 0.05
 
@@ -182,7 +182,7 @@ def test_mixture_detects_a_change_after_a_long_quiet_stretch():
 
 def test_mixture_weights_add_to_at_most_one_and_old_terms_are_dropped():
     test = seq.MixtureTest(0.3, seq.GREATER, 0.05, stride=2, terms=3)
-    for _ in range(30):
+    for ignored in range(30):
         test.update(0.3)
     assert len(test.inner) == 3
     assert sum(math.exp(w) for w in test.log_weights) < 1.0

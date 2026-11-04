@@ -186,7 +186,7 @@ def test_an_escalation_is_answered_once_and_timeouts_close_it():
     ledger.commit(dl.ATTESTATION, reply(identity, digest).to_dict())
     with pytest.raises(dl.DeploymentLedgerError, match="already closed"):
         ledger.commit(dl.ATTESTATION, reply(identity, digest).to_dict())
-    other, _ = escalate(ledger, "rollback")
+    other, ignored = escalate(ledger, "rollback")
     ledger.commit(dl.ESCALATION, {"phase": dl.PHASE_TIMEOUT, "id": other})
     assert ledger.pending() == []
     with pytest.raises(dl.DeploymentLedgerError, match="not pending"):

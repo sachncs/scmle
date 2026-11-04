@@ -178,11 +178,11 @@ def test_pick_blocks_sizes_and_cap_are_exact():
     rng = np.random.default_rng(1)
     mask, order = carve.pick_blocks(times, 0.5, 0, rng)
     assert mask.sum() == 20 and list(order) == list(range(40))
-    mask, _ = carve.pick_blocks(times, 0.425, 0, np.random.default_rng(2))
+    mask, ignored = carve.pick_blocks(times, 0.425, 0, np.random.default_rng(2))
     assert mask.sum() == 18
-    mask, _ = carve.pick_blocks(times, 1.0, 0, np.random.default_rng(3))
+    mask, ignored = carve.pick_blocks(times, 1.0, 0, np.random.default_rng(3))
     assert mask.sum() == 38
-    mask, _ = carve.pick_blocks(
+    mask, ignored = carve.pick_blocks(
         np.arange(100), 0.3, 3, np.random.default_rng(4)
     )
     assert mask.sum() == 36
@@ -193,13 +193,15 @@ def test_pick_blocks_has_a_block_of_at_least_one_row():
         np.array([]), 0.3, 0, np.random.default_rng(0)
     )
     assert len(mask) == 0 and len(order) == 0
-    mask, _ = carve.pick_blocks(np.arange(10), 0.3, 0, np.random.default_rng(0))
+    mask, ignored = carve.pick_blocks(
+        np.arange(10), 0.3, 0, np.random.default_rng(0)
+    )
     assert mask.sum() == 3
 
 
 def test_pick_blocks_orders_ties_by_position():
     times = np.array([5, 5, 5, 5, 1, 1, 1, 1] * 4)
-    _, order = carve.pick_blocks(times, 0.3, 0, np.random.default_rng(0))
+    ignored, order = carve.pick_blocks(times, 0.3, 0, np.random.default_rng(0))
     assert list(order) == [int(i) for i in np.argsort(times, kind="stable")]
 
 

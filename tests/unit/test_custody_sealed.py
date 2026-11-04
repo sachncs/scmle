@@ -167,7 +167,7 @@ def test_the_binding_and_both_hashes_are_logged():
 
 
 def test_a_set_commits_once_and_not_after_it_opened():
-    held, _ = committed(resident())
+    held, ignored = committed(resident())
     with pytest.raises(errors.LeakageError, match="already bound"):
         held.commit("claims-2", "ledger-1")
     other = sealed.SealedSet("F", resident(), sealed.OpenLog())

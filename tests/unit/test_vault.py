@@ -81,7 +81,7 @@ def test_a_bound_vault_refuses_a_release_for_another_selection(sealed):
     with pytest.raises(errors.LeakageError, match="binding mismatch"):
         sealed.open(token, "selection-b")
     assert sealed.opened is False
-    features, _ = sealed.open(token, "selection-a")
+    features, ignored = sealed.open(token, "selection-a")
     assert len(features) == 3 and sealed.opened is True
 
 

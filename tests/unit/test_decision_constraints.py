@@ -119,10 +119,10 @@ def test_incompatible_criteria_are_refused_only_when_base_rates_differ():
         constraint("demographic_parity"),
         constraint("equalized_odds"),
     )
-    _, y, groups = binormal(20000, 6, rates=(0.2, 0.5))
+    ignored, y, groups = binormal(20000, 6, rates=(0.2, 0.5))
     with pytest.raises(c.InfeasibleConstraintsError, match="cannot both hold"):
         c.check_feasibility(pair, y, groups)
-    _, y_equal, groups_equal = binormal(20000, 7, rates=(0.3, 0.3))
+    ignored, y_equal, groups_equal = binormal(20000, 7, rates=(0.3, 0.3))
     report = c.check_feasibility(pair, y_equal, groups_equal)
     assert report["differ"] is False and report["conflicts"]
     single = c.check_feasibility(pair[:1], y, groups)

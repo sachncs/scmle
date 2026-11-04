@@ -36,7 +36,7 @@ def test_the_bayes_threshold_is_the_closed_form():
 
 def test_the_net_benefit_identity_holds_on_random_tables():
     rng = np.random.default_rng(0)
-    for _ in range(20):
+    for ignored in range(20):
         y = (rng.random(300) < rng.uniform(0.1, 0.6)).astype(float)
         a = (rng.random(300) < 0.4).astype(float)
         fp, fn = rng.uniform(1, 9), rng.uniform(1, 90)

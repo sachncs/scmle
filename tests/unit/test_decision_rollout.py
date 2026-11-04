@@ -130,7 +130,7 @@ def test_a_harmful_guardrail_blocks_promotion():
 def test_a_lower_is_worse_guardrail_is_read_in_the_other_direction():
     guard = charter.Guardrail("rating", 0.05, higher_is_worse=False)
     plan = make_plan(guardrails=(guard,), n_max=30000)
-    arm, primary, _ = traffic(30000, 4)
+    arm, primary, ignored = traffic(30000, 4)
     rng = np.random.default_rng(44)
     worse = (rng.random(30000) < 0.8 - 0.10 * arm).astype(float)
     better = (rng.random(30000) < 0.8 + 0.0 * arm).astype(float)

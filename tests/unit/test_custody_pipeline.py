@@ -187,7 +187,7 @@ def test_a_refused_carve_becomes_a_run_with_no_confirmation_set(monkeypatch):
 def test_the_manifest_commits_to_the_row_content_of_each_set():
     frame = make_frame()
     manifest = run(frame).outcome.manifest
-    assert [name for name, _ in manifest.row_roots] == [
+    assert [name for name, ignored in manifest.row_roots] == [
         "exploration",
         "confirmation",
         "final_test",

@@ -109,7 +109,7 @@ def test_no_tracked_object_holds_a_canary_of_c_after_sealing():
 
 
 def test_the_resident_protocol_does_hold_the_rows_so_the_scan_is_not_vacuous():
-    _, vault, in_c, _ = custody(process=False)
+    ignored, vault, in_c, ignored = custody(process=False)
     gc.collect()
     try:
         assert holders(in_c) != []

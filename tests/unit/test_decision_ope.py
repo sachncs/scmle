@@ -23,7 +23,7 @@ def bandit(n, seed, eps=0.5, shift=0.0):
 
 def build(n, seed, **kwargs):
     parts = bandit(n, seed, **kwargs)
-    _, action, reward, behaviour, target, mean, truth = parts
+    ignored, action, reward, behaviour, target, mean, truth = parts
     log = ope.LoggedBandit(action, reward, behaviour, target, mean)
     return log, truth
 
@@ -52,7 +52,7 @@ def test_the_doubly_robust_value_is_exact_with_a_perfect_outcome_model():
 
 
 def test_a_support_violation_is_refused_with_the_reason():
-    log, _ = build(3000, 2)
+    log, ignored = build(3000, 2)
     behaviour = log.behaviour.copy()
     behaviour[:, 1] = 0.0
     behaviour[:, 0] = 1.0
@@ -69,7 +69,7 @@ def test_a_support_violation_is_refused_with_the_reason():
 
 
 def test_a_low_effective_sample_size_is_refused_and_clipping_is_labelled():
-    log, _ = build(4000, 3, eps=1.9, shift=-0.45)
+    log, ignored = build(4000, 3, eps=1.9, shift=-0.45)
     strict = ope.estimate_value(log, "ipw", ess_floor=0.95)
     assert strict.status == ope.REFUSED
     assert any("effective sample size" in r for r in strict.reasons)
@@ -79,7 +79,7 @@ def test_a_low_effective_sample_size_is_refused_and_clipping_is_labelled():
 
 
 def test_observational_logs_are_not_confirmed():
-    log, _ = build(2000, 4)
+    log, ignored = build(2000, 4)
     observational = ope.LoggedBandit(
         log.actions,
         log.rewards,
@@ -111,7 +111,7 @@ def test_a_difference_uses_the_paired_influence_function():
 
 
 def test_clustered_intervals_are_wider_when_clusters_share_noise():
-    log, _ = build(3000, 6)
+    log, ignored = build(3000, 6)
     labels = np.repeat(np.arange(30), 100)
     shared = log.rewards + np.repeat(
         np.random.default_rng(0).normal(0, 0.3, 30), 100
@@ -133,7 +133,7 @@ def test_clustered_intervals_are_wider_when_clusters_share_noise():
 
 
 def test_outcome_model_and_threshold_policy_fitting():
-    x, action, reward, behaviour, _, _, _ = bandit(8000, 7)
+    x, action, reward, behaviour, ignored, ignored, ignored = bandit(8000, 7)
     predict = ope.fit_outcome_model(x, action, reward, 2)
     q = predict(x)
     assert q.shape == (8000, 2)
@@ -178,7 +178,7 @@ def test_bad_logs_are_refused(build_log):
 
 
 def test_estimator_and_level_are_validated():
-    log, _ = build(500, 8)
+    log, ignored = build(500, 8)
     with pytest.raises(ValueError):
         ope.estimate_value(log, "magic")
     with pytest.raises(ValueError):

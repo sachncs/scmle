@@ -62,7 +62,7 @@ def test_the_pre_registered_floors_are_in_the_docstring():
 
 
 def test_certification_and_development_seeds_do_not_overlap():
-    largest = max(runs for _, runs in cert.RUNNERS.values())
+    largest = max(runs for ignored, runs in cert.RUNNERS.values())
     assert largest <= cert.DEV_SEED_BASE
 
 
