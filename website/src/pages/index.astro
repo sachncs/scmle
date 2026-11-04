@@ -64,9 +64,9 @@ const bundle = `artifacts/churn/
 ├── schema.json
 └── signature.json    <span class="tok-c"># HMAC over the manifest</span>`;
 
-const install = `<span class="cmd">$ </span>pip install scmle                  <span class="tok-c"># core</span>
-<span class="cmd">$ </span>pip install "scmle[boosting]"      <span class="tok-c"># + LightGBM, XGBoost</span>
-<span class="cmd">$ </span>pip install "scmle[all]"           <span class="tok-c"># most optional extras</span>`;
+const install = `<span class="cmd">$ </span>pip install "scmle @ git+https://github.com/sachncs/scmle" <span class="tok-c"># core</span>
+<span class="cmd">$ </span>pip install "scmle[boosting] @ git+https://github.com/sachncs/scmle" <span class="tok-c"># + LightGBM, XGBoost</span>
+<span class="cmd">$ </span>pip install "scmle[all] @ git+https://github.com/sachncs/scmle" <span class="tok-c"># most optional extras</span>`;
 
 const aheadRows = [
   { label: "Nine core datasets", ahead: 7, total: 9 },
@@ -94,7 +94,7 @@ const bw = 360;
           <a class="btn btn-primary" href={`${base}/docs/quickstart/`}>Get started</a>
           <a class="btn btn-secondary" href={repo}>View on GitHub</a>
         </div>
-        <p class="hero-meta rise" style="--d:4"><code>pip install scmle</code></p>
+        <p class="hero-meta rise" style="--d:4"><code>pip install "scmle @ git+https://github.com/sachncs/scmle"</code></p>
 
         <figure class="hero-visual rise" style="--d:5">
           <div class="result">

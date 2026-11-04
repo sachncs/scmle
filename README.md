@@ -18,9 +18,10 @@ Runs on Linux, macOS and Windows with Python 3.11 or newer (tested on 3.11 to
 to understand how the system is composed.
 
 ```bash
-pip install scmle                  # core
-pip install "scmle[boosting]"      # + LightGBM, XGBoost
-pip install "scmle[all]"           # most optional extras
+# not on PyPI yet: install from GitHub
+pip install "scmle @ git+https://github.com/sachncs/scmle"  # core
+pip install "scmle[boosting] @ git+https://github.com/sachncs/scmle"  # + LightGBM, XGBoost
+pip install "scmle[all] @ git+https://github.com/sachncs/scmle"  # most optional extras
 ```
 
 On macOS, the `boosting` extra needs the OpenMP runtime (`brew install libomp`).
