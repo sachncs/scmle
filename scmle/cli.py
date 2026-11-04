@@ -27,6 +27,9 @@ from scmle.core import config
 from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import feasibility as charter_feasibility
 from scmle.data.charter import sealing as charter_sealing
+from scmle.data.framing import costs as framing_costs
+from scmle.data.framing import draft as framing_draft
+from scmle.data.framing import refusal as framing_refusal
 from scmle.data.readers import tabular
 from scmle.inference import mapping as mapping_module
 from scmle.inference import serving
@@ -640,6 +643,80 @@ class CharterCommand(Command):
         return EXIT_OK
 
 
+class FrameCommand(Command):
+    """Drafts a charter, cost model and questions from a plain request."""
+
+    name = "frame"
+    help = (
+        "draft an unsigned charter and the questions only a person can answer"
+    )
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the request, source, data and optional inputs."""
+        parser.add_argument("request", help="text file with the request")
+        parser.add_argument(
+            "--source",
+            required=True,
+            help="JSON: uri, columns, primary_key, target_time_column",
+        )
+        parser.add_argument(
+            "--data", required=True, help="exploration rows only (CSV)"
+        )
+        parser.add_argument(
+            "--parse-dates", default="", help="comma-separated date columns"
+        )
+        parser.add_argument("--cost-model", help="JSON cost model")
+        parser.add_argument("--baseline-column", help="current 0/1 decisions")
+        parser.add_argument(
+            "--replay",
+            help="JSON with model_id, samples and tau: recorded LLM drafts",
+        )
+        parser.add_argument("--output", required=True, help="output directory")
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Writes the framing artifacts and the unsigned draft charter."""
+        source = framing_draft.SourceDescription.from_dict(
+            charter_contracts.load_json(args.source)
+        )
+        dates = [c for c in args.parse_dates.split(",") if c]
+        frame = pd.read_csv(args.data, parse_dates=dates)
+        text = pathlib.Path(args.request).read_text(encoding="utf-8")
+        model = (
+            framing_costs.DecisionCostModel.from_dict(
+                charter_contracts.load_json(args.cost_model)
+            )
+            if args.cost_model
+            else None
+        )
+        sampler = None
+        tau = None
+        if args.replay:
+            recorded = charter_contracts.load_json(args.replay)
+            sampler = framing_refusal.ReplaySampler(
+                str(recorded["model_id"]), recorded["samples"]
+            )
+            tau = recorded.get("tau")
+        result = framing_draft.frame(
+            framing_draft.FramingRequest(text, source),
+            frame,
+            cost_model=model,
+            baseline_column=args.baseline_column,
+            sampler=sampler,
+            tau=tau,
+        )
+        output = pathlib.Path(args.output)
+        written = framing_draft.write_artifacts(result, output)
+        if result.charter is not None:
+            (output / "charter.json").write_text(
+                json.dumps(result.charter.to_dict(), indent=2) + "\n",
+                encoding="utf-8",
+            )
+        LOGGER.info("framing %s: wrote %s", result.status, ", ".join(written))
+        return (
+            EXIT_BLOCKED if result.status == framing_draft.REFUSED else EXIT_OK
+        )
+
+
 COMMANDS: tuple[Command, ...] = (
     PlanCommand(),
     RunCommand(),
@@ -650,6 +727,7 @@ COMMANDS: tuple[Command, ...] = (
     ExportOnnxCommand(),
     PackageCommand(),
     CharterCommand(),
+    FrameCommand(),
 )
 
 
