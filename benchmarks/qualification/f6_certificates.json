@@ -48,11 +48,11 @@
       "outcomes": [
         {
           "certificate": {
-            "clean_rows": 1000,
+            "clean_rows": 5000,
             "defect_type": "mean_shift_auc060",
             "detected": 300,
             "detector_id": "f6-shift-mmd",
-            "false_alarms": 60,
+            "false_alarms": 259,
             "planted": 300,
             "seed_path": [
               0,
@@ -61,10 +61,10 @@
             ]
           },
           "false_alarm_interval": [
-            0.04689647267593196,
-            0.07647107479135655
+            0.04599384613067904,
+            0.05829432189287018
           ],
-          "passed": false,
+          "passed": true,
           "recall_interval": [
             0.9873570287754538,
             1.0

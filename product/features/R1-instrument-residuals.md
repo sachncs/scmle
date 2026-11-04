@@ -35,6 +35,7 @@ charter run uses it (`admissibility/qualify.py`) instead of `leakage.scan`.
 The earlier skill scan `leakage.py` is used only as a helper library by the
 screen; its own certificate (`f4-leakage-skill`, noisy copy 0.6646 against
 the floor 0.9) stays descriptive and no run path calls `leakage.scan`.
+A4 closed 2026-11-04: the MMD test was re-measured on 5000 null worlds (dated amendment in `f6_certify.py`, floors unchanged): 259 false alarms, upper bound 0.0583 against 0.075, recall lower bound 0.9874; it is certified.
 A strong legitimate predictor flagged by a certified mechanism is overridden
 only by a ledgered per-column attestation, tier `attested`
 (`admissibility/attestations.py`).
@@ -43,7 +44,6 @@ only by a ledgered per-column attestation, tier `attested`
 | ID | Item | Lives in | State (verified) | Consequence now | Closing criterion |
 |---|---|---|---|---|---|
 | A3 | Titanic `body` not shown to be flagged by a certified path | `tests/integration/test_open_datasets.py:76-91` asserts `boat` and `body` appear in `risk_findings`; `README.md:157-159` says the screen flags both | The screen's record-purity test (`screen.py`, step 2b) is designed for this case, but no offline fixture of the real Titanic table exists and the test needs OpenML access, so it skips offline. Unverified whether `body` is flagged | A committed test with a frozen, hash-checked Titanic extract (`corpora.json` entry `titanic-boat-body`, status `candidate`) asserts that `body` is a suspect at level 0.05, or the README sentence is changed to say it is not |
-| A4 | MMD shift test not certified | `benchmarks/qualification/f6_certificates.json` (`f6-shift-mmd`) | recall lower bound 0.9874 passes; false-alarm upper bound 0.0765 vs ceiling 0.075 (`f6_certify.py:84`) | MMD is descriptive; C2ST (upper 0.0355) is certified | False-alarm upper bound <= 0.075 with a larger null B chosen from the interval width needed (the observed rate is inside the ceiling; the interval is too wide), floor unchanged |
 | A5 | Label-noise detectors not certified | `benchmarks/qualification/detector_certificates.json` (`f5-label-noise`) | recall lower bound 0.7497 (symmetric) and 0.6528 (class-conditional) vs 0.80 (`f5.py:55`) | Descriptive only | Lower bounds >= 0.80 for both types, or the claim is limited to the type that passes and the other is stated as uncovered; certificate is on more than the one corpus (breast cancer) |
 | A6 | F5 certificates use one corpus | `benchmarks/qualification/README.md` "Limits" | One corpus (scikit-learn breast cancer); rows judged as independent, which understates uncertainty | Certificates are optimistic | Certificates re-issued on at least 3 corpora with different feature types; unit of replication is the table, not the row, for row detectors |
 

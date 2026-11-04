@@ -460,6 +460,11 @@ def main(arguments: list[str] | None = None) -> int:
     action.add_argument("--check", action="store_true")
     action.add_argument("--dev", action="store_true")
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument(
+        "--only-mmd",
+        action="store_true",
+        help="with --write: re-measure the MMD test and keep the rest",
+    )
     options = parser.parse_args(arguments)
     if options.dev:
         print(json.dumps(development_look(options.workers), default=str))
@@ -474,7 +479,15 @@ def main(arguments: list[str] | None = None) -> int:
         }
         print(json.dumps(report, indent=2))
         return 1 if found else 0
-    store, document = certify_all(options.workers)
+    if options.only_mmd:
+        store = certificates.CertificateStore.load(STORE_PATH)
+        document = json.loads(MEASUREMENTS_PATH.read_text(encoding="utf-8"))
+        cert, document[shift.MMD_ID] = shift_certificate(
+            shift.MMD_ID, 0, options.workers
+        )
+        store.add(cert)
+    else:
+        store, document = certify_all(options.workers)
     store.save(STORE_PATH)
     MEASUREMENTS_PATH.write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n",
