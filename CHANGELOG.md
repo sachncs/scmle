@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+* Problem framing and the decision-cost model (F8), the parts that could be
+  built and measured without outside parties. New package
+  `scmle.data.framing`: `DecisionCostModel` (four costs, a threshold range,
+  a source per entry; refuses a model where one action dominates) with net
+  benefit, treat-all, treat-none, expected cost and re-thresholded decision
+  curves; the identity `Cost = const - c_FN NB(t)` is tested to 1e-9 over
+  10,000 random cost matrices. `AnalysisCharter` gains an optional
+  `cost_model` (charter `FORMAT_VERSION` 2; charters without one keep their
+  hash and format 1 files load). `baseline`: the model against the current
+  process as an intersection-union test at the two ends of the cost range
+  with a cluster-robust t test, registered by hash before `C` is read and
+  evaluated once (a second call raises); a selective-label detector refuses
+  the claim when outcome observation depends on the baseline decision.
+  `feasibility`: the closed form applied to the gains measured on `X` with a
+  design effect and a chi-square interval for `s_d`; the verdict is
+  `inconclusive` when it changes across that interval. `questions`: a
+  tipping-point test, so only unknowns that change the verdict are asked.
+  `draft` and `refusal`: a deterministic slot-filling drafter, data-side
+  checks, an LLM slot-filler interface with recorded-response replay (no
+  client ships), canonical slot values, the ambiguity score, and `tau` by
+  upper Clopper-Pearson bound with its risk-coverage curve. `scmle frame`
+  writes `framing_draft.json`, `decision_cost_model.json`,
+  `baseline_report.json`, `framing_questions.json` and `framing_refusal.json`;
+  a charter run writes a descriptive `framing_link.json`. Measured in
+  `benchmarks/qualification/framing_measurements.json` and
+  `framing_certificates.json` (`framing_certify.py`; `python -m
+  benchmarks.qualification --check framing` fails when stale): empirical size
+  of the baseline claim at most 0.0597 at 20, 50 and 200 clusters in three
+  null worlds (so `MIN_CLUSTERS = 20`), power 0.97 where the closed form says
+  0.95, selective labels detected in 500 of 500 planted and 0 of 500 clean
+  worlds (the strong plants only; certificate `framing-selective-labels`),
+  feasibility agreeing with the oracle in 98.6% of 1000 runs away from the
+  boundary, question recall and false-question rate on planted omissions,
+  1000 malformed charter records all rejected. Plants are synthetic and
+  Gaussian-like, so these are optimistic for real data. **Not built, blocked
+  on outside parties:** the expert-written gold corpus (so no `tau` is on
+  file and the LLM slot-filler is descriptive and non-gating, and the
+  end-to-end draft correctness rate is unmeasured), the comparison with the R
+  decision-curve packages (the tests use an independent loop implementation
+  of the same definition), and a domain owner's sign-off on a cost range.
+  The baseline claim is not registered in the F3 ledger (its hypotheses are
+  single-feature statistics) and is not run by `scmle run`; unsigned-LLM tier
+  capping (`provenance.claim_tier`) is a tested function that the run does not
+  call yet.
 * Uncertainty and problem-type breadth (F12), the parts that could be built
   and measured without outside data. New in `scmle.evaluation`: per-class
   (Mondrian) conformal margins stored beside the pooled scores

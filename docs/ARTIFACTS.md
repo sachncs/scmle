@@ -35,6 +35,23 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 | `stability_report.json` | With `--charter`: each exploration survivor re-run over the grid the charter declared (imputation, outlier rule, inclusion; other choices are listed as not run). Per finding: the specification curve (effect and bootstrap interval per specification), the verdict (`stable`, `fragile` or `not_evaluable`) with the numbers behind it, a permutation test of the whole curve, and which choice moves the estimate. Stability is relative to the declared set. A fragile verdict is a warning unless a current passing certificate lets it gate, and it does not yet remove findings from the confirmation set. |
 | `shift_report.json` | With `--charter`: the exploration set against the deployment sample named by `reference`. Status is `pass` (no shift detected), `fail` or `unverifiable`; without a deployment sample it is `unverifiable`, never `pass`. Holds the classifier and kernel two-sample tests (permutation p-values), per-feature KS or chi-square under Benjamini-Hochberg, subgroup coverage for `sensitive_columns`, and the forward check, which a run reports as skipped because the final-test set is opened only by the final evaluation. Per-period drift is not implemented. |
 
+| `framing_link.json` | With `--charter`: whether the charter's target, prediction moment and unit name real columns (`resolved`) or not (`unresolved`). Names are matched to column names only; free text that matches nothing is reported, never rejected, and nothing is gated on it. Reads column names, never values. |
+
+### Problem framing (`scmle frame`)
+
+`scmle frame` reads a request, a source description and exploration rows only, and writes into `--output`:
+
+| Path | Contents |
+| --- | --- |
+| `framing_draft.json` | The draft: the unsigned charter and its hash, the source of every field (`template`, `llm`, `data` or `human`), the data-side checks, the slots left as placeholders, and, if recorded drafts were replayed, the model id, prompt, raw samples, their hash, the ambiguity score and `tau`. The charter hash covers the charter, not how it was drafted. |
+| `charter.json` | The draft charter, unsigned, readable by `scmle charter check` and signable by `scmle charter sign`. Absent when the draft is refused. |
+| `decision_cost_model.json` | With `--cost-model`: the four costs and the plausible threshold range, each with its source. The same model is inside the charter. |
+| `baseline_report.json` | With `--cost-model` and `--baseline-column`: the current process measured on the exploration rows (net benefit at five thresholds against treat-all and treat-none) and the selective-label finding. When the outcome is observed depending on the baseline decision the baseline's net benefit is withheld. The claim against the baseline on `C` is a library call (`BaselineGuard`), not part of the run yet. |
+| `framing_questions.json` | Questions that change the verdict (with the tipping value), unknowns whose range leaves the verdict unchanged, and the open items. |
+| `framing_refusal.json` | When refused: the reason (a named column the source lacks, a blocking data check, an unfillable critical slot, or LLM ambiguity above `tau`). |
+
+No LLM client ships; `--replay` serves recorded drafts. Every LLM-filled field is `unverified` until a person signs the charter, and there is no calibrated `tau` or gold corpus yet, so a replayed LLM draft without `tau` is always refused.
+
 ## Search and results
 
 | Path | Contents |

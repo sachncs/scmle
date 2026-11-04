@@ -14,6 +14,7 @@ The `scmle` command mirrors the Python API. Global option:
 | `scmle export-onnx BUNDLE` | Export an ONNX graph (needs the `onnx` extra). |
 | `scmle package BUNDLE` | Write a ready-to-run service folder with a Dockerfile. |
 | `scmle charter init\|check\|sign PATH` | Create, validate or sign an analysis charter (see below). |
+| `scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md). |
 
 `plan` and `run` take the same options; `scmle run --help` lists them all.
 The common ones:
