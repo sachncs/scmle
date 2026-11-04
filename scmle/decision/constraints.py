@@ -167,7 +167,7 @@ def satisfaction_test(
         {
             str(g)
             for table in tables.values()
-            for g, (_, total) in table.items()
+            for g, (ignored, total) in table.items()
             if total < constraint.min_group
         }
     )
@@ -327,7 +327,7 @@ def fit_group_thresholds(
         ValueError: If the criterion is not reachable by group thresholds.
     """
     s = np.asarray(scores, dtype=float)
-    outcomes, _, labels = prepared(y, np.zeros_like(s), groups)
+    outcomes, ignored, labels = prepared(y, np.zeros_like(s), groups)
     if constraint.criterion == "predictive_parity":
         raise ValueError("group thresholds cannot target predictive parity")
     bound = margin * constraint.max_gap
@@ -413,7 +413,7 @@ def price_of_constraint(
 ) -> dict[str, float]:
     """`NB(unconstrained) - NB(constrained)` with a 95% bootstrap interval."""
     outcomes, free = costs.pair(y, unconstrained)
-    _, bound = costs.pair(y, constrained)
+    ignored, bound = costs.pair(y, constrained)
     w = costs.odds(t)
     stats_matrix = np.column_stack(
         [

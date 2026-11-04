@@ -345,7 +345,7 @@ def choose_threshold(
         if recheck.calibrated and platt.slope > 0:
             rule = ThresholdRule(target, "recalibrated", platt)
         else:
-            cut, _ = grid_thresholds.optimize_threshold(
+            cut, ignored = grid_thresholds.optimize_threshold(
                 risk,
                 labels.astype(bool),
                 grid_thresholds.CostObjective(model.c_fp, model.c_fn),

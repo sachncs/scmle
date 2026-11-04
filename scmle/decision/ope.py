@@ -212,7 +212,7 @@ def estimate_value(
     if not 0.0 < level < 1.0:
         raise ValueError("level must be strictly between 0 and 1")
     qualification.finite(min_propensity, "min_propensity")
-    raw, _ = weights(log, None)
+    raw, ignored = weights(log, None)
     ess = sequential.effective_sample_size(raw) / log.rows
     reasons = []
     violations = support_violations(log, min_propensity)
@@ -302,8 +302,8 @@ def difference_value(
         return main
     if base.status == REFUSED:
         return base
-    first, _ = terms(log, estimator, clip)
-    second, _ = terms(other, estimator, clip)
+    first, ignored = terms(log, estimator, clip)
+    second, ignored = terms(other, estimator, clip)
     centre, interval = mean_interval(first - second, log.clusters, level)
     return dataclasses.replace(
         main,
