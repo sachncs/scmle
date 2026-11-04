@@ -24,6 +24,9 @@ against `framing_certificates.json` and `framing_measurements.json`: stale
 code, a `MIN_CLUSTERS` that differs from the measured minimum, or an accepted
 malformed charter fails; a method that missed its floor is listed as
 descriptive.
+The leakage screen (`scmle.data.admissibility.screen`,
+the test behind `leakage_policy="block"`) ships its certificates inside the
+package (`screen_certificates.json`) and is checked the same way.
 """
 
 import argparse
@@ -34,6 +37,7 @@ from benchmarks.qualification import f5
 from benchmarks.qualification import f6_certify
 from benchmarks.qualification import framing_certify
 from benchmarks.qualification import ledger_checks
+from benchmarks.qualification import screen_certify
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
 from benchmarks.qualification import uncertainty_certify
@@ -53,12 +57,15 @@ def check_certificates() -> int:
     f6_store = certificates.CertificateStore.load(f6_certify.STORE_PATH)
     f6_problems = f6_certify.problems(f6_store)
     uncertainty_problems = uncertainty_certify.problems()
+    screen_store = certificates.CertificateStore.load(screen_certify.STORE_PATH)
+    screen_problems = screen_certify.problems(screen_store)
     ok = (
         not problems
         and report.ok
         and not f5_problems
         and not f6_problems
         and not uncertainty_problems
+        and not screen_problems
     )
     print(
         json.dumps(
@@ -79,6 +86,10 @@ def check_certificates() -> int:
                 "f6_descriptive_only": f6_certify.audit_labels(f6_store)[
                     "uncertified"
                 ],
+                "screen_problems": screen_problems,
+                "screen_descriptive_only": screen_certify.uncertified(
+                    screen_store
+                ),
             },
             indent=2,
         )

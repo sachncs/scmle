@@ -1,0 +1,111 @@
+{
+  "alpha": 0.05,
+  "band_99": [
+    0.03224732165140968,
+    0.06775267834859033
+  ],
+  "family_sizes": [
+    14
+  ],
+  "grouped_null_replicates": 200,
+  "grouped_significant_worlds": 2,
+  "grouped_suspect_false_alarms": 0,
+  "null_replicates": 1000,
+  "old_rule_false_alarm_wilson_95": [
+    0.0,
+    0.0038267584855551234
+  ],
+  "old_rule_false_alarms": 0,
+  "plant_replicates_per_type": 200,
+  "recall": {
+    "leak_copy": {
+      "detected": 200,
+      "detected_any_mechanism": 200,
+      "old_rule_detected": 200,
+      "old_rule_wilson_95": [
+        0.9811546736227335,
+        1.0
+      ],
+      "wilson_95": [
+        0.9811546736227335,
+        1.0
+      ]
+    },
+    "leak_missing_for_class": {
+      "detected": 200,
+      "detected_any_mechanism": 200,
+      "old_rule_detected": 200,
+      "old_rule_wilson_95": [
+        0.9811546736227335,
+        1.0
+      ],
+      "wilson_95": [
+        0.9811546736227335,
+        1.0
+      ]
+    },
+    "leak_noisy_copy": {
+      "detected": 199,
+      "detected_any_mechanism": 199,
+      "old_rule_detected": 5,
+      "old_rule_wilson_95": [
+        0.010724719651761264,
+        0.05717834040664198
+      ],
+      "wilson_95": [
+        0.9722262956021069,
+        0.9991168312843989
+      ]
+    },
+    "leak_rare_record": {
+      "detected": 200,
+      "detected_any_mechanism": 200,
+      "old_rule_detected": 200,
+      "old_rule_wilson_95": [
+        0.9811546736227335,
+        1.0
+      ],
+      "wilson_95": [
+        0.9811546736227335,
+        1.0
+      ]
+    },
+    "leak_threshold": {
+      "detected": 200,
+      "detected_any_mechanism": 200,
+      "old_rule_detected": 5,
+      "old_rule_wilson_95": [
+        0.010724719651761264,
+        0.05717834040664198
+      ],
+      "wilson_95": [
+        0.9811546736227335,
+        1.0
+      ]
+    }
+  },
+  "rule": "benjamini-yekutieli",
+  "settings": {
+    "alpha": 0.05,
+    "association_ceiling": 0.9,
+    "bootstrap": 200,
+    "confidence": 0.95,
+    "folds": 5,
+    "max_leaf_nodes": 8,
+    "min_rows": 100,
+    "min_samples_leaf": 5,
+    "n_strata": 8,
+    "permutations": 199,
+    "run_seed": 0,
+    "skill_ceiling": 0.95
+  },
+  "significant_rate": 0.016,
+  "significant_rate_within_alpha": true,
+  "suspect_false_alarm_wilson_95": [
+    0.0,
+    0.0038267584855551234
+  ],
+  "suspect_false_alarms": 0,
+  "table_columns": 10,
+  "worlds_with_a_significant_column": 16
+}
