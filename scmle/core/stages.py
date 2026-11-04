@@ -55,8 +55,10 @@ from scmle.data.profiling import representativeness
 from scmle.data.readers import registry as source_registry
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
+from scmle.data.robustness import prefilter as robustness_prefilter
 from scmle.data.robustness import qualify as robustness_qualify
 from scmle.data.robustness import report as robustness_report
+from scmle.data.robustness import stability as robustness_stability
 from scmle.data.splitting import splitters
 from scmle.data.validation import target as target_module
 from scmle.evaluation import backtest
@@ -548,6 +550,15 @@ class ProfileStage(Stage):
         found = self.qualify_exploration(
             context, task, charter, view, structure
         )
+        rules = charter.rules
+        stage = robustness_prefilter.StabilityStage(
+            lambda columns: self.run_robustness(
+                context, task, charter, view, columns, structure
+            ),
+            requested=bool(rules and rules.stability_filter),
+            rows=len(view.features),
+            seed=charter.seed,
+        )
         run = ledger_governed.run_governed(
             charter=charter,
             features=view.features,
@@ -559,12 +570,28 @@ class ProfileStage(Stage):
             strata=ledger_governed.strata_labels(
                 view.features, data.group_column, data.time_column
             ),
-            rule=spec.ledger_rule,
-            confirmation_rule=ledger_budget.MultiplicityRule(
-                spec.confirmation_rule
+            rule=chartered_rule(
+                "ledger_rule",
+                spec.ledger_rule,
+                None if rules is None else rules.ledger_rule,
+                "e-lond",
             ),
-            policy=spec.confirmation_failure_policy,
+            confirmation_rule=ledger_budget.MultiplicityRule(
+                chartered_rule(
+                    "confirmation_rule",
+                    spec.confirmation_rule,
+                    None if rules is None else rules.confirmation_rule,
+                    "by",
+                )
+            ),
+            policy=chartered_rule(
+                "failure_policy",
+                spec.confirmation_failure_policy,
+                None if rules is None else rules.failure_policy,
+                "unconfirmed",
+            ),
             diagnostics=found.checks,
+            second_stage=stage,
         )
         context.emit(
             "ledger.completed",
@@ -574,30 +601,31 @@ class ProfileStage(Stage):
                 "negative_control.json",
                 "confirmed_claims.json",
             ),
-            run.summary(),
+            {
+                **run.summary(),
+                "rules": "chartered" if rules else "not chartered",
+            },
         )
-        self.assess_robustness(context, task, charter, view, run, structure)
+        self.assess_robustness(context, charter, run, stage)
         self.assess_framing(context, charter, view)
 
-    def assess_robustness(
+    def run_robustness(
         self,
         context: context_module.RunContext,
         task: tasks.TaskType,
         charter: charter_contracts.AnalysisCharter,
         view: Any,
-        run: ledger_governed.GovernedRun,
+        survivors: tuple[str, ...],
         structure: tuple[str, ...],
-    ) -> None:
-        """Stability of the survivors and shift against a deployment sample.
+    ) -> robustness_qualify.Robustness:
+        """Stability of the survivors and shift against a reference sample.
 
         Reads the exploration view and the data spec's reference sample, if
-        any; never `C` and never `F`. Writes `stability_report.json` and
-        `shift_report.json`. Without a reference sample the shift status is
-        `unverifiable`, never `pass`. The verdicts are reported; they do not
-        yet remove findings from the confirmation set.
+        any; never `C` and never `F`. It runs between exploration and the
+        opening of `C` (the second stage), so its inputs are exploration
+        rows only.
         """
-        spec = context.spec
-        data = spec.data
+        data = context.spec.data
         profile = require(context.profile, "profile")
         plan = profile.feature_plan
         candidates = [*plan.numeric, *plan.categorical]
@@ -610,12 +638,11 @@ class ProfileStage(Stage):
             if data.reference_uri
             else None
         )
-        found = robustness_qualify.run(
+        rules = charter.rules
+        return robustness_qualify.run(
             view.features,
             codes,
-            survivors=[
-                h.spec.column for h in run.ledger.survivors() if h.spec.column
-            ],
+            survivors=list(survivors),
             multiclass=kind == ledger_explore.MULTICLASS,
             choices=charter.multiverse,
             seed=charter.seed,
@@ -627,8 +654,37 @@ class ProfileStage(Stage):
             candidates=candidates,
             sensitive=tuple(data.sensitive_columns),
             temporal=bool(data.time_column),
+            rule=(
+                robustness_stability.DEFAULT_RULE
+                if rules is None
+                else robustness_stability.Rule(
+                    rules.s_min, rules.band, rules.q_min
+                )
+            ),
         )
-        stability_document = robustness_report.stability_report(found)
+
+    def assess_robustness(
+        self,
+        context: context_module.RunContext,
+        charter: charter_contracts.AnalysisCharter,
+        run: ledger_governed.GovernedRun,
+        stage: robustness_prefilter.StabilityStage,
+    ) -> None:
+        """Writes `stability_report.json` and `shift_report.json`.
+
+        The assessment itself ran as the second stage, before `C` was
+        opened, on the exploration set only. Without a reference sample the
+        shift status is `unverifiable`, never `pass`. Fragile survivors were
+        withdrawn from the confirmation only if the charter's rules ask for
+        it and the stability rule is certified for its thresholds; the
+        report says which.
+        """
+        found = stage.found
+        if found is None:  # pragma: no cover - run_governed always calls it
+            raise errors.BlockedError("the second stage did not run")
+        stability_document = robustness_report.stability_report(
+            found, stage.note if stage.requested else None
+        )
         shift_document = robustness_report.shift_report(found)
         robustness_report.validate_stability(stability_document)
         robustness_report.validate_shift(shift_document)
@@ -643,6 +699,7 @@ class ProfileStage(Stage):
                 "stability_counts": stability_document["counts"],
                 "fragile": list(found.fragile),
                 "stability_gate": found.stability_gate.value,
+                "stability_filter": stage.note,
                 "shift": shift_document["status"],
                 "shift_reason": shift_document["reason"],
                 "forward": found.forward.status,
@@ -1000,6 +1057,34 @@ class ProfileStage(Stage):
             },
         )
         return split
+
+
+def chartered_rule(
+    name: str, requested: str, chartered: str | None, default: str
+) -> str:
+    """The rule a charter run uses: the charter's when it fixes one.
+
+    A run specification that names a different, non-default value than the
+    charter does is a conflict and is refused; the charter is what was signed.
+
+    Args:
+        name: Field name, for the message.
+        requested: Value in the run specification.
+        chartered: Value in the charter's rules, or None without rules.
+        default: The specification's default.
+
+    Raises:
+        ConfigError: If the specification contradicts the charter.
+    """
+    if chartered is None:
+        return requested
+    if requested not in (chartered, default):
+        raise errors.ConfigError(
+            f"the run specification sets {name}={requested!r} but the "
+            f"charter fixes {chartered!r}; change the specification or "
+            "re-sign the charter"
+        )
+    return chartered
 
 
 def attach_feature_graph(

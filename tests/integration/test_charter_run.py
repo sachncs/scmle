@@ -413,3 +413,59 @@ def test_a_run_without_a_charter_has_no_robustness_reports(
     assert all(
         e["kind"] != "robustness.completed" for e in events(result.run_dir)
     )
+
+
+def test_chartered_rules_drive_the_ledger_and_the_second_stage(
+    binary_frame, tmp_path
+):
+    from scmle.data.charter import rules as rules_module
+    from scmle.data.ledger import ledger as ledger_module
+
+    rules = rules_module.RunRules(
+        ledger_rule="lord++", confirmation_rule="bh", stability_filter=True
+    )
+    path = write_charter(tmp_path, multiverse=RICH_MULTIVERSE, rules=rules)
+    result = run(binary_frame, tmp_path, path)
+    folder = pathlib.Path(result.run_dir)
+
+    done = event(result.run_dir, "ledger.completed")["data"]
+    assert done["rules"] == "chartered"
+    assert done["rule"] == "lord++" and done["withdrawn"] is not None
+    ledger = ledger_module.Ledger.load(
+        folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
+    )
+    assert ledger.confirmation["rule"] == "bh"
+    claims = json.loads((folder / "confirmed_claims.json").read_text())
+    stage_two = claims["stage_two"]
+    assert stage_two["rule"]["requested"] is True
+    assert stage_two["family"] == [
+        i for i in stage_two["survivors"] if i not in stage_two["withdrawn"]
+    ]
+    stability = json.loads((folder / "stability_report.json").read_text())
+    assert stability["confirmation_filter"] == stage_two["rule"]["note"]
+    assert any(
+        c.check_id.startswith("f6-stability:") for c in ledger.diagnostics
+    )
+    robustness = event(result.run_dir, "robustness.completed")["data"]
+    assert robustness["stability_filter"] == stage_two["rule"]["note"]
+
+
+def test_a_charter_without_rules_is_reported_as_not_chartered(
+    binary_frame, tmp_path
+):
+    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    done = event(result.run_dir, "ledger.completed")["data"]
+    assert done["rules"] == "not chartered" and done["rule"] == "e-lond"
+    folder = pathlib.Path(result.run_dir)
+    claims = json.loads((folder / "confirmed_claims.json").read_text())
+    assert "stage_two" not in claims
+
+
+def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
+    from scmle.core import stages
+
+    assert stages.chartered_rule("x", "by", None, "by") == "by"
+    assert stages.chartered_rule("x", "by", "bh", "by") == "bh"
+    assert stages.chartered_rule("x", "bh", "bh", "by") == "bh"
+    with pytest.raises(errors.ConfigError, match="charter fixes"):
+        stages.chartered_rule("x", "holm", "bh", "by")
