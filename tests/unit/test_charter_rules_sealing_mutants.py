@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from scmle.data.charter import contracts
 from scmle.data.charter import rules
 from scmle.data.charter import sealing
 from scmle.data.ledger import budget as budget_module
@@ -179,3 +180,38 @@ def test_a_signed_charter_read_without_a_key_is_unsigned_not_an_error(
     with pytest.raises(Exception) as caught:
         sealing.read_verified(path, signing_key="wrong")
     assert str(caught.value) == f"charter signature does not verify for {path}"
+
+
+def test_a_wrapper_without_a_signature_reads_as_unsigned(tmp_path, monkeypatch):
+    monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
+    charter = make_charter()
+    path = sealing.write_charter(tmp_path / "u.json", charter)
+    assert json.loads(path.read_text())["signature"] is None
+    seen = sealing.read_verified(path)
+    assert seen.charter == charter and seen.signed is False
+    assert seen.charter_hash == charter.charter_hash
+
+
+def test_read_charter_unwraps_a_signed_file_and_reads_a_bare_one(tmp_path):
+    charter = make_charter()
+    wrapped = sealing.write_charter(tmp_path / "w.json", charter, "k")
+    assert contracts.read_charter(wrapped) == charter
+    bare = tmp_path / "bare.json"
+    bare.write_text(json.dumps(charter.to_dict()))
+    assert contracts.read_charter(bare) == charter
+
+
+def test_unreadable_and_invalid_charters_say_what_went_wrong(tmp_path):
+    missing = tmp_path / "none.json"
+    with pytest.raises(Exception) as caught:
+        contracts.load_json(missing)
+    assert str(caught.value).startswith(f"cannot read charter {missing}: ")
+    assert "No such file" in str(caught.value)
+    listing = tmp_path / "list.json"
+    listing.write_text("[]")
+    with pytest.raises(Exception) as caught:
+        contracts.load_json(listing)
+    assert str(caught.value) == f"charter {listing} is not a JSON object"
+    with pytest.raises(Exception) as caught:
+        contracts.charter_from_record({"question": "x"})
+    assert str(caught.value).startswith("invalid analysis charter: ")
