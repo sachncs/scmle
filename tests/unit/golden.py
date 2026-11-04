@@ -70,3 +70,28 @@ def check(path: Path, name: str, run: Any) -> tuple[Any, Any]:
             encoding="utf-8",
         )
     return stored.get(name), actual
+
+
+def same(expected: Any, actual: Any, tol: float = 1e-4) -> bool:
+    """Structural equality with a relative tolerance on floats.
+
+    Learners that use threaded or platform-specific numerics (boosted trees)
+    differ in the last digits between operating systems, so their snapshots
+    are compared to `tol` instead of to the stored digits.
+    """
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        return expected.keys() == actual.keys() and all(
+            same(expected[key], actual[key], tol) for key in expected
+        )
+    if isinstance(expected, list) and isinstance(actual, list):
+        return len(expected) == len(actual) and all(
+            same(left, right, tol)
+            for left, right in zip(expected, actual, strict=True)
+        )
+    if (
+        isinstance(expected, float)
+        and isinstance(actual, float)
+        and not isinstance(expected, bool)
+    ):
+        return abs(expected - actual) <= tol * max(1.0, abs(expected))
+    return bool(expected == actual)

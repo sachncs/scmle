@@ -194,4 +194,4 @@ CASES = {
 @pytest.mark.parametrize("name", sorted(CASES))
 def test_the_estimators_reproduce_their_recorded_outputs(name):
     expected, actual = golden.check(FIXTURE, name, CASES[name])
-    assert actual == expected
+    assert golden.same(expected, actual)
