@@ -170,13 +170,13 @@ def main(arguments: list[str] | None = None) -> int:
         return 0 if summary["ok"] else 1
     if options.check == "f10":
         issues = f10_certify.problems()
-        report = {
+        f10_report = {
             "ok": not issues,
             "problems": issues,
             "descriptive_only": f10_certify.descriptive_only(),
         }
-        print(json.dumps(report, indent=2))
-        return 0 if report["ok"] else 1
+        print(json.dumps(f10_report, indent=2))
+        return 0 if f10_report["ok"] else 1
     if options.check == "f11":
         decided = f11_certify.check()
         print(json.dumps(decided, indent=2))
