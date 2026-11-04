@@ -46,6 +46,20 @@ recorded before `C` opens. `tests/unit/test_ledger_withdrawal.py` simulates
 the error rate with an `X`-only withdrawal rule that is correlated with the
 signal, and checks the order of events.
 
+Registered claims. A caller may hand over a `ClaimRunner`: claims that are not
+single-feature statistics (the baseline comparison of F8, the primary causal
+hypothesis of F10). Each is registered in the ledger by the hash of its
+registration before the survivors are frozen, the sealed set is bound to the
+survivor family and the registrations, and the *same* released frame is given
+to the runner after the bivariate family was tested. The runner never sees `C`
+twice: there is one opening. Their gates differ from the family's: a missing
+or failed negative control and an empty family stop the bivariate promotion,
+not the registered claims, which carry their own gates. The confirmation row
+records the status of each claim and the hash of every report file the runner
+wrote, so the files are bound to the ledger head. When `C` does not exist or
+the opening fails, each claim is recorded as not evaluated and stays
+unverified.
+
 Failure policy. A statistical failure to reject is a result, not a failure.
 If the confirmation run *crashes* after `C` was opened, `C` is spent and the
 charter's policy applies: ``unconfirmed`` (default) keeps every claim at tier
@@ -170,6 +184,55 @@ class Withdrawal:
             raise ValueError("a withdrawal with reasons must be accounted")
 
 
+NOT_EVALUATED = "not_evaluated"
+FAILED = "failed"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class RegisteredClaim:
+    """A claim fixed in the ledger before `C` is opened.
+
+    Attributes:
+        claim_id: Unique id (it must not collide with a hypothesis id).
+        kind: What it is (`baseline`, `causal_primary`).
+        statement: The claim in words.
+        sha256: Hash of the registration (what was frozen before `C`).
+    """
+
+    claim_id: str
+    kind: str
+    statement: str
+    sha256: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ClaimRun:
+    """What a `ClaimRunner` produced from the opened rows.
+
+    Attributes:
+        statuses: Claim id to a one-word status.
+        documents: File name to JSON-ready content; each is hashed into the
+            confirmation row.
+    """
+
+    statuses: Mapping[str, str]
+    documents: Mapping[str, Mapping[str, Any]]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ClaimRunner:
+    """Registered claims and the function that evaluates them on `C`.
+
+    Attributes:
+        registered: The claims, registered in the ledger by `confirm`.
+        run: Evaluates them on the one released frame (features, target). It
+            is called at most once, after the family was tested.
+    """
+
+    registered: tuple[RegisteredClaim, ...]
+    run: Callable[[pd.DataFrame, pd.Series], ClaimRun]
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Confirmation:
     """The outcome of the confirmation stage.
@@ -189,6 +252,9 @@ class Confirmation:
         control: The negative-control summary, or None.
         stage_two: Accounting of the withdrawal (family, hash, rule,
             statement), or None when no withdrawal rule ran.
+        registered: Claim id to its registration hash and status, or None
+            when no claim was registered.
+        documents: Report files the registered claims produced.
     """
 
     outcome: str
@@ -202,6 +268,10 @@ class Confirmation:
     custody_head: str | None
     control: dict[str, Any] | None
     stage_two: dict[str, Any] | None = None
+    registered: dict[str, Any] | None = None
+    documents: dict[str, Mapping[str, Any]] = dataclasses.field(
+        default_factory=dict
+    )
 
     @property
     def confirmed(self) -> tuple[qualification.Claim, ...]:
@@ -235,6 +305,13 @@ class Confirmation:
         }
         if self.stage_two is not None:
             record["stage_two"] = self.stage_two
+        if self.registered is not None:
+            record["registered_claims"] = self.registered
+        if self.documents:
+            record["attachments"] = {
+                name: ledger_module.digest(dict(content))
+                for name, content in sorted(self.documents.items())
+            }
         return record
 
     def write(self, path: str | Path) -> None:
@@ -316,8 +393,14 @@ def finish(
     alpha: Fraction,
     custody_head: str | None,
     stage_two: Mapping[str, Any] | None = None,
+    runner: ClaimRunner | None = None,
+    ran: ClaimRun | None = None,
 ) -> Confirmation:
-    """Writes the confirmation row and builds the result."""
+    """Writes the confirmation row and builds the result.
+
+    With a `runner`, `ran` holds what it produced; None means it was not
+    evaluated (no `C`, or the opening failed).
+    """
     survivors = ledger.survivor_set
     if survivors is None:
         raise ledger_module.LedgerError("freeze the survivors first")
@@ -333,6 +416,24 @@ def finish(
     }
     if stage_two is not None:
         body["stage_two"] = dict(stage_two)
+    registered: dict[str, Any] | None = None
+    documents: dict[str, Mapping[str, Any]] = {}
+    if runner is not None:
+        statuses = {} if ran is None else dict(ran.statuses)
+        documents = {} if ran is None else dict(ran.documents)
+        registered = {
+            item.claim_id: {
+                "kind": item.kind,
+                "sha256": item.sha256,
+                "status": statuses.get(item.claim_id, NOT_EVALUATED),
+            }
+            for item in runner.registered
+        }
+        body["claims"] = registered
+        body["attachments"] = {
+            name: ledger_module.digest(dict(content))
+            for name, content in sorted(documents.items())
+        }
     ledger.seal(body)
     return Confirmation(
         outcome=outcome,
@@ -346,6 +447,8 @@ def finish(
         custody_head=custody_head,
         control=ledger.control,
         stage_two=None if stage_two is None else dict(stage_two),
+        registered=registered,
+        documents=documents,
     )
 
 
@@ -526,6 +629,7 @@ def confirm(
     custody_log: EventLog | None = None,
     encode: Callable[[pd.Series], Any] = default_encoding,
     withdrawal: Withdrawal | None = None,
+    claim_runner: ClaimRunner | None = None,
 ) -> Confirmation:
     """Freezes the survivors and tests them once on the confirmation set.
 
@@ -545,6 +649,8 @@ def confirm(
         withdrawal: Survivors an exploration-only rule removed from the
             family (module docstring, "Second stage"); the full survivor
             set is still frozen and hashed, and `C` tests the rest.
+        claim_runner: Claims registered in the ledger and evaluated on the
+            same opening (module docstring, "Registered claims").
 
     Returns:
         The confirmation, also recorded in the ledger.
@@ -567,48 +673,29 @@ def confirm(
         raise errors.LeakageError(
             "the confirmation set was already used for the confirmation"
         )
+    if claim_runner is not None:
+        for item in claim_runner.registered:
+            ledger.register_claim(
+                item.claim_id, item.kind, item.statement, item.sha256
+            )
     survivors = ledger.freeze()
     record = (
         None if withdrawal is None else stage_two_record(ledger, withdrawal)
     )
-    if not survivors.hypothesis_ids:
+    blocked = family_block(ledger, record, alpha_confirm, require_control)
+    if blocked is not None and (claim_runner is None or source is None):
+        outcome, reason, held = blocked
         return finish(
             ledger,
-            outcome=NO_SURVIVORS,
-            reason="no hypothesis survived exploration; C was not opened",
-            claims=(),
+            outcome=outcome,
+            reason=reason,
+            claims=held,
             checks=(),
             rule=rule,
             alpha=alpha_confirm,
             custody_head=None,
             stage_two=record,
-        )
-    control = ledger.control
-    if control is None and require_control:
-        return finish(
-            ledger,
-            outcome=NO_CONTROL,
-            reason="no negative control was recorded; no claim is promoted",
-            claims=unverified_claims(ledger, "no negative control"),
-            checks=(),
-            rule=rule,
-            alpha=alpha_confirm,
-            custody_head=None,
-            stage_two=record,
-        )
-    if control is not None and not control["exceeds"]:
-        return finish(
-            ledger,
-            outcome=FLOOR_NOT_EXCEEDED,
-            reason=str(control["message"]) + "; no claim is promoted",
-            claims=unverified_claims(
-                ledger, "findings do not exceed the false-discovery floor"
-            ),
-            checks=(),
-            rule=rule,
-            alpha=alpha_confirm,
-            custody_head=None,
-            stage_two=record,
+            runner=claim_runner,
         )
     if source is None:
         return finish(
@@ -621,22 +708,28 @@ def confirm(
             alpha=alpha_confirm,
             custody_head=None,
             stage_two=record,
+            runner=claim_runner,
         )
-    if record is not None and not record["family"]:
-        return finish(
-            ledger,
-            outcome=ALL_WITHDRAWN,
-            reason="every survivor was withdrawn before C; C was not opened",
-            claims=tuple(
-                withdrawn_claims(ledger, record["withdrawn"]).values()
-            ),
-            checks=(),
-            rule=rule,
-            alpha=alpha_confirm,
-            custody_head=None,
-            stage_two=record,
+    if blocked is None and record is not None and not record["family"]:
+        blocked = (
+            ALL_WITHDRAWN,
+            "every survivor was withdrawn before C; C was not opened",
+            tuple(withdrawn_claims(ledger, record["withdrawn"]).values()),
         )
+        if claim_runner is None:
+            return finish(
+                ledger,
+                outcome=blocked[0],
+                reason=blocked[1],
+                claims=blocked[2],
+                checks=(),
+                rule=rule,
+                alpha=alpha_confirm,
+                custody_head=None,
+                stage_two=record,
+            )
     log = custody_log or source.log
+    registered = () if claim_runner is None else claim_runner.registered
     log.append(
         "C",
         "selection_frozen",
@@ -655,11 +748,23 @@ def confirm(
                     "withdrawn": len(record["withdrawn"]),
                 }
             ),
+            **(
+                {}
+                if not registered
+                else {"registered_claims": [i.claim_id for i in registered]}
+            ),
         },
     )
     claims_hash = (
         survivors.sha256 if record is None else record["family_sha256"]
     )
+    if registered:
+        claims_hash = ledger_module.digest(
+            {
+                "family": claims_hash,
+                "registered": [[i.claim_id, i.sha256] for i in registered],
+            }
+        )
     ledger_hash = ledger.head
     try:
         if not source.committed:
@@ -683,6 +788,32 @@ def confirm(
             alpha=alpha_confirm,
             custody_head=head_of(log),
             stage_two=record,
+            runner=claim_runner,
+        )
+    ran: ClaimRun | None = None
+    if claim_runner is not None:
+        try:
+            ran = claim_runner.run(*rows)
+        except Exception as failure:
+            ran = ClaimRun(
+                {i.claim_id: FAILED for i in claim_runner.registered}, {}
+            )
+            failed = failure_reason("evaluating the registered claims", failure)
+            log.append("C", "claims_failed", ACTOR, {"reason": failed})
+    if blocked is not None:
+        outcome, reason, held = blocked
+        return finish(
+            ledger,
+            outcome=outcome,
+            reason=reason + "; C was opened for the registered claims only",
+            claims=held,
+            checks=(),
+            rule=rule,
+            alpha=alpha_confirm,
+            custody_head=head_of(log),
+            stage_two=record,
+            runner=claim_runner,
+            ran=ran,
         )
     try:
         claims, checks = run_confirmation(
@@ -699,6 +830,8 @@ def confirm(
             alpha=alpha_confirm,
             custody_head=head_of(log),
             stage_two=record,
+            runner=claim_runner,
+            ran=ran,
         )
     done = sum(1 for c in claims if c.tier is qualification.Tier.CONFIRMED)
     tested = len(claims) - (0 if record is None else len(record["withdrawn"]))
@@ -715,7 +848,45 @@ def confirm(
         alpha=alpha_confirm,
         custody_head=head_of(log),
         stage_two=record,
+        runner=claim_runner,
+        ran=ran,
     )
+
+
+def family_block(
+    ledger: ledger_module.Ledger,
+    record: Mapping[str, Any] | None,
+    alpha_confirm: Fraction,
+    require_control: bool,
+) -> tuple[str, str, tuple[qualification.Claim, ...]] | None:
+    """Why the bivariate family cannot be promoted, or None when it can.
+
+    Returns the outcome, the sentence and the unverified claims, in the order
+    the gates apply: no survivors, no control, control floor not exceeded.
+    """
+    survivors = ledger.freeze()
+    if not survivors.hypothesis_ids:
+        return (
+            NO_SURVIVORS,
+            "no hypothesis survived exploration; C was not opened",
+            (),
+        )
+    control = ledger.control
+    if control is None and require_control:
+        return (
+            NO_CONTROL,
+            "no negative control was recorded; no claim is promoted",
+            unverified_claims(ledger, "no negative control"),
+        )
+    if control is not None and not control["exceeds"]:
+        return (
+            FLOOR_NOT_EXCEEDED,
+            str(control["message"]) + "; no claim is promoted",
+            unverified_claims(
+                ledger, "findings do not exceed the false-discovery floor"
+            ),
+        )
+    return None
 
 
 def failure_reason(stage: str, failure: Exception) -> str:

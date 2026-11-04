@@ -20,10 +20,19 @@ reordering any line breaks the chain from there on. Rows are:
     suspicion that was raised cannot be removed afterwards.
 ``control``
     The negative-control summary (optional, before the survivors are frozen).
+``claim``
+    A registered claim that is not a single-feature statistic (the baseline
+    comparison of F8, the primary causal hypothesis of F10), written before
+    the survivors are frozen with the hash of its registration. It spends no
+    wealth, never enters the survivors and is evaluated once, on `C`, inside
+    the single opening; the confirmation row records its outcome.
 ``survivors``
     The rejected hypotheses, frozen with a hash before `C` is unlocked.
 ``confirmation``
-    The outcome of the single confirmation, with the claims file hash.
+    The outcome of the single confirmation, with the claims file hash, the
+    status of every registered claim and the hashes of the report files the
+    registered claims produced (``attachments``), so they are bound to the
+    ledger head.
 
 Verification checks the chain and then replays every result through the
 online rule from the stored evidence, comparing level, decision and wealth
@@ -69,6 +78,7 @@ REGISTER = "register"
 RESULT = "result"
 CONTROL = "control"
 DIAGNOSTIC = "diagnostic"
+CLAIM = "claim"
 SURVIVORS = "survivors"
 CONFIRMATION = "confirmation"
 
@@ -272,6 +282,7 @@ class Ledger:
         self.control: dict[str, Any] | None = None
         self.diagnostics: list[qualification.Check] = []
         self.confirmation: dict[str, Any] | None = None
+        self.claims: dict[str, dict[str, Any]] = {}
         self.seed = 0
 
     @classmethod
@@ -481,6 +492,7 @@ class Ledger:
             RESULT: self.apply_result,
             CONTROL: self.apply_control,
             DIAGNOSTIC: self.apply_diagnostic,
+            CLAIM: self.apply_claim,
             SURVIVORS: self.apply_survivors,
             CONFIRMATION: self.apply_confirmation,
         }
@@ -615,6 +627,25 @@ class Ledger:
             raise LedgerError("diagnostics may only read the exploration set")
         self.diagnostics.append(check)
 
+    def apply_claim(self, body: Mapping[str, Any]) -> None:
+        """Registers a claim by the hash of its registration."""
+        self.require_unfrozen()
+        claim_id = evidence_module.require_text(
+            str(body["claim_id"]), "claim_id"
+        )
+        if claim_id in self.claims or claim_id in self.hypotheses:
+            raise LedgerError(f"claim {claim_id!r} is already registered")
+        self.claims[claim_id] = {
+            "claim_id": claim_id,
+            "kind": evidence_module.require_text(str(body["kind"]), "kind"),
+            "statement": evidence_module.require_text(
+                str(body["statement"]), "statement"
+            ),
+            "sha256": evidence_module.require_text(
+                str(body["sha256"]), "sha256"
+            ),
+        }
+
     def apply_survivors(self, body: Mapping[str, Any]) -> None:
         """Freezes the survivor set, which must be the rejected hypotheses."""
         self.require_unfrozen()
@@ -636,6 +667,15 @@ class Ledger:
             raise LedgerError("confirmation needs frozen survivors")
         if body.get("survivors_sha256") != self.survivor_set.sha256:
             raise LedgerError("confirmation names different survivors")
+        if self.claims:
+            recorded = body.get("claims")
+            if not isinstance(recorded, Mapping) or set(recorded) != set(
+                self.claims
+            ):
+                raise LedgerError(
+                    "the confirmation must state the outcome of every "
+                    "registered claim"
+                )
         self.confirmation = dict(body)
 
     def register(self, spec: HypothesisSpec) -> Hypothesis:
@@ -652,6 +692,33 @@ class Ledger:
             REGISTER, {"hypothesis_id": hypothesis_id, "spec": spec.to_dict()}
         )
         return self.hypotheses[hypothesis_id]
+
+    def register_claim(
+        self, claim_id: str, kind: str, statement: str, sha256: str
+    ) -> dict[str, Any]:
+        """Registers a claim by hash before the survivors are frozen.
+
+        The claim is evaluated once, on `C`, inside the single opening, and
+        the confirmation row must record its outcome. Registering the same
+        claim again with the same hash returns the stored record.
+
+        Raises:
+            LedgerError: If the survivors are frozen, or the id is registered
+                with another hash or is a hypothesis id.
+        """
+        known = self.claims.get(claim_id)
+        if known is not None and known["sha256"] == sha256:
+            return known
+        self.commit(
+            CLAIM,
+            {
+                "claim_id": claim_id,
+                "kind": kind,
+                "statement": statement,
+                "sha256": sha256,
+            },
+        )
+        return self.claims[claim_id]
 
     def require_registered(self, hypothesis: Hypothesis) -> None:
         """Requires an untested hypothesis of this ledger."""

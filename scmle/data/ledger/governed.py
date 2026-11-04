@@ -138,6 +138,7 @@ def run_governed(
         [Sequence[ledger_module.Hypothesis]], confirm.Withdrawal
     ]
     | None = None,
+    claim_runner: confirm.ClaimRunner | None = None,
 ) -> GovernedRun:
     """Explores `X` under the ledger, runs the control and confirms on `C`.
 
@@ -224,6 +225,7 @@ def run_governed(
             series, classification, classes
         ).to_numpy(dtype=float),
         withdrawal=withdrawal if withdrawal and withdrawal.accounted else None,
+        claim_runner=claim_runner,
     )
     if run_dir is not None:
         folder = Path(run_dir)

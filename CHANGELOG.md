@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+* Registered claims in the F3 ledger (`scmle.data.ledger`). A new row kind
+  `claim` registers a claim that is not a single-feature statistic (the F8
+  baseline comparison, the F10 primary causal hypothesis) by the hash of its
+  registration, before the survivors are frozen; it spends no wealth and never
+  enters the survivors. `confirm.confirm` takes a `ClaimRunner`: the claims are
+  registered, the sealed set is bound to the survivor family and the
+  registrations, and the one frame `C` releases is given to the runner after
+  the bivariate family was tested, so there is still one opening. A missing
+  negative control or an empty family stops the bivariate promotion but not
+  the registered claims. The confirmation row records each claim's status and
+  the hash of every report file the runner wrote (`attachments`), binding them
+  to the ledger head, and the ledger refuses a seal that omits a registered
+  claim. `confirmed_claims.json` gained `registered_claims` and `attachments`
+  only when a claim is registered. Nothing calls the runner yet; the entries
+  below say where it is used.
+
 * Causal identification (F10; `scmle/data/identification/`, charter format 4).
   An estimand may carry a causal block (`CausalSpec`, `NegativeControl`,
   `SensitivitySpec` in `scmle.data.charter.causal`): treatment, outcome,
