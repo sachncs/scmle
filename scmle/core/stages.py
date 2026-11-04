@@ -37,6 +37,7 @@ from scmle.contracts import tasks
 from scmle.core import compiler
 from scmle.core import context as context_module
 from scmle.core import state as run_state
+from scmle.data.admissibility import attestations
 from scmle.data.admissibility import qualify
 from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import sealing as charter_sealing
@@ -684,8 +685,11 @@ class ProfileStage(Stage):
 
         Writes `admissibility_table.json` and `detector_certificates.json`
         (the certificates the run used). A leakage suspicion quarantines a
-        field only when the leakage detector has a current certificate;
-        quarantined fields leave the feature plan, with the reason logged.
+        field only when the leakage screen has a current certificate for the
+        mechanism that raised it, and a valid per-column attestation
+        (`spec.leakage_attestations`) keeps such a field, tier `attested`,
+        with a ledger diagnostic. Quarantined fields leave the feature plan,
+        with the reason logged.
 
         Raises:
             BlockedError: If every feature would be quarantined.
@@ -700,6 +704,12 @@ class ProfileStage(Stage):
             structure=structure,
             group_column=spec.data.group_column,
             time_column=spec.data.time_column,
+            attestations=(
+                attestations.load(spec.leakage_attestations)
+                if spec.leakage_attestations
+                else ()
+            ),
+            scope=charter.charter_hash,
         )
         written: list[str] = []
         if found.table is not None:
@@ -753,13 +763,7 @@ class ProfileStage(Stage):
             {
                 "leakage_gate": found.leakage_gate.value,
                 "quarantined": quarantined,
-                "suspects": sorted(
-                    name
-                    for name, flag in (
-                        found.leakage.suspects if found.leakage else {}
-                    ).items()
-                    if flag
-                ),
+                "suspects": sorted(found.suspects),
                 "detector_status": {
                     detector: {d: s.value for d, s in by_defect.items()}
                     for detector, by_defect in found.detectors.status.items()

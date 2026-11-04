@@ -520,6 +520,7 @@ class MLProject:
         estimation_policy: parameter_estimation.EstimationPolicy | None = None,
         leakage_policy: LeakagePolicy = "warn",
         charter: str | pathlib.Path | None = None,
+        leakage_attestations: str | pathlib.Path | None = None,
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -630,6 +631,11 @@ class MLProject:
                 When given, the development rows are split into exploration
                 rows and a sealed confirmation set the exploration stages
                 cannot read; the charter is checked before any profiling.
+            leakage_attestations: JSON file of per-column attestations that a
+                strong predictor flagged by the leakage screen is legitimate.
+                Used only with `charter`; each counts only for that charter
+                and while valid, and is recorded in the ledger at tier
+                `attested`.
             checkpoints: Approval gates after planning and selection (the
                 latter fires before the test set is opened).
             output_dir: Parent directory for run directories.
@@ -705,6 +711,11 @@ class MLProject:
             problem=problem or tasks.ProblemSpec(),
             leakage_policy=leakage_policy,
             charter_path=None if charter is None else str(charter),
+            leakage_attestations=(
+                None
+                if leakage_attestations is None
+                else str(leakage_attestations)
+            ),
         )
         self.output_dir = pathlib.Path(output_dir)
         if (estimand is None) != (estimation_policy is None):

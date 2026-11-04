@@ -578,6 +578,10 @@ class ProjectSpec(FrozenModel):
     ledger_rule: Literal["e-lond", "lord++", "saffron"] = "e-lond"
     confirmation_rule: Literal["bh", "by", "holm", "bonferroni"] = "by"
     confirmation_failure_policy: Literal["unconfirmed"] = "unconfirmed"
+    # JSON file of per-column attestations that a strong predictor flagged by
+    # the leakage screen is legitimate (charter runs only; see
+    # `scmle.data.admissibility.attestations`).
+    leakage_attestations: str | None = None
 
     @pydantic.model_validator(mode="before")
     @classmethod

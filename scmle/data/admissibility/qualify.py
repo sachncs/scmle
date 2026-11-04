@@ -16,28 +16,37 @@ fields are undeclared (tier `unverified`) and decided in permissive mode:
 an unverified field is admitted with a flag, never quarantined for lack of
 provenance. The only route to quarantine in a charter run is a leakage
 suspicion on a field with no as-of evidence, and only when the leakage
-detector has a current, passing certificate for the settings used.
+screen has a current, passing certificate for the mechanism that raised it.
+
+The leakage test is the one used without a charter (`screen.py`: a
+Benjamini-Yekutieli family over cross-fitted skill, missingness and record
+purity), so a run with and without a charter flags the same columns. A
+certified suspect that is a strong legitimate predictor is kept only by a
+valid, ledgered per-column attestation (`attestations.py`, tier `attested`).
 """
 
 from collections.abc import Sequence
 import dataclasses
+import datetime
+import math
 from pathlib import Path
 
 import pandas as pd
 
 from scmle.contracts import qualification
-from scmle.data.admissibility import leakage
+from scmle.data.admissibility import attestations as attestations_module
 from scmle.data.admissibility import provenance
 from scmle.data.admissibility import rules
+from scmle.data.admissibility import screen
 from scmle.data.detectors import certificates
 from scmle.data.detectors import pipeline
 
 STORE_DIRECTORY = (
     Path(__file__).resolve().parents[3] / "benchmarks" / "qualification"
 )
-F4_STORE = "f4_certificates.json"
 F5_STORE = "detector_certificates.json"
-BLOCKS = 20
+SCREEN_STORE = "screen_certificates.json"
+ATTESTATION_SOURCE = "f4-leakage-attestation"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -83,19 +92,37 @@ class Qualification:
 
     Attributes:
         table: Admissibility decisions, or None when they were not run.
-        leakage: Leakage suspicions, or None when not run.
-        leakage_gate: Whether the leakage detector may quarantine.
+        leakage: The leakage screen report, or None when not run.
         detectors: F5 pipeline result.
         f5_store: The F5 certificates used, or None.
         notes: Plain statements of what was not run or not certified.
+        diagnostics: Ledger records (source, check) of the screen and of
+            every attestation that overrode a block.
     """
 
     table: rules.AdmissibilityTable | None
-    leakage: leakage.LeakageReport | None
-    leakage_gate: certificates.GateStatus
+    leakage: screen.ScreenReport | None
     detectors: pipeline.PipelineResult
     f5_store: certificates.CertificateStore | None
     notes: tuple[str, ...]
+    diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
+
+    @property
+    def leakage_gate(self) -> certificates.GateStatus:
+        """`GATING` when any screen mechanism has a passing certificate."""
+        if self.leakage is not None and any(
+            g is certificates.GateStatus.GATING
+            for g in self.leakage.gates.values()
+        ):
+            return certificates.GateStatus.GATING
+        return certificates.GateStatus.DESCRIPTIVE
+
+    @property
+    def suspects(self) -> dict[str, bool]:
+        """Leakage suspicion per column that the screen flagged."""
+        if self.leakage is None:
+            return {}
+        return {f.feature: True for f in self.leakage.suspects}
 
     @property
     def quarantined(self) -> dict[str, str]:
@@ -111,9 +138,75 @@ class Qualification:
     @property
     def checks(self) -> tuple[tuple[str, qualification.Check], ...]:
         """Every (source, check) pair for the ledger."""
-        if self.leakage is None:
-            return ()
-        return tuple((leakage.DETECTOR_ID, c) for c in self.leakage.checks)
+        return self.diagnostics
+
+
+def finding_check(
+    finding: screen.Finding, rows: int, seed: int, index: int
+) -> qualification.Check:
+    """The ledger record of one screen finding.
+
+    The record is a wealth-free diagnostic: it carries the permutation
+    p-value, never a claim. A suspect whose mechanism is not certified is
+    demoted to a warning (canon P1).
+    """
+    if finding.suspect:
+        decision = certificates.demote(
+            qualification.Decision.QUARANTINE, finding.gate
+        )
+    else:
+        decision = qualification.Decision.PASS
+    statistic = finding.statistic if math.isfinite(finding.statistic) else 0.0
+    return qualification.Check(
+        check_id=f"leakage.screen.{finding.mechanism}:{finding.feature}",
+        null_hypothesis=(
+            f"'{finding.feature}' has no {screen.WORDS[finding.mechanism]} "
+            "with the target"
+        ),
+        statistic=statistic,
+        p_value=min(max(finding.p_value, 0.0), 1.0),
+        interval=None,
+        effect=statistic,
+        n=rows,
+        decision=decision,
+        set_id=qualification.SetId.EXPLORATION,
+        seed_path=(seed, "leakage.screen", index),
+        tier=qualification.Tier.UNVERIFIED,
+    )
+
+
+def attestation_check(
+    item: attestations_module.LeakageAttestation,
+    findings: Sequence[screen.Finding],
+    rows: int,
+    seed: int,
+    index: int,
+) -> qualification.Check:
+    """The ledger record of an attestation that overrode a block.
+
+    Its p-value is the smallest p-value of the screen for the column, so the
+    record shows what was overridden; its tier is `attested`.
+    """
+    given = item.attestation
+    p_value = min((f.p_value for f in findings), default=1.0)
+    return qualification.Check(
+        check_id=f"leakage.attestation:{item.column}",
+        null_hypothesis=(
+            f"'{item.column}' is a legitimate predictor, known "
+            f"{item.lead_seconds:g} s before the prediction moment: attested "
+            f"by {given.name_or_id} ({given.role}) on {given.date}, valid to "
+            f"{given.expires}, evidence: {given.evidence}"
+        ),
+        statistic=max((f.statistic for f in findings), default=0.0),
+        p_value=min(max(p_value, 0.0), 1.0),
+        interval=None,
+        effect=max((f.statistic for f in findings), default=0.0),
+        n=rows,
+        decision=qualification.Decision.WARN,
+        set_id=qualification.SetId.EXPLORATION,
+        seed_path=(seed, "leakage.attestation", index),
+        tier=qualification.Tier.ATTESTED,
+    )
 
 
 def run(
@@ -127,6 +220,9 @@ def run(
     group_column: str | None = None,
     time_column: str | None = None,
     directory: Path | None = None,
+    attestations: Sequence[attestations_module.LeakageAttestation] = (),
+    scope: str = "",
+    today: datetime.date | None = None,
 ) -> Qualification:
     """Runs leakage, admissibility and the detector pipeline on `X`.
 
@@ -139,16 +235,22 @@ def run(
         structure: Group and time columns, which are not candidates.
         group_column: Entity column, so permutations keep entities whole.
         time_column: Time column, so permutations stay within time blocks.
-        directory: Folder of the certificate stores, for tests.
+        directory: Folder of the certificate stores, for tests. The F5 store
+            and the screen store are read from it.
+        attestations: Per-column statements that a strong predictor is
+            legitimate; each counts only if its scope equals `scope` and it
+            is valid on `today`.
+        scope: Charter hash the attestations must name.
+        today: Day on which attestations must be valid; defaults to the
+            current date.
 
     Returns:
         The results. A causal estimand has no declared graph in a charter,
         so its admissibility table is skipped and said so in `notes`.
     """
     notes: list[str] = []
-    f4 = load_store(F4_STORE, directory)
     f5 = load_store(F5_STORE, directory)
-    notes.extend(n for n in (f4.note, f5.note) if n)
+    notes.extend(n for n in (f5.note,) if n)
     frame = features.assign(**{str(target.name): target})
     result = pipeline.run(
         frame, str(target.name), f5.store, seed, provenance=None
@@ -158,49 +260,82 @@ def run(
         notes.append(
             f"{kind} estimand without a declared graph: admissibility not run"
         )
-        return Qualification(
-            None,
-            None,
-            certificates.GateStatus.DESCRIPTIVE,
-            result,
-            f5.store,
-            tuple(notes),
-        )
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
+        return Qualification(None, None, result, f5.store, tuple(notes))
+    day = today or datetime.date.today()
     task = "classification" if classification else "regression"
-    gate = (
-        certificates.GateStatus.DESCRIPTIVE
-        if f4.store is None
-        else leakage.gate_status(f4.store, cfg, task, int(target.nunique()))
+    store = (
+        screen.shipped_store()
+        if directory is None
+        else screen.load_store(directory / SCREEN_STORE)
     )
-    if gate is not certificates.GateStatus.GATING:
-        notes.append("leakage suspicion is descriptive: no certificate gates")
-    groups = (
-        features[group_column].astype(str)
-        if group_column and group_column in features.columns
-        else None
-    )
-    block_size = (
-        max(2, len(features) // BLOCKS)
-        if groups is None and time_column in features.columns
-        else None
-    )
-    report = leakage.scan(
+    if store is None:
+        notes.append("screen certificates unusable: leakage is descriptive")
+    report = screen.screen_table(
         frame,
         str(target.name),
         task,
-        cfg,
-        features=candidates,
-        groups=groups,
-        block_size=block_size,
-        gate=gate,
+        candidates,
+        seed,
+        group_column,
+        time_column,
+        store=store or certificates.CertificateStore(),
     )
-    records = provenance.ProvenanceTable.covering([str(c) for c in candidates])
+    if not any(
+        g is certificates.GateStatus.GATING for g in report.gates.values()
+    ):
+        notes.append("leakage suspicion is descriptive: no certificate gates")
+    notes.extend(report.notes)
+    applied = attestations_module.apply(attestations, scope, day.isoformat())
+    for column, why in applied.rejected.items():
+        notes.append(f"attestation for '{column}' ignored: {why}")
+    suspect_columns = {f.feature for f in report.suspects}
+    used = {
+        column: item
+        for column, item in applied.valid.items()
+        if column in suspect_columns and column in candidates
+    }
+    for column in applied.valid:
+        if column not in used:
+            notes.append(
+                f"attestation for '{column}' unused: the screen did not flag it"
+            )
+    records = provenance.ProvenanceTable.covering(
+        [str(c) for c in candidates], [i.field() for i in used.values()]
+    )
+    gates = {f.feature: certificates.GateStatus.GATING for f in report.blocking}
     table = rules.build_table(
         records,
         kind,
         rules.Mode.PERMISSIVE,
-        suspects=report.suspects,
-        leakage_gate=gate,
+        today=day,
+        suspects=dict.fromkeys(suspect_columns, True),
+        leakage_gate=gates,
     )
-    return Qualification(table, report, gate, result, f5.store, tuple(notes))
+    diagnostics: list[tuple[str, qualification.Check]] = [
+        (
+            screen.DETECTOR_ID,
+            finding_check(f, report.rows, seed, index),
+        )
+        for index, f in enumerate(report.findings)
+    ]
+    diagnostics.extend(
+        (
+            ATTESTATION_SOURCE,
+            attestation_check(
+                item,
+                [f for f in report.findings if f.feature == column],
+                report.rows,
+                seed,
+                index,
+            ),
+        )
+        for index, (column, item) in enumerate(sorted(used.items()))
+    )
+    return Qualification(
+        table,
+        report,
+        result,
+        f5.store,
+        tuple(notes),
+        tuple(diagnostics),
+    )

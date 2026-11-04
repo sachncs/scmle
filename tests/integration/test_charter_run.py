@@ -217,15 +217,15 @@ def test_a_charter_run_writes_the_admissibility_artifacts(
     assert set(done["detector_status"]) >= {"f5-sentinel", "f5-missingness"}
 
 
-def test_leakage_suspicion_is_logged_but_descriptive_until_certified(
+def test_a_certified_leakage_suspect_is_quarantined_and_ledgered(
     binary_frame, tmp_path
 ):
     result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     done = event(result.run_dir, "admissibility.completed")["data"]
-    assert done["leakage_gate"] == "descriptive"
-    assert "echo" in done["suspects"] and done["quarantined"] == {}
+    assert done["leakage_gate"] == "gating"
+    assert "echo" in done["suspects"] and set(done["quarantined"]) == {"echo"}
     rows = [
         json.loads(line)
         for line in (folder / "hypothesis_ledger.jsonl")
@@ -236,31 +236,80 @@ def test_leakage_suspicion_is_logged_but_descriptive_until_certified(
     assert diagnostics
     assert {r["body"]["check"]["set_id"] for r in diagnostics} == {"X"}
     plan = json.loads((folder / "dataset_profile.json").read_text())
-    assert "echo" in plan["feature_plan"]["numeric"]
+    assert "echo" not in plan["feature_plan"]["numeric"]
+    assert (
+        "quarantined by admissibility"
+        in plan["feature_plan"]["dropped"]["echo"]
+    )
 
 
-def test_a_gating_certificate_drops_the_quarantined_field_from_the_plan(
+def test_an_uncertified_mechanism_logs_the_suspicion_but_keeps_the_field(
     binary_frame, tmp_path, monkeypatch
 ):
-    from scmle.data.admissibility import qualify
+    from scmle.data.admissibility import screen
     from scmle.data.detectors import certificates
 
     monkeypatch.setattr(
-        qualify.leakage,
-        "gate_status",
-        lambda *args, **kwargs: certificates.GateStatus.GATING,
+        screen,
+        "gate_statuses",
+        lambda *args, **kwargs: dict.fromkeys(
+            screen.MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
+        ),
     )
     result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
-    plan = json.loads((folder / "dataset_profile.json").read_text())[
-        "feature_plan"
+    done = event(result.run_dir, "admissibility.completed")["data"]
+    assert done["leakage_gate"] == "descriptive"
+    assert "echo" in done["suspects"] and done["quarantined"] == {}
+    plan = json.loads((folder / "dataset_profile.json").read_text())
+    assert "echo" in plan["feature_plan"]["numeric"]
+
+
+def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
+    binary_frame, tmp_path
+):
+    attestation = {
+        "column": "echo",
+        "lead_seconds": 60.0,
+        "name_or_id": "A. Owner",
+        "role": "data owner",
+        "statement": "echo is the clinic's own earlier reading",
+        "evidence": "ticket DATA-7",
+        "date": "2020-01-01",
+        "scope": make_charter(min_effect=0.5, k_max=3).charter_hash,
+        "expires": "2099-01-01",
+    }
+    path = tmp_path / "attestations.json"
+    path.write_text(
+        json.dumps({"format_version": 1, "attestations": [attestation]})
+    )
+    result = run(
+        leaky_frame(binary_frame),
+        tmp_path,
+        write_charter(tmp_path),
+        leakage_attestations=path,
+    )
+    folder = pathlib.Path(result.run_dir)
+
+    done = event(result.run_dir, "admissibility.completed")["data"]
+    assert "echo" in done["suspects"] and done["quarantined"] == {}
+    rows = [
+        json.loads(line)
+        for line in (folder / "hypothesis_ledger.jsonl")
+        .read_text()
+        .splitlines()
     ]
-    assert "echo" not in plan["numeric"]
-    assert "quarantined by admissibility" in plan["dropped"]["echo"]
+    overrides = [
+        r["body"]["check"]
+        for r in rows
+        if r["kind"] == "diagnostic"
+        and r["body"]["check"]["check_id"] == "leakage.attestation:echo"
+    ]
+    assert [c["tier"] for c in overrides] == ["attested"]
     table = json.loads((folder / "admissibility_table.json").read_text())
-    decisions = {d["name"]: d["admission"] for d in table["decisions"]}
-    assert decisions["echo"] == "quarantine"
+    echo = next(d for d in table["decisions"] if d["name"] == "echo")
+    assert echo["tier"] == "attested" and echo["admission"] == "admit_flagged"
 
 
 def test_a_run_without_a_charter_writes_no_admissibility_artifacts(

@@ -205,6 +205,12 @@ class ProjectCommand(Command):
             "sealed confirmation set the exploration stages cannot read",
         )
         parser.add_argument(
+            "--leakage-attestations",
+            help="JSON file of per-column attestations that a strong "
+            "predictor flagged by the leakage screen is legitimate "
+            "(charter runs only)",
+        )
+        parser.add_argument(
             "--config",
             help="JSON file with the nested sections `search`, `strategies`, "
             "`ensemble`, `feature_graph`, `selection` and `decision` "
@@ -276,6 +282,7 @@ class ProjectCommand(Command):
             enforcement=args.enforcement,
             leakage_policy=args.leakage_policy,
             charter=args.charter,
+            leakage_attestations=args.leakage_attestations,
             output_dir=args.output_dir,
             **sections,
         )

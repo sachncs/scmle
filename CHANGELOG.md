@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+* Charter runs use the certified leakage screen (R1 B11).
+  `admissibility.qualify` no longer calls the earlier
+  `leakage.scan`; it runs `screen.screen_table` on the exploration set, so a
+  run with and without a charter flags the same columns with one test. The
+  screen's certificates (`screen_certificates.json`) decide per mechanism
+  whether a suspect may quarantine; the earlier "not gating yet" statement for
+  charter runs no longer holds. Every tested column is a wealth-free
+  diagnostic row in the ledger with its permutation p-value. A certified
+  suspect that is a strong legitimate predictor is kept only by an explicit
+  per-column attestation (`scmle.data.admissibility.attestations`, option
+  `--leakage-attestations`, `MLProject(leakage_attestations=...)`): a named
+  attester, evidence, a validity window and the charter hash; it yields tier
+  `attested`, an `admit_flagged` decision and a ledger row
+  `leakage.attestation:<column>`. Expired, wrong-charter and unflagged
+  attestations are ignored and reported in the run's notes. `rules.build_table`
+  accepts a leakage gate per field. A run without a charter has no ledger and
+  no override other than `leakage_policy="warn"`. The `MLProject` snapshot was
+  regenerated for the new keyword.
 * Raw-data ingestion and feature construction (F9), the parts that could be
   built and measured without outside parties or data. New package
   `scmle.data.ingest`, used by `scmle ingest` and `IngestPlan`: `profile`

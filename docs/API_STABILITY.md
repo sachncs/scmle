@@ -62,6 +62,15 @@ no cutoff, and `risk.leakage_hypotheses` now counts screen suspects instead of
 cutoff hits, so stored fingerprints of data that crossed a retired cutoff can
 differ in that one count.
 
+`MLProject` gained the optional keyword `leakage_attestations` (default
+`None`, so every existing call is unchanged), `ProjectSpec` the field of the
+same name, and the CLI the flag `--leakage-attestations`; the snapshot in
+`tests/fixtures/public_api.json` was regenerated for the `MLProject` entry
+alone. In a charter run the leakage test is now the screen above instead of
+the earlier cross-fitted skill scan, so a charter run and a run without one
+flag the same columns, and a certified suspect is quarantined unless a valid
+attestation keeps it.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

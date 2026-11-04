@@ -6,6 +6,7 @@ import pytest
 
 from scmle.contracts import qualification
 from scmle.data.admissibility import qualify
+from scmle.data.admissibility import screen
 from scmle.data.detectors import certificates
 from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
@@ -25,7 +26,7 @@ def leaky(rows=400, seed=0):
 
 
 def test_a_missing_store_is_descriptive_and_says_so(tmp_path):
-    loaded = qualify.load_store(qualify.F4_STORE, tmp_path)
+    loaded = qualify.load_store(qualify.F5_STORE, tmp_path)
 
     assert loaded.store is None
     assert "descriptive" in loaded.note
@@ -41,8 +42,8 @@ def test_an_unreadable_store_is_descriptive_and_says_so(tmp_path):
 
 
 def test_the_shipped_stores_are_found_from_a_checkout():
-    for name in (qualify.F4_STORE, qualify.F5_STORE):
-        assert qualify.load_store(name).store is not None
+    assert qualify.load_store(qualify.F5_STORE).store is not None
+    assert screen.shipped_store() is not None
 
 
 def test_without_certificates_nothing_is_quarantined(tmp_path):
@@ -58,11 +59,12 @@ def test_without_certificates_nothing_is_quarantined(tmp_path):
     )
 
     assert found.leakage_gate is certificates.GateStatus.DESCRIPTIVE
-    assert found.leakage is not None and found.leakage.suspects["copy"]
+    assert "copy" in found.suspects
     assert found.quarantined == {}
     assert found.table is not None
     assert not found.table.names(qualify.rules.Admission.QUARANTINE)
     assert found.f5_store is None
+    assert any("unusable" in note for note in found.notes)
     assert all(
         s is certificates.GateStatus.DESCRIPTIVE
         for by_defect in found.detectors.status.values()
@@ -70,35 +72,66 @@ def test_without_certificates_nothing_is_quarantined(tmp_path):
     )
 
 
-def test_the_shipped_leakage_certificate_does_not_gate_yet():
+def test_the_charter_run_uses_the_same_screen_as_a_run_without_one():
+    features, target = leaky()
+
+    found = qualify.run(
+        features, target, kind="predictive", classification=True, seed=0
+    )
+    direct = screen.screen_table(
+        features.assign(y=target),
+        "y",
+        "classification",
+        list(features.columns),
+        0,
+    )
+
+    assert found.leakage is not None
+    assert found.leakage.to_dict() == direct.to_dict()
+    assert [f.feature for f in found.leakage.suspects] == [
+        f.feature for f in direct.suspects
+    ]
+
+
+def test_a_certified_suspect_is_quarantined_and_ledgered():
     features, target = leaky()
 
     found = qualify.run(
         features, target, kind="predictive", classification=True, seed=0
     )
 
-    # leak_noisy_copy is certified descriptive, so the detector may not
-    # quarantine; the suspicion is still reported and logged.
-    assert found.leakage_gate is certificates.GateStatus.DESCRIPTIVE
-    assert found.quarantined == {}
-    assert found.leakage is not None and found.leakage.suspects["copy"]
-    assert [check for source, check in found.checks]
-
-
-def test_a_gating_certificate_quarantines_the_suspect(monkeypatch):
-    features, target = leaky()
-    monkeypatch.setattr(
-        qualify.leakage,
-        "gate_status",
-        lambda *args, **kwargs: certificates.GateStatus.GATING,
-    )
-
-    found = qualify.run(
-        features, target, kind="predictive", classification=True, seed=0
-    )
-
+    assert found.leakage_gate is certificates.GateStatus.GATING
     assert set(found.quarantined) == {"copy"}
     assert "leakage suspicion" in found.quarantined["copy"]
+    sources = {source for source, _ in found.checks}
+    assert sources == {screen.DETECTOR_ID}
+    by_id = {check.check_id: check for _, check in found.checks}
+    assert by_id["leakage.screen.skill:copy"].decision is (
+        qualification.Decision.QUARANTINE
+    )
+    assert by_id["leakage.screen.skill:a"].decision is (
+        qualification.Decision.PASS
+    )
+
+
+def test_an_uncertified_mechanism_only_warns(monkeypatch):
+    features, target = leaky()
+    monkeypatch.setattr(
+        screen,
+        "gate_statuses",
+        lambda *args, **kwargs: dict.fromkeys(
+            screen.MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
+        ),
+    )
+
+    found = qualify.run(
+        features, target, kind="predictive", classification=True, seed=0
+    )
+
+    assert found.suspects == {"copy": True}
+    assert found.quarantined == {}
+    copy = next(c for _, c in found.checks if c.check_id.endswith("skill:copy"))
+    assert copy.decision is qualification.Decision.WARN
 
 
 def test_a_regression_target_is_never_gated():
