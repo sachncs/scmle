@@ -12,6 +12,7 @@ import logging
 import pathlib
 import sys
 import threading
+import types
 from typing import ClassVar
 
 import pandas as pd
@@ -35,6 +36,8 @@ from scmle.data.ingest import budget as ingest_budget
 from scmle.data.ingest import grain as ingest_grain
 from scmle.data.ingest import plan as ingest_plan
 from scmle.data.readers import tabular
+from scmle.governance import deployment_ledger
+from scmle.governance import loop as loop_module
 from scmle.inference import mapping as mapping_module
 from scmle.inference import serving
 from scmle.optimization import optimizers
@@ -717,6 +720,171 @@ class CharterCommand(Command):
         return EXIT_OK
 
 
+class LoopCommand(Command):
+    """Drives the closed loop of a deployment (observe, step, ask, reply)."""
+
+    name = "loop"
+    help = "observe batches, step the closed loop, list and answer escalations"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the loop actions."""
+        actions = parser.add_subparsers(dest="loop_action", required=True)
+        init = actions.add_parser("init", help="create the deployment ledger")
+        init.add_argument("deploy_dir")
+        init.add_argument("--policy", required=True, help="policy JSON file")
+        init.add_argument("--charter-hash", required=True)
+        observe = actions.add_parser("observe", help="route a batch of cases")
+        observe.add_argument("deploy_dir")
+        observe.add_argument("--batch", required=True, help="CSV of cases")
+        observe.add_argument("--predictions-column", default="prediction")
+        observe.add_argument("--decisions-column", default="decision")
+        mature = actions.add_parser("mature", help="record arrived losses")
+        mature.add_argument("deploy_dir")
+        mature.add_argument(
+            "--labels", required=True, help="CSV with case_id and loss"
+        )
+        step = actions.add_parser("step", help="apply the decision map")
+        step.add_argument("deploy_dir")
+        pending = actions.add_parser("pending", help="list open escalations")
+        pending.add_argument("deploy_dir")
+        reply = actions.add_parser("reply", help="record a signed reply")
+        reply.add_argument("deploy_dir")
+        reply.add_argument("escalation_id")
+        reply.add_argument(
+            "--attestation", required=True, help="attestation JSON file"
+        )
+        reply.add_argument(
+            "--key-file",
+            required=True,
+            help="file with the key that verifies the reply (the person's)",
+        )
+        verify = actions.add_parser("verify", help="verify the ledger chain")
+        verify.add_argument("deploy_dir")
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Runs the chosen action."""
+        action = getattr(self, f"run_{args.loop_action}")
+        return action(args)
+
+    @staticmethod
+    def run_init(args: argparse.Namespace) -> int:
+        """Creates the ledger from a policy file and a charter hash."""
+        policy = loop_module.LoopPolicy.from_dict(
+            json.loads(pathlib.Path(args.policy).read_text())
+        )
+        charter = types.SimpleNamespace(charter_hash=args.charter_hash)
+        loop_module.Loop.open(args.deploy_dir, charter, policy)
+        LOGGER.info("opened deployment ledger in %s", args.deploy_dir)
+        return EXIT_OK
+
+    @staticmethod
+    def run_observe(args: argparse.Namespace) -> int:
+        """Routes one batch and prints how many cases went where."""
+        loop = loop_module.Loop.resume(args.deploy_dir)
+        frame = pd.read_csv(args.batch)
+        outcome = loop.observe(
+            frame,
+            frame[args.predictions_column].tolist(),
+            frame[args.decisions_column].tolist(),
+        )
+        counts = pd.Series(outcome.routing.status).value_counts().to_dict()
+        print(json.dumps({"batch": outcome.batch, "routing": counts}))
+        return EXIT_OK
+
+    @staticmethod
+    def run_mature(args: argparse.Namespace) -> int:
+        """Stores arrived losses by case id."""
+        loop = loop_module.Loop.resume(args.deploy_dir)
+        frame = pd.read_csv(args.labels)
+        matched = loop.mature(
+            dict(zip(frame["case_id"].astype(str), frame["loss"], strict=True))
+        )
+        print(json.dumps({"matched": matched}))
+        return EXIT_OK
+
+    @staticmethod
+    def run_step(args: argparse.Namespace) -> int:
+        """Steps the loop and prints what it found."""
+        loop = loop_module.Loop.resume(args.deploy_dir)
+        result = loop.step()
+        print(
+            json.dumps(
+                {
+                    "status": result.status,
+                    "mechanism": result.mechanism.value,
+                    "events": [list(event) for event in result.events],
+                    "escalation": (
+                        None
+                        if result.escalation is None
+                        else result.escalation.id
+                    ),
+                }
+            )
+        )
+        return EXIT_OK
+
+    @staticmethod
+    def run_pending(args: argparse.Namespace) -> int:
+        """Lists open escalations with their questions."""
+        loop = loop_module.Loop.resume(args.deploy_dir)
+        print(
+            json.dumps(
+                [
+                    {
+                        "id": e.id,
+                        "question": e.question,
+                        "question_hash": e.question_hash,
+                        "evidence": list(e.evidence),
+                        "proposed_default": e.proposed_default,
+                    }
+                    for e in loop.pending_escalations()
+                ],
+                indent=2,
+            )
+        )
+        return EXIT_OK
+
+    @staticmethod
+    def run_reply(args: argparse.Namespace) -> int:
+        """Records a person's signed reply; refused replies fail."""
+        loop = loop_module.Loop.resume(args.deploy_dir)
+        reply = deployment_ledger.Attestation.from_dict(
+            json.loads(pathlib.Path(args.attestation).read_text())
+        )
+        key = pathlib.Path(args.key_file).read_text().strip()
+        try:
+            outcome = loop.reply(args.escalation_id, reply, key)
+        except loop_module.ReplyRefused as error:
+            raise errors.ConfigError(f"reply refused: {error}") from error
+        print(
+            json.dumps(
+                {
+                    "tier": outcome.tier.value,
+                    "decision": outcome.decision.value,
+                    "safe_default_applies": outcome.safe_default_applies,
+                }
+            )
+        )
+        return EXIT_OK
+
+    @staticmethod
+    def run_verify(args: argparse.Namespace) -> int:
+        """Verifies the ledger chain and the e-LOND replay."""
+        path = pathlib.Path(args.deploy_dir) / deployment_ledger.FILE_NAME
+        try:
+            ledger = deployment_ledger.DeploymentLedger.load(path)
+        except deployment_ledger.DeploymentLedgerError as error:
+            raise errors.ArtifactError(
+                f"ledger verification failed: {error}"
+            ) from error
+        print(
+            json.dumps(
+                {"ok": True, "rows": len(ledger.rows), "head": ledger.head}
+            )
+        )
+        return EXIT_OK
+
+
 class ClaimsCommand(Command):
     """Lists, shows and verifies the claims of a charter run."""
 
@@ -893,6 +1061,7 @@ COMMANDS: tuple[Command, ...] = (
     CharterCommand(),
     ClaimsCommand(),
     FrameCommand(),
+    LoopCommand(),
 )
 
 

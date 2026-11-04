@@ -49,6 +49,7 @@ from fractions import Fraction
 import json
 import math
 from pathlib import Path
+import types
 from typing import Any
 
 import numpy as np
@@ -412,6 +413,45 @@ class Loop:
         loop.load_state()
         loop.save_state()
         return loop
+
+    @classmethod
+    def resume(
+        cls,
+        deploy_dir: str | Path,
+        *,
+        hooks: Hooks | None = None,
+        verification_keys: Mapping[str, str | bytes] | None = None,
+        system_keys: Sequence[str | bytes] = (),
+        today: Callable[[], datetime.date] = datetime.date.today,
+    ) -> "Loop":
+        """Opens an existing deployment from what its ledger records.
+
+        The charter hash and the policy (with its recorded amendments) are
+        read from the ledger, so a command line needs only the directory.
+
+        Raises:
+            DeploymentLedgerError: If there is no ledger or it fails
+                verification.
+        """
+        path = Path(deploy_dir) / ledger_module.FILE_NAME
+        ledger = ledger_module.DeploymentLedger.load(path)
+        effective = dict(ledger.header["policy"])
+        for row in ledger.rows:
+            if row["kind"] == ledger_module.OBSERVE_SUMMARY:
+                effective.update(row["body"].get("policy_amendment", {}))
+        policy = LoopPolicy.from_dict(effective)
+        charter = types.SimpleNamespace(
+            charter_hash=ledger.header["charter_hash"]
+        )
+        return cls.open(
+            deploy_dir,
+            charter,
+            policy,
+            hooks=hooks,
+            verification_keys=verification_keys,
+            system_keys=system_keys,
+            today=today,
+        )
 
     def build_monitors(self) -> None:
         """Creates fresh monitors from the policy."""
