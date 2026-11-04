@@ -1,0 +1,1856 @@
+{
+ "scores_and_routes": {
+  "chow": [
+   {
+    "consistent": false,
+    "cut": 0.1,
+    "disagreement": 0.675
+   },
+   {
+    "consistent": false,
+    "cut": 0.4,
+    "disagreement": 0.675
+   }
+  ],
+  "route": [
+   {
+    "backlog": 12,
+    "status": [
+     "answered",
+     "answered",
+     "escalated",
+     "answered",
+     "safe_default",
+     "safe_default",
+     "answered",
+     "safe_default",
+     "answered",
+     "escalated",
+     "answered",
+     "answered",
+     "safe_default",
+     "answered",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "answered",
+     "safe_default",
+     "safe_default",
+     "answered",
+     "answered",
+     "answered",
+     "answered",
+     "safe_default",
+     "escalated",
+     "answered",
+     "answered",
+     "escalated",
+     "answered",
+     "answered",
+     "answered",
+     "answered",
+     "escalated",
+     "answered",
+     "safe_default",
+     "escalated"
+    ]
+   },
+   {
+    "backlog": 0,
+    "status": [
+     "answered",
+     "answered",
+     "escalated",
+     "answered",
+     "escalated",
+     "escalated",
+     "answered",
+     "escalated",
+     "answered",
+     "escalated",
+     "answered",
+     "answered",
+     "escalated",
+     "answered",
+     "escalated",
+     "escalated",
+     "escalated",
+     "escalated",
+     "escalated",
+     "escalated",
+     "answered",
+     "escalated",
+     "escalated",
+     "answered",
+     "answered",
+     "answered",
+     "answered",
+     "escalated",
+     "escalated",
+     "answered",
+     "answered",
+     "escalated",
+     "answered",
+     "answered",
+     "answered",
+     "answered",
+     "escalated",
+     "answered",
+     "escalated",
+     "escalated"
+    ]
+   },
+   {
+    "backlog": 32,
+    "status": [
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "escalated"
+    ]
+   },
+   {
+    "backlog": 13,
+    "status": [
+     "safe_default",
+     "answered",
+     "escalated",
+     "answered",
+     "escalated",
+     "escalated",
+     "answered",
+     "escalated",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "escalated",
+     "escalated",
+     "escalated",
+     "escalated",
+     "escalated",
+     "escalated",
+     "safe_default",
+     "escalated",
+     "escalated",
+     "answered",
+     "answered",
+     "safe_default",
+     "safe_default",
+     "escalated",
+     "escalated",
+     "answered",
+     "safe_default",
+     "escalated",
+     "safe_default",
+     "safe_default",
+     "safe_default",
+     "answered",
+     "escalated",
+     "safe_default",
+     "escalated",
+     "escalated"
+    ]
+   }
+  ],
+  "score": [
+   1.0,
+   0.5,
+   0.0,
+   0.0,
+   0.25,
+   0.0
+  ]
+ },
+ "threshold": {
+  "curve": {
+   "aurc": 0.04026988,
+   "coverage": [
+    0.0,
+    0.101333333,
+    0.202,
+    0.300666667,
+    0.4,
+    0.502,
+    0.599333333,
+    0.700666667,
+    0.794,
+    0.895333333,
+    1.0
+   ],
+   "risk": [
+    "nan",
+    0.0,
+    0.00990099,
+    0.011086475,
+    0.018333333,
+    0.035856574,
+    0.046718576,
+    0.060894386,
+    0.07472712,
+    0.089352197,
+    0.109333333
+   ],
+   "tau": [
+    1.0,
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5,
+    0.4,
+    0.3,
+    0.2,
+    0.1,
+    0.0
+   ]
+  },
+  "curve_w": {
+   "aurc": 0.038122241,
+   "coverage": [
+    0.0,
+    0.108083967,
+    0.210193462,
+    0.305392217,
+    0.401246164,
+    0.501969847,
+    0.600317723,
+    0.700342451,
+    0.792731154,
+    0.893067556,
+    1.0
+   ],
+   "risk": [
+    "nan",
+    0.0,
+    0.007363209,
+    0.00706594,
+    0.014332045,
+    0.033507484,
+    0.047913254,
+    0.058678368,
+    0.071983151,
+    0.086363252,
+    0.10647276
+   ],
+   "tau": [
+    1.0,
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5,
+    0.4,
+    0.3,
+    0.2,
+    0.1,
+    0.0
+   ]
+  },
+  "grid": {
+   "coverage": 0.700666667,
+   "delta": 0.05,
+   "r_star": 0.1,
+   "risk": 0.060894386,
+   "steps": [
+    {
+     "cases": 152,
+     "errors": 0,
+     "p_value": 1.11e-07,
+     "rejected": true,
+     "tau": 0.9
+    },
+    {
+     "cases": 451,
+     "errors": 5,
+     "p_value": 0.0,
+     "rejected": true,
+     "tau": 0.7
+    },
+    {
+     "cases": 753,
+     "errors": 27,
+     "p_value": 0.0,
+     "rejected": true,
+     "tau": 0.5
+    },
+    {
+     "cases": 1051,
+     "errors": 64,
+     "p_value": 4.299e-06,
+     "rejected": true,
+     "tau": 0.3
+    }
+   ],
+   "tau": 0.3,
+   "weighted": false
+  },
+  "p": [
+   0.005153775,
+   0.250293906,
+   0.990645398
+  ],
+  "plain": {
+   "coverage": 0.539333333,
+   "delta": 0.1,
+   "r_star": 0.05,
+   "risk": 0.039555006,
+   "steps": [
+    {
+     "cases": 0,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 1.0
+    },
+    {
+     "cases": 12,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.99
+    },
+    {
+     "cases": 21,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.98
+    },
+    {
+     "cases": 37,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.97
+    },
+    {
+     "cases": 55,
+     "errors": 0,
+     "p_value": 0.059538555,
+     "rejected": true,
+     "tau": 0.96
+    },
+    {
+     "cases": 71,
+     "errors": 0,
+     "p_value": 0.026204506,
+     "rejected": true,
+     "tau": 0.95
+    },
+    {
+     "cases": 95,
+     "errors": 0,
+     "p_value": 0.007651428,
+     "rejected": true,
+     "tau": 0.94
+    },
+    {
+     "cases": 113,
+     "errors": 0,
+     "p_value": 0.003039257,
+     "rejected": true,
+     "tau": 0.93
+    },
+    {
+     "cases": 128,
+     "errors": 0,
+     "p_value": 0.001408061,
+     "rejected": true,
+     "tau": 0.92
+    },
+    {
+     "cases": 139,
+     "errors": 0,
+     "p_value": 0.000800905,
+     "rejected": true,
+     "tau": 0.91
+    },
+    {
+     "cases": 152,
+     "errors": 0,
+     "p_value": 0.000411138,
+     "rejected": true,
+     "tau": 0.9
+    },
+    {
+     "cases": 165,
+     "errors": 0,
+     "p_value": 0.000211055,
+     "rejected": true,
+     "tau": 0.89
+    },
+    {
+     "cases": 187,
+     "errors": 0,
+     "p_value": 6.8283e-05,
+     "rejected": true,
+     "tau": 0.88
+    },
+    {
+     "cases": 208,
+     "errors": 2,
+     "p_value": 0.001664608,
+     "rejected": true,
+     "tau": 0.87
+    },
+    {
+     "cases": 224,
+     "errors": 2,
+     "p_value": 0.000839014,
+     "rejected": true,
+     "tau": 0.86
+    },
+    {
+     "cases": 234,
+     "errors": 3,
+     "p_value": 0.002427887,
+     "rejected": true,
+     "tau": 0.85
+    },
+    {
+     "cases": 248,
+     "errors": 3,
+     "p_value": 0.001389821,
+     "rejected": true,
+     "tau": 0.84
+    },
+    {
+     "cases": 260,
+     "errors": 3,
+     "p_value": 0.000856069,
+     "rejected": true,
+     "tau": 0.83
+    },
+    {
+     "cases": 273,
+     "errors": 3,
+     "p_value": 0.000503351,
+     "rejected": true,
+     "tau": 0.82
+    },
+    {
+     "cases": 291,
+     "errors": 3,
+     "p_value": 0.000239,
+     "rejected": true,
+     "tau": 0.81
+    },
+    {
+     "cases": 303,
+     "errors": 3,
+     "p_value": 0.000144651,
+     "rejected": true,
+     "tau": 0.8
+    },
+    {
+     "cases": 311,
+     "errors": 3,
+     "p_value": 0.000103262,
+     "rejected": true,
+     "tau": 0.79
+    },
+    {
+     "cases": 334,
+     "errors": 3,
+     "p_value": 3.8817e-05,
+     "rejected": true,
+     "tau": 0.78
+    },
+    {
+     "cases": 345,
+     "errors": 3,
+     "p_value": 2.42e-05,
+     "rejected": true,
+     "tau": 0.77
+    },
+    {
+     "cases": 362,
+     "errors": 3,
+     "p_value": 1.1599e-05,
+     "rejected": true,
+     "tau": 0.76
+    },
+    {
+     "cases": 375,
+     "errors": 3,
+     "p_value": 6.583e-06,
+     "rejected": true,
+     "tau": 0.75
+    },
+    {
+     "cases": 392,
+     "errors": 3,
+     "p_value": 3.123e-06,
+     "rejected": true,
+     "tau": 0.74
+    },
+    {
+     "cases": 409,
+     "errors": 4,
+     "p_value": 8.301e-06,
+     "rejected": true,
+     "tau": 0.73
+    },
+    {
+     "cases": 424,
+     "errors": 4,
+     "p_value": 4.412e-06,
+     "rejected": true,
+     "tau": 0.72
+    },
+    {
+     "cases": 436,
+     "errors": 4,
+     "p_value": 2.652e-06,
+     "rejected": true,
+     "tau": 0.71
+    },
+    {
+     "cases": 451,
+     "errors": 5,
+     "p_value": 6.915e-06,
+     "rejected": true,
+     "tau": 0.7
+    },
+    {
+     "cases": 461,
+     "errors": 5,
+     "p_value": 4.598e-06,
+     "rejected": true,
+     "tau": 0.69
+    },
+    {
+     "cases": 477,
+     "errors": 5,
+     "p_value": 2.383e-06,
+     "rejected": true,
+     "tau": 0.68
+    },
+    {
+     "cases": 486,
+     "errors": 6,
+     "p_value": 7.269e-06,
+     "rejected": true,
+     "tau": 0.67
+    },
+    {
+     "cases": 509,
+     "errors": 6,
+     "p_value": 2.916e-06,
+     "rejected": true,
+     "tau": 0.66
+    },
+    {
+     "cases": 524,
+     "errors": 7,
+     "p_value": 6.51e-06,
+     "rejected": true,
+     "tau": 0.65
+    },
+    {
+     "cases": 545,
+     "errors": 8,
+     "p_value": 1.0697e-05,
+     "rejected": true,
+     "tau": 0.64
+    },
+    {
+     "cases": 559,
+     "errors": 9,
+     "p_value": 2.1393e-05,
+     "rejected": true,
+     "tau": 0.63
+    },
+    {
+     "cases": 571,
+     "errors": 9,
+     "p_value": 1.3896e-05,
+     "rejected": true,
+     "tau": 0.62
+    },
+    {
+     "cases": 584,
+     "errors": 11,
+     "p_value": 7.9042e-05,
+     "rejected": true,
+     "tau": 0.61
+    },
+    {
+     "cases": 600,
+     "errors": 11,
+     "p_value": 4.6326e-05,
+     "rejected": true,
+     "tau": 0.6
+    },
+    {
+     "cases": 614,
+     "errors": 13,
+     "p_value": 0.000204312,
+     "rejected": true,
+     "tau": 0.59
+    },
+    {
+     "cases": 632,
+     "errors": 14,
+     "p_value": 0.000284602,
+     "rejected": true,
+     "tau": 0.58
+    },
+    {
+     "cases": 648,
+     "errors": 15,
+     "p_value": 0.000409866,
+     "rejected": true,
+     "tau": 0.57
+    },
+    {
+     "cases": 669,
+     "errors": 17,
+     "p_value": 0.001062779,
+     "rejected": true,
+     "tau": 0.56
+    },
+    {
+     "cases": 676,
+     "errors": 18,
+     "p_value": 0.001786138,
+     "rejected": true,
+     "tau": 0.55
+    },
+    {
+     "cases": 689,
+     "errors": 19,
+     "p_value": 0.002498914,
+     "rejected": true,
+     "tau": 0.54
+    },
+    {
+     "cases": 710,
+     "errors": 22,
+     "p_value": 0.00900862,
+     "rejected": true,
+     "tau": 0.53
+    },
+    {
+     "cases": 723,
+     "errors": 23,
+     "p_value": 0.011536477,
+     "rejected": true,
+     "tau": 0.52
+    },
+    {
+     "cases": 734,
+     "errors": 23,
+     "p_value": 0.009156696,
+     "rejected": true,
+     "tau": 0.51
+    },
+    {
+     "cases": 753,
+     "errors": 27,
+     "p_value": 0.039845138,
+     "rejected": true,
+     "tau": 0.5
+    },
+    {
+     "cases": 768,
+     "errors": 27,
+     "p_value": 0.030695103,
+     "rejected": true,
+     "tau": 0.49
+    },
+    {
+     "cases": 785,
+     "errors": 29,
+     "p_value": 0.05039592,
+     "rejected": true,
+     "tau": 0.48
+    },
+    {
+     "cases": 798,
+     "errors": 30,
+     "p_value": 0.058856059,
+     "rejected": true,
+     "tau": 0.47
+    },
+    {
+     "cases": 809,
+     "errors": 32,
+     "p_value": 0.096677162,
+     "rejected": true,
+     "tau": 0.46
+    },
+    {
+     "cases": 826,
+     "errors": 35,
+     "p_value": 0.177974058,
+     "rejected": false,
+     "tau": 0.45
+    }
+   ],
+   "tau": 0.46,
+   "weighted": false
+  },
+  "small": {
+   "coverage": 0.0,
+   "delta": 0.1,
+   "r_star": 0.05,
+   "risk": "nan",
+   "steps": [
+    {
+     "cases": 0,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 1.0
+    },
+    {
+     "cases": 0,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.99
+    },
+    {
+     "cases": 1,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.98
+    },
+    {
+     "cases": 2,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.97
+    },
+    {
+     "cases": 3,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.96
+    },
+    {
+     "cases": 4,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.95
+    },
+    {
+     "cases": 6,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.94
+    },
+    {
+     "cases": 7,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.93
+    },
+    {
+     "cases": 9,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.92
+    },
+    {
+     "cases": 9,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.91
+    },
+    {
+     "cases": 10,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.9
+    },
+    {
+     "cases": 10,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.89
+    },
+    {
+     "cases": 10,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.88
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.87
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.86
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.85
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.84
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.83
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.82
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.81
+    },
+    {
+     "cases": 12,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.8
+    },
+    {
+     "cases": 12,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.79
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.78
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.77
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.76
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.75
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.74
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.73
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.72
+    },
+    {
+     "cases": 13,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.71
+    },
+    {
+     "cases": 14,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.7
+    },
+    {
+     "cases": 14,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.69
+    },
+    {
+     "cases": 14,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.68
+    },
+    {
+     "cases": 15,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.67
+    },
+    {
+     "cases": 16,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.66
+    },
+    {
+     "cases": 16,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.65
+    },
+    {
+     "cases": 17,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.64
+    },
+    {
+     "cases": 17,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.63
+    },
+    {
+     "cases": 17,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.62
+    },
+    {
+     "cases": 17,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.61
+    },
+    {
+     "cases": 19,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.6
+    },
+    {
+     "cases": 19,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.59
+    },
+    {
+     "cases": 20,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.58
+    },
+    {
+     "cases": 20,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.57
+    },
+    {
+     "cases": 20,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.56
+    },
+    {
+     "cases": 20,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.55
+    },
+    {
+     "cases": 21,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.54
+    },
+    {
+     "cases": 21,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.53
+    },
+    {
+     "cases": 22,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.52
+    },
+    {
+     "cases": 23,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.51
+    },
+    {
+     "cases": 24,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.5
+    },
+    {
+     "cases": 27,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.49
+    },
+    {
+     "cases": 27,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.48
+    },
+    {
+     "cases": 29,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.47
+    },
+    {
+     "cases": 29,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.46
+    },
+    {
+     "cases": 29,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.45
+    },
+    {
+     "cases": 29,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.44
+    },
+    {
+     "cases": 30,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.43
+    },
+    {
+     "cases": 30,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.42
+    },
+    {
+     "cases": 30,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.41
+    },
+    {
+     "cases": 30,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.4
+    },
+    {
+     "cases": 30,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.39
+    },
+    {
+     "cases": 30,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.38
+    },
+    {
+     "cases": 31,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.37
+    },
+    {
+     "cases": 32,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.36
+    },
+    {
+     "cases": 32,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.35
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.34
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.33
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.32
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.31
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.3
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.29
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.28
+    },
+    {
+     "cases": 33,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.27
+    },
+    {
+     "cases": 34,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.26
+    },
+    {
+     "cases": 34,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.25
+    },
+    {
+     "cases": 34,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.24
+    },
+    {
+     "cases": 34,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.23
+    },
+    {
+     "cases": 35,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.22
+    },
+    {
+     "cases": 36,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.21
+    },
+    {
+     "cases": 36,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.2
+    },
+    {
+     "cases": 36,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.19
+    },
+    {
+     "cases": 36,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.18
+    },
+    {
+     "cases": 38,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.17
+    },
+    {
+     "cases": 38,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.16
+    },
+    {
+     "cases": 38,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.15
+    },
+    {
+     "cases": 38,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.14
+    },
+    {
+     "cases": 39,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.13
+    },
+    {
+     "cases": 39,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.12
+    },
+    {
+     "cases": 39,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.11
+    },
+    {
+     "cases": 39,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.1
+    },
+    {
+     "cases": 39,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.09
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.08
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.07
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.06
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.05
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.04
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.03
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.02
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.01
+    },
+    {
+     "cases": 40,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.0
+    }
+   ],
+   "tau": "inf",
+   "weighted": false
+  },
+  "weighted": {
+   "coverage": 0.539333333,
+   "delta": 0.1,
+   "r_star": 0.05,
+   "risk": 0.039555006,
+   "steps": [
+    {
+     "cases": 0,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 1.0
+    },
+    {
+     "cases": 11,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.99
+    },
+    {
+     "cases": 19,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.98
+    },
+    {
+     "cases": 34,
+     "errors": 0,
+     "p_value": 1.0,
+     "rejected": false,
+     "tau": 0.97
+    },
+    {
+     "cases": 50,
+     "errors": 0,
+     "p_value": 0.076944975,
+     "rejected": true,
+     "tau": 0.96
+    },
+    {
+     "cases": 64,
+     "errors": 0,
+     "p_value": 0.037524139,
+     "rejected": true,
+     "tau": 0.95
+    },
+    {
+     "cases": 86,
+     "errors": 0,
+     "p_value": 0.012140318,
+     "rejected": true,
+     "tau": 0.94
+    },
+    {
+     "cases": 102,
+     "errors": 0,
+     "p_value": 0.005343278,
+     "rejected": true,
+     "tau": 0.93
+    },
+    {
+     "cases": 116,
+     "errors": 0,
+     "p_value": 0.002605783,
+     "rejected": true,
+     "tau": 0.92
+    },
+    {
+     "cases": 126,
+     "errors": 0,
+     "p_value": 0.001560178,
+     "rejected": true,
+     "tau": 0.91
+    },
+    {
+     "cases": 138,
+     "errors": 0,
+     "p_value": 0.000843058,
+     "rejected": true,
+     "tau": 0.9
+    },
+    {
+     "cases": 149,
+     "errors": 0,
+     "p_value": 0.000479532,
+     "rejected": true,
+     "tau": 0.89
+    },
+    {
+     "cases": 169,
+     "errors": 0,
+     "p_value": 0.000171905,
+     "rejected": true,
+     "tau": 0.88
+    },
+    {
+     "cases": 187,
+     "errors": 2,
+     "p_value": 0.004029847,
+     "rejected": true,
+     "tau": 0.87
+    },
+    {
+     "cases": 202,
+     "errors": 2,
+     "p_value": 0.002146976,
+     "rejected": true,
+     "tau": 0.86
+    },
+    {
+     "cases": 211,
+     "errors": 3,
+     "p_value": 0.005951564,
+     "rejected": true,
+     "tau": 0.85
+    },
+    {
+     "cases": 223,
+     "errors": 2,
+     "p_value": 0.000875951,
+     "rejected": true,
+     "tau": 0.84
+    },
+    {
+     "cases": 234,
+     "errors": 2,
+     "p_value": 0.000544363,
+     "rejected": true,
+     "tau": 0.83
+    },
+    {
+     "cases": 245,
+     "errors": 3,
+     "p_value": 0.001567399,
+     "rejected": true,
+     "tau": 0.82
+    },
+    {
+     "cases": 261,
+     "errors": 2,
+     "p_value": 0.000166799,
+     "rejected": true,
+     "tau": 0.81
+    },
+    {
+     "cases": 272,
+     "errors": 3,
+     "p_value": 0.000524451,
+     "rejected": true,
+     "tau": 0.8
+    },
+    {
+     "cases": 279,
+     "errors": 3,
+     "p_value": 0.000393149,
+     "rejected": true,
+     "tau": 0.79
+    },
+    {
+     "cases": 299,
+     "errors": 3,
+     "p_value": 0.000171088,
+     "rejected": true,
+     "tau": 0.78
+    },
+    {
+     "cases": 309,
+     "errors": 3,
+     "p_value": 0.000112359,
+     "rejected": true,
+     "tau": 0.77
+    },
+    {
+     "cases": 325,
+     "errors": 3,
+     "p_value": 5.7014e-05,
+     "rejected": true,
+     "tau": 0.76
+    },
+    {
+     "cases": 337,
+     "errors": 3,
+     "p_value": 3.4133e-05,
+     "rejected": true,
+     "tau": 0.75
+    },
+    {
+     "cases": 351,
+     "errors": 3,
+     "p_value": 1.8681e-05,
+     "rejected": true,
+     "tau": 0.74
+    },
+    {
+     "cases": 366,
+     "errors": 3,
+     "p_value": 9.747e-06,
+     "rejected": true,
+     "tau": 0.73
+    },
+    {
+     "cases": 379,
+     "errors": 3,
+     "p_value": 5.526e-06,
+     "rejected": true,
+     "tau": 0.72
+    },
+    {
+     "cases": 390,
+     "errors": 3,
+     "p_value": 3.411e-06,
+     "rejected": true,
+     "tau": 0.71
+    },
+    {
+     "cases": 403,
+     "errors": 3,
+     "p_value": 1.923e-06,
+     "rejected": true,
+     "tau": 0.7
+    },
+    {
+     "cases": 411,
+     "errors": 3,
+     "p_value": 1.349e-06,
+     "rejected": true,
+     "tau": 0.69
+    },
+    {
+     "cases": 426,
+     "errors": 3,
+     "p_value": 6.93e-07,
+     "rejected": true,
+     "tau": 0.68
+    },
+    {
+     "cases": 434,
+     "errors": 4,
+     "p_value": 2.888e-06,
+     "rejected": true,
+     "tau": 0.67
+    },
+    {
+     "cases": 453,
+     "errors": 4,
+     "p_value": 1.284e-06,
+     "rejected": true,
+     "tau": 0.66
+    },
+    {
+     "cases": 466,
+     "errors": 5,
+     "p_value": 3.746e-06,
+     "rejected": true,
+     "tau": 0.65
+    },
+    {
+     "cases": 486,
+     "errors": 6,
+     "p_value": 7.269e-06,
+     "rejected": true,
+     "tau": 0.64
+    },
+    {
+     "cases": 498,
+     "errors": 7,
+     "p_value": 1.7547e-05,
+     "rejected": true,
+     "tau": 0.63
+    },
+    {
+     "cases": 509,
+     "errors": 7,
+     "p_value": 1.1558e-05,
+     "rejected": true,
+     "tau": 0.62
+    },
+    {
+     "cases": 521,
+     "errors": 8,
+     "p_value": 2.5913e-05,
+     "rejected": true,
+     "tau": 0.61
+    },
+    {
+     "cases": 535,
+     "errors": 8,
+     "p_value": 1.5494e-05,
+     "rejected": true,
+     "tau": 0.6
+    },
+    {
+     "cases": 548,
+     "errors": 10,
+     "p_value": 9.4351e-05,
+     "rejected": true,
+     "tau": 0.59
+    },
+    {
+     "cases": 563,
+     "errors": 11,
+     "p_value": 0.000157554,
+     "rejected": true,
+     "tau": 0.58
+    },
+    {
+     "cases": 578,
+     "errors": 12,
+     "p_value": 0.000252015,
+     "rejected": true,
+     "tau": 0.57
+    },
+    {
+     "cases": 596,
+     "errors": 14,
+     "p_value": 0.000818972,
+     "rejected": true,
+     "tau": 0.56
+    },
+    {
+     "cases": 603,
+     "errors": 15,
+     "p_value": 0.001459891,
+     "rejected": true,
+     "tau": 0.55
+    },
+    {
+     "cases": 614,
+     "errors": 16,
+     "p_value": 0.002243205,
+     "rejected": true,
+     "tau": 0.54
+    },
+    {
+     "cases": 633,
+     "errors": 19,
+     "p_value": 0.009433356,
+     "rejected": true,
+     "tau": 0.53
+    },
+    {
+     "cases": 644,
+     "errors": 20,
+     "p_value": 0.012845816,
+     "rejected": true,
+     "tau": 0.52
+    },
+    {
+     "cases": 654,
+     "errors": 20,
+     "p_value": 0.010323365,
+     "rejected": true,
+     "tau": 0.51
+    },
+    {
+     "cases": 671,
+     "errors": 23,
+     "p_value": 0.032245024,
+     "rejected": true,
+     "tau": 0.5
+    },
+    {
+     "cases": 684,
+     "errors": 23,
+     "p_value": 0.025196895,
+     "rejected": true,
+     "tau": 0.49
+    },
+    {
+     "cases": 699,
+     "errors": 25,
+     "p_value": 0.045339861,
+     "rejected": true,
+     "tau": 0.48
+    },
+    {
+     "cases": 711,
+     "errors": 26,
+     "p_value": 0.054751671,
+     "rejected": true,
+     "tau": 0.47
+    },
+    {
+     "cases": 721,
+     "errors": 28,
+     "p_value": 0.095060254,
+     "rejected": true,
+     "tau": 0.46
+    },
+    {
+     "cases": 736,
+     "errors": 32,
+     "p_value": 0.237203778,
+     "rejected": false,
+     "tau": 0.45
+    }
+   ],
+   "tau": 0.46,
+   "weighted": true
+  }
+ }
+}

@@ -253,6 +253,19 @@
   without a guard nothing changes. `ModelRegistryStore.promote` gained the
   optional `guard_detail`. `alarm_gates_retrain` still defaults to False (H2
   and H10 missed their floors; not retuned).
+* Mutation scope and results for the Phase 8 to 13 modules, 2026-11-05.
+  `setup.cfg` now includes `scmle/decision`, `scmle/governance/{loop,
+  escalation,never_list,deployment_ledger}`, `scmle/monitoring/{sequential_tests,
+  labels}`, `scmle/data/identification`, `framing/draft.py` and
+  `ingest/{entities,plan}.py` (the evaluation, framing and ingestion modules
+  were in it already) with `timeout_multiplier = 2`. Results and what is and
+  is not triaged are in `tests/unit/MUTANTS_{loop,decision,identification,
+  evaluation,framing_ingest}.md`: scores from 64 percent (`identification/
+  run.py`) to 99 percent (`sequential_tests.py`), the monitoring survivors read
+  one by one, the others only classified. Pinning tests: `test_monitoring_
+  mutants.py` and golden-snapshot tests (`tests/unit/golden.py`, fixtures in
+  `tests/fixtures/*_golden.json`) for the decision layer, identification,
+  evaluation and the loop. Framing and ingestion have no new pins.
 * Citations re-read, 2026-11-05 (`docs/LITERATURE_CHECK.md`). Docstrings of
   the betting monitors, the selective threshold, CV+ and weighted conformal,
   MinT, net benefit, the robustness value and entity resolution now say what

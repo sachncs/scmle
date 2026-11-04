@@ -71,8 +71,12 @@ def read_mechanism(loop):
 def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
     loop = base.open_loop(tmp_path)
     bypass, model = feedback_groups(0.8)
-    with pytest.raises(ValueError, match="bypass"):
+    with pytest.raises(ValueError) as caught:
         loop.check_feedback(bypass, model)
+    assert str(caught.value) == (
+        "no bypass slice is declared (policy.bypass_rate is 0): "
+        "feedback cannot be tested"
+    )
 
 
 def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(

@@ -1,0 +1,1014 @@
+{
+ "aipw": {
+  "boosted_ATE": {
+   "estimand": "ATE",
+   "estimate": 2.351134407,
+   "high": 2.651002663,
+   "level": 0.95,
+   "low": 2.051266152,
+   "n": 800,
+   "n_input": 800,
+   "nuisance_digest": "255a881a71870453d21bddd1c485ffaf616769a8fc55058bf783f5374b627ac3",
+   "overlap": {
+    "eps": 0.05,
+    "ess_control": 262.749476109,
+    "ess_treated": 248.414443312,
+    "gate_share": 0.05,
+    "max_propensity": 0.941099602,
+    "max_weighted_smd": 0.198210085,
+    "min_propensity": 0.041288305,
+    "n": 800,
+    "passed": true,
+    "share_outside": 0.00125
+   },
+   "population": "the full population of the rows",
+   "se": 0.152996819
+  },
+  "boosted_ATT": {
+   "estimand": "ATT",
+   "estimate": 2.246285218,
+   "high": 2.620511439,
+   "level": 0.95,
+   "low": 1.872058997,
+   "n": 800,
+   "n_input": 800,
+   "nuisance_digest": "255a881a71870453d21bddd1c485ffaf616769a8fc55058bf783f5374b627ac3",
+   "overlap": {
+    "eps": 0.05,
+    "ess_control": 262.749476109,
+    "ess_treated": 248.414443312,
+    "gate_share": 0.05,
+    "max_propensity": 0.941099602,
+    "max_weighted_smd": 0.198210085,
+    "min_propensity": 0.041288305,
+    "n": 800,
+    "passed": true,
+    "share_outside": 0.00125
+   },
+   "population": "the full population of the rows",
+   "se": 0.190935254
+  },
+  "ess": 2.571428571,
+  "linear_ATE": {
+   "estimand": "ATE",
+   "estimate": 2.093207349,
+   "high": 2.250668336,
+   "level": 0.95,
+   "low": 1.935746361,
+   "n": 800,
+   "n_input": 800,
+   "nuisance_digest": "2a0de879fd257e18a25c1f256e66d8e45d003cffda7455f5880d9eea4ac01aac",
+   "overlap": {
+    "eps": 0.05,
+    "ess_control": 347.153781492,
+    "ess_treated": 328.698276508,
+    "gate_share": 0.05,
+    "max_propensity": 0.932550401,
+    "max_weighted_smd": 0.099398933,
+    "min_propensity": 0.080122523,
+    "n": 800,
+    "passed": true,
+    "share_outside": 0.0
+   },
+   "population": "the full population of the rows",
+   "se": 0.080338715
+  },
+  "linear_ATT": {
+   "estimand": "ATT",
+   "estimate": 2.048818737,
+   "high": 2.227793298,
+   "level": 0.95,
+   "low": 1.869844176,
+   "n": 800,
+   "n_input": 800,
+   "nuisance_digest": "2a0de879fd257e18a25c1f256e66d8e45d003cffda7455f5880d9eea4ac01aac",
+   "overlap": {
+    "eps": 0.05,
+    "ess_control": 347.153781492,
+    "ess_treated": 328.698276508,
+    "gate_share": 0.05,
+    "max_propensity": 0.932550401,
+    "max_weighted_smd": 0.099398933,
+    "min_propensity": 0.080122523,
+    "n": 800,
+    "passed": true,
+    "share_outside": 0.0
+   },
+   "population": "the full population of the rows",
+   "se": 0.09131523
+  },
+  "naive": {
+   "estimate": 3.526490919,
+   "high": 3.804056954,
+   "level": 0.95,
+   "low": 3.248924885,
+   "n": 800,
+   "se": 0.141403128
+  },
+  "scores": {
+   "ATE": [
+    2.666666667,
+    [
+     2.333333333,
+     -3.666666667,
+     4.333333333,
+     -3.0
+    ]
+   ],
+   "ATT": [
+    2.583333333,
+    [
+     -1.166666667,
+     -0.0,
+     0.833333333,
+     0.333333333
+    ]
+   ]
+  },
+  "smd": [
+   1.311111111,
+   2.719477074
+  ]
+ },
+ "battery": {
+  "clean": {
+   "alpha": 0.05,
+   "passed": true,
+   "ran": true,
+   "rejected": [],
+   "tests": [
+    {
+     "estimate": 0.1,
+     "kind": "negative_outcome",
+     "name": "a",
+     "p_value": 0.920344325,
+     "se": 1.0
+    }
+   ]
+  },
+  "empty": {
+   "alpha": 0.05,
+   "passed": false,
+   "ran": false,
+   "rejected": [],
+   "tests": []
+  },
+  "replicate": {
+   "alpha": 0.05,
+   "p_heterogeneity": 0.586813023,
+   "passed": true,
+   "pooled_sign": 1,
+   "q": 1.066098081,
+   "same_sign": true,
+   "strata": {
+    "x": [
+     1.0,
+     0.2
+    ],
+    "y": [
+     1.2,
+     0.3
+    ],
+    "z": [
+     0.8,
+     0.25
+    ]
+   }
+  },
+  "report": {
+   "alpha": 0.05,
+   "passed": false,
+   "ran": true,
+   "rejected": [
+    "b"
+   ],
+   "tests": [
+    {
+     "estimate": 0.1,
+     "kind": "negative_outcome",
+     "name": "a",
+     "p_value": 0.920344325,
+     "se": 1.0
+    },
+    {
+     "estimate": 5.0,
+     "kind": "negative_exposure",
+     "name": "b",
+     "p_value": 5.73e-07,
+     "se": 1.0
+    },
+    {
+     "estimate": -1.5,
+     "kind": "placebo",
+     "name": "c",
+     "p_value": 0.133614403,
+     "se": 1.0
+    }
+   ]
+  },
+  "split": {
+   "alpha": 0.1,
+   "p_heterogeneity": 1e-09,
+   "passed": false,
+   "pooled_sign": 1,
+   "q": 37.230769231,
+   "same_sign": false,
+   "strata": {
+    "x": [
+     1.0,
+     0.2
+    ],
+    "y": [
+     -1.2,
+     0.3
+    ]
+   }
+  }
+ },
+ "did": {
+  "plain": {
+   "coefficients": [
+    -0.082333888,
+    0.058772493,
+    1.372015505,
+    1.486301805,
+    1.385725361
+   ],
+   "covariance": [
+    [
+     0.013475966,
+     0.006051863,
+     0.006159734,
+     0.006906341,
+     0.006048613
+    ],
+    [
+     0.006051863,
+     0.012632837,
+     0.006310647,
+     0.007486026,
+     0.006393446
+    ],
+    [
+     0.006159734,
+     0.006310647,
+     0.012596498,
+     0.007234491,
+     0.006398775
+    ],
+    [
+     0.006906341,
+     0.007486026,
+     0.007234491,
+     0.014664195,
+     0.006902269
+    ],
+    [
+     0.006048613,
+     0.006393446,
+     0.006398775,
+     0.006902269,
+     0.012216033
+    ]
+   ],
+   "estimate": 1.41468089,
+   "events": [
+    -3,
+    -2,
+    0,
+    1,
+    2
+   ],
+   "groups": {
+    "3.0": 150
+   },
+   "high": 1.600099651,
+   "level": 0.95,
+   "low": 1.22926213,
+   "max_pre_change": 0.141106381,
+   "mean_horizon": 2.0,
+   "n_never": 150,
+   "pretrend_p": 0.489767809,
+   "se": 0.094603147,
+   "ses": [
+    0.11608603,
+    0.112395895,
+    0.112234124,
+    0.12109581,
+    0.110526166
+   ]
+  },
+  "second": {
+   "coefficients": [
+    -0.331781733,
+    -0.284605826,
+    -0.107239158,
+    1.529256722,
+    1.682234794,
+    1.769586756
+   ],
+   "covariance": [
+    [
+     0.013346917,
+     0.004435657,
+     0.003232666,
+     0.001410172,
+     0.003071841,
+     -0.000358393
+    ],
+    [
+     0.004435657,
+     0.006276947,
+     0.003431072,
+     0.002423035,
+     0.003150146,
+     0.003131705
+    ],
+    [
+     0.003232666,
+     0.003431072,
+     0.005075982,
+     0.002068304,
+     0.002783134,
+     0.002156247
+    ],
+    [
+     0.001410172,
+     0.002423035,
+     0.002068304,
+     0.005273795,
+     0.003599038,
+     0.003631651
+    ],
+    [
+     0.003071841,
+     0.003150146,
+     0.002783134,
+     0.003599038,
+     0.006792231,
+     0.005156948
+    ],
+    [
+     -0.000358393,
+     0.003131705,
+     0.002156247,
+     0.003631651,
+     0.005156948,
+     0.012650782
+    ]
+   ],
+   "estimate": 1.638513958,
+   "events": [
+    -4,
+    -3,
+    -2,
+    0,
+    1,
+    2
+   ],
+   "groups": {
+    "3.0": 150,
+    "4.0": 150
+   },
+   "high": 1.777027587,
+   "level": 0.95,
+   "low": 1.500000329,
+   "max_pre_change": 0.177366668,
+   "mean_horizon": 1.8,
+   "n_never": 150,
+   "pretrend_p": 0.001322776,
+   "se": 0.070671517,
+   "ses": [
+    0.115528858,
+    0.079227188,
+    0.071245928,
+    0.072620898,
+    0.082414992,
+    0.112475696
+   ]
+  },
+  "wide": "t          0         1         2         3\nid                                        \n0   0.251954  2.633588  3.743480  4.124065\n1  -1.629587 -0.077950  1.278754  4.510502\n2  -0.021055  0.328885  1.858154  1.887181\n3  -0.053439 -0.257789  2.379630  1.869338\n4   1.106334  0.705833  0.270599  0.796272"
+ },
+ "iv": {
+  "bound": 0.204818194,
+  "direct": {
+   "ar_high": 2.365208923,
+   "ar_kind": "bounded",
+   "ar_low": 2.077238903,
+   "estimate": 2.229705603,
+   "f_stat": 296.610895425,
+   "first_stage": 1.006435401,
+   "headline": "wald",
+   "high": 2.372748507,
+   "level": 0.95,
+   "low": 2.0866627,
+   "n": 600,
+   "se": 0.072982414,
+   "wald_high": 2.372748507,
+   "wald_low": 2.0866627,
+   "weak": false
+  },
+  "strong": {
+   "ar_high": 2.05060181,
+   "ar_kind": "bounded",
+   "ar_low": 1.729458275,
+   "estimate": 1.903602548,
+   "f_stat": 239.935643976,
+   "first_stage": 0.976475753,
+   "headline": "wald",
+   "high": 2.06258319,
+   "level": 0.95,
+   "low": 1.744621906,
+   "n": 600,
+   "se": 0.081114063,
+   "wald_high": 2.06258319,
+   "wald_low": 1.744621906,
+   "weak": false
+  },
+  "weak": {
+   "ar_high": "inf",
+   "ar_kind": "whole_line",
+   "ar_low": "-inf",
+   "estimate": 3.772676123,
+   "f_stat": 0.19703757,
+   "first_stage": 0.034436339,
+   "headline": "anderson_rubin",
+   "high": "inf",
+   "level": 0.95,
+   "low": "-inf",
+   "n": 300,
+   "se": 3.158935582,
+   "wald_high": 9.964076094,
+   "wald_low": -2.418723847,
+   "weak": true
+  }
+ },
+ "rd": {
+  "band": {
+   "balance": {
+    "z": {
+     "bias_corrected": 0.154239045,
+     "estimate": 0.082968111,
+     "high": 0.279361493,
+     "low": 0.029116597,
+     "p": 0.042599149,
+     "se": 0.076069047
+    }
+   },
+   "bandwidth": 0.5,
+   "bias_corrected": 1.131786052,
+   "density_p": 0.492703865,
+   "estimate": 1.11352047,
+   "high": 1.330958666,
+   "level": 0.9,
+   "low": 0.932613438,
+   "n_left": 298,
+   "n_right": 316,
+   "placebos": {
+    "left_median": {
+     "bias_corrected": 0.298236741,
+     "cutoff": -0.498625109,
+     "estimate": 0.213690054,
+     "high": 0.508527106,
+     "low": 0.087946376,
+     "p": 0.019661036,
+     "se": 0.127847464
+    },
+    "right_median": {
+     "bias_corrected": -0.13313192,
+     "cutoff": 0.481049411,
+     "estimate": -0.082224615,
+     "high": 0.073333903,
+     "low": -0.339597743,
+     "p": 0.288860999,
+     "se": 0.125522308
+    }
+   },
+   "se": 0.121088351,
+   "sensitivity": {
+    "0.5": {
+     "bias_corrected": 1.254257074,
+     "estimate": 1.136353392,
+     "high": 1.528820544,
+     "low": 0.979693605,
+     "p": 0.0,
+     "se": 0.166922737
+    },
+    "0.75": {
+     "bias_corrected": 1.168986382,
+     "estimate": 1.111490854,
+     "high": 1.395331229,
+     "low": 0.942641535,
+     "p": 0.0,
+     "se": 0.137607896
+    },
+    "1.25": {
+     "bias_corrected": 1.13427196,
+     "estimate": 1.102120709,
+     "high": 1.313938907,
+     "low": 0.954605014,
+     "p": 0.0,
+     "se": 0.109229748
+    },
+    "1.5": {
+     "bias_corrected": 1.130880886,
+     "estimate": 1.090129171,
+     "high": 1.296396301,
+     "low": 0.965365471,
+     "p": 0.0,
+     "se": 0.100626227
+    }
+   }
+  },
+  "plain": {
+   "balance": {},
+   "bandwidth": 0.472553616,
+   "bias_corrected": 1.238765925,
+   "density_p": 0.164607362,
+   "estimate": 1.135423873,
+   "high": 1.514182981,
+   "level": 0.95,
+   "low": 0.963348869,
+   "n_left": 299,
+   "n_right": 265,
+   "placebos": {
+    "left_median": {
+     "bias_corrected": -0.063851207,
+     "cutoff": -0.472553616,
+     "estimate": 0.138343246,
+     "high": 0.202888425,
+     "low": -0.330590839,
+     "p": 0.638948574,
+     "se": 0.13609415
+    },
+    "right_median": {
+     "bias_corrected": 0.078066677,
+     "cutoff": 0.526257065,
+     "estimate": 0.060744832,
+     "high": 0.320568337,
+     "low": -0.164434984,
+     "p": 0.528069302,
+     "se": 0.12372761
+    }
+   },
+   "se": 0.140521488,
+   "sensitivity": {
+    "0.5": {
+     "bias_corrected": 1.449929948,
+     "estimate": 1.266370586,
+     "high": 1.819542302,
+     "low": 1.080317595,
+     "p": 0.0,
+     "se": 0.188581197
+    },
+    "0.75": {
+     "bias_corrected": 1.341938078,
+     "estimate": 1.164073533,
+     "high": 1.656760837,
+     "low": 1.02711532,
+     "p": 0.0,
+     "se": 0.160626808
+    },
+    "1.25": {
+     "bias_corrected": 1.212064683,
+     "estimate": 1.104566151,
+     "high": 1.461926757,
+     "low": 0.962202609,
+     "p": 0.0,
+     "se": 0.127482993
+    },
+    "1.5": {
+     "bias_corrected": 1.216076241,
+     "estimate": 1.051308932,
+     "high": 1.445411505,
+     "low": 0.986740977,
+     "p": 0.0,
+     "se": 0.117009938
+    }
+   }
+  },
+  "sorted": {
+   "balance": {},
+   "bandwidth": 0.562166524,
+   "bias_corrected": 0.52660601,
+   "density_p": 1.16e-07,
+   "estimate": 0.808274298,
+   "high": 0.878518024,
+   "level": 0.95,
+   "low": 0.174693995,
+   "n_left": 263,
+   "n_right": 400,
+   "placebos": {
+    "left_median": {
+     "bias_corrected": -0.05186654,
+     "cutoff": -0.562166524,
+     "estimate": -0.015597325,
+     "high": 0.196551987,
+     "low": -0.300285067,
+     "p": 0.682382,
+     "se": 0.126746475
+    },
+    "right_median": {
+     "bias_corrected": 0.145782205,
+     "cutoff": 0.461905224,
+     "estimate": 0.059265855,
+     "high": 0.38102142,
+     "low": -0.089457011,
+     "p": 0.224508437,
+     "se": 0.120022213
+    }
+   },
+   "se": 0.179550245,
+   "sensitivity": {
+    "0.5": {
+     "bias_corrected": 0.502003818,
+     "estimate": 0.546810392,
+     "high": 1.081078227,
+     "low": -0.077070592,
+     "p": 0.089299018,
+     "se": 0.295451556
+    },
+    "0.75": {
+     "bias_corrected": 0.443168076,
+     "estimate": 0.685062486,
+     "high": 0.871352561,
+     "low": 0.014983592,
+     "p": 0.042504186,
+     "se": 0.218465486
+    },
+    "1.25": {
+     "bias_corrected": 0.622051455,
+     "estimate": 0.885977948,
+     "high": 0.92069664,
+     "low": 0.323406271,
+     "p": 4.4567e-05,
+     "se": 0.152372792
+    },
+    "1.5": {
+     "bias_corrected": 0.702766914,
+     "estimate": 0.931190076,
+     "high": 0.96752878,
+     "low": 0.438005048,
+     "p": 1.97e-07,
+     "se": 0.135085067
+    }
+   }
+  }
+ },
+ "sensitivity": {
+  "assess": {
+   "benchmark": "a confounder 1.0 times as strong as x1, the observed covariate with the widest bound (an assumption about the unobserved)",
+   "bias": 0.933947862,
+   "covariate": "x1",
+   "estimate": 1.23115219,
+   "high": 2.177063792,
+   "holds": true,
+   "low": 0.285240587,
+   "r2dz": 0.488128957,
+   "r2yz": 0.975756686,
+   "rv": 0.698368937,
+   "rv_alpha": 0.683467373
+  },
+  "assess_fixed": {
+   "benchmark": "fixed partial R2 0.01 with treatment and outcome",
+   "bias": 0.009730771,
+   "covariate": null,
+   "estimate": 1.23115219,
+   "high": 1.29585619,
+   "holds": true,
+   "low": 1.166448189,
+   "r2dz": 0.01,
+   "r2yz": 0.01,
+   "rv": 0.698368937,
+   "rv_alpha": 0.683467373
+  },
+  "bench": [
+   0.451704399,
+   0.111111111
+  ],
+  "bias": 0.153085785,
+  "evalue": [
+   3.414213562,
+   1.809016994,
+   1.0,
+   1.809016994,
+   7.263034344
+  ],
+  "fit": {
+   "benchmarks": {
+    "x1": [
+     0.328015226,
+     0.251289982
+    ],
+    "x2": [
+     0.050287241,
+     0.107893866
+    ],
+    "x3": [
+     0.008706364,
+     0.030882495
+    ]
+   },
+   "dof": 1195,
+   "estimate": 1.23115219,
+   "r2yd": 0.617874235,
+   "se": 0.028007923,
+   "t": 43.957282382
+  },
+  "interval": [
+   {
+    "limit": 1.689897949,
+    "point": 3.0
+   },
+   {
+    "limit": 1.809016994,
+    "point": 3.414213562
+   },
+   {
+    "limit": 1.0,
+    "point": 1.9244998
+   }
+  ],
+  "interval_adj": [
+   1.029144507,
+   1.433159873
+  ],
+  "partial": 0.021868492,
+  "rv": [
+   0.138762543,
+   0.004554757,
+   0.076243122,
+   0.0
+  ],
+  "smd": [
+   1.199614194,
+   0.634447968
+  ]
+ },
+ "synth": {
+  "donors": [
+   19,
+   9,
+   4
+  ],
+  "estimate": {
+   "alpha": 0.05,
+   "donors": 24,
+   "effect": 2.974298877,
+   "gaps": [
+    3.141091596,
+    2.792538529,
+    3.027640346,
+    2.935925038
+   ],
+   "min_p": 0.04,
+   "p_value": 0.04,
+   "placebo_ratios": {
+    "1": 1.027685994,
+    "10": 1.356319213,
+    "11": 2.831499202,
+    "12": 1.880770385,
+    "13": 1.201634346,
+    "14": 2.56278855,
+    "15": 2.224104072,
+    "16": 0.741906522,
+    "17": 2.151325467,
+    "18": 1.16984495,
+    "19": 3.380326605,
+    "2": 1.051818327,
+    "20": 0.925540889,
+    "21": 5.732838001,
+    "22": 2.112681208,
+    "23": 1.769644858,
+    "24": 3.01930778,
+    "3": 1.867484574,
+    "4": 1.64010758,
+    "5": 3.88781831,
+    "6": 3.254412561,
+    "7": 1.380576331,
+    "8": 4.127435137,
+    "9": 0.74708126
+   },
+   "post_rmspe": 2.977036687,
+   "pre_rmspe": 0.045476456,
+   "ratio": 65.463252357,
+   "weights": {
+    "1": 0.091289141,
+    "12": 0.271882435,
+    "13": 0.085868334,
+    "15": 0.20199206,
+    "16": 0.009867036,
+    "22": 0.196574503,
+    "7": 0.14252649
+   }
+  },
+  "weights": [
+   0.500000047,
+   0.299999973,
+   0.199999969,
+   0.0,
+   1.2e-08,
+   0.0
+  ]
+ },
+ "tier": {
+  "0": {
+   "action": "",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": true,
+    "falsification_battery": true,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [],
+   "status": "identified",
+   "tier": "confirmed"
+  },
+  "1": {
+   "action": "refuse_claim",
+   "conditions": {
+    "design_diagnostics": false,
+    "estimated_on_c": false,
+    "falsification_battery": false,
+    "replication": false,
+    "sensitivity": false
+   },
+   "reasons": [
+    "no eligible identification strategy"
+   ],
+   "status": "not_identified",
+   "tier": null
+  },
+  "10": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": false,
+    "estimated_on_c": true,
+    "falsification_battery": true,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "weak instrument: only the robust interval is valid"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "11": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": false,
+    "estimated_on_c": true,
+    "falsification_battery": false,
+    "replication": true,
+    "sensitivity": false
+   },
+   "reasons": [
+    "a design gate has no passing certificate",
+    "the battery has no passing certificate",
+    "the sensitivity analysis has no passing certificate"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "12": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": true,
+    "falsification_battery": true,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "no named attestor for: positivity, no_interference"
+   ],
+   "status": "identified",
+   "tier": "unverified"
+  },
+  "2": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": false,
+    "falsification_battery": true,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "the estimate did not use C"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "3": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": false,
+    "estimated_on_c": true,
+    "falsification_battery": true,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "a design diagnostic failed"
+   ],
+   "status": "identified",
+   "tier": "unverified"
+  },
+  "4": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": true,
+    "falsification_battery": false,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "no negative control ran"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "5": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": true,
+    "falsification_battery": false,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "a falsification test rejected"
+   ],
+   "status": "identified",
+   "tier": "unverified"
+  },
+  "6": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": true,
+    "falsification_battery": false,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "no negative control ran"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "7": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": true,
+    "falsification_battery": true,
+    "replication": false,
+    "sensitivity": true
+   },
+   "reasons": [
+    "strata disagree or are heterogeneous"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "8": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": true,
+    "falsification_battery": true,
+    "replication": true,
+    "sensitivity": false
+   },
+   "reasons": [
+    "the sensitivity gate failed at the declared strength"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "9": {
+   "action": "downgrade_tier",
+   "conditions": {
+    "design_diagnostics": true,
+    "estimated_on_c": false,
+    "falsification_battery": true,
+    "replication": true,
+    "sensitivity": true
+   },
+   "reasons": [
+    "one treated unit: nothing to hold out"
+   ],
+   "status": "identified",
+   "tier": "attested"
+  },
+  "tiers": [
+   "confirmed"
+  ]
+ }
+}
