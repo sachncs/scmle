@@ -1,8 +1,9 @@
 # Mutation survivors: custody, charter, vault and attestations
 
 mutmut 3.8.0 on Python 3.14 (free-threaded build), run on 2026-11-04 in a copy
-of the working tree (HEAD `7561034` plus other agents' uncommitted edits in
-files outside these modules). Modules and tests are listed in `setup.cfg`
+of the working tree (the second custody and charter runs started at `4307a7d`
+and `15b6175`; other agents' uncommitted edits were in files outside these
+modules). Modules and tests are listed in `setup.cfg`
 (`source_paths`, `pytest_add_cli_args_test_selection`). Each batch was run with
 a narrowed test selection (only the tests of these modules) because the full
 selection takes hours on this machine; the selection is the one in
