@@ -65,6 +65,7 @@ CONFORMAL_FILE = "conformal.json"
 QUANTILE_FILE = "quantile.joblib"
 CV_PLUS_FILE = "cv_plus.joblib"
 SHIFT_WEIGHTS_FILE = "shift_weights.joblib"
+COVERAGE_FILE = "coverage_report.json"
 NOVELTY_FILE = "novelty.joblib"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
@@ -726,6 +727,14 @@ class ModelBundle:
             cv_plus_path = root / CV_PLUS_FILE
             joblib.dump(self.cv_plus, cv_plus_path)
             files[CV_PLUS_FILE] = file_sha256(cv_plus_path)
+        if self.coverage_report is not None:
+            coverage_path = root / COVERAGE_FILE
+            coverage_path.write_text(
+                json.dumps(self.coverage_report, sort_keys=True),
+                encoding="utf-8",
+                newline="\n",
+            )
+            files[COVERAGE_FILE] = file_sha256(coverage_path)
         if self.shift_weights is not None:
             shift_path = root / SHIFT_WEIGHTS_FILE
             joblib.dump(self.shift_weights, shift_path)
@@ -996,6 +1005,19 @@ class ModelBundle:
                     "checksum mismatch: CV+ fold models were modified"
                 )
             cv_plus_models = joblib.load(cv_plus_path)
+        stored_coverage = None
+        if COVERAGE_FILE in info.files:
+            coverage_path = root / COVERAGE_FILE
+            if (
+                not coverage_path.exists()
+                or file_sha256(coverage_path) != info.files[COVERAGE_FILE]
+            ):
+                raise errors.ArtifactError(
+                    "checksum mismatch: coverage report was modified"
+                )
+            stored_coverage = json.loads(
+                coverage_path.read_text(encoding="utf-8")
+            )
         stored_weights = None
         if SHIFT_WEIGHTS_FILE in info.files:
             shift_path = root / SHIFT_WEIGHTS_FILE
@@ -1020,6 +1042,7 @@ class ModelBundle:
         )
         loaded.cv_plus = cv_plus_models
         loaded.shift_weights = stored_weights
+        loaded.coverage_report = stored_coverage
         return loaded
 
     @property

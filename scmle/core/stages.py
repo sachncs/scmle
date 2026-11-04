@@ -66,6 +66,7 @@ from scmle.evaluation import backtest
 from scmle.evaluation import bias_variance
 from scmle.evaluation import confidence
 from scmle.evaluation import conformal
+from scmle.evaluation import coverage_run
 from scmle.evaluation import criteria
 from scmle.evaluation import cv_plus
 from scmle.evaluation import diagnostics
@@ -3078,6 +3079,20 @@ class PackageStage(Stage):
             evaluation["quantile_coverage"] = bundle.quantile.coverage_curve(
                 *context.test_rows, COVERAGE_LEVELS
             )
+        if context.test_rows is not None:
+            measured = coverage_run.run_report(
+                bundle, *context.test_rows, COVERAGE_LEVELS
+            )
+            if measured is not None:
+                bundle.coverage_report = measured
+                context.write_json("coverage_report.json", measured)
+                context.emit(
+                    "coverage.reported",
+                    "coverage of the stored intervals or sets was measured "
+                    "on the final test rows",
+                    ("coverage_report.json",),
+                    {"methods": sorted(measured["methods"])},
+                )
         bundle.novelty = novelty.NoveltyDetector.fit(
             split.dev_features,
             bundle.schema.numeric,
