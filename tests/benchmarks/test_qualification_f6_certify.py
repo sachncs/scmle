@@ -91,11 +91,13 @@ def test_measurements_agree_with_the_certificates():
 
 
 def test_the_size_by_p_value_alone_is_in_the_99_percent_band():
-    for test in (shift.C2ST_ID, shift.MMD_ID):
+    nulls = {shift.C2ST_ID: f6.SHIFT_NULL, shift.MMD_ID: f6.MMD_NULL}
+    for test, count in nulls.items():
         row = measurements()[test]
         assert row["size_in_band"] is True
+        assert row["null_replicates"] == count
         assert row["band_99"] == pytest.approx(
-            list(f6.band_99(shift.ALPHA, f6.SHIFT_NULL))
+            list(f6.band_99(shift.ALPHA, count))
         )
 
 
