@@ -47,6 +47,7 @@ from scmle.data.curation import preprocessing
 from scmle.data.custody import pipeline as custody_pipeline
 from scmle.data.custody import sealed as custody_sealed
 from scmle.data.framing import draft as framing_draft
+from scmle.data.identification import run as identification_run
 from scmle.data.ledger import budget as ledger_budget
 from scmle.data.ledger import explore as ledger_explore
 from scmle.data.ledger import governed as ledger_governed
@@ -611,6 +612,7 @@ class ProfileStage(Stage):
         )
         self.assess_robustness(context, charter, run, stage)
         self.assess_framing(context, charter, view)
+        self.assess_identification(context, charter, view)
 
     def run_robustness(
         self,
@@ -731,6 +733,44 @@ class ProfileStage(Stage):
             "the charter's target, moment and unit were matched to columns",
             ("framing_link.json",),
             {k: v["status"] for k, v in document["fields"].items()},
+        )
+
+    def assess_identification(
+        self,
+        context: context_module.RunContext,
+        charter: charter_contracts.AnalysisCharter,
+        view: Any,
+    ) -> None:
+        """Selects the identification strategy for a causal charter (F10).
+
+        Runs only when the charter's estimand carries a causal block. It
+        reads the exploration view only: the strategy is chosen from the
+        charter, the design is diagnosed on `X`, and a charter that no
+        strategy identifies is refused (`not_identified`, no estimate). The
+        causal estimate on `C` is not computed here because the claim ledger
+        has already opened `C` once; the claim is therefore `unverified` and
+        says so. `identification_run.identify` computes the estimate, the
+        falsification battery and the tier when given the confirmation rows.
+        """
+        block = charter.estimand.causal
+        if block is None:
+            return
+        frame = view.features.copy()
+        frame[context.spec.data.target] = view.target
+        outcome = identification_run.design_only(
+            block,
+            frame,
+            charter.error_budget,
+            seed=charter.seed,
+        )
+        for name, document in outcome.documents.items():
+            context.write_json(name, document)
+        claims = outcome.documents["causal_claims.json"]
+        context.emit(
+            "identification.completed",
+            f"causal claim status {claims['status']}, tier {claims['tier']}",
+            tuple(outcome.documents),
+            {"status": claims["status"], "tier": claims["tier"]},
         )
 
     def qualify_exploration(
