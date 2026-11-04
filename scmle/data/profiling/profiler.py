@@ -2,7 +2,9 @@
 
 Profiling never fits model state. Risk findings are hypotheses, not verdicts:
 a feature strongly associated with the target may be a good predictor or a
-leak, and statistics alone cannot tell which.
+leak, and statistics alone cannot tell which. Leakage suspicion comes from
+`scmle.data.admissibility.screen`, a permutation test with multiplicity
+control, not from a fixed cutoff.
 """
 
 import dataclasses
@@ -13,13 +15,12 @@ import pandas as pd
 from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.data.admissibility import screen
 from scmle.data.profiling import missingness
 from scmle.data.readers import streaming
 from scmle.data.validation import columns
 from scmle.intelligence import fingerprint
 
-LEAK_ASSOCIATION = 0.98
-MISSINGNESS_LEAK = 0.9
 HIGH_MISSING_DROP = 0.95
 HIGH_MISSING_WARN = 0.30
 SEVERE_IMBALANCE = 10.0
@@ -275,39 +276,60 @@ class DatasetProfiler:
                 )
         return findings
 
-    def leakage_findings(
+    def describe_associations(
         self,
         frame: pd.DataFrame,
         statistics: dict[str, dict],
         feature_columns: list[str],
         task: tasks.TaskType,
-    ) -> list[str]:
-        """Flags features that are almost perfectly tied to the target."""
+    ) -> None:
+        """Records each feature's descriptive association with the target.
+
+        These two numbers feed the dataset fingerprint only. They carry no
+        cutoff and raise no finding; leakage suspicion comes from
+        `leakage_screen`.
+        """
         target = frame[self.spec.data.target]
-        findings = []
         for name in feature_columns:
             series = frame[name]
             kind = columns.kind_of(series)
-            score = kind.association(series, target, task)
-            missing_score = kind.missingness_association(series, target, task)
-            statistics[name]["target_association"] = round(score, 4)
-            statistics[name]["missingness_association"] = round(
-                missing_score, 4
+            statistics[name]["target_association"] = round(
+                kind.association(series, target, task), 4
             )
-            if score >= LEAK_ASSOCIATION:
-                findings.append(
-                    f"feature '{name}' is almost perfectly associated with "
-                    f"the target ({score:.3f}): possible leakage (or an "
-                    "exceptionally strong predictor); review before trusting"
-                )
-            if missing_score >= MISSINGNESS_LEAK:
-                findings.append(
-                    f"whether feature '{name}' is recorded almost determines "
-                    f"the target ({missing_score:.3f}): possible leakage "
-                    "(information captured only for some outcomes); review "
-                    "before trusting"
-                )
-        return findings
+            statistics[name]["missingness_association"] = round(
+                kind.missingness_association(series, target, task), 4
+            )
+
+    def leakage_screen(
+        self,
+        frame: pd.DataFrame,
+        feature_columns: list[str],
+        task: tasks.TaskType,
+    ) -> screen.ScreenReport | None:
+        """Screens the training rows for leakage suspects, or None.
+
+        There is no custody in a run without a charter, so the rows are the
+        development rows given to the profiler. The screen controls the false
+        discovery rate of its significant list; see `screen` for what that
+        does and does not mean.
+        """
+        data = self.spec.data
+        target = frame[data.target]
+        if task.is_classification:
+            kind = "classification"
+        elif pd.api.types.is_numeric_dtype(target):
+            kind = "regression"
+        else:
+            return None
+        return screen.screen_table(
+            frame,
+            data.target,
+            kind,
+            feature_columns,
+            self.spec.validation.seed,
+            data.group_column,
+            data.time_column,
+        )
 
     def profile(
         self,
@@ -362,7 +384,11 @@ class DatasetProfiler:
             for f in gaps
             if f.informative
         ]
-        risks = self.leakage_findings(frame, statistics, usable, task)
+        self.describe_associations(frame, statistics, usable, task)
+        report = self.leakage_screen(frame, usable, task)
+        risks = [] if report is None else list(report.sentences())
+        if report is not None:
+            quality += [f"leakage screen: {note}" for note in report.notes]
         target_summary, target_risks = summarize_target(target, task)
         base_plan = data_contracts.FeaturePlan(
             numeric=tuple(features["numeric"]),
@@ -416,4 +442,5 @@ class DatasetProfiler:
             feature_plan=feature_plan,
             dataset_statistics=dataset_statistics,
             missingness=tuple(f.to_dict() for f in gaps),
+            leakage={} if report is None else report.to_dict(),
         )

@@ -12,7 +12,6 @@ from typing import Any
 from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
 
-LEAKAGE_MARKER = "leakage"
 SMALL_DATA_ROWS = 500
 MISSING_SHARE = 0.30
 DUPLICATE_SHARE = 0.10
@@ -120,14 +119,14 @@ class LeakageAdvice(RecommendationRule):
         self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
         """Advises when leakage hypotheses exist and are not blocking."""
-        leaks = [r for r in profile.risk_findings if LEAKAGE_MARKER in r]
-        if not leaks:
+        suspects = tuple(profile.leakage.get("suspects", ()))
+        if not suspects:
             return []
         advice = [
             Recommendation(
                 "leakage",
-                "possible leakage: "
-                + "; ".join(leaks)
+                "possible leakage (a statistical suspicion, not proof) in "
+                + ", ".join(suspects)
                 + ". List columns that are only known after the outcome in "
                 "data.unavailable_at_prediction",
                 "data.unavailable_at_prediction",
@@ -137,8 +136,8 @@ class LeakageAdvice(RecommendationRule):
             advice.append(
                 Recommendation(
                     "leakage",
-                    "set leakage_policy='block' to refuse to train until "
-                    "the hypotheses are resolved",
+                    "set leakage_policy='block' to refuse to train while a "
+                    "certified suspicion is unresolved",
                     "leakage_policy",
                 )
             )

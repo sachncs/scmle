@@ -721,6 +721,9 @@ class DatasetProfile:
             structure, quality, operational, risk).
         missingness: Per-column tests of whether gaps relate to the target.
         quality_evidence: JSON-native records for reproducible quality checks.
+        leakage: The leakage screen (`screen.ScreenReport.to_dict`): its level,
+            family size, suspects and the suspects that may block a run. Empty
+            when the screen did not apply.
     """
 
     manifest: DatasetManifest
@@ -734,6 +737,12 @@ class DatasetProfile:
     )
     missingness: tuple[Mapping[str, Any], ...] = ()
     quality_evidence: tuple[QualityEvidence, ...] = ()
+    leakage: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+
+    @property
+    def blocking_leaks(self) -> tuple[str, ...]:
+        """Columns whose leakage suspicion is certified and may block a run."""
+        return tuple(self.leakage.get("blocking", ()))
 
     def __post_init__(self) -> None:
         """Validate and detach structured quality evidence."""
@@ -755,6 +764,7 @@ class DatasetProfile:
             "dataset": dict(self.dataset_statistics),
             "missingness": [dict(item) for item in self.missingness],
             "quality_evidence": [dict(item) for item in self.quality_evidence],
+            "leakage": dict(self.leakage),
         }
 
 

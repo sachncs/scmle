@@ -101,7 +101,6 @@ from scmle.sampling import strategies
 COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
 DIAGNOSTIC_BUDGET_SHARE = 0.25
 DIAGNOSTIC_MIN_SECONDS = 30.0
-LEAKAGE_MARKER = "leakage"
 BASELINE = "dummy"
 require = context_module.require
 
@@ -507,10 +506,13 @@ class ProfileStage(Stage):
             fingerprint=knowledge.fingerprint(profile, task), task=task.value
         )
         if spec.leakage_policy == "block":
-            leaks = [r for r in profile.risk_findings if LEAKAGE_MARKER in r]
+            leaks = profile.blocking_leaks
             if leaks:
                 raise errors.BlockedError(
-                    "unresolved leakage risk: " + "; ".join(leaks)
+                    "unresolved leakage risk (certified screen, "
+                    f"Benjamini-Yekutieli level {profile.leakage['alpha']}): "
+                    + ", ".join(leaks),
+                    {"leakage": dict(profile.leakage)},
                 )
         self.run_claim_ledger(context, task)
 

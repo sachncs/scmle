@@ -29,10 +29,58 @@ def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
     leaky = binary_frame.assign(leak=binary_frame.y * 3.0 + 1)
     result = support.make_project(leaky, "y", output_dir=tmp_path).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
-    with pytest.raises(errors.BlockedError, match="leakage"):
+    assert result.profile.blocking_leaks == ("leak",)
+    with pytest.raises(errors.BlockedError, match="leakage") as raised:
         support.make_project(
             leaky, "y", output_dir=tmp_path, leakage_policy="block"
         ).run()
+    assert "leak" in str(raised.value)
+    assert raised.value.details["leakage"]["blocking"] == ["leak"]
+
+
+def test_a_noisy_copy_and_a_value_recorded_for_one_class_also_block(
+    binary_frame, tmp_path
+):
+    rng = np.random.default_rng(8)
+    flip = rng.random(len(binary_frame)) < 0.02
+    noisy = binary_frame.assign(
+        noisy=np.where(flip, 1 - binary_frame.y, binary_frame.y)
+    )
+    recorded = binary_frame.assign(
+        boat=np.where(binary_frame.y == 1, rng.normal(size=500), np.nan)
+    )
+    for frame in (noisy, recorded):
+        with pytest.raises(errors.BlockedError, match="leakage"):
+            support.make_project(
+                frame, "y", output_dir=tmp_path, leakage_policy="block"
+            ).run()
+
+
+def test_strong_legitimate_signal_is_not_blocked(binary_frame, tmp_path):
+    """The fixture's own features are strong predictors; none is a leak."""
+    result = support.make_project(
+        binary_frame, "y", output_dir=tmp_path, leakage_policy="block"
+    ).run()
+    assert result.profile.blocking_leaks == ()
+    assert not result.profile.risk_findings
+
+
+def test_an_uncertified_target_warns_but_does_not_block(tmp_path):
+    rng = np.random.default_rng(2)
+    rows = 400
+    frame = pd.DataFrame({"a": rng.normal(size=rows)})
+    frame["y"] = rng.normal(size=rows)
+    frame["leak"] = frame.y * 2.0
+    result = support.make_project(
+        frame,
+        "y",
+        task="regression",
+        output_dir=tmp_path,
+        leakage_policy="block",
+    ).run()
+    assert any("'leak'" in w for w in result.profile.risk_findings)
+    assert "warning only" in " ".join(result.profile.risk_findings)
+    assert result.profile.blocking_leaks == ()
 
 
 def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):

@@ -212,15 +212,27 @@ def check_no_false_skill(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_leak_detection(directory: pathlib.Path) -> CheckRecord:
-    """A column that encodes the label is flagged, and can block the run."""
+    """A column that encodes the label is flagged, and can block the run.
+
+    The flag is the permutation screen with Benjamini-Yekutieli control: the
+    column must be a suspect (adjusted p-value below alpha and effect-size
+    lower bound above the ceiling) whose mechanism is certified, and a clean
+    column must not be.
+    """
     record = CheckRecord(
         "leak_detection",
-        "A planted leaked column is flagged and leakage_policy=block stops.",
-        threshold="flagged and blocked",
+        "A planted leaked column is flagged by the certified screen and "
+        "leakage_policy=block stops.",
+        threshold="flagged, certified and blocked; clean columns not flagged",
     )
     leaky = binary_data().assign(leak=lambda f: f.y * 3.0 + 1)
     result = fast_project(leaky, "y", directory / "warn").run()
-    flagged = any("'leak'" in item for item in result.profile.risk_findings)
+    screen = result.profile.leakage
+    flagged = (
+        screen["suspects"] == ["leak"]
+        and result.profile.blocking_leaks == ("leak",)
+        and any("'leak'" in item for item in result.profile.risk_findings)
+    )
     try:
         fast_project(
             leaky, "y", directory / "block", leakage_policy="block"
@@ -228,7 +240,12 @@ def check_leak_detection(directory: pathlib.Path) -> CheckRecord:
         blocked = False
     except errors.BlockedError:
         blocked = True
-    record.measured = {"flagged": flagged, "blocked": blocked}
+    record.measured = {
+        "flagged": flagged,
+        "blocked": blocked,
+        "suspects": screen["suspects"],
+        "alpha": screen["alpha"],
+    }
     record.passed = flagged and blocked
     return record
 

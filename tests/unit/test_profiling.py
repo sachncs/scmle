@@ -105,6 +105,57 @@ def test_leaky_feature_flagged(classification_frame):
     assert any("'leak'" in finding for finding in result.risk_findings)
     assert not any("'num'" in finding for finding in result.risk_findings)
     assert result.column_statistics["leak"]["target_association"] >= 0.98
+    screen = result.leakage
+    assert screen["suspects"] == ["leak"]
+    assert screen["blocking"] == ["leak"]
+    assert screen["rule"] == "benjamini-yekutieli"
+    (found,) = [f for f in screen["findings"] if f["suspect"]]
+    assert found["adjusted_p"] <= screen["alpha"]
+    assert found["lower_bound"] > screen["ceilings"]["skill"]
+    assert result.blocking_leaks == ("leak",)
+    assert "leakage" in result.to_dict()
+
+
+def test_clean_table_has_an_empty_screen_result(classification_frame):
+    result = profile(classification_frame)[1]
+    assert result.leakage["suspects"] == []
+    assert result.leakage["blocking"] == []
+    assert result.blocking_leaks == ()
+    assert not result.risk_findings
+
+
+def test_a_strong_legitimate_predictor_is_not_a_leakage_risk():
+    rng = np.random.default_rng(3)
+    rows = 600
+    y = rng.integers(0, 2, rows)
+    frame = pd.DataFrame(
+        {"strong": y + rng.normal(scale=0.8, size=rows), "y": y}
+    )
+    result = profile(frame)[1]
+    assert not any("leakage" in r for r in result.risk_findings)
+    (finding,) = result.leakage["findings"]
+    assert finding["significant"] and not finding["suspect"]
+
+
+def test_the_screen_uses_groups_and_the_time_order(classification_frame):
+    frame = classification_frame.assign(
+        leak=classification_frame["y"] + 0.0,
+        grp=np.arange(300) % 30,
+        when=np.arange(300)[::-1],
+    )
+    grouped = profile(frame, group_column="grp")[1]
+    timed = profile(frame, time_column="when")[1]
+    assert grouped.leakage["suspects"] == ["leak"]
+    assert timed.leakage["suspects"] == ["leak"]
+
+
+def test_the_screen_is_skipped_for_a_non_numeric_non_class_target():
+    frame = pd.DataFrame({"a": range(120), "y": ["x"] * 120})
+    spec = make_spec("auto")
+    report = profiler.DatasetProfiler(spec).leakage_screen(
+        frame, ["a"], tasks.TaskType.MULTILABEL
+    )
+    assert report is None
 
 
 def test_missing_target_blocks(classification_frame):
