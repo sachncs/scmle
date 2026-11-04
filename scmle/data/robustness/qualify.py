@@ -12,8 +12,10 @@ package does not ship. When the file is missing, unreadable or stale for the
 current code, the checks are descriptive: a `fragile` finding is a warning,
 not a quarantine (canon P1).
 
-The stability verdicts are reported and do not yet remove findings from the
-confirmation set: the ledger freezes its survivors before this step runs.
+The stability verdicts are reported. They remove findings from the
+confirmation family only through the pre-registered second stage
+(`prefilter.StabilityStage`), which runs this module between exploration and
+the opening of `C` when the charter's rules ask for it.
 """
 
 from collections.abc import Sequence
@@ -59,6 +61,8 @@ class Robustness:
         c2st_gate: Gate status of the classifier test.
         mmd_gate: Gate status of the kernel test.
         store_note: Why no certificate store was used, or an empty string.
+        rule: The survival rule the verdicts used.
+        rule_note: Why the rule is descriptive, or an empty string.
     """
 
     grid: multiverse.Grid | None
@@ -73,6 +77,8 @@ class Robustness:
     c2st_gate: certificates.GateStatus
     mmd_gate: certificates.GateStatus
     store_note: str
+    rule: stability.Rule = stability.DEFAULT_RULE
+    rule_note: str = ""
 
     @property
     def fragile(self) -> tuple[str, ...]:
@@ -98,6 +104,7 @@ def run(
     temporal: bool = False,
     directory: Path | None = None,
     budget_seconds: float = BUDGET_SECONDS,
+    rule: stability.Rule = stability.DEFAULT_RULE,
 ) -> Robustness:
     """Stability of the survivors and shift against a deployment sample.
 
@@ -118,6 +125,9 @@ def run(
         temporal: Whether the data have a time column.
         directory: Folder of the certificate store, for tests.
         budget_seconds: Time allowed for the whole multiverse.
+        rule: Survival thresholds. The certificate was measured for
+            `stability.DEFAULT_RULE` only, so any other rule is descriptive:
+            its verdicts are reported and never gate.
 
     Returns:
         The results.
@@ -125,6 +135,13 @@ def run(
     loaded = admissibility.load_store(F6_STORE, directory)
     store = loaded.store
     stability_gate = stability.gate_status(store)
+    rule_note = ""
+    if rule != stability.DEFAULT_RULE:
+        stability_gate = certificates.GateStatus.DESCRIPTIVE
+        rule_note = (
+            "the chartered stability thresholds differ from the certified "
+            "rule: the verdicts are descriptive"
+        )
     c2st_gate, mmd_gate = (
         certificates.GateStatus.DESCRIPTIVE
         if store is None
@@ -171,6 +188,7 @@ def run(
                     curve_permutations=curve,
                     budget_seconds=share,
                     gate=stability_gate,
+                    rule=rule,
                 )
             )
     sample = features[[c for c in candidates if c in features.columns]]
@@ -216,4 +234,6 @@ def run(
         c2st_gate=c2st_gate,
         mmd_gate=mmd_gate,
         store_note=loaded.note,
+        rule=rule,
+        rule_note=rule_note,
     )

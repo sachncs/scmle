@@ -223,7 +223,7 @@ def run_governed(
         encode=lambda series: explore.encode_target(
             series, classification, classes
         ).to_numpy(dtype=float),
-        withdrawal=withdrawal,
+        withdrawal=withdrawal if withdrawal and withdrawal.accounted else None,
     )
     if run_dir is not None:
         folder = Path(run_dir)

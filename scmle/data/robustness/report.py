@@ -50,8 +50,17 @@ FINDING_STATUSES = (
 )
 
 
-def stability_report(found: qualify.Robustness) -> dict[str, Any]:
-    """The `stability_report.json` document."""
+def stability_report(
+    found: qualify.Robustness, filter_note: str | None = None
+) -> dict[str, Any]:
+    """The `stability_report.json` document.
+
+    Args:
+        found: The robustness results.
+        filter_note: What the second stage did with the fragile findings, or
+            None when no second stage ran (the findings were confirmed or
+            left unconfirmed on their own merits).
+    """
     grid = found.grid
     counts = {
         status: sum(1 for f in found.findings if f.status == status)
@@ -69,7 +78,7 @@ def stability_report(found: qualify.Robustness) -> dict[str, Any]:
         "estimator": "Spearman rank correlation of one feature with the "
         "target on the exploration set X; bootstrap resamples whole groups "
         "or time blocks when the data have them",
-        "rule": stability.DEFAULT_RULE.to_dict(),
+        "rule": found.rule.to_dict(),
         "grid": {
             "declaration_sha256": None
             if grid is None
@@ -85,6 +94,7 @@ def stability_report(found: qualify.Robustness) -> dict[str, Any]:
         "certificate": {
             "gate": found.stability_gate.value,
             "note": found.store_note
+            or found.rule_note
             or (
                 "a current passing certificate lets a fragile verdict "
                 "quarantine"
@@ -96,9 +106,10 @@ def stability_report(found: qualify.Robustness) -> dict[str, Any]:
         "counts": counts,
         "fragile": list(found.fragile),
         "findings": [f.to_dict() for f in found.findings],
-        "confirmation_filter": "not applied: the ledger froze its survivors "
-        "before this step, so fragile findings were still confirmed or "
-        "left unconfirmed on their own merits",
+        "confirmation_filter": filter_note
+        or "not applied: the charter does not ask for fragile survivors to "
+        "be withdrawn, so fragile findings were still confirmed or left "
+        "unconfirmed on their own merits",
         "guarantee": "Stability is relative to the declared specification "
         "set and is not a confirmation. Confirmation comes only from the "
         "single test on the confirmation set.",

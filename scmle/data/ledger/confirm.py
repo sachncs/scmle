@@ -140,11 +140,20 @@ class Withdrawal:
             certificate state), kept in the accounting.
         diagnostics: (source, check) pairs the rule produced on `X`; the
             caller logs them as wealth-free ledger diagnostics.
+        accounted: False when the rule only produced diagnostics and no
+            withdrawal was pre-registered; no second-stage accounting is then
+            written and `reasons` must be empty.
     """
 
     reasons: Mapping[str, str]
     rule: Mapping[str, Any]
     diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
+    accounted: bool = True
+
+    def __post_init__(self) -> None:
+        """Refuses reasons without accounting."""
+        if self.reasons and not self.accounted:
+            raise ValueError("a withdrawal with reasons must be accounted")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
