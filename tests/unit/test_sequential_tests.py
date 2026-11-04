@@ -157,3 +157,46 @@ def test_scaled_gaps_and_state_round_trip_for_processes_and_alarms():
     assert float(restored.test.log_capital) == pytest.approx(
         float(alarm.test.log_capital)
     )
+
+
+def test_mixture_false_alarm_rate_is_below_the_level():
+    rng = np.random.default_rng(11)
+    test = seq.MixtureTest(np.full(600, 0.15), seq.GREATER, 0.05, stride=10)
+    for _ in range(800):
+        test.update(rng.binomial(50, 0.15, 600) / 50)
+    assert test.ever_crossed.mean() <= 0.05
+
+
+def test_mixture_detects_a_change_after_a_long_quiet_stretch():
+    rng = np.random.default_rng(12)
+    plain = seq.BettingTest(np.full(100, 0.15), seq.GREATER, 0.05)
+    mixed = seq.MixtureTest(np.full(100, 0.15), seq.GREATER, 0.05)
+    for step in range(500):
+        risk = 0.05 if step < 300 else 0.35
+        values = rng.binomial(50, risk, 100) / 50
+        plain.update(values)
+        mixed.update(values)
+    assert mixed.ever_crossed.mean() == 1.0
+    assert plain.ever_crossed.mean() < 0.5
+
+
+def test_mixture_weights_add_to_at_most_one_and_old_terms_are_dropped():
+    test = seq.MixtureTest(0.3, seq.GREATER, 0.05, stride=2, terms=3)
+    for _ in range(30):
+        test.update(0.3)
+    assert len(test.inner) == 3
+    assert sum(math.exp(w) for w in test.log_weights) < 1.0
+    fresh = seq.MixtureTest(0.3, seq.GREATER, 0.05)
+    assert math.exp(fresh.log_weights[0]) == pytest.approx(0.5)
+
+
+def test_mixture_state_round_trips():
+    test = seq.MixtureTest(0.2, seq.LESS, 0.1, stride=3, terms=4)
+    for value in (0.1, 0.4, 0.2, 0.3, 0.1, 0.0, 0.5):
+        test.update(value)
+    again = seq.MixtureTest.from_dict(test.to_dict())
+    test.update(0.25)
+    again.update(0.25)
+    assert float(again.log_capital) == pytest.approx(float(test.log_capital))
+    with pytest.raises(ValueError, match="positive"):
+        seq.MixtureTest(0.2, seq.LESS, 0.1, stride=0)

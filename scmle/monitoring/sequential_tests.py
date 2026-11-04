@@ -181,6 +181,150 @@ class BettingTest:
         return test
 
 
+class MixtureTest:
+    """A betting test restarted at fixed times and mixed over its starts.
+
+    A single `BettingTest` multiplies capital from the first observation, so
+    after a long quiet stretch the capital is far below one and a later change
+    must first climb back; the delay of the alarm grows with the quiet time.
+    This test runs one `BettingTest` from each of a fixed set of start times
+    (the first observation and then every `stride` observations) and sums
+    their capitals with weights ``w_j = 1 / ((j + 1) (j + 2))``, which add up
+    to one. Each term is a nonnegative supermartingale under the null that
+    equals its weight until its start, so the sum is one as well, and
+    ``P(sup_t M_t >= 1 / alpha) <= alpha`` still holds at every stopping time.
+    Only the newest `terms` starts are kept; dropping terms can only lower the
+    sum, so the guarantee is unchanged (a little conservative). The price is
+    the log of the weight of the start that matters, which grows only like
+    ``2 log(t / stride)``, and a delay of up to `stride` observations before
+    a restart that begins at a change.
+    """
+
+    def __init__(
+        self,
+        null_mean: Any,
+        direction: str,
+        alpha: float,
+        stride: int = 25,
+        terms: int = 64,
+        cap: float = DEFAULT_CAP,
+    ) -> None:
+        """Creates the test; arguments as for `BettingTest`.
+
+        Args:
+            null_mean: Mean under the null, strictly inside ``(0, 1)``.
+            direction: `greater` or `less`.
+            alpha: Level, in ``(0, 1)``.
+            stride: Observations between starts.
+            terms: Newest starts kept.
+            cap: Share of the positivity bound a bet may use.
+        """
+        if stride < 1 or terms < 1:
+            raise ValueError("stride and terms must be positive")
+        self.null_mean = np.asarray(null_mean, dtype=float)
+        self.direction = direction
+        self.alpha = alpha
+        self.stride = stride
+        self.terms = terms
+        self.cap = cap
+        self.count = 0
+        self.started = 0
+        self.inner: list[BettingTest] = []
+        self.log_weights: list[float] = []
+        self.peak = np.zeros_like(self.null_mean)
+        self.log_capital = np.zeros_like(self.null_mean)
+        self.start_term()
+
+    def start_term(self) -> None:
+        """Adds a term that starts with the next observation."""
+        self.inner.append(
+            BettingTest(self.null_mean, self.direction, self.alpha, self.cap)
+        )
+        self.log_weights.append(
+            -math.log((self.started + 1) * (self.started + 2))
+        )
+        self.started += 1
+        if len(self.inner) > self.terms:
+            self.inner.pop(0)
+            self.log_weights.pop(0)
+
+    @property
+    def threshold(self) -> float:
+        """``log(1 / alpha)``."""
+        return math.log(1.0 / self.alpha)
+
+    def update(self, observation: Any) -> np.ndarray:
+        """Feeds one observation in ``[0, 1]``; returns the log capital."""
+        if self.count > 0 and self.count % self.stride == 0:
+            self.start_term()
+        for test in self.inner:
+            test.update(observation)
+        self.count += 1
+        stacked = np.stack(
+            [
+                w + t.log_capital
+                for w, t in zip(self.log_weights, self.inner, strict=True)
+            ]
+        )
+        top = stacked.max(axis=0)
+        self.log_capital = top + np.log(np.exp(stacked - top).sum(axis=0))
+        self.peak = np.maximum(self.peak, self.log_capital)
+        return self.log_capital
+
+    @property
+    def crossed(self) -> Any:
+        """Whether the mixture reached ``1 / alpha`` now."""
+        return self.log_capital >= self.threshold
+
+    @property
+    def ever_crossed(self) -> Any:
+        """Whether the mixture ever reached ``1 / alpha``."""
+        return self.peak >= self.threshold
+
+    @property
+    def e_value(self) -> np.ndarray:
+        """The mixture now: an e-value at any stopping time."""
+        return np.exp(self.log_capital)
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready state (scalar tests only)."""
+        if self.null_mean.ndim != 0:
+            raise ValueError("only a single test can be serialized")
+        return {
+            "null_mean": float(self.null_mean),
+            "direction": self.direction,
+            "alpha": self.alpha,
+            "stride": self.stride,
+            "terms": self.terms,
+            "cap": self.cap,
+            "count": self.count,
+            "started": self.started,
+            "log_weights": list(self.log_weights),
+            "inner": [t.to_dict() for t in self.inner],
+            "log_capital": float(self.log_capital),
+            "peak": float(self.peak),
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> "MixtureTest":
+        """Rebuilds a test from `to_dict`."""
+        test = cls(
+            record["null_mean"],
+            record["direction"],
+            record["alpha"],
+            record["stride"],
+            record["terms"],
+            record["cap"],
+        )
+        test.count = int(record["count"])
+        test.started = int(record["started"])
+        test.log_weights = [float(w) for w in record["log_weights"]]
+        test.inner = [BettingTest.from_dict(t) for t in record["inner"]]
+        test.log_capital = np.asarray(float(record["log_capital"]))
+        test.peak = np.asarray(float(record["peak"]))
+        return test
+
+
 class ConfidenceSequence:
     """Time-uniform confidence sequence for a bounded mean, on a grid.
 
@@ -251,7 +395,7 @@ class RiskAlarm:
         if not 0.0 < null < 1.0:
             raise ValueError("reference_risk + tolerance must be in (0, scale)")
         self.scale = scale
-        self.test = BettingTest(null, GREATER, alpha)
+        self.test = MixtureTest(null, GREATER, alpha)
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready state."""
@@ -267,7 +411,7 @@ class RiskAlarm:
             state["alpha"],
             record["scale"],
         )
-        alarm.test = BettingTest.from_dict(state)
+        alarm.test = MixtureTest.from_dict(state)
         return alarm
 
     def update(self, mean_loss: float) -> bool:
@@ -299,7 +443,7 @@ class PairedEProcess:
             raise ValueError("margin must lie strictly within (-scale, scale)")
         self.margin = margin
         self.scale = scale
-        self.test = BettingTest((margin / scale + 1.0) / 2.0, GREATER, alpha)
+        self.test = MixtureTest((margin / scale + 1.0) / 2.0, GREATER, alpha)
 
     def update(self, champion_loss: Any, other_loss: Any) -> bool:
         """Feeds the mean paired losses of one matured batch.
@@ -357,7 +501,7 @@ class PairedEProcess:
         """Rebuilds a process from `to_dict`."""
         state = record["test"]
         process = cls(record["margin"], state["alpha"], record["scale"])
-        process.test = BettingTest.from_dict(state)
+        process.test = MixtureTest.from_dict(state)
         return process
 
 

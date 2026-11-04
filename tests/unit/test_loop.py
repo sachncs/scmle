@@ -32,6 +32,7 @@ def make_policy(**changes):
         "initial_tau": 0.5,
         "min_matured": 5,
         "r_star": 0.6,
+        "alarm_gates_retrain": True,
         "outcome_window": 0,
     }
     values.update(changes)
@@ -719,3 +720,21 @@ def test_an_expired_attestation_no_longer_allows(tmp_path):
     clock["today"] = datetime.date(2027, 1, 1)
     with pytest.raises(never_list.AttestationRequired):
         loop.move_champion(registry, "m", 3, None)
+
+
+def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
+    calls = []
+    loop = open_loop(
+        tmp_path,
+        make_policy(alarm_gates_retrain=False),
+        hooks=loop_module.Hooks(retrain=lambda: calls.append(1)),
+    )
+    stream = streams.simulate(
+        spec(kind="abrupt", batches=80, change=30, delta=0.25, seed=4)
+    )
+    feed(loop, stream)
+    assert rows(loop, dl.ALARM) and not rows(loop, dl.RETRAIN) and not calls
+    assert any(
+        e.question["action"] == "l1_alarm_investigate"
+        for e in loop.pending_escalations()
+    )

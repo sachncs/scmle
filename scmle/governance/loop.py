@@ -111,8 +111,12 @@ class LoopPolicy:
         r_star: Target selective risk.
         delta: Confidence ``1 - delta`` of the threshold.
         c_max: Largest escalated share of a batch.
-        max_delay: `D_max`, batches within which a `2 * tolerance` change
-            must be detected for the alarm to gate a retrain (certified).
+        alarm_gates_retrain: Whether an L1 alarm may trigger a retrain. Set
+            it True only if the loop certificate for the detection delay
+            (H2: a rise of `2 * tolerance` found within the charter's
+            `D_max` with probability at least 0.9) passed for these
+            settings; otherwise an alarm records an `alarm` row and
+            escalates (`investigate`), and nothing is retrained.
         outcome_window: Batches after which a prediction has matured.
         epsilon: Smallest propensity, also the audit-slice rate; 0 requires
             complete labels.
@@ -142,7 +146,7 @@ class LoopPolicy:
     r_star: float = 0.05
     delta: float = 0.1
     c_max: float = 0.2
-    max_delay: int = 50
+    alarm_gates_retrain: bool = False
     outcome_window: int = 1
     epsilon: float = 0.0
     bypass_rate: float = 0.0
@@ -427,16 +431,16 @@ class Loop:
         self.selective = sequential_tests.RiskAlarm(
             policy.r_star, 0.0, policy.delta, policy.scale
         )
-        self.coverage_test: sequential_tests.BettingTest | None = (
+        self.coverage_test: sequential_tests.MixtureTest | None = (
             None
             if policy.coverage_target is None
-            else sequential_tests.BettingTest(
+            else sequential_tests.MixtureTest(
                 policy.coverage_target,
                 sequential_tests.LESS,
                 policy.alpha_alarm,
             )
         )
-        self.novelty_test = sequential_tests.BettingTest(
+        self.novelty_test = sequential_tests.MixtureTest(
             min(max(policy.novelty_bound, 1e-6), 1 - 1e-6),
             sequential_tests.GREATER,
             policy.alpha_alarm,
@@ -525,10 +529,10 @@ class Loop:
             state["selective"]
         )
         if state["coverage_test"] is not None:
-            self.coverage_test = sequential_tests.BettingTest.from_dict(
+            self.coverage_test = sequential_tests.MixtureTest.from_dict(
                 state["coverage_test"]
             )
-        self.novelty_test = sequential_tests.BettingTest.from_dict(
+        self.novelty_test = sequential_tests.MixtureTest.from_dict(
             state["novelty_test"]
         )
         self.active = {
@@ -1012,18 +1016,16 @@ class Loop:
                     "mechanism": self.mechanism.value,
                 },
             )
-            name = None
-            skipped = None
-            if self.queue:
-                skipped = "a challenger is already pending"
-            elif self.hooks.retrain is not None:
-                name = self.hooks.retrain()
-            body = {"reason": "L1 alarm", "batch": batch, "challenger": name}
-            if skipped is not None:
-                body["skipped"] = skipped
-            self.ledger.commit(ledger_module.RETRAIN, body)
-            if name is not None and name not in self.ledger.registered:
-                self.register_challenger(name)
+            if not self.policy.alarm_gates_retrain:
+                newest = (
+                    self.escalate(
+                        "l1_alarm_investigate",
+                        {"batch": batch, "reason": "alarm is not certified"},
+                    )
+                    or newest
+                )
+            else:
+                self.retrain_challenger(batch)
             self.alarm = sequential_tests.RiskAlarm(
                 self.policy.reference_risk,
                 self.policy.tolerance,
@@ -1051,7 +1053,7 @@ class Loop:
                 self.escalate("coverage_below_nominal", {"batch": batch})
                 or newest
             )
-            self.coverage_test = sequential_tests.BettingTest(
+            self.coverage_test = sequential_tests.MixtureTest(
                 self.policy.coverage_target or 0.9,
                 sequential_tests.LESS,
                 self.policy.alpha_alarm,
@@ -1063,7 +1065,7 @@ class Loop:
                 )
                 or newest
             )
-            self.novelty_test = sequential_tests.BettingTest(
+            self.novelty_test = sequential_tests.MixtureTest(
                 min(max(self.policy.novelty_bound, 1e-6), 1 - 1e-6),
                 sequential_tests.GREATER,
                 self.policy.alpha_alarm,
@@ -1072,6 +1074,21 @@ class Loop:
             newest = self.decide_rollback() or newest
             newest = self.decide_queue() or newest
         return newest
+
+    def retrain_challenger(self, batch: int) -> None:
+        """Records a retrain request and registers the hook's challenger."""
+        name = None
+        skipped = None
+        if self.queue:
+            skipped = "a challenger is already pending"
+        elif self.hooks.retrain is not None:
+            name = self.hooks.retrain()
+        body = {"reason": "L1 alarm", "batch": batch, "challenger": name}
+        if skipped is not None:
+            body["skipped"] = skipped
+        self.ledger.commit(ledger_module.RETRAIN, body)
+        if name is not None and name not in self.ledger.registered:
+            self.register_challenger(name)
 
     def decide_rollback(self) -> Escalation | None:
         """Turns a crossed reverse process into a rollback proposal."""
