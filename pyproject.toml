@@ -110,7 +110,7 @@ extend-exclude = ["mutants"]
 select = ["E", "W", "F", "I", "UP", "B", "N", "D", "ANN", "SIM", "RUF", "C4", "SLF"]
 ignore = ["ANN401", "RUF012"]
 # underscore names are banned by tests/unit/test_conventions.py
-dummy-variable-rgx = "^(_|ignored)$"
+dummy-variable-rgx = "^(_\\w*|ignored)$"
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
