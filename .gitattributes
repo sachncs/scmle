@@ -1,0 +1,9 @@
+# Checked-out text is byte-identical on every platform: fixtures, certificates
+# and manifests are hashed, so Windows must not rewrite their line endings.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.parquet binary
+*.pkl binary
