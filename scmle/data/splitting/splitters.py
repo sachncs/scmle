@@ -114,11 +114,29 @@ class LockedTestSet(abc.ABC):
         """Returns the release token; call only once selection is frozen."""
 
     @abc.abstractmethod
-    def open(self, token: str) -> tuple[pd.DataFrame, pd.Series]:
+    def bind(self, binding: str) -> None:
+        """Fixes what the single release is for; call before `open`.
+
+        After a binding is set, `open` releases the rows only to a caller
+        that presents the same binding. A set can be bound once.
+
+        Args:
+            binding: Digest of the selection the release is meant to test.
+
+        Raises:
+            LeakageError: If a binding is already set or the rows were
+                released.
+        """
+
+    @abc.abstractmethod
+    def open(
+        self, token: str, binding: str | None = None
+    ) -> tuple[pd.DataFrame, pd.Series]:
         """Releases the test data a single time.
 
         Args:
             token: The token from `issue_token`.
+            binding: The binding fixed by `bind`; required once one is set.
 
         Returns:
             Test features and labels.
@@ -151,6 +169,7 @@ class ResidentTestSet(LockedTestSet):
         ids: Row ids of the test rows.
         token: Secret issued by `issue_token` (excluded from repr).
         opened: Whether the set has been released.
+        binding: Digest the release is bound to, or None.
     """
 
     features: pd.DataFrame = dataclasses.field(repr=False)
@@ -160,12 +179,21 @@ class ResidentTestSet(LockedTestSet):
         default_factory=lambda: secrets.token_hex(8), repr=False
     )
     opened: bool = False
+    binding: str | None = None
 
     def issue_token(self) -> str:
         """Returns the release token; call only once selection is frozen."""
         return self.token
 
-    def open(self, token: str) -> tuple[pd.DataFrame, pd.Series]:
+    def bind(self, binding: str) -> None:
+        """Fixes what the single release is for."""
+        if self.binding is not None or self.opened:
+            raise errors.LeakageError("test set is already bound or used")
+        self.binding = binding
+
+    def open(
+        self, token: str, binding: str | None = None
+    ) -> tuple[pd.DataFrame, pd.Series]:
         """Releases the test data a single time."""
         if token != self.token:
             raise errors.LeakageError("test set is locked: invalid token")
@@ -173,6 +201,8 @@ class ResidentTestSet(LockedTestSet):
             raise errors.LeakageError(
                 "test set was already used for final evaluation"
             )
+        if self.binding is not None and binding != self.binding:
+            raise errors.LeakageError("test set is locked: binding mismatch")
         self.opened = True
         return self.features, self.target
 

@@ -32,6 +32,15 @@ VAULT_LEVEL = "vault process"
 PROTOCOL_LEVEL = "in-process protocol"
 
 
+def binding_digest(claims_hash: str, ledger_hash: str) -> str:
+    """Digest that a release is bound to: the claim set and the ledger."""
+    return hashlib.sha256(
+        signing.canonical_payload(
+            {"claims_hash": claims_hash, "ledger_hash": ledger_hash}
+        )
+    ).hexdigest()
+
+
 def entry_hash(body: Mapping[str, Any]) -> str:
     """Hash of a log entry's content."""
     return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
@@ -139,6 +148,7 @@ class SealedSet:
         self.set_id = set_id
         self.locked = locked
         self.log = log
+        self.binding: str | None = None
         log.append(set_id, "sealed", ORCHESTRATOR, {"rows": len(locked)})
 
     @property
@@ -157,20 +167,67 @@ class SealedSet:
         self.log.append(self.set_id, "token_issued", ORCHESTRATOR)
         return token
 
+    @property
+    def committed(self) -> bool:
+        """Whether the release is bound to a claim set and a ledger."""
+        return self.binding is not None
+
+    def commit(self, claims_hash: str, ledger_hash: str) -> str:
+        """Binds the single release to a claim set and a ledger state.
+
+        After this, `open` releases the rows only when it is given the same
+        two hashes; a release for any other selection is refused by the
+        vault (or, for an in-process set, by the protocol check). The
+        binding is logged with both hashes.
+
+        Args:
+            claims_hash: Digest of the claims (survivors) to be tested.
+            ledger_hash: Head hash of the hypothesis ledger.
+
+        Returns:
+            The binding digest.
+
+        Raises:
+            LeakageError: If the set is already committed or was opened.
+        """
+        binding = binding_digest(claims_hash, ledger_hash)
+        self.locked.bind(binding)
+        self.binding = binding
+        self.log.append(
+            self.set_id,
+            "bound",
+            ORCHESTRATOR,
+            {"claims_hash": claims_hash, "ledger_hash": ledger_hash},
+        )
+        return binding
+
     def open(
-        self, token: str, actor: str = ORCHESTRATOR
+        self,
+        token: str,
+        actor: str = ORCHESTRATOR,
+        claims_hash: str | None = None,
+        ledger_hash: str | None = None,
     ) -> tuple[pd.DataFrame, pd.Series]:
         """Releases the rows a single time.
 
         Args:
             token: The token from `issue_token`.
             actor: Who is opening (recorded).
+            claims_hash: Digest of the claims being tested; required, with
+                `ledger_hash`, once the set is committed.
+            ledger_hash: Head hash of the ledger.
 
         Raises:
-            LeakageError: On a wrong token or a repeated release.
+            LeakageError: On a wrong token, a binding that does not match,
+                or a repeated release.
         """
+        offered = (
+            binding_digest(claims_hash, ledger_hash)
+            if claims_hash is not None and ledger_hash is not None
+            else None
+        )
         try:
-            rows = self.locked.open(token)
+            rows = self.locked.open(token, offered)
         except errors.LeakageError as error:
             self.log.append(
                 self.set_id, "denied", actor, {"reason": str(error)}

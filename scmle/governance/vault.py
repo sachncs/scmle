@@ -19,6 +19,7 @@ from scmle.core import ipc
 from scmle.data.splitting import splitters
 
 OPEN = "open"
+BIND = "bind"
 
 
 def serve(
@@ -26,17 +27,37 @@ def serve(
     token: str,
     rows: tuple[pd.DataFrame, pd.Series],
 ) -> None:
-    """Vault main loop: release the rows once, on the right token."""
+    """Vault main loop: bind once, release the rows once, on the right token.
+
+    A `bind` message fixes a digest. From then on `open` releases the rows
+    only to a caller that presents the same digest, so the release cannot be
+    spent on a selection other than the one that was bound.
+    """
     released = False
+    binding: str | None = None
     while True:
         try:
-            operation, presented = channel.recv()
+            message = channel.recv()
         except EOFError:
             return
-        if operation != OPEN or not secrets.compare_digest(presented, token):
+        operation, presented = message[0], message[1]
+        extra = message[2] if len(message) > 2 else None
+        if operation not in (OPEN, BIND) or not secrets.compare_digest(
+            presented, token
+        ):
             channel.send(("denied", "invalid token"))
+        elif operation == BIND:
+            if binding is not None or released:
+                channel.send(("denied", "already bound or released"))
+            else:
+                binding = str(extra)
+                channel.send(("ok", None))
         elif released:
             channel.send(("denied", "already released"))
+        elif binding is not None and not secrets.compare_digest(
+            str(extra).encode(), binding.encode()
+        ):
+            channel.send(("denied", "binding mismatch"))
         else:
             released = True
             channel.send(("ok", rows))
@@ -83,11 +104,33 @@ class SealedTestSet(splitters.LockedTestSet):
         """Returns the release token; call only once selection is frozen."""
         return self.token
 
-    def open(self, token: str) -> tuple[pd.DataFrame, pd.Series]:
+    def bind(self, binding: str) -> None:
+        """Tells the vault what the single release is for.
+
+        Args:
+            binding: Digest the vault will require at `open`.
+
+        Raises:
+            LeakageError: If already bound, released, or the vault is gone.
+        """
+        if self.opened:
+            raise errors.LeakageError("test set is already bound or used")
+        try:
+            self.channel.send((BIND, self.token, binding))
+            status, value = self.channel.recv()
+        except (EOFError, OSError) as error:
+            raise errors.LeakageError("the test-set vault is gone") from error
+        if status != "ok":
+            raise errors.LeakageError(f"test set is locked: {value}")
+
+    def open(
+        self, token: str, binding: str | None = None
+    ) -> tuple[pd.DataFrame, pd.Series]:
         """Asks the vault for the rows, once.
 
         Args:
             token: The token from `issue_token`.
+            binding: The digest given to `bind`, if one was set.
 
         Returns:
             Test features and labels.
@@ -101,7 +144,7 @@ class SealedTestSet(splitters.LockedTestSet):
                 "test set was already used for final evaluation"
             )
         try:
-            self.channel.send((OPEN, token))
+            self.channel.send((OPEN, token, binding))
             status, value = self.channel.recv()
         except (EOFError, OSError) as error:
             raise errors.LeakageError("the test-set vault is gone") from error

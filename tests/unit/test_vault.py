@@ -70,3 +70,34 @@ def test_a_vault_that_is_gone_is_reported_not_hung():
 
     with pytest.raises(errors.LeakageError, match=r"gone|locked"):
         locked.open(locked.issue_token())
+
+
+def test_a_bound_vault_refuses_a_release_for_another_selection(sealed):
+    sealed.bind("selection-a")
+    token = sealed.issue_token()
+
+    with pytest.raises(errors.LeakageError, match="binding mismatch"):
+        sealed.open(token)
+    with pytest.raises(errors.LeakageError, match="binding mismatch"):
+        sealed.open(token, "selection-b")
+    assert sealed.opened is False
+    features, _ = sealed.open(token, "selection-a")
+    assert len(features) == 3 and sealed.opened is True
+
+
+def test_a_vault_binds_once(sealed):
+    sealed.bind("selection-a")
+
+    with pytest.raises(errors.LeakageError, match="already bound"):
+        sealed.bind("selection-b")
+
+
+def test_an_unbound_vault_releases_without_a_binding(sealed):
+    assert len(sealed.open(sealed.issue_token())[0]) == 3
+
+
+def test_a_bound_vault_checks_the_token_before_the_binding(sealed):
+    sealed.bind("selection-a")
+
+    with pytest.raises(errors.LeakageError, match="invalid token"):
+        sealed.open("guess", "selection-a")

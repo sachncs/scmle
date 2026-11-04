@@ -165,3 +165,23 @@ def test_a_second_open_is_refused_and_both_attempts_are_logged():
     assert ("denied", "exploration") in events
     log.verify()
     vault.close()
+
+
+def test_a_release_for_a_different_selection_is_refused_by_the_vault():
+    built = build()
+    held, log = built.vault.sets["C"], built.log
+    held.commit("claims-1", "ledger-1")
+    token = held.issue_token()
+    try:
+        held.open(token, "exploration", "claims-1", "ledger-OTHER")
+    except errors.LeakageError:
+        pass
+    else:
+        raise AssertionError("opened for another ledger state")
+    assert not held.opened
+    held.open(token, "confirmation", "claims-1", "ledger-1")
+    events = [(e["event"], e["actor"]) for e in log.entries]
+    assert ("denied", "exploration") in events
+    assert ("open", "confirmation") in events
+    log.verify()
+    built.vault.close()

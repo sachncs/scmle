@@ -128,3 +128,63 @@ def test_exploration_view_holds_no_reference_to_a_sealed_set():
         "folds",
         "manifest_sha256",
     }
+
+
+def committed(process_set):
+    log = sealed.OpenLog()
+    held = sealed.SealedSet("C", process_set, log)
+    held.commit("claims-1", "ledger-1")
+    return held, log
+
+
+def test_a_committed_set_opens_only_for_its_claims_and_ledger():
+    held, log = committed(resident())
+    token = held.issue_token()
+    for claims, ledger in (
+        (None, None),
+        ("claims-2", "ledger-1"),
+        ("claims-1", "ledger-2"),
+    ):
+        with pytest.raises(errors.LeakageError, match="binding mismatch"):
+            held.open(token, "attacker", claims, ledger)
+    assert held.opened is False
+    held.open(token, "confirmation", "claims-1", "ledger-1")
+    assert held.opened is True
+    events = [e["event"] for e in log.entries]
+    assert events.count("denied") == 3 and events[-1] == "open"
+    log.verify()
+
+
+def test_the_binding_and_both_hashes_are_logged():
+    held, log = committed(resident())
+    bound = next(e for e in log.entries if e["event"] == "bound")
+    assert bound["detail"] == {
+        "claims_hash": "claims-1",
+        "ledger_hash": "ledger-1",
+    }
+    assert held.committed is True
+    assert held.binding == sealed.binding_digest("claims-1", "ledger-1")
+
+
+def test_a_set_commits_once_and_not_after_it_opened():
+    held, _ = committed(resident())
+    with pytest.raises(errors.LeakageError, match="already bound"):
+        held.commit("claims-2", "ledger-1")
+    other = sealed.SealedSet("F", resident(), sealed.OpenLog())
+    other.open(other.issue_token())
+    with pytest.raises(errors.LeakageError, match="already bound or used"):
+        other.commit("claims-1", "ledger-1")
+
+
+def test_the_binding_digest_depends_on_both_hashes():
+    base = sealed.binding_digest("a", "b")
+    assert base != sealed.binding_digest("a", "c")
+    assert base != sealed.binding_digest("c", "b")
+    assert base != sealed.binding_digest("b", "a")
+    assert len(base) == 64
+
+
+def test_an_unbound_set_still_opens_without_hashes():
+    held = sealed.SealedSet("C", resident(), sealed.OpenLog())
+    assert held.committed is False
+    assert len(held.open(held.issue_token())[0]) == 3
