@@ -166,6 +166,18 @@ def logistic(value: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-value))
 
 
+def marginal_risk(base: float, dependence: float) -> float:
+    """Mean loss rate of a stable stream, integrated over the covariate.
+
+    With `dependence > 0` the per-case probability is clipped to [0, 1], so
+    its mean over `z ~ N(0, 1)` differs a little from `base`; this integrates
+    it with Gauss-Hermite nodes.
+    """
+    nodes, weights = np.polynomial.hermite_e.hermegauss(200)
+    chance = np.clip(base + dependence * (logistic(nodes) - 0.5), 0.0, 1.0)
+    return float(np.sum(weights * chance) / np.sum(weights))
+
+
 def simulate(spec: StreamSpec) -> Stream:
     """Draws one stream.
 

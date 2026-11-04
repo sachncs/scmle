@@ -1,0 +1,241 @@
+{
+  "charter_inputs": {
+    "alpha_alarm": 0.05,
+    "alpha_promo": 0.05,
+    "alpha_rb": 0.05,
+    "batch_size": 50,
+    "d_max": 50,
+    "delta": 0.1,
+    "delta_promo": 0.0,
+    "delta_rb": 0.05,
+    "r_star": 0.05,
+    "reference_risk": 0.1,
+    "tolerance": 0.05
+  },
+  "dev_seed_base": 10000,
+  "gates": {
+    "H1": {
+      "batches": 5000,
+      "boundary": {
+        "betting": {
+          "bound": 0.059746794344808965,
+          "meets": true,
+          "rate": 0.0075
+        },
+        "fixed_rule_rate": 1.0,
+        "true_risk": 0.15000000000000002
+      },
+      "code_hash": "73a41428345bba4ae63df924a5e3e6f20b9d8ea1fc9b70800e0531f6c37ed459",
+      "passed": true,
+      "replicates": 2000,
+      "seeds": [
+        0,
+        2000
+      ],
+      "stable": {
+        "betting": {
+          "bound": 0.059746794344808965,
+          "meets": true,
+          "rate": 0.0
+        },
+        "fixed_rule_rate": 1.0,
+        "true_risk": 0.1
+      }
+    },
+    "H10": {
+      "by_rise": {
+        "r_star_x_2": {
+          "excess_cases_before_halt": 2850.0,
+          "median_delay_batches": 57.0,
+          "risk_after": 0.1,
+          "within_d_max": 0.1335,
+          "within_d_max_lower": 0.12114408577032808
+        },
+        "r_star_x_3": {
+          "excess_cases_before_halt": 1250.0,
+          "median_delay_batches": 25.0,
+          "risk_after": 0.15000000000000002,
+          "within_d_max": 1.0,
+          "within_d_max_lower": 0.9985032551048117
+        }
+      },
+      "code_hash": "ef916234128e25c50b57771bd60d2c0c54ba7b2ed315cc43b633b3496d68ce56",
+      "coverage_after_halt": 0.0,
+      "passed": false,
+      "replicates": 2000,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "H2": {
+      "by_rise": {
+        "1.5": {
+          "detected": 0.9995,
+          "fixed_rule_median_delay": 0.0,
+          "median_delay": 183.0,
+          "risk": 0.17500000000000002,
+          "within_d_max": 0.0,
+          "within_d_max_lower": 0.0
+        },
+        "2.0": {
+          "detected": 1.0,
+          "fixed_rule_median_delay": 0.0,
+          "median_delay": 76.0,
+          "risk": 0.2,
+          "within_d_max": 0.0035,
+          "within_d_max_lower": 0.0016437742189410833
+        },
+        "3.0": {
+          "detected": 1.0,
+          "fixed_rule_median_delay": 0.0,
+          "median_delay": 33.0,
+          "risk": 0.25,
+          "within_d_max": 1.0,
+          "within_d_max_lower": 0.9985032551048117
+        }
+      },
+      "code_hash": "1719e6e38f4ff97b5a89a93290837e07050d929bd61f92dd3ef14a8868598cf5",
+      "d_max": 50,
+      "passed": false,
+      "replicates": 2000,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "H3": {
+      "code_hash": "485ac1d218863bc6224923ec2cf34adf071199a45572b7efa7a45c16c2e51962",
+      "passed": true,
+      "psi_rule_flag_rate": 1.0,
+      "replicates": 300,
+      "retrain_trigger_rate": {
+        "bound": 0.07516611478423584,
+        "meets": true,
+        "rate": 0.0
+      },
+      "seeds": [
+        0,
+        300
+      ]
+    },
+    "H4": {
+      "bootstrap_exceeds_level": true,
+      "bootstrap_fdr": 0.6136285926448561,
+      "bootstrap_power": 1.0,
+      "challengers": 200,
+      "code_hash": "184d35c9d9d20392f13ad3c3a410946a0c1db1a68d6e905d897bd14200c581fd",
+      "elond_fdr": 0.0,
+      "elond_power": 1.0,
+      "elond_se": 0.0,
+      "horizon_batches": 150,
+      "passed": true,
+      "replicates": 100,
+      "seeds": [
+        0,
+        100
+      ],
+      "true_advantage": 0.2,
+      "true_better_share": 0.2
+    },
+    "H5": {
+      "by_difference": {
+        "0": {
+          "median_delay": null,
+          "rollback_rate": 0.0,
+          "worse_by": 0.0
+        },
+        "1": {
+          "median_delay": null,
+          "rollback_rate": 0.0,
+          "worse_by": 0.05
+        },
+        "2": {
+          "median_delay": 148.0,
+          "rollback_rate": 1.0,
+          "worse_by": 0.1
+        }
+      },
+      "code_hash": "b707336b7572c4a7673a008f04f2d64fdc4fa1f0b88b70d6df249b637419cce3",
+      "passed": true,
+      "replicates": 2000,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
+    "H6": {
+      "code_hash": "37d763f4c9c00ebcf1dd352c15597865703f6e2dc70d4fcb5b62d2b7acf07e0f",
+      "cs_coverage_floor": 0.9122508278236462,
+      "cs_time_uniform_coverage": 1.0,
+      "mnar_without_audit_slice": {
+        "actions_taken": 0,
+        "all_unverified": true,
+        "runs": 10
+      },
+      "naive_bias": 0.04738927228358806,
+      "passed": true,
+      "replicates": 300,
+      "seeds": [
+        0,
+        300
+      ],
+      "weighted_bias": -4.146820368633545e-06,
+      "weighted_bias_se": 0.000244214099137859
+    },
+    "H7": {
+      "arrival_bias": -0.07573849154210222,
+      "arrival_se": 0.0005145558523951006,
+      "code_hash": "81189b75780d1727c1d5f6d5f965820ef5ec282de15314799c616dbfe0c31e2d",
+      "maturity_bias": -8.098765432099855e-05,
+      "maturity_se": 0.0001913306067687159,
+      "passed": true,
+      "replicates": 300,
+      "seeds": [
+        0,
+        300
+      ]
+    },
+    "H8": {
+      "code_hash": "4bb719b5688e2facbf00340c7659316e8a29acdc38019874290c365a46874086",
+      "detection_rate": {
+        "loop_bypass_0.05": 0.9,
+        "loop_bypass_0.10": 0.98,
+        "loop_bypass_0.20": 0.99,
+        "loop_free": 0.05
+      },
+      "false_detection_bound": 0.09358898943540674,
+      "passed": true,
+      "replicates": 100,
+      "seeds": [
+        0,
+        100
+      ],
+      "without_bypass_slice": "unverified"
+    },
+    "H9": {
+      "code_hash": "1e8318bb144b4392f9f7c77139f02dcbdff0806a9c6128bfdb7e32861b6a9ea0",
+      "everything_escalates_rate": 0.008,
+      "mean_coverage_at_tau": 0.6387600806451614,
+      "naive_best_cut_violation_rate": 0.464,
+      "oracle_coverage": 0.7071067811865476,
+      "oracle_tau": 0.2928932188134524,
+      "passed": true,
+      "replicates": 1000,
+      "seeds": [
+        0,
+        1000
+      ],
+      "violation_bound": 0.11897366596101028,
+      "violation_rate": 0.076
+    }
+  },
+  "not_measured": [
+    "H11 agreement with a domain owner's signed escalation audit",
+    "replay of recorded incident-like streams (no verified corpus)",
+    "ledger replay on Python 3.11 (only the environment's interpreter ran)",
+    "independent confidence-sequence implementation (none pinned)"
+  ],
+  "simulator_hash": "f909387f761776286662131e3f4136101ebf9a237a6e4f407d251c1fb4535ae3",
+  "version": 1
+}
