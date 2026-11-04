@@ -15,6 +15,34 @@ A second call raises `LeakageError` and is logged. This module takes the
 sealed set as an argument; it imports nothing from custody, and no other
 module of the ledger package can reach `C` (an import-graph test checks it).
 
+Second stage (optional, pre-registered). Between the negative control and the
+opening of `C` the caller may hand over a `Withdrawal`: survivors that a rule
+computed from `X` alone (the stability filter) removes from the family that
+goes to `C`. The ledger is untouched: it still freezes and hashes the full
+survivor set, and the withdrawal is its own accounting, written to the custody
+log (``selection_frozen``, with ``family_sha256``) before `C` opens and to the
+confirmation row and ``confirmed_claims.json`` after (``stage_two``). Withdrawn
+survivors are reported at tier `unverified` and are never tested on `C`.
+
+What is controlled, and under what assumption (`STAGE_TWO_STATEMENT`). Let
+``S`` be the frozen survivors and ``F`` the subset not withdrawn. If ``F`` is a
+function of `X`, the charter and the seed only, and `C` is independent of `X`
+(the existing assumption), then conditionally on ``X`` the p-values on `C` of
+the true nulls in ``F`` keep their null distribution, so the rule's guarantee
+holds for ``F``: FDR of the confirmed claims at most ``alpha_confirm`` for BY
+(any dependence) and for BH under independence or positive dependence on `C`,
+FWER at most ``alpha_confirm`` for Holm and Bonferroni. The bound is on the
+claims actually made, which are a subset of ``F``; it averages over the
+selection, so the same level holds unconditionally. The withdrawal spends no
+alpha and adds none. What is not claimed: that the withdrawal raises power
+(it can only remove hypotheses, a true effect withdrawn is lost), that a
+withdrawn finding is false, or any guarantee if ``F`` was computed from rows
+of `C` or `F`. The module cannot see how the caller computed ``F``; it checks
+only that the withdrawn ids are survivors and that the family hash is
+recorded before `C` opens. `tests/unit/test_ledger_withdrawal.py` simulates
+the error rate with an `X`-only withdrawal rule that is correlated with the
+signal, and checks the order of events.
+
 Failure policy. A statistical failure to reject is a result, not a failure.
 If the confirmation run *crashes* after `C` was opened, `C` is spent and the
 charter's policy applies: ``unconfirmed`` (default) keeps every claim at tier
@@ -31,6 +59,7 @@ for grouped or serial data); the family is exactly the frozen survivors.
 """
 
 from collections.abc import Callable
+from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 from fractions import Fraction
@@ -90,6 +119,34 @@ class ConfirmationSource(Protocol):
         """Releases the rows a single time."""
 
 
+STAGE_TWO_STATEMENT = (
+    "the confirmed claims keep the guarantee of the confirmation rule at "
+    "alpha_confirm over the family that was not withdrawn, provided the "
+    "withdrawal was computed from the exploration set only and C is "
+    "independent of it; the withdrawal spends no alpha, and withdrawn "
+    "findings are unverified, not shown false"
+)
+ALL_WITHDRAWN = "all_withdrawn"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Withdrawal:
+    """Survivors an exploration-only rule removed before `C` was opened.
+
+    Attributes:
+        reasons: Hypothesis id to the sentence that withdrew it. Every id
+            must be a frozen survivor.
+        rule: JSON-ready description of the rule (name, thresholds,
+            certificate state), kept in the accounting.
+        diagnostics: (source, check) pairs the rule produced on `X`; the
+            caller logs them as wealth-free ledger diagnostics.
+    """
+
+    reasons: Mapping[str, str]
+    rule: Mapping[str, Any]
+    diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Confirmation:
     """The outcome of the confirmation stage.
@@ -107,6 +164,8 @@ class Confirmation:
         ledger_head: Ledger head hash when the confirmation was written.
         custody_head: Custody log head hash after the open, or None.
         control: The negative-control summary, or None.
+        stage_two: Accounting of the withdrawal (family, hash, rule,
+            statement), or None when no withdrawal rule ran.
     """
 
     outcome: str
@@ -119,6 +178,7 @@ class Confirmation:
     ledger_head: str
     custody_head: str | None
     control: dict[str, Any] | None
+    stage_two: dict[str, Any] | None = None
 
     @property
     def confirmed(self) -> tuple[qualification.Claim, ...]:
@@ -129,7 +189,7 @@ class Confirmation:
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record (``confirmed_claims.json``)."""
-        return {
+        record = {
             "outcome": self.outcome,
             "reason": self.reason,
             "rule": self.rule,
@@ -150,6 +210,9 @@ class Confirmation:
                 "feature admission or preprocessing."
             ),
         }
+        if self.stage_two is not None:
+            record["stage_two"] = self.stage_two
+        return record
 
     def write(self, path: str | Path) -> None:
         """Writes ``confirmed_claims.json``."""
@@ -162,10 +225,10 @@ class Confirmation:
 
 
 def assumptions(
-    rule: budget_module.MultiplicityRule, size: int
+    rule: budget_module.MultiplicityRule, size: int, withdrawn: int = 0
 ) -> tuple[str, ...]:
     """The assumptions a confirmed claim depends on."""
-    return (
+    lines = [
         f"{multiplicity.STATEMENTS[rule]} (rule {rule.value}, family of "
         f"{size} survivors fixed before C was opened)",
         "rows of C are independent of rows of X (grouped split by entity, "
@@ -174,7 +237,15 @@ def assumptions(
         "each statistic is valid under its null on C: Spearman and Kruskal "
         "assume independent rows",
         "exploration FDR is a triage budget, not part of this guarantee",
-    )
+    ]
+    if withdrawn:
+        lines.insert(
+            1,
+            f"{withdrawn} survivor(s) were withdrawn before C was opened by "
+            "a rule computed from the exploration set only; the family above "
+            "is the survivors that remain",
+        )
+    return tuple(lines)
 
 
 def statement(spec: ledger_module.HypothesisSpec) -> str:
@@ -221,25 +292,25 @@ def finish(
     rule: budget_module.MultiplicityRule,
     alpha: Fraction,
     custody_head: str | None,
+    stage_two: Mapping[str, Any] | None = None,
 ) -> Confirmation:
     """Writes the confirmation row and builds the result."""
     survivors = ledger.survivor_set
     if survivors is None:
         raise ledger_module.LedgerError("freeze the survivors first")
-    ledger.seal(
-        {
-            "outcome": outcome,
-            "reason": reason,
-            "rule": rule.value,
-            "alpha_confirm": str(alpha),
-            "confirmed": [
-                c.claim_id
-                for c in claims
-                if c.tier is qualification.Tier.CONFIRMED
-            ],
-            "custody_head": custody_head,
-        }
-    )
+    body: dict[str, Any] = {
+        "outcome": outcome,
+        "reason": reason,
+        "rule": rule.value,
+        "alpha_confirm": str(alpha),
+        "confirmed": [
+            c.claim_id for c in claims if c.tier is qualification.Tier.CONFIRMED
+        ],
+        "custody_head": custody_head,
+    }
+    if stage_two is not None:
+        body["stage_two"] = dict(stage_two)
+    ledger.seal(body)
     return Confirmation(
         outcome=outcome,
         reason=reason,
@@ -251,6 +322,7 @@ def finish(
         ledger_head=ledger.head,
         custody_head=custody_head,
         control=ledger.control,
+        stage_two=None if stage_two is None else dict(stage_two),
     )
 
 
@@ -265,19 +337,88 @@ def check_policy(policy: str) -> None:
         raise errors.ConfigError(f"failure policy must be one of {POLICIES}")
 
 
+def withdrawn_claims(
+    ledger: ledger_module.Ledger, reasons: Mapping[str, str]
+) -> dict[str, qualification.Claim]:
+    """Unverified claims for survivors withdrawn before `C` was opened."""
+    claims = {}
+    for hypothesis_id, why in reasons.items():
+        result = ledger.results[hypothesis_id]
+        spec = ledger.hypotheses[hypothesis_id].spec
+        claims[hypothesis_id] = qualification.Claim(
+            claim_id=hypothesis_id,
+            statement=statement(spec),
+            check_ids=(f"{hypothesis_id}:X",),
+            adjusted_p_value=None,
+            effect=result.check.effect if result.check else 0.0,
+            tier=qualification.Tier.UNVERIFIED,
+            assumptions=(
+                f"withdrawn before C was opened, not tested on C: {why}",
+                "exploration finding only; it does not change feature "
+                "admission or preprocessing",
+            ),
+        )
+    return claims
+
+
+def stage_two_record(
+    ledger: ledger_module.Ledger, withdrawal: Withdrawal
+) -> dict[str, Any]:
+    """The accounting of a withdrawal, hashed over the surviving family.
+
+    Raises:
+        LedgerError: If a withdrawn id is not a frozen survivor.
+    """
+    survivors = ledger.freeze()
+    unknown = sorted(set(withdrawal.reasons) - set(survivors.hypothesis_ids))
+    if unknown:
+        raise ledger_module.LedgerError(
+            f"withdrawn ids {unknown} are not frozen survivors"
+        )
+    family = [
+        i for i in survivors.hypothesis_ids if i not in withdrawal.reasons
+    ]
+    return {
+        "survivors_sha256": survivors.sha256,
+        "survivors": list(survivors.hypothesis_ids),
+        "withdrawn": dict(sorted(withdrawal.reasons.items())),
+        "family": family,
+        "family_sha256": ledger_module.digest(
+            {"survivors_sha256": survivors.sha256, "family": family}
+        ),
+        "rule": dict(withdrawal.rule),
+        "statement": STAGE_TWO_STATEMENT,
+    }
+
+
 def run_confirmation(
     ledger: ledger_module.Ledger,
     rows: tuple[pd.DataFrame, pd.Series],
     rule: budget_module.MultiplicityRule,
     alpha: Fraction,
     encode: Callable[[pd.Series], Any],
+    stage_two: Mapping[str, Any] | None = None,
 ) -> tuple[tuple[qualification.Claim, ...], tuple[qualification.Check, ...]]:
-    """Tests the survivors on the opened rows and builds checks and claims."""
+    """Tests the survivors on the opened rows and builds checks and claims.
+
+    Args:
+        ledger: The ledger with frozen survivors.
+        rows: The opened rows of `C`.
+        rule: Multiplicity rule.
+        alpha: Confirmation level.
+        encode: Target encoder.
+        stage_two: Accounting from `stage_two_record`; the family is then its
+            ``family`` and the withdrawn survivors get unverified claims.
+
+    Returns:
+        Claims (in survivor order) and the checks on `C`.
+    """
     survivors = ledger.survivor_set
     if survivors is None:
         raise ledger_module.LedgerError("freeze the survivors first")
     features, target = rows
-    ids = survivors.hypothesis_ids
+    withdrawn = {} if stage_two is None else dict(stage_two["withdrawn"])
+    ids = tuple(i for i in survivors.hypothesis_ids if i not in withdrawn)
     codes = encode(target)
     outcomes = []
     for hypothesis_id in ids:
@@ -332,9 +473,13 @@ def run_confirmation(
                 adjusted_p_value=adjustment.adjusted[index],
                 effect=outcome.effect,
                 tier=tier,
-                assumptions=assumptions(rule, len(ids)),
+                assumptions=assumptions(rule, len(ids), len(withdrawn)),
             )
         )
+    if withdrawn:
+        by_id = {c.claim_id: c for c in claims}
+        by_id.update(withdrawn_claims(ledger, withdrawn))
+        claims = [by_id[i] for i in survivors.hypothesis_ids]
     return tuple(claims), tuple(checks)
 
 
@@ -357,6 +502,7 @@ def confirm(
     require_control: bool = True,
     custody_log: EventLog | None = None,
     encode: Callable[[pd.Series], Any] = default_encoding,
+    withdrawal: Withdrawal | None = None,
 ) -> Confirmation:
     """Freezes the survivors and tests them once on the confirmation set.
 
@@ -373,6 +519,9 @@ def confirm(
             sealed set's own log when omitted).
         encode: Turns the opened target into the floats the statistics read;
             it must code classes exactly as exploration did.
+        withdrawal: Survivors an exploration-only rule removed from the
+            family (module docstring, "Second stage"); the full survivor
+            set is still frozen and hashed, and `C` tests the rest.
 
     Returns:
         The confirmation, also recorded in the ledger.
@@ -396,6 +545,9 @@ def confirm(
             "the confirmation set was already used for the confirmation"
         )
     survivors = ledger.freeze()
+    record = (
+        None if withdrawal is None else stage_two_record(ledger, withdrawal)
+    )
     if not survivors.hypothesis_ids:
         return finish(
             ledger,
@@ -406,6 +558,7 @@ def confirm(
             rule=rule,
             alpha=alpha_confirm,
             custody_head=None,
+            stage_two=record,
         )
     control = ledger.control
     if control is None and require_control:
@@ -418,6 +571,7 @@ def confirm(
             rule=rule,
             alpha=alpha_confirm,
             custody_head=None,
+            stage_two=record,
         )
     if control is not None and not control["exceeds"]:
         return finish(
@@ -431,6 +585,7 @@ def confirm(
             rule=rule,
             alpha=alpha_confirm,
             custody_head=None,
+            stage_two=record,
         )
     if source is None:
         return finish(
@@ -442,6 +597,21 @@ def confirm(
             rule=rule,
             alpha=alpha_confirm,
             custody_head=None,
+            stage_two=record,
+        )
+    if record is not None and not record["family"]:
+        return finish(
+            ledger,
+            outcome=ALL_WITHDRAWN,
+            reason="every survivor was withdrawn before C; C was not opened",
+            claims=tuple(
+                withdrawn_claims(ledger, record["withdrawn"]).values()
+            ),
+            checks=(),
+            rule=rule,
+            alpha=alpha_confirm,
+            custody_head=None,
+            stage_two=record,
         )
     log = custody_log or source.log
     log.append(
@@ -453,6 +623,15 @@ def confirm(
             "survivors": len(survivors.hypothesis_ids),
             "ledger_head": ledger.head,
             "rule": rule.value,
+            **(
+                {}
+                if record is None
+                else {
+                    "family_sha256": record["family_sha256"],
+                    "family": len(record["family"]),
+                    "withdrawn": len(record["withdrawn"]),
+                }
+            ),
         },
     )
     try:
@@ -469,10 +648,11 @@ def confirm(
             rule=rule,
             alpha=alpha_confirm,
             custody_head=head_of(log),
+            stage_two=record,
         )
     try:
         claims, checks = run_confirmation(
-            ledger, rows, rule, alpha_confirm, encode
+            ledger, rows, rule, alpha_confirm, encode, record
         )
     except Exception as failure:
         return finish(
@@ -484,13 +664,15 @@ def confirm(
             rule=rule,
             alpha=alpha_confirm,
             custody_head=head_of(log),
+            stage_two=record,
         )
     done = sum(1 for c in claims if c.tier is qualification.Tier.CONFIRMED)
+    tested = len(claims) - (0 if record is None else len(record["withdrawn"]))
     return finish(
         ledger,
         outcome=CONFIRMED,
         reason=(
-            f"{done} of {len(claims)} survivors confirmed on C by "
+            f"{done} of {tested} survivors confirmed on C by "
             f"{rule.value} at {float(alpha_confirm):g}"
         ),
         claims=claims,
@@ -498,6 +680,7 @@ def confirm(
         rule=rule,
         alpha=alpha_confirm,
         custody_head=head_of(log),
+        stage_two=record,
     )
 
 

@@ -9,12 +9,15 @@ and, separately, the sealed confirmation set as an argument:
 3. negative control: re-run the whole exploration `B` times with the target
    permuted within groups or time blocks, record the discoveries, and gate on
    the 95th percentile;
-4. confirm: freeze the survivors and test them once on `C`.
+4. optionally, a second stage: a rule computed from `X` alone withdraws some
+   survivors from the family (see "Second stage" in `confirm`);
+5. confirm: freeze the survivors and test the family once on `C`.
 
 The module imports nothing from custody; the caller hands `C` over as
 `source`, so the code that selects survivors cannot reach it.
 """
 
+from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 from fractions import Fraction
@@ -73,6 +76,11 @@ class GovernedRun:
             "control_scope": self.scope,
             "ledger_head": self.ledger.head,
             "survivors_sha256": self.confirmation.survivors_sha256,
+            "withdrawn": (
+                None
+                if self.confirmation.stage_two is None
+                else len(self.confirmation.stage_two["withdrawn"])
+            ),
         }
 
 
@@ -126,6 +134,10 @@ def run_governed(
     ),
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
+    second_stage: Callable[
+        [Sequence[ledger_module.Hypothesis]], confirm.Withdrawal
+    ]
+    | None = None,
 ) -> GovernedRun:
     """Explores `X` under the ledger, runs the control and confirms on `C`.
 
@@ -143,6 +155,12 @@ def run_governed(
         policy: Failure policy of the confirmation.
         diagnostics: (source, check) pairs from detectors run on `X`; they
             are logged once, before exploration, and spend no wealth.
+        second_stage: Pre-registered withdrawal rule. It receives the
+            survivors (rejected hypotheses, in order) after the negative
+            control and must compute its answer from `X` alone; the closure
+            the caller builds holds no `C`. Its diagnostics are logged
+            without wealth before the survivors are frozen, and the
+            withdrawn survivors are not tested on `C`.
 
     Returns:
         The governed run; artifacts are written when `run_dir` is given.
@@ -190,6 +208,11 @@ def run_governed(
         strata=strata,
     )
     ledger.record_control(control.to_dict())
+    withdrawal = None
+    if second_stage is not None:
+        withdrawal = second_stage(ledger.survivors())
+        for source_name, found in withdrawal.diagnostics:
+            ledger.record_diagnostic(found, source_name)
     alpha = Fraction(charter.error_budget.confirmation.alpha_confirm)
     confirmation = confirm.confirm(
         ledger,
@@ -200,6 +223,7 @@ def run_governed(
         encode=lambda series: explore.encode_target(
             series, classification, classes
         ).to_numpy(dtype=float),
+        withdrawal=withdrawal,
     )
     if run_dir is not None:
         folder = Path(run_dir)
