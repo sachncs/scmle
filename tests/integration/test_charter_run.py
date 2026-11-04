@@ -7,6 +7,7 @@ import pytest
 import support
 
 from scmle.contracts import errors
+from scmle.data.charter import contracts as c
 from scmle.data.charter import sealing
 from scmle.data.custody import manifest as manifest_module
 from scmle.data.custody import sealed
@@ -272,4 +273,94 @@ def test_a_run_without_a_charter_writes_no_admissibility_artifacts(
     assert not (folder / "detector_certificates.json").exists()
     assert all(
         e["kind"] != "admissibility.completed" for e in events(result.run_dir)
+    )
+
+
+RICH_MULTIVERSE = (
+    c.Choice("imputation", ("median", "complete_case"), "median"),
+    c.Choice("outlier_rule", ("none", "winsorize", "iqr_drop"), "none"),
+    c.Choice("inclusion", ("all", "first_half", "second_half"), "all"),
+)
+
+
+def test_a_charter_run_writes_valid_stability_and_shift_reports(
+    binary_frame, tmp_path
+):
+    from scmle.data.robustness import report as robustness_report
+
+    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    folder = pathlib.Path(result.run_dir)
+
+    stability = json.loads((folder / "stability_report.json").read_text())
+    shifted = json.loads((folder / "shift_report.json").read_text())
+    robustness_report.validate_stability(stability)
+    robustness_report.validate_shift(shifted)
+    # The default charter declares one implemented choice with one usable
+    # option, so no finding can be called stable.
+    assert stability["status"] == "not_evaluated"
+    assert "specification" in stability["reason"]
+    assert shifted["status"] == "unverifiable"
+    assert shifted["forward"]["status"] == "skipped"
+    done = event(result.run_dir, "robustness.completed")["data"]
+    assert done["shift"] == "unverifiable"
+    assert done["stability"] == "not_evaluated"
+
+
+def test_survivors_are_rerun_over_the_declared_multiverse(
+    binary_frame, tmp_path
+):
+    from scmle.data.ledger import ledger as ledger_module
+
+    path = write_charter(tmp_path, multiverse=RICH_MULTIVERSE)
+    result = run(binary_frame, tmp_path, path)
+    folder = pathlib.Path(result.run_dir)
+
+    report = json.loads((folder / "stability_report.json").read_text())
+    done = event(result.run_dir, "ledger.completed")["data"]
+    ledger = ledger_module.Ledger.load(
+        folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
+    )
+    survivors = {h.spec.column for h in ledger.survivors()}
+    assert survivors
+    assert report["status"] == "evaluated"
+    assert {f["name"] for f in report["findings"]} == survivors
+    assert report["grid"]["run"] == 12 and report["grid"]["total"] == 18
+    assert report["grid"]["subset"] is True
+    first = report["findings"][0]
+    assert len(first["specs"]) == 12 and first["attribution"]
+    assert report["certificate"]["gate"] in {"gating", "descriptive"}
+    assert report["confirmation_filter"].startswith("not applied")
+
+
+def test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable(
+    binary_frame, tmp_path
+):
+    reference = tmp_path / "reference.csv"
+    binary_frame.drop(columns="y").head(200).to_csv(reference, index=False)
+    result = run(
+        binary_frame,
+        tmp_path,
+        write_charter(tmp_path),
+        reference=str(reference),
+        sensitive_columns=["c"],
+    )
+    shifted = json.loads(
+        (pathlib.Path(result.run_dir) / "shift_report.json").read_text()
+    )
+    assert shifted["status"] in {"pass", "fail"}
+    assert shifted["c2st"]["check_id"] == "f6-shift-c2st"
+    assert shifted["mmd"]["set_id"] == "X"
+    assert {row["column"] for row in shifted["coverage"]} == {"c"}
+    assert shifted["periods"]["status"] == "not_run"
+
+
+def test_a_run_without_a_charter_has_no_robustness_reports(
+    binary_frame, tmp_path
+):
+    result = run(binary_frame, tmp_path)
+    folder = pathlib.Path(result.run_dir)
+    assert not (folder / "stability_report.json").exists()
+    assert not (folder / "shift_report.json").exists()
+    assert all(
+        e["kind"] != "robustness.completed" for e in events(result.run_dir)
     )

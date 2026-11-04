@@ -45,6 +45,7 @@ from scmle.data.curation import preprocessing
 from scmle.data.custody import pipeline as custody_pipeline
 from scmle.data.custody import sealed as custody_sealed
 from scmle.data.ledger import budget as ledger_budget
+from scmle.data.ledger import explore as ledger_explore
 from scmle.data.ledger import governed as ledger_governed
 from scmle.data.profiling import label_noise
 from scmle.data.profiling import profiler
@@ -52,6 +53,8 @@ from scmle.data.profiling import representativeness
 from scmle.data.readers import registry as source_registry
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
+from scmle.data.robustness import qualify as robustness_qualify
+from scmle.data.robustness import report as robustness_report
 from scmle.data.splitting import splitters
 from scmle.data.validation import target as target_module
 from scmle.evaluation import backtest
@@ -568,6 +571,77 @@ class ProfileStage(Stage):
                 "confirmed_claims.json",
             ),
             run.summary(),
+        )
+        self.assess_robustness(context, task, charter, view, run, structure)
+
+    def assess_robustness(
+        self,
+        context: context_module.RunContext,
+        task: tasks.TaskType,
+        charter: charter_contracts.AnalysisCharter,
+        view: Any,
+        run: ledger_governed.GovernedRun,
+        structure: tuple[str, ...],
+    ) -> None:
+        """Stability of the survivors and shift against a deployment sample.
+
+        Reads the exploration view and the data spec's reference sample, if
+        any; never `C` and never `F`. Writes `stability_report.json` and
+        `shift_report.json`. Without a reference sample the shift status is
+        `unverifiable`, never `pass`. The verdicts are reported; they do not
+        yet remove findings from the confirmation set.
+        """
+        spec = context.spec
+        data = spec.data
+        profile = require(context.profile, "profile")
+        plan = profile.feature_plan
+        candidates = [*plan.numeric, *plan.categorical]
+        codes = ledger_explore.encode_target(
+            view.target, task.is_classification
+        )
+        kind = ledger_explore.target_kind(view.target, task.is_classification)
+        reference = (
+            tabular.read_table(data.reference_uri)
+            if data.reference_uri
+            else None
+        )
+        found = robustness_qualify.run(
+            view.features,
+            codes,
+            survivors=[
+                h.spec.column for h in run.ledger.survivors() if h.spec.column
+            ],
+            multiclass=kind == ledger_explore.MULTICLASS,
+            choices=charter.multiverse,
+            seed=charter.seed,
+            permutations=charter.error_budget.permutations_b,
+            strata=ledger_governed.strata_labels(
+                view.features, data.group_column, data.time_column
+            ),
+            reference=reference,
+            candidates=candidates,
+            sensitive=tuple(data.sensitive_columns),
+            temporal=bool(data.time_column),
+        )
+        stability_document = robustness_report.stability_report(found)
+        shift_document = robustness_report.shift_report(found)
+        robustness_report.validate_stability(stability_document)
+        robustness_report.validate_shift(shift_document)
+        context.write_json("stability_report.json", stability_document)
+        context.write_json("shift_report.json", shift_document)
+        context.emit(
+            "robustness.completed",
+            "stability and shift were assessed on the exploration set",
+            ("stability_report.json", "shift_report.json"),
+            {
+                "stability": stability_document["status"],
+                "stability_counts": stability_document["counts"],
+                "fragile": list(found.fragile),
+                "stability_gate": found.stability_gate.value,
+                "shift": shift_document["status"],
+                "shift_reason": shift_document["reason"],
+                "forward": found.forward.status,
+            },
         )
 
     def qualify_exploration(
