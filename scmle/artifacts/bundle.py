@@ -328,6 +328,9 @@ class ModelBundle:
         self.shift_weights: shift_weights_module.StoredShiftWeights | None = (
             None
         )
+        # Measured coverage of the stored intervals or sets on the final test
+        # rows (`coverage_run.run_report`), set by the run.
+        self.coverage_report: dict[str, Any] | None = None
         # Serializes `remember`, which rewrites `history` from itself.
         self.history_lock = threading.RLock()
 
