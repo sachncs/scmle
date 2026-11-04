@@ -357,3 +357,182 @@ def confirmation_alpha(
     if rule is MultiplicityRule.BY:
         return float(alpha) / (n_survivors * harmonic(n_survivors))
     return float(alpha / n_survivors)
+
+
+def discount_weight(index: int, horizon: int | None) -> Fraction:
+    """`gamma_index` of the discount sequence (F11).
+
+    With no horizon ``gamma_j = 1 / (j (j + 1))``, which sums to less than one
+    for every finite count. With an integer ``H`` it is ``1 / H`` up to ``H``
+    and zero afterwards.
+    """
+    qualification.count(index, "index", minimum=1)
+    if horizon is None:
+        return Fraction(1, index * (index + 1))
+    qualification.count(horizon, "horizon", minimum=1)
+    return Fraction(1, horizon) if index <= horizon else Fraction(0)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DecisionBudget:
+    """Levels for sequential promote and rollback decisions (F11).
+
+    It sits beside the `ErrorBudget` and shares no arithmetic with it: the
+    promotion levels are spent by started experiments, and each promoted
+    champion gets the whole rollback level for its own monitoring lifetime.
+    Promotion levels follow the discount-only rule (valid by the union bound
+    over experiments): experiment ``j`` is assigned
+    ``alpha_promote * gamma_j``. A level is spent when the experiment starts,
+    whether or not it ends in a promotion.
+
+    Attributes:
+        alpha_promote: Total level for false promotions, in (0, 1).
+        alpha_rollback: Level of each champion's rollback monitor, in (0, 1).
+        horizon: Planned number of experiments, or None for the open-ended
+            sequence ``gamma_j = 1 / (j (j + 1))``.
+        assigned: ``(experiment_id, level)`` in assignment order.
+        monitored: Champions whose rollback monitor has been started.
+    """
+
+    alpha_promote: Fraction
+    alpha_rollback: Fraction
+    horizon: int | None = None
+    assigned: tuple[tuple[str, Fraction], ...] = ()
+    monitored: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Validates the state, including that no level was overspent."""
+        for name in ("alpha_promote", "alpha_rollback"):
+            if not 0 < getattr(self, name) < 1:
+                raise ValueError(f"{name} must be strictly between 0 and 1")
+        if self.horizon is not None:
+            qualification.count(self.horizon, "horizon", minimum=1)
+        ids = [name for name, _ in self.assigned]
+        if len(set(ids)) != len(ids):
+            raise ValueError("duplicate experiment id in assigned")
+        if any(level <= 0 for _, level in self.assigned):
+            raise ValueError("assigned levels must be positive")
+        if self.spent > self.alpha_promote:
+            raise ValueError("assigned levels exceed alpha_promote")
+        if len(set(self.monitored)) != len(self.monitored):
+            raise ValueError("duplicate champion in monitored")
+
+    @classmethod
+    def create(
+        cls,
+        alpha_promote: Number,
+        alpha_rollback: Number,
+        horizon: int | None = None,
+    ) -> Self:
+        """Builds a fresh budget from plain numbers (floats read exactly)."""
+        return cls(
+            alpha_promote=exact(alpha_promote, "alpha_promote"),
+            alpha_rollback=exact(alpha_rollback, "alpha_rollback"),
+            horizon=horizon,
+        )
+
+    @property
+    def spent(self) -> Fraction:
+        """Sum of the assigned promotion levels."""
+        return sum((level for _, level in self.assigned), Fraction(0))
+
+    @property
+    def remaining(self) -> Fraction:
+        """Promotion level not yet assigned."""
+        return self.alpha_promote - self.spent
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record; fractions are written as ``"p/q"`` strings."""
+        return {
+            "alpha_promote": str(self.alpha_promote),
+            "alpha_rollback": str(self.alpha_rollback),
+            "horizon": self.horizon,
+            "assigned": [[name, str(level)] for name, level in self.assigned],
+            "monitored": list(self.monitored),
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds the budget exactly, rejecting unknown or missing fields."""
+        qualification.require_fields(cls, record)
+        return cls(
+            alpha_promote=parse_fraction(
+                record["alpha_promote"], "alpha_promote"
+            ),
+            alpha_rollback=parse_fraction(
+                record["alpha_rollback"], "alpha_rollback"
+            ),
+            horizon=record["horizon"],
+            assigned=tuple(
+                (str(name), parse_fraction(level, "level"))
+                for name, level in record["assigned"]
+            ),
+            monitored=tuple(str(name) for name in record["monitored"]),
+        )
+
+
+def assign_experiment(
+    budget: DecisionBudget,
+    experiment_id: str,
+    level: Number | None = None,
+) -> tuple[DecisionBudget, Fraction]:
+    """Assigns a promotion level to an experiment before it has any traffic.
+
+    Args:
+        budget: The budget before the assignment; it is not modified.
+        experiment_id: A new, non-blank identifier.
+        level: An explicit level; by default ``alpha_promote * gamma_j`` for
+            the next index ``j``.
+
+    Returns:
+        The new budget and the level assigned.
+
+    Raises:
+        ValueError: If the id is blank or already used, or the level is not
+            positive.
+        BudgetExhaustedError: If the level would take the total past
+            `alpha_promote`, or the horizon is used up.
+    """
+    evidence.require_text(experiment_id, "experiment_id")
+    if any(name == experiment_id for name, _ in budget.assigned):
+        raise ValueError(f"experiment {experiment_id} already has a level")
+    if level is None:
+        gamma = discount_weight(len(budget.assigned) + 1, budget.horizon)
+        chosen = budget.alpha_promote * gamma
+        if chosen == 0:
+            raise BudgetExhaustedError("the experiment horizon is used up")
+    else:
+        chosen = exact(level, "level")
+        if chosen <= 0:
+            raise ValueError("level must be positive")
+    if chosen > budget.remaining:
+        raise BudgetExhaustedError(
+            f"level {float(chosen):.6g} exceeds the remaining promotion "
+            f"level {float(budget.remaining):.6g}"
+        )
+    return (
+        dataclasses.replace(
+            budget, assigned=(*budget.assigned, (experiment_id, chosen))
+        ),
+        chosen,
+    )
+
+
+def start_rollback_monitor(
+    budget: DecisionBudget, champion_id: str
+) -> tuple[DecisionBudget, Fraction]:
+    """Starts the rollback monitor of a promoted champion.
+
+    The rollback level is per champion and is not shared, so starting the
+    monitor never reduces the promotion budget. A champion is monitored once.
+
+    Raises:
+        ValueError: If the id is blank or already monitored.
+    """
+    evidence.require_text(champion_id, "champion_id")
+    if champion_id in budget.monitored:
+        raise ValueError(f"champion {champion_id} is already monitored")
+    return (
+        dataclasses.replace(budget, monitored=(*budget.monitored, champion_id)),
+        budget.alpha_rollback,
+    )
