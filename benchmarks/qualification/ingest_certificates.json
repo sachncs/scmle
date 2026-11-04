@@ -1,0 +1,133 @@
+{
+  "certificates": [
+    {
+      "code_hash": "2a5df5babbf7b78e6b889e6517e2c0608b9bd61a743e6c8b15aa2723cf40671e",
+      "corpus_hash": "ca316d0fa4854fee8cc43f97a92f12bd13d58f3f72b3e537e39ad9bec415e55b",
+      "created": null,
+      "detector_id": "ingest-reconcile",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 500,
+            "defect_type": "fanout",
+            "detected": 500,
+            "detector_id": "ingest-reconcile",
+            "false_alarms": 0,
+            "planted": 500,
+            "seed_path": [
+              0,
+              "ingest.certify.reconcile",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.007624340461552241
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9923756595384479,
+            1.0
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 500,
+            "defect_type": "dropped_rows",
+            "detected": 500,
+            "detector_id": "ingest-reconcile",
+            "false_alarms": 0,
+            "planted": 500,
+            "seed_path": [
+              0,
+              "ingest.certify.reconcile",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.007624340461552241
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9923756595384479,
+            1.0
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 500,
+            "defect_type": "torn_read",
+            "detected": 500,
+            "detector_id": "ingest-reconcile",
+            "false_alarms": 0,
+            "planted": 500,
+            "seed_path": [
+              0,
+              "ingest.certify.reconcile",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.007624340461552241
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9923756595384479,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.95
+      },
+      "seeds": [
+        0
+      ]
+    },
+    {
+      "code_hash": "2b0cf34ada24996152c727298d250ccc3e6378469178fa650739c5d538fe300f",
+      "corpus_hash": "d1bc55759283309b358b06aa6404fe7c4c2de19811756347d4b5fdb050ede450",
+      "created": null,
+      "detector_id": "ingest-torn-read",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 500,
+            "defect_type": "torn_read",
+            "detected": 500,
+            "detector_id": "ingest-torn-read",
+            "false_alarms": 0,
+            "planted": 500,
+            "seed_path": [
+              0,
+              "ingest.certify.torn",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.007624340461552241
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9923756595384479,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.02,
+        "recall_floor": 0.99
+      },
+      "seeds": [
+        0
+      ]
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,150 @@
+{
+  "budget": {
+    "budgets": 100,
+    "external_referent": "the cost model's estimate against counted source queries",
+    "floor_met": true,
+    "gate": "descriptive",
+    "gate_reason": "not bound to a charter decision map yet",
+    "identical_stop_boundaries": 100,
+    "overhead": "none for queries and rows (admitted before they run); wall time depends on the clock and is not covered",
+    "runs_stopped_early": 92,
+    "within_budget": 100
+  },
+  "code_hashes": {
+    "budget": "66970cc7b6d3fdd04270746396077195ea7ac13fe9657d822b1b0776a6be0ca1",
+    "entities": "29baca222bb7591a9cf2b41ac95be06495c87691bc3a53bde1af13d6930bfc17",
+    "grain": "d7b104cb60522c2923bcef6248a20765b4dbe8dc925b44456b9b6326a047354b",
+    "joins": "8c35e710864deb04d03cb25db217e0e431aecac285b8a477d80c45f0784e7b84",
+    "point_in_time": "11d195af2e6f09052d9b4fb0b175d3f0e3c9efaf9eaa4cb171ecb47e503a8b59",
+    "reconcile": "2a5df5babbf7b78e6b889e6517e2c0608b9bd61a743e6c8b15aa2723cf40671e",
+    "torn_read": "2b0cf34ada24996152c727298d250ccc3e6378469178fa650739c5d538fe300f"
+  },
+  "development_seed_base": 10000,
+  "entities": {
+    "entities_each": 300,
+    "external_referent": null,
+    "false_group_pairs": 573,
+    "floor_met": true,
+    "gate": "descriptive",
+    "gate_reason": "no external referent, and not bound to a decision map",
+    "link_recall": 0.9986403806934059,
+    "link_recall_interval": [
+      0.9950561211226844,
+      0.9996270641283159
+    ],
+    "mean_reduction_ratio": 0.9457071741820599,
+    "note": "the corruption is ours; not a public ER benchmark. Grouping stays unverified until a labelled benchmark is run: no labelled ER benchmark registered",
+    "pair_completeness": 0.9986403806934059,
+    "registries": 10,
+    "true_pairs": 1471
+  },
+  "joins": {
+    "auto_accepted": 679,
+    "external_referent": null,
+    "fk_precision_on_corpus": "not measured: no declared-key relational corpus registered",
+    "floor_met": true,
+    "gate": "descriptive",
+    "gate_reason": "no external referent, and not bound to a decision map",
+    "note": "twin parents (account/user) and unnamed owner_id links are left as candidates, which costs recall",
+    "precision_interval": [
+      0.9943743034769322,
+      1.0
+    ],
+    "recall": 1.0,
+    "recall_interval": [
+      0.9943743034769322,
+      1.0
+    ],
+    "schemas": 200,
+    "schemas_with_a_spurious_accept": 0,
+    "spurious_accepted": 0,
+    "true_links": 679
+  },
+  "multiplicity": {
+    "declared_equals_registered": 20,
+    "external_referent": "ledger registration count",
+    "floor_met": true,
+    "gate": "descriptive",
+    "gate_reason": "not bound to a charter decision map yet",
+    "mismatch_fails_run": 20,
+    "worlds": 20
+  },
+  "point_in_time": {
+    "baseline_leaked_rows": 10818,
+    "baseline_leaking_worlds": 500,
+    "differential_cases": 1000,
+    "differential_mismatches": 0,
+    "differential_tolerance": 1e-09,
+    "external_referent": "independent naive reference (ingest_naive.py, written separately)",
+    "floor_met": true,
+    "gate": "descriptive",
+    "gate_reason": "not bound to a charter decision map yet",
+    "late_worlds": 500,
+    "limit": "the guarantee is about the code: it holds only if the recorded time is true",
+    "metamorphic_cases": 10000,
+    "metamorphic_failures": 0,
+    "view_leaked_rows": 0
+  },
+  "reconcile": {
+    "by_defect": {
+      "dropped_rows": {
+        "detected": 500,
+        "planted": 500
+      },
+      "fanout": {
+        "detected": 500,
+        "planted": 500
+      },
+      "torn_read": {
+        "detected": 500,
+        "planted": 500
+      }
+    },
+    "clean_worlds": 500,
+    "false_alarms": 0,
+    "seed_offset": 0,
+    "tolerance": 0.0
+  },
+  "seconds": 29.9,
+  "torn_read": {
+    "batch_rows": 5,
+    "detected": 500,
+    "detected_by_kind": {
+      "delete": 125,
+      "insert": 125,
+      "update_ahead": 125,
+      "update_behind": 125
+    },
+    "false_detections": 0,
+    "mutated_worlds": 500,
+    "seed_offset": 0,
+    "static_worlds": 500
+  },
+  "unit_verdict": {
+    "accuracy_interval": [
+      0.9811546736227335,
+      1.0
+    ],
+    "coarser_reported_as_match": 0,
+    "correct": 200,
+    "external_referent": null,
+    "floor_met": true,
+    "gate": "descriptive",
+    "gate_reason": "no external referent, and not bound to a decision map",
+    "key_recall_precision": "not measured: no declared-key relational corpus registered",
+    "near_key": {
+      "allowed_duplicates": 10,
+      "exact": true,
+      "is_key_by_duplicates": {
+        "7": true,
+        "8": true,
+        "9": true,
+        "10": true,
+        "11": false,
+        "12": false,
+        "13": false
+      }
+    },
+    "pairs": 200
+  }
+}

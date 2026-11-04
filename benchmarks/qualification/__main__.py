@@ -5,6 +5,7 @@
     python -m benchmarks.qualification --check            # certificates
     python -m benchmarks.qualification --check fdr        # claim ledger (F3)
     python -m benchmarks.qualification --check framing    # framing (F8)
+    python -m benchmarks.qualification --check ingest     # ingestion (F9)
     python -m benchmarks.qualification --write-sample F   # stand-in sample
     python -m benchmarks.qualification --write-f5 F       # F5 certificates
 
@@ -27,6 +28,10 @@ descriptive.
 The leakage screen (`scmle.data.admissibility.screen`,
 the test behind `leakage_policy="block"`) ships its certificates inside the
 package (`screen_certificates.json`) and is checked the same way.
+The F9 ingestion detectors (torn-read check, extract reconciliation) are checked
+against `ingest_certificates.json`; `--check ingest` also verifies that
+`ingest_measurements.json` was measured on the current code and re-runs a
+small live point-in-time and torn-read check.
 """
 
 import argparse
@@ -36,6 +41,7 @@ from pathlib import Path
 from benchmarks.qualification import f5
 from benchmarks.qualification import f6_certify
 from benchmarks.qualification import framing_certify
+from benchmarks.qualification import ingest_certify
 from benchmarks.qualification import ledger_checks
 from benchmarks.qualification import screen_certify
 from benchmarks.qualification import smoke
@@ -59,6 +65,10 @@ def check_certificates() -> int:
     uncertainty_problems = uncertainty_certify.problems()
     screen_store = certificates.CertificateStore.load(screen_certify.STORE_PATH)
     screen_problems = screen_certify.problems(screen_store)
+    ingest_store = certificates.CertificateStore.load(
+        ingest_certify.STORE_PATH
+    )
+    ingest_problems = ingest_certify.problems(ingest_store)
     ok = (
         not problems
         and report.ok
@@ -66,6 +76,7 @@ def check_certificates() -> int:
         and not f6_problems
         and not uncertainty_problems
         and not screen_problems
+        and not ingest_problems
     )
     print(
         json.dumps(
@@ -90,6 +101,10 @@ def check_certificates() -> int:
                 "screen_descriptive_only": screen_certify.uncertified(
                     screen_store
                 ),
+                "ingest_problems": ingest_problems,
+                "ingest_descriptive_only": ingest_certify.audit_labels(
+                    ingest_store
+                )["uncertified"],
             },
             indent=2,
         )
@@ -106,7 +121,7 @@ def main(arguments: list[str] | None = None) -> int:
         "--check",
         nargs="?",
         const="certificates",
-        choices=("certificates", "fdr", "framing"),
+        choices=("certificates", "fdr", "framing", "ingest"),
     )
     action.add_argument("--write-sample", type=Path, metavar="FILE")
     action.add_argument("--write-f5", type=Path, metavar="FILE")
@@ -126,6 +141,10 @@ def main(arguments: list[str] | None = None) -> int:
         summary = ledger_checks.report(findings)
         print(json.dumps(summary, indent=2))
         return 0 if summary["ok"] else 1
+    if options.check == "ingest":
+        ingested = ingest_certify.check()
+        print(json.dumps(ingested, indent=2))
+        return 0 if ingested["ok"] else 1
     if options.check == "framing":
         found = framing_certify.check()
         print(json.dumps(found, indent=2))
