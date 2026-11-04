@@ -111,6 +111,14 @@ class DatasetProfiler:
             roles[data.baseline_column] = (
                 "current process decision (used by the baseline claim only)"
             )
+        if data.logged_action_column:
+            roles[data.logged_action_column] = (
+                "logged action (used by off-policy evaluation only)"
+            )
+        if data.propensity_column:
+            roles[data.propensity_column] = (
+                "logged propensity (used by off-policy evaluation only)"
+            )
         if data.query_column:
             roles[data.query_column] = "query identifier (ranking only)"
         if data.event_column:

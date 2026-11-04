@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+* F11 reports in a charter run (`scmle.core.decision_reports`). With a decision
+  block on a binary task, `FinalEvaluationStage` now writes, once, from the
+  locked rows: `policy_value.json` (self-normalised IPW of the frozen rule with
+  the charter's clip, support and effective-sample-size gates, from a log whose
+  0/1 action is `data.logged_action_column` and recorded probability
+  `data.propensity_column`; without both it is `not_assessable` and no
+  propensity is estimated), the fairness satisfaction test for every declared
+  constraint, `rollout_design.json` (plan hash, fixed-horizon size, simulated
+  expected sample number of the anytime-valid test) with a one-row hash-chained
+  `rollout_decisions.jsonl`, and `decision_report.json`. New optional fields
+  `logged_action_column` and `propensity_column` on `DataSpec`, `MLProject`
+  and `--logged-action-column`/`--propensity-column`; both are never features.
+  Not done: `LifecycleManager` still does not call `Rollout`/`RollbackMonitor`
+  (that file belongs to the Phase 13 work), no experiment assignments reach the
+  F3 ledger, and `claims verify` does not check these four files.
 * The causal estimate on `C` in a charter run (F10; `scmle.core.causal_claim`).
   The primary hypothesis `theta = 0` is registered in the ledger by the hash of
   the causal block, the strategy, the DAG hash, the confirmation level and the

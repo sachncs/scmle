@@ -37,6 +37,7 @@ from scmle.contracts import tasks
 from scmle.core import causal_claim
 from scmle.core import compiler
 from scmle.core import context as context_module
+from scmle.core import decision_reports
 from scmle.core import randomness
 from scmle.core import state as run_state
 from scmle.data.admissibility import attestations
@@ -2308,6 +2309,86 @@ class FinalEvaluationStage(Stage):
         record["pseudo_rows"] = count
         return augmented
 
+    def write_decision_reports(
+        self,
+        context: context_module.RunContext,
+        pipeline: Any,
+        features: pd.DataFrame,
+        target: pd.Series,
+        decision: dict[str, Any] | None,
+        net_benefit: dict[str, Any] | None,
+    ) -> None:
+        """Policy value, fairness satisfaction and the rollout design (F11).
+
+        Runs only when the charter has a decision block and the task is
+        binary, once, on the locked rows that were just opened. It writes
+        `policy_value.json`, `rollout_design.json`, `rollout_decisions.jsonl`
+        and `decision_report.json`.
+        """
+        charter = chartered_decision_model(context)
+        if charter is None or charter.decision is None:
+            return
+        if require(context.task, "task") is not tasks.TaskType.BINARY:
+            return
+        layer = charter.decision
+        data = context.spec.data
+        positive = pipeline.classes_[1]
+        outcome = (target == positive).to_numpy(dtype=float)
+        actions = (np.asarray(pipeline.predict(features)) == positive).astype(
+            float
+        )
+        logged = (
+            features[data.logged_action_column].to_numpy(dtype=float)
+            if data.logged_action_column
+            and data.logged_action_column in features
+            else None
+        )
+        propensity = (
+            features[data.propensity_column].to_numpy(dtype=float)
+            if data.propensity_column and data.propensity_column in features
+            else None
+        )
+        value = decision_reports.policy_value(
+            layer, actions, outcome, logged, propensity
+        )
+        satisfaction = decision_reports.fairness(
+            layer,
+            features,
+            outcome,
+            actions,
+            float(charter.error_budget.confirmation.alpha_confirm),
+        )
+        design_record = None
+        built = decision_reports.rollout_design(
+            charter, float(np.mean(outcome)) if len(outcome) else 0.0
+        )
+        report = decision_reports.decision_report(
+            charter,
+            decision,
+            net_benefit,
+            value,
+            satisfaction,
+            None if built is None else built[0],
+        )
+        context.write_json("policy_value.json", value)
+        written = ["decision_report.json", "policy_value.json"]
+        if built is not None:
+            design_record, log = built
+            context.write_json("rollout_design.json", design_record)
+            if context.store is not None:
+                log.write(context.store.directory / "rollout_decisions.jsonl")
+            written += ["rollout_design.json", "rollout_decisions.jsonl"]
+        context.write_json("decision_report.json", report)
+        context.emit(
+            "decision.reported",
+            "policy value, fairness satisfaction and rollout design written",
+            tuple(written),
+            {
+                "policy_value": value.get("status"),
+                "fairness": [f["status"] for f in satisfaction],
+            },
+        )
+
     def execute(self, context: context_module.RunContext) -> None:
         """Refits on all development data and evaluates on the test set."""
         context.check_cancelled()
@@ -2411,6 +2492,12 @@ class FinalEvaluationStage(Stage):
         )
         for name, report_body in context.diagnostics.items():
             context.write_json(f"diagnostics/{name}.json", report_body)
+        net_benefit = chartered_net_benefit(
+            context, pipeline, test_features, test_target, decision
+        )
+        self.write_decision_reports(
+            context, pipeline, test_features, test_target, decision, net_benefit
+        )
         context.evaluation = {
             "run_id": context.store.run_id if context.store else "",
             "task": task.value,
@@ -2460,9 +2547,7 @@ class FinalEvaluationStage(Stage):
             "split_fingerprint": split.manifest.fingerprint,
             "split_strategy": split.manifest.strategy,
             "decision": decision,
-            "net_benefit": chartered_net_benefit(
-                context, pipeline, test_features, test_target, decision
-            ),
+            "net_benefit": net_benefit,
             "resources": usage.to_dict(),
             "resource_limits": context.resource_governor.report(),
             "test_set_opened": locked.opened,

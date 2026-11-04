@@ -523,6 +523,8 @@ class MLProject:
         leakage_attestations: str | pathlib.Path | None = None,
         baseline_column: str | None = None,
         framing_draft: str | pathlib.Path | None = None,
+        propensity_column: str | None = None,
+        logged_action_column: str | None = None,
         checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -644,6 +646,11 @@ class MLProject:
                 exploration rows and the claim that it beats the current
                 process over the cost range is registered in the ledger and
                 tested once on the confirmation set (`baseline_report.json`).
+            logged_action_column: With a charter decision block, the 0/1
+                action the current process logged; never a feature.
+            propensity_column: With `logged_action_column`, the recorded
+                probability of action 1; never a feature. It enables the
+                off-policy value of the frozen rule (`policy_value.json`).
             framing_draft: The `framing_draft.json` written by `scmle frame`
                 for the charter; a claim that depends on an LLM-filled field
                 of an unsigned charter stays `unverified`.
@@ -692,6 +699,8 @@ class MLProject:
                 pseudo_label_confidence=pseudo_label_confidence,
                 monotonic_constraints=monotonic_constraints or {},
                 baseline_column=baseline_column,
+                propensity_column=propensity_column,
+                logged_action_column=logged_action_column,
                 framing_draft=(
                     None if framing_draft is None else str(framing_draft)
                 ),

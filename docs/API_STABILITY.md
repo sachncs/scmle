@@ -69,6 +69,14 @@ was regenerated for the `MLProject` entry alone. `scmle claims list` prints
 claims registered by hash after the bivariate ones, and `scmle claims verify`
 gained one step, present only when a claim was registered.
 
+`MLProject` gained the optional keywords `logged_action_column` and
+`propensity_column` (default `None`), `DataSpec` the fields of the same names,
+and the CLI the flags `--logged-action-column` and `--propensity-column`;
+`tests/fixtures/public_api.json` was regenerated for the `MLProject` entry
+alone. A charter run with a decision block now also writes `decision_report.json`,
+`policy_value.json` and, with a rollout plan, `rollout_design.json` and
+`rollout_decisions.jsonl`.
+
 Uncertainty (F12). `ModelBundle.predict_set` gained the optional argument
 `conditional` (default `None`, the previous behaviour). `conformal.json` gained
 `class_scores`; bundles saved earlier load and answer pooled queries, and

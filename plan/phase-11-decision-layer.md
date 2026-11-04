@@ -18,12 +18,10 @@ promotion and rollback rules descriptive, keep independent approval, write the
 assignments to the decision log. Done when: B9 runs through `LifecycleManager`
 and existing lifecycle tests are unchanged where no charter rollout is set.
 
-**W2 Reports and ledger** (one agent). Write `decision_report.json`,
-`policy_value.json`, `rollout_design.json` and `rollout_decisions.jsonl` in a
-charter run; run policy value and fairness satisfaction once on the sealed set
-in `FinalEvaluationStage`; put experiment assignments in the F3 ledger. Done
-when: a charter run with a rollout plan produces the files and `claims verify`
-checks them.
+**W2 remainder** (one agent). The files and the one-time policy value and
+fairness tests are written by a charter run. Left: experiment assignments in
+the F3 ledger (no experiment runs inside a charter run) and `claims verify`
+checking the four files.
 
 **W3 Fairness integration** (one agent). Make `evaluation/fairness.py` and
 `mitigation.py` clients of `decision.constraints`; stop their constants gating;

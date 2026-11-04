@@ -284,6 +284,14 @@ class DataSpec(FrozenModel):
             A rule is frozen on the exploration rows and the claim that it
             beats the current process is registered in the ledger and tested
             once on the confirmation set (`baseline_report.json`).
+        logged_action_column: With a charter decision block, the 0/1 action
+            the current process logged. Never a feature.
+        propensity_column: With a charter decision block and
+            `logged_action_column`, the recorded probability that action 1
+            was taken. Never a feature. It lets
+            the run estimate the frozen rule's off-policy value on the
+            locked rows (`policy_value.json`); without it that file says
+            `not_assessable`.
         framing_draft: Path of the `framing_draft.json` that `scmle frame`
             wrote for the charter. A claim that depends on an LLM-filled field
             of an unsigned charter stays `unverified`.
@@ -322,6 +330,8 @@ class DataSpec(FrozenModel):
     pseudo_label_confidence: float = pydantic.Field(default=0.9, gt=0.5, lt=1.0)
     baseline_column: str | None = None
     framing_draft: str | None = None
+    propensity_column: str | None = None
+    logged_action_column: str | None = None
 
 
 class ValidationSpec(FrozenModel):
