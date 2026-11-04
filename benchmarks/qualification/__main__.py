@@ -7,6 +7,8 @@
     python -m benchmarks.qualification --check ingest     # ingestion (F9)
     python -m benchmarks.qualification --check framing    # framing (F8)
     python -m benchmarks.qualification --check loop       # closed loop (F13)
+    python -m benchmarks.qualification --check f10        # causal (F10)
+    python -m benchmarks.qualification --check f11        # decision layer (F11)
     python -m benchmarks.qualification --write-sample F   # stand-in sample
     python -m benchmarks.qualification --write-f5 F       # F5 certificates
 
@@ -32,6 +34,14 @@ against `framing_certificates.json` and `framing_measurements.json`: stale
 code, a `MIN_CLUSTERS` that differs from the measured minimum, or an accepted
 malformed charter fails; a method that missed its floor is listed as
 descriptive.
+The F10 causal gates (`f10_certify.py`) are checked by `--check f10` against
+`f10_certificates.json`: a certificate is stale when the code it measured
+changed; a gate that missed its floor is listed as descriptive and does not
+fail the check, and the package counts it as uncertified.
+The F11 decision-layer gates (`f11_certify.py`) are checked by `--check f11`
+against `f11_certificates.json`: a certificate is stale when the code it
+measured changed; a gate that missed its floor, or could not run for lack of
+the Hillstrom file, is listed as descriptive and does not fail the check.
 The F13 closed-loop gates (`loop_certify.py`) are checked by `--check loop`
 against `loop_certificates.json`: a certificate is stale when the code or the
 simulator it measured changed; a gate that missed its floor (today the
@@ -46,6 +56,8 @@ from pathlib import Path
 from benchmarks.qualification import f5
 from benchmarks.qualification import f5_corpora
 from benchmarks.qualification import f6_certify
+from benchmarks.qualification import f10_certify
+from benchmarks.qualification import f11_certify
 from benchmarks.qualification import framing_certify
 from benchmarks.qualification import ingest_certify
 from benchmarks.qualification import ledger_checks
@@ -130,6 +142,8 @@ def main(arguments: list[str] | None = None) -> int:
         const="certificates",
         choices=(
             "certificates",
+            "f10",
+            "f11",
             "fdr",
             "framing",
             "ingest",
@@ -154,6 +168,19 @@ def main(arguments: list[str] | None = None) -> int:
         summary = ledger_checks.report(findings)
         print(json.dumps(summary, indent=2))
         return 0 if summary["ok"] else 1
+    if options.check == "f10":
+        issues = f10_certify.problems()
+        report = {
+            "ok": not issues,
+            "problems": issues,
+            "descriptive_only": f10_certify.descriptive_only(),
+        }
+        print(json.dumps(report, indent=2))
+        return 0 if report["ok"] else 1
+    if options.check == "f11":
+        decided = f11_certify.check()
+        print(json.dumps(decided, indent=2))
+        return 0 if decided["ok"] else 1
     if options.check == "loop":
         looped = loop_certify.check()
         print(json.dumps(looped, indent=2))
