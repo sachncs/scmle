@@ -1,0 +1,116 @@
+{
+  "development_seed_base": 10000,
+  "feasibility": {
+    "agreement": 0.986,
+    "boundary_inconclusive_share": 0.48,
+    "meets_floor": true,
+    "ratio_0.6": {
+      "agree": 497,
+      "runs": 500
+    },
+    "ratio_1.6": {
+      "agree": 489,
+      "runs": 500
+    }
+  },
+  "min_clusters_in_code": 20,
+  "min_clusters_measured": 20,
+  "planted_omission": {
+    "asked_when_critical": 200,
+    "asked_when_given": 0,
+    "asked_when_robust": 0,
+    "false_question_wilson_upper": 0.009512294334296508,
+    "meets_floor": true,
+    "recall_wilson_lower": 0.9811546736227335,
+    "runs_each": 200
+  },
+  "power": {
+    "attainable": true,
+    "closed_form_power": 0.9544588413906322,
+    "clusters": 100,
+    "empirical_power": 0.9655,
+    "floor": 0.7821114561800018,
+    "meets_floor": true,
+    "runs": 2000
+  },
+  "schema_fuzz": {
+    "accepted": 0,
+    "malformed": 1000
+  },
+  "seconds": 7.8,
+  "selective_labels": {
+    "alpha": 0.01,
+    "clean": 500,
+    "detected": 500,
+    "false_alarms": 0,
+    "planted": 500,
+    "seed_offset": 0,
+    "tolerance": 0.2
+  },
+  "size": {
+    "null_both/20": {
+      "clusters": 20,
+      "meets_bound": true,
+      "rate": 0.025,
+      "rejections": 50,
+      "runs": 2000
+    },
+    "null_both/200": {
+      "clusters": 200,
+      "meets_bound": true,
+      "rate": 0.024,
+      "rejections": 48,
+      "runs": 2000
+    },
+    "null_both/50": {
+      "clusters": 50,
+      "meets_bound": true,
+      "rate": 0.026,
+      "rejections": 52,
+      "runs": 2000
+    },
+    "null_hi/20": {
+      "clusters": 20,
+      "meets_bound": true,
+      "rate": 0.0465,
+      "rejections": 93,
+      "runs": 2000
+    },
+    "null_hi/200": {
+      "clusters": 200,
+      "meets_bound": true,
+      "rate": 0.048,
+      "rejections": 96,
+      "runs": 2000
+    },
+    "null_hi/50": {
+      "clusters": 50,
+      "meets_bound": true,
+      "rate": 0.051,
+      "rejections": 102,
+      "runs": 2000
+    },
+    "null_lo/20": {
+      "clusters": 20,
+      "meets_bound": true,
+      "rate": 0.017,
+      "rejections": 34,
+      "runs": 2000
+    },
+    "null_lo/200": {
+      "clusters": 200,
+      "meets_bound": true,
+      "rate": 0.001,
+      "rejections": 2,
+      "runs": 2000
+    },
+    "null_lo/50": {
+      "clusters": 50,
+      "meets_bound": true,
+      "rate": 0.0055,
+      "rejections": 11,
+      "runs": 2000
+    }
+  },
+  "size_bound": 0.059746794344808965
+}

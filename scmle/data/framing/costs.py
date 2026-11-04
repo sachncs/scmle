@@ -251,7 +251,7 @@ def net_benefit_curve(
         "threshold": grid,
         "model": [net_benefit(y, a, t) for t in grid],
         "all": [net_benefit_all(y, t) for t in grid],
-        "none": [net_benefit_none() for _ in grid],
+        "none": [0.0] * len(grid),
     }
 
 
@@ -270,5 +270,5 @@ def decision_curve(
         "threshold": grid,
         "model": [net_benefit(y, (risk >= t).astype(float), t) for t in grid],
         "all": [net_benefit_all(y, t) for t in grid],
-        "none": [net_benefit_none() for _ in grid],
+        "none": [0.0] * len(grid),
     }

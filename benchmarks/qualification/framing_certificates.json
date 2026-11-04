@@ -1,0 +1,45 @@
+{
+  "certificates": [
+    {
+      "code_hash": "63e93d6f7a28e84742f6f61ed39b63f2983b3bfb953109f53701e43eafa24675",
+      "corpus_hash": "46c881a55f36c49c885d1407c0403ca2eb999f1064bac49e7642304f9130390a",
+      "created": null,
+      "detector_id": "framing-selective-labels",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 500,
+            "defect_type": "selective_labels",
+            "detected": 500,
+            "detector_id": "framing-selective-labels",
+            "false_alarms": 0,
+            "planted": 500,
+            "seed_path": [
+              0,
+              "framing.certify.labels",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.007624340461552241
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.9923756595384479,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.95
+      },
+      "seeds": [
+        0
+      ]
+    }
+  ],
+  "schema_version": 1
+}

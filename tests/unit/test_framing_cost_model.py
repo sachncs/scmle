@@ -28,9 +28,9 @@ def reference_nb(y, a, t):
 
 
 def test_identity_over_random_cost_matrices():
-    rng = np.random.default_rng(1)
     worst = 0.0
-    for _ in range(10_000):
+    for draw in range(10_000):
+        rng = np.random.default_rng(draw)
         c00, c11 = rng.normal(size=2)
         c_fp, c_fn = rng.uniform(0.1, 5.0, size=2)
         m = costs.DecisionCostModel(
