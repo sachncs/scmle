@@ -82,31 +82,22 @@ custody was built. Status of its stated gaps, verified by reading `scmle/data/cu
 |---|---|---|
 | C1 | Custody coupled to the supervision flag | Closed for charter runs (`stages.py:850-890`, `apply_charter_custody`; CHANGELOG). Still coupled for non-charter runs (`stages.py:629-635`); that path has no `C` |
 | C2 | `C` and `F` have custody | Closed for `C` and `final_test` (`pipeline.py:211-222`). For temporal data `F` is the final test set (`manifest.py:50`) |
-| C3 | Caller-held copy of the data | **Open.** `docs/SECURITY.md:40-43` says a caller DataFrame or the file still holds every row. A closing option: the CLI reads the file inside the orchestrator and never returns the full frame to the caller |
-| C4 | Canary-value test over all artifacts | **Open.** No canary test found (`grep canary tests` empty). `tests/leakage/test_custody_access.py` covers view reachability, pickling, log content, orchestrator keeps ids, second open (lines 88-151) |
-| C5 | `gc.get_objects()` scan for rows of `C`/`F` | **Open.** Not found in tests |
-| C6 | Import-graph test | **Partly closed.** `tests/leakage/test_ledger_independence.py` covers `scmle/data/ledger` only; nothing for `detectors/`, `admissibility/` or `robustness/` |
-| C7 | Unlock bound to `claims_hash` and `ledger_hash` | **Open.** No `claims_hash` anywhere in `scmle/data/custody` or `scmle/governance/vault.py`; the vault enforces one open per set only |
-| C8 | Log signed with HMAC | **Open for the custody log** (`sealed.py` hash-chains with `signing.canonical_payload`; no HMAC call found). The charter is optionally HMAC-signed |
-| C9 | Merkle root over per-row content hashes | **Open.** Manifest v2 hashes ids (`manifest.py:120`); a changed row value does not change it. Stated in F2 as a requirement |
-| C10 | Embargo from measured autocorrelation | **Open.** `carve.py` uses `embargo_rows` from the spec; no ACF code found |
-| C11 | Identical manifest on three platforms | **Unverified.** CI runs the custody unit tests on Windows and macOS, but no test compares manifests across platforms |
-| C12 | Custody modules in the mutation scope | **Open.** `setup.cfg` omits `scmle/data/custody/*`, `scmle/data/charter/*`, `scmle/governance/vault.py` (see F7 W6) |
+| C7 | Unlock bound to `claims_hash` and `ledger_hash` | **Built, not wired.** `SealedSet.commit(claims_hash, ledger_hash)` binds the single release and the vault refuses any other pair (`vault.py`, `sealed.py`; tests in `test_vault.py`, `test_custody_sealed.py`, `test_custody_access.py`). `scmle/data/ledger/confirm.py` does not call `commit`, so a charter run is not bound. Closing criterion: `confirm.py` commits the survivors digest and the ledger head before it opens `C`, with a test that a changed ledger is refused |
+| C11 | Identical manifest on three platforms | **Pinned on one platform.** `tests/unit/test_custody_golden.py` pins the manifest hash of a grouped and a temporal fixture (macOS arm64, Python 3.14.7). The `cross-platform` and `minimal-dependencies` CI jobs run `tests/unit`; their result has not been observed from this machine. Closes when those jobs pass |
 
-Closing criterion for the group: C3-C12 each either has a failing-then-passing
-test or is recorded in `docs/SECURITY.md` as an accepted limit with its
-reason; and the F2 file is rewritten to describe only what is left.
+Closed or accepted on 2026-11-04 and removed: C3 (accepted limit, recorded in `docs/SECURITY.md`), C4 and C5 (canary and `gc` tests), C6 (import-graph test over `detectors/`, `admissibility/`, `robustness/`), C8 (HMAC on every custody log entry when a key is available), C9 (Merkle root over row content in the manifest), C10 (autocorrelation-based embargo) and C12 (custody, charter, vault, attestation and Merkle modules are in the mutation scope; survivors in `tests/unit/MUTANTS_custody.md`). The statements each test establishes, and their limits, are in `docs/SECURITY.md`.
 
-## D. Evidence artifacts not yet produced
+Closing criterion for the rest of the group: C7 and C11 as stated above.
 
-None of these is in the repo today (verified by listing).
+## D. Evidence artifacts: what the generated ones are not
 
-| ID | Artifact | Produced by | Closing criterion |
-|---|---|---|---|
-| D1 | Signed sample run: a charter run directory with `analysis_charter.json`, ledger, custody log, claims, reports, signed by a key whose holder is not the author | A run on a public dataset, plus `scmle charter sign` | Directory committed under `examples/` (or released as an asset) with a `verify` command that exits 0 |
-| D2 | Access-attempt log: a custody log containing a refused second open and a refused wrong-token attempt from a deliberate attack script | Red team (F7 W2) | Log verifies; attempts and refusals match the red-team report |
-| D3 | Sample split manifest (v2) for a grouped and a temporal fixture | `split_manifest.json` from D1 | Hash-verifiable; included in docs |
-| D4 | Oracle comparison table: for every p-value or decision producer, reference, tolerance, maximum observed difference | F7 W5 and the existing scipy fixtures | Generated by a script into `docs/`; CI fails if a row is missing |
+Produced on 2026-11-04 by `scripts/make_phase7_evidence.py` and `python -m benchmarks.qualification.oracle_table` from the real code (nothing hand-written): `plan/evidence/phase-7/` (sample run, access-attempt log, sample manifests) and `docs/ORACLES.md`. Closed and removed: D3, and the generation part of D1, D2 and D4. What is left:
+
+| ID | Residual | Closing criterion |
+|---|---|---|
+| D1 | The sample run is signed with a published demonstration key, so it is tamper evidence only; the roadmap asked for a key whose holder is not the author | A run signed by an independent holder. (`scmle claims verify plan/evidence/phase-7/signed-sample-run --key-file KEY` exited 0 with 7 of 9 steps passing and 2 skipped on 2026-11-04, where the key file holds the published demonstration key) |
+| D2 | The attacker is the generator script, not the red team (F7 W2) | Log and report from the red-team analyst; attempts and refusals match |
+| D4 | Six of twelve oracles (`chi2_contingency`, `fisher_exact`, `kendalltau`, `ks_2samp`, `mannwhitneyu`, `pearsonr`) have no scmle producer compared in the table; the `onlineFDR` and `knockoff` references are pending R | Each gets a producer in `oracle_table.WIRED` or is removed with a dated reason; the R references are frozen |
 
 ## E. Citations from memory, not re-fetched
 
