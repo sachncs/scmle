@@ -60,12 +60,12 @@ measured boundary of what is left to one.
 Proposed interface:
 
 ```python
-loop = Loop.open(deploy_dir, charter, policy)      # own hash-chained ledger
-loop.observe(batch, predictions, decisions)        # logs score, route, propensity
-loop.mature(labels)                                # labels arrive, with delay
-state = loop.step()                                # may return Escalation(...)
+loop = Loop.open(deploy_dir, charter, policy)  # own hash-chained ledger
+loop.observe(batch, predictions, decisions)  # logs score, route, propensity
+loop.mature(labels)  # labels arrive, with delay
+state = loop.step()  # may return Escalation(...)
 esc = loop.pending_escalations()
-loop.reply(esc.id, attestation)                    # human reply -> ledger row
+loop.reply(esc.id, attestation)  # human reply -> ledger row
 ```
 
 Artifacts: `deployment_ledger.jsonl` (hash-chained; kinds `open`,

@@ -65,20 +65,25 @@ charter `FORMAT_VERSION`, `contracts.py:30`):
 
 ```python
 CausalSpec(
-    treatment="coupon", outcome="spend_30d",
-    estimand="ATE",                       # ATE | ATT | LATE | ATT_DID | ATT_SC | LATE_RD
-    unit="customer_id", time="week",      # optional, required by DiD / SC
-    instrument=None, running_variable=None, cutoff=None,
-    dag="dag.json",                       # hashed hypothesis (dag.py), optional
-    assumptions=(                          # closed vocabulary, each one attested
+    treatment="coupon",
+    outcome="spend_30d",
+    estimand="ATE",  # ATE | ATT | LATE | ATT_DID | ATT_SC | LATE_RD
+    unit="customer_id",
+    time="week",  # optional, required by DiD / SC
+    instrument=None,
+    running_variable=None,
+    cutoff=None,
+    dag="dag.json",  # hashed hypothesis (dag.py), optional
+    assumptions=(  # closed vocabulary, each one attested
         "unconfoundedness_given:age,region,tenure",
-        "positivity", "no_interference",
+        "positivity",
+        "no_interference",
     ),
-    strategies=("backdoor_aipw",),         # priority order, fixed in the charter
-    negative_controls=(                    # pre-registered, attested to share confounding
+    strategies=("backdoor_aipw",),  # priority order, fixed in the charter
+    negative_controls=(  # pre-registered, attested to share confounding
         NegativeControl(kind="outcome", variable="spend_prior_year"),
     ),
-    strata=("region",),                    # replication strata, or "period"
+    strata=("region",),  # replication strata, or "period"
     sensitivity=SensitivitySpec(benchmark="strongest_observed", max_bias=0.2),
 )
 ```

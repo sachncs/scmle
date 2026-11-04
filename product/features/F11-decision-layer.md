@@ -66,18 +66,31 @@ not run and no decision claim is made):
 DecisionModel(
     actions=("act", "no_act"),
     # payoffs per outcome, in a stated unit; costs are positive numbers
-    cost_fp=5.0, cost_fn=100.0, unit="EUR per case",
+    cost_fp=5.0,
+    cost_fn=100.0,
+    unit="EUR per case",
     # plausible range of the cost ratio, used for the decision-curve claim
-    ratio_range=(0.02, 0.15),            # threshold-probability range [t_lo, t_hi]
+    ratio_range=(0.02, 0.15),  # threshold-probability range [t_lo, t_hi]
     baselines=("treat_none", "treat_all", "incumbent"),
-    treatment_cost=None,                 # for causal policies: cost per treated unit
+    treatment_cost=None,  # for causal policies: cost per treated unit
 )
-FairnessConstraint(attribute="sex", criterion="equal_opportunity",
-                   max_gap=0.05, mechanism="group_thresholds")  # explicit, never default
-RolloutPlan(unit="user", assignment_prob=0.5, primary="conversion",
-            guardrails=(Guardrail("latency_p95", margin=20.0),),
-            delta_min=0.005, tolerance=0.01, n_max=200_000,
-            alpha_promote="1/50", alpha_rollback="1/100")
+FairnessConstraint(
+    attribute="sex",
+    criterion="equal_opportunity",
+    max_gap=0.05,
+    mechanism="group_thresholds",
+)  # explicit, never default
+RolloutPlan(
+    unit="user",
+    assignment_prob=0.5,
+    primary="conversion",
+    guardrails=(Guardrail("latency_p95", margin=20.0),),
+    delta_min=0.005,
+    tolerance=0.01,
+    n_max=200_000,
+    alpha_promote="1/50",
+    alpha_rollback="1/100",
+)
 ```
 
 Pipeline:
