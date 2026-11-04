@@ -31,10 +31,15 @@ from scmle.data.charter import rules as rules_module
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 5
+FORMAT_VERSION = 6
 OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
+
+
+NEW_ENTITY = "new_entity"
+KNOWN_ENTITY_FUTURE = "known_entity_future"
+UNITS_OF_PREDICTION = (NEW_ENTITY, KNOWN_ENTITY_FUTURE)
 
 
 class DecisionAction(enum.StrEnum):
@@ -327,6 +332,12 @@ class AnalysisCharter:
         decision: The decision layer (format 5): how the cost model is used,
             fairness constraints and the rollout plan; None for a charter
             that makes no decision claim. It needs a `cost_model`.
+        unit_of_prediction: What a deployed prediction is for (format 6):
+            `new_entity` (a row of an entity not seen in training) or
+            `known_entity_future` (a later row of a known entity); None when
+            the charter does not say, which serialises, hashes and loads as
+            a format 1-5 charter did. `new_entity` needs a group column in
+            the data and makes interval calibration use one score per entity.
     """
 
     question: str
@@ -345,6 +356,7 @@ class AnalysisCharter:
     cost_model: costs.DecisionCostModel | None = None
     rules: rules_module.RunRules | None = None
     decision: decision_module.DecisionLayer | None = None
+    unit_of_prediction: str | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint."""
@@ -367,6 +379,13 @@ class AnalysisCharter:
         self.check_decision_map()
         if self.decision is not None and self.cost_model is None:
             raise ValueError("a decision layer needs a cost_model")
+        if (
+            self.unit_of_prediction is not None
+            and self.unit_of_prediction not in UNITS_OF_PREDICTION
+        ):
+            raise ValueError(
+                f"unit_of_prediction must be one of {UNITS_OF_PREDICTION}"
+            )
 
     def check_decision_map(self) -> None:
         """Every gating check has exactly one row and a certificate id."""
@@ -431,14 +450,19 @@ class AnalysisCharter:
             record["rules"] = self.rules.to_dict()
         if self.decision is not None:
             record["decision"] = self.decision.to_dict()
+        if self.unit_of_prediction is not None:
+            record["unit_of_prediction"] = self.unit_of_prediction
         return record
 
     @property
     def format_version(self) -> int:
         """Oldest format that carries this charter.
 
-        2; 3 with rules; 4 with a causal block; 5 with a decision layer.
+        2; 3 with rules; 4 with a causal block; 5 with a decision layer; 6
+        with a unit of prediction.
         """
+        if self.unit_of_prediction is not None:
+            return 6
         if self.decision is not None:
             return 5
         if self.estimand.causal is not None:
@@ -448,7 +472,13 @@ class AnalysisCharter:
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the charter, rejecting unknown or missing fields."""
-        record = {"cost_model": None, "rules": None, "decision": None, **record}
+        record = {
+            "cost_model": None,
+            "rules": None,
+            "decision": None,
+            "unit_of_prediction": None,
+            **record,
+        }
         qualification.require_fields(cls, record)
         cost = record["cost_model"]
         chosen = record["rules"]
@@ -486,6 +516,7 @@ class AnalysisCharter:
                 if layer is None
                 else decision_module.DecisionLayer.from_dict(layer)
             ),
+            unit_of_prediction=record["unit_of_prediction"],
         )
 
 

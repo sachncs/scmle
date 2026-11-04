@@ -20,6 +20,7 @@ SIGNATURE_FIELD = "signature"
 RULES_FORMAT = 3
 CAUSAL_FORMAT = 4
 DECISION_FORMAT = 5
+UNIT_FORMAT = 6
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -84,8 +85,9 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
     """Refuses a wrapper from a newer format, or a field its format lacks.
 
     A wrapper without a `format` is read as format 1. Format 3 added `rules`,
-    format 4 the causal block and format 5 the decision layer; an older
-    wrapper that carries one of them was edited or mislabelled.
+    format 4 the causal block, format 5 the decision layer and format 6 the
+    unit of prediction; an older wrapper that carries one of them was edited
+    or mislabelled.
 
     Raises:
         ConfigError: If the format is newer than this code reads, or an
@@ -112,6 +114,13 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
         raise errors.ConfigError(
             f"charter {path} declares format {declared} but carries a "
             f"'decision' block, which needs format {DECISION_FORMAT}"
+        )
+    if declared < UNIT_FORMAT and "unit_of_prediction" in record.get(
+        "charter", {}
+    ):
+        raise errors.ConfigError(
+            f"charter {path} declares format {declared} but carries "
+            f"'unit_of_prediction', which needs format {UNIT_FORMAT}"
         )
 
 
