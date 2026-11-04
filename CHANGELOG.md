@@ -92,8 +92,8 @@
   the hash of every report file the runner wrote (`attachments`), binding them
   to the ledger head, and the ledger refuses a seal that omits a registered
   claim. `confirmed_claims.json` gained `registered_claims` and `attachments`
-  only when a claim is registered. Nothing calls the runner yet; the entries
-  below say where it is used.
+  only when a claim is registered. The baseline and causal entries above use
+  it.
 
 * Causal identification (F10; `scmle/data/identification/`, charter format 4).
   An estimand may carry a causal block (`CausalSpec`, `NegativeControl`,
