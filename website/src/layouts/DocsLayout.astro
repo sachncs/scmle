@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
+import { docsNav } from "../data/docsNav";
 
 interface Props {
   title: string;
@@ -9,73 +10,10 @@ interface Props {
 
 const { title, description, current } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const page = (slug: string, label: string, key: string = slug) => ({ href: `${base}/docs/${slug}${slug ? "/" : ""}`, label, key });
-const groups = [
-  {
-    title: "Get started",
-    pages: [
-      page("", "Overview", "start"),
-      page("quickstart", "Quickstart"),
-      page("data", "Data & curation"),
-      page("modalities", "Modality lifecycles"),
-      page("capabilities", "Capability matrix"),
-      page("governed-data", "Governed data"),
-    ],
-  },
-  {
-    title: "Modelling and evidence",
-    pages: [
-      page("modeling", "Modelling & estimation"),
-      page("evidence", "Evidence & gates"),
-      page("qualification", "Qualification instrument"),
-      page("causal-decision", "Causal, decision & framing"),
-      page("workflows", "Workflows"),
-      page("cards", "Cards & explanations"),
-      page("extensions", "Extension contracts"),
-    ],
-  },
-  {
-    title: "Reference",
-    pages: [
-      page("api", "Python API"),
-      page("api-stability", "API stability"),
-      page("cli", "Command line"),
-      page("artifacts", "Artifacts & bundles"),
-      page("architecture", "Architecture"),
-      page("benchmarks", "Benchmarks"),
-    ],
-  },
-  {
-    title: "Serve and operate",
-    pages: [
-      page("operations", "Operations"),
-      page("operating-loop", "Operating loop"),
-      page("service", "Serving contract & SLO"),
-      page("local", "Local environment"),
-      page("orchestration", "Orchestration"),
-      page("portable-training", "Portable training"),
-      page("recovery", "Recovery"),
-      page("migrations", "Migrations"),
-      page("troubleshooting", "Troubleshooting"),
-    ],
-  },
-  {
-    title: "Cloud and release",
-    pages: [
-      page("infrastructure", "Infrastructure as code"),
-      page("cloud-release", "Cloud release"),
-      page("releasing", "Releasing the package"),
-    ],
-  },
-  {
-    title: "Trust",
-    pages: [
-      page("security", "Security"),
-      page("threat-model", "Threat model & controls"),
-      page("tenant-isolation", "Tenant isolation"),
-    ],
-  },
-];
+const groups = docsNav.map((group) => ({
+  title: group.title,
+  pages: group.pages.map((p) => ({ href: `${base}/docs/${p.slug}${p.slug ? "/" : ""}`, label: p.label, key: p.key })),
+}));
 // Only pages that exist are linked, so the sidebar and pager can never point at a missing route.
 const existing = new Set(
   Object.keys(import.meta.glob("../pages/docs/*.astro")).map((file) => file.replace("../pages/docs/", "").replace(/\.astro$/, "").replace(/^index$/, "")),

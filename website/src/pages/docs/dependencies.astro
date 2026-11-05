@@ -1,0 +1,44 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const extras = [
+  ["<code>boosting</code>", "LightGBM, XGBoost", "Adapters are rejected with a reason when absent."],
+  ["<code>optimization</code>", "Optuna", "<code>SearchSpec(optimizer=\"optuna\")</code>."],
+  ["<code>sampling</code>", "imbalanced-learn", "SMOTE, Borderline-SMOTE and ADASYN strategies."],
+  ["<code>polars</code>", "Polars", "Polars frames and lazyframes as input. Arrow tables need only pyarrow."],
+  ["<code>spreadsheets</code>", "openpyxl", "<code>.xlsx</code> and <code>.xlsm</code> input; the first worksheet is read."],
+  ["<code>tracking</code>", "MLflow", "<code>MlflowExperimentStore</code>."],
+  ["<code>distributed</code>", "Ray", "<code>ResourceSpec(executor=\"ray\")</code>. No free-threaded (3.14t) wheel yet."],
+  ["<code>catboost</code>", "CatBoost", "No free-threaded (3.14t) wheel yet, so it is kept out of <code>boosting</code>."],
+  ["<code>deeplearning</code>", "PyTorch, Keras 3 (PyTorch backend)", "Model families run in a separate worker process; CPU wheel on Linux via <code>uv</code>."],
+  ["<code>tabpfn</code>", "TabPFN", "Needs an accepted Prior Labs licence and <code>TABPFN_TOKEN</code>. Extension-only and not in <code>all</code>."],
+  ["<code>embeddings</code>", "sentence-transformers", "Downloads a model on first use. Not in <code>all</code>."],
+  ["<code>onnx</code>", "skl2onnx, onnxruntime, onnxmltools", "For <code>scmle export-onnx</code>."],
+  ["<code>multimodal</code>", "Pillow", "Image modality."],
+  ["<code>benchmarks</code>", "huggingface_hub", "The Hugging Face benchmark suite."],
+];
+---
+
+<DocsLayout title="Dependencies & extras" description="The scmle dependency policy: a light base install, optional extras that are never imported unless used, tested lower bounds, auditing and licence checks." current="dependencies">
+  <p class="eyebrow"><span></span> Reference</p>
+  <h1>A light core,<br /><em>extras on request.</em></h1>
+  <p class="lead">SCMLE needs CPython 3.11 or newer and is tested on 3.11, 3.12, 3.13 and 3.14, including the free-threaded 3.14 build. The base install is deliberately small, and nothing optional is imported unless you use it.</p>
+
+  <h2>The base install</h2>
+  <p>numpy, pandas, pyarrow, pydantic, scikit-learn, joblib and threadpoolctl. No GPU, service, database server or cloud account is required. The install commands are on the <a href={`${base}/docs/quickstart/`}>quickstart</a>.</p>
+
+  <h2>Optional extras</h2>
+  <DocTable label="Optional extras" head={["Extra", "Adds", "Notes"]} rows={extras} />
+  <p>On macOS, the <code>boosting</code> extra needs the OpenMP runtime (<code>brew install libomp</code>). Which model families each extra enables, and which are experimental, is on the <a href={`${base}/docs/capabilities/`}>capability matrix</a>.</p>
+
+  <h2>Version policy</h2>
+  <ul>
+    <li><strong>Lower bounds are tested, not guessed.</strong> CI resolves the lowest direct versions and runs the unit, property and leakage suites on them (pandas 3.0, scikit-learn 1.8, numpy 2.3 and so on).</li>
+    <li><strong>Upper bounds</strong> are not pinned in the library. The lock file records the combination that CI exercises.</li>
+    <li><strong>Audit.</strong> <code>pip-audit</code> runs in CI; a vulnerable release fails the build.</li>
+    <li><strong>Licences.</strong> The project is Apache-2.0. CI traverses the installed base runtime closure and publishes a licence inventory. A missing licence record or a copyleft licence (GPL, LGPL, AGPL, SSPL, BUSL or Elastic) fails the security job. Optional extras must be audited in the environment where they are enabled before a release claim includes them, and any copyleft package added to an extra needs review.</li>
+  </ul>
+
+  <p class="meta">Dependency policy of the 0.1 beta line</p>
+</DocsLayout>

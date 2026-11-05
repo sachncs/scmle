@@ -1,0 +1,60 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout title="Operational rehearsal" description="The release rehearsal procedure for scmle: interruption and resume, rollback, signing-key rotation, fault evidence recording and monitoring handoff, run on a disposable candidate and reviewed independently." current="rehearsal">
+  <p class="eyebrow"><span></span> Serve and operate</p>
+  <h1>Prove recovery works<br /><em>before you release.</em></h1>
+  <p class="lead">Run this procedure against a disposable release candidate and a disposable registry. Record the commit, package version, Python version, platform, operator, timestamps, and the resulting run directory and logs. The rehearsal is complete only when every step has evidence and an operator other than the author can explain the recovery decision.</p>
+
+  <h2>1. Interruption and resume</h2>
+  <ol>
+    <li>Start a bounded run with a small dataset and a run output directory.</li>
+    <li>Interrupt it after at least one trial checkpoint exists.</li>
+    <li>Confirm the run ends in <code>CANCELLED</code> or <code>FAILED</code> and that its event log and recoverable trial list are present.</li>
+    <li>Resume the same run with the same data and configuration.</li>
+    <li>Confirm completed trials are reused, the final state is <code>COMPLETED</code>, and the event log contains both the original and the resumed state transitions.</li>
+  </ol>
+  <p>Automated evidence exists in the resume and recovery integration tests. See also <a href={`${base}/docs/recovery/`}>Recovery</a>.</p>
+
+  <h2>2. Rollback</h2>
+  <ol>
+    <li>Register a known-good bundle and promote it with a signed <code>PromotionApproval</code> bound to its content digest, review decision and evidence references. Pass the release verification key to the promotion call.</li>
+    <li>Stage a challenger under the <code>challenger</code> alias. Do not move the serving alias as part of the training step.</li>
+    <li>Score the same sufficiently large labelled batch with both versions.</li>
+    <li>Run the rollback check with the declared tolerance and confirm a clearly worse champion remains in place while approval is pending.</li>
+    <li>Approve the previous version independently, rerun the rollback action, and confirm it restores the previous alias with a complete approval record in the rollback audit trail.</li>
+  </ol>
+
+  <h2>3. Signing-key rotation</h2>
+  <ol>
+    <li>Produce a signed bundle with the current key.</li>
+    <li>Run <code>ModelBundle.rotate_signing_key(bundle_dir, old_key, new_key)</code>.</li>
+    <li>Load the bundle with the new key and verify predictions against a saved parity sample.</li>
+    <li>Confirm the old key is rejected and no temporary signature file remains.</li>
+    <li>Only then retire the old key in the secret manager.</li>
+  </ol>
+
+  <h2>4. Fault evidence recording</h2>
+  <ol>
+    <li>Build the complete fault-injection plan registry for the disposable release candidate.</li>
+    <li>Use the fault-injection harness with a unique execution id, reviewer and evidence directory.</li>
+    <li>Run one scenario-specific injector and return one artifact for every declared evidence requirement.</li>
+    <li>Confirm each artifact is atomically persisted and its SHA-256 digest recorded, and that missing or unsafe observations remain inconclusive or failed.</li>
+    <li>Do not treat this recorder test as evidence that process death, disk exhaustion or worker loss has actually been exercised. Those injectors still need an environment-specific executor (see <a href={`${base}/docs/operations/`}>Operations</a>).</li>
+  </ol>
+
+  <h2>5. Monitoring handoff</h2>
+  <ol>
+    <li>Assess a fresh labelled batch with the promoted bundle.</li>
+    <li>Record row count, labelled coverage, drift findings, the recommendation and the operator decision.</li>
+    <li>If retraining is recommended, require challenger comparison evidence before promotion; otherwise record why the recommendation was deferred.</li>
+    <li>Confirm the monitoring report and audit events are retained with the run or registry evidence.</li>
+  </ol>
+
+  <h2>Exit criteria</h2>
+  <div class="callout"><p><strong>The release gate stays open</strong> if any step was skipped, used an untracked secret, relied on <code>trusted=True</code> outside the disposable rehearsal, or lacked an independent operator review. Attach the evidence bundle to the release review. The loop that this feeds is described on <a href={`${base}/docs/operating-loop/`}>Operating loop</a>.</p></div>
+
+  <p class="meta">Rehearsal procedure of the 0.1 beta line</p>
+</DocsLayout>

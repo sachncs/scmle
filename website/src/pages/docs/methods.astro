@@ -1,0 +1,51 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const lit = [
+  ["Betting capital and plug-in bet (sequential tests)", "Waudby-Smith and Ramdas, arXiv:2010.09686", "The capital process and its predictable-bet martingale property; Ville's inequality; the variance and mean estimators; the cap.", "The bet formula is the paper's plug-in for a two-sided interval, not for the one-sided capital used here. That use is this project's adaptation and its validity rests on predictability only."],
+  ["e-LOND and p-to-e calibration (online FDR)", "Xu and Ramdas, arXiv:2311.06412", "The level rule and the FDR statement under arbitrary dependence.", "The venue was recalled from memory."],
+  ["Fixed-sequence threshold (escalation)", "Angelopoulos et al., \"Learn then Test\", arXiv:2110.01052", "Fixed-sequence testing stops at the first acceptance and controls FWER; exact binomial tail for selective classification.", "The paper assumes an i.i.d. calibration set; a docstring said exchangeable and was corrected."],
+  ["Selective risk and coverage", "Geifman and El-Yaniv, arXiv:1705.08500; El-Yaniv and Wiener, JMLR 2010", "Definitions of coverage and selective risk; the guarantee with probability 1 - delta over an i.i.d. sample.", "None."],
+  ["Chow's rule", "Described in El-Yaniv and Wiener; Chow 1957 and 1970 not retrieved", "That it is the Bayes-optimal reject rule under 0-1 loss with a known distribution.", "The reading of the cut as the ratio of two costs is this project's own, not checked against Chow."],
+  ["CV+ and weighted conformal", "Barber, Candes, Ramdas, Tibshirani, arXiv:1905.02928; Tibshirani et al., arXiv:1904.06019", "The interval construction; the CV+ guarantee for exchangeable data and a symmetric algorithm; the weighted quantile needs the exact likelihood ratio.", "\"Coverage near 1 - alpha\" is an empirical expectation in the paper, not a theorem; a docstring that said otherwise was corrected."],
+  ["MinT forecast reconciliation", "Wickramasuriya, Athanasopoulos, Hyndman, working-paper version of 2018", "The minimum-trace formula among unbiased maps; shrinkage toward the diagonal.", "The unbiasedness constraint was missing from a docstring. The journal version and the shrinkage source were not read."],
+  ["Net benefit and threshold", "Vickers and Elkin 2006, author manuscript", "NB = TP/n - FP/n * pt/(1-pt); the weight is the harm ratio.", "A \"recalled, not re-read\" note was replaced."],
+  ["Robustness value and bias formulas", "Cinelli and Hazlett, JRSS-B 2020, eq. 12 and 18 to 22", "The robustness value, standard-error adjustment and benchmark bound, algebraically identical to the code; a table example reproduced.", "One rule from the paper is not implemented."],
+  ["Fellegi-Sunter weights (entity resolution)", "Fellegi and Sunter 1969 not retrieved", "Only secondary descriptions.", "Marked as not verified against the primary source."],
+];
+const oracles = [
+  ["Clopper-Pearson interval", "<code>scipy.stats.binomtest(...).proportion_ci(method='exact')</code>", "5", "&lt;= 1e-15"],
+  ["Wilson interval", "<code>scipy.stats.binomtest(...).proportion_ci(method='wilson')</code>", "10", "&lt;= 1e-15"],
+  ["FDR control", "<code>scipy.stats.false_discovery_control</code>", "6", "&lt;= 1e-15"],
+  ["Harmonic number", "digamma plus the Euler-Mascheroni constant", "10", "&lt;= 1e-15"],
+  ["Kruskal-Wallis", "<code>scipy.stats.kruskal</code>", "3", "&lt;= 1e-16"],
+  ["Spearman correlation", "<code>scipy.stats.spearmanr</code>", "4", "&lt;= 1e-16"],
+];
+---
+
+<DocsLayout title="Methods checked" description="Which cited statistical methods in scmle were read against their primary papers, which could not be retrieved, and which routines are compared with frozen scipy reference outputs." current="methods">
+  <p class="eyebrow"><span></span> Modelling and evidence</p>
+  <h1>What was checked<br /><em>against the source.</em></h1>
+  <p class="lead">On 2026-11-05 the primary sources of the methods below were fetched and read in full wherever they could be retrieved, and the code's documentation was corrected where a claim went beyond them. <strong>"Verified" means a statement was read in the source and agrees with the module's text.</strong> It does not mean the code is correct: that is the job of the tests and the certificates.</p>
+
+  <h2>Cited methods</h2>
+  <DocTable label="Cited methods checked against their sources" head={["Method", "Source read", "Verified", "Corrected or not supported"]} rows={lit} />
+
+  <h2>Not verified</h2>
+  <ul>
+    <li>Begg and Greenes 1983 (label-selection bias): not retrievable. The docstring still says it was written from memory.</li>
+    <li>Chow 1957 and 1970, and Fellegi and Sunter 1969, as above.</li>
+    <li>Uno et al. 2011 (censoring weights), Gneiting and Raftery 2007 (proper scores), Romano et al. arXiv:1905.03222, Berger 1982, and the M4 and M5 papers: not opened in this pass.</li>
+    <li>Every dataset named for replay or corpora: existence, licence and hash.</li>
+    <li>No R or Python reference package was run: sensemakr, hts, onlineFDR, MAPIE.</li>
+  </ul>
+
+  <h2>Oracle comparison</h2>
+  <p>Each row runs the project's function on every case of a frozen reference file and reports a bound on the largest relative disagreement (absolute where the reference is zero). The references are scipy outputs, so agreement shows that two computations match, not that either is correct. Tolerance is 1e-8 relative.</p>
+  <DocTable label="Oracle comparison with scipy" head={["Quantity", "Reference", "Cases", "Max difference"]} rows={oracles} />
+  <p>Six further oracles (chi-square contingency, Fisher exact, Kendall tau, two-sample Kolmogorov-Smirnov, Mann-Whitney and Pearson) have frozen cases but no project function wired to them, so they are not compared. Frozen references from R packages (knockoff and onlineFDR) are pending, because R is not available in the environment that built the table.</p>
+  <p>How certificates and gates build on these checks is on <a href={`${base}/docs/qualification/#certificates`}>the qualification instrument</a>.</p>
+
+  <p class="meta">Checked as of 2026-11-05</p>
+</DocsLayout>
