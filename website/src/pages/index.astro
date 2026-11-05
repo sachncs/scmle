@@ -385,13 +385,14 @@ const bw = 360;
             </svg>
             <div class="bench-note">
               <p class="note">One split and one seed per dataset: differences in the fourth digit are within noise. With three seeds and 95% intervals, only one of four bundled datasets was distinguishable from the reference (diabetes progression, ahead).</p>
-              <a class="link-arrow" href={`${base}/docs/benchmarks/#more-datasets`}>Full tables and reading notes →</a>
+              <p class="note"><strong>Scope.</strong> Commit <code>491dd24</code> recorded these results. Nine datasets: four bundled, five OpenML (versions not pinned). 400 s budget, 2 workers, every optional extra installed, hardware not recorded. <code>leakage_policy="warn"</code> is set explicitly by the benchmark runner, so these scores do not show the behaviour of <code>"block"</code>. One split and one seed per dataset; nine of nine runs finished. Reference: a plain scikit-learn <code>HistGradientBoosting</code> on the same rows. <strong>No AutoML head-to-head result exists</strong>, so nothing here supports a claim of superiority over other AutoML systems. Reproduce: <code>python -m benchmarks.run_benchmarks --budget 400 --workers 2</code> from a source checkout.</p>
+              <a class="link-arrow" href={`${base}/docs/benchmarks/#what-this-shows`}>Full scope, repeated-seed intervals and all tables →</a>
             </div>
           </figure>
           <div class="reveal" data-delay="1">
             <div class="table-wrap" tabindex="0" role="region" aria-label="Selected benchmark results, scrollable">
               <table class="data">
-                <caption>Locked-test score, from the README (400 s budget, 2 workers)</caption>
+                <caption>Single-seed locked-test scores (point estimates; the repeated-seed intervals are on the benchmarks page)</caption>
                 <thead><tr><th scope="col">Dataset</th><th scope="col">Metric</th><th scope="col" class="num">SCMLE</th><th scope="col" class="num">Reference</th></tr></thead>
                 <tbody>
                   <tr><th scope="row">breast_cancer</th><td>roc_auc</td><td class="num ahead">0.9940</td><td class="num">0.9901</td></tr>

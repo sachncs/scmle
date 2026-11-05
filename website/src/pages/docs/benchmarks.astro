@@ -1,6 +1,7 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/DocTable.astro";
+import ScopeBox from "../../components/ScopeBox.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const core = [
  [
@@ -647,6 +648,47 @@ const tasks = [
   "catboost"
  ]
 ];
+const scopeCore = [
+  ["Commit", "Results file recorded in commit <code>491dd24e470705b3268556bf72b33c29dfbab369</code> (\"benchmark table re-measured on the final code and defaults\"). Re-running on a later commit may differ."],
+  ["Datasets", "Four bundled scikit-learn tables and five OpenML tables (credit-g, titanic, kc1, adult income 12k sample, california housing 10k sample). Dataset versions are <strong>not pinned</strong> in the results file."],
+  ["Environment", "Every optional extra installed, so the model families that need them were candidates. Python and package versions are not recorded in the results file."],
+  ["Budget", "400 s per dataset, 2 workers."],
+  ["Leakage policy", "<code>warn</code>, set explicitly by the benchmark runner. These results do <strong>not</strong> show the behaviour of <code>block</code>, and Titanic's score comes from leaked columns."],
+  ["Split and seeds", "One locked-test split and one seed (0) per dataset. Reference: plain scikit-learn <code>HistGradientBoosting</code> on the same development rows."],
+  ["Hardware", "Not recorded in the results file."],
+  ["Failures", "None: all nine datasets finished with status ok. Wine and kc1 are behind the reference."],
+  ["Reproduce", "<code>python -m benchmarks.run_benchmarks --budget 400 --workers 2 --output results.json</code> from a source checkout. Expect differences: the search stops at a time budget and hardware differs."],
+];
+const scopeMore = [
+  ["Commit", "Not recorded: the raw results file for these suites is not committed, only the table below."],
+  ["Datasets", "20 Hugging Face Hub tables and 21 OpenML tables, loaded by name; versions not pinned."],
+  ["Budget", "240 s per dataset, 2 workers. Wide and large multiclass sets had little room to tune at this budget."],
+  ["Leakage policy", "<code>warn</code>, set explicitly by the benchmark runner."],
+  ["Split and seeds", "One locked-test split and one seed per dataset."],
+  ["Hardware and environment", "Not recorded."],
+  ["Failures", "None listed in the table; the raw log is not committed."],
+  ["Reproduce", "<code>python -m benchmarks.run_benchmarks --suite huggingface --budget 240</code> and <code>--suite extended</code> (downloads data; needs the <code>benchmarks</code> extra)."],
+];
+const scopeSeeds = [
+  ["Commit", "Results file recorded in commit <code>19ba9c526ed483c58acaa05db88f7f0f7bc7d10a</code>."],
+  ["Datasets", "The four bundled scikit-learn tables (no download)."],
+  ["Budget", "150 s per seed."],
+  ["Leakage policy", "<code>warn</code>, set explicitly by the benchmark runner."],
+  ["Split and seeds", "Three seeds; each seed changes the split and the models. Advantage over the reference with a 95% Student-t interval. A win needs the interval to exclude zero."],
+  ["Hardware and environment", "Not recorded in the results file."],
+  ["Failures", "None."],
+  ["Reproduce", "<code>python -m benchmarks.run_benchmarks --offline --seeds 3 --budget 150 --output results.json</code>."],
+];
+const scopeTasks = [
+  ["Commit", "Results file recorded in commit <code>19ba9c526ed483c58acaa05db88f7f0f7bc7d10a</code>."],
+  ["Datasets", "Public data: OpenML, R datasets, the Criteo uplift sample (420k rows sampled), MSLR-WEB10k (700 queries), covertype. Versions not pinned."],
+  ["Budget", "300 s per case."],
+  ["Leakage policy", "<code>warn</code>, set explicitly."],
+  ["Split and seeds", "One split and one seed per case, against a simple baseline scored on the same locked rows."],
+  ["Hardware and environment", "Not recorded."],
+  ["Failures", "None listed; clear losses are in the table."],
+  ["Reproduce", "<code>python -m benchmarks.real_tasks --budget 300</code>."],
+];
 const reliability = [
  [
   "<code>determinism</code>",
@@ -707,12 +749,35 @@ const reliability = [
   <DocTable label="Reliability checks" head={["Check", "Claim", "Passes when"]} rows={reliability} />
   <p>The coverage and problem-type methods have their own measured gates, written to a certificate file and checked for staleness against the code. Two gates missed their pre-registered floors and are listed as descriptive: CQR conditional coverage in the highest-noise decile, and the slice flag's familywise false-flag rate. Gates that need outside data or tools have not run and are listed as not measured. These checks complement, and do not replace, the leakage test suite, the mutation gate and the operational rehearsal.</p>
 
-  <h2 id="core">Nine core datasets</h2>
+  <h2 id="what-this-shows">What these results do and do not show</h2>
+  <ul>
+    <li>They compare SCMLE with <strong>one</strong> baseline, a plain scikit-learn <code>HistGradientBoosting</code>, on the same development and locked-test rows.</li>
+    <li><strong>No AutoML head-to-head result exists.</strong> A protocol for comparing against external AutoML systems was written in advance, and it has no completed results. Nothing here supports a claim of superiority over AutoGluon, H2O or any other AutoML system.</li>
+    <li>Every benchmark run here sets <code>leakage_policy="warn"</code> explicitly, so none of it shows the behaviour of the opt-in <code>block</code> policy.</li>
+    <li>Most tables below are single-seed point estimates. They are shown in a quieter style on purpose; read the repeated-seed intervals first.</li>
+  </ul>
+
+  <h2 id="seeds">Repeated seeds with intervals</h2>
+  <p><strong>This is the primary evidence.</strong> Repeated seeds give an interval, and an interval is what can separate a result from noise.</p>
+  <ScopeBox title="repeated-seed results" items={scopeSeeds} />
+  <p><code>--seeds N</code> repeats each dataset with N seeds (each seed changes the split and the models) and reports the advantage over the reference with a 95% Student-t interval. A win needs the interval to exclude zero; otherwise the verdict is <code>tie</code>. Three seeds, 150 s budget, the four bundled datasets:</p>
+  <DocTable label="Repeated-seed results" head={["dataset", "metric", "test (mean)", "reference (mean)", "advantage (95% CI)", "verdict"]} rows={seeds} />
+  <p>With three seeds only one result is distinguishable from noise (diabetes progression, ahead). The single-seed "behind" label on wine is not supported once the spread across seeds is counted: its interval spans zero by a wide margin because one seed scored badly.</p>
+
+  <h2 id="core">Nine core datasets <span class="tag-single">single seed</span></h2>
+  <div class="single-seed-note">Single-seed point estimates. Differences in the fourth digit are within noise.</div>
+  <ScopeBox title="nine core datasets" items={scopeCore} />
+  <div class="subordinate">
   <p>400 s budget, 2 workers, every optional extra installed.</p>
   <DocTable label="Core benchmark results" head={["dataset", "rows", "task", "metric", "selected", "cv", "test", "reference"]} rows={core} />
   <p><strong>Honest reading:</strong> ahead of the reference on 7 of 9. The two exceptions are <em>wine</em>, whose locked test set has only 36 rows so one confident mistake dominates log loss, and <em>kc1</em>, where the selected stack trails the reference by about 0.026 PR-AUC on a 15%-positive set with few positives in the test rows, so the score is noisy. Titanic's near-perfect score comes from leaked columns (<code>boat</code>, <code>body</code>): the leakage screen flags both (<code>boat</code> by skill, missingness and record purity; <code>body</code> by record purity only, because it is recorded for 9% of passengers, all of whom died), and <code>leakage_policy="block"</code> (opt-in; the default is <code>"warn"</code>) refuses to proceed. See <a href={`${base}/docs/leakage/`}>the leakage screen</a>.</p>
 
-  <h2 id="more-datasets">More open datasets</h2>
+    </div>
+
+  <h2 id="more-datasets">More open datasets <span class="tag-single">single seed</span></h2>
+  <div class="single-seed-note">Single-seed point estimates; the raw results file is not committed.</div>
+  <ScopeBox title="Hugging Face and OpenML suites" items={scopeMore} />
+  <div class="subordinate">
   <p>20 tables from the Hugging Face Hub and 21 more from OpenML, with a 240 s budget and 2 workers.</p>
   <h3>Hugging Face Hub (inria-soda/tabular-benchmark and scikit-learn tables)</h3>
   <p>Ahead of the reference on <strong>16 of 20</strong>.</p>
@@ -721,6 +786,7 @@ const reliability = [
   <p>Ahead of the reference on <strong>13 of 21</strong>.</p>
   <DocTable label="OpenML benchmark results" head={["dataset", "rows", "metric", "selected", "test", "reference", "vs reference"]} rows={openml} />
 
+  </div>
   <h3>Reading the results</h3>
   <ul>
     <li>Ties at the third significant digit (ailerons, elevators, spambase, cpu_act, pol) are labelled by the unrounded numbers; treat them as ties.</li>
@@ -730,15 +796,15 @@ const reliability = [
     <li>Scores come from one split and one seed per dataset, so differences in the fourth digit are within noise.</li>
   </ul>
 
-  <h2 id="seeds">Repeated seeds with intervals</h2>
-  <p><code>--seeds N</code> repeats each dataset with N seeds (each seed changes the split and the models) and reports the advantage over the reference with a 95% Student-t interval. A win needs the interval to exclude zero; otherwise the verdict is <code>tie</code>. Three seeds, 150 s budget, the four bundled datasets:</p>
-  <DocTable label="Repeated-seed results" head={["dataset", "metric", "test (mean)", "reference (mean)", "advantage (95% CI)", "verdict"]} rows={seeds} />
-  <p>With three seeds only one result is distinguishable from noise (diabetes progression, ahead). The single-seed "behind" label on wine is not supported once the spread across seeds is counted: its interval spans zero by a wide margin because one seed scored badly.</p>
-
-  <h2 id="task-types">New task types on real datasets</h2>
+  <h2 id="task-types">New task types on real datasets <span class="tag-single">single seed</span></h2>
+  <div class="single-seed-note">Single-seed point estimates, not intervals.</div>
+  <ScopeBox title="new task types" items={scopeTasks} />
+  <div class="subordinate">
   <p>Every task type added after the first release was run on public data (OpenML, R datasets, the Criteo uplift sample, MSLR-WEB10k, covertype) with a 300 s budget per case and one seed, against a simple strong baseline scored on the same locked rows.</p>
   <DocTable label="Task-type benchmark results" head={["dataset", "task", "metric", "framework", "baseline", "verdict", "selected"]} rows={tasks} />
   <p><strong>Reading it honestly:</strong> these are single-seed point estimates, not intervals, so small gaps are ties (wine-red 0.572 against 0.567; yeast 0.4175 against 0.4195; mslr 0.5575 against 0.5583). Clear wins: AirPassengers, nottem, wine-white, scene, PBC, the randomized uplift sets, and covertype under a 50 MB memory budget. Clear losses: UKgas (the seasonal-naive forecast is better than the framework's direct ridge on 108 points) and energy-efficiency (a per-target boosted regressor is slightly better). On the observational Lalonde data the uplift estimate rests on the no-unmeasured-confounding assumption and its Qini is close to zero, so it should not be read as a causal result. Covertype's baseline is a default boosted model on all development rows, which is weak, so its margin overstates the framework's advantage.</p>
+
+  </div>
 
   <h2>Reproducing the numbers</h2>
   <pre><code>{`python -m benchmarks.run_benchmarks --offline --output results.json

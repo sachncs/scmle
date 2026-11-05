@@ -176,3 +176,15 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
 .docs-content .glossary-filter { display: block !important; margin: var(--s3) 0; max-width: 28rem; }
 .docs-content .term[hidden] { display: none; }
 .docs-content blockquote { border-left: 3px solid var(--accent); margin: var(--s3) 0; padding: 0 var(--s3); }
+
+/* Result scope boxes and single-seed subordination */
+.scope-box, .docs-content .scope-box { background: var(--bg-alt); border: 1px solid var(--line); border-radius: var(--radius); margin: var(--s3) 0; padding: var(--s2) var(--s3); }
+.scope-box .scope-title { color: var(--text); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; margin: 0 0 var(--s1); text-transform: uppercase; }
+.scope-box dl { display: grid; gap: 4px var(--s2); grid-template-columns: 1fr; margin: 0; }
+@media (min-width: 720px) { .scope-box dl { grid-template-columns: 9.5rem 1fr; } }
+.scope-box dt { color: var(--text); font-size: var(--step--1); font-weight: 600; }
+.scope-box dd { color: var(--text-2); font-size: var(--step--1); margin: 0 0 6px; overflow-wrap: anywhere; }
+.docs-content .single-seed-note { border-left: 3px solid var(--warn); color: var(--text-2); font-size: var(--step--1); margin: var(--s2) 0; padding: 2px var(--s2); }
+.docs-content .subordinate table th, .docs-content .subordinate table td { font-size: 0.8125rem; padding: 8px 12px; }
+.docs-content .subordinate .model-table { border-style: dashed; }
+.docs-content .tag-single { background: var(--bg-alt); border: 1px solid var(--line-strong); border-radius: 999px; color: var(--text-2); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; margin-left: 8px; padding: 2px 8px; text-transform: uppercase; vertical-align: middle; white-space: nowrap; }

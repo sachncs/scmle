@@ -1,0 +1,12 @@
+---
+// The scope of a published result, written next to the result so it cannot be read without it.
+interface Props { title: string; items: [string, string][] }
+const { title, items } = Astro.props;
+---
+
+<aside class="scope-box" aria-label={`Scope of ${title}`}>
+  <p class="scope-title">Scope: {title}</p>
+  <dl>
+    {items.map(([k, v]) => (<><dt>{k}</dt><dd set:html={v} /></>))}
+  </dl>
+</aside>
