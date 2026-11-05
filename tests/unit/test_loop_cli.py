@@ -149,3 +149,9 @@ def test_a_refused_reply_and_a_broken_ledger_fail(tmp_path, capsys):
     lines = path.read_text().splitlines()
     path.write_text("\n".join([lines[0], lines[0], *lines[1:]]) + "\n")
     assert run("loop", "verify", deploy) == 1
+
+
+def test_a_policy_file_needs_only_the_reference_risk():
+    policy = loop_module.LoopPolicy.from_dict({"reference_risk": 0.1})
+    assert policy.high_impact_actions == ()
+    assert policy.reference_risk == 0.1

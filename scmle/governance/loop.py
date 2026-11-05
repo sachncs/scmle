@@ -199,7 +199,9 @@ class LoopPolicy:
     def from_dict(cls, record: Mapping[str, Any]) -> "LoopPolicy":
         """Rebuilds a policy from `to_dict`."""
         values = dict(record)
-        values["high_impact_actions"] = tuple(values["high_impact_actions"])
+        values["high_impact_actions"] = tuple(
+            values.get("high_impact_actions", ())
+        )
         return cls(**values)
 
 
