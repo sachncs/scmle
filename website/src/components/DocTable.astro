@@ -7,11 +7,13 @@ interface Props {
   rowHeads?: boolean;
   minWidth?: string;
 }
-const { label, head, rows, rowHeads = true, minWidth } = Astro.props;
+const { label, head, rows, rowHeads = true, minWidth: widthOverride } = Astro.props;
+// Narrow tables should wrap on a phone instead of scrolling; wide ones keep a readable minimum.
+const minWidth = widthOverride ?? (head.length <= 2 ? "0" : head.length === 3 ? "560px" : "720px");
 ---
 
 <div class="model-table" role="region" aria-label={label} tabindex="0">
-  <table style={minWidth ? `min-width:${minWidth}` : undefined}>
+  <table style={`min-width:${minWidth}`}>
     <thead><tr>{head.map((h) => <th scope="col">{h}</th>)}</tr></thead>
     <tbody>
       {rows.map((row) => (
