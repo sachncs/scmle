@@ -4,9 +4,11 @@ Terraform (or OpenTofu) under [`deploy/terraform/`](../deploy/terraform) declare
 the same service on AWS and on GCP. This page says what is declared, what is
 checked without an account, and what is not checked at all.
 
-Nothing in this repository has been applied to an account. `terraform
-validate`, `fmt` and `plan` have not been run by the author (the tool was not
-installed); only the Python policy check and its tests have run.
+Nothing in this repository has been applied to an account, and `plan` has not
+been run (it needs provider credentials). OpenTofu 1.13.5 has run `fmt` and
+`init -backend=false` plus `validate` on both modules and all six environments
+and they pass; the provider lock files from that `init` are committed. The
+Python policy check and its tests also run.
 
 ## Layout
 
