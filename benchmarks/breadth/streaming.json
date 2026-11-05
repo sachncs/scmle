@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "slice": "streaming",
+  "status": "definition_only",
+  "task_family": "streaming_inference_and_ingestion",
+  "modality": "tabular",
+  "built": "none",
+  "evidence_in_repo": [
+    "scmle/data/readers/streaming.py",
+    "scmle/operations/spool.py",
+    "tests/unit/test_streaming.py"
+  ],
+  "deployment_requirement": {
+    "statement": "An event stream, the delivery semantics the consumer needs and the cost of a duplicate or a loss, declared by its owner.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A replay of a recorded stream with the pipeline killed at every stage; an independent run.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Is the effect of the pipeline the same as a batch computation under faults?",
+      "perturbation_or_signal": "Duplicate, out-of-order and late events; a kill at every stage; replay from a checkpoint.",
+      "truth": "The batch computation over the same events.",
+      "metric": "Equality of the pipeline's effects (outputs, counters, ledger rows) with the batch result after each fault.",
+      "acceptance_rule": "Zero differences for the stated semantics at each of kill_points kill points, over the whole pipeline from source to sink.",
+      "parameters": {
+        "kill_points": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is concept drift noticed on the stream?",
+      "perturbation_or_signal": "A planted drift at a known event time.",
+      "truth": "The event time of the drift.",
+      "metric": "Detection delay in events and in seconds; false alarms per 1000 null windows.",
+      "acceptance_rule": "Median delay <= delay_ceiling and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "delay_ceiling": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Can a streamed prediction be explained after the fact?",
+      "perturbation_or_signal": "A sample of logged predictions.",
+      "truth": "The batch explanation of the same inputs.",
+      "metric": "Share of logged predictions whose explanation can be reproduced from the log.",
+      "acceptance_rule": "Share >= reproduce_floor.",
+      "parameters": {
+        "reproduce_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Are lag, backlog and duplicates visible?",
+      "perturbation_or_signal": "A stalled consumer; a duplicate burst.",
+      "truth": "The injected stall and burst.",
+      "metric": "Detection delay for consumer lag, backlog and duplicate rate.",
+      "acceptance_rule": "Median delay <= delay_ceiling seconds.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "exactly-once delivery or effect for any pipeline",
+    "any event-streaming pipeline exists in SCMLE: the streaming module reads a table in chunks, and the telemetry spool delivers at least once"
+  ]
+}

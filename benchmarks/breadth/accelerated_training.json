@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "slice": "accelerated_training",
+  "status": "definition_only",
+  "task_family": "gpu_and_distributed_training",
+  "modality": "tabular",
+  "built": "none",
+  "evidence_in_repo": [
+    "docs/PORTABLE_TRAINING.md",
+    "tests/integration/test_ray_cluster.py"
+  ],
+  "deployment_requirement": {
+    "statement": "A workload whose size or latency requirement a single CPU job cannot meet, with the measurement that shows it.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A timing and cost comparison on the owner's workload, checked by an independent run.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does training give the same model on different devices and worker counts?",
+      "perturbation_or_signal": "Single CPU, one GPU and several workers on the same data and seed; a killed worker.",
+      "truth": "The single-CPU result.",
+      "metric": "Difference in the selected metric; resumption after a killed worker.",
+      "acceptance_rule": "Metric difference <= equivalence_band and the job resumes with no repeated trial.",
+      "parameters": {
+        "equivalence_band": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is anything different about drift detection on the trained model?",
+      "perturbation_or_signal": "The same planted shifts as the tabular beta.",
+      "truth": "The planted shift.",
+      "metric": "Detection rate against the single-CPU model.",
+      "acceptance_rule": "Detection rate equal within detect_band.",
+      "parameters": {
+        "detect_band": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Are explanations the same as on a single device?",
+      "perturbation_or_signal": "Fixed inputs explained by both models.",
+      "truth": "The single-CPU explanations.",
+      "metric": "Rank correlation of attributions.",
+      "acceptance_rule": "Rank correlation >= rank_floor.",
+      "parameters": {
+        "rank_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Are cost and utilisation visible and bounded?",
+      "perturbation_or_signal": "A job with a declared budget.",
+      "truth": "The budget.",
+      "metric": "Spend, utilisation and failed-worker count against the budget.",
+      "acceptance_rule": "Spend <= budget and every failure is recorded.",
+      "parameters": {
+        "budget": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "a GPU or a cluster is justified for any workload in this repository"
+  ]
+}

@@ -23,6 +23,7 @@ Reading guide and published tables: [`docs/BENCHMARKS.md`](../docs/BENCHMARKS.md
 | `results_real_tasks.json` | Committed output of `real_tasks.py`. |
 | `sota/` | Pre-registered comparison against external AutoML systems: [`PROTOCOL.md`](sota/PROTOCOL.md), the pinned task table and the seeded development / hold-out split (`split.py`). No results yet. |
 | `results_reliability.json` | Committed output of `reliability.py`. |
+| `breadth/` | Definitions, written before any slice is built, of the robustness, drift, explanation and monitoring benchmark of each further task family and modality (clustering, association, dimensionality reduction, forecasting, ranking, documents, image, audio, video, geospatial, graph, pretrained and multimodal, accelerated training, streaming). Nothing in it has been run and no threshold is set; see [`docs/BREADTH.md`](../docs/BREADTH.md). |
 
 ## Run
 

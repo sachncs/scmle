@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "slice": "clustering",
+  "status": "definition_only",
+  "task_family": "clustering",
+  "modality": "tabular",
+  "built": "library_only",
+  "evidence_in_repo": [
+    "scmle/unsupervised/clustering.py",
+    "tests/unit/test_clustering.py"
+  ],
+  "deployment_requirement": {
+    "statement": "Segments that a named team will act on, with a stated tolerance for segments that do not persist.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public dataset with known groups plus a domain owner's labelled segments; an independent replication of the stability result.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Do the same groups come back when the data is perturbed?",
+      "perturbation_or_signal": "Gaussian noise at 0.1, 0.25 and 0.5 standard deviations; 50% row subsampling; dropping one feature at a time.",
+      "truth": "Planted-group generators with known k; uniform noise with no groups as the null.",
+      "metric": "Adjusted Rand index of labels against the unperturbed fit on shared rows; rate at which the stability gate calls noise stable.",
+      "acceptance_rule": "Median ARI on planted data >= ari_floor at every perturbation level; the gate calls the noise null stable in <= false_stable_rate of runs.",
+      "parameters": {
+        "ari_floor": null,
+        "false_stable_rate": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a change in the population noticed before segments are used?",
+      "perturbation_or_signal": "Move one centroid, merge two groups, add a new group, change group proportions.",
+      "truth": "The planted change, with null batches drawn from the training distribution.",
+      "metric": "Detection rate within max_batches batches; false alarms per 1000 null batches; population stability index of the assignment shares.",
+      "acceptance_rule": "Detection within max_batches batches at a rate >= detect_floor for each planted change, and false alarms <= alarm_ceiling per 1000 batches.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null,
+        "max_batches": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Do the cluster profiles name the features that separate the groups?",
+      "perturbation_or_signal": "Planted generators in which only m of p features separate the groups.",
+      "truth": "The planted discriminating features.",
+      "metric": "Precision at m of the features ranked by between-group effect size.",
+      "acceptance_rule": "Precision at m >= precision_floor, with an interval over seeds that excludes chance.",
+      "parameters": {
+        "precision_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can the deployed segmentation be watched with the signals that exist in production?",
+      "perturbation_or_signal": "Streams of batches with a planted drift at a known batch.",
+      "truth": "The batch at which the drift began.",
+      "metric": "Detection delay in batches for distance to centroid, assignment shares and silhouette on a sample.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches with false alarms <= alarm_ceiling per 1000 batches.",
+      "parameters": {
+        "delay_ceiling": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "a stability score is not evidence that segments are useful to a business"
+  ]
+}

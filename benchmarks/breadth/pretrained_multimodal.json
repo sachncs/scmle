@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "slice": "pretrained_multimodal",
+  "status": "definition_only",
+  "task_family": "pretrained_and_multimodal_models",
+  "modality": "multimodal",
+  "built": "none",
+  "evidence_in_repo": [
+    "scmle/contracts/capabilities.py",
+    "scmle/core/context.py"
+  ],
+  "deployment_requirement": {
+    "statement": "A use case that needs a pretrained or multimodal model and cannot be met by a smaller one, declared by its owner.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public benchmark checked for contamination with the pretraining data, and an independent replication.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does the model hold up when a modality is missing or the input shifts?",
+      "perturbation_or_signal": "Dropping each modality; paraphrase and corruption of the remaining one.",
+      "truth": "The full-input prediction and a unimodal baseline.",
+      "metric": "Metric against the unimodal baseline; contamination test of the benchmark against the pretraining corpus.",
+      "acceptance_rule": "Beats the unimodal baseline by lift_floor under every drop and no contamination above contamination_ceiling.",
+      "parameters": {
+        "lift_floor": null,
+        "contamination_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a shift from the pretraining distribution noticed?",
+      "perturbation_or_signal": "Inputs from a planted domain absent from pretraining.",
+      "truth": "The planted domain.",
+      "metric": "Detection rate on embedding distance; false alarms per 1000 null batches.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Does the explanation say which modality and part decided the output?",
+      "perturbation_or_signal": "Inputs where one modality carries the label.",
+      "truth": "The planted modality and region.",
+      "metric": "Attribution mass on the planted modality; deletion test.",
+      "acceptance_rule": "Mass >= modality_floor and deletion changes the output.",
+      "parameters": {
+        "modality_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can output quality be watched in production?",
+      "perturbation_or_signal": "Streams with a planted quality drop.",
+      "truth": "The batch at which it began.",
+      "metric": "Detection delay for a labelled sample's error rate and for input embedding drift.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "transformer or JEPA families are supported outside the experimental tabular opt-in"
+  ]
+}

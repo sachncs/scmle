@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "slice": "dimensionality_reduction",
+  "status": "definition_only",
+  "task_family": "dimensionality_reduction",
+  "modality": "tabular",
+  "built": "none",
+  "evidence_in_repo": [],
+  "deployment_requirement": {
+    "statement": "A lower-dimensional representation that a named downstream use accepts, with a tolerated loss.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public dataset with a known latent dimension and a domain owner's accepted downstream task.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does the representation survive noise and resampling?",
+      "perturbation_or_signal": "Noise at three levels; 50% row subsampling; feature scaling changes.",
+      "truth": "Generators with a known latent subspace.",
+      "metric": "Principal angle between the fitted and planted subspace; trustworthiness of neighbourhoods.",
+      "acceptance_rule": "Largest principal angle <= angle_ceiling and trustworthiness >= trust_floor.",
+      "parameters": {
+        "angle_ceiling": null,
+        "trust_floor": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is data that the representation no longer fits noticed?",
+      "perturbation_or_signal": "New data with a rotated or enlarged latent subspace.",
+      "truth": "The planted change.",
+      "metric": "Detection rate on out-of-sample reconstruction error; false alarms per 1000 null batches.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Do the components say what they are made of?",
+      "perturbation_or_signal": "Planted loadings on a known set of features.",
+      "truth": "The planted loadings.",
+      "metric": "Cosine similarity between fitted and planted loadings, up to sign.",
+      "acceptance_rule": "Median similarity >= cosine_floor.",
+      "parameters": {
+        "cosine_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can reconstruction quality be watched in production?",
+      "perturbation_or_signal": "Streams with a planted shift at a known batch.",
+      "truth": "The batch at which the shift began.",
+      "metric": "Detection delay in batches for reconstruction error.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "any unsupervised dimensionality-reduction estimator exists in SCMLE today"
+  ]
+}

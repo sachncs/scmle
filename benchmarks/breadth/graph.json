@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "slice": "graph",
+  "status": "definition_only",
+  "task_family": "graph_modelling",
+  "modality": "graph",
+  "built": "experimental_lifecycle",
+  "evidence_in_repo": [
+    "scmle/data/modalities/graph.py",
+    "tests/unit/test_modality_lifecycle.py"
+  ],
+  "deployment_requirement": {
+    "statement": "A graph source, a decision that rests on a node or edge prediction and a tolerance, declared by its owner.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public graph benchmark with an inductive split; an independent replication.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does the model hold up when the graph is damaged?",
+      "perturbation_or_signal": "Random edge dropout at 5% and 20%; node attribute noise; degree rewiring.",
+      "truth": "The intact graph and a feature-only baseline.",
+      "metric": "Macro F1 against the intact graph; gap between transductive and inductive scores to expose leakage.",
+      "acceptance_rule": "F1 drop <= drop_ceiling and the transductive-inductive gap <= leakage_band.",
+      "parameters": {
+        "drop_ceiling": null,
+        "leakage_band": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a change in graph structure noticed?",
+      "perturbation_or_signal": "A planted change in degree distribution and a planted new community.",
+      "truth": "The planted change.",
+      "metric": "Detection rate on degree distribution distance; new-node share.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Does the explanation find the subgraph that decides the label?",
+      "perturbation_or_signal": "Labels generated from a planted motif.",
+      "truth": "The planted motif.",
+      "metric": "Overlap of the highlighted edges with the planted motif.",
+      "acceptance_rule": "Median overlap >= overlap_floor.",
+      "parameters": {
+        "overlap_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can graph health be watched in production?",
+      "perturbation_or_signal": "Streams with planted structural drift.",
+      "truth": "The batch at which it began.",
+      "metric": "Detection delay for degree drift and new-node share.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run"
+  ]
+}

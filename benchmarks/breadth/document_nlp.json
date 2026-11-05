@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "slice": "document_nlp",
+  "status": "definition_only",
+  "task_family": "document_and_text_classification",
+  "modality": "document",
+  "built": "experimental_lifecycle",
+  "evidence_in_repo": [
+    "scmle/models/modality_lifecycle.py",
+    "scmle/data/modalities/document.py",
+    "scmle/models/documents.py",
+    "tests/unit/test_modality_lifecycle.py"
+  ],
+  "deployment_requirement": {
+    "statement": "A document type, a decision that rests on it and the cost of a wrong reading, declared by its owner.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public labelled corpus and a scanned-document set with ground-truth text; an independent replication.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does the model hold up when the text is degraded?",
+      "perturbation_or_signal": "Character noise at OCR-like rates; paraphrase; truncation to half length.",
+      "truth": "The clean text and its label.",
+      "metric": "Macro F1 on perturbed text against clean; character error rate of the OCR step against ground truth.",
+      "acceptance_rule": "Macro F1 drop <= f1_drop_ceiling at each level and character error rate <= cer_ceiling.",
+      "parameters": {
+        "f1_drop_ceiling": null,
+        "cer_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a change in vocabulary or topic noticed?",
+      "perturbation_or_signal": "A planted topic mix change and a new document template.",
+      "truth": "The planted change.",
+      "metric": "Detection rate on out-of-vocabulary share and embedding distance; false alarms per 1000 null batches.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Are cited passages the ones that support the answer?",
+      "perturbation_or_signal": "Documents with a planted supporting passage.",
+      "truth": "The planted passage.",
+      "metric": "Share of predictions whose cited span contains the planted passage; deletion test on the cited span.",
+      "acceptance_rule": "Citation grounding >= grounding_floor and the prediction changes when the cited span is deleted in >= deletion_floor of cases.",
+      "parameters": {
+        "grounding_floor": null,
+        "deletion_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can reading quality be watched in production?",
+      "perturbation_or_signal": "Streams with degraded scans at a known batch.",
+      "truth": "The batch at which scan quality fell.",
+      "metric": "Detection delay for OCR confidence and out-of-vocabulary share.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "a baseline linear classifier on bag-of-words features is a qualified NLP system"
+  ]
+}

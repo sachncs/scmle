@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "slice": "association",
+  "status": "definition_only",
+  "task_family": "association_analysis",
+  "modality": "tabular",
+  "built": "none",
+  "evidence_in_repo": [],
+  "deployment_requirement": {
+    "statement": "Co-occurrence rules a named team will act on, with a false-discovery tolerance.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public transaction dataset with planted rules and a domain owner's reviewed rules.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Are the mined rules the same under resampling and noise?",
+      "perturbation_or_signal": "Bootstrap of transactions; random item dropout at 5% and 20%.",
+      "truth": "Planted rules in a generator; shuffled-item data with no rules as the null.",
+      "metric": "Jaccard overlap of rule sets across resamples; false rules per run on the null after multiplicity control.",
+      "acceptance_rule": "Median Jaccard >= jaccard_floor on planted data and false rules <= false_rule_ceiling on the null.",
+      "parameters": {
+        "jaccard_floor": null,
+        "false_rule_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a change in co-occurrence noticed?",
+      "perturbation_or_signal": "A planted new rule; a planted rule whose support halves.",
+      "truth": "The planted change and null batches.",
+      "metric": "Detection rate and false alarms per 1000 batches on rule support and confidence.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Does each reported rule carry its evidence?",
+      "perturbation_or_signal": "Rules mined from planted data.",
+      "truth": "The planted rules and their true lift.",
+      "metric": "Share of planted rules recovered with an interval for lift that contains the true lift.",
+      "acceptance_rule": "Recovery >= recovery_floor and interval coverage >= coverage_floor.",
+      "parameters": {
+        "recovery_floor": null,
+        "coverage_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can rule churn be watched in production?",
+      "perturbation_or_signal": "Streams with a planted change in rule support.",
+      "truth": "The batch at which the change began.",
+      "metric": "Detection delay in batches for rule-set churn and top-rule support.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "any association-rule code exists in SCMLE today"
+  ]
+}

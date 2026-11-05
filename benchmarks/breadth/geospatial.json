@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "slice": "geospatial",
+  "status": "definition_only",
+  "task_family": "geospatial_modelling",
+  "modality": "geospatial",
+  "built": "experimental_lifecycle",
+  "evidence_in_repo": [
+    "scmle/data/modalities/geospatial.py",
+    "tests/unit/test_modality_lifecycle.py"
+  ],
+  "deployment_requirement": {
+    "statement": "A region, a decision that rests on a spatial prediction and a tolerance, declared by its owner.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public geospatial benchmark and a held-out region; an independent replication.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Is the result invariant to how the space is described?",
+      "perturbation_or_signal": "Reprojection to another coordinate reference system; coordinate jitter; changed boundaries.",
+      "truth": "The same data in the original reference system.",
+      "metric": "Metric change after reprojection; metric under spatial-block cross-validation against random splits.",
+      "acceptance_rule": "Metric change <= reproject_ceiling and the spatial-block score within leakage_band of the random-split score.",
+      "parameters": {
+        "reproject_ceiling": null,
+        "leakage_band": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a shift in where cases occur noticed?",
+      "perturbation_or_signal": "A planted move of the case density to a new region.",
+      "truth": "The planted shift.",
+      "metric": "Detection rate on spatial density distance; out-of-extent share.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Does the explanation locate what drives the prediction?",
+      "perturbation_or_signal": "Targets generated from a planted spatial feature.",
+      "truth": "The planted location.",
+      "metric": "Overlap of the attributed area with the planted area.",
+      "acceptance_rule": "Median overlap >= overlap_floor.",
+      "parameters": {
+        "overlap_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can spatial coverage be watched in production?",
+      "perturbation_or_signal": "Streams with a planted move of case locations.",
+      "truth": "The batch at which it began.",
+      "metric": "Detection delay for out-of-extent share and density distance.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run"
+  ]
+}

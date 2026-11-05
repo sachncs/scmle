@@ -34,6 +34,7 @@ in order.
 | How the system is built and extended | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | How evidence and feedback drive changes | [`OPERATING_LOOP.md`](OPERATING_LOOP.md) |
 | Which cited methods were checked against their papers | [`LITERATURE_CHECK.md`](LITERATURE_CHECK.md) |
+| Which task families and modalities are qualified, partial or not supported, and why none is yet qualified | [`BREADTH.md`](BREADTH.md) |
 | How well it works, and how we check | [`BENCHMARKS.md`](BENCHMARKS.md) and [`../benchmarks/`](../benchmarks/README.md) |
 
 ## Operate and release it
@@ -51,6 +52,7 @@ in order.
 | Release a model to a cloud: gate, live tests, record, promote, roll back, reconcile | [`CLOUD_RELEASE.md`](CLOUD_RELEASE.md) |
 | Operate a deployed model: telemetry, incidents, retraining, recovery, the production claim | [`OPERATIONS.md`](OPERATIONS.md) |
 | Prove recovery works before release | [`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md) |
+| Follow one deployed model from the business question to observed outcomes, from retained records only | [`TRAIL.md`](TRAIL.md) |
 | Cut a release | [`RELEASING.md`](RELEASING.md) and [`../scripts/`](../scripts/README.md) |
 
 The hosted site, [sachncs.github.io/scmle](https://sachncs.github.io/scmle/),

@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "slice": "ranking",
+  "status": "definition_only",
+  "task_family": "ranking",
+  "modality": "tabular",
+  "built": "tabular_beta_path",
+  "evidence_in_repo": [
+    "scmle/models/ranking/",
+    "tests/integration/test_ranking_task.py",
+    "benchmarks/real_tasks.py"
+  ],
+  "deployment_requirement": {
+    "statement": "A list length, a business metric for the ordering and a tolerance, declared by the owner of the surface that shows it.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public learning-to-rank dataset (candidates: MSLR-WEB, Yahoo LTR; none chosen) and an independent replication.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does the ordering hold up under label noise and changed lists?",
+      "perturbation_or_signal": "Relevance label noise at 5% and 20%; query lists shortened to half; duplicate documents added.",
+      "truth": "Clean-label relevance and a feature-only baseline ranker.",
+      "metric": "NDCG at k against the baseline with an interval over queries.",
+      "acceptance_rule": "NDCG at k >= baseline plus lift_floor under every perturbation.",
+      "parameters": {
+        "lift_floor": null,
+        "k": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a shift in the relevance distribution noticed?",
+      "perturbation_or_signal": "A planted change in feature distributions and in the share of relevant items.",
+      "truth": "The planted change.",
+      "metric": "Detection rate and false alarms per 1000 null batches on score and feature distributions.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Do attributions recover what drives relevance?",
+      "perturbation_or_signal": "Relevance generated from a known weighted sum of features.",
+      "truth": "The planted weights.",
+      "metric": "Rank correlation between attributions and planted weights.",
+      "acceptance_rule": "Median rank correlation >= rank_floor.",
+      "parameters": {
+        "rank_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can ranking quality be watched when judgments arrive late?",
+      "perturbation_or_signal": "Streams with a planted degradation and a stated judgment delay.",
+      "truth": "The batch at which it began.",
+      "metric": "Detection delay for NDCG at k on judged queries.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run"
+  ]
+}

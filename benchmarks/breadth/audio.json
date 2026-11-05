@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "slice": "audio",
+  "status": "definition_only",
+  "task_family": "audio_classification",
+  "modality": "audio",
+  "built": "experimental_lifecycle",
+  "evidence_in_repo": [
+    "scmle/data/modalities/audio.py",
+    "scmle/models/modality_lifecycle.py",
+    "tests/unit/test_media_modalities.py",
+    "tests/unit/test_modality_lifecycle.py"
+  ],
+  "deployment_requirement": {
+    "statement": "An audio source, a decision that rests on its label and the cost of an error, declared by the owner.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public labelled audio set and a recording set from the target microphone; an independent replication.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does the model hold up under the damage this medium sees?",
+      "perturbation_or_signal": "Additive noise at three signal-to-noise ratios; resampling; clipping.",
+      "truth": "The undamaged sample and its label.",
+      "metric": "Accuracy and macro F1 on damaged samples against undamaged, with an interval over samples.",
+      "acceptance_rule": "Metric drop <= drop_ceiling at every severity.",
+      "parameters": {
+        "drop_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a change in the source noticed?",
+      "perturbation_or_signal": "A change of sample rate or microphone response; a new background noise.",
+      "truth": "The planted change and null batches.",
+      "metric": "Detection rate and false alarms per 1000 null batches on input statistics and embeddings.",
+      "acceptance_rule": "Detection rate >= detect_floor and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "detect_floor": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Does the explanation point at what determines the label?",
+      "perturbation_or_signal": "A planted tone at known time-frequency bins that determines the label.",
+      "truth": "The planted location.",
+      "metric": "Pointing accuracy and a deletion test on the highlighted region.",
+      "acceptance_rule": "Pointing accuracy >= pointing_floor and the prediction changes when the region is removed.",
+      "parameters": {
+        "pointing_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can the deployed model be watched with production signals?",
+      "perturbation_or_signal": "Spectral drift and silence share in production.",
+      "truth": "A planted degradation at a known batch.",
+      "metric": "Detection delay in batches.",
+      "acceptance_rule": "Median delay <= delay_ceiling batches.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "a baseline linear classifier on hand-built features is a qualified model for this medium"
+  ]
+}

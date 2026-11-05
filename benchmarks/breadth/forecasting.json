@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "slice": "forecasting",
+  "status": "definition_only",
+  "task_family": "forecasting",
+  "modality": "tabular",
+  "built": "tabular_beta_path",
+  "evidence_in_repo": [
+    "scmle/models/forecasting/estimators.py",
+    "tests/integration/test_forecast_task.py",
+    "benchmarks/real_tasks.py"
+  ],
+  "deployment_requirement": {
+    "statement": "A forecast horizon, a decision that uses it and the cost of a miss, declared by the owner of that decision.",
+    "declared_by": null,
+    "declared": false
+  },
+  "external_referent": "A public forecasting benchmark (the M4 competition series are a candidate, none is chosen) and an independent replication.",
+  "benchmarks": {
+    "robustness": {
+      "question": "Does the forecast hold up when the series is damaged?",
+      "perturbation_or_signal": "Missing stretches, outliers and a level shift injected into held-out series.",
+      "truth": "The undamaged series and a seasonal-naive forecast.",
+      "metric": "MASE against seasonal naive; empirical coverage of the prediction interval.",
+      "acceptance_rule": "MASE <= mase_ceiling under each damage and coverage within coverage_band of nominal.",
+      "parameters": {
+        "mase_ceiling": null,
+        "coverage_band": null
+      },
+      "status": "not_run"
+    },
+    "drift": {
+      "question": "Is a break in the series noticed?",
+      "perturbation_or_signal": "A planted trend break and a planted change of seasonal period.",
+      "truth": "The planted break date.",
+      "metric": "Detection delay in periods; false alarms per 1000 periods on unbroken series.",
+      "acceptance_rule": "Median delay <= delay_ceiling periods and false alarms <= alarm_ceiling.",
+      "parameters": {
+        "delay_ceiling": null,
+        "alarm_ceiling": null
+      },
+      "status": "not_run"
+    },
+    "explanation": {
+      "question": "Does the explanation recover what drives the series?",
+      "perturbation_or_signal": "Series built from a known seasonal term, trend and lagged regressor.",
+      "truth": "The planted components.",
+      "metric": "Correlation between estimated and planted components; rank of the planted lag.",
+      "acceptance_rule": "Component correlation >= correlation_floor and the planted lag in the top 2.",
+      "parameters": {
+        "correlation_floor": null
+      },
+      "status": "not_run"
+    },
+    "monitoring": {
+      "question": "Can forecast quality be watched when actuals arrive late?",
+      "perturbation_or_signal": "Streams with a planted degradation and a stated actuals delay.",
+      "truth": "The period at which the degradation began.",
+      "metric": "Detection delay for rolling MASE and interval coverage.",
+      "acceptance_rule": "Median delay <= delay_ceiling periods.",
+      "parameters": {
+        "delay_ceiling": null
+      },
+      "status": "not_run"
+    }
+  },
+  "lifecycle_required": [
+    "ingestion",
+    "evaluation",
+    "packaging",
+    "cloud_deployment",
+    "monitoring",
+    "recovery"
+  ],
+  "parameter_rule": "Every null parameter is fixed by the deployment owner and written into this file before the first line of the slice is built; it is never fitted to a result.",
+  "not_claimed": [
+    "this slice is production-supported",
+    "any benchmark in this file has been run",
+    "a rolling-origin evaluation by itself qualifies the task family"
+  ]
+}
