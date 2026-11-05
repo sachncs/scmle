@@ -171,3 +171,7 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
 .docs-pager span { color: var(--text-3); font-size: var(--step--1); }
 .docs-pager strong { color: var(--text); font-size: var(--step-0); font-weight: 620; }
 @media (max-width: 639px) { .docs-pager a.next { text-align: left; } }
+
+/* Glossary search stays visible at every width */
+.docs-content .glossary-filter { display: block !important; margin: var(--s3) 0; max-width: 28rem; }
+.docs-content .term[hidden] { display: none; }

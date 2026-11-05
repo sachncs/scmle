@@ -1,0 +1,14 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/decisions.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="Decisions before you run" description="The choices to make before running scmle on your own data: the target, the unit of a row, how to split, what counts as an answer, and when to ask a person." current="decisions">
+  <p class="eyebrow"><span></span> Learn</p>
+  <h1>Decide before<br /><em>you run anything.</em></h1>
+  <Fragment set:html={html} />
+
+  <p class="meta">Written for a first-time reader · 0.1 beta</p>
+</DocsLayout>

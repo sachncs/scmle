@@ -1,0 +1,14 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/start-here.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="Start here: your first model" description="A 30-minute walkthrough from nothing to a built, checked, shipped, watched and rolled-back model, with the real output of every command." current="start-here">
+  <p class="eyebrow"><span></span> Learn</p>
+  <h1>Your first model,<br /><em>start to finish.</em></h1>
+  <Fragment set:html={html} />
+
+  <p class="meta">Written for a first-time reader · 0.1 beta</p>
+</DocsLayout>

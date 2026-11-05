@@ -1,0 +1,19 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/what-scmle-cannot-do.html?raw";
+import findings0 from "../../learn/beginner-findings.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+const findings = findings0.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="What SCMLE cannot do" description="The limits of scmle stated plainly, and the rough edges found when a beginner path was followed end to end." current="what-scmle-cannot-do">
+  <p class="eyebrow"><span></span> Learn</p>
+  <h1>What it cannot do,<br /><em>stated plainly.</em></h1>
+  <Fragment set:html={html} />
+
+  <h2 id="rough-edges">Rough edges found while following the beginner path</h2>
+  <Fragment set:html={findings} />
+
+  <p class="meta">Written for a first-time reader · 0.1 beta</p>
+</DocsLayout>

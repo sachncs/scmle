@@ -1,0 +1,75 @@
+<p class="lead">A model is the answer to a question you chose. If you choose badly, the tool will still give you a number, and the number will look fine. This page lists the choices only a person can make, how to make each one, and what happens if you get it wrong.</p>
+<p>Fill in the sheet at the end before you press run. Ten minutes here can save a week.</p>
+<p>New words are explained in the <a href="@@BASE@@/docs/glossary/">glossary</a>.</p>
+<h2 id="1-what-exactly-am-i-predicting-the-target">1. What exactly am I predicting? (the target)</h2>
+<p><strong>The question.</strong> Which single column holds the answer, and does it really mean what I think it means?</p>
+<p><strong>How to choose.</strong></p>
+<ul><li>Say it as a sentence: "Predict whether _this_ happens to _this kind of thing_ by _this moment_."</li><li>Look at how the column is recorded. Who writes it, and when? A column called <code>churned</code> that is set when the account is closed is different from "will churn in the next 30 days".</li><li>If there are many possible answers, check the task SCMLE picks in <code>scmle plan</code> (<code>binary_classification</code>, <code>multiclass</code>, <code>regression</code> and so on). If it picks wrong, say so with <code>--task</code>.</li></ul>
+<p><strong>If you choose wrong.</strong> You get a precise answer to the wrong question. A model that predicts "customer has closed their account" is useless for finding customers about to leave. SCMLE cannot see this; only you can.</p>
+<p><strong>Command.</strong> <code>--target survived</code>.</p>
+<h2 id="2-how-will-i-judge-a-prediction-the-metric">2. How will I judge a prediction? (the metric)</h2>
+<p><strong>The question.</strong> Which number tells me the model is good enough for my use?</p>
+<p><strong>How to choose.</strong></p>
+<div class="model-table" role="region" aria-label="Table: Your situation" tabindex="0"><table style="min-width:560px"><thead><tr><th scope="col">Your situation</th><th scope="col">A good first metric</th><th scope="col">Why</th></tr></thead><tbody><tr><th scope="row">Two answers, balanced, you rank cases</th><td><code>roc_auc</code></td><td>Ignores the cut-off; good for ranking</td></tr><tr><th scope="row">Two answers, the "yes" is rare (under about 10 percent)</th><td><code>pr_auc</code> (PR AUC)</td><td>ROC AUC looks fine even when you miss most rare cases</td></tr><tr><th scope="row">You act on the probability itself</th><td><code>log_loss</code></td><td>Punishes confident mistakes and bad probabilities</td></tr><tr><th scope="row">A number, big mistakes hurt more</th><td><code>rmse</code></td><td>Squares the errors</td></tr><tr><th scope="row">A number, all mistakes count the same</th><td><code>mae</code></td><td>The typical miss</td></tr><tr><th scope="row">Many categories</th><td><code>f1_macro</code> or <code>log_loss</code></td><td>Counts every category equally</td></tr></tbody></table></div>
+<p>SCMLE lists the others it knows in <code>scmle.evaluation.metrics.CATALOG</code>. You can also add your own with <code>scmle.register_metric</code>, for example the money lost.</p>
+<p><strong>If you choose wrong.</strong> The search picks the model that is best at the wrong thing. Accuracy on a rare event picks a model that always says "no". The tool's pick is <code>roc_auc</code> for two answers by default; that is only a default.</p>
+<p><strong>Command.</strong> <code>--metric pr_auc</code>.</p>
+<h2 id="3-which-columns-may-the-model-use-what-you-may-not-use">3. Which columns may the model use? (what you may not use)</h2>
+<p><strong>The question.</strong> At the moment I will use the model, which of these facts do I really have?</p>
+<p><strong>How to choose.</strong> Go down the column list and for each ask: "When is this value filled in?" If it can be filled in only after the outcome, or because of the outcome, remove it.</p>
+<p>Typical traps:</p>
+<ul><li>A column recorded after the event (a cancellation date, a lifeboat number, a payment-chased flag).</li><li>A column that is a copy or near-copy of the target in disguise (a status code that contains the answer).</li><li>An identifier (row number, customer id). It lets the model memorise rows. Mark it with <code>--id-columns</code>.</li><li>A column you are not allowed to use for legal or ethical reasons. Remove it, and also name it in <code>--sensitive-columns</code> so SCMLE reports how the model treats each group.</li></ul>
+<p>Tools:</p>
+<ul><li><code>--unavailable-at-prediction boat body</code> says "known only after the outcome". This is the right flag for leaks.</li><li><code>--exclude colA colB</code> drops columns for any other reason.</li><li><code>--leakage-policy block</code> turns SCMLE's suspicions into a stop. Use it.</li></ul>
+<p><strong>If you choose wrong.</strong> A leak makes the model look brilliant. On the Titanic table, the score was 0.988 with <code>boat</code> and <code>body</code>, and 0.885 without. A model shipped with a leak fails the first day it is used, because the leaked column is empty or different in real use. See <a href="@@BASE@@/docs/reading-results/">Reading results</a>.</p>
+<h2 id="4-are-my-rows-independent-grouping">4. Are my rows independent? (grouping)</h2>
+<p><strong>The question.</strong> Do several rows belong to the same person, shop, machine or household?</p>
+<p><strong>How to choose.</strong> If yes, name the identifier column as the group. SCMLE then keeps every row of a group on the same side of every split.</p>
+<p><strong>If you choose wrong.</strong> If one customer has rows in both the practice part and the exam part, the model has seen that customer's habits before the exam. The exam score is too high, and the model will do worse on new customers than the report says.</p>
+<p><strong>Command.</strong> <code>--group-column customer_id</code>. If the same entity appears many times and you do not group, SCMLE may print a recommendation about duplicates (see the last line in Step 7 of <a href="@@BASE@@/docs/start-here/">Start here</a>).</p>
+<h2 id="5-does-time-matter-time-order">5. Does time matter? (time order)</h2>
+<p><strong>The question.</strong> Will I use this model to predict the future from the past?</p>
+<p><strong>How to choose.</strong> If your rows have dates and you will always predict later rows, then yes. Name the date column. SCMLE trains on the earlier rows and tests on the later ones. If the order of rows is meaningless, no.</p>
+<ul><li><code>--time-column event_time</code> trains on the past and tests on the future.</li><li><code>--validation temporal</code> or <code>rolling</code> for stricter schemes; <code>--embargo-rows N</code> leaves a gap between training and test so that neighbouring rows do not leak into each other.</li><li><code>--feature-delay COL=ROWS</code> for a column that is only known some rows after the fact.</li></ul>
+<p><strong>If you choose wrong.</strong> Randomly shuffled rows let the model learn from the future. The exam looks easy, and then the real future is harder. For time-series data this is the most common reason for a model that works in the lab and not in use.</p>
+<h2 id="6-what-do-the-two-kinds-of-mistakes-cost-the-cost-of-errors">6. What do the two kinds of mistakes cost? (the cost of errors)</h2>
+<p><strong>The question.</strong> If I say "yes" and I am wrong, what does that cost? If I say "no" and I am wrong, what does that cost?</p>
+<p><strong>How to choose.</strong> Put a number on each, in any unit you like, as long as they are in the same unit. A missed fraud may cost 8 times a false alarm. A missed disease may cost 50 times an unneeded test. If you truly cannot tell, say so, and see "If you do not know the costs" below.</p>
+<p>Write it down once:</p>
+<pre><code class="language-json">{"decision": {"threshold_objective": "cost", "false_positive_cost": 1, "false_negative_cost": 8}}</code></pre>
+<p>Save that as <code>cost.json</code> and pass it with <code>--config cost.json</code>. SCMLE then picks the probability cut-off that minimises the total cost on practice predictions, instead of 0.5.</p>
+<p><strong>If you choose wrong.</strong> The default cut of 0.5 treats both mistakes as equal. If a miss is 8 times worse, 0.5 is too timid. If you invent costs, the cut will look scientific and be arbitrary. Report the costs next to the cut.</p>
+<p><strong>If you do not know the costs.</strong> Write that down as an open question. The careful (charter) mode treats costs that no person supplied as <code>unverified</code>, and lists them as questions that could change the verdict. That is better than a made-up number.</p>
+<h2 id="7-how-sure-do-i-need-to-be-error-budget-and-the-exam">7. How sure do I need to be? (error budget and the exam)</h2>
+<p><strong>The question.</strong> How many mistakes in my <em>findings</em> (not predictions) can I tolerate, and how many rows can I keep unseen?</p>
+<p><strong>How to choose.</strong> For a first model, the defaults are fine: SCMLE keeps about a fifth of the rows for the exam (<code>--test-fraction</code>, default 0.20; our Titanic run kept 216 of 1309). With a charter, you choose the confirmation fraction (default 0.25), the effect size worth finding (default 0.2) and the error allowance (<code>alpha_confirm</code> of 1/20). Run <code>scmle charter check charter.json --rows N</code> to see whether the number of rows you have can support your promises.</p>
+<p><strong>If you choose wrong.</strong> With too few rows the exam score has a wide band and can be luck. A charter that promises more than your rows support is "downgraded": the run still finishes but its scope becomes <code>exploratory_unconfirmed</code>, and no claim is called confirmed. Example, with the default effect 0.2 and the 1093 Titanic rows left after the exam rows: <code>feasibility: downgrade (273 rows &lt; 333 needed for power 0.8 at effect 0.2; detectable effect is 0.221)</code>.</p>
+<h2 id="8-how-much-time-may-the-search-use">8. How much time may the search use?</h2>
+<p><strong>The question.</strong> How long may the computer search?</p>
+<p><strong>How to choose.</strong> Start with <code>--time-budget 120</code> to see the whole pipeline work. For a result you will rely on, give it 10 minutes or more. Set <code>--workers</code> to the number of spare CPU cores. A longer budget lets SCMLE tune more hyperparameters (the settings of each model).</p>
+<p><strong>If you choose wrong.</strong> A budget under 300 seconds searches only the cheap models, and the report may skip parts. In our run, a 60-second budget left the feature-importance table empty. A tight budget also makes the result depend on how fast your computer is.</p>
+<h2 id="9-who-is-allowed-to-approve-it-people-and-keys">9. Who is allowed to approve it? (people and keys)</h2>
+<p><strong>The question.</strong> Who will review the model before it goes live, and where is the secret signing key kept?</p>
+<p><strong>How to choose.</strong> The person who approves a promotion must not be the one who built the model. Keep the signing key in a secret manager, not in a file in the repository. Use <code>SCMLE_SIGNING_KEY_FILE</code> to point at a mounted file.</p>
+<p><strong>If you choose wrong.</strong> If you sign your own approvals with a key you leave in the code, the signature proves nothing. SCMLE checks the mechanism, not the honesty of the people.</p>
+<h2 id="10-what-will-make-me-stop">10. What will make me stop?</h2>
+<p>Write this before you see results, so that you cannot talk yourself out of it later.</p>
+<ul><li>The lowest exam score I would accept (a number, not "good").</li><li>The largest gap between practice and exam score I would accept.</li><li>The drift or performance drop at which I roll back.</li><li>The names of the people to call.</li></ul>
+<p>SCMLE can hold your thresholds as success criteria (<code>ProblemSpec.success_criteria</code>). If you declare none, the release evaluation says <code>policy_not_declared</code> and blocks: the tool will not invent thresholds from the metrics it just saw.</p>
+<h2 id="the-decision-sheet">The decision sheet</h2>
+<p>Copy this, fill it in, keep it next to the run.</p>
+<pre><code class="language-text">Question in one sentence:
+Target column:
+What each row is:
+Metric and why:
+Columns I may NOT use, and why:
+Identifier columns:
+Group column (rows that belong together):
+Date column (and do I predict the future?):
+Cost of a false alarm:        Cost of a miss:
+Costs came from (a person's name, or "unknown"):
+Lowest exam score I accept:
+Largest practice-exam gap I accept:
+Time budget:
+Reviewer (not me):
+Where the signing key lives:</code></pre>

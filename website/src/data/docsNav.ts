@@ -4,6 +4,17 @@ export interface NavGroup { title: string; pages: NavPage[] }
 
 export const docsNav: NavGroup[] = [
   {
+    title: "Learn",
+    pages: [
+      { slug: "start-here", label: "Start here", key: "start-here", summary: "A 30-minute walkthrough from a table to a built, checked, shipped, watched and rolled-back model, with real output." },
+      { slug: "glossary", label: "Glossary", key: "glossary", summary: "Every word in plain language, with an example and why it matters. Searchable." },
+      { slug: "decisions", label: "Decisions", key: "decisions", summary: "The choices to make before you run anything on your own data." },
+      { slug: "reading-results", label: "Reading results", key: "reading-results", summary: "Which file to open first, how to read scores and claims, and which results need care." },
+      { slug: "when-things-go-wrong", label: "When things go wrong", key: "when-things-go-wrong", summary: "Every refusal and failure, what it means and what to do." },
+      { slug: "what-scmle-cannot-do", label: "What SCMLE cannot do", key: "what-scmle-cannot-do", summary: "The limits stated plainly, and the rough edges found on the beginner path." },
+    ],
+  },
+  {
     title: "Get started",
     pages: [
       { slug: "", label: "Overview", key: "start", summary: "Where to begin, and every page on this site grouped by what you are trying to do." },

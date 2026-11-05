@@ -1,0 +1,14 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/reading-results.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="Reading your results" description="How to read a scmle run: which file to open first, scores, leaderboard, diagnostics, charters, claims and tiers, and the results that need care." current="reading-results">
+  <p class="eyebrow"><span></span> Learn</p>
+  <h1>Read the result,<br /><em>then read the caveats.</em></h1>
+  <Fragment set:html={html} />
+
+  <p class="meta">Written for a first-time reader · 0.1 beta</p>
+</DocsLayout>

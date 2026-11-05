@@ -1,0 +1,51 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/glossary.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="Glossary" description="Every scmle word in plain language, with a meaning, an example and why it matters, in groups from the first ideas to production. Searchable." current="glossary">
+  <p class="eyebrow"><span></span> Learn</p>
+  <h1>Every word,<br /><em>in plain language.</em></h1>
+  <div class="filter glossary-filter">
+    <label class="sr-only" for="term-filter">Search the glossary</label>
+    <input id="term-filter" type="search" placeholder="Search terms, meanings and examples" autocomplete="off" />
+  </div>
+  <p class="filter-empty" id="term-empty" hidden>No matching terms.</p>
+  <div id="glossary-body"><Fragment set:html={html} /></div>
+  <p class="meta">Written for a first-time reader · 0.1 beta</p>
+</DocsLayout>
+
+<script is:inline>
+  (function () {
+    var input = document.getElementById("term-filter");
+    var root = document.getElementById("glossary-body");
+    if (!input || !root) return;
+    // Wrap each term (an h3 and the paragraphs after it) so it can be hidden as a unit.
+    root.querySelectorAll("h3").forEach(function (h) {
+      var wrap = document.createElement("section");
+      wrap.className = "term";
+      h.parentNode.insertBefore(wrap, h);
+      wrap.appendChild(h);
+      while (wrap.nextSibling && !/^(H2|H3)$/.test(wrap.nextSibling.tagName || "")) wrap.appendChild(wrap.nextSibling);
+    });
+    var empty = document.getElementById("term-empty");
+    input.addEventListener("input", function () {
+      var q = input.value.trim().toLowerCase();
+      var shown = 0;
+      root.querySelectorAll(".term").forEach(function (t) {
+        var hit = !q || t.textContent.toLowerCase().indexOf(q) !== -1;
+        t.hidden = !hit;
+        if (hit) shown += 1;
+      });
+      root.querySelectorAll("h2").forEach(function (h2) {
+        var n = h2.nextElementSibling, any = false;
+        while (n && n.tagName !== "H2") { if (n.classList.contains("term") && !n.hidden) any = true; n = n.nextElementSibling; }
+        h2.hidden = !!q && !any;
+      });
+      root.querySelectorAll(":scope > ul").forEach(function (u) { u.hidden = !!q; });
+      empty.hidden = shown > 0;
+    });
+  })();
+</script>

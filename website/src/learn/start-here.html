@@ -1,0 +1,375 @@
+<p class="lead">This page takes you from nothing to a model that is built, checked, shipped, watched and rolled back. You need no data-science background. You need to be able to open a terminal and type commands.</p>
+<p>Every command below was run by the author on a real dataset, and every "What you should see" block is the real output (trimmed where it says so). Your numbers may differ in the last digits. Time-limited searches depend on how fast your computer is.</p>
+<p>Where to type: a <strong>terminal</strong> is the window where you type commands. On a Mac it is the Terminal app, on Linux any terminal. On Windows use WSL (Windows Subsystem for Linux) or Git Bash, because the commands below are written for that kind of shell. Type each command, press Enter, and wait for the prompt to come back before the next one. Lines starting with <code>#</code> are comments; skip them.</p>
+<p>How long it takes: about 30 minutes, of which about 8 minutes is waiting for the computer.</p>
+<p>If a word is new, look it up in the <a href="@@BASE@@/docs/glossary/">glossary</a>. If a step goes wrong, look in <a href="@@BASE@@/docs/when-things-go-wrong/">When things go wrong</a>. If you are unsure how to choose something, read <a href="@@BASE@@/docs/decisions/">Decisions</a>.</p>
+<h2 id="the-story-in-five-lines">The story in five lines</h2>
+<ol><li>You have a table. One column is the answer you want to predict.</li><li>You show SCMLE the table and name that column. It tries many models.</li><li>It keeps some rows hidden until the very end, like an exam. The exam score is the number to trust.</li><li>You save the winning model as a signed folder and let other programs ask it for predictions.</li><li>You watch it. If it gets worse, you go back to the old one.</li></ol>
+<h2 id="what-we-will-predict">What we will predict</h2>
+<p>We use the Titanic passenger table that ships in this repository. Each row is one passenger. We want to predict <strong><code>survived</code></strong>: <code>1</code> if the passenger lived, <code>0</code> if not. This column is called the <strong>target</strong>. The other columns (class, sex, age, fare and so on) are the <strong>features</strong>: the facts the model may use to guess the target.</p>
+<h2 id="step-1-install">Step 1. Install</h2>
+<p>You need Python 3.11 or newer. Check:</p>
+<pre><code class="language-bash">python3 --version</code></pre>
+<p>What you should see: <code>Python 3.11</code> or higher (the author used 3.14). What could go wrong: an older version. Install a newer Python first.</p>
+<p>Get the code and create a private Python environment (a <strong>virtual environment</strong> is a folder that keeps this project's libraries apart from the rest of your computer):</p>
+<pre><code class="language-bash">git clone https://github.com/sachncs/scmle
+cd scmle
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .</code></pre>
+<p>If you use Windows PowerShell instead of WSL, run <code>.venv\Scripts\activate</code> in place of the <code>source</code> line, and expect to adapt other lines. The install downloads a few hundred megabytes. It may take a few minutes.</p>
+<p>Check that the command exists:</p>
+<pre><code class="language-bash">scmle --help</code></pre>
+<p>What you should see (first lines):</p>
+<pre><code class="language-text">usage: scmle [-h] [--log-level {DEBUG,INFO,WARNING,ERROR}]
+             {plan,run,resume,catalog,predict,batch,serve,export-onnx,package,ingest,charter,claims,frame,loop,deploy} ...</code></pre>
+<p>What could go wrong: <code>scmle: command not found</code> means the environment is not active. Run the <code>source</code> line again. Every new terminal needs it.</p>
+<p>Make a working folder and copy the data into it. The data file lives in the repository's test folder:</p>
+<pre><code class="language-bash">mkdir -p ~/first-model
+cp tests/fixtures/titanic_extract.csv ~/first-model/titanic.csv
+cd ~/first-model</code></pre>
+<p>All the commands below run inside <code>~/first-model</code>.</p>
+<h2 id="step-2-look-at-the-data-first">Step 2. Look at the data first</h2>
+<p>Never train on a table you have not looked at. Print its size and first rows:</p>
+<pre><code class="language-bash">python -c "import pandas as pd; d = pd.read_csv('titanic.csv'); print(d.shape); print(d.head(3).to_string())"</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">(1309, 10)
+   survived  pclass     sex      age  sibsp  parch      fare embarked boat  body
+0         1       1  female  29.0000      0      0  211.3375        S    2   NaN
+1         1       1    male   0.9167      1      2  151.5500        S   11   NaN
+2         0       1  female   2.0000      1      2  151.5500        S  NaN   NaN</code></pre>
+<p>Look at it: 1309 rows, 10 columns. <code>NaN</code> means "no value recorded". Now ask SCMLE for a fact sheet about the table:</p>
+<pre><code class="language-bash">scmle catalog titanic.csv --label-column survived --output catalog.json</code></pre>
+<p>What you should see: a block of JSON. Find these parts:</p>
+<pre><code class="language-text">"label": {"distribution": {"0": 809, "1": 500}, ...}
+"duplicates": {"duplicate_fraction": 0.1787..., "duplicate_rows": 234, ...}
+"missingness": {"by_field": {"age": 263, "boat": 823, "body": 1188, ...}}</code></pre>
+<p>What to look at:</p>
+<ul><li>809 died and 500 lived. That is not extreme, so a plain score is fine.</li><li>234 rows are exact copies of another row. Copies can make a model look better than it is, because a copy can sit in both the practice and the exam part. Remember this. SCMLE will warn you about it again.</li><li><code>boat</code> is missing for 823 people and <code>body</code> for 1188. These two columns look odd. Hold that thought.</li></ul>
+<p>What could go wrong: nothing here changes your data. The command only reads.</p>
+<h2 id="step-3-state-the-question-before-you-run-anything">Step 3. State the question before you run anything</h2>
+<p>Write these answers down. They are explained in <a href="@@BASE@@/docs/decisions/">Decisions</a>.</p>
+<div class="model-table" role="region" aria-label="Table: Question" tabindex="0"><table style="min-width:560px"><thead><tr><th scope="col">Question</th><th scope="col">Our answer</th><th scope="col">Why</th></tr></thead><tbody><tr><th scope="row">What do I predict?</th><td><code>survived</code></td><td>It is the outcome we care about</td></tr><tr><th scope="row">What is a good score?</th><td>ROC AUC</td><td>It measures how well the model puts survivors above non-survivors. 0.5 is a coin flip, 1.0 is perfect</td></tr><tr><th scope="row">When will I use the model?</th><td>Before the voyage, from the ticket</td><td>This decides which columns I may use</td></tr><tr><th scope="row">Which columns would I not know at that moment?</th><td><code>boat</code> and <code>body</code></td><td>Which lifeboat you got on, or whether your body was found, is known only after the ship sinks</td></tr></tbody></table></div>
+<p>The last row is the most important one. A column that records something that happens after the outcome gives the model the answer. That is called <strong>leakage</strong>. A model with leakage scores wonderfully and then fails on real use. You will see it happen below.</p>
+<h2 id="step-4-plan-nothing-is-trained-yet">Step 4. Plan (nothing is trained yet)</h2>
+<pre><code class="language-bash">scmle plan titanic.csv --target survived</code></pre>
+<p>This takes about 7 seconds. It prints about 70 lines: each model SCMLE could try and whether it will, then warnings. Here is the start and the end:</p>
+<pre><code class="language-text">Plan plan_3e14748f79: binary_classification, metric=roc_auc, validation=stratified, budget=1800s
+Candidates: dummy, hist_gradient_boosting, decision_tree, logistic_regression, bagged_decision_tree, bagged_logistic_regression, knn, bagged_knn, extra_trees, random_forest, neural_network, svm
+  ...
+  WARNING: feature 'body' is a leakage suspect: share of one target class among the recorded values 1.000 ... This is a suspicion, not proof: a strong legitimate predictor looks the same without provenance; review before trusting
+  WARNING: feature 'boat' is a leakage suspect: cross-fitted skill 0.973 ... This is a suspicion, not proof ...</code></pre>
+<p>What to look at:</p>
+<ul><li>First line: <code>binary_classification</code> (two possible answers), <code>metric=roc_auc</code> (it picked a score for you), <code>validation=stratified</code> (the practice rounds keep the survivor share the same in each part), <code>budget=1800s</code> (it would search up to 30 minutes).</li><li><code>Candidates</code> lists the <strong>models</strong> it will try. <code>dummy</code> is a model that ignores the features. It is the floor every real model must beat.</li><li><code>[reject] ... missing dependency: lightgbm</code> lines are normal. Those models need optional extras you did not install.</li><li>The two <code>WARNING</code> lines say <code>body</code> and <code>boat</code> look like leaks. SCMLE is telling you what you already suspected.</li></ul>
+<p>What could go wrong: if it picks the wrong metric or task, tell it with <code>--metric</code> or <code>--task</code>. If the target is a column with many numbers, check that it says <code>regression</code> and not <code>classification</code>.</p>
+<h2 id="step-5-see-scmle-refuse-a-leak">Step 5. See SCMLE refuse a leak</h2>
+<p>By default, a warning does not stop a run. Turn the warnings into a stop with <code>--leakage-policy block</code>. (The author ran the default once, without the flag: it finished with a test score of 0.988 and printed nothing alarming at the end. That is the trap. You do not need to repeat it.)</p>
+<pre><code class="language-bash">scmle run titanic.csv --target survived --leakage-policy block \
+  --time-budget 120 --workers 2 --output-dir runs_blocked
+echo "exit code: $?"</code></pre>
+<p>What you should see (last two lines):</p>
+<pre><code class="language-text">[run_20261105_001] state.BLOCKED: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
+blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat</code></pre>
+<p>and <code>exit code: 2</code>.</p>
+<p>What to look at: <code>BLOCKED</code> is a safe stop, not a crash. No model was built. The names after the colon are the suspect columns. <code>boat</code> appears three times because three different checks flagged it.</p>
+<p>What it means and what to do: see "Leakage block" in <a href="@@BASE@@/docs/when-things-go-wrong/">When things go wrong</a>. Here, we decide <code>boat</code> and <code>body</code> are not known before the voyage, so we declare them off limits in the next step.</p>
+<h2 id="step-6-run-for-real">Step 6. Run for real</h2>
+<p>Tell SCMLE those two columns are only known after the outcome:</p>
+<pre><code class="language-bash">scmle run titanic.csv --target survived \
+  --unavailable-at-prediction boat body \
+  --leakage-policy block --time-budget 120 --workers 2 --output-dir runs</code></pre>
+<p>This takes two to four minutes, depending on your computer. Lines scroll by as it works. The ones that matter:</p>
+<pre><code class="language-text">[run_20261105_001] state.PROFILING: profile dataset
+[run_20261105_001] split.created: stratified split
+[run_20261105_001] state.TRAINING: 7 candidates
+[run_20261105_001] trial.ok: decision_tree
+...
+[run_20261105_001] state.SELECTING: best mean CV score; exact ties -&gt; simpler_model; dummy baseline excluded when other models ran
+[run_20261105_001] selection.frozen: stacking/default
+[run_20261105_001] state.TESTING: final one-time test evaluation of stacking
+[run_20261105_001] test.opened: locked test set released once, after selection was frozen
+[run_20261105_001] state.COMPLETED: run complete
+run_20261105_001: selected stacking (cv roc_auc=0.8482); test: roc_auc=0.8855, pr_auc=0.8539, log_loss=0.4081, f1=0.7738, balanced_accuracy=0.8137, accuracy=0.8241
+artifacts: runs/run_20261105_001</code></pre>
+<p>What to look at, in the order the run does them:</p>
+<ol><li><code>split.created</code>: SCMLE set some rows aside before looking at anything.</li><li><code>trial.ok</code> lines: one practice model each. <code>trial.pruned</code> means it gave up early on a hopeless one. That is fine.</li><li><code>selection.frozen</code>: the winner is chosen using only the practice rows.</li><li><code>test.opened</code>: only now are the hidden rows used, and only once.</li><li>The last line: <code>cv roc_auc=0.8482</code> is the practice score and <code>test: roc_auc=0.8855</code> is the exam score. Trust the exam score.</li></ol>
+<p>What could go wrong:</p>
+<ul><li><code>state.BLOCKED</code> again: you forgot <code>--unavailable-at-prediction boat body</code>.</li><li><code>state.FAILED</code>: read the line after it. Run <code>scmle resume runs/run_...</code> to continue after an interruption (finished trials are kept).</li><li><code>all trials failed</code>, or a trial <code>exceeded its 6.0s hard time ceiling and was killed</code>: the time budget is too small for your computer. The first run on a new installation is the slowest. Raise <code>--time-budget</code> (try 300).</li><li>It stops early: the time budget ran out. Raise <code>--time-budget</code>. A short budget searches fewer models and can leave some report parts empty (see <a href="@@BASE@@/docs/reading-results/">Reading results</a>).</li></ul>
+<h2 id="step-7-read-the-result">Step 7. Read the result</h2>
+<p>SCMLE wrote a folder <code>runs/run_20261105_001</code>. The file <code>report.html</code> is the full report. Open it in a browser. It starts with a long list of plan decisions. Scroll to the "Leaderboard" heading. The same numbers are easier to read with this short script. Save it as <code>read_results.py</code>:</p>
+<pre><code class="language-python">import json
+import pathlib
+
+run = sorted(pathlib.Path("runs").glob("run_*"))[-1]
+ev = json.loads((run / "evaluation.json").read_text())
+print("run folder       :", run)
+print("chosen model     :", ev["selected_model"])
+print("metric           :", ev["metric"])
+print("practice score   :", round(ev["selected_cv_score"], 3), "+/-", round(ev["selected_cv_std"], 3))
+low, high = ev["cv_confidence"]["interval"]
+print("practice 95% band:", round(low, 3), "to", round(high, 3))
+print("exam score       :", round(ev["test_metrics"]["roc_auc"], 3))
+unc = json.loads((run / "diagnostics" / "metric_uncertainty.json").read_text())
+print("exam 95% band    :", [round(x, 3) for x in unc["ci_95"]])
+print("dummy baseline   :", ev["baseline_cv_score"])
+print("fit health       :", ev["fit_health"]["verdict"])
+print("rows             :", ev["n_dev"], "to learn from,", ev["n_test"], "kept for the exam")
+cm = json.loads((run / "diagnostics" / "classification_report.json").read_text())
+print("confusion matrix :", cm["confusion_matrix"])
+imp = json.loads((run / "diagnostics" / "permutation_importance.json").read_text())
+if imp["truncated"]:
+    print("importance       : not finished in time; raise --time-budget")
+for row in imp["features"][:4]:
+    print("importance       :", row["feature"], round(row["importance"], 3))
+for item in json.loads((run / "diagnostics" / "recommendations.json").read_text()):
+    print("recommendation   :", item["message"])</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">python read_results.py</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">run folder       : runs/run_20261105_001
+chosen model     : stacking
+metric           : roc_auc
+practice score   : 0.848 +/- 0.023
+practice 95% band: 0.8 to 0.896
+exam score       : 0.885
+exam 95% band    : [0.841, 0.927]
+dummy baseline   : 0.5
+fit health       : healthy
+rows             : 1093 to learn from, 216 kept for the exam
+confusion matrix : [[113, 18], [20, 65]]
+importance       : sex 0.242
+importance       : pclass 0.074
+importance       : age 0.039
+importance       : fare 0.017
+recommendation   : 14% of rows are exact duplicates; duplicates can appear in both training and validation folds and inflate scores. Deduplicate, or set data.group_column if rows belong to the same entity</code></pre>
+<p>Your numbers will not match these exactly, and that is normal. The search stops when the time budget ends, so a slower or busier computer tries fewer models. When the author repeated this page on a second, busier machine with the same command, the winner was <code>bagged_logistic_regression</code> (practice 0.835, exam 0.869) instead of <code>stacking</code> (practice 0.848, exam 0.885), and the importance rows were missing because the time ran out. What must hold on your machine: the exam score is clearly above 0.5, it is close to the practice score, and <code>fit health</code> says <code>healthy</code>. If the importance rows are missing, rerun with <code>--time-budget 300</code>.</p>
+<p>How to read it, line by line:</p>
+<ul><li><strong>practice score 0.848</strong> and <strong>exam score 0.885</strong> are close. Good. A big gap (practice far above exam) would mean the model memorised.</li><li><strong>exam 95% band 0.841 to 0.927</strong>: with only 216 exam rows, the true score could plausibly be anywhere in that band. Do not report "0.885" as if it were exact.</li><li><strong>dummy baseline 0.5</strong>: a model that ignores the data scores 0.5. Ours is far above, so it learned something.</li><li><strong>fit health healthy</strong>: what it learned in practice carried over.</li><li><strong>confusion matrix</strong>: rows are the truth (died, lived), columns are the guess. 113 deaths guessed right, 18 wrongly guessed as lived; 65 survivors guessed right, 20 wrongly guessed as died.</li><li><strong>importance</strong>: shuffling <code>sex</code> hurts the score most. That fits the history (women were let into boats first). If the top feature were a surprise, you would investigate.</li><li><strong>recommendation</strong>: a warning that the table has copies. It is the same warning from Step 2. It means 0.885 may be a little optimistic. This is honest: the model's number is not perfect, and the tool says so.</li></ul>
+<p>If this were a leaked run, the exam score would be about 0.99 and the top features would be <code>boat</code> or <code>body</code>. See <a href="@@BASE@@/docs/reading-results/">Reading results</a>.</p>
+<p>What could go wrong: the list of <code>importance</code> rows is empty, or <code>FileNotFoundError</code>. A short time budget can leave the importance table empty (the file then says <code>"truncated": true</code>). Rerun with a larger <code>--time-budget</code>.</p>
+<h2 id="step-8-save-the-model-and-predict">Step 8. Save the model and predict</h2>
+<p>The model is inside <code>runs/run_.../model</code>. It is stored as a "bundle" (a folder of files). Bundles can run code when opened, so SCMLE refuses to open one that is not <strong>signed</strong>. A signature is a stamp made with a secret key that shows the folder has not been changed. Pick a secret and keep it. Here we use a demo one:</p>
+<pre><code class="language-bash">export SCMLE_SIGNING_KEY=demo-key-change-me</code></pre>
+<p>The run did not sign its bundle. Sign it by saving a copy. Save this as <code>save_model.py</code>. The <code>if __name__</code> lines at the bottom are required (see the note after):</p>
+<pre><code class="language-python">import pathlib
+
+import scmle
+
+
+def main():
+    run = sorted(pathlib.Path("runs").glob("run_*"))[-1]
+    bundle = scmle.ModelBundle.load(run / "model", trusted=True)
+    bundle.save("artifacts/titanic", signing_key="demo-key-change-me")
+    print("saved artifacts/titanic")
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+<pre><code class="language-bash">python save_model.py
+ls artifacts/titanic</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">saved artifacts/titanic
+conformal.json
+coverage_report.json
+model_manifest.json
+novelty.joblib
+pipeline.joblib
+reference.json
+schema.json
+signature.json</code></pre>
+<p>Notice the new file <code>signature.json</code>. (On a slower computer the list can lack <code>conformal.json</code> and <code>coverage_report.json</code>; that is the time budget again.)</p>
+<p><code>trusted=True</code> means "I made this folder myself, open it." Never use it on a folder from someone else.</p>
+<p>Now make a small file of new passengers. They have the same columns as before, minus <code>survived</code>, <code>boat</code> and <code>body</code>:</p>
+<pre><code class="language-bash">python -c "
+import pandas as pd
+d = pd.read_csv('titanic.csv')
+cols = ['pclass', 'sex', 'age', 'sibsp', 'parch', 'fare', 'embarked']
+pd.concat([d.iloc[100:105], d.iloc[800:805]])[cols].to_csv('new_passengers.csv', index=False)
+"
+scmle predict artifacts/titanic new_passengers.csv --output scored.csv
+head -4 scored.csv</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">wrote 10 predictions to scored.csv
+prediction,proba_0,proba_1
+0,0.5570198341867083,0.44298016581329164
+0,0.657531739140053,0.34246826085994697
+1,0.07917512598754506,0.9208248740124549</code></pre>
+<p><code>prediction</code> is the guess (0 or 1). <code>proba_1</code> is the model's chance that the passenger lived. A prediction of 1 with <code>proba_1</code> 0.92 is confident. A 0 with <code>proba_1</code> 0.44 is a near toss-up. Look at the probabilities, not only the 0 or 1.</p>
+<p>Now see two refusals on purpose:</p>
+<pre><code class="language-bash">SCMLE_SIGNING_KEY=wrong-key scmle predict artifacts/titanic new_passengers.csv
+echo "exit code: $?"
+printf 'class,sex\n1,m\n' &gt; bad.csv
+scmle predict artifacts/titanic bad.csv
+echo "exit code: $?"</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">artifact error: bundle signature is invalid: the bundle was modified or signed with a different key
+exit code: 1
+schema error: input is missing required columns: ['pclass', 'age', 'sibsp', 'parch', 'fare', 'embarked']
+exit code: 1</code></pre>
+<p>The first says: wrong key, or someone changed the folder. The second says: the columns you gave are not the ones the model was trained on. SCMLE never guesses at column names. You can map names yourself with <code>--rename INCOMING=EXPECTED</code>.</p>
+<p>What could go wrong: forgetting the <code>export</code> line gives <code>refusing to load an unauthenticated bundle</code>. Run the <code>export</code> again in this terminal.</p>
+<p>A note on the <code>if __name__ == "__main__":</code> lines. SCMLE trains models in helper processes. On macOS and Windows, a script without that guard makes the helper re-run your whole script, and you get a long error about "bootstrapping phase". Always keep the guard in scripts that call <code>run()</code>.</p>
+<h2 id="step-9-package-then-serve">Step 9. Package, then serve</h2>
+<p>To let other programs ask for predictions, run the model as a small web service. Start it (leave this terminal open; open a second one for the next commands, activate the environment there too, and <code>export</code> the key again):</p>
+<pre><code class="language-bash">scmle serve artifacts/titanic --port 8765</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">serving stacking on http://127.0.0.1:8765</code></pre>
+<p>In the second terminal:</p>
+<pre><code class="language-bash">curl -s localhost:8765/livez
+curl -s localhost:8765/readyz</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">{"status": "alive", "request_id": "srv-ae7f7cff553540149e0b6af82c622a08"}
+{"ready": true, "phase": "ready", "completed": {"verifying": 0.0, "loading": 0.0, "warming": 0.2252}, ...}</code></pre>
+<p><code>livez</code> means "the program is running". <code>readyz</code> means "the model is checked and loaded and can answer". They are different on purpose. If <code>readyz</code> says <code>ready: false</code>, read its <code>reason</code>; see <a href="@@BASE@@/docs/when-things-go-wrong/">When things go wrong</a>.</p>
+<p>Ask for a prediction:</p>
+<pre><code class="language-bash">curl -s -X POST localhost:8765/predict -H 'Content-Type: application/json' \
+  -d '{"records": [{"pclass": 1, "sex": "male", "age": 49.0, "sibsp": 1, "parch": 0, "fare": 56.9292, "embarked": "C"}]}'</code></pre>
+<p>What you should see: JSON with <code>"predictions": [0]</code> and <code>"probabilities"</code> holding two numbers, plus <code>"model_version": "v1"</code> and an <code>artifact_digest</code>. The digest is a fingerprint of the exact model that answered. Write it down in any report you make from these predictions.</p>
+<p>Stop the service with Ctrl-C in the first terminal.</p>
+<p>Two safety rules to see once:</p>
+<pre><code class="language-bash">scmle serve artifacts/titanic --host 0.0.0.0 --port 8766</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">config error: refusing to listen on '0.0.0.0' without authentication: set SCMLE_AUTH_KEYS_FILE (or SCMLE_AUTH_HS256_SECRET) with SCMLE_AUTH_ISSUER and SCMLE_AUTH_AUDIENCE, or bind a loopback address</code></pre>
+<p>The reference server has no login and no encryption. It only listens on your own machine unless you set up tokens (see <a href="@@BASE@@/docs/tenant-isolation/"><code>TENANT_ISOLATION.md</code></a>). Never put it on the internet as it is.</p>
+<p>To ship to a real server you build a container. <code>scmle package</code> writes the folder for that:</p>
+<pre><code class="language-bash">scmle package artifacts/titanic --output service
+ls -A service</code></pre>
+<p>What you should see (the listing may be laid out in columns):</p>
+<pre><code class="language-text">wrote service folder service
+.dockerignore
+Dockerfile
+README.md
+build.sh
+environment.lock
+model
+provenance.json
+requirements.lock
+requirements.txt
+sbom.cdx.json
+serve.py
+vuln-policy.json</code></pre>
+<p>What these are:</p>
+<ul><li><code>Dockerfile</code> and <code>build.sh</code> build the container image. You need Docker and network access to run them. The author did <strong>not</strong> build an image for this page.</li><li><code>sbom.cdx.json</code> is a <strong>software bill of materials</strong>: a list of every library inside, so a security tool can check for known flaws.</li><li><code>provenance.json</code> is a signed statement of what the package was made from. The service checks it when it starts.</li></ul>
+<p>The cloud steps after this (release gate, live checks, promotion to AWS or Google Cloud) are in <a href="@@BASE@@/docs/cloud-release/"><code>CLOUD_RELEASE.md</code></a>. They have not been run against a real cloud account. See <a href="@@BASE@@/docs/what-scmle-cannot-do/">What SCMLE cannot do</a>.</p>
+<h2 id="step-10-monitor">Step 10. Monitor</h2>
+<p>A model is correct only about the world it was trained on. When the world changes, it gets worse, quietly. <strong>Monitoring</strong> compares new data and new outcomes with what the model saw in training.</p>
+<p>For this walk-through we pretend a batch of rows is new. Real monitoring uses rows that arrived after training. Our pretend rows were seen during training, so the performance number below is too good. What matters is how the alarm behaves. Save as <code>monitor_model.py</code>:</p>
+<pre><code class="language-python">import pandas as pd
+
+import scmle
+from scmle.monitoring import monitor
+
+
+def main():
+    data = pd.read_csv("titanic.csv").drop(columns=["boat", "body"])
+    bundle = scmle.ModelBundle.load(
+        "artifacts/titanic", signing_key="demo-key-change-me"
+    )
+    watcher = monitor.ModelMonitor(bundle)
+
+    batch = data.sample(300, random_state=0)
+    report = watcher.assess(batch.drop(columns=["survived"]), batch["survived"])
+    print("normal batch :", report.recommendation.action, report.recommendation.reasons)
+
+    changed = batch.copy()
+    changed["fare"] = changed["fare"] * 8
+    changed["pclass"] = 3
+    changed["age"] = changed["age"] + 30
+    report = watcher.assess(changed.drop(columns=["survived"]), changed["survived"])
+    print("changed batch:", report.recommendation.action)
+    for reason in report.recommendation.reasons:
+        print("   -", reason)
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+<pre><code class="language-bash">python monitor_model.py</code></pre>
+<p>What you should see (the changed batch is built by hand to look different):</p>
+<pre><code class="language-text">normal batch : none []
+changed batch: retrain
+   - 43% of features drifted strongly: 'fare' (PSI 6.32), 'age' (PSI 4.77), 'pclass' (PSI 3.66)
+   - model output drifted strongly (PSI 0.72)</code></pre>
+<p>The feature numbers repeat on any computer. The output number (0.72 here, 0.91 on the author's second machine) depends on which model won.</p>
+<p>How to read it:</p>
+<ul><li>The recommendation is one of three words: <code>none</code> (all is well), <code>investigate</code> (look, something moved), <code>retrain</code> (the model is clearly stale).</li><li><strong>PSI</strong> is a number for "how different is this column from training". Under about 0.1 is calm. Above about 0.25 is a strong shift.</li><li><strong>Drift</strong> means the incoming data stopped looking like the training data.</li><li>A drift alarm is not always a real problem. In the author's first try, a "fresh" batch was the last 509 rows of the file, which is sorted by passenger class, so it was nearly all third class and the monitor said <code>investigate</code>. The alarm was right: that batch really was different. The cure was a better sample, not a new model.</li></ul>
+<p>What could go wrong: <code>labeled_fraction</code> low. Performance is judged only on rows whose true outcome has arrived. If most outcomes are still unknown, trust the drift numbers and be careful with the performance numbers.</p>
+<h2 id="step-11-register-promote-and-roll-back">Step 11. Register, promote and roll back</h2>
+<p>A <strong>registry</strong> is a shelf of model versions with labels. The label <code>champion</code> marks the version in use. To move the label you need an <strong>approval</strong>: a signed note by a person who is not the one who built the model. Promotion without it is refused, on purpose.</p>
+<p>To practice a rollback, first make a deliberately bad second model: the same data with the answers shuffled. Save as <code>bad_model.py</code>:</p>
+<pre><code class="language-python">import pandas as pd
+
+import scmle
+
+
+def main():
+    data = pd.read_csv("titanic.csv")
+    data["survived"] = data["survived"].sample(frac=1, random_state=1).to_numpy()
+    project = scmle.MLProject(
+        data,
+        target="survived",
+        unavailable_at_prediction=["boat", "body"],
+        time_budget=120,
+        workers=2,
+        output_dir="runs_bad",
+    )
+    result = project.run()
+    print(result.summary())
+    result.save("artifacts/titanic_v2", signing_key="demo-key-change-me")
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+<pre><code class="language-bash">python bad_model.py</code></pre>
+<p>What you should see (one to three minutes; the numbers will differ on your computer, but the exam score will sit near 0.5):</p>
+<pre><code class="language-text">run_20261105_001: selected hist_gradient_boosting (cv roc_auc=0.5242); test: roc_auc=0.4974, pr_auc=0.3856, log_loss=0.7885, f1=0.3194, balanced_accuracy=0.4828, accuracy=0.5288</code></pre>
+<p>A score of 0.50 is a coin flip. This is what "the model learned nothing" looks like. Now register both and try to promote. Save as <code>ship_model.py</code>:</p>
+<pre><code class="language-python">from scmle.governance import registry
+
+KEY = "demo-key-change-me"
+
+
+def approval_for(record, why):
+    return registry.PromotionApproval(
+        model="titanic",
+        version=record.version,
+        content_id=record.content_id,
+        reviewer="you@example.com",
+        decision=registry.PromotionDecision.APPROVED,
+        reason=why,
+        evidence=("runs/report.html",),
+        approved_at="2026-11-05T00:00:00+00:00",
+    ).sign(KEY)
+
+
+def main():
+    store = registry.ModelRegistryStore("registry")
+    v1 = store.register("titanic", "artifacts/titanic", signing_key=KEY)
+    v2 = store.register("titanic", "artifacts/titanic_v2", signing_key=KEY)
+    print("versions:", [record.version for record in store.versions("titanic")])
+    try:
+        store.promote("titanic", 1)
+    except Exception as error:
+        print("without approval:", error)
+    store.promote("titanic", 1, approval=approval_for(v1, "first release"), signing_key=KEY)
+    print("after promoting v1:", store.aliases("titanic"))
+    store.promote("titanic", 2, approval=approval_for(v2, "second release"), signing_key=KEY)
+    print("after promoting v2:", store.aliases("titanic"))
+    previous = store.resolve("titanic", "previous")
+    note = approval_for(previous, "roll back: v2 is worse")
+    store.promote("titanic", previous.version, approval=note, signing_key=KEY)
+    print("after rolling back:", store.aliases("titanic"))
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+<pre><code class="language-bash">python ship_model.py</code></pre>
+<p>What you should see:</p>
+<pre><code class="language-text">versions: [1, 2]
+without approval: champion promotion requires independent approval
+after promoting v1: {'champion': 1}
+after promoting v2: {'champion': 2, 'previous': 1}
+after rolling back: {'champion': 1, 'previous': 2}</code></pre>
+<p>How to read it: <code>champion</code> is the version being served. Promoting v2 kept v1 under the label <code>previous</code>, so going back is one step. After the rollback, version 1 is champion again.</p>
+<p>What you should know that this demo skips: a real approval is written by a second person, with real evidence files, using a key you keep secret. The demo signs its own approval, which proves the mechanism, not the independence. The registry also has <code>LifecycleManager.check_rollback</code>, which compares the two versions on fresh labeled rows and rolls back only if the new one is clearly worse. See <a href="@@BASE@@/docs/quickstart/"><code>TUTORIAL.md</code></a> section 7.</p>
+<h2 id="step-12-where-to-go-next">Step 12. Where to go next</h2>
+<ul><li>A beginner trap list: <a href="@@BASE@@/docs/decisions/">Decisions</a>.</li><li>Understand every number you saw: <a href="@@BASE@@/docs/reading-results/">Reading results</a>.</li><li>A refusal you do not understand: <a href="@@BASE@@/docs/when-things-go-wrong/">When things go wrong</a>.</li><li>The "charter" and the claims it produces (the careful, pre-registered mode of working): see "A second mode: the charter" in <a href="@@BASE@@/docs/reading-results/">Reading results</a>.</li><li>What this tool does not do: <a href="@@BASE@@/docs/what-scmle-cannot-do/">What SCMLE cannot do</a>.</li><li>All the options: <a href="@@BASE@@/docs/cli/"><code>CLI.md</code></a> and <a href="@@BASE@@/docs/quickstart/"><code>TUTORIAL.md</code></a>.</li></ul>

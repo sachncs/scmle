@@ -1,0 +1,14 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/when-things-go-wrong.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="When things go wrong" description="Every refusal, block and failure scmle can give, what it means, and what to do: runs, bundles, the service, the release gate and the closed loop." current="when-things-go-wrong">
+  <p class="eyebrow"><span></span> Learn</p>
+  <h1>Every refusal<br /><em>has a next step.</em></h1>
+  <Fragment set:html={html} />
+
+  <p class="meta">Written for a first-time reader · 0.1 beta</p>
+</DocsLayout>
