@@ -50,10 +50,23 @@ cd ~/first-model</code></pre>
 <h2 id="step-3-state-the-question-before-you-run-anything">Step 3. State the question before you run anything</h2>
 <p>Write these answers down. They are explained in <a href="@@BASE@@/docs/decisions/">Decisions</a>.</p>
 <div class="model-table" role="region" aria-label="Table: Question" tabindex="0"><table style="min-width:560px"><thead><tr><th scope="col">Question</th><th scope="col">Our answer</th><th scope="col">Why</th></tr></thead><tbody><tr><th scope="row">What do I predict?</th><td><code>survived</code></td><td>It is the outcome we care about</td></tr><tr><th scope="row">What is a good score?</th><td>ROC AUC</td><td>It measures how well the model puts survivors above non-survivors. 0.5 is a coin flip, 1.0 is perfect</td></tr><tr><th scope="row">When will I use the model?</th><td>Before the voyage, from the ticket</td><td>This decides which columns I may use</td></tr><tr><th scope="row">Which columns would I not know at that moment?</th><td><code>boat</code> and <code>body</code></td><td>Which lifeboat you got on, or whether your body was found, is known only after the ship sinks</td></tr></tbody></table></div>
-<p>The last row is the most important one. A column that records something that happens after the outcome gives the model the answer. That is called <strong>leakage</strong>. A model with leakage scores wonderfully and then fails on real use. You will see it happen below.</p>
-<h2 id="step-4-plan-nothing-is-trained-yet">Step 4. Plan (nothing is trained yet)</h2>
+<p>The last row is the most important one. A column that records something that happens after the outcome gives the model the answer. That is called <strong>leakage</strong>. A model with leakage scores wonderfully and then fails on real use. You will see SCMLE stop it in Step 4.</p>
+<h2 id="step-4-your-first-run-is-refused-on-purpose">Step 4. Your first run is refused (on purpose)</h2>
+<p>Run the simplest command, with no special options except a short time limit and an output folder:</p>
+<pre><code class="language-bash">scmle run titanic.csv --target survived --time-budget 120 --workers 2 --output-dir runs_blocked
+echo "exit code: $?"</code></pre>
+<p>This takes about 8 seconds. What you should see (last two lines):</p>
+<pre><code class="language-text">[run_20261105_001] state.BLOCKED: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
+blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat</code></pre>
+<p>and <code>exit code: 2</code>.</p>
+<p>What to look at: <code>BLOCKED</code> is a safe stop, not a crash. No model was built. The names after the colon are the suspect columns: <code>body</code> and <code>boat</code>. <code>boat</code> appears three times because three different checks flagged it.</p>
+<p>Why SCMLE stops by default. The author once ran the same command with the stop turned off (<code>--leakage-policy warn</code>). It finished and reported an exam ROC AUC of <strong>0.988</strong>, and its last line said:</p>
+<pre><code class="language-text">run_20261105_001: selected bagged_logistic_regression (cv roc_auc=0.9917); test: roc_auc=0.9880, ...; WARNING 2 leakage suspect(s) kept in: boat, body</code></pre>
+<p>That score is far too good. It comes from <code>boat</code> and <code>body</code>, which are only known after the ship sinks. A model that uses them looks brilliant and fails the day it is used for real. Because it is so easy to miss a warning, the safe behaviour (<code>block</code>) is the default. You do not need to repeat the warn run.</p>
+<p>What it means and what to do: see "Leakage block" in <a href="@@BASE@@/docs/when-things-go-wrong/">When things go wrong</a>. In short: for each suspect ask "would I know this value before the voyage?". We would not, so we declare both off limits in Step 6. First, let us see what the plan says about them.</p>
+<h2 id="step-5-plan-nothing-is-trained-yet-why-it-refused">Step 5. Plan (nothing is trained yet): why it refused</h2>
 <pre><code class="language-bash">scmle plan titanic.csv --target survived</code></pre>
-<p>This takes about 7 seconds. It prints about 70 lines: each model SCMLE could try and whether it will, then warnings. Here is the start and the end:</p>
+<p>This takes about 7 seconds and trains nothing. It prints about 70 lines: each model SCMLE could try and whether it will, then warnings. Here is the start and the end:</p>
 <pre><code class="language-text">Plan plan_3e14748f79: binary_classification, metric=roc_auc, validation=stratified, budget=1800s
 Candidates: dummy, hist_gradient_boosting, decision_tree, logistic_regression, bagged_decision_tree, bagged_logistic_regression, knn, bagged_knn, extra_trees, random_forest, neural_network, svm
   ...
@@ -62,22 +75,11 @@ Candidates: dummy, hist_gradient_boosting, decision_tree, logistic_regression, b
 <p>What to look at:</p>
 <ul><li>First line: <code>binary_classification</code> (two possible answers), <code>metric=roc_auc</code> (it picked a score for you), <code>validation=stratified</code> (the practice rounds keep the survivor share the same in each part), <code>budget=1800s</code> (it would search up to 30 minutes).</li><li><code>Candidates</code> lists the <strong>models</strong> it will try. <code>dummy</code> is a model that ignores the features. It is the floor every real model must beat.</li><li><code>[reject] ... missing dependency: lightgbm</code> lines are normal. Those models need optional extras you did not install.</li><li>The two <code>WARNING</code> lines say <code>body</code> and <code>boat</code> look like leaks. SCMLE is telling you what you already suspected.</li></ul>
 <p>What could go wrong: if it picks the wrong metric or task, tell it with <code>--metric</code> or <code>--task</code>. If the target is a column with many numbers, check that it says <code>regression</code> and not <code>classification</code>.</p>
-<h2 id="step-5-see-scmle-refuse-a-leak">Step 5. See SCMLE refuse a leak</h2>
-<p>By default, a warning does not stop a run. Turn the warnings into a stop with <code>--leakage-policy block</code>. (The author ran the default once, without the flag: it finished with a test score of 0.988 and printed nothing alarming at the end. That is the trap. You do not need to repeat it.)</p>
-<pre><code class="language-bash">scmle run titanic.csv --target survived --leakage-policy block \
-  --time-budget 120 --workers 2 --output-dir runs_blocked
-echo "exit code: $?"</code></pre>
-<p>What you should see (last two lines):</p>
-<pre><code class="language-text">[run_20261105_001] state.BLOCKED: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
-blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat</code></pre>
-<p>and <code>exit code: 2</code>.</p>
-<p>What to look at: <code>BLOCKED</code> is a safe stop, not a crash. No model was built. The names after the colon are the suspect columns. <code>boat</code> appears three times because three different checks flagged it.</p>
-<p>What it means and what to do: see "Leakage block" in <a href="@@BASE@@/docs/when-things-go-wrong/">When things go wrong</a>. Here, we decide <code>boat</code> and <code>body</code> are not known before the voyage, so we declare them off limits in the next step.</p>
 <h2 id="step-6-run-for-real">Step 6. Run for real</h2>
 <p>Tell SCMLE those two columns are only known after the outcome:</p>
 <pre><code class="language-bash">scmle run titanic.csv --target survived \
   --unavailable-at-prediction boat body \
-  --leakage-policy block --time-budget 120 --workers 2 --output-dir runs</code></pre>
+  --time-budget 120 --workers 2 --output-dir runs</code></pre>
 <p>This takes two to four minutes, depending on your computer. Lines scroll by as it works. The ones that matter:</p>
 <pre><code class="language-text">[run_20261105_001] state.PROFILING: profile dataset
 [run_20261105_001] split.created: stratified split
