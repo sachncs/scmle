@@ -22,6 +22,12 @@ const routes = [
   "./docs/methods/",
   "./docs/dependencies/",
   "./docs/rehearsal/",
+  "./docs/start-here/",
+  "./docs/glossary/",
+  "./docs/decisions/",
+  "./docs/reading-results/",
+  "./docs/when-things-go-wrong/",
+  "./docs/what-scmle-cannot-do/",
   "./docs/governed-data/",
   "./docs/qualification/",
   "./docs/causal-decision/",
@@ -75,6 +81,27 @@ test("sidebar groups every page and the filter hides empty groups", async ({ pag
   await page.getByLabel("Filter documentation pages").fill("tenant");
   await expect(page.locator(".sidebar nav a:visible")).toHaveCount(1);
   await expect(page.locator(".nav-group:visible")).toHaveCount(1);
+});
+
+test("the glossary search hides non-matching terms and empty groups", async ({ page }) => {
+  await page.goto("./docs/glossary/");
+  const terms = page.locator(".term");
+  const total = await terms.count();
+  expect(total).toBeGreaterThan(40);
+  await page.getByLabel("Search the glossary").fill("leak");
+  const visible = await page.locator(".term:visible").count();
+  expect(visible).toBeGreaterThan(0);
+  expect(visible).toBeLessThan(total);
+  await page.getByLabel("Search the glossary").fill("zzzzqqq");
+  await expect(page.locator("#term-empty")).toBeVisible();
+});
+
+test("start here is linked from the home hero and leads the sidebar", async ({ page }) => {
+  await page.goto("./");
+  await expect(page.locator("main").getByRole("link", { name: /Start here/ }).first()).toHaveAttribute("href", "/scmle/docs/start-here/");
+  await page.goto("./docs/start-here/");
+  await expect(page.locator(".nav-group-label").first()).toHaveText("Learn");
+  await expect(page.locator(".sidebar nav a").first()).toHaveText(/Start here/);
 });
 
 test("modeling page exposes the estimation contract and honest boundaries", async ({
