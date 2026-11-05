@@ -3,8 +3,8 @@
 > Mathematics meets engineering.
 
 [![CI](https://github.com/sachncs/scmle/actions/workflows/ci.yml/badge.svg)](https://github.com/sachncs/scmle/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/scmle)](https://pypi.org/project/scmle/)
-[![Python](https://img.shields.io/pypi/pyversions/scmle)](https://pypi.org/project/scmle/)
+![Status](https://img.shields.io/badge/status-beta-orange)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 SCMLE is a curation-first machine learning lifecycle for teams that need
@@ -43,7 +43,7 @@ project = scmle.MLProject("customers.parquet", target="churn", metric="roc_auc")
 logging.info(project.plan().summary())  # inspect before any training
 result = project.run()  # profile, split, search, test, package
 logging.info("\n%s", result.leaderboard())
-result.save("artifacts/churn", signing_key="...")  # signed bundle
+result.save("artifacts/churn", signing_key="...")  # signed with your key
 result.predict("new_customers.parquet")
 ```
 
@@ -90,8 +90,9 @@ The hosted documentation is available at
 3. **Engineers features** declaratively (`FeatureGraphSpec`: ratios, bins,
    clipping, datetime parts, lags and rolling statistics per entity), with
    every statistic learned on the training fold only.
-4. **Searches** every compatible model family (scikit-learn, LightGBM,
-   XGBoost, CatBoost, SVM, kNN), then evaluates data strategies on the
+4. **Searches** the planned compatible model families (scikit-learn,
+   LightGBM, XGBoost, CatBoost, SVM, kNN) within the configured time budget
+   (the plan lists what it included, rejected and deferred), then evaluates data strategies on the
    original validation folds (class weighting, random and SMOTE-family
    resampling, copula augmentation, calibration, log / interaction features), tunes the winners
    with pruned search (random or Optuna), and assembles a cross-fitted stack
@@ -112,7 +113,9 @@ The hosted documentation is available at
 
 - **Leakage-safe by construction.** Preprocessing, resampling, calibration
   and stacking are part of the candidate and fitted inside each fold;
-  `tests/leakage` proves the search is invariant to the test partition.
+  `tests/leakage` checks, on the tested scenarios, that the search result does
+  not change when the held-out rows are perturbed (evidence under those
+  conditions, not a proof for every input).
 - **Auditable.** Every run writes its configuration, split, events, trials,
   decision log, data-access ledger (verified against the split), report and
   bundle; approval checkpoints can gate the plan and the selection.

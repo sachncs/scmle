@@ -31,7 +31,8 @@ tracking database.
    development rows only.
 3. **Plan** asks the `Planner` (a chain of `PlanningRule`s) for candidates,
    recording every included, rejected and deferred technique.
-4. **Train** screens every compatible `ModelAdapter`, then evaluates data
+4. **Train** screens the planned compatible `ModelAdapter`s within the time
+   budget (what was cut is in the plan), then evaluates data
    strategies (`DataStrategy`), tunes the winners with pruned search, and
    assembles a cross-fitted stack. Every candidate is a complete pipeline
    (preprocessing + estimator) evaluated on the same folds, in parallel via an
