@@ -14,6 +14,7 @@ import pathlib
 
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
+from scmle.contracts import signing
 from scmle.deploy import attest
 from scmle.deploy import contract
 from scmle.deploy import provenance
@@ -32,6 +33,19 @@ class Verified:
     provenance_verified: bool
     trusted: bool
     production: bool
+
+
+PUBLISHED_KEYS = frozenset({"scmle-local-demo-signing-key-published-fixture"})
+
+
+def refuse_published_key(key: str | None, production: bool) -> None:
+    """Raises when production is given a key that is published in the repo."""
+    if production and key in PUBLISHED_KEYS:
+        raise errors.ArtifactError(
+            "the signing key is the published demo fixture; configure a "
+            f"managed key with ${SIGNING_KEY} or "
+            f"${signing.SIGNING_KEY_FILE_ENV}"
+        )
 
 
 def is_production(environ: Mapping[str, str]) -> bool:
@@ -85,7 +99,8 @@ def verify_service(
     root = pathlib.Path(folder)
     model_directory = root / "model"
     production = is_production(environ)
-    key = environ.get(SIGNING_KEY) or None
+    key = signing.key_from_environment(environ)
+    refuse_published_key(key, production)
     digest = provenance.bundle_digest(model_directory)
     signed = bundle_module.verify_signature(model_directory, key)
     trusted = environ.get(TRUSTED) == "1"

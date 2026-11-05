@@ -8,7 +8,25 @@ import os
 from typing import Any
 
 SIGNING_KEY_ENV = "SCMLE_SIGNING_KEY"
+SIGNING_KEY_FILE_ENV = "SCMLE_SIGNING_KEY_FILE"
 SIGNATURE_ALGORITHM = "hmac-sha256"
+
+
+def key_from_environment(environ: Mapping[str, str]) -> str | None:
+    """The configured key: `SCMLE_SIGNING_KEY`, else the file it names.
+
+    The file form lets a secret manager mount the key (a Kubernetes secret, a
+    Secrets Manager or Secret Manager volume) so it never sits in an
+    environment variable or an image.
+    """
+    direct = environ.get(SIGNING_KEY_ENV)
+    if direct:
+        return direct
+    path = environ.get(SIGNING_KEY_FILE_ENV)
+    if path:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read().strip() or None
+    return None
 
 
 def resolve_key(signing_key: str | bytes | None) -> bytes | None:
@@ -16,7 +34,7 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
     key = (
         signing_key
         if signing_key is not None
-        else os.environ.get(SIGNING_KEY_ENV)
+        else key_from_environment(os.environ)
     )
     if key is None or key == "":
         return None
