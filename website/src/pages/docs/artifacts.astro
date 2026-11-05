@@ -118,7 +118,7 @@ const service = [
   <DocTable label="Search and result files" head={["Path", "Contents"]} rows={search} />
 
   <h2 id="bundle">The model bundle</h2>
-  <p><code>model/</code> is the checksummed bundle (authenticated by a signature when a signing key was configured when it was written): <code>pipeline.joblib</code> (fitted preprocessing and estimator), <code>schema.json</code>, <code>reference.json</code> (monitoring reference profile), <code>conformal.json</code> (pooled and per-class calibration scores), <code>novelty.joblib</code> and <code>model_manifest.json</code> (checksums and signature). Bundles are pickle-based; the loading rules are on the <a href={`${base}/docs/threat-model/`}>threat model</a> page. Use <code>result.save(directory, signing_key=...)</code> to export one for deployment.</p>
+  <p><code>model/</code> is the checksummed bundle (signed when a signing key was configured; an unsigned bundle is refused unless you vouch for it with <code>--trusted</code>): <code>pipeline.joblib</code> (fitted preprocessing and estimator), <code>schema.json</code>, <code>reference.json</code> (monitoring reference profile), <code>conformal.json</code> (pooled and per-class calibration scores), <code>novelty.joblib</code> and <code>model_manifest.json</code> (checksums and signature). Bundles are pickle-based; the loading rules are on the <a href={`${base}/docs/threat-model/`}>threat model</a> page. Use <code>result.save(directory, signing_key=...)</code> to export one for deployment.</p>
 
   <h2>Provenance and governance</h2>
   <DocTable label="Provenance and governance files" head={["File", "Contents"]} rows={provenance} />
