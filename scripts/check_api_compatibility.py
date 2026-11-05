@@ -17,6 +17,13 @@ from scmle.data.store import processing as store_processing
 from scmle.data.store import quality as store_quality
 from scmle.data.store import snapshot as store_snapshot
 from scmle.deploy import contract as deploy_contract
+from scmle.runners import aws as runners_aws
+from scmle.runners import base as runners_base
+from scmle.runners import checkpoint as runners_checkpoint
+from scmle.runners import gcp as runners_gcp
+from scmle.runners import local as runners_local
+from scmle.runners import reproducibility as runners_reproducibility
+from scmle.runners import roles as runners_roles
 from scmle.security import access as security_access
 from scmle.security import audit as security_audit
 from scmle.security import tokens as security_tokens
@@ -101,6 +108,30 @@ EXTENSION_SURFACES = {
             "Rule",
             "Stage",
         ),
+    ),
+    "scmle.runners.base": (
+        runners_base,
+        (
+            "CostBudget",
+            "CostRate",
+            "JobSpec",
+            "Resources",
+            "RunManifest",
+            "RunState",
+            "Runner",
+        ),
+    ),
+    "scmle.runners.local": (runners_local, ("LocalRunner",)),
+    "scmle.runners.aws": (runners_aws, ("AwsContainerJobRunner",)),
+    "scmle.runners.gcp": (runners_gcp, ("GcpJobRunner",)),
+    "scmle.runners.roles": (
+        runners_roles,
+        ("Role", "RoleStore", "check_distinct", "check_separation"),
+    ),
+    "scmle.runners.checkpoint": (runners_checkpoint, ("CheckpointStore",)),
+    "scmle.runners.reproducibility": (
+        runners_reproducibility,
+        ("Tolerances", "compare"),
     ),
     "scmle.data.store.processing": (
         store_processing,

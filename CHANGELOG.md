@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+* Portable training (F14 item 6, local half; `scmle.runners`,
+  `docs/PORTABLE_TRAINING.md`). One `JobSpec` and a `Runner` template that
+  stores the spec and a manifest under a durable run id, retries interrupted
+  and retryably failed attempts under a `RetryPolicy` and resumes them from
+  digest-protected checkpoints, stops a run whose estimated cost passes its
+  budget, enforces the timeout, refuses a changed spec for a known id and a job
+  that would run as the serving identity, and keeps separate training and
+  serving roles (`RoleStore`). Adapters: `LocalRunner`,
+  `AwsContainerJobRunner` (ECS `RunTask`, task role override, spot
+  interruption mapping) and `GcpJobRunner` (Cloud Run job executions, job
+  service account and resources checked against the spec). A GPU requires a
+  declared reason. `scmle.runners.entrypoint` is what the container runs;
+  `run_project` runs an unchanged `MLProject` and mirrors its run directory to
+  the store so a cancelled or killed job resumes. `reproducibility.compare`
+  reports results against tolerances declared in advance. Not done: the AWS and
+  GCP adapters ran only against scripted responses of the documented shapes,
+  `RunV2Client` and the SDK factories not at all; no image, container, cloud
+  job, billing measurement or cross-place result comparison exists.
 * Governed data (F14 item 7, local half; `scmle.data.store`,
   `scmle.core.retry`, `docs/GOVERNED_DATA.md`). An `ObjectStore` interface with
   local, S3 and GCS backends (the SDKs are imported only by `s3_store` and

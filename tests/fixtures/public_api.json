@@ -340,6 +340,88 @@
         "signature_sha256": "930c30c0dd0681f2b0fa82a9df84c9a892051a01444545223a9f5fe9a1981311"
       }
     },
+    "scmle.runners.aws": {
+      "AwsContainerJobRunner": {
+        "kind": "class",
+        "signature_sha256": "dd20f2691a973a9831d3880bf29ca0b9e91f8f0ca090c2ba1a4b8937e60d90cd"
+      }
+    },
+    "scmle.runners.base": {
+      "CostBudget": {
+        "kind": "class",
+        "signature_sha256": "e7039bdd98cee69e6963a534434a10c5eb56aa625873f90a3ddd44035e3158a8"
+      },
+      "CostRate": {
+        "kind": "class",
+        "signature_sha256": "aea2b30a1b9070b7e6df46c850f319a859ed08d00553c1cc7493c947abed0072"
+      },
+      "JobSpec": {
+        "kind": "class",
+        "signature_sha256": "ff051cf94fcca6fcecc490339d9d155b60f3a4977a2dd947064f804dc62ac838"
+      },
+      "Resources": {
+        "kind": "class",
+        "signature_sha256": "59102e10d5ef8f969bc15fc46da57222e8f24eb769ada3a7755e01caaca2d2f5"
+      },
+      "RunManifest": {
+        "kind": "class",
+        "signature_sha256": "a79d29c712a1beedd4821e04a17deeec4361f6f41608a1e29227e291a22b40f3"
+      },
+      "RunState": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "Runner": {
+        "kind": "class",
+        "signature_sha256": "1622fc7de9b4f9debc69e58eacf6271eed1fae031026f661be7c205556d4b36b"
+      }
+    },
+    "scmle.runners.checkpoint": {
+      "CheckpointStore": {
+        "kind": "class",
+        "signature_sha256": "8de07e40ef1e2f1e0ccdb5ff1fc2deb4e016b21a376509c956e6c09aba3864a7"
+      }
+    },
+    "scmle.runners.gcp": {
+      "GcpJobRunner": {
+        "kind": "class",
+        "signature_sha256": "7c69d095752f29ce9839f0826d4fd5e746045af33a8a2fe0410241a0ae02adb1"
+      }
+    },
+    "scmle.runners.local": {
+      "LocalRunner": {
+        "kind": "class",
+        "signature_sha256": "1f0111617e8592f5019c026d2891c1f94be0201e66e5ad08841fd5e8fd1be143"
+      }
+    },
+    "scmle.runners.reproducibility": {
+      "Tolerances": {
+        "kind": "class",
+        "signature_sha256": "e5ef42dd41b5eb1ac1fee725bc18fa40fa4770a97c675fee725edffd0fbd6e6d"
+      },
+      "compare": {
+        "kind": "callable",
+        "signature_sha256": "8a2e53befae5d8d1a697f67836c4c708eabd3e5bd212818490e797213fcaf0f0"
+      }
+    },
+    "scmle.runners.roles": {
+      "Role": {
+        "kind": "class",
+        "signature_sha256": "26e09d744c5ba37606f548b23dfa556d9b85638a15920afa33d76a3e68f43998"
+      },
+      "RoleStore": {
+        "kind": "class",
+        "signature_sha256": "f91ba1ecd175aebe4e2430e524668695f129227c35feff6391608acabfab5dfa"
+      },
+      "check_distinct": {
+        "kind": "callable",
+        "signature_sha256": "b94e6f395b3176c89d0c497c52a477dbdd71f0aeb2659f896898288e234b7ac2"
+      },
+      "check_separation": {
+        "kind": "callable",
+        "signature_sha256": "e4603d469a6a5e02ccd5b63523bf3a8c80afc80e719deac1fef4f4b0ce8e075a"
+      }
+    },
     "scmle.security.access": {
       "AccessDenied": {
         "kind": "class",

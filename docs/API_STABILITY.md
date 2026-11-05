@@ -170,6 +170,12 @@ signatures avoid function-valued defaults (a `None` default is resolved in the
 body), because a function's repr carries an address and would make the
 snapshot differ between runs.
 
+## Training runners
+
+`scmle.runners` (`base`, `local`, `aws`, `gcp`, `roles`, `checkpoint`,
+`reproducibility`) is an extension surface pinned like the others; the
+entrypoint, project workload and fakes are not pinned.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 
