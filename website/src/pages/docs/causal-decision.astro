@@ -1,0 +1,70 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const strategies = [
+  ["Randomized assignment", "Difference in means", "Randomized data. The balance check that would replace an uncertified rule is not built."],
+  ["Back-door adjustment", "Augmented inverse-probability weighting (AIPW)", "No unmeasured confounding given a declared adjustment set; the AIPW coverage gate missed its floor, so it is descriptive."],
+  ["Difference in differences", "With a pre-period trend test", "Parallel trends. The sensitivity bound is a simplified relative-magnitudes bound, not the conditional or fixed-length procedure; no covariates."],
+  ["Instrumental variable", "One instrument, one endogenous regressor", "Relevance and exclusion. No overidentification tests and no exclusion-violation sensitivity, so the claim stays <code>attested</code>."],
+  ["Regression discontinuity", "Cross-validated bandwidth grid", "Continuity at the cutoff, with a density check by a binomial test of counts."],
+  ["Synthetic control", "Outcomes only, one treated unit", "A good pre-period fit; no covariates and no battery of its own."],
+];
+const conditions = [
+  ["1", "The estimate and its interval were computed on <code>C</code>, opened once."],
+  ["2", "Every design diagnostic passed at a certified threshold."],
+  ["3", "The pre-registered falsification battery ran and passed, with at least one negative control declared."],
+  ["4", "The estimate replicated in at least two strata, with one sign and no heterogeneity."],
+  ["5", "The sensitivity gate holds at the declared strength."],
+];
+const decision = [
+  ["Cost-optimal threshold", "The cut comes from the chartered cost model. A calibration check (binned chi-square) decides the path: Bayes on the raw probability, Platt recalibration fitted on development data, or the existing grid search as a labelled fallback. A cluster-bootstrap interval reports the expected cost."],
+  ["Net benefit", "A frozen rule is compared with treat-none, treat-all and the incumbent across the chartered range of cost ratios, with a simultaneous cluster-bootstrap band computed once on the locked test set. <strong>The band missed its coverage floor at n = 2000 for independent rows, is conservative, and has low power, so it is descriptive and nothing gates on it.</strong>"],
+  ["Off-policy value", "IPW, SNIPS and doubly robust estimators with declared clipping, a support gate and an effective-sample-size gate that refuse instead of estimating. A non-randomized log is never <code>confirmed</code>."],
+  ["Fairness constraints", "An upper-bound satisfaction test per declared constraint, group thresholds, <code>not_assessable</code> small groups, and refusal of incompatible criteria at the measured base rates. Only group thresholds are solved as a mechanism."],
+  ["Rollout design", "Salted-hash assignment, a fixed-horizon sample size, a simulated expected sample number, and exact and anytime sample-ratio checks."],
+  ["Promote, hold, roll back", "An anytime-valid mixture e-process for a bounded mean, with an intersection-union rule over the primary metric and guardrails, a rollback monitor per promoted champion, and a hash-chained decision log. Levels come from an exact-fraction decision budget with a discount-only rule."],
+];
+const framing = [
+  ["A person decides the question", "The request is a sentence. SCMLE drafts a charter and a cost model from it and lists what it could not fill."],
+  ["Sources of every field", "Each field is marked <code>template</code>, <code>llm</code>, <code>data</code> or <code>human</code>."],
+  ["The data answers what it can", "Column names are matched to the charter's target, prediction moment and unit; the current process is measured as a baseline on exploration rows; a selective-label check withholds a baseline whose outcomes depend on its own decisions."],
+  ["Questions only a person can answer", "Questions that would change the verdict come with the tipping value; unknowns whose range leaves the verdict unchanged are listed separately."],
+  ["Refusal", "A named missing column, a blocking data check, an unfillable critical slot, or language-model ambiguity above a threshold produces a refusal file and exit code 2."],
+];
+---
+
+<DocsLayout title="Causal, decision & framing" description="How scmle frames a problem into a charter, identifies a causal effect or refuses, turns a model into a cost-optimal decision, and tiers each causal and decision claim honestly." current="causal-decision">
+  <p class="eyebrow"><span></span> Modelling and evidence</p>
+  <h1>From a question to a decision,<br /><em>or a refusal.</em></h1>
+  <p class="lead">Three features sit around the model: framing a plain request into a charter, identifying a causal effect, and choosing a decision under stated costs. All three run inside a chartered run and write the files listed on <a href={`${base}/docs/artifacts/`}>Artifacts & bundles</a>. Each can end in a refusal, and each reports what it cannot verify.</p>
+  <div class="callout"><p><strong>Certified versus descriptive.</strong> A mechanism gates only with a current passing certificate. Where a gate missed its pre-registered floor, the result is still shown but cannot block, confirm or promote anything. The summary is on <a href={`${base}/docs/qualification/#certificates`}>the qualification instrument</a>.</p></div>
+
+  <h2 id="framing">Problem framing</h2>
+  <p><code>scmle frame REQUEST --source S --data X --output DIR</code> reads a plain-language request, a source description and exploration rows only. It writes an unsigned draft charter, a decision-cost model and baseline, and the questions it cannot answer.</p>
+  <DocTable label="How framing works" head={["Step", "What happens"]} rows={framing} />
+  <p>No language-model client ships: <code>--replay</code> serves recorded drafts. Every field filled by a model is <code>unverified</code> until a person signs the charter, and there is no calibrated ambiguity threshold or gold corpus yet, so a replayed model draft without a threshold is always refused. The selective-label check has a certificate with a recall floor of 0.95.</p>
+
+  <h2 id="ingestion">Getting to a table</h2>
+  <p>When the data starts in a source system, <code>scmle ingest --sqlite FILE --tables a,b</code> opens a read-only connection and profiles each table with aggregate queries run inside the source. It reports minimal approximate keys, a verdict on whether the table's grain matches the charter's unit (<code>match</code>, <code>finer</code>, <code>coarser</code>, <code>unknown</code>, with the last two exiting 2), a measured join graph with containment and cardinality, and a budget of queries, rows and seconds. Candidate joins are listed as questions rather than accepted. Entity resolution, feature synthesis with a cutoff rule and as-of evidence, and reconciliation exist as library modules; a charter run does not produce them yet. Reconciliation and torn-read detection have certificates.</p>
+
+  <h2 id="causal">Causal identification</h2>
+  <p>A causal claim starts in the charter: the estimand carries a causal block (charter format 4) naming the treatment, the strategy's assumptions and the attestors. The strategy is chosen <strong>from the charter alone</strong>, by a selector that lists eligible and ineligible strategies with the missing assumptions or design fields. A charter that no strategy identifies is <code>not_identified</code>: no estimate is computed, and the action is <code>refuse_claim</code>.</p>
+  <DocTable label="Identification strategies" head={["Design", "Estimator", "Assumption and stated limit"]} rows={strategies} />
+  <p>The design diagnostics are computed on <code>X</code>. The estimate, the falsification battery (negative controls, pre-trend and density checks), replication across strata and the sensitivity bound are computed on the frame the confirmation set releases, in the same single opening as the bivariate family. The five report files are hashed into the ledger and <code>scmle claims verify</code> checks them. A declared causal graph adds a graph key to the identification report, falsification tests on <code>X</code>, and refusal of adjustment members that the graph rules out.</p>
+
+  <h3>When a causal claim is confirmed</h3>
+  <p>A causal claim is <code>confirmed</code> only when all five hold:</p>
+  <DocTable label="Conditions for a confirmed causal claim" head={["#", "Condition"]} rows={conditions} />
+  <p><code>attested</code> means every assumption has a named attestor and the design passed, but one of the conditions above is missing: no negative control, a single treated unit, a weak instrument, an uncertified gate, or an unchecked adjustment set. <code>unverified</code> means an attestor is missing, a design diagnostic failed, or a falsification test rejected. <strong><code>confirmed</code> does not say the assumptions are true.</strong> A held-out set alone never confirms a causal effect. In a charter run today, the run reports every causal claim at <code>unverified</code> unless attestors are supplied, because the charter has no field for them yet.</p>
+  <p>Fifteen of the sixteen recorded simulation gates passed; the AIPW coverage gate missed its floor. Real-covariate worlds, frozen outputs from R reference packages, and outside reproduction have not been measured. Sensitivity benchmark conversions apply to the linear-model coefficient, not to the AIPW estimate itself, and matching is cut unless chartered. Subgroup and heterogeneity hypotheses are not registered.</p>
+  <p>In benchmarks, the observational Lalonde uplift estimate rests on no unmeasured confounding and its Qini is close to zero, so it must not be read as a causal result (see <a href={`${base}/docs/benchmarks/#task-types`}>Benchmarks</a>).</p>
+
+  <h2 id="decision">The decision layer</h2>
+  <p>With a decision block in the charter (format 5) and a cost model, a binary-task run chooses its threshold from the costs rather than from a metric. Costs, margins and propensities are <strong>inputs</strong>: a decision claim is <code>attested</code> only if every cost came from a person, and an estimate that rests on non-randomized data inherits the tier of the effect.</p>
+  <DocTable label="Decision layer components" head={["Component", "What it does"]} rows={decision} />
+  <p>Run on the locked rows once, the layer writes the decision report, the policy value and the rollout design. No experiment runs inside a charter run, so the rollout files hold only the registration of the plan. The lifecycle manager does not yet call the rollout and rollback monitors; it still decides rollback by a bootstrap rule and promotion by fixed-sample comparison.</p>
+  <p>Sixteen of twenty recorded decision-layer gates passed, and the misses stay descriptive. Open limits: the anytime engine is the project's own mixture construction whose finite-sample error was measured but whose cited papers were read from abstracts; the effect is assumed stationary; outcomes missing differently across arms have no rule; fairness bounds treat rows as independent; and the off-policy checks used simulated bandits plus one real randomized set whose fitted policy treated 98 percent of rows, so that check barely tests a policy difference.</p>
+
+  <p class="meta">Status as recorded for the 0.1 beta line</p>
+</DocsLayout>

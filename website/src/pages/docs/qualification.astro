@@ -1,0 +1,118 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const sets = [
+  ["<code>X</code> exploration", "Everything that reads the target or changes a modelling decision reads only this set: detectors, the hypothesis ledger, admissibility and robustness."],
+  ["<code>C</code> confirmation", "Held in a separate vault process. Opened at most once, to test the exploration survivors. Confirmed claims never shape the model that <code>C</code> would score."],
+  ["<code>F</code> forward holdout", "Temporal data only. It is the final-evaluation set for temporal data; otherwise the final-test set has the manifest role <code>final_test</code>. Opened only by the final evaluation."],
+  ["embargo", "Rows between sets for a temporal split, at least as many as the leading autocorrelation lags of the target outside +-1.96/sqrt(n)."],
+];
+const tiers = [
+  ["<span class=\"status status-supported\">confirmed</span>", "The claim passed fresh data: it was tested once on the confirmation set."],
+  ["<span class=\"status status-experimental\">attested</span>", "A named human supplied the provenance or an assumption. The check passed, but a condition for <code>confirmed</code> is missing."],
+  ["<span class=\"status status-extension\">unverified</span>", "A default was used, an attestor is missing, a design diagnostic failed, or a model drafted the field."],
+];
+const certs = [
+  ["Duplicates (exact, near)", "<code>f5-duplicates</code>", "recall floor 0.8, false-alarm ceiling 0.05", "Certified on the shipped corpus"],
+  ["Outlier triage", "<code>f5-outlier-triage</code>", "same policy", "Certified on the shipped corpus"],
+  ["Missingness", "<code>f5-missingness</code>", "same policy", "Certified on the shipped corpus"],
+  ["Label noise", "<code>f5-label-noise</code>", "same policy", "Descriptive: recall misses its floor on the shipped corpus"],
+  ["Sentinel values", "<code>f5-sentinel</code>", "same policy", "Passes on the shipped corpus, but flags clean rows on three other tables, so treat it as descriptive"],
+  ["Leakage permutation screen", "screen certificates", "per leak type, binary classification", "Certified for binary classification; this is what can block a run"],
+  ["Earlier leakage skill scan", "<code>f4-leakage-skill</code>", "recall floor 0.9", "Descriptive; no run path calls it"],
+  ["As-of reconstruction, reconciliation", "<code>f4-asof-reconstruction</code>, <code>f4-reconciliation</code>", "recall floor 0.9", "Measured and recorded"],
+  ["Distribution shift (classifier two-sample, kernel two-sample)", "<code>f6-shift-c2st</code>, <code>f6-shift-mmd</code>", "recall floor 0.8, false-alarm ceiling 0.075", "Certified; the kernel test was re-measured on 5000 null worlds"],
+  ["Specification stability", "<code>f6-stability</code>", "recall floor 0.8, false-alarm ceiling 0.1", "Certificate on file; gates only when current and passing"],
+  ["Selective labels (framing)", "<code>framing-selective-labels</code>", "recall floor 0.95", "Measured and recorded"],
+  ["Ingestion reconciliation, torn read", "<code>ingest-reconcile</code>, <code>ingest-torn-read</code>", "recall floors 0.95 and 0.99", "Measured and recorded"],
+];
+const gates = [
+  ["Causal identification", "16", "15", "The AIPW coverage gate missed its floor."],
+  ["Decision layer", "20", "16", "Four gates missed their floors."],
+  ["Uncertainty and breadth", "9", "7", "Two gates missed: CQR conditional coverage in the highest-noise decile, and the slice flag's familywise false-flag rate."],
+  ["Closed loop", "10", "8", "Detection delay (H2, H10) missed its floor."],
+];
+---
+
+<DocsLayout title="Qualification instrument" description="The scmle data-stage qualification instrument: the signed charter, custody of sealed sets, the hash-chained hypothesis ledger, one-time confirmation, evidence tiers, and which detectors are certified and which are only descriptive." current="qualification">
+  <p class="eyebrow"><span></span> Modelling and evidence</p>
+  <h1>Claims about data,<br /><em>with their error rate.</em></h1>
+  <p class="lead">The qualification instrument turns a signed analysis charter into tier-labelled claims about a dataset. It is built and tested, and it is <strong>in development</strong>: its detectors are certified against planted defects on stated corpora, none of it has been independently validated, and its guarantees are probabilistic and conditional on recorded assumptions.</p>
+  <div class="callout"><p><strong>What this page will not say.</strong> It is not a proof of correctness, not a replacement for a data scientist, and not adversary-proof custody on one machine. Whatever a charter or a person cannot supply is reported as <code>unverified</code>, never silently assumed.</p></div>
+
+  <h2>The pipeline</h2>
+  <div class="diagram">
+    <div class="diagram-caption"><span>One chartered run</span><strong>decide first, explore on X, confirm once on C</strong></div>
+    <div class="flow-row">
+      <div class="flow-node active"><span>01 / CHARTER</span><b>Question fixed</b><small>estimand, sets, error budget</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node"><span>02 / CUSTODY</span><b>Sets sealed</b><small>X, C, F, embargo</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node"><span>03 / EXPLORE</span><b>Ledger on X</b><small>online FDR triage</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node"><span>04 / ADMIT</span><b>Admissibility</b><small>quarantine, attest</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node active"><span>05 / CONFIRM</span><b>Open C once</b><small>claims with tiers</small></div>
+    </div>
+    <div class="evidence-rail"><span>charter hash + signature</span><i></i><span>hash-chained custody log and ledger</span></div>
+  </div>
+
+  <h2 id="charter">1. The charter</h2>
+  <p>An <code>AnalysisCharter</code> is a hashed, optionally HMAC-signed record that fixes, before any data is profiled:</p>
+  <ul>
+    <li>the <strong>estimand</strong>: population, target variable, prediction moment, intercurrent events and summary measure (in the style of ICH E9(R1)), either predictive or causal;</li>
+    <li>the <strong>unit</strong> and population;</li>
+    <li>the <strong>decision map</strong>: a table binding each gating check to the concrete action it triggers;</li>
+    <li>the <strong>set sizes</strong> and the <strong>error budget</strong> (<code>alpha_confirm</code>, the exploration wealth, detector tolerances, the permutation count);</li>
+    <li>a declaration of the choices the stability check should vary, and optional <code>rules</code> that pre-register the online ledger rule, the confirmation rule, the failure policy and the stability thresholds.</li>
+  </ul>
+  <p>Later formats add optional blocks for a causal estimand, a decision and cost model, and a raw-data ingestion plan. A charter without a newer block keeps its hash and signature. A one-byte edit fails verification, and the signature proves possession of the key, not the signer's identity. Commands: <a href={`${base}/docs/cli/#charter`}>charter init, check and sign</a>.</p>
+  <p>If the confirmation set is too small to support the promised power, the run still completes: the scope becomes <code>exploratory_unconfirmed</code> and a feasibility report states the effect that could be detected.</p>
+
+  <h2 id="custody">2. Custody of the sets</h2>
+  <DocTable label="Sets in a chartered run" head={["Set", "Role"]} rows={sets} />
+  <p>In a chartered run the confirmation and final-test rows are held in a separate vault process regardless of the enforcement setting. Exploration code receives only a view with no reference to a vault, token or log. A second open is refused, and every seal, token issue, open and refused attempt is written to a hash-chained custody log of ids and counts (never row values), with an HMAC on each entry when a signing key is available. The split manifest carries a full SHA-256 and a Merkle root over the canonical content of each set's rows.</p>
+  <div class="callout"><p><strong>Custody is tamper-evident, not adversary-proof.</strong> The vault is a subprocess of the same user. It stops accidental and in-code access. A process with the same privileges could attach to it or read the original data file, and the caller's own copy of the data still holds every row. Removing the newest log entries is not detected by the chain. See <a href={`${base}/docs/threat-model/#custody-limits`}>the limits of custody</a> for what is and is not tested.</p></div>
+
+  <h2 id="ledger">3. The hypothesis ledger and one-time confirmation</h2>
+  <p>Exploration on <code>X</code> is recorded in an append-only, hash-chained ledger of every hypothesis spent, with alpha-wealth accounting under an online false-discovery-rate rule (e-LOND). Stability and shift results are written as diagnostic rows that spend no wealth.</p>
+  <p>The distinction matters for what the guarantee is. <strong>The final claim guarantee, FDR at most <code>alpha_confirm</code>, comes only from testing the exploration survivors once on the confirmation set.</strong> The exploration wealth is a triage budget that limits how many hypotheses the confirmation set must pay for. The two do not add. A multiplicity rule is replayed on the recorded p-values, and <code>scmle claims verify</code> checks that the artifacts agree with each other. It does not recompute statistics from data.</p>
+  <p>When the charter sets <code>rules.stability_filter</code> and a current passing certificate covers the chartered thresholds, survivors whose estimates are <code>fragile</code> across the declared specifications are withdrawn before <code>C</code> opens, as a pre-registered second stage with its own accounting. Otherwise the filter is recorded as requested and not applied, and verdicts stay warnings.</p>
+
+  <h2 id="admissibility">4. Admissibility and provenance</h2>
+  <p>Each feature gets one decision: <code>admit</code>, <code>admit_flagged</code> or <code>quarantine</code>, with a tier and reasons. Quarantine happens only when a leakage suspicion from the permutation screen is one a current, passing certificate lets gate, and only unless a valid per-column attestation keeps it (tier <code>attested</code>, recorded in the ledger). Because a charter carries no declared provenance per field, fields are decided in permissive mode. As-of facts, such as "this value existed at prediction time", are attestations or log-derived and tiered as such; statistics cannot prove a feature postdates nothing.</p>
+
+  <h2 id="tiers">5. Evidence tiers</h2>
+  <p>Every claim carries one tier, shown in the command-line summary and the report header.</p>
+  <DocTable label="Evidence tiers" head={["Tier", "Meaning"]} rows={tiers} />
+  <p>Causal claims have a stricter reading, and decision claims inherit the tier of the effect they rest on when the data is not randomized. Both are described on <a href={`${base}/docs/causal-decision/`}>Causal, decision &amp; framing</a>.</p>
+
+  <h2 id="certificates">6. Detector certificates and gate discipline</h2>
+  <p>A check may <strong>gate</strong> a run only if all three hold:</p>
+  <ol>
+    <li>the charter's decision map binds it to a concrete action;</li>
+    <li>its operating characteristic (false-alarm rate and recall) has been measured and is on file as a certificate;</li>
+    <li>it has an external reference: a reference implementation, a closed form, or a labelled corpus.</li>
+  </ol>
+  <p>Everything else is descriptive analysis: shown, never gating. A certificate records a detector's size and recall by defect type, with Wilson 95% intervals, the policy it had to meet, the corpus hash and the code hash. It goes stale when the code changes. A freshly installed package does not carry the certificate store; it is read from a source checkout, and when it is absent every detector is descriptive and the run says so.</p>
+  <DocTable label="Detector certificates and their status" head={["Detector", "Id", "Policy", "Status"]} rows={certs} />
+  <p>The shipped detector certificates use a single corpus, breast cancer. Repeating the plants on three other tables, duplicates and outlier triage still pass, label noise passes on one, and the sentinel detector flags the clean rows. A certificate says the detector met its floors on planted defects of that type in that corpus; it is not a claim about your data.</p>
+  <p>Statistical routines are also compared with frozen reference outputs from scipy (Clopper-Pearson, Wilson, multiplicity adjustment, Spearman, Kruskal-Wallis, harmonic numbers) to within 1e-15 relative difference. That shows two computations match, not that either is correct. Several cited methods were checked against their primary papers, and a few sources could not be retrieved; those are marked not verified.</p>
+
+  <h3>Measured gates for the later features</h3>
+  <p>The causal, decision, uncertainty and closed-loop features each have a table of gates with pre-registered floors, measured by simulation. Misses are reported, and a missed gate leaves its mechanism descriptive.</p>
+  <DocTable label="Measured gates and misses" head={["Feature", "Gates", "Passed", "Misses"]} rows={gates} />
+  <p>Items that need outside data or tools are listed as not measured: real-covariate causal worlds, frozen outputs from R reference packages (rdrobust, sensemakr, did, HonestDiD, onlineFDR), outside-party reproduction, and agreement with a domain owner's escalation audit.</p>
+
+  <h2 id="loop">7. The closed loop</h2>
+  <p>After deployment, a loop opens a hash-chained deployment ledger that records the charter hash, the policy, the keys the system holds, and then observation summaries, alarms, retraining, challenger results, promotion and rollback proposals, escalations, attestations, halts and incidents. A challenger is registered before it is scored and its anytime-valid decision is replayed on load. An attestation is bound to one escalation, expires, and is refused if signed with a key the system holds. If the ledger head at the next open differs from the saved state, the loop starts halted.</p>
+  <p>An alarm does not retrain unless the policy sets <code>alarm_gates_retrain</code>, which should be set only when the detection-delay gate is listed as passed for the policy's settings; today it is descriptive. Escalation uses a risk-coverage threshold chosen by fixed-sequence testing. A feedback loop between predictions and labels is undetectable without a randomized bypass slice, and the label mechanism is recorded for that reason. See <a href={`${base}/docs/artifacts/#loop`}>the loop's files</a>.</p>
+
+  <h2>What is not built or not claimed</h2>
+  <ul>
+    <li>No head-to-head against practitioners on unseen raw problems has been run, so autonomy is not claimed. Each feature states its own measured operating characteristic and nothing more.</li>
+    <li>The forward check on the final-test set is reported as skipped inside a run; per-period drift, Thresholdout, text near-duplicate detection and stability for multiclass targets are not implemented. The stability grid varies imputation, outlier rule and inclusion only; other declared choices are listed as not run.</li>
+    <li>The confirmation stage does not yet bind the single release to a claims hash and a ledger hash, though the vault supports it.</li>
+    <li>The label-noise detector, the sentinel detector beyond its shipped corpus, and the earlier leakage skill scan stay descriptive.</li>
+    <li>Cloud acceptance of any of this on AWS or GCP is not proven; see <a href={`${base}/docs/cloud-release/`}>Cloud release</a>.</li>
+  </ul>
+
+  <p class="meta">Status as recorded for the 0.1 beta line</p>
+</DocsLayout>
