@@ -4,31 +4,71 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <DocsLayout
-  title="Start here"
-  description="Developer onboarding for SCMLE: install the framework, run your first curation-first workflow, and understand the evidence it produces."
+  title="Overview"
+  description="Documentation for SCMLE: install the framework, run a curation-first workflow, and read every reference, operations and trust page without leaving the site."
   current="start"
 >
-  <p class="eyebrow"><span></span> Developer onboarding</p>
+  <p class="eyebrow"><span></span> Documentation</p>
   <h1>Start with the data.<br /><em>Ship with evidence.</em></h1>
-  <p class="lead">A practical path from your first install to a reproducible, monitored ML workflow. SCMLE treats curation as a first-class engineering job and modelling as one measured step inside it.</p>
+  <p class="lead">A practical path from your first install to a reproducible, monitored ML workflow. SCMLE treats curation as a first-class engineering job and modelling as one measured step inside it. Everything you need is on this site.</p>
 
   <div class="callout"><p><strong>New here?</strong> Follow the <a href={`${base}/docs/quickstart/`}>quickstart</a> first. It takes a table, profiles it, validates the split, trains a small candidate set, and leaves an auditable run directory behind.</p></div>
 
+  <h2>Get started</h2>
   <div class="doc-cards">
-    <a class="doc-card" href={`${base}/docs/quickstart/`}><small>01 / FIRST RUN</small><h3>Quickstart</h3><p>Install the package and run your first curation-first project.</p></a>
-    <a class="doc-card" href={`${base}/docs/data/`}><small>02 / INPUTS</small><h3>Data & curation</h3><p>Choose an input path, understand supported formats, and read the curation report.</p></a>
-    <a class="doc-card" href={`${base}/docs/modalities/`}><small>03 / LIFECYCLE</small><h3>Modality lifecycles</h3><p>Follow the 15-stage contract from raw input to an honest release boundary.</p></a>
-    <a class="doc-card" href={`${base}/docs/capabilities/`}><small>04 / BOUNDARY</small><h3>Capability matrix</h3><p>See which dataset families are supported, experimental, or extension-only.</p></a>
-    <a class="doc-card" href={`${base}/docs/modeling/`}><small>05 / MODELS</small><h3>Modelling & estimation</h3><p>Understand the transformer paths, the JEPA boundary, uncertainty, and what parameter estimation still needs.</p></a>
-    <a class="doc-card" href={`${base}/docs/evidence/`}><small>06 / PROOF</small><h3>Evidence & gates</h3><p>Record what a claim means, what proves it, and what blocks a release.</p></a>
-    <a class="doc-card" href={`${base}/docs/workflows/`}><small>07 / BUILD</small><h3>Workflows</h3><p>Move from a project declaration to plans, runs, resumes, and predictions.</p></a>
-    <a class="doc-card" href={`${base}/docs/api/`}><small>08 / CODE</small><h3>Python API</h3><p>Use the stable top-level objects and understand what is safe to depend on.</p></a>
-    <a class="doc-card" href={`${base}/docs/architecture/`}><small>09 / MENTAL MODEL</small><h3>Architecture</h3><p>See how ingestion, profiling, evaluation, packaging, and monitoring connect.</p></a>
-    <a class="doc-card" href={`${base}/docs/cards/`}><small>10 / CONTEXT</small><h3>Cards & explanations</h3><p>Carry provenance, limitations, and review decisions with data and models.</p></a>
-    <a class="doc-card" href={`${base}/docs/operations/`}><small>11 / SHIPPING</small><h3>Operations</h3><p>Resume interrupted work, verify bundles, approve promotions, and evolve safely.</p></a>
-    <a class="doc-card" href={`${base}/docs/security/`}><small>12 / TRUST</small><h3>Security</h3><p>Understand signatures, privacy, dependencies, and trust boundaries.</p></a>
-    <a class="doc-card" href={`${base}/docs/recovery/`}><small>13 / FAILURE</small><h3>Recovery</h3><p>Keep failed runs observable and recover without promoting partial output.</p></a>
-    <a class="doc-card" href={`${base}/docs/migrations/`}><small>14 / CHANGE</small><h3>Migrations</h3><p>Upgrade contracts deliberately and rerun the evidence that changed.</p></a>
+    <a class="doc-card" href={`${base}/docs/quickstart/`}><small>01 / GET STARTED</small><h3>Quickstart</h3><p>Install the package and run your first curation-first project.</p></a>
+    <a class="doc-card" href={`${base}/docs/data/`}><small>02 / GET STARTED</small><h3>Data & curation</h3><p>Choose an input path, understand supported formats, and read the curation report.</p></a>
+    <a class="doc-card" href={`${base}/docs/modalities/`}><small>03 / GET STARTED</small><h3>Modality lifecycles</h3><p>Follow the 15-stage contract from raw input to an honest release boundary.</p></a>
+    <a class="doc-card" href={`${base}/docs/capabilities/`}><small>04 / GET STARTED</small><h3>Capability matrix</h3><p>See which dataset families are supported, experimental, or extension-only.</p></a>
+    <a class="doc-card" href={`${base}/docs/governed-data/`}><small>05 / GET STARTED</small><h3>Governed data</h3><p>Object stores with verified checksums, snapshot lineage, declared quality gates and incremental processing.</p></a>
+  </div>
+
+  <h2>Modelling and evidence</h2>
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/modeling/`}><small>06 / MODELLING AND EVIDENCE</small><h3>Modelling & estimation</h3><p>Understand the transformer paths, the JEPA boundary, uncertainty, and what parameter estimation still needs.</p></a>
+    <a class="doc-card" href={`${base}/docs/evidence/`}><small>07 / MODELLING AND EVIDENCE</small><h3>Evidence & gates</h3><p>Record what a claim means, what proves it, and what blocks a release.</p></a>
+    <a class="doc-card" href={`${base}/docs/qualification/`}><small>08 / MODELLING AND EVIDENCE</small><h3>Qualification instrument</h3><p>The signed charter, custody of sealed sets, the hypothesis ledger, tiers, and which detectors are certified.</p></a>
+    <a class="doc-card" href={`${base}/docs/causal-decision/`}><small>09 / MODELLING AND EVIDENCE</small><h3>Causal, decision & framing</h3><p>Frame a request, identify a causal effect or refuse, and choose a decision under stated costs.</p></a>
+    <a class="doc-card" href={`${base}/docs/workflows/`}><small>10 / MODELLING AND EVIDENCE</small><h3>Workflows</h3><p>Move from a project declaration to plans, runs, resumes, and predictions.</p></a>
+    <a class="doc-card" href={`${base}/docs/cards/`}><small>11 / MODELLING AND EVIDENCE</small><h3>Cards & explanations</h3><p>Carry provenance, limitations, and review decisions with data and models.</p></a>
+    <a class="doc-card" href={`${base}/docs/extensions/`}><small>12 / MODELLING AND EVIDENCE</small><h3>Extension contracts</h3><p>Add readers, models, metrics and policies without editing the core.</p></a>
+  </div>
+
+  <h2>Reference</h2>
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/api/`}><small>13 / REFERENCE</small><h3>Python API</h3><p>Use the stable top-level objects and understand what is safe to depend on.</p></a>
+    <a class="doc-card" href={`${base}/docs/api-stability/`}><small>14 / REFERENCE</small><h3>API stability</h3><p>What is pinned, which modules are extension surfaces, and how changes are recorded.</p></a>
+    <a class="doc-card" href={`${base}/docs/cli/`}><small>15 / REFERENCE</small><h3>Command line</h3><p>Every command and the common run options.</p></a>
+    <a class="doc-card" href={`${base}/docs/artifacts/`}><small>16 / REFERENCE</small><h3>Artifacts & bundles</h3><p>Every file a run, ingestion, framing pass, loop and service package writes.</p></a>
+    <a class="doc-card" href={`${base}/docs/architecture/`}><small>17 / REFERENCE</small><h3>Architecture</h3><p>See how ingestion, profiling, evaluation, packaging, and monitoring connect, and the known limits.</p></a>
+    <a class="doc-card" href={`${base}/docs/benchmarks/`}><small>18 / REFERENCE</small><h3>Benchmarks</h3><p>Full locked-test tables, repeated-seed intervals, new task types and the nine reliability checks.</p></a>
+  </div>
+
+  <h2>Serve and operate</h2>
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/operations/`}><small>19 / SERVE AND OPERATE</small><h3>Operations</h3><p>Resume interrupted work, verify bundles, approve promotions, and evolve safely.</p></a>
+    <a class="doc-card" href={`${base}/docs/operating-loop/`}><small>20 / SERVE AND OPERATE</small><h3>Operating loop</h3><p>Measure, observe, evaluate, evolve: the evidence map and review cadence.</p></a>
+    <a class="doc-card" href={`${base}/docs/service/`}><small>21 / SERVE AND OPERATE</small><h3>Serving contract & SLO</h3><p>Endpoints, schema, data policies, limits and declared objectives.</p></a>
+    <a class="doc-card" href={`${base}/docs/local/`}><small>22 / SERVE AND OPERATE</small><h3>Local environment</h3><p>Run train, package, serve, parity and rollback on one machine.</p></a>
+    <a class="doc-card" href={`${base}/docs/orchestration/`}><small>23 / SERVE AND OPERATE</small><h3>Orchestration</h3><p>One workflow definition, a durable local executor, emitted cloud definitions.</p></a>
+    <a class="doc-card" href={`${base}/docs/portable-training/`}><small>24 / SERVE AND OPERATE</small><h3>Portable training</h3><p>One job spec across local, AWS and GCP runners, with checkpoints and cost budgets.</p></a>
+    <a class="doc-card" href={`${base}/docs/recovery/`}><small>25 / SERVE AND OPERATE</small><h3>Recovery</h3><p>Keep failed runs observable and recover without promoting partial output.</p></a>
+    <a class="doc-card" href={`${base}/docs/migrations/`}><small>26 / SERVE AND OPERATE</small><h3>Migrations</h3><p>Upgrade contracts deliberately and rerun the evidence that changed.</p></a>
+    <a class="doc-card" href={`${base}/docs/troubleshooting/`}><small>27 / SERVE AND OPERATE</small><h3>Troubleshooting</h3><p>Symptoms, causes and fixes.</p></a>
+  </div>
+
+  <h2>Cloud and release</h2>
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/infrastructure/`}><small>28 / CLOUD AND RELEASE</small><h3>Infrastructure as code</h3><p>The Terraform for AWS and GCP, the policy check, and destroy without orphans.</p></a>
+    <a class="doc-card" href={`${base}/docs/cloud-release/`}><small>29 / CLOUD AND RELEASE</small><h3>Cloud release</h3><p>Gate, live tests, signed record, promotion, rollback and reconcile.</p></a>
+    <a class="doc-card" href={`${base}/docs/releasing/`}><small>30 / CLOUD AND RELEASE</small><h3>Releasing the package</h3><p>Version, tag, preflight and the tag pipeline.</p></a>
+  </div>
+
+  <h2>Trust</h2>
+  <div class="doc-cards">
+    <a class="doc-card" href={`${base}/docs/security/`}><small>31 / TRUST</small><h3>Security</h3><p>Understand signatures, privacy, dependencies, and trust boundaries.</p></a>
+    <a class="doc-card" href={`${base}/docs/threat-model/`}><small>32 / TRUST</small><h3>Threat model & controls</h3><p>The control behind each risk and the limits of custody.</p></a>
+    <a class="doc-card" href={`${base}/docs/tenant-isolation/`}><small>33 / TRUST</small><h3>Tenant isolation</h3><p>One deployment per tenant, scoped tokens, safe errors and audit.</p></a>
   </div>
 
   <h2>What you will learn</h2>
@@ -37,5 +77,5 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <li>How leakage-safe validation and curation findings shape the experiment plan.</li>
     <li>How run artifacts, signed bundles, and monitoring reports make decisions inspectable.</li>
   </ol>
-  <p class="meta">Documentation follows the 0.1 beta API · Last reviewed October 2026</p>
+  <p class="meta">Documentation follows the 0.1 beta API · Last reviewed November 2026</p>
 </DocsLayout>

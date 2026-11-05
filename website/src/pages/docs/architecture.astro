@@ -1,5 +1,29 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const layout = [
+  ["<code>scmle.contracts</code>", "Typed contracts: pydantic configuration, frozen dataclasses for data, metrics, artifacts, events, abstract base classes."],
+  ["<code>scmle.data</code>", "Readers (CSV, Parquet, Arrow and Polars interchange), profiling, validation (column kinds, target and task), curation (fold-local preprocessing), splitting (leakage-safe and structure-aware strategies), and the qualification packages (charter, custody, ledger, admissibility, detectors, robustness, identification)."],
+  ["<code>scmle.features</code>", "Versioned, fitted feature graph (row-wise and series nodes)."],
+  ["<code>scmle.sampling</code>", "Resamplers, synthesis, and the data strategies evaluated inside folds."],
+  ["<code>scmle.models</code>", "The model adapter hierarchy and registry, scikit-learn and boosting adapters, conformance, thresholds, stacking."],
+  ["<code>scmle.optimization</code>", "Ask/tell optimizers (random, Optuna)."],
+  ["<code>scmle.experimentation</code>", "Trials, tuning, strategy and ensemble search, experiment stores (SQLite)."],
+  ["<code>scmle.intelligence</code>", "Dataset fingerprint, planner and planning rules, recommendations, meta-learning from run history."],
+  ["<code>scmle.evaluation</code>", "Metric catalog, selection policies, diagnostics, resource measurement, conformal intervals."],
+  ["<code>scmle.explainability</code>", "Permutation importance, partial dependence, per-prediction occlusion."],
+  ["<code>scmle.core</code>", "State machine, workflow compiler, stage hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator."],
+  ["<code>scmle.artifacts</code>", "Signed model bundle, run store, report, replay verification."],
+  ["<code>scmle.inference</code>", "Column mapping, input validation, batch and HTTP serving."],
+  ["<code>scmle.monitoring</code>", "Reference profiles, drift, delayed-label performance, champion-challenger."],
+  ["<code>scmle.governance</code>", "Access ledger, content-addressed model registry, lifecycle manager, run audit, release states."],
+  ["<code>scmle.security</code>, <code>scmle.deploy</code>, <code>scmle.runners</code>, <code>scmle.workflow</code>", "Token verification and audit, packaging and release gates, portable training runners, and workflow definitions."],
+  ["<code>scmle.integrations</code>", "Optional MLflow and Ray adapters."],
+  ["<code>scmle.unsupervised</code>", "Clustering model search and scoring."],
+  ["<code>scmle.durability</code>", "Atomic, crash-safe file writes used by the stores."],
+  ["<code>scmle.api</code>", "<code>MLProject</code>, <code>RunResult</code>, <code>load_model</code> and <code>predict</code>."],
+];
 ---
 
 <DocsLayout title="Architecture" description="How scmle turns heterogeneous datasets into reproducible ML workflows." current="architecture">
@@ -64,6 +88,23 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <li><code>evaluation.json</code> stores metrics, splits, selected strategy, and test results.</li>
     <li><code>evidence_graph.json</code> links those identities into a deterministic source-to-bundle DAG.</li>
     <li>The model bundle stores its schema, checksums, environment, and monitoring reference.</li>
+  </ul>
+
+  <h2 id="layout">Package layout</h2>
+  <DocTable label="Package layout" head={["Package", "Responsibility"]} rows={layout} />
+  <p>Extension points are polymorphic: add a <code>TableReader</code>, <code>ColumnKind</code>, <code>SplitStrategy</code>, <code>DataStrategy</code>, <code>ModelAdapter</code>, <code>Optimizer</code>, <code>PlanningRule</code>, <code>SelectionPolicy</code>, <code>Diagnostic</code>, <code>PolicyCheckpoint</code>, <code>ExecutionBackend</code>, <code>ExperimentStore</code>, <code>ServingAdapter</code> or <code>Stage</code> subclass, and no core edit is needed. Third-party adapters can also register through the <code>scmle.models</code> entry-point group and must pass the conformance check. The contracts for these seams are on <a href={`${base}/docs/extensions/`}>Extension contracts</a>; which of them are pinned is on <a href={`${base}/docs/api-stability/`}>API stability</a>.</p>
+
+  <h2 id="known-limits">Known limits</h2>
+  <ul>
+    <li>Memory is sampled while a trial runs (every 0.1 s), so a very fast spike can overshoot once before the trial is killed. The trial's memory includes every process it started, and those are killed with it. Setting <code>resources.enforcement: cooperative</code> turns supervision off.</li>
+    <li>Series features (lag and rolling) at prediction time use the recent rows the model stored at training time, plus rows scored so far by the serving adapters. A record before an entity's stored history gets missing values by construction.</li>
+    <li>Only the target is looked at before the split (to resolve the task and, for stratified splits, to choose the test rows). All other profiling, feature selection, leakage detection and the fingerprint use the development partition alone.</li>
+    <li>The HTTP serving adapter is a minimal reference server. It verifies bearer tokens when configured, and refuses a non-loopback bind without them, but it has no TLS: terminate TLS at an ingress.</li>
+    <li>PyTorch and Keras model families ship with the <code>deeplearning</code> extra and run in a separate worker process, because two OpenMP runtimes in one process crash. TabPFN stays extension-only and needs its own licence and token. <code>gpu="required"</code> blocks a run unless PyTorch can see a CUDA device.</li>
+    <li>The test-set vault keeps the locked rows out of trial processes. It cannot stop a process from reading the original data file when a path was given, and a caller's own in-memory DataFrame still holds every row.</li>
+    <li>Ray and CatBoost have no free-threaded (3.14t) wheels yet.</li>
+    <li>The public API may be called from several threads of one process. Locks are per process, so separate processes that share one registry, journal or run directory are not coordinated, and mutating a shared <code>ModelBundle</code> (<code>calibrate</code>) while others predict is not supported.</li>
+    <li>On Windows, peak-memory reporting counts this process only (finished child processes are not reported), and the free-threaded build is not tested.</li>
   </ul>
 
   <h2>Why modelling is limited</h2>

@@ -125,7 +125,7 @@ policy ─────→ block promotion + record disposition
 only a verified, digest-bound state may move forward`}</code></pre>
 
   <h2>Run the local fault matrix</h2>
-  <p>The repository includes a bounded local executor for all 15 declared fault scenarios. It exercises real child-process termination, timeout cancellation, atomic publication, artifact quarantine, signature rejection, checkpoint and snapshot mismatch, retry exhaustion, duplicate-event idempotency, incomplete lineage, and rejected approvals.</p>
+  <p>SCMLE includes a bounded local executor for all 15 declared fault scenarios. It exercises real child-process termination, timeout cancellation, atomic publication, artifact quarantine, signature rejection, checkpoint and snapshot mismatch, retry exhaustion, duplicate-event idempotency, incomplete lineage, and rejected approvals.</p>
   <pre><code>{`from pathlib import Path
 
 from scmle.contracts import reliability

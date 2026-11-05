@@ -384,7 +384,7 @@ const bw = 360;
             </svg>
             <div class="bench-note">
               <p class="note">One split and one seed per dataset: differences in the fourth digit are within noise. With three seeds and 95% intervals, only one of four bundled datasets was distinguishable from the reference (diabetes progression, ahead).</p>
-              <a class="link-arrow" href={`${repo}/blob/master/docs/BENCHMARKS.md#benchmarks-on-more-open-datasets`}>Full tables and reading notes in docs/BENCHMARKS.md →</a>
+              <a class="link-arrow" href={`${base}/docs/benchmarks/#more-datasets`}>Full tables and reading notes →</a>
             </div>
           </figure>
           <div class="reveal" data-delay="1">
@@ -402,7 +402,7 @@ const bw = 360;
                 </tbody>
               </table>
             </div>
-            <p class="note" style="margin-top:12px">Six of nine core rows shown; all nine are in the <a href={`${repo}#benchmarks-on-open-datasets`}>README</a>. Lower is better for log loss and RMSE. *Titanic's score comes from leaked columns that the profiler flags.</p>
+            <p class="note" style="margin-top:12px">Six of nine core rows shown; all nine are on the <a href={`${base}/docs/benchmarks/#core`}>benchmarks page</a>. Lower is better for log loss and RMSE. *Titanic's score comes from leaked columns that the profiler flags.</p>
             <div class="panel" style="margin-top:var(--s3)">
               <p class="panel-title">python -m benchmarks.reliability · nine checks</p>
               <ul class="sig-list">
@@ -411,7 +411,7 @@ const bw = 360;
                 <li><code>tamper_detection</code><span>wrong key refused</span></li>
                 <li><code>failure_isolation</code><span>one crash, run completes</span></li>
               </ul>
-              <p class="note" style="margin:12px 0 0">Four of nine shown. <a href={`${repo}/blob/master/docs/BENCHMARKS.md#reliability-checks`}>All nine, with thresholds</a>.</p>
+              <p class="note" style="margin:12px 0 0">Four of nine shown. <a href={`${base}/docs/benchmarks/#reliability-checks`}>All nine, with thresholds</a>.</p>
             </div>
           </div>
         </div>
@@ -434,19 +434,19 @@ const bw = 360;
           <h3>Known limits</h3>
           <ul>
             <li>The test-set vault keeps locked rows out of trial processes. It cannot stop a process from reading the original data file when a path was given.</li>
-            <li>The HTTP serving adapter is a minimal reference server with no authentication or TLS. Run it behind a gateway.</li>
+            <li>The HTTP serving adapter is a minimal reference server. It verifies bearer tokens when configured and has no TLS, so run it behind an ingress.</li>
             <li>The public API may change between <code>0.x</code> releases. SCMLE is in beta.</li>
           </ul>
-          <a class="link-arrow" href={`${repo}#known-limits`} style="display:inline-block;margin-top:16px">All known limits →</a>
+          <a class="link-arrow" href={`${base}/docs/architecture/#known-limits`} style="display:inline-block;margin-top:16px">All known limits →</a>
         </div>
 
         <div class="dev reveal" style="margin-top:var(--s8)">
           <div>
             <span class="tag">In development</span>
             <h3>The qualification instrument</h3>
-            <p>A planned data-stage instrument that turns a signed charter into tier-labelled claims about a dataset, with every detector carrying a measured certificate. It is being designed and built in the open, is not part of the released package, and makes no claims yet. Its guarantees would be probabilistic and conditional on recorded assumptions.</p>
+            <p>A data-stage instrument that turns a signed charter into tier-labelled claims about a dataset: custody of held-out sets, a hash-chained hypothesis ledger, one-time confirmation, and detectors that gate only with a measured certificate. It is built and tested but not independently validated, several detectors remain descriptive, and its guarantees are probabilistic and conditional on recorded assumptions.</p>
           </div>
-          <a class="link-arrow" href={`${repo}/tree/master/product`}>Read the product definition →</a>
+          <a class="link-arrow" href={`${base}/docs/qualification/`}>How the instrument works →</a>
         </div>
       </div>
     </section>
@@ -461,7 +461,7 @@ const bw = 360;
           <p class="install-meta"><span>Linux, macOS and Windows</span><span>Python 3.11 or newer</span><span>Apache-2.0</span><span>Beta: API may change between 0.x releases</span></p>
           <div class="cta-row">
             <a class="btn btn-primary" href={`${base}/docs/quickstart/`}>Read the quickstart</a>
-            <a class="btn btn-secondary" href="https://pypi.org/project/scmle/">View on PyPI</a>
+            <a class="btn btn-secondary" href={`${base}/docs/cli/`}>Command reference</a>
           </div>
         </div>
       </div>

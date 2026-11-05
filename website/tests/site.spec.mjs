@@ -18,6 +18,24 @@ const routes = [
   "./docs/recovery/",
   "./docs/migrations/",
   "./docs/troubleshooting/",
+  "./docs/extensions/",
+  "./docs/governed-data/",
+  "./docs/qualification/",
+  "./docs/causal-decision/",
+  "./docs/api-stability/",
+  "./docs/cli/",
+  "./docs/artifacts/",
+  "./docs/benchmarks/",
+  "./docs/operating-loop/",
+  "./docs/service/",
+  "./docs/local/",
+  "./docs/orchestration/",
+  "./docs/portable-training/",
+  "./docs/infrastructure/",
+  "./docs/cloud-release/",
+  "./docs/releasing/",
+  "./docs/threat-model/",
+  "./docs/tenant-isolation/",
 ];
 
 test("every public route renders a standalone page", async ({ page }) => {
@@ -27,6 +45,33 @@ test("every public route renders a standalone page", async ({ page }) => {
     await expect(page.locator("h1").first(), route).toBeVisible();
     await expect(page.locator('a[href$=".md"]'), route).toHaveCount(0);
   }
+});
+
+test("every page links out only to the repository home, issues and licence", async ({ page }) => {
+  const allowed = new Set([
+    "https://github.com/sachncs/scmle",
+    "https://github.com/sachncs/scmle/issues",
+    "https://www.apache.org/licenses/LICENSE-2.0",
+    "https://pypi.org/project/scmle/",
+  ]);
+  for (const route of routes) {
+    await page.goto(route);
+    const hrefs = await page.$$eval("a[href]", (anchors) => anchors.map((a) => a.href));
+    for (const href of hrefs) {
+      const url = new URL(href);
+      if (url.hostname === "127.0.0.1") continue;
+      expect(allowed.has(`${url.origin}${url.pathname.replace(/\/$/, "")}`), `${route} -> ${href}`).toBe(true);
+    }
+  }
+});
+
+test("sidebar groups every page and the filter hides empty groups", async ({ page }) => {
+  await page.goto("./docs/cli/");
+  await expect(page.locator(".nav-group-label").first()).toBeVisible();
+  await expect(page.locator('.sidebar nav a[aria-current="page"]')).toHaveText(/Command line/);
+  await page.getByLabel("Filter documentation pages").fill("tenant");
+  await expect(page.locator(".sidebar nav a:visible")).toHaveCount(1);
+  await expect(page.locator(".nav-group:visible")).toHaveCount(1);
 });
 
 test("modeling page exposes the estimation contract and honest boundaries", async ({
@@ -159,7 +204,7 @@ test("skip link is the first tab stop and focus is visible", async ({ page }) =>
 
 test("pages work at phone width without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const route of ["./", "./docs/", "./docs/capabilities/", "./docs/architecture/"]) {
+  for (const route of routes) {
     await page.goto(route);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,

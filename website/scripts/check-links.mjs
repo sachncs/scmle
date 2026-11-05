@@ -5,6 +5,26 @@ const siteRoot = resolve("dist");
 const siteBase = "/scmle";
 const siteOrigin = "https://sachncs.github.io";
 
+// The site holds its own information. The only outbound links are the repository
+// home, its issue tracker, the licence text, and PyPI once the package is published.
+const allowedExternal = new Set([
+  "https://github.com/sachncs/scmle",
+  "https://github.com/sachncs/scmle/issues",
+  "https://www.apache.org/licenses/LICENSE-2.0",
+  "https://pypi.org/project/scmle/",
+]);
+
+function externalProblem(url) {
+  if (/\.md$/i.test(url.pathname)) return "links to a markdown file";
+  if (url.hostname === "github.com" && /\/(blob|tree|raw|blame)\//.test(url.pathname)) {
+    return "links to a file in the repository (github.com blob/tree)";
+  }
+  if (url.hostname === "raw.githubusercontent.com") return "links to a raw repository file";
+  const normalised = `${url.origin}${url.pathname.replace(/\/$/, "")}`;
+  if (!allowedExternal.has(normalised)) return "is not on the external link allowlist";
+  return null;
+}
+
 function htmlFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = join(directory, entry.name);
@@ -41,6 +61,7 @@ function hasAnchor(contents, anchor) {
 
 const failures = [];
 let checkedLinks = 0;
+let checkedExternal = 0;
 const files = htmlFiles(siteRoot);
 
 for (const filePath of files) {
@@ -51,7 +72,18 @@ for (const filePath of files) {
     const href = hrefAttr ?? metaUrl;
     if (href === "#" || /^(mailto|tel|javascript):/i.test(href)) continue;
     const url = new URL(href, sourceUrl);
-    if (url.origin !== siteOrigin) continue;
+    if (url.origin !== siteOrigin) {
+      if (/^https?:$/.test(url.protocol)) {
+        checkedExternal += 1;
+        const problem = externalProblem(url);
+        if (problem) failures.push(`${relative(siteRoot, filePath)} -> ${href} (${problem})`);
+      }
+      continue;
+    }
+    if (/\.md$/i.test(url.pathname)) {
+      failures.push(`${relative(siteRoot, filePath)} -> ${href} (links to a markdown file)`);
+      continue;
+    }
     checkedLinks += 1;
     const destination = targetFile(url);
     if (!destination) {
@@ -65,9 +97,9 @@ for (const filePath of files) {
 }
 
 if (failures.length) {
-  console.error(`Found ${failures.length} broken internal links:`);
+  console.error(`Found ${failures.length} link problems:`);
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log(`Internal link checks passed for ${files.length} HTML files (${checkedLinks} links).`);
+  console.log(`Internal link checks passed for ${files.length} HTML files (${checkedLinks} internal, ${checkedExternal} external links).`);
 }
