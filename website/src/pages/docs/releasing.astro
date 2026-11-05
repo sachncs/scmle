@@ -1,0 +1,49 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<DocsLayout title="Releasing the package" description="How a scmle package release works: version bump, tag, preflight, the tag pipeline that refuses to publish without evidence, and the two controls that need people." current="releasing">
+  <p class="eyebrow"><span></span> Cloud and release</p>
+  <h1>A tag is a claim<br /><em>the pipeline checks.</em></h1>
+  <p class="lead">A release is a version bump, a tag, and a pipeline that refuses to publish unless the evidence holds. This page is about releasing the Python package. Releasing a trained model is a different act, covered on <a href={`${base}/docs/cloud-release/`}>Cloud release</a>.</p>
+
+  <h2>Before tagging</h2>
+  <ol>
+    <li>Set the version in <code>pyproject.toml</code> and in the package's <code>__version__</code>.</li>
+    <li>Move the <code>Unreleased</code> changelog entries under a heading for the new version.</li>
+    <li>If the public API changed deliberately, regenerate the pinned snapshot and record the change in the changelog and on <a href={`${base}/docs/api-stability/`}>API stability</a>:
+      <pre><code>python scripts/check_api_compatibility.py tests/fixtures/public_api.json --write</code></pre>
+    </li>
+    <li>Run the full local evidence chain:
+      <pre><code>./scripts/release_preflight.sh        # SCMLE_PYTHON_VERSION=3.11 to vary</code></pre>
+      It builds the artifacts and the site, then runs lint, types, <code>bandit</code>, <code>pip-audit</code>, the API check and the complete test suite.
+    </li>
+  </ol>
+
+  <h2>The pipeline</h2>
+  <p>The release workflow runs on a <code>v*</code> tag, in four stages:</p>
+  <ol>
+    <li><strong>verify:</strong> the tag equals the package version, the in-code version and a changelog section.</li>
+    <li><strong>test:</strong> the bounded suite on Linux, macOS and Windows.</li>
+    <li><strong>release-checks:</strong> the preflight script.</li>
+    <li><strong>publish:</strong> the full test suite, the benchmark regression gate, build, <code>twine check</code>, a reproducibility and offline-install check, a wheel and sdist smoke test, PyPI trusted publishing, and finally an external check that compares the public tag and PyPI files with the local build by digest.</li>
+  </ol>
+  <p>PyPI publishing uses OIDC trusted publishing, so no token is stored. The <code>pypi</code> GitHub environment should require approval.</p>
+
+  <h2>Evidence the pipeline cannot produce</h2>
+  <p>Two controls need people, and the release stays open without them:</p>
+  <ul>
+    <li>The operational rehearsal, reviewed by someone other than the author (see <a href={`${base}/docs/operations/`}>Operations</a> for the scenarios).</li>
+    <li>An independent review record, checked with
+      <pre><code>python scripts/verify_release_review.py review.json --source-commit &lt;sha&gt;</code></pre>
+    </li>
+  </ul>
+
+  <h2>After publishing</h2>
+  <p>Install the released version in a clean environment on each platform, run the quickstart example, and open the GitHub release to confirm the notes.</p>
+
+  <div class="callout"><p><strong>Status.</strong> The package is not on PyPI yet; it installs from GitHub as shown in the <a href={`${base}/docs/quickstart/`}>quickstart</a>. The independent review and the rehearsal review need people outside the pipeline, and this page does not claim that either has happened.</p></div>
+
+  <p class="meta">Release process of the 0.1 beta line</p>
+</DocsLayout>
