@@ -508,6 +508,20 @@
         "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
       }
     },
+    "scmle.operations.claim": {
+      "ClaimVerdict": {
+        "kind": "class",
+        "signature_sha256": "1e58b8f10261259f421d4117fb948809dd41d43bd83f2f9ad3a5f21598c6c097"
+      },
+      "check_claim": {
+        "kind": "callable",
+        "signature_sha256": "05c5ad308b9f7fad5e4470b402a5e18c59b9a1bcf5722495039ccee5676fbee2"
+      },
+      "claim_text_problems": {
+        "kind": "callable",
+        "signature_sha256": "2b3cf61786ce541addeec140acbd3121ff92588a211ddac0f2935f380e2af3fe"
+      }
+    },
     "scmle.operations.classify": {
       "Classification": {
         "kind": "class",

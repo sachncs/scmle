@@ -27,6 +27,7 @@ from scmle.deploy import observation as deploy_observation
 from scmle.deploy import orphans as deploy_orphans
 from scmle.deploy import record as deploy_record
 from scmle.governance import release_state as governance_release_state
+from scmle.operations import claim as operations_claim
 from scmle.operations import classify as operations_classify
 from scmle.operations import continuous as operations_continuous
 from scmle.operations import exporters as operations_exporters
@@ -280,6 +281,10 @@ EXTENSION_SURFACES = {
     "scmle.operations.spool": (
         operations_spool,
         ("FlushResult", "MetricsSpool"),
+    ),
+    "scmle.operations.claim": (
+        operations_claim,
+        ("ClaimVerdict", "check_claim", "claim_text_problems"),
     ),
     "scmle.operations.notify": (
         operations_notify,

@@ -209,8 +209,9 @@ ledgers and registries load unchanged.
 protocols) and `continuous` (`ContinuousEvaluation`, `RetrainPolicy`,
 `RetrainDecision`, `MetricSpec`, `Replacement`, `TrainingHistory`,
 `post_promotion_check`), `recovery` (`Fault`, `Objective`, `Measurement`,
-`Result`, `Runner`) and `spool` (`MetricsSpool`, `FlushResult`) are
-extension surfaces pinned like the others. The metrics
+`Result`, `Runner`), `spool` (`MetricsSpool`, `FlushResult`) and `claim`
+(`check_claim`, `ClaimVerdict`, `claim_text_problems`) are extension surfaces
+pinned like the others. The metrics
 registry, the log writer, the cost report and the response desk are not
 pinned.
 
