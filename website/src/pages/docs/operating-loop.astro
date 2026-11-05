@@ -1,0 +1,53 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const evidence = [
+  ["Did the code remain correct?", "The pull-request contract suite and scheduled full-suite coverage", "Failed test, unexplained skip, or coverage regression"],
+  ["Did performance regress?", "Offline benchmark results, the regression checker and the reliability checks", "Any failed benchmark gate or material drift from baseline"],
+  ["Did the data remain trustworthy?", "<code>curation_report.json</code>, manifest, fingerprint, leakage checks", "New schema, missingness, duplicates, drift or representativeness finding"],
+  ["Can the result be reproduced?", "Run events, checkpoints, bundle checksums, environment metadata", "Resume mismatch, corrupt artifact or environment change"],
+  ["Is the deployed model still healthy?", "Monitoring report, labelled coverage, drift and rollback decision", "Threshold breach or insufficient outcome coverage"],
+  ["Is the release safe?", "Bandit, pip-audit, package smoke tests, platform matrix", "Any security finding or platform-specific failure"],
+];
+---
+
+<DocsLayout title="Operating loop" description="Measure, observe, evaluate, evolve: the four kinds of evidence scmle uses to keep production quality a feedback loop, the evidence map and the review cadence." current="operating-loop">
+  <p class="eyebrow"><span></span> Serve and operate</p>
+  <h1>Measure, observe,<br /><em>evaluate, evolve.</em></h1>
+  <p class="lead">Production quality is a feedback loop, not a one-time approval. The project works from four kinds of evidence, and a green model score never overrides a curation, leakage, reproducibility or security failure.</p>
+
+  <div class="diagram">
+    <div class="diagram-caption"><span>The loop</span><strong>each turn leaves an artifact and a small commit</strong></div>
+    <div class="flow-row">
+      <div class="flow-node active"><span>01 / MEASURE</span><b>CI evidence</b><small>tests, coverage, benchmarks</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node"><span>02 / OBSERVE</span><b>Run records</b><small>events, manifests, profiles</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node"><span>03 / EVALUATE</span><b>Compare</b><small>locked data, baseline, champion</small></div><i class="flow-arrow">→</i>
+      <div class="flow-node active"><span>04 / EVOLVE</span><b>Change safely</b><small>test, rule, case, decision</small></div>
+    </div>
+  </div>
+
+  <ol>
+    <li><strong>Measure.</strong> CI records test outcomes, coverage, benchmark results, dependency findings, package smoke tests and dataset-curation findings.</li>
+    <li><strong>Observe.</strong> Each run writes event records, manifests, fingerprints, curation reports, model metadata and monitoring reference profiles. These artifacts make failures and data changes inspectable after the process has moved on (see <a href={`${base}/docs/artifacts/`}>Artifacts & bundles</a>).</li>
+    <li><strong>Evaluate.</strong> Compare a candidate with its locked evaluation data, the benchmark baseline, the prior champion and the declared operational thresholds.</li>
+    <li><strong>Evolve.</strong> Turn recurring findings into a test, a validation rule, a benchmark case, a documented operating decision, or a deliberately scoped product change. Every change should leave an auditable artifact and a small atomic commit.</li>
+  </ol>
+
+  <h2>Evidence map</h2>
+  <DocTable label="Evidence map" head={["Question", "Primary evidence", "Review trigger"]} rows={evidence} />
+
+  <h2>Review cadence</h2>
+  <ul>
+    <li>Every pull request runs the bounded contract tier and records its coverage artifact. The enforced floor is currently 75% (the bounded suite measured 79% without the optional extras installed); the nightly run enforces 85% on core contracts.</li>
+    <li>Every scheduled full-suite run publishes coverage and benchmark evidence.</li>
+    <li>Every dataset or schema change requires reviewing the curation report before model comparisons are interpreted.</li>
+    <li>Every candidate promotion requires locked-data evaluation, monitoring reference approval, an independent <code>PromotionApproval</code> bound to the exact bundle digest, and a rollback decision.</li>
+    <li>Every release requires the declared release checks to be complete (see <a href={`${base}/docs/releasing/`}>Releasing the package</a>).</li>
+  </ul>
+
+  <div class="callout"><p><strong>When a signal changes:</strong> preserve the evidence first, identify the smallest reproducible cause, and then evolve the system with a focused test or control.</p></div>
+  <p>The benchmark gates in this loop are described on <a href={`${base}/docs/benchmarks/`}>Benchmarks</a>, and the production half of the loop (drift, delayed labels, retrain, gated promotion, escalation) is covered on <a href={`${base}/docs/operations/`}>Operations</a> and <a href={`${base}/docs/qualification/#loop`}>the qualification instrument</a>.</p>
+
+  <p class="meta">Operating practice of the 0.1 beta line</p>
+</DocsLayout>
