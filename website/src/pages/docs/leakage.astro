@@ -1,0 +1,13 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/leakage.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="Leakage screen: what it can and cannot tell you" description="Why data alone cannot separate a leak from a strong legitimate predictor, what the scmle leakage screen tests, its measured error rates, and the open items. A flag is a statistical suspicion, not proof." current="leakage">
+  <p class="eyebrow"><span></span> Learn</p>
+  <h1>A flag is a suspicion,<br /><em>not a verdict.</em></h1>
+  <Fragment set:html={html} />
+  <p class="meta">Measured numbers are regenerated from the project's own scripts · 0.1 beta</p>
+</DocsLayout>

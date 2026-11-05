@@ -27,7 +27,7 @@ const options = [
   ["<code>--validation</code>", "<code>auto</code>, <code>stratified</code>, <code>random</code>, <code>group</code>, <code>temporal</code>, <code>rolling</code> and more."],
   ["<code>--group-column</code>, <code>--time-column</code>, <code>--weight-column</code>", "Describe the structure of the data."],
   ["<code>--exclude</code>, <code>--id-columns</code>, <code>--unavailable-at-prediction</code>", "Keep columns out of the features."],
-  ["<code>--leakage-policy {warn,block}</code>", "Default <code>block</code>: stop the run on suspicious features that have a passing certificate. <code>warn</code> is the opt-out: the run finishes and its last line names the suspects."],
+  ["<code>--leakage-policy {warn,block}</code>", "Default <code>warn</code>: the run finishes, logs a warning and labels the score provisional. <code>block</code> (opt-in) stops the run on suspicious features that have a passing certificate. See <a href=\"" + base + "/docs/leakage/\">the leakage screen</a>."],
   ["<code>--charter FILE</code>", "Govern the run by an analysis charter: a sealed confirmation set is split off before profiling."],
   ["<code>--exclude-models</code>, <code>--exclude-families</code>", "Restrict the search."],
   ["<code>--output-dir</code>, <code>--seed</code>", "Where runs go; reproducibility."],

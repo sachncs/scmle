@@ -47,7 +47,7 @@ const surfaces = [
   ]} />
 
   <h2>The leakage screen</h2>
-  <p>The profiler's fixed leakage cutoffs are gone. <code>leakage_policy</code> keeps its values and meaning, but its default changed from <code>"warn"</code> to <code>"block"</code>, so the pinned <code>MLProject</code> signature was regenerated once for that default. What blocks is now a typed result, <code>DatasetProfile.blocking_leaks</code>, from a permutation screen. Behaviour you may notice:</p>
+  <p>The profiler's fixed leakage cutoffs are gone. <code>leakage_policy</code> keeps its values and its meaning at the top level, and the pinned <code>MLProject</code> signature is unchanged. What blocks is now a typed result, <code>DatasetProfile.blocking_leaks</code>, from a permutation screen. Behaviour you may notice:</p>
   <ul>
     <li>Blocking needs a passing certificate for the mechanism, which exists for binary classification only. Regression and multiclass targets get warnings with p-values.</li>
     <li>The screen also reports a value recorded only for some outcomes when most rows are blank.</li>

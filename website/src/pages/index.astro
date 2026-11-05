@@ -133,7 +133,7 @@ const bw = 360;
               <li><b>Fingerprint</b><span>A full dataset fingerprint that ties results to the data</span></li>
               <li><b>Leakage</b><span><em class="flag">boat</em><em class="flag">body</em> flagged on the Titanic table: outcome-dependent recording</span></li>
             </ul>
-            <div class="callout-inline"><p>The default <code>leakage_policy="block"</code> makes the run refuse to proceed (<code>"warn"</code> is the opt-out). Titanic's unusually high score comes from those two columns, which is why the profiler flags them.</p></div>
+            <div class="callout-inline"><p>With <code>leakage_policy="block"</code> (opt-in; the default is <code>"warn"</code>) the run refuses to proceed. A flag is a statistical suspicion, not proof; see <a href={`${base}/docs/leakage/`}>what the leakage screen can and cannot tell you</a>. Titanic's unusually high score comes from those two columns, which is why the profiler flags them.</p></div>
           </div>
         </div>
       </div>

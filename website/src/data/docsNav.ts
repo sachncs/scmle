@@ -10,6 +10,7 @@ export const docsNav: NavGroup[] = [
       { slug: "glossary", label: "Glossary", key: "glossary", summary: "Every word in plain language, with an example and why it matters. Searchable." },
       { slug: "decisions", label: "Decisions", key: "decisions", summary: "The choices to make before you run anything on your own data." },
       { slug: "reading-results", label: "Reading results", key: "reading-results", summary: "Which file to open first, how to read scores and claims, and which results need care." },
+      { slug: "leakage", label: "Leakage screen", key: "leakage", summary: "What a leakage flag can and cannot tell you, with the measured error rates and the open items." },
       { slug: "when-things-go-wrong", label: "When things go wrong", key: "when-things-go-wrong", summary: "Every refusal and failure, what it means and what to do." },
       { slug: "what-scmle-cannot-do", label: "What SCMLE cannot do", key: "what-scmle-cannot-do", summary: "The limits stated plainly, and the rough edges found on the beginner path." },
     ],
