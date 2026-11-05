@@ -36,6 +36,11 @@ Row kinds (``open`` first and only once):
     status ``open``. It is a record that a person must look, not an incident
     workflow (`scmle.monitoring.incidents` wants an SLO evaluation, which a
     halt does not have).
+``audit``
+    A security event of the prediction service: a model activation, an
+    access decision (allowed or denied) or an administrative action. Chained
+    so an entry cannot be removed or edited afterwards; it carries who, what,
+    the outcome and a request id, never a credential or a request body.
 """
 
 from collections.abc import Callable
@@ -69,6 +74,7 @@ ESCALATION = "escalation"
 ATTESTATION = "attestation"
 HALT = "halt"
 INCIDENT = "incident"
+AUDIT = "audit"
 KINDS = (
     OPEN,
     OBSERVE_SUMMARY,
@@ -81,6 +87,7 @@ KINDS = (
     ATTESTATION,
     HALT,
     INCIDENT,
+    AUDIT,
 )
 REGISTERED = "registered"
 DECIDED = "decided"

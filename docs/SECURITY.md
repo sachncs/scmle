@@ -11,9 +11,11 @@ file-write path, plus `bandit -r scmle` and `pip-audit` (both run in CI).
   execution. This is the principal risk.
 * **Untrusted datasets.** Parsed with pandas/pyarrow; malformed files raise
   `DataError`.
-* **Multi-tenant serving.** Out of scope: the HTTP adapter is a minimal
-  reference server with no authentication or TLS and must sit behind a
-  gateway.
+* **Unauthenticated or cross-tenant callers.** The HTTP adapters verify a
+  bearer token (JWT, HS256 or RS256, key rotation by `kid`), check scopes and
+  tenant, rate-limit and audit (`scmle.security`; policy in
+  [`TENANT_ISOLATION.md`](TENANT_ISOLATION.md)). They do not terminate TLS:
+  run them behind an ingress that does.
 
 ## Controls
 
@@ -32,6 +34,10 @@ file-write path, plus `bandit -r scmle` and `pip-audit` (both run in CI).
 | Serving a modified or unattested service folder | Before it deserializes anything, the service checks the bundle signature, the checksum of every listed file, the signed provenance statement (bundle digest and build materials); on failure it stays alive but never ready | same tests |
 | Secrets in the image or its build context | The generated `.dockerignore` excludes credential files; `scmle.deploy.context` scans the context for key material, configured secret values and secret-looking `ENV` lines before every build | `test_the_build_context_holds_no_secret` |
 | Vulnerable dependencies in the image | `scmle.deploy.vuln_gate` fails a build on a blocking finding, an empty scan, a finding without severity, an expired exception, or an SBOM component the scan did not cover. It does not scan; the scanner and its database date are the report's | `tests/unit/test_service_hardening.py` |
+| Unauthenticated access | `HttpServing` and `ModalityHttpServing` refuse to listen beyond loopback without a gateway; every path except `/livez` and `/readyz` needs a verified token with the route's scope; the compose file publishes no port and gives its services the demo identity settings | `tests/unit/test_security_service.py` |
+| Invalid, revoked, expired or foreign credentials | Signature, `alg` (never `none`, never confused with the key's), `kid`, key validity window, `iss`, `aud`, `exp`, `nbf`, revocation by token, subject or key; refusals say only 401, 403 or 429, never why | `tests/unit/test_security_tokens.py`, `tests/unit/test_security_service.py` |
+| Guessing credentials, request floods | Per-client limit on refused attempts and per-subject request limit (429 with `Retry-After`), on top of the size, record and concurrency limits | `tests/unit/test_security_service.py` |
+| Unrecorded access or administration | Activation, access and key-rotation events are `audit` rows of the hash-chained deployment ledger, without credentials or bodies | same tests |
 | Supply chain | Releases use PyPI trusted publishing (OIDC), no stored token; `pip-audit` gates CI | `.github/workflows` |
 | Reading the confirmation set early | With a charter, the confirmation rows are sealed in a separate vault process (even under `enforcement="cooperative"`); exploration code receives only an `ExplorationView` with no reference to a vault, token or log; a second open is refused; every attempt is written to a hash-chained log | `tests/leakage/test_custody_access.py` |
 | Edited charter or split manifest | The charter carries a SHA-256 hash and an optional HMAC signature; the split manifest v2 carries a full SHA-256; either fails to load if a byte changes | `tests/unit/test_charter_signing.py`, `tests/unit/test_custody_manifest.py` |

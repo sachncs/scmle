@@ -11,6 +11,9 @@ from typing import Any
 
 import scmle
 from scmle.deploy import contract as deploy_contract
+from scmle.security import access as security_access
+from scmle.security import audit as security_audit
+from scmle.security import tokens as security_tokens
 
 # Extension surfaces: documented contracts below the top-level API. Their
 # signatures are pinned too, without changing any `scmle.__all__` entry.
@@ -32,6 +35,29 @@ EXTENSION_SURFACES = {
             "conformance_problems",
         ),
     ),
+    "scmle.security.tokens": (
+        security_tokens,
+        (
+            "KeySet",
+            "Principal",
+            "RevocationList",
+            "TokenError",
+            "TokenVerifier",
+            "VerificationKey",
+            "sign_hs256",
+        ),
+    ),
+    "scmle.security.access": (
+        security_access,
+        (
+            "AccessDenied",
+            "Gateway",
+            "RateLimiter",
+            "gateway_from_environment",
+            "require_authentication_for",
+        ),
+    ),
+    "scmle.security.audit": (security_audit, ("AuditLog",)),
 }
 
 

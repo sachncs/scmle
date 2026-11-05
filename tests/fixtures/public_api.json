@@ -223,6 +223,64 @@
         "kind": "callable",
         "signature_sha256": "930c30c0dd0681f2b0fa82a9df84c9a892051a01444545223a9f5fe9a1981311"
       }
+    },
+    "scmle.security.access": {
+      "AccessDenied": {
+        "kind": "class",
+        "signature_sha256": "6cec7f9df08a2e0790926d94044abcb76027544a5ee817b62dd3b817d4e67932"
+      },
+      "Gateway": {
+        "kind": "class",
+        "signature_sha256": "7a659a53f8c3fd5fe6248f50c98715ee717e1bd0e67ad03ba0dbfc3529ec8b02"
+      },
+      "RateLimiter": {
+        "kind": "class",
+        "signature_sha256": "3267a3556840e5a202f61a413051ed9b362ee9a83220914bbd96e09450d7e811"
+      },
+      "gateway_from_environment": {
+        "kind": "callable",
+        "signature_sha256": "f7e49cea1d6f6a559a7f56a573634935d195d1cbed6b2b20a5cd7386cbb6868b"
+      },
+      "require_authentication_for": {
+        "kind": "callable",
+        "signature_sha256": "621473227a05925ff45960cc31704df1df9cd732d413b62a28f5628e5fbda81c"
+      }
+    },
+    "scmle.security.audit": {
+      "AuditLog": {
+        "kind": "class",
+        "signature_sha256": "3fa1b3fe908a098e6bb162c8401e24527bc538096f340689f4690af17daeffed"
+      }
+    },
+    "scmle.security.tokens": {
+      "KeySet": {
+        "kind": "class",
+        "signature_sha256": "fb6b601a0983e1ce907d8112667ac480f8e42b406864e407febf53c38cdc98b0"
+      },
+      "Principal": {
+        "kind": "class",
+        "signature_sha256": "a4f0247d2b0df21e2f2e9c9dd40737bb0a21e87054839e5b2cd85f4d0e4ed84f"
+      },
+      "RevocationList": {
+        "kind": "class",
+        "signature_sha256": "80881ed4663a732f54faa21d7d49bd9dc69fc265184e2356ba29f990a40121d1"
+      },
+      "TokenError": {
+        "kind": "class",
+        "signature_sha256": "ebb301db500005893e6e14b86813dc8167cdc12451c09ff7fb65c0d359cc4d36"
+      },
+      "TokenVerifier": {
+        "kind": "class",
+        "signature_sha256": "8f207b18b5f3fed6a9ac8b15b58bd353ec54ea63bb2d657041777b307b514266"
+      },
+      "VerificationKey": {
+        "kind": "class",
+        "signature_sha256": "7fbecf12f06ba1307ba0688f1fc68a13831f1d13458bb00d00c93fd6c0aed943"
+      },
+      "sign_hs256": {
+        "kind": "callable",
+        "signature_sha256": "a2595b470c83be98251c6957c3531977742fb0bf4d0d4247b3fed996757cdb54"
+      }
     }
   },
   "release": "0.1.0b1",

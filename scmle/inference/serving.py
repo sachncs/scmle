@@ -25,6 +25,8 @@ from scmle.contracts import serving as serving_contract
 from scmle.deploy import provenance
 from scmle.inference import guard
 from scmle.inference import validation
+from scmle.security import access
+from scmle.security import audit
 
 LOGGER = logging.getLogger("scmle.serving")
 
@@ -343,6 +345,7 @@ class HttpServing(ServingAdapter):
         on_null: str = "impute",
         on_unseen: str = "report",
         warmup_records: list[dict[str, Any]] | None = None,
+        gateway: access.Gateway | None = None,
     ) -> None:
         """Initializes the adapter.
 
@@ -364,10 +367,14 @@ class HttpServing(ServingAdapter):
             on_null: `impute` or `reject` (see `ServingAdapter`).
             on_unseen: `report` or `reject` (see `ServingAdapter`).
             warmup_records: Records for the warm-up call.
+            gateway: Authenticates, authorizes, rate-limits and audits every
+                request except `/livez` and `/readyz`. Without it the server
+                may only bind a loopback address.
 
         Raises:
             ConfigError: If neither or both of `bundle` and `loader` are
-                given.
+                given, or `host` is not a loopback address and there is no
+                `gateway`.
             ValueError: If a request bound or timeout is not positive.
         """
         if (bundle is None) == (loader is None):
@@ -378,7 +385,9 @@ class HttpServing(ServingAdapter):
             or request_timeout_seconds <= 0
         ):
             raise ValueError("request bounds and timeout must be positive")
+        access.require_authentication_for(host, gateway)
         super().__init__(bundle, on_null, on_unseen, warmup_records)
+        self.gateway = gateway
         self.loader = loader
         self.host = host
         self.port = port
@@ -435,8 +444,28 @@ class HttpServing(ServingAdapter):
                 else type(error).__name__
             )
             self.readiness.fail(reason)
+            self.announce()
             return
         self.warm_up()
+        self.announce()
+
+    def announce(self) -> None:
+        """Audits the outcome of verify, load and warm-up (activation)."""
+        gateway = self.gateway
+        if gateway is None or gateway.audit is None:
+            return
+        snapshot = self.readiness.snapshot()
+        if snapshot["ready"]:
+            gateway.audit.activation(
+                self.bundle.info.model_version, self.artifact_digest
+            )
+        else:
+            gateway.audit.record(
+                audit.ACTIVATION,
+                actor="service",
+                outcome=audit.DENIED,
+                reason=str(snapshot.get("reason", "not ready")),
+            )
 
     def score(self, request: serving_contract.ScoreRequest) -> dict[str, Any]:
         """Scores a parsed request within the concurrency and time limits."""
@@ -535,8 +564,31 @@ class HttpServing(ServingAdapter):
                     return False
                 return True
 
+            def authorize(self, method: str) -> bool:
+                gateway = adapter.gateway
+                if gateway is None:
+                    return True
+                try:
+                    gateway.check(
+                        method,
+                        self.path,
+                        self.headers.get("Authorization"),
+                        self.client_address[0],
+                        self.request_id,
+                    )
+                except access.AccessDenied as denied:
+                    self.fail(
+                        denied.status,
+                        denied.body["error"],
+                        denied.body["category"],
+                        None,
+                        denied.headers,
+                    )
+                    return False
+                return True
+
             def do_GET(self) -> None:
-                if not self.identify():
+                if not self.identify() or not self.authorize("GET"):
                     return
                 readiness = adapter.readiness.snapshot()
                 if self.path == "/livez":
@@ -620,7 +672,7 @@ class HttpServing(ServingAdapter):
                 return body
 
             def do_POST(self) -> None:
-                if not self.identify():
+                if not self.identify() or not self.authorize("POST"):
                     return
                 if self.path not in serving_contract.PREDICT_PATHS:
                     self.fail(404, "not found", "request")
@@ -704,6 +756,7 @@ class HttpServing(ServingAdapter):
             self.loading.start()
         else:
             self.warm_up()
+            self.announce()
 
     def wait_until_settled(self, timeout: float = 60.0) -> bool:
         """Waits for the loader to finish; returns whether it is ready."""

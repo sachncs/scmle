@@ -114,5 +114,7 @@ pickle-based, so loading requires a valid signature (set `SCMLE_SIGNING_KEY`).
 it on a bundle from elsewhere. `predict` also takes `--rename INCOMING=EXPECTED`,
 `--case-insensitive` and `--strip-whitespace` for explicit column mapping.
 
-`serve` is a minimal reference server (no authentication or TLS). Bind to
-loopback or run it behind a gateway; see [`SECURITY.md`](SECURITY.md).
+`serve` is a minimal reference server without TLS. On loopback it needs no
+credentials; on any other address it refuses to start unless the `SCMLE_AUTH_*`
+variables of [`TENANT_ISOLATION.md`](TENANT_ISOLATION.md) configure token
+verification. See [`SECURITY.md`](SECURITY.md).

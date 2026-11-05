@@ -20,6 +20,7 @@ The demo signing key below is a published fixture, not a secret.
 """
 
 import argparse
+from collections.abc import Mapping
 import dataclasses
 import json
 import os
@@ -48,6 +49,7 @@ from scmle.governance import registry as registry_module
 from scmle.inference import parity
 from scmle.inference import serving
 from scmle.monitoring import monitor as monitor_module
+from scmle.security import tokens
 
 DEMO_SIGNING_KEY = "scmle-local-demo-signing-key-published-fixture"
 MODEL = "churn"
@@ -164,6 +166,59 @@ def start_service(
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
+
+
+class BearerHandler(urllib.request.BaseHandler):
+    """Adds one bearer token to requests for the listed services only."""
+
+    handler_order = 100
+
+    def __init__(self, token: str, prefixes: tuple[str, ...]) -> None:
+        """Remembers the token and the URL prefixes it may be sent to."""
+        self.token = token
+        self.prefixes = prefixes
+
+    def http_request(
+        self, request: urllib.request.Request
+    ) -> urllib.request.Request:
+        """Attaches the token if the URL is one of the listed services."""
+        if request.full_url.startswith(self.prefixes):
+            request.add_unredirected_header(
+                "Authorization", f"Bearer {self.token}"
+            )
+        return request
+
+
+def install_bearer(
+    environ: Mapping[str, str], prefixes: tuple[str, ...]
+) -> bool:
+    """Makes `urllib` authenticate to the compose services.
+
+    The token is minted from the published demo key in `deploy/local/demo.env`
+    and sent only to URLs that start with one of `prefixes`.
+
+    Returns:
+        Whether a token was installed (the demo key was configured).
+    """
+    secret = environ.get("SCMLE_AUTH_HS256_SECRET")
+    if not secret:
+        return False
+    now = time.time()
+    token = tokens.sign_hs256(
+        secret.encode(),
+        "env",
+        {
+            "iss": environ.get("SCMLE_AUTH_ISSUER", ""),
+            "aud": environ.get("SCMLE_AUTH_AUDIENCE", ""),
+            "sub": "demo-test-runner",
+            "iat": int(now),
+            "exp": int(now) + 3600,
+            "scope": "model:read model:predict",
+        },
+    )
+    opener = urllib.request.build_opener(BearerHandler(token, prefixes))
+    urllib.request.install_opener(opener)
+    return True
 
 
 def get_json(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
@@ -742,6 +797,7 @@ def verify_remote(
 ) -> Transcript:
     """The checks the compose test runner makes against running containers."""
     transcript = Transcript()
+    install_bearer(os.environ, (api, golden_api))
     started = time.monotonic()
     ready = wait_ready(api) is not None and wait_ready(golden_api) is not None
     transcript.record("services ready", started, ok=ready)

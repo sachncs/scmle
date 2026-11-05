@@ -3,8 +3,9 @@
 What the generated prediction service promises, and what it does not. The
 service is the reference HTTP adapter in `scmle/inference/serving.py` (tabular)
 and `scmle/inference/modality_serving.py` (signed modality packages). It uses
-only the standard library; authentication, TLS and rate limiting per caller
-belong to the deployment (F14 item 4).
+only the standard library. Authentication, scopes, per-caller rate limits and
+audit are in `scmle.security` ([`TENANT_ISOLATION.md`](TENANT_ISOLATION.md));
+TLS belongs to the ingress.
 
 ## Endpoints
 
@@ -18,6 +19,16 @@ belong to the deployment (F14 item 4).
 
 `/livez` is for the orchestrator's restart decision, `/readyz` for its routing
 decision. Do not point both at the same path.
+
+## Authentication
+
+With a gateway configured (required beyond loopback) every path except
+`/livez` and `/readyz` needs `Authorization: Bearer <JWT>`: 401 without a
+valid token (with `WWW-Authenticate`), 403 when the scope or tenant is wrong,
+429 with `Retry-After` over the per-subject rate or after repeated failures.
+The body is a fixed message and never says which check failed. Scopes:
+`model:read` for `/health` and `/schema`, `model:predict` for `/predict`.
+Details and limits: [`TENANT_ISOLATION.md`](TENANT_ISOLATION.md).
 
 ## Schema version 1
 

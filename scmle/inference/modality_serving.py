@@ -23,6 +23,7 @@ from scmle.contracts import modalities
 from scmle.contracts import serving as serving_contract
 from scmle.inference import guard
 from scmle.models import modality_lifecycle
+from scmle.security import access
 
 MAX_MODALITY_REQUEST_BYTES = 16 * 1024 * 1024
 MAX_MODALITY_REQUEST_SAMPLES = 10_000
@@ -70,12 +71,17 @@ class ModalityHttpServing:
     ) -> None:
         """Bind a verified predictor and an explicit sample decoder.
 
+        The pinned constructor is unchanged; `set_gateway` adds
+        authentication, and `start` refuses a non-loopback ``host`` without
+        one.
+
         ``require_lifecycle_report`` enables the production-boundary mode.
         In that mode the predictor must have been loaded with a verified,
         identity-matching signed lifecycle report.
         """
         if max_request_bytes < 1 or max_samples < 1:
             raise ValueError("request bounds must be positive")
+        self.gateway: access.Gateway | None = None
         if require_lifecycle_report and (
             predictor.lifecycle_report_digest is None
         ):
@@ -101,6 +107,15 @@ class ModalityHttpServing:
         )
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
+
+    def set_gateway(self, gateway: access.Gateway | None) -> None:
+        """Requires a bearer token on every request except the probes.
+
+        Args:
+            gateway: Authenticates, authorizes, rate-limits and audits
+                requests (`/livez` and `/readyz` stay public).
+        """
+        self.gateway = gateway
 
     @property
     def address(self) -> str:
@@ -201,6 +216,7 @@ class ModalityHttpServing:
                 status: int,
                 payload: dict[str, object],
                 request_id: str,
+                headers: dict[str, str] | None = None,
             ) -> None:
                 """Send a JSON response with safe reference-server headers."""
                 response_payload = dict(payload)
@@ -213,8 +229,30 @@ class ModalityHttpServing:
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Referrer-Policy", "no-referrer")
                 self.send_header("X-Request-ID", request_id)
+                for name, value in (headers or {}).items():
+                    self.send_header(name, value)
                 self.end_headers()
                 self.wfile.write(body)
+
+            def authorized(self, method: str, request_id: str) -> bool:
+                """Apply the gateway; answer a refusal with a safe body."""
+                gateway = adapter.gateway
+                if gateway is None:
+                    return True
+                try:
+                    gateway.check(
+                        method,
+                        self.path,
+                        self.headers.get("Authorization"),
+                        self.client_address[0],
+                        request_id,
+                    )
+                except access.AccessDenied as denied:
+                    self.send_json(
+                        denied.status, denied.body, request_id, denied.headers
+                    )
+                    return False
+                return True
 
             def do_GET(self) -> None:
                 """Serve health and decoder-schema evidence."""
@@ -225,6 +263,8 @@ class ModalityHttpServing:
                         {"error": identity_error, "category": "request"},
                         request_id,
                     )
+                    return
+                if not self.authorized("GET", request_id):
                     return
                 if self.path == "/livez":
                     self.send_json(200, {"status": "alive"}, request_id)
@@ -273,6 +313,8 @@ class ModalityHttpServing:
                         {"error": identity_error, "category": "request"},
                         request_id,
                     )
+                    return
+                if not self.authorized("POST", request_id):
                     return
                 if self.path != "/predict":
                     self.send_json(404, {"error": "not found"}, request_id)
@@ -392,6 +434,7 @@ class ModalityHttpServing:
             def log_message(self, format: str, *args: Any) -> None:
                 """Suppress per-request reference-server logging."""
 
+        access.require_authentication_for(self.host, self.gateway)
         self.httpd = server.ThreadingHTTPServer((self.host, self.port), Handler)
         self.thread = threading.Thread(
             target=self.httpd.serve_forever,

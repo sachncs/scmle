@@ -9,6 +9,7 @@ import argparse
 from collections.abc import Sequence
 import json
 import logging
+import os
 import pathlib
 import sys
 import threading
@@ -41,6 +42,7 @@ from scmle.governance import loop as loop_module
 from scmle.inference import mapping as mapping_module
 from scmle.inference import serving
 from scmle.optimization import optimizers
+from scmle.security import access
 
 LOGGER = logging.getLogger(__name__)
 EXIT_OK = 0
@@ -560,7 +562,12 @@ class ServeCommand(Command):
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
-        adapter = serving.HttpServing(model, args.host, args.port)
+        adapter = serving.HttpServing(
+            model,
+            args.host,
+            args.port,
+            gateway=access.gateway_from_environment(os.environ),
+        )
         adapter.start()
         LOGGER.info("serving %s on %s", model.info.model_name, adapter.address)
         try:

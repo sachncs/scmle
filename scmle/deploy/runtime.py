@@ -22,6 +22,7 @@ from scmle.contracts import errors
 from scmle.deploy import verify
 from scmle.inference import guard
 from scmle.inference import serving
+from scmle.security import access
 
 LOGGER = logging.getLogger("service")
 DEFAULT_HOST = "0.0.0.0"  # nosec B104 - a container service binds all interfaces
@@ -39,7 +40,12 @@ def number(environ: Mapping[str, str], name: str, default: float) -> float:
 
 
 def settings(environ: Mapping[str, str]) -> dict[str, Any]:
-    """The `HttpServing` keywords an environment asks for."""
+    """The `HttpServing` keywords an environment asks for.
+
+    The default host is every interface, so a service started without the
+    `SCMLE_AUTH_*` settings is refused by `HttpServing` unless `HOST` is a
+    loopback address: no container exposes an unauthenticated backend.
+    """
     return {
         "host": environ.get("HOST", DEFAULT_HOST),
         "port": int(number(environ, "PORT", 8000)),
@@ -63,6 +69,7 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
         ),
         "on_null": environ.get("SCMLE_ON_NULL", "impute"),
         "on_unseen": environ.get("SCMLE_ON_UNSEEN", "report"),
+        "gateway": access.gateway_from_environment(environ),
     }
 
 

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+* Security (F14 item 4, local half; `scmle.security`, `docs/TENANT_ISOLATION.md`).
+  Bearer-token verification with the standard library only: JWT with HS256 or
+  RS256 (RS256 is the RFC 8017 PKCS#1 v1.5 check, so only public keys are
+  held), a required `kid`, a key set that rotates by replacement and per-key
+  `nbf`/`exp` windows, `iss`, `aud`, `exp`, `nbf`, `iat` checks with a bounded
+  leeway, the `none` algorithm and algorithm confusion refused, and revocation
+  by token id, subject or key id (a revocation file that cannot be read
+  refuses every token). `Gateway` applies scopes per route (`model:read`,
+  `model:predict`), the deployment's tenant, a per-subject token bucket and a
+  limit on refused attempts; refusals are a fixed 401, 403 or 429 body that
+  never names the failed check. Activation, access and key rotation are
+  `audit` rows of the existing hash-chained deployment ledger (new row kind).
+  Behaviour changes: `HttpServing` gained the keyword-only `gateway` and
+  refuses to listen beyond loopback without one; `ModalityHttpServing` gained
+  `set_gateway` (its pinned constructor is unchanged) and its `start` refuses
+  the same; `scmle serve` and the generated service read `SCMLE_AUTH_*`, so
+  the generated image, which binds every interface, no longer starts without
+  them; the compose services get the published demo identity settings and the
+  test runner mints a demo token. `scmle.security.*` is pinned as an extension
+  surface in `tests/fixtures/public_api.json`. Not done: no TLS, workload
+  identity or managed keys in any cloud, no OIDC discovery or JWKS fetch over
+  the network (the key set is a file), and the compose path was not run.
 * Local environment (F14 item 1; `compose.yaml`, `Makefile`, `deploy/`,
   `scmle.deploy.demo`, `scmle.deploy.mocks`, `docs/LOCAL.md`). `make demo` trains
   and evaluates a good model and a bad release from explicit datasets in

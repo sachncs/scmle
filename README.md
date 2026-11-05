@@ -232,8 +232,9 @@ installed into a clean environment.
   stratified splits, to choose the test rows). All other profiling, feature
   selection, leakage detection and the fingerprint use the development
   partition alone.
-* The HTTP serving adapter is a minimal reference server (no authentication
-  or TLS); run it behind a gateway.
+* The HTTP serving adapter is a minimal reference server: it verifies bearer
+  tokens when configured (and refuses a non-loopback bind without them) but
+  has no TLS; terminate TLS at an ingress.
 * PyTorch and Keras model families ship with the `deeplearning` extra and run
   in a separate worker process (two OpenMP runtimes in one process crash).
   TabPFN (the `tabpfn` extra) stays extension-only and needs its own license

@@ -148,6 +148,19 @@ Because it sits below `scmle.__all__`, no entry of `exports` in
 removed` and `extension contract changed` for it. The spec format is
 versioned (`SPEC_FORMAT`); `from_dict` refuses any other format.
 
+## Security surface
+
+`scmle.security.tokens`, `scmle.security.access` and `scmle.security.audit`
+are extension surfaces like `scmle.deploy.contract`: token verification
+(`TokenVerifier`, `KeySet`, `VerificationKey`, `RevocationList`, `Principal`),
+the request gateway (`Gateway`, `RateLimiter`, `AccessDenied`) and the audit
+log (`AuditLog`) are pinned in the snapshot's `extension_surfaces` block, and
+no `exports` entry changed. Behaviour changes to existing classes:
+`HttpServing` gained the keyword-only `gateway` and refuses a non-loopback
+`host` without one; `ModalityHttpServing` kept its constructor, gained
+`set_gateway`, and `start` refuses a non-loopback `host` without a gateway.
+The deployment ledger gained the row kind `audit`.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 
