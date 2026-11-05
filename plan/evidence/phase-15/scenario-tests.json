@@ -1,0 +1,1124 @@
+{
+  "all": [
+    {
+      "id": "tests.unit.test_security_tokens::test_a_valid_hs256_token_gives_a_principal",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_a_valid_rs256_token_gives_a_principal",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_scopes_may_arrive_as_a_list",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_a_signature_from_another_key_is_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_a_tampered_payload_is_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_the_none_algorithm_and_confusion_attacks_are_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[a.b]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[a.b.c.d]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[...]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[not a token]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_expired_and_future_tokens_are_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_the_leeway_is_bounded",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_wrong_issuer_audience_and_missing_claims_are_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_revoked_tokens_subjects_and_keys_are_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_the_revocation_file_is_read_on_every_check_and_fails_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_an_expired_key_stops_verifying_and_a_future_key_is_not_yet_valid",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_rotation_keeps_old_tokens_until_the_old_key_expires",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_weak_or_malformed_keys_are_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_a_key_set_loads_from_a_jwks_file",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_tokens::test_a_short_hs256_secret_cannot_mint",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_probes_are_public_and_everything_else_needs_a_token",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_predict_works_with_the_scope_and_not_without",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_error_bodies_never_say_why",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_a_token_of_another_tenant_is_forbidden",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_the_rate_limit_answers_429_with_retry_after",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_guessing_credentials_is_slowed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_the_request_size_limit_still_applies_behind_the_gateway",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_audit_records_activation_access_and_admin_in_a_valid_chain",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_an_edited_audit_row_breaks_the_chain",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_a_failed_activation_is_audited",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_no_unauthenticated_server_can_listen_beyond_loopback",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_the_runtime_default_host_needs_authentication",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_authentication_settings_need_an_issuer_and_audience",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_the_shipped_compose_file_publishes_no_port_and_secures_the_apis",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_the_generated_image_does_not_turn_authentication_off",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_a_tampered_artifact_never_loads_in_production",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_security_service::test_the_modality_service_is_gated_the_same_way",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_conformance_suite_passes_on_every_backend[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_conformance_suite_passes_on_every_backend[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_conformance_suite_passes_on_every_backend[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_suite_leaves_nothing_behind[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_suite_leaves_nothing_behind[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_suite_leaves_nothing_behind[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_suite_catches_a_backend_that_breaks_a_promise",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_uris_name_the_backend_and_prefix",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_a_local_key_cannot_leave_the_root",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_a_changed_object_is_detected_by_its_recorded_hash[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_a_changed_object_is_detected_by_its_recorded_hash[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_s3_errors_are_translated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_gcs_errors_are_translated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_transient_failures_are_retried_with_the_declared_backoff[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_transient_failures_are_retried_with_the_declared_backoff[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_retries_stop_at_the_budget_and_never_retry_a_permanent_error",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_sdk_factories_import_lazily_and_explain_a_missing_sdk",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_factories_pass_arguments_to_the_sdk_client",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_retry_policy_is_validated_and_deterministic",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_object_store_conformance::test_the_conformance_script_reports_and_sets_its_exit_status",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_every_read_records_identity_schema_freshness_and_lineage[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_every_read_records_identity_schema_freshness_and_lineage[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_every_read_records_identity_schema_freshness_and_lineage[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_snapshot_ids_follow_the_content[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_snapshot_ids_follow_the_content[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_snapshot_ids_follow_the_content[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_staleness_and_schema_drift_are_recorded_not_hidden[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_staleness_and_schema_drift_are_recorded_not_hidden[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_staleness_and_schema_drift_are_recorded_not_hidden[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_read_log_persists_and_traces_lineage[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_read_log_persists_and_traces_lineage[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_read_log_persists_and_traces_lineage[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_unreadable_objects_fail_clearly[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_unreadable_objects_fail_clearly[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_unreadable_objects_fail_clearly[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_phase_9_connector_reads_through_a_store[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_phase_9_connector_reads_through_a_store[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_phase_9_connector_reads_through_a_store[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_contract_is_validated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_clean_dataset_passes_both_stages[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_clean_dataset_passes_both_stages[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_clean_dataset_passes_both_stages[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_fail_policy_stops_the_run_with_the_report[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_fail_policy_stops_the_run_with_the_report[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_fail_policy_stops_the_run_with_the_report[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_row_level_quarantine_removes_and_keeps_the_rows[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_row_level_quarantine_removes_and_keeps_the_rows[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_row_level_quarantine_removes_and_keeps_the_rows[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_dataset_level_quarantine_holds_the_snapshot_until_released[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_dataset_level_quarantine_holds_the_snapshot_until_released[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_dataset_level_quarantine_holds_the_snapshot_until_released[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_warn_policy_records_and_continues[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_warn_policy_records_and_continues[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_warn_policy_records_and_continues[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_rules_apply_only_to_their_stages[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_rules_apply_only_to_their_stages[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_rules_apply_only_to_their_stages[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_schema_drift_and_allowed_values_are_caught[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_schema_drift_and_allowed_values_are_caught[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_schema_drift_and_allowed_values_are_caught[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_gate_needs_rules_and_valid_policies",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_incremental_runs_process_each_object_once_and_deduplicate[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_incremental_runs_process_each_object_once_and_deduplicate[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_incremental_runs_process_each_object_once_and_deduplicate[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_repeated_upload_is_skipped_and_a_changed_input_is_refused[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_repeated_upload_is_skipped_and_a_changed_input_is_refused[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_repeated_upload_is_skipped_and_a_changed_input_is_refused[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_result_is_deterministic",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_crash_between_output_and_checkpoint_recovers_without_duplicates[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_crash_between_output_and_checkpoint_recovers_without_duplicates[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_crash_between_output_and_checkpoint_recovers_without_duplicates[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_transient_failures_are_retried_with_backoff[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_transient_failures_are_retried_with_backoff[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_transient_failures_are_retried_with_backoff[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_gate_runs_before_processing_and_quarantine_is_respected[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_gate_runs_before_processing_and_quarantine_is_respected[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_gate_runs_before_processing_and_quarantine_is_respected[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_damaged_checkpoint_is_never_silently_reset[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_damaged_checkpoint_is_never_silently_reset[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_damaged_checkpoint_is_never_silently_reset[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_second_run_cannot_share_the_checkpoint[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_second_run_cannot_share_the_checkpoint[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_a_second_run_cannot_share_the_checkpoint[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_max_objects_bounds_a_run_and_the_next_continues[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_max_objects_bounds_a_run_and_the_next_continues[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_max_objects_bounds_a_run_and_the_next_continues[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_processing_needs_key_columns",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_governed_data::test_the_frame_dtype_kinds_are_reader_independent",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_run_writes_spec_checkpoints_result_and_manifest[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_run_writes_spec_checkpoints_result_and_manifest[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_run_writes_spec_checkpoints_result_and_manifest[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_reference[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_reference[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_reference[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_retries_are_bounded[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_retries_are_bounded[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_retries_are_bounded[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_transient_failures_retry_and_permanent_ones_do_not[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_transient_failures_retry_and_permanent_ones_do_not[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_transient_failures_retry_and_permanent_ones_do_not[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_run_that_ends_without_a_result_is_a_failure[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_run_that_ends_without_a_result_is_a_failure[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_run_that_ends_without_a_result_is_a_failure[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_the_cost_budget_stops_a_runaway_job[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_the_cost_budget_stops_a_runaway_job[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_the_cost_budget_stops_a_runaway_job[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_the_budget_accumulates_across_attempts[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_the_budget_accumulates_across_attempts[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_the_budget_accumulates_across_attempts[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_timeout_is_final[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_timeout_is_final[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_timeout_is_final[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_finished_run_id_is_idempotent_and_a_different_spec_is_refused[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_finished_run_id_is_idempotent_and_a_different_spec_is_refused[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_finished_run_id_is_idempotent_and_a_different_spec_is_refused[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_crashed_supervisor_continues_the_numbering[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_crashed_supervisor_continues_the_numbering[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_a_crashed_supervisor_continues_the_numbering[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_training_cannot_run_as_serving_or_touch_released_bundles[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_training_cannot_run_as_serving_or_touch_released_bundles[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_training_cannot_run_as_serving_or_touch_released_bundles[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_role_tables_are_separate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_specialised_compute_needs_a_declared_reason_and_specs_are_validated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_checkpoints_skip_a_damaged_newest_one[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_checkpoints_skip_a_damaged_newest_one[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_checkpoints_skip_a_damaged_newest_one[gcs]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_aws_runs_the_same_spec_and_resumes_after_a_spot_interruption",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_aws_budget_and_timeout_stop_the_task",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_aws_requests_carry_gpu_capacity_and_a_stable_spec_digest",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_aws_maps_task_outcomes",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_aws_capacity_failures_at_placement_are_retried",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_gcp_resumes_after_a_preemption_and_matches_the_reference",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_gcp_refuses_mismatched_identity_resources_and_the_serving_account",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_gcp_budget_cancels_the_execution_and_outcomes_are_mapped",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_run_v2_client_wraps_the_sdk_shapes",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_portable_training::test_reproducibility_is_reported_against_declared_tolerances",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.integration.test_runner_project::test_workdir_sync_pushes_changes_and_restores",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.integration.test_runner_project::test_a_project_runs_as_a_job",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.integration.test_runner_project::test_a_cancelled_project_is_interrupted_and_the_retry_resumes_it",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_the_standard_pipeline_is_valid_and_ordered",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_invalid_definitions_are_refused",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_run_waits_for_approval_and_the_approved_step_follows_it[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_run_waits_for_approval_and_the_approved_step_follows_it[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_repeated_invocation_runs_nothing_and_has_the_same_run_id[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_repeated_invocation_runs_nothing_and_has_the_same_run_id[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_second_executor_cannot_work_on_a_run_in_flight[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_second_executor_cannot_work_on_a_run_in_flight[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_max_concurrent_runs_is_enforced[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_max_concurrent_runs_is_enforced[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_partial_failure_skips_dependents_and_resume_runs_only_the_rest[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_partial_failure_skips_dependents_and_resume_runs_only_the_rest[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_interrupted_steps_retry_with_backoff_and_the_same_key[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_interrupted_steps_retry_with_backoff_and_the_same_key[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_retries_are_bounded[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_retries_are_bounded[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_crashed_executor_is_taken_over_after_its_lease[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_crashed_executor_is_taken_over_after_its_lease[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_timeouts_budgets_and_the_run_budget[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_timeouts_budgets_and_the_run_budget[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_step_over_its_own_budget_fails[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_step_over_its_own_budget_fails[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_independent_steps_run_in_parallel_and_a_group_limit_holds[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_independent_steps_run_in_parallel_and_a_group_limit_holds[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_approval_rules_are_enforced[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_approval_rules_are_enforced[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_rejection_or_an_expiry_never_reaches_the_approved_step[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_rejection_or_an_expiry_never_reaches_the_approved_step[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_changed_definition_cannot_continue_an_old_run[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_changed_definition_cannot_continue_an_old_run[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_every_non_approval_step_needs_a_handler[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_every_non_approval_step_needs_a_handler[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_missed_slots_follow_the_declared_policy[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_missed_slots_follow_the_declared_policy[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_slot_that_cannot_start_is_deferred_and_stays_due[local]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_slot_that_cannot_start_is_deferred_and_stays_due[s3]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_schedule_is_required",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_a_training_step_runs_through_a_runner_and_resumes_inside_it",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_the_step_functions_document_is_structurally_valid",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_the_step_functions_validator_finds_structural_problems",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_the_cloud_workflows_document_is_structurally_valid",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_the_cloud_workflows_validator_finds_structural_problems",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.unit.test_workflow::test_schedules_convert_or_are_refused",
+      "outcome": "passed"
+    }
+  ],
+  "failed": 0,
+  "pytest_exit_status": 0,
+  "scenarios": {
+    "checkpoint recovery of incremental processing": [
+      {
+        "id": "tests.unit.test_governed_data::test_a_crash_between_output_and_checkpoint_recovers_without_duplicates[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_governed_data::test_a_crash_between_output_and_checkpoint_recovers_without_duplicates[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_governed_data::test_a_crash_between_output_and_checkpoint_recovers_without_duplicates[gcs]",
+        "outcome": "passed"
+      }
+    ],
+    "cost budget stops a runaway job": [
+      {
+        "id": "tests.unit.test_portable_training::test_the_cost_budget_stops_a_runaway_job[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_the_cost_budget_stops_a_runaway_job[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_the_cost_budget_stops_a_runaway_job[gcs]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_the_budget_accumulates_across_attempts[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_the_budget_accumulates_across_attempts[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_the_budget_accumulates_across_attempts[gcs]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_aws_budget_and_timeout_stop_the_task",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_gcp_budget_cancels_the_execution_and_outcomes_are_mapped",
+        "outcome": "passed"
+      }
+    ],
+    "duplicate invocation": [
+      {
+        "id": "tests.unit.test_workflow::test_a_repeated_invocation_runs_nothing_and_has_the_same_run_id[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_a_repeated_invocation_runs_nothing_and_has_the_same_run_id[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_a_second_executor_cannot_work_on_a_run_in_flight[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_a_second_executor_cannot_work_on_a_run_in_flight[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_max_concurrent_runs_is_enforced[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_max_concurrent_runs_is_enforced[s3]",
+        "outcome": "passed"
+      }
+    ],
+    "interrupted job": [
+      {
+        "id": "tests.unit.test_portable_training::test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_reference[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_reference[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_reference[gcs]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_aws_runs_the_same_spec_and_resumes_after_a_spot_interruption",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_portable_training::test_gcp_resumes_after_a_preemption_and_matches_the_reference",
+        "outcome": "passed"
+      }
+    ],
+    "missed schedule": [
+      {
+        "id": "tests.unit.test_workflow::test_missed_slots_follow_the_declared_policy[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_missed_slots_follow_the_declared_policy[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet[s3]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots[s3]",
+        "outcome": "passed"
+      }
+    ],
+    "partial failure": [
+      {
+        "id": "tests.unit.test_workflow::test_partial_failure_skips_dependents_and_resume_runs_only_the_rest[local]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_workflow::test_partial_failure_skips_dependents_and_resume_runs_only_the_rest[s3]",
+        "outcome": "passed"
+      }
+    ],
+    "security: invalid, revoked, expired credentials; expired keys": [
+      {
+        "id": "tests.unit.test_security_tokens::test_a_tampered_payload_is_refused",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_the_none_algorithm_and_confusion_attacks_are_refused",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[a.b]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[a.b.c.d]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[...]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[not a token]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_malformed_tokens_are_refused[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_expired_and_future_tokens_are_refused",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_revoked_tokens_subjects_and_keys_are_refused",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_tokens::test_an_expired_key_stops_verifying_and_a_future_key_is_not_yet_valid",
+        "outcome": "passed"
+      }
+    ],
+    "security: no unauthenticated backend": [
+      {
+        "id": "tests.unit.test_security_service::test_no_unauthenticated_server_can_listen_beyond_loopback",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_service::test_the_runtime_default_host_needs_authentication",
+        "outcome": "passed"
+      },
+      {
+        "id": "tests.unit.test_security_service::test_the_shipped_compose_file_publishes_no_port_and_secures_the_apis",
+        "outcome": "passed"
+      }
+    ],
+    "security: tampered artifacts": [
+      {
+        "id": "tests.unit.test_security_service::test_a_tampered_artifact_never_loads_in_production",
+        "outcome": "passed"
+      }
+    ]
+  },
+  "skipped": 0,
+  "tests": 229
+}

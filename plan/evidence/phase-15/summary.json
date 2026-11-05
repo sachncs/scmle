@@ -1,0 +1,47 @@
+{
+  "checks": {
+    "conformance_passed": {
+      "gcs-in-memory-client": true,
+      "local": true,
+      "s3-in-memory-client": true
+    },
+    "emitted_structural_problems": {
+      "cloud_workflows": [],
+      "step_functions": []
+    },
+    "interrupted_job_matches_reference": true,
+    "lineage_traced": true,
+    "scenario_tests": {
+      "exit_status": 0,
+      "scenarios_without_a_test": [],
+      "tests": 229
+    },
+    "workflow_scenarios": {
+      "duplicate invocation runs nothing": true,
+      "missed schedule follows the declared policy": true,
+      "partial failure resumes only the rest": true
+    }
+  },
+  "commit": "d6093af6c9d61a871898a51088747a1614032a18",
+  "generated": "2026-11-05T04:22:01+00:00",
+  "local_checks_passed": true,
+  "not_run": [
+    "MinIO, the GCS emulator or any real bucket",
+    "any AWS or GCP account: ECS tasks, Cloud Run jobs, Step Functions, Cloud Workflows, Scheduler, IAM",
+    "Docker or any container",
+    "the reproducibility-tolerance report across local, AWS and GCP",
+    "TLS, workload identity, managed keys",
+    "a cloud dataset ingested, validated, trained on and traced",
+    "cost measured against a bill"
+  ],
+  "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+  "python": "3.14.7",
+  "ran": [
+    "conformance suite on a local directory and S3 and GCS client fakes",
+    "interrupted job resume compared with a local reference",
+    "duplicate invocation, partial failure and missed schedule, local executor",
+    "source-snapshot lineage trace on a local store",
+    "structural validation of the emitted Step Functions and Cloud Workflows",
+    "unit and integration tests for the four work packages"
+  ]
+}

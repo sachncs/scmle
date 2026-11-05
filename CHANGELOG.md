@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+* Phase 15 local evidence (`plan/evidence/phase-15/`,
+  `scripts/make_phase15_evidence.py`, `plan/phase-15-...`, F14). The conformance
+  suite on the local directory and on S3 and GCS in-memory clients, an
+  interrupted job resumed to the local reference's result, duplicate
+  invocation, partial failure and missed-schedule logs, a lineage trace, the
+  emitted workflow definitions with their structural check, and the results of
+  229 scenario tests. The phase plan and F14 now list only what is open: every
+  cloud run (AWS and GCP accounts, a spending cap and a named approver are
+  needed), MinIO and the GCS emulator, the container path, and the
+  reproducibility-tolerance report. None of those ran.
 * Orchestration (F14 item 8, local half; `scmle.workflow`,
   `docs/ORCHESTRATION.md`). One `Workflow` type for ingest, train, evaluate,
   monitor, batch-predict and approval steps with dependencies, per-step

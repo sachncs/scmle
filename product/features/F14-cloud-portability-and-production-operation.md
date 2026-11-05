@@ -33,6 +33,14 @@ monitoring, retraining and rollback to real operational signals.
   `SCMLE_TRUSTED` refused in production, vulnerability gate) and a versioned
   serving contract with `/livez`, `/readyz`, limits, batch and golden-record
   parity. Evidence: `plan/evidence/phase-14/`. The container path was not run.
+- The local halves of items 4, 6, 7 and 8 are built and verified without a
+  cloud account: token verification, scopes, tenant policy, limits and audit
+  (`scmle.security`); object stores, snapshots, quality gates and incremental
+  processing (`scmle.data.store`); the `Runner` interface with local, AWS and
+  GCP adapters (`scmle.runners`); one workflow definition, a local executor
+  and emitted Step Functions and Cloud Workflows definitions
+  (`scmle.workflow`). Evidence: `plan/evidence/phase-15/`. The cloud adapters
+  ran only against scripted or in-memory stand-ins.
 - `scmle/governance/` holds `registry.py`, `lifecycle.py`,
   `deployment_ledger.py`, `keyring.py`, `sbom.py`, `local_faults.py` and the
   closed loop. None reads a cloud control plane.
@@ -52,11 +60,11 @@ and a named approver.
 | 1 | Reproducible local environment | Built; open: run the container path on a machine with Docker, arm64 | none |
 | 2 | Immutable, secure artifacts | Built; open: build and scan a real image, attest its digest, measure two-build reproducibility | Prediction parity and vulnerability gate on AWS and GCP |
 | 3 | Infrastructure as code | Terraform or OpenTofu modules for dev, staging and production per provider; `validate`, lint, policy checks and `plan` in CI | `apply`, test, `destroy`, recorded cost |
-| 4 | Authentication, authorization, security | Token verification and rotation against a mock identity provider, scopes, tenant isolation policy, rate and size limits, safe errors, audit rows, tests for invalid, revoked and expired credentials and tampered bundles | TLS ingress, workload identity and managed keys in each cloud |
+| 4 | Authentication, authorization, security | Built locally (`scmle.security`, `docs/TENANT_ISOLATION.md`); open: OIDC discovery and a network JWKS, revocation distribution, an independent review | TLS ingress, workload identity and managed keys in each cloud |
 | 5 | Online and batch inference | Built (`docs/SERVICE_SLO.md`) | Restart, load and scaling tests on each cloud |
-| 6 | Portable training | A `Runner` interface (local, AWS container job, GCP job) running one project spec; checkpoints and manifests to durable storage; resume after interruption; retries; cost cap; separate training and serving roles | Same spec completing on all three with a reproducibility-tolerance report |
-| 7 | Governed data sources | Object-store interface with local, S3 and GCS backends; snapshot identity, freshness, lineage, quality gates before train and before inference; incremental processing with dedup and checkpoint recovery | One warehouse per cloud, ingest to train to trace on a controlled dataset |
-| 8 | Orchestration | One workflow definition with idempotency keys, durable run ids, dependencies, backoff, concurrency limits, cost budget and a human-approval step; a local executor | Step Functions and Cloud Workflows with Scheduler; duplicate, partial-failure, missed-schedule and interruption runs |
+| 6 | Portable training | Built locally (`scmle.runners`, `docs/PORTABLE_TRAINING.md`); open: exercise the AWS and GCP adapters and their SDK factories against real services | Same spec completing on all three with a reproducibility-tolerance report |
+| 7 | Governed data sources | Built locally (`scmle.data.store`, `docs/GOVERNED_DATA.md`); open: the conformance suite against MinIO and the GCS emulator | One warehouse per cloud, ingest to train to trace on a controlled dataset |
+| 8 | Orchestration | Built locally (`scmle.workflow`, `docs/ORCHESTRATION.md`); open: have the services accept the emitted definitions | Step Functions and Cloud Workflows with Scheduler; duplicate, partial-failure, missed-schedule and interruption runs |
 | 9 | CI/CD release gates | Image build and scan, evidence chain binding commit, model digest, image digest and approver; refusal on any failed gate; workflow linting | Federated short-lived credentials, staging then production, live tests |
 | 10 | Registry bound to the runtime | Reconcile command comparing registry state with a runtime report; states candidate, challenger, approved, production, retired; promotion and rollback that change registry state only after the runtime confirms | Reading the real revision from ECS and Cloud Run, traffic split, previous-revision rollback |
 | 11 | Observability and incidents | Structured logs, trace ids, version attribution, metric exporters, alert rules, pager and ticket webhooks, a classifier separating infrastructure, data-quality and model faults, cost by service and version | CloudWatch and Cloud Monitoring; injected failure and controlled drift |

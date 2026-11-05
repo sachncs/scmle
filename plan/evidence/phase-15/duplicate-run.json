@@ -1,0 +1,22 @@
+{
+  "first_state_before_approval": "waiting_approval",
+  "handler_calls_after_second_invocation": [
+    "ingest",
+    "train",
+    "evaluate",
+    "monitor",
+    "batch_predict"
+  ],
+  "handler_calls_before": [
+    "ingest",
+    "train",
+    "evaluate",
+    "monitor",
+    "batch_predict"
+  ],
+  "run_id": "scmle-pipeline-57237c4e08d88ded",
+  "second_invocation_ran_nothing": true,
+  "second_invocation_run_id": "scmle-pipeline-57237c4e08d88ded",
+  "second_invocation_state": "succeeded",
+  "state_after_approval": "succeeded"
+}

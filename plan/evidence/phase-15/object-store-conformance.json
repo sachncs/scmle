@@ -1,0 +1,254 @@
+{
+  "gcs-in-memory-client": {
+    "backend": "gs:gs://bucket/team/data",
+    "checks": [
+      {
+        "detail": "",
+        "name": "round_trip",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "binary_and_empty",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "large",
+        "passed": true,
+        "seconds": 0.0007
+      },
+      {
+        "detail": "",
+        "name": "overwrite",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "missing",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "head_matches_get",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "if_absent",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "if_absent_race",
+        "passed": true,
+        "seconds": 0.0008
+      },
+      {
+        "detail": "",
+        "name": "listing",
+        "passed": true,
+        "seconds": 0.0001
+      },
+      {
+        "detail": "",
+        "name": "pagination",
+        "passed": true,
+        "seconds": 0.0002
+      },
+      {
+        "detail": "",
+        "name": "delete",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "key_rules",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "isolation",
+        "passed": true,
+        "seconds": 0.0
+      }
+    ],
+    "passed": true
+  },
+  "local": {
+    "backend": "file:file:///private/var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/tmpvp0mbt3j/root",
+    "checks": [
+      {
+        "detail": "",
+        "name": "round_trip",
+        "passed": true,
+        "seconds": 0.0008
+      },
+      {
+        "detail": "",
+        "name": "binary_and_empty",
+        "passed": true,
+        "seconds": 0.001
+      },
+      {
+        "detail": "",
+        "name": "large",
+        "passed": true,
+        "seconds": 0.0021
+      },
+      {
+        "detail": "",
+        "name": "overwrite",
+        "passed": true,
+        "seconds": 0.0009
+      },
+      {
+        "detail": "",
+        "name": "missing",
+        "passed": true,
+        "seconds": 0.0007
+      },
+      {
+        "detail": "",
+        "name": "head_matches_get",
+        "passed": true,
+        "seconds": 0.0007
+      },
+      {
+        "detail": "",
+        "name": "if_absent",
+        "passed": true,
+        "seconds": 0.0013
+      },
+      {
+        "detail": "",
+        "name": "if_absent_race",
+        "passed": true,
+        "seconds": 0.0039
+      },
+      {
+        "detail": "",
+        "name": "listing",
+        "passed": true,
+        "seconds": 0.0039
+      },
+      {
+        "detail": "",
+        "name": "pagination",
+        "passed": true,
+        "seconds": 0.0104
+      },
+      {
+        "detail": "",
+        "name": "delete",
+        "passed": true,
+        "seconds": 0.0009
+      },
+      {
+        "detail": "",
+        "name": "key_rules",
+        "passed": true,
+        "seconds": 0.0005
+      },
+      {
+        "detail": "",
+        "name": "isolation",
+        "passed": true,
+        "seconds": 0.0021
+      }
+    ],
+    "passed": true
+  },
+  "s3-in-memory-client": {
+    "backend": "s3:s3://bucket/team/data",
+    "checks": [
+      {
+        "detail": "",
+        "name": "round_trip",
+        "passed": true,
+        "seconds": 0.0001
+      },
+      {
+        "detail": "",
+        "name": "binary_and_empty",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "large",
+        "passed": true,
+        "seconds": 0.0008
+      },
+      {
+        "detail": "",
+        "name": "overwrite",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "missing",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "head_matches_get",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "if_absent",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "if_absent_race",
+        "passed": true,
+        "seconds": 0.001
+      },
+      {
+        "detail": "",
+        "name": "listing",
+        "passed": true,
+        "seconds": 0.0001
+      },
+      {
+        "detail": "",
+        "name": "pagination",
+        "passed": true,
+        "seconds": 0.0003
+      },
+      {
+        "detail": "",
+        "name": "delete",
+        "passed": true,
+        "seconds": 0.0
+      },
+      {
+        "detail": "",
+        "name": "key_rules",
+        "passed": true,
+        "seconds": 0.0001
+      },
+      {
+        "detail": "",
+        "name": "isolation",
+        "passed": true,
+        "seconds": 0.0
+      }
+    ],
+    "passed": true
+  }
+}

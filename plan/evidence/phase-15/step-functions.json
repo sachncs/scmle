@@ -1,0 +1,308 @@
+{
+  "controls": {
+    "approved_steps": [
+      "batch_predict"
+    ],
+    "concurrency_groups": {
+      "train": [
+        "train",
+        1
+      ]
+    },
+    "max_concurrent_runs": 1,
+    "run_cost_budget": null,
+    "step_cost_budgets": {}
+  },
+  "definition": {
+    "Comment": "scmle-pipeline v1 (2314a45e7a1f); the execution name is the idempotency key",
+    "StartAt": "Layer0",
+    "States": {
+      "Layer0": {
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "RunFailed",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Comment": "ingest; effect: automatic",
+        "Next": "Layer1",
+        "Parameters": {
+          "Cluster": "CLUSTER_ARN",
+          "Overrides": {
+            "ContainerOverrides": [
+              {
+                "Environment": [
+                  {
+                    "Name": "SCMLE_STEP",
+                    "Value": "ingest"
+                  },
+                  {
+                    "Name": "SCMLE_IDEMPOTENCY_KEY",
+                    "Value.$": "$$.Execution.Name"
+                  }
+                ],
+                "Name": "step"
+              }
+            ]
+          },
+          "TaskDefinition": "TASK_DEFINITION_ARN"
+        },
+        "Resource": "arn:aws:states:::ecs:runTask.sync",
+        "Retry": [
+          {
+            "BackoffRate": 2.0,
+            "ErrorEquals": [
+              "States.TaskFailed",
+              "States.Timeout"
+            ],
+            "IntervalSeconds": 2,
+            "MaxAttempts": 2,
+            "MaxDelaySeconds": 60
+          }
+        ],
+        "TimeoutSeconds": 3600,
+        "Type": "Task"
+      },
+      "Layer1": {
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "RunFailed",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Comment": "train; effect: automatic",
+        "Next": "Layer2",
+        "Parameters": {
+          "Cluster": "CLUSTER_ARN",
+          "Overrides": {
+            "ContainerOverrides": [
+              {
+                "Environment": [
+                  {
+                    "Name": "SCMLE_STEP",
+                    "Value": "train"
+                  },
+                  {
+                    "Name": "SCMLE_IDEMPOTENCY_KEY",
+                    "Value.$": "$$.Execution.Name"
+                  }
+                ],
+                "Name": "step"
+              }
+            ]
+          },
+          "TaskDefinition": "TASK_DEFINITION_ARN"
+        },
+        "Resource": "arn:aws:states:::ecs:runTask.sync",
+        "Retry": [
+          {
+            "BackoffRate": 2.0,
+            "ErrorEquals": [
+              "States.TaskFailed",
+              "States.Timeout"
+            ],
+            "IntervalSeconds": 2,
+            "MaxAttempts": 2,
+            "MaxDelaySeconds": 60
+          }
+        ],
+        "TimeoutSeconds": 3600,
+        "Type": "Task"
+      },
+      "Layer2": {
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "RunFailed",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Comment": "evaluate; effect: automatic",
+        "Next": "Layer3",
+        "Parameters": {
+          "Cluster": "CLUSTER_ARN",
+          "Overrides": {
+            "ContainerOverrides": [
+              {
+                "Environment": [
+                  {
+                    "Name": "SCMLE_STEP",
+                    "Value": "evaluate"
+                  },
+                  {
+                    "Name": "SCMLE_IDEMPOTENCY_KEY",
+                    "Value.$": "$$.Execution.Name"
+                  }
+                ],
+                "Name": "step"
+              }
+            ]
+          },
+          "TaskDefinition": "TASK_DEFINITION_ARN"
+        },
+        "Resource": "arn:aws:states:::ecs:runTask.sync",
+        "Retry": [
+          {
+            "BackoffRate": 2.0,
+            "ErrorEquals": [
+              "States.TaskFailed",
+              "States.Timeout"
+            ],
+            "IntervalSeconds": 2,
+            "MaxAttempts": 2,
+            "MaxDelaySeconds": 60
+          }
+        ],
+        "TimeoutSeconds": 3600,
+        "Type": "Task"
+      },
+      "Layer3": {
+        "Branches": [
+          {
+            "StartAt": "approve",
+            "States": {
+              "approve": {
+                "Comment": "waits for a signed approval; approvers: ml-owner, second",
+                "End": true,
+                "Parameters": {
+                  "MessageBody": {
+                    "execution.$": "$$.Execution.Name",
+                    "step": "approve",
+                    "token.$": "$$.Task.Token"
+                  },
+                  "QueueUrl": "APPROVAL_QUEUE_URL"
+                },
+                "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+                "TimeoutSeconds": 7200,
+                "Type": "Task"
+              }
+            }
+          },
+          {
+            "StartAt": "monitor",
+            "States": {
+              "monitor": {
+                "Comment": "monitor; effect: automatic",
+                "End": true,
+                "Parameters": {
+                  "Cluster": "CLUSTER_ARN",
+                  "Overrides": {
+                    "ContainerOverrides": [
+                      {
+                        "Environment": [
+                          {
+                            "Name": "SCMLE_STEP",
+                            "Value": "monitor"
+                          },
+                          {
+                            "Name": "SCMLE_IDEMPOTENCY_KEY",
+                            "Value.$": "$$.Execution.Name"
+                          }
+                        ],
+                        "Name": "step"
+                      }
+                    ]
+                  },
+                  "TaskDefinition": "TASK_DEFINITION_ARN"
+                },
+                "Resource": "arn:aws:states:::ecs:runTask.sync",
+                "Retry": [
+                  {
+                    "BackoffRate": 2.0,
+                    "ErrorEquals": [
+                      "States.TaskFailed",
+                      "States.Timeout"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 2,
+                    "MaxDelaySeconds": 60
+                  }
+                ],
+                "TimeoutSeconds": 3600,
+                "Type": "Task"
+              }
+            }
+          }
+        ],
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "RunFailed",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Next": "Layer4",
+        "Type": "Parallel"
+      },
+      "Layer4": {
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "RunFailed",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Comment": "batch_predict; effect: approved",
+        "Next": "RunSucceeded",
+        "Parameters": {
+          "Cluster": "CLUSTER_ARN",
+          "Overrides": {
+            "ContainerOverrides": [
+              {
+                "Environment": [
+                  {
+                    "Name": "SCMLE_STEP",
+                    "Value": "batch_predict"
+                  },
+                  {
+                    "Name": "SCMLE_IDEMPOTENCY_KEY",
+                    "Value.$": "$$.Execution.Name"
+                  }
+                ],
+                "Name": "step"
+              }
+            ]
+          },
+          "TaskDefinition": "TASK_DEFINITION_ARN"
+        },
+        "Resource": "arn:aws:states:::ecs:runTask.sync",
+        "Retry": [
+          {
+            "BackoffRate": 2.0,
+            "ErrorEquals": [
+              "States.TaskFailed",
+              "States.Timeout"
+            ],
+            "IntervalSeconds": 2,
+            "MaxAttempts": 2,
+            "MaxDelaySeconds": 60
+          }
+        ],
+        "TimeoutSeconds": 3600,
+        "Type": "Task"
+      },
+      "RunFailed": {
+        "Cause": "a step failed, was rejected or expired",
+        "Error": "WorkflowFailed",
+        "Type": "Fail"
+      },
+      "RunSucceeded": {
+        "Type": "Succeed"
+      }
+    }
+  },
+  "schedule": "rate(1 hour)",
+  "structural_problems": []
+}
