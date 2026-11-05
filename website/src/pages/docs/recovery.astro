@@ -13,7 +13,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <h2>The recovery loop</h2>
   <div class="diagram">
     <div class="diagram-caption"><span>Recovery sequence</span><strong>observe before you mutate</strong></div>
-    <div class="data-path">
+    <div class="data-path" role="region" tabindex="0" aria-label="Recovery sequence diagram, scrolls sideways on narrow screens">
       <div class="path-step highlighted"><span>01</span><b>Observe failure</b></div><i class="path-line"></i>
       <div class="path-step"><span>02</span><b>Quarantine output</b></div><i class="path-line"></i>
       <div class="path-step"><span>03</span><b>Verify identity</b></div><i class="path-line"></i>

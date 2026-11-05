@@ -188,3 +188,17 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
 .docs-content .subordinate table th, .docs-content .subordinate table td { font-size: 0.8125rem; padding: 8px 12px; }
 .docs-content .subordinate .model-table { border-style: dashed; }
 .docs-content .tag-single { background: var(--bg-alt); border: 1px solid var(--line-strong); border-radius: 999px; color: var(--text-2); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; margin-left: 8px; padding: 2px 8px; text-transform: uppercase; vertical-align: middle; white-space: nowrap; }
+
+/* Scrollable regions: a visible edge cue and a visible keyboard focus ring */
+.docs-content .data-path, .docs-content .model-table, .docs-content .capability-table, .table-wrap {
+  --edge: var(--bg);
+  background:
+    linear-gradient(90deg, var(--edge) 30%, transparent) left center / 36px 100% no-repeat local,
+    linear-gradient(270deg, var(--edge) 30%, transparent) right center / 36px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.22), transparent) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.22), transparent) right center / 12px 100% no-repeat scroll;
+}
+.docs-content .diagram .data-path, .docs-content .diagram.data-path { --edge: var(--bg-alt); }
+.docs-content .data-path:focus-visible, .docs-content .model-table:focus-visible, .docs-content .capability-table:focus-visible, .table-wrap:focus-visible, .docs-content pre:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+}
