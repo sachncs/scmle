@@ -2,6 +2,7 @@
 
 import json
 import re
+import threading
 from typing import cast
 import urllib.error
 import urllib.request
@@ -365,3 +366,73 @@ def test_modality_http_serving_rejects_unsafe_request_identity(
         assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
     finally:
         serving.stop()
+
+
+def started_modality_service(tmp_path, limits=None):
+    reference = adapter()
+    report = modality_lifecycle.ModalityLifecycle().run(
+        reference, tmp_path / "package", signing_key="serving-key"
+    )
+    predictor = modality_lifecycle.ModalityPredictor.from_package(
+        reference, report.package.path, "serving-key"
+    )
+    service = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
+    if limits:
+        service.set_limits(*limits)
+    service.start()
+    return service, predictor
+
+
+SAMPLE_PAYLOAD = {
+    "samples": [{"document_id": "d1", "content": "alpha beta", "label": "a"}]
+}
+
+
+def test_modality_service_has_liveness_readiness_and_identity(tmp_path):
+    service, predictor = started_modality_service(tmp_path)
+    try:
+        with urllib.request.urlopen(f"{service.address}/livez") as response:
+            assert json.loads(response.read())["status"] == "alive"
+        with urllib.request.urlopen(f"{service.address}/readyz") as response:
+            ready = json.loads(response.read())
+        assert ready["ready"] is True
+        assert set(ready["completed"]) == {"verifying", "loading", "warming"}
+        digest = "sha256:" + predictor.package.model_sha256
+        assert ready["artifact_digest"] == digest
+        status, body = post(f"{service.address}/predict", SAMPLE_PAYLOAD)
+        assert status == 200
+        assert body["schema_version"] == "1"
+        assert body["artifact_digest"] == digest
+        assert body["model_version"] == digest
+    finally:
+        service.stop()
+
+
+def test_modality_service_limits_concurrency_and_time(tmp_path, monkeypatch):
+    service = started_modality_service(tmp_path, (1, 0.3))[0]
+    gate = threading.Event()
+    entered = threading.Event()
+    original = service.response
+
+    def slow(payload):
+        entered.set()
+        gate.wait(5)
+        return original(payload)
+
+    monkeypatch.setattr(service, "response", slow)
+    holder = []
+    try:
+        worker = threading.Thread(
+            target=lambda: holder.append(
+                post(f"{service.address}/predict", SAMPLE_PAYLOAD)
+            )
+        )
+        worker.start()
+        assert entered.wait(5)
+        status, body = post(f"{service.address}/predict", SAMPLE_PAYLOAD)
+        assert status == 429 and body["category"] == "overloaded"
+        worker.join(10)
+        assert holder[0][0] == 504 and holder[0][1]["category"] == "timeout"
+    finally:
+        gate.set()
+        service.stop()

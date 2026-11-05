@@ -20,6 +20,8 @@ import numpy as np
 
 from scmle.contracts import errors
 from scmle.contracts import modalities
+from scmle.contracts import serving as serving_contract
+from scmle.inference import guard
 from scmle.models import modality_lifecycle
 
 MAX_MODALITY_REQUEST_BYTES = 16 * 1024 * 1024
@@ -43,9 +45,17 @@ class ModalitySampleDecoder(abc.ABC):
 class ModalityHttpServing:
     """Serve a verified modality predictor through a bounded HTTP reference API.
 
-    Endpoints are ``GET /health``, ``GET /schema``, and ``POST /predict`` with
-    ``{"samples": ...}``. Authentication, TLS, transport-specific decoding,
-    and operational paging remain deployment-owner responsibilities.
+    Endpoints are ``GET /livez``, ``GET /readyz``, ``GET /health``,
+    ``GET /schema``, and ``POST /predict`` with ``{"samples": ...}``. The
+    predictor is verified when it is loaded, so the service is ready once
+    started; the warm-up step is recorded as skipped because a caller-owned
+    decoder has no synthetic sample. At most 8 requests run at once (429
+    beyond) and a scoring call past 30 seconds answers 504; ``set_limits``
+    changes both. Every response carries the schema version and the package
+    digest, which doubles as the model version because modality packages
+    carry no separate label. Authentication, TLS, transport-specific
+    decoding, and operational paging remain deployment-owner
+    responsibilities.
     """
 
     def __init__(
@@ -80,6 +90,15 @@ class ModalityHttpServing:
         self.max_samples = max_samples
         self.require_lifecycle_report = require_lifecycle_report
         self.lock = threading.Lock()
+        self.admission = guard.AdmissionControl(8, 30.0)
+        self.readiness = guard.Readiness()
+        for step in guard.STEPS[:2]:
+            self.readiness.begin(step)
+            self.readiness.complete(step, "verified when the predictor loaded")
+        self.readiness.begin(guard.Phase.WARMING)
+        self.readiness.complete(
+            guard.Phase.WARMING, "skipped: the decoder is owned by the caller"
+        )
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
 
@@ -89,6 +108,29 @@ class ModalityHttpServing:
         if self.httpd is None:
             raise errors.ScmleError("server is not running")
         return f"http://{self.host}:{self.httpd.server_address[1]}"
+
+    def set_limits(
+        self, max_concurrent: int, scoring_timeout_seconds: float
+    ) -> None:
+        """Replaces the concurrency and scoring-time limits before `start`.
+
+        The constructor signature is part of the pinned public API, so the
+        limits (default 8 in flight, 30 seconds) are set here.
+
+        Raises:
+            ScmleError: If the server is running.
+        """
+        if self.httpd is not None:
+            raise errors.ScmleError("limits cannot change while running")
+        self.admission.close()
+        self.admission = guard.AdmissionControl(
+            max_concurrent, scoring_timeout_seconds
+        )
+
+    @property
+    def artifact_digest(self) -> str:
+        """The `sha256:` digest of the verified model package."""
+        return "sha256:" + self.predictor.package.model_sha256
 
     def response(self, payload: object) -> dict[str, object]:
         """Decode samples and return deterministic predictions."""
@@ -103,6 +145,9 @@ class ModalityHttpServing:
             predictions = self.predictor.predict(samples)
             probabilities = self.predictor.predict_proba(samples)
         return {
+            "schema_version": serving_contract.SCHEMA_VERSION,
+            "model_version": self.artifact_digest,
+            "artifact_digest": self.artifact_digest,
             "modality": modalities.modality_value(
                 self.predictor.adapter.modality
             ),
@@ -181,12 +226,29 @@ class ModalityHttpServing:
                         request_id,
                     )
                     return
-                if self.path == "/health":
-                    self.send_json(200, adapter.predictor.health(), request_id)
+                if self.path == "/livez":
+                    self.send_json(200, {"status": "alive"}, request_id)
+                elif self.path == "/readyz":
+                    state = adapter.readiness.snapshot()
+                    self.send_json(
+                        200 if state["ready"] else 503,
+                        {**state, "artifact_digest": adapter.artifact_digest},
+                        request_id,
+                    )
+                elif self.path == "/health":
+                    self.send_json(
+                        200,
+                        {
+                            **adapter.predictor.health(),
+                            "artifact_digest": adapter.artifact_digest,
+                        },
+                        request_id,
+                    )
                 elif self.path == "/schema":
                     self.send_json(
                         200,
                         {
+                            "schema_version": serving_contract.SCHEMA_VERSION,
                             "modality": (
                                 modalities.modality_value(
                                     adapter.predictor.adapter.modality
@@ -282,7 +344,23 @@ class ModalityHttpServing:
                             request_id,
                         )
                         return
-                    self.send_json(200, adapter.response(payload), request_id)
+                    with adapter.admission.admit():
+                        response = adapter.admission.run(
+                            lambda: adapter.response(payload)
+                        )
+                    self.send_json(200, response, request_id)
+                except guard.OverloadedError as error:
+                    self.send_json(
+                        429,
+                        {"error": str(error), "category": error.category},
+                        request_id,
+                    )
+                except guard.DeadlineError as error:
+                    self.send_json(
+                        504,
+                        {"error": str(error), "category": error.category},
+                        request_id,
+                    )
                 except OverflowError as error:
                     self.send_json(
                         413,
@@ -328,6 +406,7 @@ class ModalityHttpServing:
             self.httpd.server_close()
         if self.thread is not None:
             self.thread.join(timeout=5)
+        self.admission.close()
         self.httpd = None
         self.thread = None
 

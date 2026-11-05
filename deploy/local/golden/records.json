@@ -1,0 +1,15 @@
+{
+  "comment": "Golden records: ordinary rows, a null number, a null category, a category never seen, an extra column and extreme values.",
+  "records": [
+    {"age": 52.0, "balance": 2300.0, "plan": "pro"},
+    {"age": 31.0, "balance": 400.0, "plan": "basic"},
+    {"age": 40.0, "balance": 1500.0, "plan": "basic"},
+    {"age": null, "balance": 900.0, "plan": "pro"},
+    {"age": 45.0, "balance": null, "plan": "basic"},
+    {"age": 38.0, "balance": 1200.0, "plan": null},
+    {"age": 60.0, "balance": 3100.0, "plan": "enterprise"},
+    {"age": 29.0, "balance": 150.0, "plan": "pro", "note": "extra column"},
+    {"age": 95.0, "balance": 25000.0, "plan": "pro"},
+    {"age": -20.0, "balance": -5000.0, "plan": "basic"}
+  ]
+}

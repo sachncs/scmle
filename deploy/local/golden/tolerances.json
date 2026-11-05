@@ -1,0 +1,5 @@
+{
+  "comment": "Declared before the first comparison and not tuned afterwards. Labels must match exactly. same_process compares paths that run the same code in one interpreter; cross_environment compares another machine, architecture or library build.",
+  "same_process": {"label": "exact", "probability_abs": 1e-9},
+  "cross_environment": {"label": "exact", "probability_abs": 1e-6}
+}

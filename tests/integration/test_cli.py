@@ -89,6 +89,7 @@ def test_commands_are_polymorphic():
         "resume",
         "catalog",
         "predict",
+        "batch",
         "serve",
         "export-onnx",
         "package",

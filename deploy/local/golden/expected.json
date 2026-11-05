@@ -1,0 +1,31 @@
+{
+  "comment": "Closed-form outputs of model_spec.json on records.json. Regenerate with scripts/make_serving_golden.py; never edit by hand.",
+  "classes": [
+    0,
+    1
+  ],
+  "labels": [
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    1,
+    0,
+    0
+  ],
+  "probability_of_class_1": [
+    0.7613327148429104,
+    0.3469438867133872,
+    0.35434369377420455,
+    0.7455466141264027,
+    0.528095374408387,
+    0.4569816192756901,
+    0.5986876601124521,
+    0.6601022701532934,
+    6.857595613644077e-05,
+    0.20792148327471938
+  ]
+}

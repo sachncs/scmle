@@ -1,5 +1,7 @@
 """Schema validation of inference input against a bundle's contract."""
 
+from typing import Any
+
 import pandas as pd
 
 from scmle.contracts import artifacts
@@ -52,6 +54,44 @@ class InputValidator:
             },
             unseen_categories=unseen,
         )
+
+    def row_report(self, frame: pd.DataFrame) -> list[dict[str, Any]]:
+        """Describes each row: its null features and its unseen categories.
+
+        Args:
+            frame: Incoming data with already-normalized column names.
+
+        Returns:
+            One mapping per row with `missing` (feature columns that are null
+            in that row) and `unseen` (categorical column -> value never seen
+            in training). Columns absent from the frame are a schema error
+            reported by `report`, not row facts.
+        """
+        wanted = [c for c in self.schema.features if c in frame.columns]
+        null_mask = frame[wanted].isna() if wanted else frame.iloc[:, :0]
+        unseen_values: dict[str, pd.Series] = {}
+        for column in self.schema.categorical:
+            if column in frame.columns:
+                known = set(self.schema.known_categories[column])
+                values = frame[column]
+                unseen_values[column] = values.notna() & ~values.astype(
+                    str
+                ).isin(known)
+        rows = []
+        for position in range(len(frame)):
+            rows.append(
+                {
+                    "missing": [
+                        c for c in wanted if bool(null_mask.iloc[position][c])
+                    ],
+                    "unseen": {
+                        column: str(frame[column].iloc[position])
+                        for column, flags in unseen_values.items()
+                        if bool(flags.iloc[position])
+                    },
+                }
+            )
+        return rows
 
     def check(self, frame: pd.DataFrame) -> None:
         """Raises when the data cannot be scored.

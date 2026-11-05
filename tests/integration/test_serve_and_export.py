@@ -74,10 +74,9 @@ def test_the_server_rejects_empty_prediction_requests(saved):
         adapter.stop()
 
     assert status == 400
-    assert body == {
-        "error": "malformed request: records must not be empty",
-        "category": "request",
-    }
+    assert body["error"] == "malformed request: records must not be empty"
+    assert body["category"] == "request"
+    assert body["schema_version"] == "1" and body["request_id"]
 
 
 def test_the_server_refuses_oversized_bodies_with_413(saved):
@@ -166,10 +165,9 @@ def test_the_server_classifies_malformed_and_internal_requests(
             f"{adapter.address}/predict", {"records": [{"a": 1.0, "b": 2.0}]}
         )
         assert status == 500
-        assert body == {
-            "error": "internal serving failure",
-            "category": "internal",
-        }
+        assert body["error"] == "internal serving failure"
+        assert body["category"] == "internal"
+        assert "model failed" not in json.dumps(body)
     finally:
         adapter.stop()
 

@@ -12,6 +12,8 @@ test under `tests/unit/`. Run any script with `uv run python scripts/<name>.py`.
 | `check_test_stability.py` | Repeats tests and applies the quarantine policy in `tests/quarantine.json` (owner, reason, expiry). | `full-suite.yml` |
 | `check_mutation_score.sh` | Mutation score of the critical modules in `setup.cfg` is at least the given minimum (default 70). | `full-suite.yml` |
 | `check_dependency_licenses.py` | The runtime dependency closure has a license record and no copyleft license. | `ci.yml` |
+| `make_serving_golden.py` | The golden expected outputs in `deploy/local/golden/` equal the closed form of the hand-written reference model (`--check`). | tests |
+| `check_serving_parity.py` | A running service returns the golden labels and probabilities within the declared tolerance, with version and artifact digest. | local demo, tests |
 | `verify_hosted_controls.py` | Workflows pin every action to a commit SHA, never use `pull_request_target`, and keep their required control steps; optionally probes a live Pages URL with unauthenticated GETs. | `ci.yml`, `pages.yml`, `site.yml` |
 | `verify_release_artifacts.sh` | Two builds are byte-identical and the wheel installs and runs without an index. | `ci.yml`, `release.yml` |
 | `verify_external_release.py` | After publishing, the public tag and the PyPI files match the locally built artifacts by digest. | `release.yml` |

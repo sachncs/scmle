@@ -1,0 +1,20 @@
+{
+  "comment": "A logistic model written out by hand. Every number below is the model: nothing is fitted, so every platform serves the same function.",
+  "model_name": "golden_reference",
+  "model_version": "golden-1",
+  "target": "churned",
+  "numeric": ["age", "balance"],
+  "categorical": ["plan"],
+  "categories": ["basic", "pro"],
+  "median": {"age": 40.0, "balance": 1000.0},
+  "mean": {"age": 40.0, "balance": 1500.0},
+  "scale": {"age": 10.0, "balance": 800.0},
+  "coefficients": {
+    "age": 0.8,
+    "balance": -0.5,
+    "plan=basic": -0.4,
+    "plan=pro": 0.9
+  },
+  "intercept": -0.2,
+  "classes": [0, 1]
+}

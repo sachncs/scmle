@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+* Serving contract (F14 item 5; `scmle.inference.serving`, `guard`, `parity`,
+  `scmle.contracts.serving`, `docs/SERVICE_SLO.md`). Request and response
+  schema version 1 with a `/v1/predict` alias; every response carries
+  `schema_version`, `request_id`, `model_version`, `artifact_digest` (digest of
+  the canonical bundle manifest) and `schema_digest`, plus one `rows` entry per
+  record listing null features and unseen categories. New `GET /livez` and
+  `GET /readyz`: ready only after verify, load and warm-up, otherwise 503 with
+  the phase and reason (`HttpServing(loader=...)` keeps the process alive and
+  never ready when verification fails). Limits: requests in flight (429),
+  scoring time (504), body size and record count (413). Policies `on_null` and
+  `on_unseen` accept `reject` (422 `data_policy`); a record without a required
+  key is a 422; `expected_schema_digest` and an unknown `schema_version` are a
+  409 `schema_change`. New `scmle batch` shares `respond_frame` with the online
+  path and writes a manifest with the version and digest. The modality service
+  gained `/livez`, `/readyz`, the same limits (`set_limits`; its pinned constructor is unchanged) and the digest and version.
+  Behaviour changes: the error body now carries `schema_version` and
+  `request_id`; `ServingAdapter.respond_locked` is gone (use `respond_frame`);
+  `HttpServing(bundle)` warms up in `start()` and answers 503 before that
+  finishes. The golden-record suite (`deploy/local/golden/`, hand-written model,
+  closed-form expectations, tolerances declared in advance) is checked in
+  process, online and in batch, and by `scripts/check_serving_parity.py` against
+  any running service. Not done: no load, restart or scaling test, no cloud
+  result.
 * Deployment contract (F14 item 1; `scmle.deploy.contract`). One typed,
   versioned `DeploymentSpec` (image by digest, bundle by manifest digest,
   configuration, secret references, resources, health, version) that a

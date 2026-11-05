@@ -2,12 +2,16 @@
 
 `ServingAdapter` is the contract; `BatchServing` scores files and
 `HttpServing` exposes a JSON API using only the standard library, so serving
-needs no extra dependencies.
+needs no extra dependencies. Online and batch scoring share one path,
+`ServingAdapter.respond_frame`, so they cannot drift apart: the same
+validation, the same preprocessing, the same model call, the same response.
 """
 
 import abc
+from collections.abc import Callable
 from http import server
 import json
+import logging
 import pathlib
 import threading
 from typing import Any
@@ -17,32 +21,138 @@ import pandas as pd
 from scmle import durability
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
+from scmle.contracts import serving as serving_contract
+from scmle.deploy import provenance
+from scmle.inference import guard
+from scmle.inference import validation
+
+LOGGER = logging.getLogger("scmle.serving")
 
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
 MAX_REQUEST_RECORDS = 10_000
+MAX_CONCURRENT_REQUESTS = 8
+SCORING_TIMEOUT_SECONDS = 30.0
+BATCH_CHUNK_ROWS = 10_000
+Loader = Callable[[guard.Readiness], bundle_module.ModelBundle]
 
 
 class ServingAdapter(abc.ABC):
     """Exposes a model bundle to callers."""
 
-    def __init__(self, bundle: bundle_module.ModelBundle) -> None:
+    def __init__(
+        self,
+        bundle: bundle_module.ModelBundle | None,
+        on_null: str = "impute",
+        on_unseen: str = "report",
+        warmup_records: list[dict[str, Any]] | None = None,
+    ) -> None:
         """Initializes the adapter.
 
         Args:
-            bundle: Model to serve.
+            bundle: Model to serve. `None` defers loading to a subclass that
+                drives `readiness` itself (see `HttpServing`).
+            on_null: `impute` lets the fitted imputers handle null features
+                and reports them per row; `reject` answers 422 instead.
+            on_unseen: `report` scores rows with categories never seen in
+                training and flags them per row; `reject` answers 422.
+            warmup_records: Records for the warm-up call; by default one is
+                derived from the schema.
+
+        Raises:
+            ConfigError: If a policy name is unknown.
         """
-        self.bundle = bundle
+        if on_null not in serving_contract.NULL_POLICIES:
+            raise errors.ConfigError(
+                f"on_null must be in {serving_contract.NULL_POLICIES}"
+            )
+        if on_unseen not in serving_contract.UNSEEN_POLICIES:
+            raise errors.ConfigError(
+                f"on_unseen must be in {serving_contract.UNSEEN_POLICIES}"
+            )
+        self.loaded = bundle
         self.lock = threading.Lock()
+        self.on_null = on_null
+        self.on_unseen = on_unseen
+        self.warmup_records = warmup_records
+        self.readiness = guard.Readiness()
+        if bundle is not None:
+            note = "bundle provided by the caller"
+            self.readiness.begin(guard.Phase.VERIFYING)
+            self.readiness.complete(guard.Phase.VERIFYING, note)
+            self.readiness.begin(guard.Phase.LOADING)
+            self.readiness.complete(guard.Phase.LOADING, note)
+
+    @property
+    def bundle(self) -> bundle_module.ModelBundle:
+        """The loaded bundle.
+
+        Raises:
+            NotReadyError: Before verification and loading finished.
+        """
+        if self.loaded is None:
+            raise guard.NotReadyError("the model is not loaded")
+        return self.loaded
+
+    @property
+    def artifact_digest(self) -> str:
+        """Digest of the manifest of the bundle being served."""
+        return provenance.manifest_digest(self.bundle.info.to_dict())
+
+    @property
+    def schema_digest(self) -> str:
+        """Digest of the input schema of the bundle being served."""
+        return serving_contract.schema_digest(self.bundle.schema.to_dict())
+
+    def synthetic_record(self) -> dict[str, Any] | None:
+        """A record valid for the schema, or None if one cannot be derived."""
+        schema = self.bundle.schema
+        if schema.series or schema.extra_inputs or schema.optional_inputs:
+            return None
+        record: dict[str, Any] = dict.fromkeys(schema.numeric, 0.0)
+        for name in schema.categorical:
+            known = schema.known_categories.get(name) or [""]
+            record[name] = known[0]
+        return record
+
+    def warm_up(self) -> None:
+        """Scores once so the first request does not pay for initialization.
+
+        Marks the warm-up step done, or the service failed. The warm-up call
+        never feeds series history.
+        """
+        self.readiness.begin(guard.Phase.WARMING)
+        try:
+            records = self.warmup_records
+            note = "explicit warm-up records"
+            if records is None:
+                record = self.synthetic_record()
+                records = None if record is None else [record]
+                note = "synthetic record from the schema"
+            if records is None:
+                self.readiness.complete(
+                    guard.Phase.WARMING,
+                    "skipped: no synthetic record for series or extra inputs",
+                )
+                return
+            with self.lock:
+                self.bundle.score(pd.DataFrame(records))
+        except Exception as error:  # reported through readiness
+            LOGGER.error("warm-up failed: %s", error)
+            self.readiness.fail(f"warm-up failed: {type(error).__name__}")
+            return
+        self.readiness.complete(guard.Phase.WARMING, note)
 
     def respond(self, records: list[dict[str, Any]]) -> dict[str, Any]:
         """Scores records and builds the structured response.
 
         Args:
-            records: Feature dictionaries.
+            records: Feature dictionaries. Every record must carry every
+                required feature (null is allowed, a missing key is not).
 
         Returns:
-            Predictions, probabilities (classifiers), model version and
-            schema diagnostics.
+            The version 1 response: predictions, probabilities (classifiers),
+            model version, artifact digest, schema digest, schema diagnostics
+            and one `rows` entry per record.
 
         Raises:
             SchemaError: If the records do not satisfy the model's schema.
@@ -50,15 +160,67 @@ class ServingAdapter(abc.ABC):
         """
         if not records:
             raise ValueError("records must not be empty")
-        with self.lock:
-            return self.respond_locked(records)
+        required = self.bundle.features
+        absent = sorted(
+            {
+                name
+                for record in records
+                for name in required
+                if name not in record
+            }
+        )
+        if absent:
+            raise errors.SchemaError(
+                f"records are missing required features: {absent}",
+                {
+                    "missing": absent,
+                    "records": [
+                        index
+                        for index, record in enumerate(records)
+                        if any(name not in record for name in required)
+                    ][:20],
+                },
+            )
+        return self.respond_frame(pd.DataFrame(records))
 
-    def respond_locked(self, records: list[dict[str, Any]]) -> dict[str, Any]:
-        """Scores records, then remembers them as series history."""
-        frame = pd.DataFrame(records)
-        response = self.bundle.score(frame)
-        self.bundle.remember(frame)
+    def respond_frame(
+        self, frame: pd.DataFrame, remember: bool = True
+    ) -> dict[str, Any]:
+        """The one scoring path, used by online and batch serving."""
+        with self.lock:
+            bundle = self.bundle
+            rows = validation.InputValidator(bundle.schema).row_report(frame)
+            response = bundle.score(frame)
+            self.enforce_policy(rows)
+            if remember:
+                bundle.remember(frame)
+        response.update(
+            {
+                "schema_version": serving_contract.SCHEMA_VERSION,
+                "artifact_digest": self.artifact_digest,
+                "schema_digest": self.schema_digest,
+                "record_count": len(rows),
+                "rows": rows,
+            }
+        )
         return response
+
+    def enforce_policy(self, rows: list[dict[str, Any]]) -> None:
+        """Applies the null and unseen-category policies to scored rows."""
+        if self.on_null == "reject":
+            nulls = [i for i, row in enumerate(rows) if row["missing"]]
+            if nulls:
+                raise serving_contract.PolicyError(
+                    "null features are rejected by policy",
+                    {"records": nulls[:20]},
+                )
+        if self.on_unseen == "reject":
+            unseen = [i for i, row in enumerate(rows) if row["unseen"]]
+            if unseen:
+                raise serving_contract.PolicyError(
+                    "unseen categories are rejected by policy",
+                    {"records": unseen[:20]},
+                )
 
     @abc.abstractmethod
     def start(self) -> None:
@@ -70,7 +232,7 @@ class ServingAdapter(abc.ABC):
 
 
 class BatchServing(ServingAdapter):
-    """Scores CSV / Parquet files."""
+    """Scores CSV / Parquet files through the same path as online serving."""
 
     def start(self) -> None:
         """Nothing to start for batch scoring."""
@@ -79,75 +241,156 @@ class BatchServing(ServingAdapter):
         """Nothing to stop for batch scoring."""
 
     def score_file(
-        self, source: str | pathlib.Path, destination: str | pathlib.Path
+        self,
+        source: str | pathlib.Path,
+        destination: str | pathlib.Path,
+        chunk_rows: int = BATCH_CHUNK_ROWS,
     ) -> int:
         """Scores a file and writes predictions (and probabilities).
+
+        The output CSV is accompanied by `<destination>.manifest.json`,
+        which carries the model version and artifact digest the whole file
+        was scored with.
 
         Args:
             source: Input CSV / Parquet.
             destination: Output CSV.
+            chunk_rows: Rows scored per call.
 
         Returns:
             Number of rows scored.
+
+        Raises:
+            ConfigError: If `chunk_rows` is not positive.
         """
+        if chunk_rows < 1:
+            raise errors.ConfigError("chunk_rows must be positive")
         frame = self.bundle.read_frame(source)
-        result = pd.DataFrame({"prediction": self.bundle.predict(frame)})
-        if self.bundle.schema.classes is not None:
-            probabilities = self.bundle.predict_proba(frame)
-            for index, label in enumerate(self.bundle.schema.classes):
-                result[f"proba_{label}"] = probabilities[:, index]
-        self.bundle.remember(frame)
+        pieces = []
+        flagged = {"rows_with_nulls": 0, "rows_with_unseen_categories": 0}
+        response: dict[str, Any] = {}
+        for start in range(0, max(len(frame), 1), chunk_rows):
+            chunk = frame.iloc[start : start + chunk_rows].reset_index(
+                drop=True
+            )
+            response = self.respond_frame(chunk)
+            result = pd.DataFrame({"prediction": response["predictions"]})
+            if "classes" in response:
+                probabilities = response["probabilities"]
+                for index, label in enumerate(response["classes"]):
+                    result[f"proba_{label}"] = [
+                        row[index] for row in probabilities
+                    ]
+            pieces.append(result)
+            flagged["rows_with_nulls"] += sum(
+                1 for row in response["rows"] if row["missing"]
+            )
+            flagged["rows_with_unseen_categories"] += sum(
+                1 for row in response["rows"] if row["unseen"]
+            )
+        output = pd.concat(pieces, ignore_index=True)
+        content = output.to_csv(index=False).encode("utf-8")
+        target = pathlib.Path(destination)
+        durability.write_atomically(target, content)
+        manifest = {
+            "schema_version": serving_contract.SCHEMA_VERSION,
+            "model_version": response.get(
+                "model_version", self.bundle.info.model_version
+            ),
+            "artifact_digest": self.artifact_digest,
+            "schema_digest": self.schema_digest,
+            "rows": len(output),
+            "output_sha256": provenance.sha256_digest(content),
+            **flagged,
+        }
         durability.write_atomically(
-            destination, result.to_csv(index=False).encode("utf-8")
+            target.with_name(target.name + ".manifest.json"),
+            json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"),
         )
-        return len(result)
+        return len(output)
 
 
 class HttpServing(ServingAdapter):
     """JSON-over-HTTP serving on a background thread.
 
-    Endpoints: `GET /health` (status, model version and checksum),
-    `GET /schema`, and `POST /predict` with `{"records": [{...}, ...]}`.
+    Endpoints:
+
+    * `GET /livez`: 200 while the process runs.
+    * `GET /readyz`: 200 only after verify, load and warm-up; else 503.
+    * `GET /health`: status, model version, digest (503 until ready).
+    * `GET /schema`: input schema, schema digest, request and response
+      schemas, limits and policies.
+    * `POST /predict` (alias `/v1/predict`) with `{"records": [{...}]}`.
+
     Records that violate the schema get a 422 with the reason; malformed
-    requests get a 400.
+    requests get a 400; a schema the caller does not expect gets a 409;
+    more than `max_concurrent` requests in flight get a 429; a request that
+    runs past `scoring_timeout_seconds` gets a 504; before readiness 503.
     """
 
     def __init__(
         self,
-        bundle: bundle_module.ModelBundle,
+        bundle: bundle_module.ModelBundle | None = None,
         host: str = "127.0.0.1",
         port: int = 0,
         max_request_bytes: int = MAX_REQUEST_BYTES,
         max_records: int = MAX_REQUEST_RECORDS,
         request_timeout_seconds: float = 10.0,
+        *,
+        loader: Loader | None = None,
+        max_concurrent: int = MAX_CONCURRENT_REQUESTS,
+        scoring_timeout_seconds: float = SCORING_TIMEOUT_SECONDS,
+        on_null: str = "impute",
+        on_unseen: str = "report",
+        warmup_records: list[dict[str, Any]] | None = None,
     ) -> None:
         """Initializes the adapter.
 
         Args:
-            bundle: Model to serve.
+            bundle: Model to serve, already verified and loaded by the
+                caller; the service is ready once `start` warmed it up.
             host: Interface to bind (loopback by default).
             port: Port; 0 picks a free one.
             max_request_bytes: Maximum JSON request body size.
             max_records: Maximum records accepted by one prediction request.
             request_timeout_seconds: Maximum time allowed for request I/O.
+            loader: Instead of `bundle`: a callable that verifies and loads
+                the bundle while driving the `Readiness` it is given. The
+                server listens at once; `/livez` answers 200 and `/readyz`
+                503 until the loader and the warm-up finish, and stays 503
+                with the reason if either fails.
+            max_concurrent: Requests allowed in flight.
+            scoring_timeout_seconds: Time one scoring call may take.
+            on_null: `impute` or `reject` (see `ServingAdapter`).
+            on_unseen: `report` or `reject` (see `ServingAdapter`).
+            warmup_records: Records for the warm-up call.
 
         Raises:
+            ConfigError: If neither or both of `bundle` and `loader` are
+                given.
             ValueError: If a request bound or timeout is not positive.
         """
+        if (bundle is None) == (loader is None):
+            raise errors.ConfigError("give exactly one of bundle and loader")
         if (
             max_request_bytes < 1
             or max_records < 1
             or request_timeout_seconds <= 0
         ):
             raise ValueError("request bounds and timeout must be positive")
-        super().__init__(bundle)
+        super().__init__(bundle, on_null, on_unseen, warmup_records)
+        self.loader = loader
         self.host = host
         self.port = port
         self.max_request_bytes = max_request_bytes
         self.max_records = max_records
         self.request_timeout_seconds = request_timeout_seconds
+        self.admission = guard.AdmissionControl(
+            max_concurrent, scoring_timeout_seconds
+        )
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
+        self.loading: threading.Thread | None = None
 
     @property
     def address(self) -> str:
@@ -156,17 +399,76 @@ class HttpServing(ServingAdapter):
             raise errors.ScmleError("server is not running")
         return f"http://{self.host}:{self.httpd.server_address[1]}"
 
+    def limits(self) -> dict[str, Any]:
+        """The declared limits and policies, for `/schema`."""
+        return {
+            "max_request_bytes": self.max_request_bytes,
+            "max_records": self.max_records,
+            "max_concurrent": self.admission.max_concurrent,
+            "scoring_timeout_seconds": self.admission.timeout_seconds,
+            "request_timeout_seconds": self.request_timeout_seconds,
+            "on_null": self.on_null,
+            "on_unseen": self.on_unseen,
+        }
+
+    def identity(self) -> dict[str, Any]:
+        """Model version and digest, or nothing before the model is loaded."""
+        if self.loaded is None:
+            return {}
+        return {
+            "model_version": self.loaded.info.model_version,
+            "artifact_digest": self.artifact_digest,
+        }
+
+    def load_in_background(self) -> None:
+        """Runs the loader, then the warm-up; failure is kept as readiness."""
+        loader = self.loader
+        if loader is None:
+            raise errors.ScmleError("no loader to run")
+        try:
+            self.loaded = loader(self.readiness)
+        except Exception as error:  # reported through readiness
+            LOGGER.error("verification or load failed: %s", error)
+            reason = (
+                f"{error.category}: {error}"
+                if isinstance(error, errors.ScmleError)
+                else type(error).__name__
+            )
+            self.readiness.fail(reason)
+            return
+        self.warm_up()
+
+    def score(self, request: serving_contract.ScoreRequest) -> dict[str, Any]:
+        """Scores a parsed request within the concurrency and time limits."""
+        if (
+            request.expected_schema_digest is not None
+            and request.expected_schema_digest != self.schema_digest
+        ):
+            raise serving_contract.SchemaChangeError(
+                "the model's input schema differs from the one the caller "
+                "expects",
+                {
+                    "expected": request.expected_schema_digest,
+                    "served": self.schema_digest,
+                },
+            )
+        return self.respond(request.records)
+
     def start(self) -> None:
         """Binds the socket and serves in a daemon thread."""
         if self.httpd is not None:
             raise errors.ScmleError("server is already running")
         adapter = self
+        request_schema = serving_contract.REQUEST_JSON_SCHEMA
+        response_schema = serving_contract.RESPONSE_JSON_SCHEMA
 
         class ReferenceServer(server.ThreadingHTTPServer):
             daemon_threads = True
             allow_reuse_address = True
 
         class Handler(server.BaseHTTPRequestHandler):
+            request_id = ""
+
             def setup(self) -> None:
                 super().setup()
                 self.connection.settimeout(adapter.request_timeout_seconds)
@@ -174,19 +476,86 @@ class HttpServing(ServingAdapter):
             def version_string(self) -> str:
                 return "scmle-reference"
 
-            def send_json(self, status: int, payload: dict[str, Any]) -> None:
-                body = json.dumps(payload).encode()
+            def send_json(
+                self,
+                status: int,
+                payload: dict[str, Any],
+                headers: dict[str, str] | None = None,
+            ) -> None:
+                body = json.dumps(
+                    {**payload, "request_id": self.request_id}
+                ).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("X-Request-ID", self.request_id)
+                for name, value in (headers or {}).items():
+                    self.send_header(name, value)
                 self.end_headers()
                 self.wfile.write(body)
 
+            def fail(
+                self,
+                status: int,
+                message: str,
+                category: str,
+                details: dict[str, Any] | None = None,
+                headers: dict[str, str] | None = None,
+            ) -> None:
+                payload: dict[str, Any] = {
+                    "schema_version": serving_contract.SCHEMA_VERSION,
+                    "error": message,
+                    "category": category,
+                }
+                if details is not None:
+                    payload["details"] = details
+                self.send_json(status, payload, headers)
+
+            def identify(self) -> bool:
+                caller = self.headers.get("X-Request-ID")
+                if caller is None:
+                    self.request_id = guard.new_request_id()
+                    return True
+                self.request_id = (
+                    caller
+                    if guard.is_valid_request_id(caller)
+                    else guard.new_request_id()
+                )
+                if self.request_id != caller:
+                    self.fail(
+                        400,
+                        "X-Request-ID must be 1-128 ASCII characters from "
+                        "A-Z, a-z, 0-9, '.', '_', ':', or '-': "
+                        "request rejected",
+                        "request",
+                    )
+                    return False
+                return True
+
             def do_GET(self) -> None:
-                if self.path == "/health":
+                if not self.identify():
+                    return
+                readiness = adapter.readiness.snapshot()
+                if self.path == "/livez":
+                    self.send_json(200, {"status": "alive"})
+                elif self.path == "/readyz":
+                    self.send_json(
+                        200 if readiness["ready"] else 503,
+                        {**readiness, **adapter.identity()},
+                        None if readiness["ready"] else {"Retry-After": "1"},
+                    )
+                elif not readiness["ready"]:
+                    self.fail(
+                        503,
+                        "service is not ready",
+                        "not_ready",
+                        readiness,
+                        {"Retry-After": "1"},
+                    )
+                elif self.path == "/health":
                     info = adapter.bundle.info
                     self.send_json(
                         200,
@@ -196,6 +565,7 @@ class HttpServing(ServingAdapter):
                             "model_sha256": info.files.get(
                                 bundle_module.MODEL_FILE, ""
                             ),
+                            "artifact_digest": adapter.artifact_digest,
                             "task": adapter.bundle.schema.task,
                         },
                     )
@@ -203,127 +573,121 @@ class HttpServing(ServingAdapter):
                     self.send_json(
                         200,
                         {
+                            "schema_version": serving_contract.SCHEMA_VERSION,
                             "schema": adapter.bundle.schema.to_dict(),
-                            "model_version": adapter.bundle.info.model_version,
+                            "schema_digest": adapter.schema_digest,
+                            "request_schema": request_schema,
+                            "response_schema": response_schema,
+                            "limits": adapter.limits(),
+                            **adapter.identity(),
                         },
                     )
                 else:
-                    self.send_json(404, {"error": "not found"})
+                    self.fail(404, "not found", "request")
+
+            def read_body(self) -> bytes | None:
+                content_type = self.headers.get("Content-Type", "")
+                if content_type.split(";", 1)[0].strip().lower() != (
+                    "application/json"
+                ):
+                    self.fail(
+                        415, "Content-Type must be application/json", "request"
+                    )
+                    return None
+                raw_length = self.headers.get("Content-Length")
+                if raw_length is None:
+                    self.fail(411, "Content-Length is required", "request")
+                    return None
+                try:
+                    length = int(raw_length)
+                except ValueError:
+                    self.fail(
+                        400, "Content-Length must be an integer", "request"
+                    )
+                    return None
+                if length < 0 or length > adapter.max_request_bytes:
+                    self.fail(
+                        413,
+                        "request body exceeds "
+                        f"{adapter.max_request_bytes} bytes",
+                        "request",
+                    )
+                    return None
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    self.fail(400, "request body is incomplete", "request")
+                    return None
+                return body
 
             def do_POST(self) -> None:
-                if self.path != "/predict":
-                    self.send_json(404, {"error": "not found"})
+                if not self.identify():
+                    return
+                if self.path not in serving_contract.PREDICT_PATHS:
+                    self.fail(404, "not found", "request")
+                    return
+                if not adapter.readiness.ready:
+                    self.fail(
+                        503,
+                        "service is not ready",
+                        "not_ready",
+                        adapter.readiness.snapshot(),
+                        {"Retry-After": "1"},
+                    )
                     return
                 try:
-                    content_type = self.headers.get("Content-Type", "")
-                    if content_type.split(";", 1)[0].strip().lower() != (
-                        "application/json"
-                    ):
-                        self.send_json(
-                            415,
-                            {
-                                "error": (
-                                    "Content-Type must be application/json"
-                                ),
-                                "category": "request",
-                            },
-                        )
-                        return
-                    raw_length = self.headers.get("Content-Length")
-                    if raw_length is None:
-                        self.send_json(
-                            411,
-                            {
-                                "error": "Content-Length is required",
-                                "category": "request",
-                            },
-                        )
-                        return
-                    try:
-                        length = int(raw_length)
-                    except ValueError:
-                        self.send_json(
-                            400,
-                            {
-                                "error": "Content-Length must be an integer",
-                                "category": "request",
-                            },
-                        )
-                        return
-                    if length < 0 or length > adapter.max_request_bytes:
-                        self.send_json(
-                            413,
-                            {
-                                "error": "request body exceeds "
-                                f"{adapter.max_request_bytes} bytes",
-                                "category": "request",
-                            },
-                        )
-                        return
-                    body = self.rfile.read(length)
-                    if len(body) != length:
-                        self.send_json(
-                            400,
-                            {
-                                "error": "request body is incomplete",
-                                "category": "request",
-                            },
-                        )
+                    with adapter.admission.admit():
+                        self.predict()
+                except guard.OverloadedError as error:
+                    self.fail(
+                        429,
+                        str(error),
+                        error.category,
+                        None,
+                        {"Retry-After": "1"},
+                    )
+
+            def predict(self) -> None:
+                try:
+                    body = self.read_body()
+                    if body is None:
                         return
                     try:
                         payload = json.loads(body)
                     except json.JSONDecodeError as error:
-                        self.send_json(
-                            400,
-                            {
-                                "error": f"invalid JSON request: {error.msg}",
-                                "category": "request",
-                            },
+                        self.fail(
+                            400, f"invalid JSON request: {error.msg}", "request"
                         )
                         return
-                    records = payload["records"]
-                    if not isinstance(records, list):
-                        raise TypeError("'records' must be a list")
-                    if len(records) > adapter.max_records:
-                        self.send_json(
-                            413,
-                            {
-                                "error": "request contains more than "
-                                f"{adapter.max_records} records",
-                                "category": "request",
-                            },
-                        )
-                        return
-                    if not all(isinstance(record, dict) for record in records):
-                        raise TypeError("every record must be an object")
-                    self.send_json(200, adapter.respond(records))
+                    request = serving_contract.parse_request(
+                        payload, adapter.max_records
+                    )
+                    response = adapter.admission.run(
+                        lambda: adapter.score(request)
+                    )
+                    response["request_id"] = self.request_id
+                    self.send_json(200, response)
+                except guard.DeadlineError as error:
+                    self.fail(504, str(error), error.category)
+                except guard.NotReadyError as error:
+                    self.fail(503, str(error), error.category)
+                except serving_contract.SchemaChangeError as error:
+                    self.fail(409, str(error), error.category, error.details)
                 except errors.ScmleError as error:
                     # Rows that break the schema are well-formed requests the
                     # server cannot process: 422. Anything else is a 400.
-                    self.send_json(
+                    self.fail(
                         422 if isinstance(error, errors.DataError) else 400,
-                        {
-                            "error": str(error),
-                            "category": error.category,
-                            "details": error.details,
-                        },
+                        str(error),
+                        error.category,
+                        error.details,
                     )
+                except OverflowError as error:
+                    self.fail(413, str(error), "request")
                 except (KeyError, ValueError, TypeError) as error:
-                    self.send_json(
-                        400,
-                        {
-                            "error": f"malformed request: {error}",
-                            "category": "request",
-                        },
-                    )
+                    self.fail(400, f"malformed request: {error}", "request")
                 except Exception:
-                    self.send_json(
-                        500,
-                        {
-                            "error": "internal serving failure",
-                            "category": "internal",
-                        },
-                    )
+                    LOGGER.exception("internal serving failure")
+                    self.fail(500, "internal serving failure", "internal")
 
             def log_message(self, format: str, *args: Any) -> None:
                 """Silences per-request logging."""
@@ -333,6 +697,19 @@ class HttpServing(ServingAdapter):
             target=self.httpd.serve_forever, daemon=True
         )
         self.thread.start()
+        if self.loader is not None:
+            self.loading = threading.Thread(
+                target=self.load_in_background, daemon=True
+            )
+            self.loading.start()
+        else:
+            self.warm_up()
+
+    def wait_until_settled(self, timeout: float = 60.0) -> bool:
+        """Waits for the loader to finish; returns whether it is ready."""
+        if self.loading is not None:
+            self.loading.join(timeout)
+        return self.readiness.ready
 
     def stop(self) -> None:
         """Shuts the server down and joins its thread."""
@@ -341,4 +718,5 @@ class HttpServing(ServingAdapter):
             self.httpd.server_close()
         if self.thread is not None:
             self.thread.join(timeout=5)
+        self.admission.close()
         self.httpd = self.thread = None

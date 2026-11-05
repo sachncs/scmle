@@ -498,6 +498,46 @@ class PredictCommand(Command):
         return EXIT_OK
 
 
+class BatchCommand(Command):
+    """Scores a file through the same path as the online service."""
+
+    name = "batch"
+    help = (
+        "score a file with the online serving path and write a manifest "
+        "with the model version and artifact digest"
+    )
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds bundle, data, output and policy options."""
+        parser.add_argument("bundle", help="bundle directory")
+        parser.add_argument("data", help="CSV or Parquet file")
+        parser.add_argument("--output", default="predictions.csv")
+        parser.add_argument("--chunk-rows", type=int, default=10_000)
+        parser.add_argument(
+            "--on-null", choices=["impute", "reject"], default="impute"
+        )
+        parser.add_argument(
+            "--on-unseen", choices=["report", "reject"], default="report"
+        )
+        parser.add_argument(
+            "--trusted",
+            action="store_true",
+            help="load an unsigned bundle you vouch for (pickle executes code)",
+        )
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Writes predictions and `<output>.manifest.json`."""
+        model = bundle_module.ModelBundle.load(
+            args.bundle, trusted=args.trusted
+        )
+        adapter = serving.BatchServing(
+            model, on_null=args.on_null, on_unseen=args.on_unseen
+        )
+        rows = adapter.score_file(args.data, args.output, args.chunk_rows)
+        LOGGER.info("wrote %d predictions to %s", rows, args.output)
+        return EXIT_OK
+
+
 class ServeCommand(Command):
     """Serves a saved bundle over HTTP."""
 
@@ -1075,6 +1115,7 @@ COMMANDS: tuple[Command, ...] = (
     ResumeCommand(),
     CatalogCommand(),
     PredictCommand(),
+    BatchCommand(),
     ServeCommand(),
     ExportOnnxCommand(),
     PackageCommand(),

@@ -10,7 +10,8 @@ The `scmle` command mirrors the Python API. Global option:
 | `scmle resume RUN_DIR` | Continue a cancelled, failed or crashed run, reusing finished trials. |
 | `scmle catalog INPUT` | Catalog a local table (or raw bytes) into a JSON artifact. |
 | `scmle predict BUNDLE DATA` | Score a file with a saved bundle. |
-| `scmle serve BUNDLE` | Serve a bundle over HTTP. |
+| `scmle batch BUNDLE DATA` | Score a file through the same code path as the online service; writes `--output` and `<output>.manifest.json` (model version, artifact digest, row counts). `--on-null` and `--on-unseen` accept `reject`. |
+| `scmle serve BUNDLE` | Serve a bundle over HTTP: `/livez`, `/readyz`, `/predict` (see [SERVICE_SLO](SERVICE_SLO.md)). |
 | `scmle export-onnx BUNDLE` | Export an ONNX graph (needs the `onnx` extra). |
 | `scmle package BUNDLE` | Write a ready-to-run service folder with a Dockerfile. |
 | `scmle charter init\|check\|sign PATH` | Create, validate or sign an analysis charter (see below). |

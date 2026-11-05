@@ -117,6 +117,13 @@ Use `result.save(directory, signing_key=...)` to export one for deployment.
 | `fault_injection_plan.json` | Failure scenarios and the evidence each needs ([`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md)). |
 | `parameter_estimation_declaration.*` | The declaration (or its absence) for parameter-estimation runs. |
 
+## Serving outputs
+
+| File | Contents |
+| --- | --- |
+| `<output>.manifest.json` (from `scmle batch`) | Schema version, model version, artifact digest (SHA-256 of the canonical bundle manifest), schema digest, row count, rows with nulls and with unseen categories, and the output file's digest. |
+| `deploy/local/golden/` | The hand-written reference model, golden records, closed-form expected outputs and the declared tolerances ([`SERVICE_SLO.md`](SERVICE_SLO.md)). |
+
 ## Cleanup
 
 `runs/` is gitignored and safe to delete once you no longer need to resume or
