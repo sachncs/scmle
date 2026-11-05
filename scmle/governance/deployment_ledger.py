@@ -36,6 +36,10 @@ Row kinds (``open`` first and only once):
     status ``open``. It is a record that a person must look, not an incident
     workflow (`scmle.monitoring.incidents` wants an SLO evaluation, which a
     halt does not have).
+``deployment``
+    A release event confirmed or rejected by the runtime (`ReleaseRegistry`):
+    the model, version, environment, revision and image digest, and whether
+    the platform confirmed the promotion, the rollback or refused it.
 ``audit``
     A security event of the prediction service: a model activation, an
     access decision (allowed or denied) or an administrative action. Chained
@@ -75,6 +79,7 @@ ATTESTATION = "attestation"
 HALT = "halt"
 INCIDENT = "incident"
 AUDIT = "audit"
+DEPLOYMENT = "deployment"
 KINDS = (
     OPEN,
     OBSERVE_SUMMARY,
@@ -88,6 +93,7 @@ KINDS = (
     HALT,
     INCIDENT,
     AUDIT,
+    DEPLOYMENT,
 )
 REGISTERED = "registered"
 DECIDED = "decided"

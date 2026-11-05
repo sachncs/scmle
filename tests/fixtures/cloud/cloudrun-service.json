@@ -1,0 +1,57 @@
+{
+  "createTime": "2026-11-01T09:00:00Z",
+  "generation": "11",
+  "ingress": "INGRESS_TRAFFIC_ALL",
+  "latestCreatedRevision": "projects/scmle-proj/locations/europe-west1/services/scmle-staging-serve/revisions/scmle-staging-serve-00011-abc",
+  "latestReadyRevision": "projects/scmle-proj/locations/europe-west1/services/scmle-staging-serve/revisions/scmle-staging-serve-00011-abc",
+  "name": "projects/scmle-proj/locations/europe-west1/services/scmle-staging-serve",
+  "observedGeneration": "11",
+  "reconciling": false,
+  "template": {
+    "containers": [
+      {
+        "image": "europe-west1-docker.pkg.dev/scmle-proj/scmle-staging/serve@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ports": [
+          {
+            "containerPort": 8000
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        }
+      }
+    ],
+    "maxInstanceRequestConcurrency": 20,
+    "revision": "",
+    "scaling": {
+      "maxInstanceCount": 3,
+      "minInstanceCount": 1
+    },
+    "serviceAccount": "scmle-staging-serve@scmle-proj.iam.gserviceaccount.com"
+  },
+  "terminalCondition": {
+    "lastTransitionTime": "2026-11-05T09:01:00Z",
+    "state": "CONDITION_SUCCEEDED",
+    "type": "Ready"
+  },
+  "traffic": [
+    {
+      "percent": 100,
+      "revision": "scmle-staging-serve-00011-abc",
+      "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION"
+    }
+  ],
+  "trafficStatuses": [
+    {
+      "percent": 100,
+      "revision": "scmle-staging-serve-00011-abc",
+      "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION"
+    }
+  ],
+  "uid": "11111111-2222-3333-4444-555555555555",
+  "updateTime": "2026-11-05T09:00:00Z",
+  "uri": "https://scmle-staging-serve-abc-ew.a.run.app"
+}

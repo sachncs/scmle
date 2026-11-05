@@ -1,0 +1,34 @@
+{
+  "failures": [],
+  "services": [
+    {
+      "clusterArn": "arn:aws:ecs:eu-west-1:111122223333:cluster/scmle-staging",
+      "createdAt": "2026-11-01T09:00:00+00:00",
+      "deployments": [
+        {
+          "createdAt": "2026-11-05T09:00:00+00:00",
+          "desiredCount": 2,
+          "failedTasks": 0,
+          "id": "ecs-svc/0000000000000000012",
+          "launchType": "FARGATE",
+          "pendingCount": 0,
+          "rolloutState": "COMPLETED",
+          "rolloutStateReason": "ECS deployment ecs-svc/0000000000000000012 completed.",
+          "runningCount": 2,
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:eu-west-1:111122223333:task-definition/scmle-staging-serve:12",
+          "updatedAt": "2026-11-05T09:03:00+00:00"
+        }
+      ],
+      "desiredCount": 2,
+      "events": [],
+      "launchType": "FARGATE",
+      "pendingCount": 0,
+      "runningCount": 2,
+      "serviceArn": "arn:aws:ecs:eu-west-1:111122223333:service/scmle-staging/serve",
+      "serviceName": "serve",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:eu-west-1:111122223333:task-definition/scmle-staging-serve:12"
+    }
+  ]
+}

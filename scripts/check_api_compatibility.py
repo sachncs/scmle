@@ -16,13 +16,17 @@ from scmle.data.store import objectstore as store_objectstore
 from scmle.data.store import processing as store_processing
 from scmle.data.store import quality as store_quality
 from scmle.data.store import snapshot as store_snapshot
+from scmle.deploy import cloudrun as deploy_cloudrun
 from scmle.deploy import contract as deploy_contract
+from scmle.deploy import control as deploy_control
+from scmle.deploy import ecs as deploy_ecs
 from scmle.deploy import gate as deploy_gate
 from scmle.deploy import iac_policy as deploy_iac_policy
 from scmle.deploy import livetests as deploy_livetests
 from scmle.deploy import observation as deploy_observation
 from scmle.deploy import orphans as deploy_orphans
 from scmle.deploy import record as deploy_record
+from scmle.governance import release_state as governance_release_state
 from scmle.runners import aws as runners_aws
 from scmle.runners import base as runners_base
 from scmle.runners import checkpoint as runners_checkpoint
@@ -56,6 +60,36 @@ EXTENSION_SURFACES = {
             "SecretRef",
             "SecretSource",
             "conformance_problems",
+        ),
+    ),
+    "scmle.deploy.control": (
+        deploy_control,
+        (
+            "ConfirmPolicy",
+            "ControlPlane",
+            "RuntimeUnconfirmed",
+            "Unsupported",
+            "confirm",
+            "expecting",
+        ),
+    ),
+    "scmle.deploy.ecs": (
+        deploy_ecs,
+        ("EcsControlPlane", "observe_services"),
+    ),
+    "scmle.deploy.cloudrun": (
+        deploy_cloudrun,
+        ("CloudRunControlPlane", "observe_service"),
+    ),
+    "scmle.governance.release_state": (
+        governance_release_state,
+        (
+            "Finding",
+            "Outcome",
+            "ReconcileReport",
+            "ReleaseRegistry",
+            "ReleaseState",
+            "RuntimeDisagrees",
         ),
     ),
     "scmle.deploy.gate": (

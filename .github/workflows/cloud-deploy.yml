@@ -139,6 +139,9 @@ jobs:
           aws ecs wait services-stable --cluster "${CLUSTER}" --services "${SERVICE}"
           aws ecs describe-services --cluster "${CLUSTER}" --services "${SERVICE}" > runtime.json
           aws ecs describe-task-definition --task-definition "${new}" > task-definition.json
+          arns="$(aws ecs list-tasks --cluster "${CLUSTER}" --service-name "${SERVICE}" --desired-status RUNNING --query 'taskArns' --output text)"
+          # shellcheck disable=SC2086
+          aws ecs describe-tasks --cluster "${CLUSTER}" --tasks ${arns} > tasks.json
 
       - name: Push the image and deploy it (GCP)
         if: inputs.provider == 'gcp'
@@ -146,6 +149,7 @@ jobs:
           SERVICE: ${{ vars.SCMLE_CLOUD_RUN_SERVICE }}
           REGION: ${{ vars.SCMLE_GCP_REGION }}
           REPOSITORY: ${{ vars.SCMLE_GCP_REPOSITORY }}
+          GCP_PROJECT: ${{ vars.SCMLE_GCP_PROJECT }}
         run: |
           sudo apt-get install -y skopeo
           skopeo copy --preserve-digests --dest-registry-token "$(gcloud auth print-access-token)" \
@@ -153,10 +157,26 @@ jobs:
           pushed="$(skopeo inspect --format '{{.Digest}}' --registry-token "$(gcloud auth print-access-token)" "docker://${REPOSITORY}/serve:${GITHUB_SHA}")"
           [ "${pushed}" = "${CONTAINER_DIGEST}" ] || { echo "registry digest ${pushed} != built ${CONTAINER_DIGEST}"; exit 1; }
           gcloud run deploy "${SERVICE}" --region "${REGION}" --image "${REPOSITORY}/serve@${CONTAINER_DIGEST}" --quiet
-          gcloud run services describe "${SERVICE}" --region "${REGION}" --format=json > runtime.json
+          name="projects/${GCP_PROJECT}/locations/${REGION}/services/${SERVICE}"
+          token="$(gcloud auth print-access-token)"
+          curl --fail --silent -H "Authorization: Bearer ${token}" "https://run.googleapis.com/v2/${name}" > runtime.json
+          echo '{}' > revisions.json
+          for revision in $(jq -r '[.trafficStatuses[].revision // empty, .latestCreatedRevision // empty] | map(split("/")[-1]) | unique[]' runtime.json); do
+            curl --fail --silent -H "Authorization: Bearer ${token}" "https://run.googleapis.com/v2/${name}/revisions/${revision}" \
+              | jq --arg n "${revision}" '{($n): .}' > rev.json
+            jq -s '.[0] * .[1]' revisions.json rev.json > revs.json && mv revs.json revisions.json
+          done
 
       - name: Read what the platform says is running
-        run: uv run scmle deploy observe --provider "${PROVIDER}" --input runtime.json --output "${RELEASE_DIR}/observation.json"
+        run: |
+          if [ "${PROVIDER}" = "aws" ]; then
+            uv run scmle deploy observe --provider aws --input runtime.json \
+              --tasks tasks.json --task-definition task-definition.json \
+              --output "${RELEASE_DIR}/observation.json"
+          else
+            uv run scmle deploy observe --provider gcp --input runtime.json \
+              --revisions revisions.json --output "${RELEASE_DIR}/observation.json"
+          fi
 
       - name: Live schema, inference, security and health tests
         env:
@@ -191,3 +211,5 @@ jobs:
             ${{ inputs.release_dir }}/checks.json
             ${{ inputs.release_dir }}/observation.json
             runtime.json
+            tasks.json
+            revisions.json

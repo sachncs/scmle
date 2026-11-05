@@ -290,6 +290,16 @@
         "signature_sha256": "1620e29433a782d8294f364b5051c530f2d0b10a6cd6fcd53e55115a583cd05d"
       }
     },
+    "scmle.deploy.cloudrun": {
+      "CloudRunControlPlane": {
+        "kind": "class",
+        "signature_sha256": "89659922137e87db606f16e5ae2036e4f00efe65f318a62b45671e383c18c41d"
+      },
+      "observe_service": {
+        "kind": "callable",
+        "signature_sha256": "4335551856e69d7caf82f25c35657a64053d74a27f37584f8111d64be26018e2"
+      }
+    },
     "scmle.deploy.contract": {
       "Architecture": {
         "kind": "class",
@@ -338,6 +348,42 @@
       "conformance_problems": {
         "kind": "callable",
         "signature_sha256": "930c30c0dd0681f2b0fa82a9df84c9a892051a01444545223a9f5fe9a1981311"
+      }
+    },
+    "scmle.deploy.control": {
+      "ConfirmPolicy": {
+        "kind": "class",
+        "signature_sha256": "f0b0c8ab578def7bd7d41078adf861b57efe9c71971a72fff0bbf07f1bed1a52"
+      },
+      "ControlPlane": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      },
+      "RuntimeUnconfirmed": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      },
+      "Unsupported": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      },
+      "confirm": {
+        "kind": "callable",
+        "signature_sha256": "21b494be3844b88c670324435c6d55bb247b17f75098f1a6a033de9e8593a385"
+      },
+      "expecting": {
+        "kind": "callable",
+        "signature_sha256": "a8da28dce82b1a8a663be476c9a0699b99cba317755884aab70e75175b6130e7"
+      }
+    },
+    "scmle.deploy.ecs": {
+      "EcsControlPlane": {
+        "kind": "class",
+        "signature_sha256": "7cb2cc72c9ca633c17f57e23a5b1e152e3bcdbf871095a02e66118f21e8c5590"
+      },
+      "observe_services": {
+        "kind": "callable",
+        "signature_sha256": "c2f0ce822e70b70d8b1b047147e534dd97c05dfcc8b73deeed227c60bee6fe84"
       }
     },
     "scmle.deploy.gate": {
@@ -434,6 +480,32 @@
       "write_record": {
         "kind": "callable",
         "signature_sha256": "90a5e36c1fd90e32db8c2f2442231f2cb73d63ef1910618a5dad488a0679b2ad"
+      }
+    },
+    "scmle.governance.release_state": {
+      "Finding": {
+        "kind": "class",
+        "signature_sha256": "14b37209d24d102d435c1ceb4de5fb6e025c3e68b9085f2878cb60cc0b6d0128"
+      },
+      "Outcome": {
+        "kind": "class",
+        "signature_sha256": "6a8c7b404d661bb6460a2d4f5f70706698501cb179a259966aa6ac8937c805f7"
+      },
+      "ReconcileReport": {
+        "kind": "class",
+        "signature_sha256": "deb4d773b03f42749ab39f0001ee864eb95cc541d96f6700a54ede310f6fc0e2"
+      },
+      "ReleaseRegistry": {
+        "kind": "class",
+        "signature_sha256": "cf726300e8891fd1bc693d40875ce481effdea2c9892946df0a93ce6185f1899"
+      },
+      "ReleaseState": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "RuntimeDisagrees": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
       }
     },
     "scmle.runners.aws": {
