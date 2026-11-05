@@ -185,6 +185,8 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
             result = "won"
         except objectstore.AlreadyExistsError:
             result = "lost"
+        except Exception as error:
+            result = f"failed {type(error).__name__}: {error}"
         with guard:
             outcomes.append(result)
 
@@ -193,6 +195,12 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
         thread.start()
     for thread in threads:
         thread.join()
+    broken = [item for item in outcomes if item.startswith("failed")]
+    require(not broken, f"racers failed: {broken}")
+    require(len(outcomes) == RACERS, f"only {len(outcomes)} racers finished")
+    broken = [item for item in outcomes if item.startswith("failed")]
+    require(not broken, f"racers failed: {broken}")
+    require(len(outcomes) == RACERS, f"only {len(outcomes)} racers finished")
     require(outcomes.count("won") == 1, f"winners: {outcomes.count('won')}")
     require(outcomes.count("lost") == RACERS - 1, "losers were not refused")
 

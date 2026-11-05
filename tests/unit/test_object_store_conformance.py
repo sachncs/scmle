@@ -209,3 +209,28 @@ def test_the_conformance_script_reports_and_sets_its_exit_status(
     assert json.loads(capsys.readouterr().out)["backend"].startswith("file:")
     with pytest.raises(SystemExit):
         module.main(["s3"])
+
+
+def test_a_denied_link_onto_a_taken_path_means_already_exists(tmp_path):
+    taken = tmp_path / "taken"
+    taken.write_bytes(b"x")
+    denied = PermissionError(13, "Access is denied")
+    assert objectstore.refused_as_existing(denied, taken)
+    assert objectstore.refused_as_existing(FileExistsError(), taken)
+
+
+def test_a_denied_link_onto_a_missing_path_is_a_real_error(tmp_path):
+    denied = PermissionError(13, "Access is denied")
+    assert not objectstore.refused_as_existing(denied, tmp_path / "absent")
+    assert not objectstore.refused_as_existing(
+        OSError(28, "No space left"), tmp_path / "absent"
+    )
+
+
+def test_a_racer_that_dies_is_reported_with_its_error(tmp_path):
+    class Broken(objectstore.LocalObjectStore):
+        def put(self, key, data, *, if_absent=False):
+            raise OSError("disk on fire")
+
+    with pytest.raises(conformance.ConformanceFailure, match="disk on fire"):
+        conformance.check_if_absent_race(Broken(tmp_path / "r"), "base")

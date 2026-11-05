@@ -195,6 +195,49 @@ class ObjectStore(abc.ABC):
         return True
 
 
+# Windows error codes for a link onto a path another writer holds: access
+# denied, sharing violation, file exists and already exists.
+EXISTING_WINERRORS = frozenset({5, 32, 80, 183})
+RETRY_ATTEMPTS = 20
+EXISTS_ATTEMPTS = 6
+
+
+def refused_as_existing(error: OSError, path: pathlib.Path) -> bool:
+    """Whether a failed exclusive link means the target is already taken.
+
+    Args:
+        error: What `os.link` raised.
+        path: The target of the link.
+
+    Returns:
+        True for FileExistsError, and for the access or sharing errors
+        Windows raises while another writer creates the target, once the
+        target is seen to exist.
+    """
+    if isinstance(error, FileExistsError):
+        return True
+    code = getattr(error, "winerror", None)
+    if code not in EXISTING_WINERRORS and not isinstance(
+        error, PermissionError
+    ):
+        return False
+    for attempt in range(EXISTS_ATTEMPTS):
+        if os.path.lexists(path):
+            return True
+        time.sleep(0.005 * (attempt + 1))
+    return False
+
+
+def unlink_tolerantly(path: pathlib.Path) -> None:
+    """Removes a temp file, retrying while Windows still holds it open."""
+    for attempt in range(RETRY_ATTEMPTS):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            time.sleep(0.005 * (attempt + 1))
+
+
 class LocalObjectStore(ObjectStore):
     """Objects as files under a root directory."""
 
@@ -246,17 +289,18 @@ class LocalObjectStore(ObjectStore):
                 os.fsync(handle.fileno())
             try:
                 os.link(temporary, path)
-            except (FileExistsError, PermissionError) as error:
+            except OSError as error:
                 # Windows reports a link onto a file that another writer is
-                # creating at that moment as PermissionError, not
-                # FileExistsError; either way the object is not ours.
-                if isinstance(error, PermissionError) and not path.exists():
+                # creating at that moment as PermissionError or a sharing
+                # violation, not FileExistsError; either way the object is
+                # not ours.
+                if not refused_as_existing(error, path):
                     raise
                 raise AlreadyExistsError(
                     f"{path.name} already exists", {"key": path.name}
                 ) from error
         finally:
-            temporary.unlink(missing_ok=True)
+            unlink_tolerantly(temporary)
 
     def get(self, key: str) -> tuple[bytes, ObjectMeta]:
         """Reads an object."""
