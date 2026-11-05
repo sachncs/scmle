@@ -253,8 +253,14 @@ class LocalObjectStore(ObjectStore):
         super().__init__(self.root.as_uri())
 
     def path_of(self, key: str) -> pathlib.Path:
-        """The file for a key, never outside the root."""
-        target = (self.root / check_key(key)).resolve()
+        """The file for a key, never outside the root.
+
+        The check is lexical on the normalised absolute path: keys are
+        validated by `check_key`, and resolving the target would depend on
+        which directories exist at that instant (and on 8.3 short names on
+        Windows), which a concurrent writer can change.
+        """
+        target = pathlib.Path(os.path.abspath(self.root / check_key(key)))
         if self.root not in target.parents:
             raise StoreError(f"key {key!r} escapes the store root")
         return target

@@ -234,3 +234,13 @@ def test_a_racer_that_dies_is_reported_with_its_error(tmp_path):
 
     with pytest.raises(conformance.ConformanceFailure, match="disk on fire"):
         conformance.check_if_absent_race(Broken(tmp_path / "r"), "base")
+
+
+def test_path_of_is_lexical_and_never_leaves_the_root(tmp_path):
+    local = objectstore.LocalObjectStore(tmp_path / "root")
+    deep = local.path_of("a/b/c.json")
+    assert deep == local.root / "a" / "b" / "c.json"
+    assert not deep.parent.exists()
+    for bad in ("../x", "a/../../x", "/abs"):
+        with pytest.raises(objectstore.StoreError):
+            local.path_of(bad)
