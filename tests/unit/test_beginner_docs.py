@@ -12,6 +12,7 @@ import contextlib
 import importlib
 import inspect
 import io
+import json
 import pathlib
 import re
 import shlex
@@ -29,6 +30,7 @@ BEGINNER = (
     "READING_RESULTS.md",
     "WHEN_THINGS_GO_WRONG.md",
     "WHAT_SCMLE_CANNOT_DO.md",
+    "LEAKAGE.md",
 )
 FENCE = re.compile(r"```(\w+)([^\n]*)\n(.*?)```", re.S)
 REQUIRED_TERMS = (
@@ -301,3 +303,59 @@ def test_the_maps_link_every_beginner_document(name):
 def test_the_maps_list_start_here_before_the_reference_pages(path):
     text = path.read_text(encoding="utf-8")
     assert text.index("START_HERE.md") < text.index("TUTORIAL.md")
+
+
+MEASUREMENTS = ROOT / "benchmarks" / "leakage_screen_measurements.json"
+
+
+def measurements():
+    return json.loads(MEASUREMENTS.read_text(encoding="utf-8"))
+
+
+def test_leakage_doc_quotes_the_committed_measurements():
+    text = (DOCS / "LEAKAGE.md").read_text(encoding="utf-8")
+    record = measurements()
+    certified = record["certified"]
+    assert (
+        f"**{certified['null_worlds_with_a_suspect']} of "
+        f"{certified['null_replicates']}**"
+    ) in text
+    low, high = certified["null_false_alarm_wilson_95"]
+    assert f"{low:.0f} to {high * 100:.2f} percent" in text
+    per_type = certified["plant_replicates_per_type"]
+    for found in certified["detected"].values():
+        assert f"{found} of {per_type}" in text
+    assert certified["skill_ceiling"] == 0.95
+    assert "AUC 0.95" in text
+    planted = record["planted"]
+    detected = sum(row["detected"] for row in planted.values())
+    total = sum(row["tables"] for row in planted.values())
+    assert f"**{detected} of {total}**" in text
+    flagged = sum(row["real_columns_flagged"] for row in planted.values())
+    assert flagged == 5 * 7
+    row = next(iter(planted.values()))
+    assert (
+        f"{row['real_columns_flagged']}\n  of the {row['real_columns_screened']}"
+    ) in text
+
+
+def test_leakage_doc_table_matches_the_measured_flags():
+    text = (DOCS / "LEAKAGE.md").read_text(encoding="utf-8")
+    for table in measurements()["tables"]:
+        name = table["table"]
+        for column in table["flagged"]:
+            assert column in text, (name, column)
+        count = f"({len(table['false_flags'])} of {table['columns']}"
+        if table["false_flags"] and not table["leaks_found"]:
+            assert count in text, (name, count)
+    breast = next(
+        t for t in measurements()["tables"] if t["table"] == "breast_cancer"
+    )
+    assert f"{breast['false_flag_rate'] * 100:.1f} percent" in text
+
+
+def test_the_screen_is_reported_descriptive_for_multiclass_tables():
+    for table in measurements()["tables"]:
+        if table["classes"] > 2:
+            assert table["gating"] == ["descriptive"]
+            assert table["would_block"] == []

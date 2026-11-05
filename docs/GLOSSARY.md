@@ -212,8 +212,23 @@ single biggest cause of too-good results. See
 **Meaning.** A feature SCMLE's statistical screen flags as probably a leak.
 **Example.** `boat` and `body`.
 **Why it matters.** It is a suspicion, not proof. A genuinely strong feature
-looks the same. By default a suspect stops the run (`leakage_policy` is
-`block`); a person must decide. See "unverified" and "attestation".
+looks the same. By default a suspect does not stop the run (`leakage_policy`
+is `warn`); the score is labelled provisional until a person settles it. See "unverified" and "attestation".
+
+### false flag
+
+**Meaning.** A column the leakage screen flags although it is legitimate: its
+values really are known at prediction time.
+**Example.** Two of the 30 breast-cancer measurements (`worst radius` and
+`worst area`) when the whole table is screened.
+**Why it matters.** The screen cannot avoid them, because a strong honest
+predictor and a leak look alike in the data. See [Leakage](LEAKAGE.md).
+
+### provisional
+
+**Meaning.** A score that may change once a person settles an open question.
+**Example.** `test (PROVISIONAL: 2 flagged column(s) not attested: boat, body)`.
+**Why it matters.** It tells you not to quote the number yet.
 
 ### split
 

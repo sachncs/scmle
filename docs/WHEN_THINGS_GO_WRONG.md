@@ -73,20 +73,46 @@ leaves the sealed test rows unopened. Nothing is broken. You can read why:
 tail -n 1 runs/run_*/events.jsonl
 ```
 
+### Score labelled `PROVISIONAL: N flagged column(s) not attested` (Seen)
+
+```text
+leakage suspect(s) boat, body stay in the features; the test score is provisional until a person settles them (declare the column unavailable at prediction, or attest it)
+run_20261105_001: selected bagged_logistic_regression (cv roc_auc=0.9917); test (PROVISIONAL: 2 flagged column(s) not attested: boat, body): roc_auc=0.9880, ...
+```
+
+**What it means.** The run finished (exit code 0), but the screen flagged
+columns that are still in the model, and no person has said when their values are
+known. The exam score may be inflated by them.
+**Why it exists.** The data alone cannot decide whether a flagged column is a
+leak or a legitimate strong predictor, so SCMLE does not refuse. It trains,
+says so on the first lines and on the last line, and withholds the word
+"settled" until a person settles the flag.
+**What to do.** Settle each name:
+
+* The value is not known at prediction time: add `--unavailable-at-prediction
+  NAME` and run again. The label disappears and the score is the honest one.
+* The value is known and you can say who vouches for it: write an attestation
+  (format and worked example in [Leakage](LEAKAGE.md)). Attestations are read in
+  charter runs.
+* You cannot settle it: do not rely on the score, or use `--leakage-policy
+  block`.
+
 ### Leakage block (Seen)
 
 ```text
 blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
 ```
 
-**What it means.** The leakage policy is `block`, which is the default (you
-did not turn it off with `--leakage-policy warn`), and a statistical screen found columns that predict the target
+**What it means.** You chose `--leakage-policy block` (it is opt-in; the default
+is `warn`), and a statistical screen found columns that predict the target
 suspiciously well, or whose "is it recorded?" pattern gives the answer away.
 The names are the suspects. A name repeats when more than one test flagged it.
-**Why it exists.** A leaked column makes a model look wonderful and then fail.
-A warning is easy to miss, so a stop is the default; `--leakage-policy warn`
-(or `leakage_policy="warn"`) is the opt-out. With `warn` the run finishes and
-its last line ends with `WARNING N leakage suspect(s) kept in: ...`.
+**Why it exists.** A leaked column makes a model look wonderful and then fail,
+and a warning is easy to miss. `block` turns the suspicion into a stop. It is
+not the default because the screen cannot tell a leak from a strong, legitimate
+column (see [Leakage](LEAKAGE.md)); it flags legitimate measurements too.
+Use `block` when you cannot attest where each value comes from, or in regulated
+work.
 Only checks with a measured error rate (a certificate) are allowed to block.
 **What to do.** Ask for each suspect: "Would I know this value at the moment I
 use the model?"

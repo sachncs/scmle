@@ -61,6 +61,7 @@ More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 | Read a report, tiers and claims | [`docs/READING_RESULTS.md`](docs/READING_RESULTS.md) |
 | Understand a refusal, gate or alarm | [`docs/WHEN_THINGS_GO_WRONG.md`](docs/WHEN_THINGS_GO_WRONG.md) |
 | Know the limits | [`docs/WHAT_SCMLE_CANNOT_DO.md`](docs/WHAT_SCMLE_CANNOT_DO.md) |
+| Understand leakage flags and their measured error rates | [`docs/LEAKAGE.md`](docs/LEAKAGE.md) |
 | Browse every page | [`docs/README.md`](docs/README.md) |
 | Learn the product | [`docs/TUTORIAL.md`](docs/TUTORIAL.md), [`examples/`](examples/README.md) |
 | Use the command line | [`docs/CLI.md`](docs/CLI.md) |
@@ -163,8 +164,8 @@ the locked test rows by about 0.026 PR-AUC (a 15%-positive set with few
 positives in the test rows, so the score is noisy). Titanic's near-perfect score comes from leaked columns (`boat`,
 `body`): the leakage screen flags both (`boat` by skill, missingness and record
 purity; `body` by record purity only, because it is recorded for 9% of
-passengers, all of whom died), and the default `leakage_policy="block"` refuses to
-proceed (`"warn"` is the opt-out). Choosing the best of many trials carries a mild optimism bias, which
+passengers, all of whom died), and `leakage_policy="block"` (opt-in; the default is
+`"warn"`) refuses to proceed. See [`docs/LEAKAGE.md`](docs/LEAKAGE.md). Choosing the best of many trials carries a mild optimism bias, which
 is why the locked-test score is the number to trust.
 
 More datasets: on 20 Hugging Face Hub tables the framework is ahead of the same reference on 16 of 20, and on 21 further OpenML tables on 13 of 21

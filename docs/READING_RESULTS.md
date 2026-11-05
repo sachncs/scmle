@@ -168,17 +168,17 @@ with how much it kept in validation.
 
 The author ran the same table twice. The only difference was `boat` and `body`:
 
-| | Without them (`--unavailable-at-prediction boat body`) | With them (`--leakage-policy warn`) |
+| | Without them (`--unavailable-at-prediction boat body`) | With them (default run) |
 | --- | --- | --- |
 | Exam ROC AUC | 0.885 | 0.988 |
 | Top feature | `sex`, importance 0.242 | `boat`, importance 0.334 |
 | Chosen model | stacking | bagged_logistic_regression, strategy `select_features` |
 
-The second run only happened because the stop was turned off. By default
-SCMLE refuses it (`blocked: unresolved leakage risk ...`). With `warn` the run
-finished and the last line ends with
-`WARNING 2 leakage suspect(s) kept in: boat, body`. The "Findings" section at
-the top of its `report.html` and the plan warnings contain:
+The second run finished without a stop (the default policy is `warn`). Its
+last line labels the score
+`test (PROVISIONAL: 2 flagged column(s) not attested: boat, body)`, a warning
+line appears near the start, and the "Findings" section at the top of its
+`report.html` and the plan warnings contain:
 
 ```text
 feature 'boat' is a leakage suspect: cross-fitted skill 0.973 ... This is a suspicion, not proof ...
@@ -186,9 +186,10 @@ feature 'boat' is a leakage suspect: cross-fitted skill 0.973 ... This is a susp
 
 Two lessons. First, a score of 0.988 for "who survived the Titanic from a
 ticket" should have rung a bell: the real answer is not that predictable.
-Second, that is why `block` is the default: it stops the run instead of
-warning. Turn it off (`--leakage-policy warn`) only when you have looked at
-every suspect and decided it is a legitimate predictor.
+Second, a flag is a suspicion and not a verdict: the data cannot say when a
+value is recorded. Settle it by declaring the column unavailable, or by
+attesting it ([Leakage](LEAKAGE.md)). If you want a hard stop instead of a
+warning, use `--leakage-policy block`.
 
 A leakage suspicion is "not proof": a really strong, legitimate feature looks
 the same to a statistical screen. The cure is a human question: "Would I know

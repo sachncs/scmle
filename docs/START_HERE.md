@@ -152,50 +152,79 @@ Write these answers down. They are explained in [Decisions](DECISIONS.md).
 The last row is the most important one. A column that records something that
 happens after the outcome gives the model the answer. That is called
 **leakage**. A model with leakage scores wonderfully and then fails on real
-use. You will see SCMLE stop it in Step 4.
+use. You will see SCMLE flag it in Step 4.
 
-## Step 4. Your first run is refused (on purpose)
+## Step 4. Your first run finishes, and it warns
 
-Run the simplest command, with no special options except a short time limit
-and an output folder:
+Run the simplest command, with only a short time limit and an output folder:
 
 ```bash runnable
-scmle run titanic.csv --target survived --time-budget 120 --workers 2 --output-dir runs_blocked
+scmle run titanic.csv --target survived --time-budget 120 --workers 2 --output-dir runs_first
 echo "exit code: $?"
 ```
 
-This takes about 8 seconds. What you should see (last two lines):
+This takes two to four minutes. Near the start you will see one line that is
+easy to miss, and the last lines look like this:
+
+```text
+leakage suspect(s) boat, body stay in the features; the test score is provisional until a person settles them (declare the column unavailable at prediction, or attest it)
+...
+run_20261105_001: selected bagged_logistic_regression (cv roc_auc=0.9917); test (PROVISIONAL: 2 flagged column(s) not attested: boat, body): roc_auc=0.9880, pr_auc=0.9692, log_loss=0.1188, f1=0.9574, balanced_accuracy=0.9628, accuracy=0.9657
+artifacts: runs_first/run_20261105_001
+```
+
+and `exit code: 0`.
+
+What to look at:
+
+* The run **finished**. SCMLE did not stop you. It trained a model and
+  reported the exam score.
+* But the score is labelled `PROVISIONAL: 2 flagged column(s) not attested:
+  boat, body`. "Flagged" means a statistical screen found those two columns
+  suspiciously good at predicting the answer. "Not attested" means no person
+  has said when their values are known.
+* The exam ROC AUC is **0.988**. That is far too good for "who survived the
+  Titanic, from the ticket". Do not trust it.
+
+Why not trust it: `boat` (which lifeboat you got on) and `body` (whether your
+body was found) are only known after the ship sinks. A model that uses them has
+been given the answer. That is **leakage**. It looks brilliant today and fails
+the first day it is used for real.
+
+Why SCMLE warns instead of refusing. From the data alone, a leaked column and a
+genuinely strong, legitimate column look identical. The screen has no way to
+know when a value is recorded. If it refused every flagged column, it would also
+refuse good analyses (it flags legitimate measurements on the breast-cancer
+table). So it trains, says so loudly, labels the score provisional, and leaves
+the decision to a person who knows when each value is known. The full
+reasoning and the measured error rates are in [Leakage](LEAKAGE.md).
+
+You settle a flag in one of two ways:
+
+1. **The value is not known at prediction time**: declare it so. This is what
+   we do next (Step 6). The score falls to the honest 0.885.
+2. **The value is known at prediction time and a person vouches for it**: write
+   an attestation (see [Leakage](LEAKAGE.md)).
+
+If you would rather have a hard stop than a warning, add `--leakage-policy
+block`. This is useful in regulated work. Try it:
+
+```bash runnable
+scmle run titanic.csv --target survived --leakage-policy block --time-budget 120 --workers 2 --output-dir runs_blocked
+echo "exit code: $?"
+```
+
+What you should see (last two lines):
 
 ```text
 [run_20261105_001] state.BLOCKED: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
 blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
 ```
 
-and `exit code: 2`.
-
-What to look at: `BLOCKED` is a safe stop, not a crash. No model was built.
-The names after the colon are the suspect columns: `body` and `boat`.
+and `exit code: 2`. `BLOCKED` is a safe stop, not a crash: no model was built.
 `boat` appears three times because three different checks flagged it.
 
-Why SCMLE stops by default. The author once ran the same command with the
-stop turned off (`--leakage-policy warn`). It finished and reported an exam
-ROC AUC of **0.988**, and its last line said:
-
-```text
-run_20261105_001: selected bagged_logistic_regression (cv roc_auc=0.9917); test: roc_auc=0.9880, ...; WARNING 2 leakage suspect(s) kept in: boat, body
-```
-
-That score is far too good. It comes from `boat` and `body`, which are only
-known after the ship sinks. A model that uses them looks brilliant and fails
-the day it is used for real. Because it is so easy to miss a warning, the safe
-behaviour (`block`) is the default. You do not need to repeat the warn run.
-
-What it means and what to do: see "Leakage block" in
-[When things go wrong](WHEN_THINGS_GO_WRONG.md). In short: for each suspect
-ask "would I know this value before the voyage?". We would not, so we declare
-both off limits in Step 6. First, let us see what the plan says about them.
-
-## Step 5. Plan (nothing is trained yet): why it refused
+## Step 5. Plan (nothing is trained yet): see the evidence
 
 ```bash runnable
 scmle plan titanic.csv --target survived
@@ -231,7 +260,8 @@ that it says `regression` and not `classification`.
 
 ## Step 6. Run for real
 
-Tell SCMLE those two columns are only known after the outcome:
+Tell SCMLE those two columns are only known after the outcome. This settles
+the flag:
 
 ```bash runnable
 scmle run titanic.csv --target survived \
@@ -845,4 +875,6 @@ worse. See [`TUTORIAL.md`](TUTORIAL.md) section 7.
   of working): see "A second mode: the charter" in
   [Reading results](READING_RESULTS.md).
 * What this tool does not do: [What SCMLE cannot do](WHAT_SCMLE_CANNOT_DO.md).
+* Why a flag is a suspicion and not a verdict, with measured error rates:
+  [Leakage](LEAKAGE.md).
 * All the options: [`CLI.md`](CLI.md) and [`TUTORIAL.md`](TUTORIAL.md).

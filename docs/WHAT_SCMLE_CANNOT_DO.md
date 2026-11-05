@@ -34,7 +34,7 @@ benchmarks, which are not a head-to-head with people.
   the one to trust ([`README.md`](../README.md) says the same).
 * **Duplicates can inflate scores.** SCMLE warns and keeps copies together in a
   charter run, but it does not remove them for you.
-* **A leakage flag is a suspicion.** By default it stops the run (`block`). A real strong predictor looks the same to
+* **A leakage flag is a suspicion.** By default it does not stop the run: it labels the score provisional (`block` stops). A real strong predictor looks the same to
   the screen. Only a person who knows when the column is filled in can settle
   it.
 * **No leak is proven absent.** A leakage screen that finds nothing means

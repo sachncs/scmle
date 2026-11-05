@@ -117,7 +117,7 @@ fold choices, the chance of any false alarm is at most `alpha`, and the false
 discovery rate of the significant list is at most `alpha` under arbitrary
 dependence between columns. Not guaranteed: telling a legitimate strong
 predictor from a leak (that needs provenance), power below the ceiling,
-detection of leaks that need several columns together. `leakage_policy="block"` (the default)
+detection of leaks that need several columns together. `leakage_policy="block"` (opt-in; the default is `warn`)
 blocks only suspects whose mechanism has a current, passing certificate
 (`scmle/data/admissibility/screen_certificates.json`, produced by
 `python -m benchmarks.qualification.screen_certify --write`); a regression or

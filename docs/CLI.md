@@ -30,7 +30,7 @@ The common ones:
 | `--validation` | `auto`, `stratified`, `random`, `group`, `temporal`, `rolling`, and more. |
 | `--group-column`, `--time-column`, `--weight-column` | Data structure. |
 | `--exclude`, `--id-columns`, `--unavailable-at-prediction` | Keep columns out of the features. |
-| `--leakage-policy {warn,block}` | Default `block`: stop the run on suspicious features. `warn` is the opt-out: the run finishes and its last line names the suspects. |
+| `--leakage-policy {warn,block}` | Default `warn`: the run finishes, logs a warning and labels the score provisional. `block` (opt-in) stops the run on suspicious features. See [LEAKAGE](LEAKAGE.md). |
 | `--charter FILE` | Govern the run by an analysis charter: a sealed confirmation set is split off before profiling. |
 | `--exclude-models`, `--exclude-families` | Restrict the search. |
 | `--output-dir`, `--seed` | Where runs go; reproducibility. |
