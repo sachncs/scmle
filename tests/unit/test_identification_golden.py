@@ -206,7 +206,5 @@ def test_the_boosted_learner_gives_a_finite_estimate():
     nuis = aipw.fit_nuisances(
         aipw_tests.planted(600, 1), COLUMNS, "t", "y", 0, "boosted"
     )
-    result = aipw.estimate(
-        nuis, aipw_tests.planted(800, 2), "t", "y", "ATE"
-    )
+    result = aipw.estimate(nuis, aipw_tests.planted(800, 2), "t", "y", "ATE")
     assert np.isfinite(golden.snapshot(result)["estimate"])
