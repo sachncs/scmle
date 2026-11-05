@@ -28,6 +28,13 @@ production dependency audit, and `npm run build`.
   for the e2e tests).
 * The sitemap and web manifest are generated at build time
   (`src/pages/sitemap.xml.ts`, `src/pages/site.webmanifest.ts`).
+* The site holds its own information. Documentation pages are written natively in
+  `src/pages/docs/` (tables use `src/components/DocTable.astro`); do not point readers
+  to a repository file or a markdown page. The sidebar, pager and overview all read one
+  list, `src/data/docsNav.ts`, so a new page is added there once. Outbound links are
+  limited to the repository home, its issue tracker, the Apache licence text and, when
+  the package exists, PyPI. `npm run check:links` fails on any other external link, on any
+  `github.com` blob or tree link, and on any link to a `.md` path.
 * Every number on the landing page comes from the repository README,
   `docs/BENCHMARKS.md`, or a real local run that is labelled as such. Keep it that way.
 
