@@ -25,6 +25,15 @@ document.querySelectorAll(".menu-panel a").forEach((a) =>
   a.addEventListener("click", () => a.closest("details")?.removeAttribute("open")),
 );
 
+// Escape closes the open mobile menu and returns focus to its button ---------
+addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const open = document.querySelector("details.menu[open]");
+  if (!open) return;
+  open.removeAttribute("open");
+  open.querySelector("summary")?.focus();
+});
+
 // Scroll reveal ------------------------------------------------------------
 const reveals = document.querySelectorAll(".reveal");
 if (reveals.length) {
@@ -128,4 +137,16 @@ if (input) {
     const typing = t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
     if (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); input.focus(); }
   });
+}
+
+// Documentation chips: show a fade on the side that has more to scroll ------
+if (sideNav) {
+  const cue = () => {
+    const overflow = sideNav.scrollWidth - sideNav.clientWidth;
+    sideNav.classList.toggle("fade-start", overflow > 2 && sideNav.scrollLeft > 2);
+    sideNav.classList.toggle("fade-end", overflow > 2 && sideNav.scrollLeft < overflow - 2);
+  };
+  sideNav.addEventListener("scroll", cue, { passive: true });
+  addEventListener("resize", cue);
+  cue();
 }

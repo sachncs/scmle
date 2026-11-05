@@ -246,3 +246,17 @@ test("pages work at phone width without horizontal overflow", async ({ page }) =
     expect(overflow, route).toBeLessThanOrEqual(0);
   }
 });
+
+test("Escape closes the mobile menu and the docs chip row shows a scroll cue", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./docs/cli/");
+  const menu = page.locator("details.menu");
+  await menu.locator("summary").click();
+  await expect(menu).toHaveAttribute("open", "");
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toHaveAttribute("open", "");
+  const nav = page.locator(".sidebar nav");
+  const overflows = await nav.evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(overflows).toBe(true);
+  await expect(nav).toHaveClass(/fade-(start|end)/);
+});
