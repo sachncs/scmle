@@ -125,7 +125,7 @@ same way.
   environment variable or an image). The key signs bundles, provenance and
   image attestations and is read the same way when the service verifies them.
 * **Published demo key.** `deploy/local/demo.env` holds a key that is public.
-  With `SCMLE_ENV=production` the service refuses to start with it.
+  With `SCMLE_ENV=production` the service refuses to start with it, unless `SCMLE_ALLOW_PUBLISHED_KEY=1`, which only the local demo files set.
 * **What the signature proves.** The signing is HMAC, so it shows the
   statement was made by a holder of the key and was not altered; it does not
   show who built the model beyond that. Do not call an image "signed and
