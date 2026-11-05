@@ -2,7 +2,68 @@
 
 ## Unreleased
 
-* Beginner documentation: `docs/START_HERE.md` (a first model, step by step on the Titanic table), `GLOSSARY.md`, `DECISIONS.md`, `READING_RESULTS.md`, `WHEN_THINGS_GO_WRONG.md`, `WHAT_SCMLE_CANNOT_DO.md` and `BEGINNER_FINDINGS.md`, with a test that checks their commands and terms. Five small tool fixes found while following the path: near-duplicate screen with missing text, missing group/time/weight column, `resume` on a missing folder, a malformed attestation file, and a loop policy without `high_impact_actions`.
+* Phase 17 local evidence (`plan/evidence/phase-17/local/`,
+  `scripts/make_phase17_evidence.py`, `docs/OPERATIONS.md`, `plan/phase-17-...`,
+  F14). A killed local service classified as infrastructure and a shifted
+  feed as data quality, then mixed once labels worsened, with signed webhooks
+  to recording transports, retained telemetry and audit rows for the operator;
+  a simulated degradation that reaches the escalation path, a challenger, the
+  loop's proposal, four seeded gate refusals and a replacement on a scripted
+  ECS control plane; eleven recovery faults against the real local service
+  and emulators with measured RTO and RPO. The phase plan and F14 list only
+  what is open. None of it ran on AWS or GCP, no real pager or ticket
+  endpoint was used, and the production claim has not been made.
+* Production claim (F14 release gate; `scmle.operations.claim`,
+  `scripts/check_production_claim.py`, `docs/RELEASING.md`). The claim is one
+  fixed sentence in the releasing guide, which also says it has not happened.
+  The checker refuses unless `plan/evidence/phase-17/aws/` and `gcp/` each
+  hold signed acceptance, deployment, recovery, observability and
+  continuous-evaluation records from staging for one commit, all passing
+  within the declared RTO and RPO, and a sign-off from a reviewer who is not
+  the requester, signed with a key the pipeline does not hold, that covers
+  the current digest of each file. The committed provider folders are empty,
+  so it refuses; tests seed each missing or spoiled record.
+* Recovery (F14 item 13, local half; `scmle.operations.recovery`, `faults`,
+  `spool`). A catalogue of thirteen faults with declared RTO and RPO
+  objectives per stateful component (service, ledger, registry state, object
+  store, secrets, telemetry spool, job state). Eleven run locally: process
+  kill, an unready replacement and a clean rolling restart, a wrong key,
+  lost object-store access, a metrics outage with a file-backed spool, a
+  tampered bundle, a schema the service does not serve, a bad release rolled
+  back through the release registry against revisions that are local
+  processes, a killed workflow run continued from its state, a killed ledger
+  writer, and a rotated key. The rollback to a managed revision and a zone or
+  region loss are listed as not run, as is every provider. The runner found a
+  real defect: a writer killed between the temp file and the rename left a
+  `.<name>.<random>.tmp` file that made `LocalObjectStore.list_objects` raise,
+  so a killed workflow run could not be continued. Listing now ignores such
+  files. Not covered: machine crash, power loss, full disk, partitions.
+* Continuous evaluation (F14 item 12, local half;
+  `scmle.operations.continuous`). Delayed labels and business outcomes become
+  losses for `Loop.mature`, for the serving model and each challenger.
+  `RetrainPolicy` recommends by default or triggers; both go through
+  `Loop.escalate` and neither sets `alarm_gates_retrain`, which stays False.
+  A recommended retrain runs only after a person's signed reply. Dataset
+  versions (content digest, preserved copy), training runs, proposals and
+  replacements are in a hash-chained history. `replace` refuses without the
+  loop's promotion proposal, the promotion gate's admission and the release
+  registry's runtime confirmation. `post_promotion_check` gives intervals per
+  metric and `helped`, `harmed` or `inconclusive`, and says it cannot
+  attribute the change to the model.
+* Observability and incidents (F14 item 11, local half;
+  `scmle.operations.metrics`, `logs`, `signals`, `classify`, `exporters`,
+  `notify`, `respond`, `cost`). Metrics with a Prometheus text exposition,
+  JSON logs with a trace id and the model version and digest, windowed
+  monitors for service health, feature quality, drift and delayed-label
+  loss with configurable window, sampling and thresholds, CloudWatch
+  (embedded metric format and `PutMetricData`) and Cloud Monitoring payloads
+  checked against shapes written from the API references, HMAC-signed pager
+  and ticket webhooks with retry and an idempotency key, a classifier that
+  reports `mixed` rather than ranking causes, cost by service and version
+  from declared rates, and a response desk that retains telemetry and writes
+  operator actions to the audit ledger. Extension surfaces added to
+  `tests/fixtures/public_api.json`.
+
 * Phase 16 local evidence (`plan/evidence/phase-16/`,
   `scripts/make_phase16_evidence.py`, `plan/phase-16-...`, F14). The policy
   check over all Terraform and eight seeded violations, the seeded orphan

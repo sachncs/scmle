@@ -1,0 +1,668 @@
+{
+  "all_local_passed": true,
+  "cloud": {
+    "aws": {
+      "faults": [
+        "process_kill",
+        "unhealthy_container_rolling_restart",
+        "invalid_credentials",
+        "lost_object_store_access",
+        "dependency_outage",
+        "corrupted_bundle",
+        "incompatible_schema",
+        "bad_release",
+        "job_interruption",
+        "audit_log_continuity",
+        "secret_rotation_recovery",
+        "rollback_to_managed_revision",
+        "zone_or_region_loss"
+      ],
+      "reason": "no AWS or GCP account, staging environment or reviewer was available",
+      "status": "not_run"
+    },
+    "gcp": {
+      "faults": [
+        "process_kill",
+        "unhealthy_container_rolling_restart",
+        "invalid_credentials",
+        "lost_object_store_access",
+        "dependency_outage",
+        "corrupted_bundle",
+        "incompatible_schema",
+        "bad_release",
+        "job_interruption",
+        "audit_log_continuity",
+        "secret_rotation_recovery",
+        "rollback_to_managed_revision",
+        "zone_or_region_loss"
+      ],
+      "reason": "no AWS or GCP account, staging environment or reviewer was available",
+      "status": "not_run"
+    }
+  },
+  "faults": [
+    {
+      "cloud_needs": "Kill a task or revision instance and read the platform's own restart and health record.",
+      "components": [
+        "service",
+        "registry_state"
+      ],
+      "id": "process_kill",
+      "local_limits": "The runner is the supervisor; no orchestrator restarts anything.",
+      "summary": "SIGKILL the serving process; a supervisor starts a new one. Also kills a state writer at random points.",
+      "title": "Process kill"
+    },
+    {
+      "cloud_needs": "A failing health check and a rolling deployment on ECS and Cloud Run with the load balancer's request log.",
+      "components": [
+        "service"
+      ],
+      "id": "unhealthy_container_rolling_restart",
+      "local_limits": "Processes, not containers; readiness-gated switching is done by the runner, not by ECS or Cloud Run.",
+      "summary": "A replacement that never becomes ready is not admitted; a ready replacement takes over without dropped requests.",
+      "title": "Unhealthy instance and rolling restart"
+    },
+    {
+      "cloud_needs": "Revoked or wrong workload identity and secret versions on each provider.",
+      "components": [
+        "secrets"
+      ],
+      "id": "invalid_credentials",
+      "local_limits": "The credential is the bundle signing key in an environment variable; no IAM, token issuer or secret manager is involved.",
+      "summary": "The service starts with a key that does not verify its bundle; it stays alive and unready until the key is corrected.",
+      "title": "Invalid credentials"
+    },
+    {
+      "cloud_needs": "A denied bucket policy or key on S3 and GCS and a restore from versioned objects.",
+      "components": [
+        "object_store"
+      ],
+      "id": "lost_object_store_access",
+      "local_limits": "A local emulator (scmle.deploy.mocks); no IAM, bucket policy, versioning or replication.",
+      "summary": "The store stops answering; the running service keeps serving; when access returns the bundle is fetched again by digest.",
+      "title": "Lost object-store access"
+    },
+    {
+      "cloud_needs": "An outage or throttling of CloudWatch and Cloud Monitoring.",
+      "components": [
+        "telemetry_spool"
+      ],
+      "id": "dependency_outage",
+      "local_limits": "A local metrics sink; not CloudWatch or Cloud Monitoring.",
+      "summary": "The metrics destination is down; telemetry is spooled and drained when it returns; serving is unaffected.",
+      "title": "Dependency outage"
+    },
+    {
+      "cloud_needs": "A corrupted object in S3 or GCS and an image whose bundle digest differs from the release record.",
+      "components": [
+        "service",
+        "object_store"
+      ],
+      "id": "corrupted_bundle",
+      "local_limits": "The copy is in a local folder and an emulator.",
+      "summary": "A modified model file never becomes ready; restoring the bundle from a digest-checked copy recovers.",
+      "title": "Corrupted bundle"
+    },
+    {
+      "cloud_needs": "A client and a model version released on a provider that differ in schema.",
+      "components": [
+        "service"
+      ],
+      "id": "incompatible_schema",
+      "local_limits": "One local service and one client.",
+      "summary": "Requests with a schema the service does not serve are refused with a precise status; the service keeps serving; the caller recovers by reading the schema.",
+      "title": "Incompatible schema"
+    },
+    {
+      "cloud_needs": "The same on ECS and Cloud Run with their real revisions and traffic shares.",
+      "components": [
+        "service"
+      ],
+      "id": "bad_release",
+      "local_limits": "Revisions are local processes behind a local control plane that implements the same interface as the ECS and Cloud Run adapters.",
+      "summary": "A release that serves wrong answers is detected from delayed labels and rolled back to the previous revision; a release that never becomes ready is not promoted and the previous revision is restored.",
+      "title": "Bad release"
+    },
+    {
+      "cloud_needs": "Step Functions and Cloud Workflows executions with their own retry and state.",
+      "components": [
+        "job_state"
+      ],
+      "id": "job_interruption",
+      "local_limits": "The local executor and a local state directory.",
+      "summary": "A workflow run is killed mid-step; after the lease expires it continues; finished steps are not repeated.",
+      "title": "Job interruption with persistent state"
+    },
+    {
+      "cloud_needs": "The ledger on the provider's durable storage across a task replacement.",
+      "components": [
+        "ledger"
+      ],
+      "id": "audit_log_continuity",
+      "local_limits": "Process kill only; no machine crash, disk full or torn page.",
+      "summary": "The ledger writer is killed; the chain verifies after restart and continues without a gap.",
+      "title": "Audit-log continuity"
+    },
+    {
+      "cloud_needs": "A rotation in Secrets Manager and Secret Manager with the workload picking up the new version.",
+      "components": [
+        "secrets"
+      ],
+      "id": "secret_rotation_recovery",
+      "local_limits": "A rotated environment variable; no secret manager versions.",
+      "summary": "The signing key is rotated; a service with the old key cannot verify the new bundle and recovers once given the new key.",
+      "title": "Secret rotation"
+    },
+    {
+      "cloud_needs": "A previous ECS task definition revision or Cloud Run revision with the traffic split read back from the platform.",
+      "components": [
+        "service"
+      ],
+      "id": "rollback_to_managed_revision",
+      "local_limits": "The registry logic is exercised in bad_release against local processes; no managed revision exists locally.",
+      "summary": "Traffic returns to the previous revision of the managed service and the registry follows only after the platform confirms.",
+      "title": "Rollback to a managed revision"
+    },
+    {
+      "cloud_needs": "Two zones or regions per provider and a deliberate failover.",
+      "components": [
+        "service",
+        "object_store",
+        "ledger"
+      ],
+      "id": "zone_or_region_loss",
+      "local_limits": "Nothing local resembles it.",
+      "summary": "A zone or region of the provider is unavailable.",
+      "title": "Zone or region loss"
+    }
+  ],
+  "objectives": [
+    {
+      "component": "service",
+      "rpo_lost": 0,
+      "rpo_unit": "requests answered differently after restart",
+      "rto_seconds": 30.0,
+      "scope": "the serving process; stateless, so recovery is a restart to ready"
+    },
+    {
+      "component": "ledger",
+      "rpo_lost": 0,
+      "rpo_unit": "acknowledged ledger rows",
+      "rto_seconds": 10.0,
+      "scope": "reload and chain verification after the writer is killed; a machine crash or power loss is not covered (no fsync is claimed)"
+    },
+    {
+      "component": "registry_state",
+      "rpo_lost": 0,
+      "rpo_unit": "acknowledged state writes",
+      "rto_seconds": 10.0,
+      "scope": "atomic replacement of a state file with its writer killed"
+    },
+    {
+      "component": "object_store",
+      "rpo_lost": 0,
+      "rpo_unit": "acknowledged objects",
+      "rto_seconds": 30.0,
+      "scope": "the local object-store emulator, from access restored to a verified bundle serving; not S3 or GCS"
+    },
+    {
+      "component": "secrets",
+      "rpo_lost": 0,
+      "rpo_unit": "none: secrets are held outside this system",
+      "rto_seconds": 60.0,
+      "scope": "from detection of a credential mismatch to ready under the corrected or rotated key; a local environment variable, not a secret manager"
+    },
+    {
+      "component": "telemetry_spool",
+      "rpo_lost": 0,
+      "rpo_unit": "spooled samples",
+      "rto_seconds": 30.0,
+      "scope": "from the destination returning to the spool drained; delivery is at least once, so duplicates are possible"
+    },
+    {
+      "component": "job_state",
+      "rpo_lost": 0,
+      "rpo_unit": "completed steps",
+      "rto_seconds": 60.0,
+      "scope": "a workflow run killed mid-step and continued from its persisted state, including the wait for the lease to expire"
+    }
+  ],
+  "results": [
+    {
+      "checks": {
+        "killed process stopped answering and the restart answers the same predictions": true,
+        "no state file was ever unreadable": true
+      },
+      "detail": {
+        "processes_still_alive_after_close": 0,
+        "service_rto_seconds_per_trial": [
+          1.646,
+          1.73,
+          2.051
+        ],
+        "state_trials": {
+          "acknowledged_writes_lost": 0,
+          "read_seconds_max": 0.0004681670106947422,
+          "trials": 10,
+          "unreadable_files": 0
+        }
+      },
+      "environment": "local subprocess",
+      "fault_id": "process_kill",
+      "measurements": [
+        {
+          "component": "service",
+          "method": "SIGKILL to the first 200 from /predict of the restarted process, 3 trials, maximum; RPO is answers that differ from before the kill. time.monotonic() in the runner",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "requests answered differently after restart",
+          "rto_objective_seconds": 30.0,
+          "rto_seconds": 2.051
+        },
+        {
+          "component": "registry_state",
+          "method": "10 trials: a child rewrites a state file atomically in a loop and prints each acknowledged counter; SIGKILL at a random point; the file is read back and its counter must not be below the last acknowledged one",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "acknowledged state writes",
+          "rto_objective_seconds": 10.0,
+          "rto_seconds": 0.0
+        }
+      ],
+      "problems": [],
+      "seconds": 35.08,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "no request failed during the replacement": true,
+        "the ready replacement took over": true,
+        "the unready replacement stayed alive and unready": true,
+        "the unready replacement was never given traffic": true
+      },
+      "detail": {
+        "processes_still_alive_after_close": 0,
+        "replacement_ready_seconds": 2.28,
+        "requests_failed": 0,
+        "requests_sent": 86,
+        "unready_replacement": {
+          "livez": 200,
+          "phase": "failed",
+          "predict": 503,
+          "readyz": 503,
+          "reason": "artifact: checksum mismatch: pipeline.joblib was modified or corrupted"
+        },
+        "window_seconds": 4.14
+      },
+      "environment": "local subprocess",
+      "fault_id": "unhealthy_container_rolling_restart",
+      "measurements": [
+        {
+          "component": "service",
+          "method": "a client sends one /predict every 50 ms to the instance the runner has declared current; RTO is the longest run of failures, RPO is failed requests; the runner stands in for the orchestrator: it switches only after /readyz is 200",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "requests answered differently after restart",
+          "rto_objective_seconds": 30.0,
+          "rto_seconds": 0.0
+        }
+      ],
+      "problems": [],
+      "seconds": 8.28,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "the corrected key serves": true,
+        "the failure reason is reported without the key": true,
+        "the wrong key leaves the service alive and unready": true
+      },
+      "detail": {
+        "processes_still_alive_after_close": 0,
+        "with_wrong_key": {
+          "livez": 200,
+          "phase": "failed",
+          "predict": 503,
+          "readyz": 503,
+          "reason": "artifact: bundle signature is invalid: the bundle was modified or signed with a different key"
+        }
+      },
+      "environment": "local subprocess",
+      "fault_id": "invalid_credentials",
+      "measurements": [
+        {
+          "component": "secrets",
+          "method": "from the service reporting the credential failure to the first 200 from /predict under the corrected key (restart included). time.monotonic() in the runner",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "none: secrets are held outside this system",
+          "rto_objective_seconds": 60.0,
+          "rto_seconds": 3.946
+        }
+      ],
+      "problems": [],
+      "seconds": 9.85,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "an altered object is refused by its digest": true,
+        "the bundle fetched after recovery has the original digest": true,
+        "the fetch failed while the store was down": true,
+        "the running service kept serving": true
+      },
+      "detail": {
+        "objects": 15,
+        "processes_still_alive_after_close": 0
+      },
+      "environment": "local emulator + subprocess",
+      "fault_id": "lost_object_store_access",
+      "measurements": [
+        {
+          "component": "object_store",
+          "method": "from the emulator being started again on the same port and root to a refetched, digest-verified bundle serving; RPO is uploaded objects missing from the root afterwards. time.monotonic() in the runner",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "acknowledged objects",
+          "rto_objective_seconds": 30.0,
+          "rto_seconds": 2.305
+        }
+      ],
+      "problems": [],
+      "seconds": 5.49,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "a restarted spool still held every sample": true,
+        "serving and readiness were unaffected": true,
+        "the failed flush kept every sample": true,
+        "the spool drained": true
+      },
+      "detail": {
+        "flush_while_down": {
+          "error": "URLError: <urlopen error [Errno 61] Connection refused>",
+          "remaining": 50,
+          "sent": 0
+        },
+        "processes_still_alive_after_close": 0
+      },
+      "environment": "local emulator",
+      "fault_id": "dependency_outage",
+      "measurements": [
+        {
+          "component": "telemetry_spool",
+          "method": "50 samples spooled while the sink was down, the spool object recreated (a restart), the sink started, then flushed; RTO is the flush time, RPO is sample names absent from the sink",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "spooled samples",
+          "rto_objective_seconds": 30.0,
+          "rto_seconds": 0.013
+        }
+      ],
+      "problems": [],
+      "seconds": 3.44,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "the restored bundle serves": true,
+        "the restored copy has the recorded digest": true,
+        "the tampered bundle was alive but never ready": true,
+        "the tampered bundle's digest differs": true
+      },
+      "detail": {
+        "processes_still_alive_after_close": 0,
+        "tampered_verdict": {
+          "livez": 200,
+          "phase": "failed",
+          "predict": 503,
+          "readyz": 503,
+          "reason": "artifact: checksum mismatch: pipeline.joblib was modified or corrupted"
+        }
+      },
+      "environment": "local subprocess",
+      "fault_id": "corrupted_bundle",
+      "measurements": [
+        {
+          "component": "service",
+          "method": "from the service reporting the tampered bundle to the first 200 after restoring a copy whose digest equals the recorded one. time.monotonic() in the runner",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "requests answered differently after restart",
+          "rto_objective_seconds": 30.0,
+          "rto_seconds": 2.905
+        }
+      ],
+      "problems": [],
+      "seconds": 5.99,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "a different expected schema digest is refused with 409": true,
+        "a record missing a required column is refused with 422": true,
+        "an unserved schema version is refused with 409": true,
+        "the caller recovers after reading /schema": true,
+        "the refusals classify as data quality, not infrastructure": true,
+        "the service stayed ready": true
+      },
+      "detail": {
+        "classification": {
+          "breached": [
+            "invalid_request_rate"
+          ],
+          "categories": [
+            "data_quality"
+          ],
+          "caveats": [],
+          "response": "inspect the upstream feed and the request schema; do not retrain on this data",
+          "severity": "warning",
+          "unobserved": [
+            "windowed_loss"
+          ],
+          "verdict": "data_quality"
+        },
+        "processes_still_alive_after_close": 0,
+        "statuses": {
+          "expected_schema_digest": 409,
+          "schema_version": 409
+        }
+      },
+      "environment": "local subprocess",
+      "fault_id": "incompatible_schema",
+      "measurements": [
+        {
+          "component": "service",
+          "method": "from the first refused request to a 200 after the client read /schema and sent its digest; the service itself was never down. time.monotonic() in the runner",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "requests answered differently after restart",
+          "rto_objective_seconds": 30.0,
+          "rto_seconds": 0.059
+        }
+      ],
+      "problems": [],
+      "seconds": 2.63,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "a release that never becomes ready was not promoted": true,
+        "registry, ledger and runtime agree after the rollback": true,
+        "the bad release served different answers": true,
+        "the first and the bad release were promoted": true,
+        "the loss signal classified it as model performance": true,
+        "the previous revision still serves": true,
+        "the refused release changed nothing in the registry": true,
+        "the rollback was confirmed by the platform": true,
+        "the rolled-back service answers as before": true
+      },
+      "detail": {
+        "control_plane": "ProcessPlane: revisions are local processes",
+        "detected_after_labelled_cases": 30,
+        "processes_still_alive_after_close": 0,
+        "rollback": {
+          "done": true,
+          "reasons": [],
+          "restored": null,
+          "revision": "local-1",
+          "version": 1
+        },
+        "unready_release": {
+          "done": false,
+          "reasons": [
+            "the platform did not confirm: the platform does not report the service ready"
+          ],
+          "restored": true,
+          "revision": null,
+          "version": null
+        }
+      },
+      "environment": "local processes",
+      "fault_id": "bad_release",
+      "measurements": [
+        {
+          "component": "service",
+          "method": "from the labelled-outcome window classifying the release as model performance to the platform confirming the previous revision with all traffic (rollback and read-back). Detection delay is reported separately. time.monotonic() in the runner",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "requests answered differently after restart",
+          "rto_objective_seconds": 30.0,
+          "rto_seconds": 0.004
+        }
+      ],
+      "problems": [],
+      "seconds": 28.86,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "the continued run finished": true,
+        "the finished step was not repeated": true,
+        "the first run was killed during train": true,
+        "the interrupted step ran again once": true,
+        "the remaining step ran once": true
+      },
+      "detail": {
+        "handler_calls": [
+          "ingest",
+          "train",
+          "train",
+          "evaluate"
+        ],
+        "lease_seconds": 1.0,
+        "processes_still_alive_after_close": 0,
+        "state_objects": 4
+      },
+      "environment": "local subprocess",
+      "fault_id": "job_interruption",
+      "measurements": [
+        {
+          "component": "job_state",
+          "method": "a child runs a 3-step workflow and SIGKILLs itself in step 2; after the 1 s lease a second process starts the same trigger; RTO includes the lease wait; RPO counts completed steps run again or lost",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "completed steps",
+          "rto_objective_seconds": 60.0,
+          "rto_seconds": 4.956
+        }
+      ],
+      "problems": [],
+      "seconds": 8.68,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "every killed ledger reopened with a verified chain": true,
+        "recovered rows are contiguous and the chain continues": true
+      },
+      "detail": {
+        "processes_still_alive_after_close": 0,
+        "torn_or_broken": 0,
+        "trials": 5
+      },
+      "environment": "local subprocess",
+      "fault_id": "audit_log_continuity",
+      "measurements": [
+        {
+          "component": "ledger",
+          "method": "5 trials: a child appends audit rows and prints each acknowledged one; SIGKILL at a random point; the ledger is reopened (chain verified) and must hold at least every acknowledged row; then it is extended and verified again. Machine crash and power loss are not covered.",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "acknowledged ledger rows",
+          "rto_objective_seconds": 10.0,
+          "rto_seconds": 0.003
+        }
+      ],
+      "problems": [],
+      "seconds": 24.85,
+      "status": "passed"
+    },
+    {
+      "checks": {
+        "the rotated bundle is refused under the old key": true,
+        "the rotated key serves": true,
+        "the rotation is in the audit ledger": true,
+        "the service ran under the old key": true
+      },
+      "detail": {
+        "processes_still_alive_after_close": 0,
+        "stale_key_verdict": {
+          "livez": 200,
+          "phase": "failed",
+          "predict": 503,
+          "readyz": 503,
+          "reason": "artifact: bundle signature is invalid: the bundle was modified or signed with a different key"
+        }
+      },
+      "environment": "local subprocess",
+      "fault_id": "secret_rotation_recovery",
+      "measurements": [
+        {
+          "component": "secrets",
+          "method": "from the stale key being refused to the first 200 under the rotated key with the re-signed bundle. time.monotonic() in the runner",
+          "rpo_lost": 0,
+          "rpo_objective": 0,
+          "rpo_unit": "none: secrets are held outside this system",
+          "rto_objective_seconds": 60.0,
+          "rto_seconds": 3.535
+        }
+      ],
+      "problems": [],
+      "seconds": 8.99,
+      "status": "passed"
+    },
+    {
+      "checks": {},
+      "detail": {},
+      "environment": "not run",
+      "fault_id": "rollback_to_managed_revision",
+      "measurements": [],
+      "problems": [
+        "needs a real cloud environment: A previous ECS task definition revision or Cloud Run revision with the traffic split read back from the platform."
+      ],
+      "seconds": 0.0,
+      "status": "not_run"
+    },
+    {
+      "checks": {},
+      "detail": {},
+      "environment": "not run",
+      "fault_id": "zone_or_region_loss",
+      "measurements": [],
+      "problems": [
+        "needs a real cloud environment: Two zones or regions per provider and a deliberate failover."
+      ],
+      "seconds": 0.0,
+      "status": "not_run"
+    }
+  ],
+  "summary": {
+    "failed": 0,
+    "faults": 13,
+    "not_run": 2,
+    "passed": 11,
+    "ran_locally": 11
+  }
+}

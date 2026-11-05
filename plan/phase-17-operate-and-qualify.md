@@ -5,52 +5,80 @@ items 11, 12 and 13, then the final release gate. Depends on
 [Phase 16](phase-16-infrastructure-and-release.md) and on the built Phase 13
 closed loop (`scmle/governance/loop.py`).
 
-## Work packages
+The code, tests and local evidence for the four work packages are built and
+verified without a cloud account (`scmle.operations`, `docs/OPERATIONS.md`,
+the fixed claim in `docs/RELEASING.md`). Evidence:
+`plan/evidence/phase-17/local/` (regenerate with
+`scripts/make_phase17_evidence.py`). The local run measured a local service,
+emulators, a ledger writer and a workflow executor; exporters were checked
+against shapes written from the API references; webhooks went to recording
+transports; the replacement ran on a scripted control plane. **Nothing ran on
+AWS or GCP and the production claim has not been made.** What remains needs an
+AWS account, a GCP account, a staging environment per provider and a reviewer
+other than the author.
 
-- **WP-17.1 Observability and incidents (item 11).** Request counts, latency
-  distributions, error rates, resource use and availability; structured logs
-  with trace correlation and model-version attribution; data drift,
-  prediction drift, feature quality and delayed-label performance with
-  configurable windows, sampling and thresholds; exporters for CloudWatch
-  and Cloud Monitoring; pager and ticket webhooks; a classifier that
-  separates infrastructure faults, data-quality issues and model-performance
-  degradation; cost reporting by service and deployed version.
-- **WP-17.2 Continuous evaluation (item 12).** Feed delayed labels and
-  observed business outcomes to the F13 loop. Retraining is triggered or
-  recommended by an explicit policy; datasets, evidence and training history
-  are preserved; a challenger is compared with the champion; replacing the
-  production model needs the declared approval; after promotion the selected
-  operational and business metrics are checked to see whether the model
-  helped. Note that the F13 alarm does not yet gate retraining because its
-  detection-delay gates missed their floors; this work package must use the
-  certified path (escalate) until that is re-measured.
-- **WP-17.3 Recovery (item 13).** A fault catalogue and runner covering
-  process kill, unhealthy container and rolling restart, invalid
-  credentials, lost object-store access, dependency outage, corrupted
-  bundle, incompatible schema, bad release, job interruption with persistent
-  state recovery, real rollback to a managed revision, audit-log continuity
-  and secret-rotation recovery. Define and measure RTO and RPO for each
-  stateful component. Record real environment failures, not only simulated
-  fault artifacts.
-- **WP-17.4 The production claim.** Run all P0 acceptance on both providers in
-  staging, store the evidence, and obtain a reviewer-approved sign-off. The
-  claim text is fixed in `docs/RELEASING.md` before the run.
+## Open
 
-## Gate
+- **WP-17.1 Observability, on each provider.** Write the metrics, logs and
+  signals to CloudWatch and Cloud Monitoring from the staging service, with a
+  real pager and ticket endpoint, and fix what differs from the recorded
+  payload shapes. Inject a service failure and a controlled drift event in
+  each provider's staging, keep the alert and telemetry captures, and have an
+  operator acknowledge and resolve them. Close the known gaps: the signals
+  are not yet wired into the generated service (a deployment calls them); the
+  cost report needs the provider's real rates and a comparison with the bill;
+  the incident classifier's rules are untuned and have met no real incident.
+- **WP-17.2 Continuous evaluation, in staging.** Run the controlled
+  degradation against a deployed model with labels that arrive after a real
+  delay and a real business outcome, and keep the proposal, the person's
+  reply, the challenger's evidence and the replacement. The F13 alarm still
+  does not gate retraining (`alarm_gates_retrain` stays False) until its
+  detection-delay certificate passes on a re-measurement; until then
+  retraining proposals go through the escalation path. Decide per product
+  which business metrics and margins `post_promotion_check` watches, and add
+  a holdback so its answer can be attributed to the model.
+- **WP-17.3 Recovery, on each provider.** Run every catalogued fault in each
+  provider's staging and record RTO and RPO per stateful component against
+  the objectives in `recovery.OBJECTIVES`: process and task kill, an unhealthy
+  task with the platform's rolling replacement, revoked workload identity,
+  denied bucket access, a managed-dependency outage, a corrupted object, a
+  rollback to a real managed revision (`rollback_to_managed_revision`), job
+  interruption in Step Functions and Cloud Workflows, and secret rotation in
+  the provider's secret manager. Add the two the local run cannot see: a
+  machine crash or power loss (the ledger and state files are shown only to
+  survive a killed process) and a zone or region loss. Revisit the objectives
+  with the owner; they were declared for a local run.
+- **WP-17.4 The claim.** Run all P0 acceptance on both providers in staging,
+  write `acceptance.json`, `deployment.json`, `recovery.json`,
+  `observability.json` and `continuous-evaluation.json` under
+  `plan/evidence/phase-17/{aws,gcp}/`, have a reviewer other than the author
+  sign `signoff.json` with a key the pipeline does not hold, and run
+  `scripts/check_production_claim.py`. Only then may the sentence in
+  `docs/RELEASING.md` be used, and the status line there be changed.
+
+## Gate (still open)
 
 An injected service failure and a controlled drift event produce correctly
-classified alerts, retained telemetry and an auditable operator response. A
-controlled degradation produces the expected retraining proposal or
-escalation, and a new model is deployed only after its tests and approvals
-pass. Each provider passes the declared recovery scenarios within the
-documented RTO and RPO.
+classified alerts, retained telemetry and an auditable operator response on
+each provider. A controlled degradation produces the expected retraining
+proposal or escalation, and a new model is deployed only after its tests and
+approvals pass. Each provider passes the declared recovery scenarios within the
+documented RTO and RPO. The local half of the gate passes: a killed local
+service is classified as infrastructure and a shifted feed as data quality
+(and, once labels get worse, as mixed), the recommendation reaches the
+escalation path and trains a challenger only after a person's reply, the
+gate refuses each seeded failure, and every local fault recovered within its
+objective; see the evidence summary.
 
 ## Evidence
 
+`plan/evidence/phase-17/local/`: what ran locally and what did not.
 `plan/evidence/phase-17/{aws,gcp}/`: alert and telemetry captures, operator
-records, recovery timings, reviewer sign-off.
+records, recovery timings and the reviewer sign-off. They are empty, and the
+claim checker refuses them.
 
 ## Not claimed
 
 Anything outside the declared scenarios. A passing recovery run is a
-measurement of those scenarios, not of availability in general.
+measurement of those scenarios, not of availability in general. Nothing local
+is a cloud result, and the production claim has not been made.

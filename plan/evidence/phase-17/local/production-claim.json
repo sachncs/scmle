@@ -1,0 +1,60 @@
+{
+  "checker_self_test": {
+    "every_seeded_missing_record_refused": true,
+    "note": "synthetic records signed with throwaway keys by tests/support_claim.py; this is a test of the checker, not evidence about any provider",
+    "seeded": {
+      "aws: acceptance.json missing": true,
+      "aws: continuous-evaluation.json missing": true,
+      "aws: deployment.json missing": true,
+      "aws: observability.json missing": true,
+      "aws: recovery.json missing": true,
+      "aws: signoff.json missing": true,
+      "gcp: acceptance.json missing": true,
+      "gcp: continuous-evaluation.json missing": true,
+      "gcp: deployment.json missing": true,
+      "gcp: observability.json missing": true,
+      "gcp: recovery.json missing": true,
+      "gcp: signoff.json missing": true
+    },
+    "synthetic_complete_tree_accepted": true
+  },
+  "claim_made": false,
+  "claim_text_matches_releasing_guide": true,
+  "committed_folders": {
+    "allowed": false,
+    "claim": "SCMLE is production-qualified on AWS and GCP: every P0 acceptance criterion passed in staging on both providers, with evidence signed by a reviewer other than the author.",
+    "problems": [
+      "aws: acceptance.json is missing",
+      "aws: deployment.json is missing",
+      "aws: recovery.json is missing",
+      "aws: observability.json is missing",
+      "aws: continuous-evaluation.json is missing",
+      "aws: signoff.json is missing",
+      "gcp: acceptance.json is missing",
+      "gcp: deployment.json is missing",
+      "gcp: recovery.json is missing",
+      "gcp: observability.json is missing",
+      "gcp: continuous-evaluation.json is missing",
+      "gcp: signoff.json is missing"
+    ],
+    "providers": {
+      "aws": [
+        "acceptance.json is missing",
+        "deployment.json is missing",
+        "recovery.json is missing",
+        "observability.json is missing",
+        "continuous-evaluation.json is missing",
+        "signoff.json is missing"
+      ],
+      "gcp": [
+        "acceptance.json is missing",
+        "deployment.json is missing",
+        "recovery.json is missing",
+        "observability.json is missing",
+        "continuous-evaluation.json is missing",
+        "signoff.json is missing"
+      ]
+    }
+  },
+  "committed_folders_allow_the_claim": false
+}

@@ -60,6 +60,18 @@ monitoring, retraining and rollback to real operational signals.
   (`scmle.governance.release_state`, `docs/CLOUD_RELEASE.md`). Evidence:
   `plan/evidence/phase-16/`. Terraform itself was not run, the workflows never
   ran, and every cloud answer is a recorded or scripted shape.
+- The local halves of items 11, 12 and 13 and the production-claim checker are
+  built and verified without a cloud account (`scmle.operations`,
+  `docs/OPERATIONS.md`, `docs/RELEASING.md`): metrics with Prometheus text,
+  trace-correlated logs, windowed signals, CloudWatch and Cloud Monitoring
+  payloads, signed pager and ticket webhooks, a classifier that reports mixed
+  causes and cost by version; labels and outcomes into the F13 loop, a
+  retraining policy that recommends by default through the escalation path,
+  gated replacement and a post-promotion check with intervals; a fault
+  catalogue with eleven local scenarios and measured RTO and RPO. Evidence:
+  `plan/evidence/phase-17/local/`. Nothing ran on a cloud, the exporters
+  were checked against shapes written from the API references, the webhooks
+  went to recording transports, and the production claim has not been made.
 
 ## Items (backlog numbers 1 to 13)
 
@@ -80,9 +92,9 @@ and a named approver.
 | 8 | Orchestration | Built locally (`scmle.workflow`, `docs/ORCHESTRATION.md`); open: have the services accept the emitted definitions | Step Functions and Cloud Workflows with Scheduler; duplicate, partial-failure, missed-schedule and interruption runs |
 | 9 | CI/CD release gates | Built locally (`cloud-release.yml`, `scmle.deploy.gate`, `docs/CLOUD_RELEASE.md`); open: run the workflows, build and scan a real image | Federated short-lived credentials, staging then production, live tests |
 | 10 | Registry bound to the runtime | Built locally (`scmle.governance.release_state`, `scmle deploy reconcile`); open: staged traffic on ECS | Reading the real revision from ECS and Cloud Run, traffic split, previous-revision rollback |
-| 11 | Observability and incidents | Structured logs, trace ids, version attribution, metric exporters, alert rules, pager and ticket webhooks, a classifier separating infrastructure, data-quality and model faults, cost by service and version | CloudWatch and Cloud Monitoring; injected failure and controlled drift |
-| 12 | Continuous evaluation | Delayed labels and business outcomes into the F13 loop, retrain recommendation policy, champion and challenger comparison, approval before replacement, post-promotion metric check | Controlled degradation scenario in staging |
-| 13 | Failure recovery and DR | Fault catalogue and runner (process kill, bad release, lost storage access, corrupted bundle, schema break, job interruption, secret rotation); RTO and RPO per stateful component | Independent passes on AWS and GCP staging with reviewer-approved evidence |
+| 11 | Observability and incidents | Built locally (`scmle.operations`, `docs/OPERATIONS.md`); open: wire the signals into the generated service, tune the classifier on real incidents, price against a bill | CloudWatch and Cloud Monitoring; a real pager; injected failure and controlled drift |
+| 12 | Continuous evaluation | Built locally (`scmle.operations.continuous`); open: the F13 alarm still does not gate retraining, a holdback for attribution | Controlled degradation scenario in staging |
+| 13 | Failure recovery and DR | Built locally (`scmle.operations.recovery`, `faults`); open: machine crash and power loss, objectives revisited with the owner | Independent passes on AWS and GCP staging with reviewer-approved evidence |
 
 ## Method and measurement
 
