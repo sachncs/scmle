@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the site text of the Learn pages and the observability page from docs/*.md.
+"""Regenerate the site text of the Learn, observability, trail and breadth pages from docs/*.md.
 
 Run from anywhere:  python3 website/scripts/learn_from_docs.py
 
@@ -258,6 +258,8 @@ JOBS = [  # (source, output name, glossary layout, demote h2 to h3)
     ("WHAT_SCMLE_CANNOT_DO", "what-scmle-cannot-do", False, False),
     ("BEGINNER_FINDINGS", "beginner-findings", False, True),
     ("OPERATIONS", "observability", False, False),
+    ("TRAIL", "trail", False, False),
+    ("BREADTH", "breadth", False, False),
 ]
 
 if __name__ == "__main__":

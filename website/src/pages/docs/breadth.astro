@@ -1,0 +1,13 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/breadth.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="Breadth: what is qualified" description="A status table of fourteen task and modality slices: what exists, what is missing, and the three conditions for calling one qualified. None is." current="breadth">
+  <p class="eyebrow"><span></span> Reference</p>
+  <h1>What is qualified,<br /><em>what is partial, what is not.</em></h1>
+  <Fragment set:html={html} />
+  <p class="meta">A status table, not a roadmap · 0.1 beta</p>
+</DocsLayout>

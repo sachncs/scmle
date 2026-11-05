@@ -17,6 +17,7 @@ const commands = [
   ["<code>scmle frame REQUEST --source S --data X --output DIR</code>", "Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused."],
   ["<code>scmle ingest</code>", "Profile a read-only SQLite source, find grain and joins, and write the ingestion catalog (see <a href=\"" + base + "/docs/artifacts/#ingest\">artifacts</a>)."],
   ["<code>scmle loop init|verify</code>", "Open and verify the hash-chained deployment ledger of the closed loop."],
+  ["<code>scmle trail build|verify|show</code>", "Join the charter, framing, claim ledger, registry and deployment ledger into one sealed folder, check it against itself, or print it. See the <a href=\"" + base + "/docs/trail/\">business trail</a>."],
   ["<code>scmle deploy …</code>", "Live checks, the promotion gate, signed deployment records, platform observation and reconcile. See <a href=\"" + base + "/docs/cloud-release/\">Cloud release</a>."],
 ];
 const options = [

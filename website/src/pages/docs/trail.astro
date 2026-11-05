@@ -1,0 +1,13 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/trail.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="The business trail" description="How scmle joins the charter, framing, claim ledger, registry and deployment ledger into one sealed folder a reviewer can verify, what verify detects, and the limits of the local evidence." current="trail">
+  <p class="eyebrow"><span></span> Serve and operate</p>
+  <h1>From the question<br /><em>to the observed outcome.</em></h1>
+  <Fragment set:html={html} />
+  <p class="meta">Local evidence only; no independent reviewer has signed a trail · 0.1 beta</p>
+</DocsLayout>
