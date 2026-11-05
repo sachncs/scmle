@@ -14,9 +14,14 @@ for alerting are computed from events by `scmle.operations.signals`.
 from collections.abc import Mapping
 import math
 import re
-import resource
 import sys
 import threading
+import time
+
+try:
+    import resource
+except ImportError:  # Windows has no `resource` module.
+    resource = None  # type: ignore[assignment]
 
 DEFAULT_BUCKETS = (
     0.005,
@@ -278,12 +283,16 @@ def resident_bytes() -> int:
     ``ru_maxrss`` is a peak, not the current size; it is bytes on macOS and
     kibibytes on Linux.
     """
+    if resource is None:
+        return 0
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return int(peak if sys.platform == "darwin" else peak * 1024)
 
 
 def cpu_seconds() -> float:
     """User plus system CPU time of this process, in seconds."""
+    if resource is None:
+        return time.process_time()
     usage = resource.getrusage(resource.RUSAGE_SELF)
     return float(usage.ru_utime + usage.ru_stime)
 
