@@ -1,0 +1,24 @@
+---
+// A scrollable, labelled documentation table. Cells are trusted HTML written in the page source.
+interface Props {
+  label: string;
+  head: string[];
+  rows: string[][];
+  rowHeads?: boolean;
+  minWidth?: string;
+}
+const { label, head, rows, rowHeads = true, minWidth } = Astro.props;
+---
+
+<div class="model-table" role="region" aria-label={label} tabindex="0">
+  <table style={minWidth ? `min-width:${minWidth}` : undefined}>
+    <thead><tr>{head.map((h) => <th scope="col">{h}</th>)}</tr></thead>
+    <tbody>
+      {rows.map((row) => (
+        <tr>
+          {row.map((cell, i) => (rowHeads && i === 0 ? <th scope="row" set:html={cell} /> : <td set:html={cell} />))}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

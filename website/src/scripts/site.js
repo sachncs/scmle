@@ -115,6 +115,9 @@ if (input) {
       a.hidden = !hit;
       if (hit) shown += 1;
     });
+    document.querySelectorAll(".nav-group").forEach((g) => {
+      g.hidden = ![...g.querySelectorAll("a")].some((a) => !a.hidden);
+    });
     if (empty) empty.hidden = shown > 0;
   });
   input.addEventListener("keydown", (e) => {

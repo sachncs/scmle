@@ -9,25 +9,82 @@ interface Props {
 
 const { title, description, current } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const links = [
-  { href: `${base}/docs/`, label: "Start here", key: "start" },
-  { href: `${base}/docs/quickstart/`, label: "Quickstart", key: "quickstart" },
-  { href: `${base}/docs/data/`, label: "Data & curation", key: "data" },
-  { href: `${base}/docs/modalities/`, label: "Modality lifecycles", key: "modalities" },
-  { href: `${base}/docs/extensions/`, label: "Extension contracts", key: "extensions" },
-  { href: `${base}/docs/capabilities/`, label: "Capability matrix", key: "capabilities" },
-  { href: `${base}/docs/modeling/`, label: "Modelling & estimation", key: "modeling" },
-  { href: `${base}/docs/evidence/`, label: "Evidence & gates", key: "evidence" },
-  { href: `${base}/docs/workflows/`, label: "Workflows", key: "workflows" },
-  { href: `${base}/docs/api/`, label: "Python API", key: "api" },
-  { href: `${base}/docs/architecture/`, label: "Architecture", key: "architecture" },
-  { href: `${base}/docs/cards/`, label: "Cards & explanations", key: "cards" },
-  { href: `${base}/docs/operations/`, label: "Operations", key: "operations" },
-  { href: `${base}/docs/security/`, label: "Security", key: "security" },
-  { href: `${base}/docs/recovery/`, label: "Recovery", key: "recovery" },
-  { href: `${base}/docs/migrations/`, label: "Migrations", key: "migrations" },
-  { href: `${base}/docs/troubleshooting/`, label: "Troubleshooting", key: "troubleshooting" },
+const page = (slug: string, label: string, key: string = slug) => ({ href: `${base}/docs/${slug}${slug ? "/" : ""}`, label, key });
+const groups = [
+  {
+    title: "Get started",
+    pages: [
+      page("", "Overview", "start"),
+      page("quickstart", "Quickstart"),
+      page("data", "Data & curation"),
+      page("modalities", "Modality lifecycles"),
+      page("capabilities", "Capability matrix"),
+      page("governed-data", "Governed data"),
+    ],
+  },
+  {
+    title: "Modelling and evidence",
+    pages: [
+      page("modeling", "Modelling & estimation"),
+      page("evidence", "Evidence & gates"),
+      page("qualification", "Qualification instrument"),
+      page("causal-decision", "Causal, decision & framing"),
+      page("workflows", "Workflows"),
+      page("cards", "Cards & explanations"),
+      page("extensions", "Extension contracts"),
+    ],
+  },
+  {
+    title: "Reference",
+    pages: [
+      page("api", "Python API"),
+      page("api-stability", "API stability"),
+      page("cli", "Command line"),
+      page("artifacts", "Artifacts & bundles"),
+      page("architecture", "Architecture"),
+      page("benchmarks", "Benchmarks"),
+    ],
+  },
+  {
+    title: "Serve and operate",
+    pages: [
+      page("operations", "Operations"),
+      page("operating-loop", "Operating loop"),
+      page("service", "Serving contract & SLO"),
+      page("local", "Local environment"),
+      page("orchestration", "Orchestration"),
+      page("portable-training", "Portable training"),
+      page("recovery", "Recovery"),
+      page("migrations", "Migrations"),
+      page("troubleshooting", "Troubleshooting"),
+    ],
+  },
+  {
+    title: "Cloud and release",
+    pages: [
+      page("infrastructure", "Infrastructure as code"),
+      page("cloud-release", "Cloud release"),
+      page("releasing", "Releasing the package"),
+    ],
+  },
+  {
+    title: "Trust",
+    pages: [
+      page("security", "Security"),
+      page("threat-model", "Threat model & controls"),
+      page("tenant-isolation", "Tenant isolation"),
+    ],
+  },
 ];
+// Only pages that exist are linked, so the sidebar and pager can never point at a missing route.
+const existing = new Set(
+  Object.keys(import.meta.glob("../pages/docs/*.astro")).map((file) => file.replace("../pages/docs/", "").replace(/\.astro$/, "").replace(/^index$/, "")),
+);
+const sections = groups
+  .map((group) => ({ ...group, pages: group.pages.filter((p) => existing.has(p.href.replace(`${base}/docs/`, "").replace(/\/$/, ""))) }))
+  .filter((group) => group.pages.length > 0);
+const links = sections.flatMap((group) => group.pages);
+let counter = 0;
 const path = Astro.url.pathname.startsWith(base) ? Astro.url.pathname.slice(base.length) || "/" : Astro.url.pathname;
 const currentIndex = links.findIndex((link) => link.key === current);
 const previous = currentIndex > 0 ? links[currentIndex - 1] : null;
@@ -43,10 +100,18 @@ const next = currentIndex >= 0 && currentIndex < links.length - 1 ? links[curren
         <input id="doc-filter" type="search" placeholder="Filter pages  ( / )" autocomplete="off" />
       </div>
       <nav aria-label="Documentation pages">
-        {links.map((link, i) => (
-          <a aria-current={current === link.key ? "page" : undefined} href={link.href}>
-            <span>{String(i + 1).padStart(2, "0")}</span>{link.label}
-          </a>
+        {sections.map((group) => (
+          <div class="nav-group">
+            <p class="nav-group-label">{group.title}</p>
+            {group.pages.map((link) => {
+              counter += 1;
+              return (
+                <a aria-current={current === link.key ? "page" : undefined} href={link.href}>
+                  <span>{String(counter).padStart(2, "0")}</span>{link.label}
+                </a>
+              );
+            })}
+          </div>
         ))}
       </nav>
       <p class="filter-empty" hidden>No matching pages.</p>

@@ -30,6 +30,8 @@
 .sidebar nav a[aria-current="page"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .filter-empty { color: var(--text-3); font-size: var(--step--1); margin: 0; }
 .sidebar-foot { display: none; }
+.nav-group { display: contents; }
+.nav-group-label { display: none; }
 @media (min-width: 960px) {
   .sidebar nav { display: grid; gap: 2px; margin: 0; overflow: visible; padding: 0; }
   .sidebar nav a { background: none; border-radius: var(--radius-s); display: flex; gap: 12px; padding: 7px 10px; white-space: normal; }
@@ -37,6 +39,9 @@
   .sidebar nav a:hover { background: var(--bg-alt); color: var(--text); }
   .sidebar nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent-ink); }
   .sidebar nav a[aria-current="page"] span { color: var(--accent-ink); }
+  .nav-group { display: grid; gap: 2px; margin-bottom: var(--s2); }
+  .nav-group[hidden] { display: none; }
+  .nav-group-label { color: var(--text-3); display: block; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; margin: var(--s1) 0 4px 10px; text-transform: uppercase; }
   .sidebar-foot { color: var(--text-3); display: block; font-size: 0.75rem; margin-top: var(--s3); padding-left: 10px; }
 }
 
