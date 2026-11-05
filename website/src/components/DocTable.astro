@@ -14,7 +14,7 @@ const minWidth = widthOverride ?? (head.length <= 2 ? "0" : head.length === 3 ? 
 
 <div class="model-table" role="region" aria-label={label} tabindex="0">
   <table style={`min-width:${minWidth}`}>
-    <thead><tr>{head.map((h) => <th scope="col">{h}</th>)}</tr></thead>
+    <thead><tr>{head.map((h) => (h.trim() ? <th scope="col">{h}</th> : <td><span class="sr-only">(no header)</span></td>))}</tr></thead>
     <tbody>
       {rows.map((row) => (
         <tr>

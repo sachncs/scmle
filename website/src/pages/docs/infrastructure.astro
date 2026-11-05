@@ -30,7 +30,7 @@ const matrix = [
   <p>Each environment directory holds a <code>main.tf</code> that calls the shared module with its own sizing, budget and protection settings, a <code>variables.tf</code> for the values that only exist at deploy time (image digest, issuer, repository), and <code>outputs.tf</code>. The state location is not in the files: the S3 and GCS backends are empty blocks filled with <code>-backend-config</code> at <code>init</code>.</p>
 
   <h2>What is declared</h2>
-  <DocTable label="Infrastructure declared on each provider" head={["", "AWS", "GCP"]} rows={matrix} />
+  <DocTable label="Infrastructure declared on each provider" head={["Area", "AWS", "GCP"]} rows={matrix} />
   <p>Every taggable resource carries <code>scmle-environment=&lt;env&gt;</code>; the destroy-orphan checker finds leftovers by it.</p>
   <p><strong>Known gaps:</strong> the GCP module uses Google-managed encryption for Artifact Registry and Secret Manager (a customer key only on Cloud Storage); the AWS API Gateway default endpoint is used, with no custom domain or certificate; there is no WAF or Cloud Armor; there is no multi-region; Cloud Run containers cannot be made read-only through this resource; and the API Gateway access-log resource policy is not declared.</p>
 

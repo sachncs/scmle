@@ -77,7 +77,7 @@ def inline(s):
     return s
 
 
-def table(lines):
+def table(lines, label='Table'):
     rows = [
         [c.strip() for c in re.split(r"(?<!\\)\|", l.strip().strip("|"))]
         for l in lines
@@ -86,11 +86,11 @@ def table(lines):
     body = rows[2:]
     n = len(head)
     mw = "0" if n <= 2 else ("560px" if n == 3 else "720px")
-    label = html.escape(re.sub(r"<[^>]+>", "", inline(head[0])) or "Table")
+    label = html.escape(label)
     out = [
-        f'<div class="model-table" role="region" aria-label="Table: {label}" tabindex="0"><table style="min-width:{mw}"><thead><tr>'
+        f'<div class="model-table" role="region" aria-label="{label}" tabindex="0"><table style="min-width:{mw}"><thead><tr>'
     ]
-    out += [f'<th scope="col">{inline(h)}</th>' for h in head]
+    out += [(f'<th scope="col">{inline(h)}</th>' if h.strip() else '<td><span class="sr-only">(no header)</span></td>') for h in head]
     out.append("</tr></thead><tbody>")
     for r in body:
         r += [""] * (n - len(r))
@@ -156,6 +156,8 @@ def convert(md, glossary=False):
     lead_done = False
     seen_h2 = False
     used = set()
+    heading = 'Table'
+    labels = {}
     while i < len(L):
         l = L[i]
         if l.startswith("```"):
@@ -190,6 +192,7 @@ def convert(md, glossary=False):
                 used.add(sid)
                 if lvl == 2:
                     seen_h2 = True
+                heading=re.sub(r'<[^>]+>','',inline(t))
                 out.append(f'<h{lvl} id="{sid}">{inline(t)}</h{lvl}>')
             i += 1
             continue
@@ -198,7 +201,9 @@ def convert(md, glossary=False):
             while i < len(L) and L[i].startswith("|"):
                 b.append(L[i])
                 i += 1
-            out.append(table(b))
+            n = labels.get(heading, 0) + 1
+            labels[heading] = n
+            out.append(table(b, f'{heading} (table {n})' if n > 1 else f'{heading} (table)'))
             continue
         if re.match(r"^\s*([-*]|\d+\.)\s+", l):
             b = []
