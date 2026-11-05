@@ -204,9 +204,11 @@ ledgers and registries load unchanged.
 `scmle.operations.signals` (`SignalMonitor`, `Signal`, `SignalThresholds`,
 `WindowPolicy`, `Category`, `Status`), `classify` (`classify`,
 `Classification`, `Verdict`), `notify` (`WebhookSender`, `Notifier`,
-`Request`, `Delivery`, `sign`, `verify_signature`) and `exporters`
+`Request`, `Delivery`, `sign`, `verify_signature`), `exporters`
 (`CloudWatchExporter`, `CloudMonitoringExporter` and the two client
-protocols) are extension surfaces pinned like the others. The metrics
+protocols) and `continuous` (`ContinuousEvaluation`, `RetrainPolicy`,
+`RetrainDecision`, `MetricSpec`, `Replacement`, `TrainingHistory`,
+`post_promotion_check`) are extension surfaces pinned like the others. The metrics
 registry, the log writer, the cost report and the response desk are not
 pinned.
 

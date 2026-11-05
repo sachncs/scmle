@@ -28,6 +28,7 @@ from scmle.deploy import orphans as deploy_orphans
 from scmle.deploy import record as deploy_record
 from scmle.governance import release_state as governance_release_state
 from scmle.operations import classify as operations_classify
+from scmle.operations import continuous as operations_continuous
 from scmle.operations import exporters as operations_exporters
 from scmle.operations import notify as operations_notify
 from scmle.operations import signals as operations_signals
@@ -257,6 +258,18 @@ EXTENSION_SURFACES = {
     "scmle.operations.classify": (
         operations_classify,
         ("Classification", "Verdict", "classify"),
+    ),
+    "scmle.operations.continuous": (
+        operations_continuous,
+        (
+            "ContinuousEvaluation",
+            "MetricSpec",
+            "Replacement",
+            "RetrainDecision",
+            "RetrainPolicy",
+            "TrainingHistory",
+            "post_promotion_check",
+        ),
     ),
     "scmle.operations.notify": (
         operations_notify,

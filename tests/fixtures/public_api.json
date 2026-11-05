@@ -522,6 +522,36 @@
         "signature_sha256": "b962a1ff501b8b828e163296bd5b2eb2ce55b025c4ce34e668a84da29814eb1d"
       }
     },
+    "scmle.operations.continuous": {
+      "ContinuousEvaluation": {
+        "kind": "class",
+        "signature_sha256": "d942de0ccd6326dead9081c40f89a11701ae0c9e439580bcb731835d237639e1"
+      },
+      "MetricSpec": {
+        "kind": "class",
+        "signature_sha256": "27b9bf7953888c98faaff1951eac3baa41a593351b493391ba563c92c7907e4c"
+      },
+      "Replacement": {
+        "kind": "class",
+        "signature_sha256": "144f5f3c3435aeb49ae1381c16fa4a05ab87e9390b0ae28927df775ef8d7dc51"
+      },
+      "RetrainDecision": {
+        "kind": "class",
+        "signature_sha256": "0079cde2d5db5e28ea3816a924dce569f696b742538475e9e4f9489b7c6eebd4"
+      },
+      "RetrainPolicy": {
+        "kind": "class",
+        "signature_sha256": "03b64b65765686d89baf15382a80d595603d67befd098676cbd05713f8f68f5d"
+      },
+      "TrainingHistory": {
+        "kind": "class",
+        "signature_sha256": "7a318404bd9f75c89a6b65fb564bdb42bd47f48e198e256c784934c1f71a5de4"
+      },
+      "post_promotion_check": {
+        "kind": "callable",
+        "signature_sha256": "7400f5f8d251b88c1130cf280c41cff4791086106c4752cbe709ea114f19a6eb"
+      }
+    },
     "scmle.operations.exporters": {
       "CloudMonitoringClient": {
         "kind": "class",
