@@ -13,7 +13,8 @@ discipline with production engineering: typed contracts, leakage-safe
 evaluation, signed artifacts, operational checkpoints, and monitoring.
 
 Runs on Linux, macOS and Windows with Python 3.11 or newer (tested on 3.11 to
-3.14, including the free-threaded 3.14 build). Start with the
+3.14, including the free-threaded 3.14 build). New to machine learning? Start with
+[Start here](docs/START_HERE.md). Otherwise start with the
 [quickstart](docs/TUTORIAL.md), then use the [architecture guide](docs/ARCHITECTURE.md)
 to understand how the system is composed.
 
@@ -54,6 +55,12 @@ More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 
 | Need | Start here |
 | --- | --- |
+| Build your first model, no experience needed | [`docs/START_HERE.md`](docs/START_HERE.md) |
+| Look up a word | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) |
+| Decide what to predict, measure and avoid | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
+| Read a report, tiers and claims | [`docs/READING_RESULTS.md`](docs/READING_RESULTS.md) |
+| Understand a refusal, gate or alarm | [`docs/WHEN_THINGS_GO_WRONG.md`](docs/WHEN_THINGS_GO_WRONG.md) |
+| Know the limits | [`docs/WHAT_SCMLE_CANNOT_DO.md`](docs/WHAT_SCMLE_CANNOT_DO.md) |
 | Browse every page | [`docs/README.md`](docs/README.md) |
 | Learn the product | [`docs/TUTORIAL.md`](docs/TUTORIAL.md), [`examples/`](examples/README.md) |
 | Use the command line | [`docs/CLI.md`](docs/CLI.md) |

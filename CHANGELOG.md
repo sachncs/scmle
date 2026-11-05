@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Beginner documentation: `docs/START_HERE.md` (a first model, step by step on the Titanic table), `GLOSSARY.md`, `DECISIONS.md`, `READING_RESULTS.md`, `WHEN_THINGS_GO_WRONG.md`, `WHAT_SCMLE_CANNOT_DO.md` and `BEGINNER_FINDINGS.md`, with a test that checks their commands and terms. Five small tool fixes found while following the path: near-duplicate screen with missing text, missing group/time/weight column, `resume` on a missing folder, a malformed attestation file, and a loop policy without `high_impact_actions`.
 * Phase 16 local evidence (`plan/evidence/phase-16/`,
   `scripts/make_phase16_evidence.py`, `plan/phase-16-...`, F14). The policy
   check over all Terraform and eight seeded violations, the seeded orphan

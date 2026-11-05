@@ -54,6 +54,6 @@ characteristic and nothing more.
 
 ## Evidence tiers
 
-`confirmed` > `attested` > `unverified`. Shown on every claim, in the CLI
-summary and in the report header. The causal and decision readings are in the
-canon.
+`confirmed` > `attested` > `unverified`. Shown on every claim (`scmle claims list`);
+the run summary and `report.html` do not show them yet. The causal and
+decision readings are in the canon.
