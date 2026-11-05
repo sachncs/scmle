@@ -277,3 +277,14 @@ def test_gate_status_is_descriptive_without_a_current_passing_certificate():
     assert result.status["f5-duplicates"]["duplicate_exact"] is (
         certificates.GateStatus.DESCRIPTIVE
     )
+
+
+def test_a_missing_text_value_does_not_break_the_block_key():
+    frame = pd.DataFrame(
+        {
+            "k": ["x", None] * 10 + ["x", None],
+            "v": [*np.arange(20.0), 0.0, 1.0],
+        }
+    )
+    flags = d.near_flags(frame, ["k", "v"], 0.01)
+    assert flags[-2:].all() and not flags[:20].any()

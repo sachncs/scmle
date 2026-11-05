@@ -118,7 +118,8 @@ def near_flags(
     spread = frame[numeric].std(ddof=0).replace(0.0, 1.0).fillna(1.0)
     block = standardized_block(frame[numeric], spread)
     if other:
-        keys = frame[other].astype(str).agg("\x1f".join, axis=1).to_numpy()
+        text = frame[other].astype(str).fillna("<missing>")
+        keys = text.agg("\x1f".join, axis=1).to_numpy()
         labels = pd.factorize(keys)[0]
     else:
         labels = np.zeros(len(frame), dtype=int)
