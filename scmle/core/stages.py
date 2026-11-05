@@ -417,6 +417,16 @@ class ProfileStage(Stage):
                 f"success criteria name unreported metrics {unknown}; "
                 f"available: {sorted(context.catalog.report_names[task])}"
             )
+        for role, column in (
+            ("group", spec.data.group_column),
+            ("time", spec.data.time_column),
+            ("weight", spec.data.weight_column),
+        ):
+            if column and column not in frame.columns:
+                raise errors.DataError(
+                    f"{role} column '{column}' not found; "
+                    f"columns: {list(frame.columns)[:20]}"
+                )
         frame = self.synthesize_features(context, frame)
         split = self.make_split(context, task, frame)
         spec = context.spec  # reweighing may have set the weight column
