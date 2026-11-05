@@ -136,6 +136,22 @@ class RunResult:
         """Whether every stated success criterion was met (True if none)."""
         return all(c["met"] for c in self.evaluation["success_criteria"])
 
+    def claim_tiers(self) -> dict[str, int]:
+        """Counts the claims of a charter run by evidence tier.
+
+        Returns:
+            Tier name to count; empty without a charter run.
+        """
+        path = pathlib.Path(self.run_dir) / "confirmed_claims.json"
+        if not path.exists():
+            return {}
+        record = json.loads(path.read_text(encoding="utf-8"))
+        counts: dict[str, int] = {}
+        for claim in record.get("claims", ()):
+            tier = str(claim.get("tier", "unverified"))
+            counts[tier] = counts.get(tier, 0) + 1
+        return counts
+
     def summary(self) -> str:
         """Returns a one-line human-readable result."""
         evaluation = self.evaluation
@@ -158,5 +174,16 @@ class RunResult:
                 "; success criteria met"
                 if not missed
                 else "; success criteria NOT met: " + ", ".join(missed)
+            )
+        suspects = sorted(set(self.profile.leakage.get("suspects", ())))
+        if suspects:
+            text += (
+                f"; WARNING {len(suspects)} leakage suspect(s) kept in: "
+                + ", ".join(suspects)
+            )
+        tiers = self.claim_tiers()
+        if tiers:
+            text += "; claims: " + ", ".join(
+                f"{count} {tier}" for tier, count in sorted(tiers.items())
             )
         return text

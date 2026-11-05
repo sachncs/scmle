@@ -65,7 +65,9 @@ class HtmlReport:
         return (
             f"<!doctype html><meta charset=utf-8>"
             f"<title>{escape(result.run_id)}</title>"
-            f"<h1>{escape(result.run_id)}</h1><p>{summary}</p>"
+            f"<h1>{escape(result.run_id)}</h1>"
+            f"<p><b>{escape(result.summary())}</b></p>"
+            f"<h2>Findings</h2><ul>{items}</ul>"
             f"<h2>Leaderboard</h2>{leaderboard.to_html(index=False, border=0)}"
             f"<h2>Final test metrics ({escape(result.selected_model)})</h2>"
             f"<table>{metric_rows}</table>"
@@ -73,7 +75,8 @@ class HtmlReport:
             f"{calibration_html}"
             f"<h2>Reliability checks</h2>{reliability}"
             f"<h2>Explanation evidence</h2><ul>{explanation_links}</ul>"
-            f"<h2>Findings</h2><ul>{items}</ul>"
+            f"<details><summary>The plan: every technique considered</summary>"
+            f"<p>{summary}</p></details>"
         )
 
     @staticmethod

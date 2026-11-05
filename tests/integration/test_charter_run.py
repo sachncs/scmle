@@ -483,3 +483,26 @@ def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
     assert stages.chartered_rule("x", "bh", "bh", "by") == "bh"
     with pytest.raises(errors.ConfigError, match="charter fixes"):
         stages.chartered_rule("x", "holm", "bh", "by")
+
+
+def test_the_summary_and_report_put_leaks_and_findings_first(
+    binary_frame, tmp_path
+):
+    result = run(leaky_frame(binary_frame), tmp_path, leakage_policy="warn")
+
+    assert "WARNING" in result.summary()
+    assert "echo" in result.summary()
+    page = (pathlib.Path(result.run_dir) / "report.html").read_text()
+    assert page.index("<h2>Findings</h2>") < page.index("<h2>Leaderboard</h2>")
+    assert page.index("<h2>Leaderboard</h2>") < page.index("<details>")
+
+
+def test_the_summary_counts_claims_by_tier(binary_frame, tmp_path):
+    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    claims = {"claims": [{"tier": "confirmed"}, {"tier": "confirmed"}]}
+    (pathlib.Path(result.run_dir) / "confirmed_claims.json").write_text(
+        json.dumps(claims)
+    )
+
+    assert result.claim_tiers() == {"confirmed": 2}
+    assert result.summary().endswith("claims: 2 confirmed")
