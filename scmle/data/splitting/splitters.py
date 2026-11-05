@@ -9,6 +9,7 @@ exactly once, with the token the orchestrator issues after selection.
 import abc
 import dataclasses
 import hashlib
+import math
 import secrets
 from typing import ClassVar
 
@@ -305,13 +306,40 @@ class RandomSplit(SplitStrategy):
         )
         return list(splitter.split(np.arange(len(dev_ids))))
 
+    def require_rows_per_class(self, rows: int, labels: pd.Series) -> None:
+        """Stops with advice when the held-out part cannot hold every class.
+
+        A stratified holdout needs at least one test row per class, and the
+        development part needs at least as many rows as classes. A table too
+        small for that fails inside scikit-learn with a message about
+        `test_size`; this says what to do instead.
+
+        Raises:
+            DataError: If `rows` is too few for the classes and the fraction.
+        """
+        classes = int(labels.nunique())
+        held_out = math.ceil(rows * self.validation.test_fraction)
+        if held_out < classes or rows - held_out < classes:
+            needed = math.ceil(classes / self.validation.test_fraction)
+            raise errors.DataError(
+                f"{rows} rows are too few to hold out "
+                f"{self.validation.test_fraction:.0%} for testing and still "
+                f"have every one of the {classes} classes in the test rows "
+                f"and the training rows (the test part would have "
+                f"{held_out} rows). Provide at least {needed} rows, or "
+                "lower the number of classes, or raise the test fraction."
+            )
+
     def partition(self, frame: pd.DataFrame) -> Partition:
         """Random holdout followed by K-fold on the development rows."""
+        labels = self.stratify_labels(frame)
+        if labels is not None:
+            self.require_rows_per_class(len(frame), labels)
         dev_ids, test_ids = model_selection.train_test_split(
             np.arange(len(frame)),
             test_size=self.validation.test_fraction,
             random_state=self.validation.seed,
-            stratify=self.stratify_labels(frame),
+            stratify=labels,
         )
         dev_ids, test_ids = np.sort(dev_ids), np.sort(test_ids)
         notes: list[str] = []

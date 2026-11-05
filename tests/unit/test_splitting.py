@@ -355,3 +355,17 @@ def test_feature_delays_need_a_time_column_and_forbid_reading_the_raw_column():
                 ]
             ),
         )
+
+
+def test_a_table_too_small_for_its_classes_gets_advice():
+    tiny = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [0, 1, 0, 1]})
+    with pytest.raises(errors.DataError, match="Provide at least"):
+        split(tiny)
+
+
+def test_a_table_just_large_enough_still_splits():
+    rng = np.random.default_rng(1)
+    enough = pd.DataFrame({"x": rng.normal(size=60), "y": [0, 1] * 30})
+    result = split(enough)
+    assert len(result.dev_features) < 60
+    assert result.dev_target.nunique() == 2
