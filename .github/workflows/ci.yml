@@ -95,7 +95,7 @@ jobs:
   cross-platform:
     name: ${{ matrix.os }} (Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
     env:
       UV_PYTHON: ${{ matrix.python }}
       # Shared runners start a Python service several times slower than the
