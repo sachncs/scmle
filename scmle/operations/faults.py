@@ -384,6 +384,10 @@ def process_kill() -> recovery.Result:
 # ---- unhealthy_container_rolling_restart -------------------------------
 
 
+DRAIN_REQUESTS = 3
+DRAIN_SECONDS = 10.0
+
+
 class Client(threading.Thread):
     """Sends requests to whatever instance the router points at."""
 
@@ -440,6 +444,13 @@ def rolling_restart() -> recovery.Result:
         became_ready = ready_after(new)
         if became_ready is not None:
             router["current"] = new
+            # An orchestrator drains the old instance before stopping it: a
+            # request already sent to it must finish, which is certain once
+            # two requests that began after the switch have been answered.
+            drained = client.sent + DRAIN_REQUESTS
+            deadline = time.monotonic() + DRAIN_SECONDS
+            while client.sent < drained and time.monotonic() < deadline:
+                time.sleep(0.05)
         old.process.terminate()
         old.process.wait(timeout=15)
         time.sleep(0.8)
