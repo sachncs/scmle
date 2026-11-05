@@ -16,6 +16,7 @@ import json
 import sys
 from typing import Any
 from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 from scmle.contracts import errors
 from scmle.core import retry
@@ -38,7 +39,8 @@ def open_store(uri: str) -> objectstore.ObjectStore:
     parts = urlsplit(uri)
     prefix = parts.path.strip("/")
     if parts.scheme == "file":
-        return objectstore.LocalObjectStore(parts.path)
+        # url2pathname turns /C:/dir into C:\\dir on Windows
+        return objectstore.LocalObjectStore(url2pathname(parts.path))
     if parts.scheme == "s3":
         return cloud.s3_store(parts.netloc, prefix)
     if parts.scheme == "gs":
