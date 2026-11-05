@@ -199,6 +199,17 @@ manifest loader (`release`) are not pinned. The `deployment` row kind of the
 deployment ledger and the `release_state.json` file are additions; existing
 ledgers and registries load unchanged.
 
+## Operations surfaces
+
+`scmle.operations.signals` (`SignalMonitor`, `Signal`, `SignalThresholds`,
+`WindowPolicy`, `Category`, `Status`), `classify` (`classify`,
+`Classification`, `Verdict`), `notify` (`WebhookSender`, `Notifier`,
+`Request`, `Delivery`, `sign`, `verify_signature`) and `exporters`
+(`CloudWatchExporter`, `CloudMonitoringExporter` and the two client
+protocols) are extension surfaces pinned like the others. The metrics
+registry, the log writer, the cost report and the response desk are not
+pinned.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

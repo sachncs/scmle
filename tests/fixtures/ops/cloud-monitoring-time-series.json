@@ -1,0 +1,57 @@
+{
+  "_note": "Written from the Cloud Monitoring projects.timeSeries.create reference (TimeSeries with metric.type under custom.googleapis.com, a monitored resource, metricKind, valueType and one point with an interval endTime and a typed value). Not captured from an account.",
+  "request": {
+    "timeSeries": [
+      {
+        "metric": {
+          "type": "custom.googleapis.com/scmle/latency_p95_seconds",
+          "labels": {"model_version": "v1"}
+        },
+        "resource": {
+          "type": "generic_task",
+          "labels": {
+            "project_id": "demo-project",
+            "location": "europe-west1",
+            "namespace": "scmle",
+            "job": "serve",
+            "task_id": "revision-1"
+          }
+        },
+        "metricKind": "GAUGE",
+        "valueType": "DOUBLE",
+        "unit": "s",
+        "points": [
+          {
+            "interval": {"endTime": "2026-11-05T10:00:00.000Z"},
+            "value": {"doubleValue": 0.35}
+          }
+        ]
+      },
+      {
+        "metric": {
+          "type": "custom.googleapis.com/scmle/server_error_rate",
+          "labels": {"model_version": "v1"}
+        },
+        "resource": {
+          "type": "generic_task",
+          "labels": {
+            "project_id": "demo-project",
+            "location": "europe-west1",
+            "namespace": "scmle",
+            "job": "serve",
+            "task_id": "revision-1"
+          }
+        },
+        "metricKind": "GAUGE",
+        "valueType": "DOUBLE",
+        "unit": "1",
+        "points": [
+          {
+            "interval": {"endTime": "2026-11-05T10:00:00.000Z"},
+            "value": {"doubleValue": 0.02}
+          }
+        ]
+      }
+    ]
+  }
+}

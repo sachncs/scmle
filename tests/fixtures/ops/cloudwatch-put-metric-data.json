@@ -1,0 +1,22 @@
+{
+  "_note": "Written from the PutMetricData API reference (Namespace, MetricData with MetricName, Dimensions, Timestamp, Value, Unit). Not captured from an account.",
+  "request": {
+    "Namespace": "Scmle/Serving",
+    "MetricData": [
+      {
+        "MetricName": "latency_p95_seconds",
+        "Dimensions": [{"Name": "model_version", "Value": "v1"}],
+        "Timestamp": "2026-11-05T10:00:00.000Z",
+        "Value": 0.35,
+        "Unit": "Seconds"
+      },
+      {
+        "MetricName": "server_error_rate",
+        "Dimensions": [{"Name": "model_version", "Value": "v1"}],
+        "Timestamp": "2026-11-05T10:00:00.000Z",
+        "Value": 0.02,
+        "Unit": "None"
+      }
+    ]
+  }
+}

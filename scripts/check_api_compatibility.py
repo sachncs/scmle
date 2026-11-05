@@ -27,6 +27,10 @@ from scmle.deploy import observation as deploy_observation
 from scmle.deploy import orphans as deploy_orphans
 from scmle.deploy import record as deploy_record
 from scmle.governance import release_state as governance_release_state
+from scmle.operations import classify as operations_classify
+from scmle.operations import exporters as operations_exporters
+from scmle.operations import notify as operations_notify
+from scmle.operations import signals as operations_signals
 from scmle.runners import aws as runners_aws
 from scmle.runners import base as runners_base
 from scmle.runners import checkpoint as runners_checkpoint
@@ -238,6 +242,41 @@ EXTENSION_SURFACES = {
     "scmle.data.store.processing": (
         store_processing,
         ("Checkpoint", "IncrementalProcessor", "RunResult"),
+    ),
+    "scmle.operations.signals": (
+        operations_signals,
+        (
+            "Category",
+            "Signal",
+            "SignalMonitor",
+            "SignalThresholds",
+            "Status",
+            "WindowPolicy",
+        ),
+    ),
+    "scmle.operations.classify": (
+        operations_classify,
+        ("Classification", "Verdict", "classify"),
+    ),
+    "scmle.operations.notify": (
+        operations_notify,
+        (
+            "Delivery",
+            "Notifier",
+            "Request",
+            "WebhookSender",
+            "sign",
+            "verify_signature",
+        ),
+    ),
+    "scmle.operations.exporters": (
+        operations_exporters,
+        (
+            "CloudMonitoringClient",
+            "CloudMonitoringExporter",
+            "CloudWatchClient",
+            "CloudWatchExporter",
+        ),
     ),
 }
 
