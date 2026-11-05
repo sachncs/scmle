@@ -840,7 +840,8 @@ class ModelBundle:
         verifies against `signing_key` / `$SCMLE_SIGNING_KEY`, or the caller
         vouches for its source with `trusted=True`. Checksums and signatures
         are verified *before* anything is unpickled. An invalid signature is
-        always an error, even with `trusted=True`.
+        always an error, even with `trusted=True`, and `trusted=True` is
+        refused outright when `$SCMLE_ENV` is `production`.
 
         Args:
             directory: Bundle directory.
@@ -859,6 +860,13 @@ class ModelBundle:
             ArtifactError: If the bundle is unauthenticated, tampered with,
                 incomplete, or incompatible.
         """
+        if trusted and os.environ.get("SCMLE_ENV", "").strip().lower() == (
+            "production"
+        ):
+            raise errors.ArtifactError(
+                "trusted loading is refused when SCMLE_ENV=production: sign "
+                "the bundle and verify it with the signing key"
+            )
         root = pathlib.Path(directory)
         try:
             manifest = json.loads(
@@ -1479,19 +1487,27 @@ class ModelBundle:
             pathlib.Path(path).write_text(text, encoding="utf-8", newline="\n")
         return text
 
-    def export_service(self, destination: str | pathlib.Path) -> pathlib.Path:
+    def export_service(
+        self,
+        destination: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+    ) -> pathlib.Path:
         """Writes a deployable service folder (works for every model).
 
-        The folder holds this bundle, pinned requirements, the full build
-        environment, a server script and a Dockerfile.
+        The folder holds this bundle, the locked runtime requirements, the
+        full build environment, a server script, a hardened Dockerfile, an
+        SBOM and a signed provenance statement.
 
         Args:
             destination: Folder to create.
+            signing_key: HMAC key that signs the bundle and the provenance;
+                defaults to `$SCMLE_SIGNING_KEY`. An unsigned folder cannot
+                be served in production.
 
         Returns:
             The folder.
         """
-        return packaging.write_service(self, destination)
+        return packaging.write_service(self, destination, None, signing_key)
 
     def export_onnx(
         self,

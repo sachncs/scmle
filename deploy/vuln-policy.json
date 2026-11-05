@@ -1,0 +1,5 @@
+{
+  "comment": "Findings at or above this severity block a build. A scanner that gives no severity (pip-audit) blocks on any finding. An exception needs an id, a reason and an expiry date; an expired exception blocks again.",
+  "fail_at_or_above": "HIGH",
+  "exceptions": []
+}

@@ -4,6 +4,7 @@ from collections.abc import Mapping
 import datetime
 import hashlib
 import json
+import os
 import re
 from typing import Any
 import uuid
@@ -95,3 +96,83 @@ def build(
         },
         "components": components,
     }
+
+
+def parse_pins(text: str) -> dict[str, str]:
+    """Reads `name==version` lines of a lock file; comments are skipped."""
+    pins = {}
+    for line in text.splitlines():
+        entry = line.split("#", 1)[0].strip()
+        if not entry or "==" not in entry:
+            continue
+        parts = entry.partition("==")
+        pins[normalize_name(parts[0])] = parts[2].strip().split(" ")[0]
+    return pins
+
+
+def source_timestamp() -> str:
+    """The build time: `SOURCE_DATE_EPOCH` if set, else the current time."""
+    epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    if epoch is not None and epoch.isdigit():
+        moment = datetime.datetime.fromtimestamp(int(epoch), datetime.UTC)
+        return moment.isoformat()
+    return datetime.datetime.now(datetime.UTC).isoformat()
+
+
+def build_service(
+    distributions: Mapping[str, str],
+    *,
+    model_name: str,
+    model_version: str,
+    bundle_digest: str,
+    base_image: str,
+    software_version: str,
+    observed_at: str | None = None,
+) -> dict[str, Any]:
+    """Build the CycloneDX SBOM of a packaged service.
+
+    On top of the Python distributions it lists the model bundle (by the
+    SHA-256 of its manifest) and the base image (by reference; the digest is
+    recorded in the build's attestation once the base image is resolved), and
+    a dependency edge from the service to each of them.
+    """
+    if not bundle_digest.startswith("sha256:"):
+        raise ValueError("bundle_digest must be a sha256: digest")
+    document = build(
+        distributions,
+        run_id=bundle_digest,
+        software_version=software_version,
+        observed_at=observed_at or source_timestamp(),
+    )
+    model_ref = f"model:{model_name}@{bundle_digest}"
+    image_ref = f"image:{base_image}"
+    document["components"] = [
+        *document["components"],
+        {
+            "type": "machine-learning-model",
+            "bom-ref": model_ref,
+            "name": model_name,
+            "version": model_version,
+            "hashes": [
+                {
+                    "alg": "SHA-256",
+                    "content": bundle_digest.removeprefix("sha256:"),
+                }
+            ],
+        },
+        {
+            "type": "container",
+            "bom-ref": image_ref,
+            "name": base_image.split(":", 1)[0],
+            "version": base_image.split(":", 1)[-1],
+        },
+    ]
+    document["dependencies"] = [
+        {
+            "ref": COMPONENT_NAME,
+            "dependsOn": sorted(
+                [item["bom-ref"] for item in document["components"]]
+            ),
+        }
+    ]
+    return document

@@ -117,6 +117,22 @@ Use `result.save(directory, signing_key=...)` to export one for deployment.
 | `fault_injection_plan.json` | Failure scenarios and the evidence each needs ([`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md)). |
 | `parameter_estimation_declaration.*` | The declaration (or its absence) for parameter-estimation runs. |
 
+## The service folder (`scmle package`)
+
+| File | Contents |
+| --- | --- |
+| `model/` | The signed bundle. |
+| `Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by a digest placeholder that the build refuses until `build.sh` resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests. |
+| `requirements.txt`, `requirements.lock`, `environment.lock` | Direct pins; the runtime closure installed with `--no-deps`; every package of the build environment. |
+| `sbom.cdx.json` | CycloneDX SBOM: runtime libraries, the bundle (by manifest digest) and the base image. |
+| `provenance.json` | Signed statement: subject is the bundle digest; materials are the files above. Verified by the service at start. |
+| `vuln-policy.json` | The gate policy: block at HIGH and above, no exceptions. |
+| `base-image.lock.json`, `scan.json`, `build-metadata.json`, `image-attestation.json` | Written by `build.sh`: the resolved base digest, the scanner report, the build's image digest, and the signed statement binding the image to the provenance. |
+
+The attestations are HMAC-signed: they prove possession of the signing key and
+that the statement is unchanged. They are not public-key signatures or a
+transparency log, and they do not prove the build host was honest.
+
 ## Serving outputs
 
 | File | Contents |

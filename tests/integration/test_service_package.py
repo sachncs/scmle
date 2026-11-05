@@ -133,15 +133,87 @@ def test_the_generated_server_scores_rows_like_the_bundle(boosted):
     assert body["predictions"] == bundle.predict(frame.head(20)).tolist()
 
 
-def test_the_generated_server_refuses_an_unsigned_bundle_by_default(boosted):
+def fetch(port, path):
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}{path}", timeout=5
+        ) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
+
+
+def wait_for_state(port, process, phases):
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        assert process.poll() is None, process.stderr.read().decode()
+        try:
+            status, body = fetch(port, "/readyz")
+        except OSError:
+            time.sleep(0.3)
+            continue
+        if body.get("phase") in phases:
+            return status, body
+        time.sleep(0.3)
+    raise AssertionError("service never reached " + str(phases))
+
+
+def test_the_generated_server_stays_unready_for_an_unsigned_bundle(boosted):
     bundle, root = boosted[0], boosted[2]
     folder = bundle.export_service(root / "untrusted")
-    process = start(folder, free_port(), {})
+    port = free_port()
+    process = start(folder, port, {})
+    try:
+        status, body = wait_for_state(port, process, {"failed"})
+        assert status == 503 and "unauthenticated" in body["reason"]
+        assert fetch(port, "/livez")[0] == 200
+        assert fetch(port, "/health")[0] == 503
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+        process.stderr.close()
 
-    code = process.wait(timeout=60)
 
-    assert code != 0
-    assert "unauthenticated" in process.stderr.read().decode()
+def test_production_serves_only_a_signed_verified_folder(boosted):
+    bundle, root = boosted[0], boosted[2]
+    key = "package-test-key"
+    folder = bundle.export_service(root / "production", signing_key=key)
+    production = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": key}
+    port = free_port()
+    process = start(folder, port, production)
+    try:
+        status, body = wait_for_state(port, process, {"ready", "failed"})
+        assert status == 200, body
+        assert body["model_version"] == bundle.info.model_version
+        assert body["artifact_digest"].startswith("sha256:")
+        assert "provenance=True" in body["notes"]["verifying"]
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+        process.stderr.close()
+
+    port = free_port()
+    process = start(folder, port, {**production, "SCMLE_TRUSTED": "1"})
+    try:
+        status, body = wait_for_state(port, process, {"ready", "failed"})
+        assert status == 503 and "SCMLE_TRUSTED=1 is refused" in body["reason"]
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+        process.stderr.close()
+
+    corrupted = bundle.export_service(root / "corrupted", signing_key=key)
+    with (corrupted / "model" / "pipeline.joblib").open("ab") as handle:
+        handle.write(b"x")
+    port = free_port()
+    process = start(corrupted, port, production)
+    try:
+        status, body = wait_for_state(port, process, {"ready", "failed"})
+        assert status == 503 and "checksum mismatch" in body["reason"]
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+        process.stderr.close()
 
 
 def test_the_package_command_writes_the_folder(boosted, tmp_path):

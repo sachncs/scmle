@@ -13,7 +13,7 @@ The `scmle` command mirrors the Python API. Global option:
 | `scmle batch BUNDLE DATA` | Score a file through the same code path as the online service; writes `--output` and `<output>.manifest.json` (model version, artifact digest, row counts). `--on-null` and `--on-unseen` accept `reject`. |
 | `scmle serve BUNDLE` | Serve a bundle over HTTP: `/livez`, `/readyz`, `/predict` (see [SERVICE_SLO](SERVICE_SLO.md)). |
 | `scmle export-onnx BUNDLE` | Export an ONNX graph (needs the `onnx` extra). |
-| `scmle package BUNDLE` | Write a ready-to-run service folder with a Dockerfile. |
+| `scmle package BUNDLE` | Write a hardened service folder: pinned-base Dockerfile, locked requirements, SBOM, signed provenance, `build.sh`. Sign with `SCMLE_SIGNING_KEY`. |
 | `scmle charter init\|check\|sign PATH` | Create, validate or sign an analysis charter (see below). |
 | `scmle claims list\|show\|verify RUN_DIR` | List the claims of a charter run, show one with its hypothesis and checks, or verify the run's ledger and claims (see below). `verify` exits 1 when any step fails. |
 | `scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md). |
@@ -103,6 +103,10 @@ cat payload.bin | scmle catalog --raw-bytes
 ```
 
 ## Bundles: signed versus trusted
+
+When `SCMLE_ENV=production`, `--trusted` (and `SCMLE_TRUSTED=1`) is refused
+for every command; sign the bundle and supply `SCMLE_SIGNING_KEY` instead.
+
 
 `predict`, `serve`, `export-onnx` and `package` load a bundle. Bundles are
 pickle-based, so loading requires a valid signature (set `SCMLE_SIGNING_KEY`).

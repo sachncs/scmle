@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+* Hardened service package (F14 item 2; `scmle.inference.packaging`,
+  `scmle.deploy`, `scmle.governance.sbom`). `scmle package` and
+  `ModelBundle.export_service(destination, signing_key=None)` now write a
+  Dockerfile whose base image carries a placeholder digest that the build
+  refuses until `build.sh` resolves it (`python -m scmle.deploy.base_image`),
+  a locked install (`requirements.lock`, the runtime closure only, with
+  `--no-deps` and `pip check`), a non-root user, `SCMLE_ENV=production` as the
+  image default, a `.dockerignore` for credentials, a CycloneDX SBOM that also
+  lists the bundle and the base image (`sbom.build_service`), a signed
+  provenance statement, a vulnerability-gate policy and the `build.sh` that
+  ties them together. The generated `serve.py` now calls
+  `scmle.deploy.runtime`: it listens first, verifies the bundle signature, the
+  checksum of every file and the provenance before deserializing anything,
+  then loads and warms up. `SCMLE_TRUSTED=1` and `trusted=True` are refused
+  when `SCMLE_ENV=production`, in `ModelBundle.load` and in the service, and
+  the variable is gone from the generated README and Dockerfile (it still works
+  outside production for a deliberate local run). Behaviour change: a service
+  that fails verification used to exit; it now stays alive with `/livez` 200,
+  `/readyz` 503 and the reason, so that it never takes traffic. New
+  `scmle.deploy.vuln_gate` (and `scripts/vuln_gate.py`) fails closed on an
+  empty, unreadable or uncovered scan. Not done: the image was not built and
+  nothing was scanned or attested against a real registry or vulnerability
+  database in this change; the attestations are HMAC-signed, not public-key
+  or transparency-log signatures; the locked install pins versions without
+  hashes (the repository's own image uses hashes).
 * Serving contract (F14 item 5; `scmle.inference.serving`, `guard`, `parity`,
   `scmle.contracts.serving`, `docs/SERVICE_SLO.md`). Request and response
   schema version 1 with a `/v1/predict` alias; every response carries
