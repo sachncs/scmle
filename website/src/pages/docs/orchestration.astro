@@ -1,0 +1,41 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const executor = [
+  ["Durable run id", "Derived from workflow name, version and the caller's trigger key (a schedule slot, a request id). The same trigger is the same run."],
+  ["Idempotency key", "A hash of run id, step, parameters and upstream outputs. A step already succeeded with that key is not run again, and the key is passed to the handler for external deduplication."],
+  ["Duplicate invocation", "<code>start</code> with a finished trigger returns the record and runs nothing. A second executor on a run in flight gets <code>RunInFlightError</code> (lease)."],
+  ["Partial failure", "The failing step is retried under its policy; dependents are <code>skipped</code>; independent steps finish. <code>resume</code> re-runs only what has not succeeded, and is an explicit act: <code>start</code> never retries a failed run."],
+  ["Interrupted job", "<code>StepInterruptedError</code> (or any <code>TransientError</code>) is retried with the same key and the declared backoff. The runner handler runs training through a <code>Runner</code>, whose own checkpoints make the retry a resume."],
+  ["Crashed executor", "Its lease expires (<code>lease_seconds</code>); another executor takes the run over and re-runs the step that was in flight."],
+  ["Timeouts", "Cooperative: handlers call <code>context.check()</code>. Cloud engines enforce theirs."],
+  ["Cost", "<code>context.spend</code> raises past the step's or the run's budget. A run over budget stops its remaining steps (<code>budget_stopped</code>)."],
+  ["Concurrency", "<code>max_concurrent_runs</code> by leases; <code>max_parallel</code> and per-group limits for steps."],
+  ["Approval", "The approval step waits (<code>waiting_approval</code>). A decision is an HMAC-signed record from a listed approver who is not the requester. A rejection or an expiry ends the run and the approved step never runs."],
+];
+---
+
+<DocsLayout title="Orchestration" description="One scmle workflow definition for ingestion, training, evaluation, monitoring and batch prediction, a local executor with durable state, and emitted Step Functions and Cloud Workflows definitions." current="orchestration">
+  <p class="eyebrow"><span></span> Serve and operate</p>
+  <h1>One workflow,<br /><em>defined once.</em></h1>
+  <p class="lead">A workflow definition for ingestion, training, evaluation, monitoring and batch prediction; a local executor that runs it with durable state; and AWS Step Functions and Google Cloud Workflows definitions emitted from it as data.</p>
+
+  <h2>The definition</h2>
+  <p>A <code>Workflow</code> is a set of named, versioned <code>Step</code>s with explicit <code>depends_on</code>. A step has a kind (<code>ingest</code>, <code>train</code>, <code>evaluate</code>, <code>monitor</code>, <code>batch_predict</code> or <code>approval</code>), a timeout, a <code>RetryPolicy</code> (attempts, first delay, factor, ceiling), an optional cost budget and an optional concurrency group. The workflow adds an optional <code>Schedule</code>, <code>max_concurrent_runs</code>, a run cost budget, group limits and <code>max_parallel</code>. Dependency cycles, unknown dependencies and duplicate names are refused when the object is built.</p>
+  <div class="callout"><p><strong>Automatic versus approved.</strong> A step with <code>effect="approved"</code> may only exist behind an <code>approval</code> step it depends on; the definition refuses otherwise. The standard workflow is: ingest, train, evaluate, then monitor and an approval in parallel, then batch prediction (approved).</p></div>
+
+  <h2>The local executor</h2>
+  <p>State lives in an <code>ObjectStore</code> (see <a href={`${base}/docs/governed-data/`}>Governed data</a>) under <code>workflows/&lt;name&gt;/runs/&lt;run id&gt;/</code>.</p>
+  <DocTable label="Executor behaviour" head={["Concern", "Behaviour"]} rows={executor} />
+  <p>A <code>Scheduler</code> turns the schedule into slots and applies the declared catch-up policy to missed ones: <code>run_all</code> (bounded by <code>max_catch_up</code>), <code>latest_only</code>, or <code>skip</code> (only a slot still within a tenth of an interval). Run ids come from the slot, so a scheduler that lost its state cannot repeat a finished slot. The first tick does not backfill. A slot that cannot start because the workflow is busy is <code>deferred</code> and stays due.</p>
+
+  <h2>Emitted definitions</h2>
+  <p>Two emitters return <code>{`{"definition", "schedule", "controls"}`}</code> for Step Functions and Cloud Workflows. Independent steps of a layer become a <code>Parallel</code> state or a <code>parallel</code> block; retries and timeouts are native fields; approval is a callback wait bounded by its expiry, with a rejection going to a failure; and the execution name is the idempotency key.</p>
+  <p>Validators check structure only: required fields, state types, that every target exists in its scope, that every state is reachable, retry and timeout values, parallel branches and unique step names. Concurrency limits, cost budgets and groups cannot be written in either language, so they come back under <code>controls</code> for the infrastructure (scheduler concurrency, billing alarms) to enforce.</p>
+
+  <h2>What was not done</h2>
+  <p>Neither emitted document was deployed or accepted by Step Functions or Cloud Workflows. The validators encode the documented structure and may miss rules the services apply. No EventBridge or Cloud Scheduler job exists. No duplicate, partial-failure, missed-schedule or interruption scenario ran on a cloud engine, only on the local executor. The approval callback is not wired to a notification channel or a UI, and cost budgets are not enforced by the cloud definitions.</p>
+
+  <p class="meta">Workflow surface of the 0.1 beta line</p>
+</DocsLayout>

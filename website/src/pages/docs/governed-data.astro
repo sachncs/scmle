@@ -1,0 +1,46 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const backends = [
+  ["Directory", "<code>LocalObjectStore(root)</code>", "none"],
+  ["S3, MinIO", "<code>S3ObjectStore(client, bucket, prefix)</code> or <code>s3_store(...)</code>", "a boto3 S3 client, or anything with <code>put_object</code>, <code>get_object</code>, <code>head_object</code>, <code>list_objects_v2</code>, <code>delete_object</code>"],
+  ["GCS", "<code>GcsObjectStore(client, bucket, prefix)</code> or <code>gcs_store(...)</code>", "a <code>google.cloud.storage.Client</code>, or anything with <code>bucket()</code> and, on it, <code>blob()</code>, <code>get_blob()</code>, <code>list_blobs()</code>"],
+];
+const policies = [
+  ["<code>fail</code>", "<code>QualityGateError</code> with the report; nothing continues."],
+  ["<code>quarantine</code>", "Row-level rules remove the rows and write them with the report under <code>quarantine/&lt;snapshot id&gt;/</code>. Dataset-level rules (<code>SchemaRule</code>, <code>FreshnessRule</code>, <code>MinRowsRule</code>, <code>NullFractionRule</code>) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until a person calls <code>release</code>."],
+  ["<code>warn</code>", "Recorded in the report, data unchanged."],
+];
+---
+
+<DocsLayout title="Governed data" description="Object stores with verified checksums, snapshot reading with lineage, declared quality gates and at-least-once incremental processing in scmle, and what a real cloud account would still have to prove." current="governed-data">
+  <p class="eyebrow"><span></span> Inputs and evidence</p>
+  <h1>Check the data<br /><em>before it is used.</em></h1>
+  <p class="lead">How data is read, checked and processed before training and inference. This is the local half of the cloud work: everything below runs without an account, and the last section lists what does not.</p>
+
+  <h2>Object stores</h2>
+  <p>An <code>ObjectStore</code> is bytes under keys, with <code>put</code> (atomic replace; <code>if_absent=True</code> creates only), <code>get</code>, <code>head</code>, <code>list_objects</code>, <code>delete</code> and <code>exists</code>. Metadata always carries a SHA-256 computed by this code. The S3 and GCS backends keep it as user metadata and verify it on read, so a changed object raises <code>CorruptObjectError</code>.</p>
+  <DocTable label="Object store backends" head={["Backend", "Class", "Client"]} rows={backends} />
+  <p>Neither cloud SDK is a dependency. The factories import <code>boto3</code> or <code>google.cloud.storage</code> only when called and explain how to install them, and a caller may pass a client it built (credentials, endpoint, proxies). Keys are validated before they reach a backend (no <code>..</code>, empty segment or leading slash). <code>RetryingStore</code> retries <code>TransientStoreError</code> (throttling, timeouts, 5xx) under a <code>RetryPolicy</code>.</p>
+  <p>One conformance suite runs against every backend: round trip, binary, empty and large objects, overwrite, missing keys, <code>head</code> against <code>get</code>, conditional create, a race of eight conditional creates (exactly one wins), sorted prefix listing, pagination, idempotent delete, key rules and prefix isolation. The tests run it on the directory backend and on the S3 and GCS backends over in-memory clients; a script can run it against MinIO, the GCS emulator or a real bucket.</p>
+
+  <h2>Snapshots</h2>
+  <p><code>SnapshotReader.read(key, contract, parents)</code> returns the frame and a <code>SnapshotRecord</code>, and appends the record to a <code>ReadLog</code> (optionally a JSON-lines file). The record holds the URI, content hash, size, modification time, backend version, declared schema version, observed schema digest and whether it matches, row count, age against the contract's <code>max_age_seconds</code> (<code>fresh</code>, <code>stale</code> or <code>unknown</code>) and the ids of the snapshots it derives from.</p>
+  <p>The <code>snapshot_id</code> hashes URI, content and schema, so the same bytes give the same id. <code>ReadLog.trace(id)</code> walks the lineage, and <code>connector_reader(store)</code> plugs a store into the object-store connector described on the <a href={`${base}/docs/data/`}>data</a> page.</p>
+
+  <h2>Quality gates</h2>
+  <p><code>QualityGate(rules, store).run(frame, record, contract, stage)</code> runs for stage <code>train</code> or <code>inference</code>. Each rule declares its policy in advance:</p>
+  <DocTable label="Quality gate policies" head={["Policy", "Effect"]} rows={policies} />
+  <p>Rules: <code>SchemaRule</code>, <code>FreshnessRule</code>, <code>MinRowsRule</code>, <code>NullFractionRule</code>, <code>NoNullsRule</code>, <code>UniqueKeyRule</code>, <code>RangeRule</code> and <code>AllowedValuesRule</code>, each limited to the stages it names. Every rule is evaluated before any action, and the report is written to <code>quality/</code> whatever the outcome.</p>
+
+  <h2>Incremental processing</h2>
+  <p><code>IncrementalProcessor</code> processes new objects under an input prefix in sorted key order, once each. It deduplicates repeated row keys and repeated uploads, writes a checkpoint with its own digest after each object, retries transient errors under a <code>RetryPolicy</code> (reproducible backoff, no jitter), writes the output before the checkpoint, and takes a lock object so two runs cannot share a checkpoint.</p>
+  <div class="callout"><p><strong>Delivery semantics: at-least-once for the work, idempotent for the output.</strong> A crash between writing an output and committing the checkpoint makes the next run process that object again and rewrite the same bytes under the same key. The final outputs and checkpoint equal those of an uninterrupted run (tested). Exactly-once is not claimed: a transform with side effects beyond its output must be idempotent.</p></div>
+  <p>A crashed run leaves its lock; <code>break_lock</code> is a person's decision. The set of seen row keys lives in one JSON object, which is fine for millions of keys and not beyond.</p>
+
+  <h2>What was not done</h2>
+  <p>MinIO and the GCS emulator were not started, and no real bucket was touched. The S3 and GCS code ran only against in-memory clients written to the same protocol, so differences in a real service (consistency, error codes, conditional-write support in older S3-compatible servers) are untested. A warehouse per cloud, and a dataset ingested, validated, trained on and traced in a real account, need cloud accounts that this work has not used.</p>
+
+  <p class="meta">Governed-data surface of the 0.1 beta line</p>
+</DocsLayout>
