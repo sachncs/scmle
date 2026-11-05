@@ -1,10 +1,11 @@
-"""A group, time or weight column that is not in the data is a clear error."""
+"""Missing role columns and missing run directories give clear errors."""
 
 import numpy as np
 import pandas as pd
 import pytest
 
 import scmle
+from scmle import cli
 from scmle.contracts import errors
 
 
@@ -33,3 +34,10 @@ def test_a_missing_role_column_names_the_role(tmp_path, role, option):
     )
     with pytest.raises(errors.DataError, match=f"{role} column 'nosuch'"):
         project.plan()
+
+
+def test_resuming_a_missing_run_directory_is_an_artifact_error(
+    tmp_path, caplog
+):
+    assert cli.main(["resume", str(tmp_path / "nope")]) == 1
+    assert "run directory not found" in caplog.text

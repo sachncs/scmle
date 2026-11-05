@@ -352,7 +352,10 @@ class ResumeCommand(Command):
 
     def execute(self, args: argparse.Namespace) -> int:
         """Resumes the run and prints the result summary."""
-        result = project.MLProject.resume(args.run_directory)
+        try:
+            result = project.MLProject.resume(args.run_directory)
+        except FileNotFoundError as error:
+            raise errors.ArtifactError(str(error)) from error
         LOGGER.info("%s", result.summary())
         LOGGER.info("artifacts: %s", result.run_dir)
         return EXIT_OK
