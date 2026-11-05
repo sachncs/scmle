@@ -1010,7 +1010,7 @@ def bad_release() -> recovery.Result:
         release = release_state.ReleaseRegistry(
             store,
             ledger,
-            control.ConfirmPolicy(attempts=12, delay=recovery.scaled(0.5)),
+            control.ConfirmPolicy(attempts=40, delay=recovery.scaled(0.5)),
         )
         good_spec = golden_spec()
         third_spec = {**good_spec, "model_version": "golden-3"}

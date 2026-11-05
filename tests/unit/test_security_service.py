@@ -22,6 +22,9 @@ from tests import support_identity as idp
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 KEY = "security-test-signing-key-31c9"
+# Hex digests in the log can contain short words, so the rejected credential
+# must be a string no digest can contain.
+BAD_TOKEN = "not-a-token-zz"
 
 
 @pytest.fixture(scope="module")
@@ -209,7 +212,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     adapter.start()
     try:
         call(adapter.address, "/health", bearer(clock))
-        call(adapter.address, "/health", "bad")
+        call(adapter.address, "/health", BAD_TOKEN)
     finally:
         adapter.stop()
     gateway.rotate(
@@ -234,7 +237,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     assert rows[3]["kids_before"] == ["hs-1"] and rows[3]["kids_after"] == [
         "rs-2"
     ]
-    assert "Bearer" not in path.read_text() and "bad" not in json.dumps(
+    assert "Bearer" not in path.read_text() and BAD_TOKEN not in json.dumps(
         rows[2:3]
     )
 

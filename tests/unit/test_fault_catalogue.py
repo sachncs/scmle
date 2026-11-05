@@ -9,6 +9,13 @@ from scmle.data.store import objectstore
 from scmle.operations import recovery
 from scmle.operations import spool
 
+
+@pytest.fixture(autouse=True)
+def full_speed(monkeypatch):
+    """CI sets a time scale for slow runners; these tests assume none."""
+    monkeypatch.delenv(recovery.TIME_SCALE_ENV, raising=False)
+
+
 STAMP = "2026-11-05T10:00:00+00:00"
 
 
