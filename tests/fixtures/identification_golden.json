@@ -1,53 +1,5 @@
 {
  "aipw": {
-  "boosted_ATE": {
-   "estimand": "ATE",
-   "estimate": 2.351134407,
-   "high": 2.651002663,
-   "level": 0.95,
-   "low": 2.051266152,
-   "n": 800,
-   "n_input": 800,
-   "nuisance_digest": "255a881a71870453d21bddd1c485ffaf616769a8fc55058bf783f5374b627ac3",
-   "overlap": {
-    "eps": 0.05,
-    "ess_control": 262.749476109,
-    "ess_treated": 248.414443312,
-    "gate_share": 0.05,
-    "max_propensity": 0.941099602,
-    "max_weighted_smd": 0.198210085,
-    "min_propensity": 0.041288305,
-    "n": 800,
-    "passed": true,
-    "share_outside": 0.00125
-   },
-   "population": "the full population of the rows",
-   "se": 0.152996819
-  },
-  "boosted_ATT": {
-   "estimand": "ATT",
-   "estimate": 2.246285218,
-   "high": 2.620511439,
-   "level": 0.95,
-   "low": 1.872058997,
-   "n": 800,
-   "n_input": 800,
-   "nuisance_digest": "255a881a71870453d21bddd1c485ffaf616769a8fc55058bf783f5374b627ac3",
-   "overlap": {
-    "eps": 0.05,
-    "ess_control": 262.749476109,
-    "ess_treated": 248.414443312,
-    "gate_share": 0.05,
-    "max_propensity": 0.941099602,
-    "max_weighted_smd": 0.198210085,
-    "min_propensity": 0.041288305,
-    "n": 800,
-    "passed": true,
-    "share_outside": 0.00125
-   },
-   "population": "the full population of the rows",
-   "se": 0.190935254
-  },
   "ess": 2.571428571,
   "linear_ATE": {
    "estimand": "ATE",

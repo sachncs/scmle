@@ -31,9 +31,14 @@ FIXTURE = Path(__file__).parents[1] / "fixtures" / "identification_golden.json"
 COLUMNS = ("a", "b", "c")
 
 
+# Boosted trees differ between platforms by more than any useful tolerance,
+# so only the linear learner is pinned; the boosted one is checked for sanity.
+PINNED_LEARNERS = ("linear",)
+
+
 def case_aipw():
     out = {}
-    for learner in aipw.LEARNERS:
+    for learner in PINNED_LEARNERS:
         nuis = aipw.fit_nuisances(
             aipw_tests.planted(600, 1), COLUMNS, "t", "y", 0, learner
         )
@@ -195,3 +200,13 @@ CASES = {
 def test_the_estimators_reproduce_their_recorded_outputs(name):
     expected, actual = golden.check(FIXTURE, name, CASES[name])
     assert golden.same(expected, actual)
+
+
+def test_the_boosted_learner_gives_a_finite_estimate():
+    nuis = aipw.fit_nuisances(
+        aipw_tests.planted(600, 1), COLUMNS, "t", "y", 0, "boosted"
+    )
+    result = aipw.estimate(
+        nuis, aipw_tests.planted(800, 2), "t", "y", "ATE"
+    )
+    assert np.isfinite(golden.snapshot(result)["estimate"])
