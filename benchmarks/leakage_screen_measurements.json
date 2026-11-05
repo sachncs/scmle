@@ -1,0 +1,214 @@
+{
+  "certified": {
+    "alpha": 0.05,
+    "association_ceiling": 0.9,
+    "detected": {
+      "leak_copy": 200,
+      "leak_missing_for_class": 200,
+      "leak_noisy_copy": 199,
+      "leak_rare_record": 200,
+      "leak_threshold": 200
+    },
+    "detection_wilson_95": {
+      "leak_copy": [
+        0.9811546736227335,
+        1.0
+      ],
+      "leak_missing_for_class": [
+        0.9811546736227335,
+        1.0
+      ],
+      "leak_noisy_copy": [
+        0.9722262956021069,
+        0.9991168312843989
+      ],
+      "leak_rare_record": [
+        0.9811546736227335,
+        1.0
+      ],
+      "leak_threshold": [
+        0.9811546736227335,
+        1.0
+      ]
+    },
+    "null_false_alarm_wilson_95": [
+      0.0,
+      0.0038267584855551234
+    ],
+    "null_replicates": 1000,
+    "null_worlds_with_a_suspect": 0,
+    "plant_replicates_per_type": 200,
+    "skill_ceiling": 0.95,
+    "source": "benchmarks/qualification/screen_measurements.json"
+  },
+  "planted": {
+    "leak_copy": {
+      "detected": 10,
+      "real_columns_flagged": 7,
+      "real_columns_screened": 90,
+      "tables": 10
+    },
+    "leak_missing_for_class": {
+      "detected": 10,
+      "real_columns_flagged": 7,
+      "real_columns_screened": 90,
+      "tables": 10
+    },
+    "leak_noisy_copy": {
+      "detected": 10,
+      "real_columns_flagged": 7,
+      "real_columns_screened": 90,
+      "tables": 10
+    },
+    "leak_rare_record": {
+      "detected": 10,
+      "real_columns_flagged": 7,
+      "real_columns_screened": 90,
+      "tables": 10
+    },
+    "leak_threshold": {
+      "detected": 10,
+      "real_columns_flagged": 7,
+      "real_columns_screened": 90,
+      "tables": 10
+    }
+  },
+  "settings": {
+    "alpha": 0.05,
+    "association_ceiling": 0.9,
+    "permutations": 199,
+    "run_seed": 0,
+    "skill_ceiling": 0.95
+  },
+  "tables": [
+    {
+      "classes": 2,
+      "columns": 30,
+      "false_flag_rate": 0.06666666666666667,
+      "false_flags": [
+        "worst radius",
+        "worst area"
+      ],
+      "family": 30,
+      "flagged": [
+        "worst radius",
+        "worst area"
+      ],
+      "gating": [
+        "gating"
+      ],
+      "leaks_found": [],
+      "legitimate_columns": 30,
+      "rows": 569,
+      "table": "breast_cancer",
+      "true_leaks": [],
+      "would_block": [
+        "worst radius",
+        "worst area"
+      ]
+    },
+    {
+      "classes": 3,
+      "columns": 13,
+      "false_flag_rate": 0.0,
+      "false_flags": [],
+      "family": 13,
+      "flagged": [],
+      "gating": [
+        "descriptive"
+      ],
+      "leaks_found": [],
+      "legitimate_columns": 13,
+      "rows": 178,
+      "table": "wine",
+      "true_leaks": [],
+      "would_block": []
+    },
+    {
+      "classes": 3,
+      "columns": 4,
+      "false_flag_rate": 0.5,
+      "false_flags": [
+        "petal length (cm)",
+        "petal width (cm)"
+      ],
+      "family": 4,
+      "flagged": [
+        "petal length (cm)",
+        "petal width (cm)"
+      ],
+      "gating": [
+        "descriptive"
+      ],
+      "leaks_found": [],
+      "legitimate_columns": 4,
+      "rows": 150,
+      "table": "iris",
+      "true_leaks": [],
+      "would_block": []
+    },
+    {
+      "classes": 10,
+      "columns": 64,
+      "false_flag_rate": 0.0,
+      "false_flags": [],
+      "family": 61,
+      "flagged": [],
+      "gating": [
+        "descriptive"
+      ],
+      "leaks_found": [],
+      "legitimate_columns": 64,
+      "rows": 1797,
+      "table": "digits",
+      "true_leaks": [],
+      "would_block": []
+    },
+    {
+      "classes": 2,
+      "columns": 9,
+      "false_flag_rate": 0.0,
+      "false_flags": [],
+      "family": 19,
+      "flagged": [
+        "boat",
+        "body"
+      ],
+      "gating": [
+        "gating"
+      ],
+      "leaks_found": [
+        "boat",
+        "body"
+      ],
+      "legitimate_columns": 7,
+      "rows": 1309,
+      "table": "titanic",
+      "true_leaks": [
+        "boat",
+        "body"
+      ],
+      "would_block": [
+        "boat",
+        "body"
+      ]
+    },
+    {
+      "classes": 2,
+      "columns": 7,
+      "false_flag_rate": 0.0,
+      "false_flags": [],
+      "family": 13,
+      "flagged": [],
+      "gating": [
+        "gating"
+      ],
+      "leaks_found": [],
+      "legitimate_columns": 7,
+      "rows": 1309,
+      "table": "titanic without boat and body",
+      "true_leaks": [],
+      "would_block": []
+    }
+  ]
+}
