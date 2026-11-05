@@ -1088,6 +1088,16 @@ class ProfileStage(Stage):
             BlockedError: If every feature would be quarantined.
         """
         spec = context.spec
+        try:
+            given = (
+                attestations.load(spec.leakage_attestations)
+                if spec.leakage_attestations
+                else ()
+            )
+        except ValueError as error:
+            raise errors.ConfigError(
+                f"invalid leakage attestations: {error}"
+            ) from error
         found = qualify.run(
             view.features,
             view.target,
@@ -1097,11 +1107,7 @@ class ProfileStage(Stage):
             structure=structure,
             group_column=spec.data.group_column,
             time_column=spec.data.time_column,
-            attestations=(
-                attestations.load(spec.leakage_attestations)
-                if spec.leakage_attestations
-                else ()
-            ),
+            attestations=given,
             scope=charter.charter_hash,
             causal=charter.estimand.causal,
             dag=graph,

@@ -312,6 +312,20 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
     assert echo["tier"] == "attested" and echo["admission"] == "admit_flagged"
 
 
+def test_a_malformed_attestation_file_is_a_config_error(binary_frame, tmp_path):
+    path = tmp_path / "attestations.json"
+    path.write_text(json.dumps({"format_version": 1}))
+    project = support.make_project(
+        binary_frame,
+        "y",
+        output_dir=tmp_path / "out",
+        charter=write_charter(tmp_path),
+        leakage_attestations=path,
+    )
+    with pytest.raises(errors.ConfigError, match="leakage attestations"):
+        project.plan()
+
+
 def test_a_run_without_a_charter_writes_no_admissibility_artifacts(
     binary_frame, tmp_path
 ):
