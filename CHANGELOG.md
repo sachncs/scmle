@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+* Governed data (F14 item 7, local half; `scmle.data.store`,
+  `scmle.core.retry`, `docs/GOVERNED_DATA.md`). An `ObjectStore` interface with
+  local, S3 and GCS backends (the SDKs are imported only by `s3_store` and
+  `gcs_store`; a client you built can be passed instead; hashes kept as object
+  metadata and verified on read) and one conformance suite
+  (`run_conformance`, `scripts/run_object_store_conformance.py`) that the tests
+  run on all three. `SnapshotReader` records, for every read, the object's
+  URI, content hash, size, modification time, declared schema version,
+  observed schema digest and match, freshness against the contract, and
+  lineage to parent snapshots (`ReadLog.trace`); `connector_reader` plugs a
+  store into the Phase 9 `ObjectStoreConnector`. `QualityGate` checks data
+  before training and inference with rules whose failure policy (`fail`,
+  `quarantine`, `warn`) is declared in advance; quarantine writes rows or holds
+  the whole snapshot. `IncrementalProcessor` processes new objects in key order
+  with deduplication, a digest-protected checkpoint, retries with reproducible
+  backoff, a lock, and recovery after a crash between output and checkpoint:
+  at-least-once work with idempotent output, not exactly-once. Not done: MinIO,
+  the GCS emulator and real buckets were not run (the backends ran against
+  in-memory clients), no warehouse was chosen or connected, and nothing was
+  ingested, trained on or traced in a cloud account.
 * Security (F14 item 4, local half; `scmle.security`, `docs/TENANT_ISOLATION.md`).
   Bearer-token verification with the standard library only: JWT with HS256 or
   RS256 (RS256 is the RFC 8017 PKCS#1 v1.5 check, so only public keys are

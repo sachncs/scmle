@@ -161,6 +161,15 @@ no `exports` entry changed. Behaviour changes to existing classes:
 `set_gateway`, and `start` refuses a non-loopback `host` without a gateway.
 The deployment ledger gained the row kind `audit`.
 
+## Governed-data surface
+
+`scmle.data.store` (`objectstore`, `cloud`, `snapshot`, `quality`,
+`processing`) and `scmle.core.retry` are extension surfaces pinned in the
+snapshot's `extension_surfaces` block; no `exports` entry changed. Pinned
+signatures avoid function-valued defaults (a `None` default is resolved in the
+body), because a function's repr carries an address and would make the
+snapshot differ between runs.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any
 
 import scmle
+from scmle.core import retry as core_retry
+from scmle.data.store import cloud as store_cloud
+from scmle.data.store import objectstore as store_objectstore
+from scmle.data.store import processing as store_processing
+from scmle.data.store import quality as store_quality
+from scmle.data.store import snapshot as store_snapshot
 from scmle.deploy import contract as deploy_contract
 from scmle.security import access as security_access
 from scmle.security import audit as security_audit
@@ -58,6 +64,48 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.security.audit": (security_audit, ("AuditLog",)),
+    "scmle.core.retry": (
+        core_retry,
+        (
+            "RetryPolicy",
+            "RetryExhaustedError",
+            "TransientError",
+            "call_with_retries",
+        ),
+    ),
+    "scmle.data.store.objectstore": (
+        store_objectstore,
+        (
+            "LocalObjectStore",
+            "ObjectMeta",
+            "ObjectStore",
+            "RetryingStore",
+            "StoreError",
+        ),
+    ),
+    "scmle.data.store.cloud": (
+        store_cloud,
+        ("GcsObjectStore", "S3ObjectStore", "gcs_store", "s3_store"),
+    ),
+    "scmle.data.store.snapshot": (
+        store_snapshot,
+        ("DataContract", "ReadLog", "SnapshotReader", "SnapshotRecord"),
+    ),
+    "scmle.data.store.quality": (
+        store_quality,
+        (
+            "GateReport",
+            "Policy",
+            "QualityGate",
+            "QualityGateError",
+            "Rule",
+            "Stage",
+        ),
+    ),
+    "scmle.data.store.processing": (
+        store_processing,
+        ("Checkpoint", "IncrementalProcessor", "RunResult"),
+    ),
 }
 
 
