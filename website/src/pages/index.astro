@@ -27,7 +27,7 @@ project = scmle.MLProject(<span class="tok-s">"customers.parquet"</span>, target
 logging.info(project.plan().summary())  <span class="tok-c"># inspect before any training</span>
 result = project.run()  <span class="tok-c"># profile, split, search, test, package</span>
 logging.info(<span class="tok-s">"\\n%s"</span>, result.leaderboard())
-result.save(<span class="tok-s">"artifacts/churn"</span>, signing_key=<span class="tok-s">"..."</span>)  <span class="tok-c"># signed bundle</span>
+result.save(<span class="tok-s">"artifacts/churn"</span>, signing_key=<span class="tok-s">"..."</span>)  <span class="tok-c"># signed with your key</span>
 result.predict(<span class="tok-s">"new_customers.parquet"</span>)`;
 
 const output = `<span class="tok-c"># project.plan().summary(), first line</span>
@@ -79,7 +79,7 @@ const bw = 360;
 <BaseLayout
   title="SCMLE: Mathematics meets engineering"
   fullTitle
-  description="SCMLE is a curation-first machine learning lifecycle: leakage-safe evaluation behind a locked test set, a search over every compatible model, and signed, auditable artifacts."
+  description="SCMLE is a curation-first machine learning lifecycle: leakage-safe evaluation behind a locked test set, a planned search over compatible candidates within your budget, and checksummed, auditable artifacts you can authenticate with a signing key."
   path="/"
   section="home"
 >
@@ -89,7 +89,7 @@ const bw = 360;
       <div class="container">
         <p class="badge rise" style="--d:0"><i></i> Open source · Apache-2.0 · 0.1 beta</p>
         <h1 id="hero-title" class="rise" style="--d:1">Mathematics meets engineering.</h1>
-        <p class="lede rise" style="--d:2">A curation-first machine learning lifecycle. It splits without leakage behind a locked test set, searches every compatible model, and ships a signed bundle with the evidence behind every choice.</p>
+        <p class="lede rise" style="--d:2">A curation-first machine learning lifecycle. It profiles your data, splits behind a locked test set, plans compatible candidates and searches within the configured budget, and writes a checksummed bundle with the evidence behind every choice. Configure a signing key to authenticate the bundle.</p>
         <div class="cta-row rise" style="--d:3">
           <a class="btn btn-primary" href={`${base}/docs/quickstart/`}>Get started</a>
           <a class="btn btn-secondary" href={repo}>View on GitHub</a>
@@ -194,7 +194,7 @@ const bw = 360;
         <div class="story">
           <div class="story-text reveal">
             <p class="kicker">03 · Search</p>
-            <h2 class="h2" id="s-search">Search every compatible model. Then justify the winner.</h2>
+            <h2 class="h2" id="s-search">Plan compatible candidates. Search within your budget. Justify the winner.</h2>
             <p class="sub">scikit-learn, LightGBM, XGBoost, CatBoost, SVM and kNN, plus data strategies and pruned tuning. A stack is adopted only if it beats its best member.</p>
             <ul>
               <li>Every rejected candidate comes with a reason.</li>
@@ -217,8 +217,8 @@ const bw = 360;
         <div class="story flip">
           <div class="story-text reveal">
             <p class="kicker">04 · Evidence</p>
-            <h2 class="h2" id="s-evidence">A signed bundle, and the decisions behind it.</h2>
-            <p class="sub">Every run writes its configuration, split, events, trials, decision log and data-access ledger. The model ships as a checksummed, signed bundle.</p>
+            <h2 class="h2" id="s-evidence">A checksummed bundle, and the decisions behind it.</h2>
+            <p class="sub">Every run writes its configuration, split, events, trials, decision log and data-access ledger. The model is written as a checksummed bundle; with a signing key configured it is signed as well.</p>
             <ul>
               <li>Bundles are pickle-based, so loading is refused unless the HMAC signature verifies, or you pass <code>trusted=True</code>.</li>
               <li>Checksums are verified before anything is unpickled.</li>
@@ -343,7 +343,7 @@ const bw = 360;
       <div class="container">
         <div class="section-head center reveal">
           <p class="kicker">Quickstart</p>
-          <h2 class="h2" id="qs-title">From a table to a signed model.</h2>
+          <h2 class="h2" id="qs-title">From a table to a model bundle.</h2>
           <p class="sub">The quickstart from the README, and what the same calls print.</p>
         </div>
         <div class="code-grid">
@@ -427,14 +427,14 @@ const bw = 360;
           <h2 class="h2" id="trust-title">Guarantees you can check, limits we state.</h2>
         </div>
         <div class="trust-grid">
-          <div class="trust-item reveal"><h3>Leakage-safe by construction</h3><p>Preprocessing, resampling, calibration and stacking are part of the candidate. <code>tests/leakage</code> checks that the search is invariant to the test partition.</p></div>
+          <div class="trust-item reveal"><h3>Leakage-aware evaluation</h3><p>Preprocessing, resampling, calibration and stacking are fitted inside each fold as part of the candidate. The leakage tests check, under stated conditions, that perturbing the test partition does not change the search; that is evidence for the tested scenarios, not a proof for every dataset.</p></div>
           <div class="trust-item reveal" data-delay="1"><h3>Auditable</h3><p>Configuration, split, events, trials, decision log, data-access ledger, report and bundle are written for every run. Replays are classed <code>exact</code>, <code>comparable</code> or <code>different</code>.</p></div>
-          <div class="trust-item reveal" data-delay="2"><h3>Secure by default</h3><p>Signed, checksummed bundles. CI runs <code>bandit</code> and <code>pip-audit</code>, and builds the wheel into a clean environment.</p></div>
+          <div class="trust-item reveal" data-delay="2"><h3>Secure by default</h3><p>Bundles are checksummed, and are authenticated when you configure a signing key; loading an unsigned bundle is refused unless you vouch for it. CI runs <code>bandit</code> and <code>pip-audit</code>, and builds the wheel into a clean environment.</p></div>
         </div>
         <div class="limits reveal">
           <h3>Known limits</h3>
           <ul>
-            <li>The test-set vault keeps locked rows out of trial processes. It cannot stop a process from reading the original data file when a path was given.</li>
+            <li>The test-set vault keeps locked rows out of trial processes. It does not prevent access to the original data file, and a caller's own in-memory table still holds every row.</li>
             <li>The HTTP serving adapter is a minimal reference server. It verifies bearer tokens when configured and has no TLS, so run it behind an ingress.</li>
             <li>The public API may change between <code>0.x</code> releases. SCMLE is in beta.</li>
           </ul>

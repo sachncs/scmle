@@ -71,7 +71,7 @@ const provenance = [
   ["<code>parameter_estimation_declaration.*</code>", "The declaration (or its absence) for parameter-estimation runs."],
 ];
 const service = [
-  ["<code>model/</code>", "The signed bundle."],
+  ["<code>model/</code>", "The bundle, signed when a signing key is configured."],
   ["<code>Dockerfile</code>, <code>.dockerignore</code>, <code>build.sh</code>", "Base image pinned by a digest placeholder that the build refuses until <code>build.sh</code> resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests."],
   ["<code>requirements.txt</code>, <code>requirements.lock</code>, <code>environment.lock</code>", "Direct pins; the runtime closure installed with <code>--no-deps</code>; every package of the build environment."],
   ["<code>sbom.cdx.json</code>", "CycloneDX SBOM: runtime libraries, the bundle (by manifest digest) and the base image."],
@@ -118,7 +118,7 @@ const service = [
   <DocTable label="Search and result files" head={["Path", "Contents"]} rows={search} />
 
   <h2 id="bundle">The model bundle</h2>
-  <p><code>model/</code> is the signed, checksummed bundle: <code>pipeline.joblib</code> (fitted preprocessing and estimator), <code>schema.json</code>, <code>reference.json</code> (monitoring reference profile), <code>conformal.json</code> (pooled and per-class calibration scores), <code>novelty.joblib</code> and <code>model_manifest.json</code> (checksums and signature). Bundles are pickle-based; the loading rules are on the <a href={`${base}/docs/threat-model/`}>threat model</a> page. Use <code>result.save(directory, signing_key=...)</code> to export one for deployment.</p>
+  <p><code>model/</code> is the checksummed bundle (authenticated by a signature when a signing key was configured when it was written): <code>pipeline.joblib</code> (fitted preprocessing and estimator), <code>schema.json</code>, <code>reference.json</code> (monitoring reference profile), <code>conformal.json</code> (pooled and per-class calibration scores), <code>novelty.joblib</code> and <code>model_manifest.json</code> (checksums and signature). Bundles are pickle-based; the loading rules are on the <a href={`${base}/docs/threat-model/`}>threat model</a> page. Use <code>result.save(directory, signing_key=...)</code> to export one for deployment.</p>
 
   <h2>Provenance and governance</h2>
   <DocTable label="Provenance and governance files" head={["File", "Contents"]} rows={provenance} />
