@@ -617,10 +617,8 @@ def test_l309_statistics_preserve_uncertainty_about_leakage():
     frame["y"] = (frame.x > 0).astype(int)
     result = support.make_project(frame, "y", leakage_policy="warn").plan()
     findings = " ".join(result.warnings)
-    assert (
-        "possible leakage" in findings
-        and "exceptionally strong predictor" in findings
-    )
+    assert "leakage suspect" in findings
+    assert "a suspicion, not proof" in findings
 
 
 def test_l311_l321_decision_policy_examples():
