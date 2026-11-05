@@ -82,7 +82,9 @@ Tools:
 * `--unavailable-at-prediction boat body` says "known only after the outcome".
   This is the right flag for leaks.
 * `--exclude colA colB` drops columns for any other reason.
-* `--leakage-policy block` turns SCMLE's suspicions into a stop. Use it.
+* `--leakage-policy block` is the default: SCMLE's suspicions stop the run.
+  Leave it on. `--leakage-policy warn` turns it off and is for a person who
+  has reviewed every suspect.
 
 **If you choose wrong.** A leak makes the model look brilliant. On the Titanic
 table, the score was 0.988 with `boat` and `body`, and 0.885 without. A model

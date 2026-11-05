@@ -163,8 +163,8 @@ the locked test rows by about 0.026 PR-AUC (a 15%-positive set with few
 positives in the test rows, so the score is noisy). Titanic's near-perfect score comes from leaked columns (`boat`,
 `body`): the leakage screen flags both (`boat` by skill, missingness and record
 purity; `body` by record purity only, because it is recorded for 9% of
-passengers, all of whom died), and `leakage_policy="block"` refuses to
-proceed. Choosing the best of many trials carries a mild optimism bias, which
+passengers, all of whom died), and the default `leakage_policy="block"` refuses to
+proceed (`"warn"` is the opt-out). Choosing the best of many trials carries a mild optimism bias, which
 is why the locked-test score is the number to trust.
 
 More datasets: on 20 Hugging Face Hub tables the framework is ahead of the same reference on 16 of 20, and on 21 further OpenML tables on 13 of 21

@@ -34,7 +34,7 @@ project = scmle.MLProject(
         threshold_objective="cost", false_positive_cost=1, false_negative_cost=8
     ),
     selection=tasks.SelectionSpec(max_model_mb=50, max_p95_latency_ms=20),
-    leakage_policy="block",  # refuse suspicious features
+    leakage_policy="block",  # the default: refuse suspicious features
 )
 ```
 

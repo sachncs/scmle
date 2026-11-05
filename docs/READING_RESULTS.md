@@ -20,7 +20,7 @@ Terms are in the [glossary](GLOSSARY.md).
 | You want to know | Open | Look for |
 | --- | --- | --- |
 | The headline | the last line of the run output | `selected ... (cv ...); test: ...` |
-| The story in one page | `report.html` | start at the heading "Leaderboard"; the long plan list above it is the decision list |
+| The story in one page | `report.html` | findings first, then the leaderboard; the long plan list is folded at the bottom |
 | Every number | `evaluation.json` | `test_metrics`, `selected_cv_score`, `fit_health`, `cv_confidence` |
 | Every model tried | `leaderboard.parquet` or `result.leaderboard()` | `score_mean`, `score_std`, `status`, `fit_health` |
 | Why each choice was made | `diagnostics/decision_log.json` | `selection`, `outcomes` |
@@ -162,21 +162,23 @@ with how much it kept in validation.
 | Exam score about equal to the baseline | no signal, or the wrong target | check the target and features; look at the data again |
 | `fragile_under` lists scenarios | the model breaks when inputs are a bit worse | expect real-life data to be messier; fix inputs or retrain on messier data |
 | A large `slice_performance` gap | the model is weaker for a group | decide if it is acceptable; collect more data for that group |
-| Warnings at the end of the report that the run's last line did not mention | something needs a look | read the "Findings" section |
+| `WARNING ... leakage suspect(s)` at the end of the last line, or entries in the "Findings" section at the top of the report | something needs a look | read the "Findings" section |
 
 ### The leak, as it looked
 
 The author ran the same table twice. The only difference was `boat` and `body`:
 
-| | Without them (`--unavailable-at-prediction boat body`) | With them (default) |
+| | Without them (`--unavailable-at-prediction boat body`) | With them (`--leakage-policy warn`) |
 | --- | --- | --- |
 | Exam ROC AUC | 0.885 | 0.988 |
 | Top feature | `sex`, importance 0.242 | `boat`, importance 0.334 |
 | Chosen model | stacking | bagged_logistic_regression, strategy `select_features` |
 
-The second run finished without any error, printed no alarm in the last line,
-and contained this in its `report.html` "Findings" section and in the plan
-warnings:
+The second run only happened because the stop was turned off. By default
+SCMLE refuses it (`blocked: unresolved leakage risk ...`). With `warn` the run
+finished and the last line ends with
+`WARNING 2 leakage suspect(s) kept in: boat, body`. The "Findings" section at
+the top of its `report.html` and the plan warnings contain:
 
 ```text
 feature 'boat' is a leakage suspect: cross-fitted skill 0.973 ... This is a suspicion, not proof ...
@@ -184,8 +186,9 @@ feature 'boat' is a leakage suspect: cross-fitted skill 0.973 ... This is a susp
 
 Two lessons. First, a score of 0.988 for "who survived the Titanic from a
 ticket" should have rung a bell: the real answer is not that predictable.
-Second, the safe setting is `--leakage-policy block`, which stops the run
-instead of warning.
+Second, that is why `block` is the default: it stops the run instead of
+warning. Turn it off (`--leakage-policy warn`) only when you have looked at
+every suspect and decided it is a legitimate predictor.
 
 A leakage suspicion is "not proof": a really strong, legitimate feature looks
 the same to a statistical screen. The cure is a human question: "Would I know

@@ -55,5 +55,5 @@ characteristic and nothing more.
 ## Evidence tiers
 
 `confirmed` > `attested` > `unverified`. Shown on every claim (`scmle claims list`);
-the run summary and `report.html` do not show them yet. The causal and
-decision readings are in the canon.
+the run summary ends with the count per tier. The causal and decision
+readings are in the canon.

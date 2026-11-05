@@ -152,15 +152,56 @@ Write these answers down. They are explained in [Decisions](DECISIONS.md).
 The last row is the most important one. A column that records something that
 happens after the outcome gives the model the answer. That is called
 **leakage**. A model with leakage scores wonderfully and then fails on real
-use. You will see it happen below.
+use. You will see SCMLE stop it in Step 4.
 
-## Step 4. Plan (nothing is trained yet)
+## Step 4. Your first run is refused (on purpose)
+
+Run the simplest command, with no special options except a short time limit
+and an output folder:
+
+```bash runnable
+scmle run titanic.csv --target survived --time-budget 120 --workers 2 --output-dir runs_blocked
+echo "exit code: $?"
+```
+
+This takes about 8 seconds. What you should see (last two lines):
+
+```text
+[run_20261105_001] state.BLOCKED: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
+blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
+```
+
+and `exit code: 2`.
+
+What to look at: `BLOCKED` is a safe stop, not a crash. No model was built.
+The names after the colon are the suspect columns: `body` and `boat`.
+`boat` appears three times because three different checks flagged it.
+
+Why SCMLE stops by default. The author once ran the same command with the
+stop turned off (`--leakage-policy warn`). It finished and reported an exam
+ROC AUC of **0.988**, and its last line said:
+
+```text
+run_20261105_001: selected bagged_logistic_regression (cv roc_auc=0.9917); test: roc_auc=0.9880, ...; WARNING 2 leakage suspect(s) kept in: boat, body
+```
+
+That score is far too good. It comes from `boat` and `body`, which are only
+known after the ship sinks. A model that uses them looks brilliant and fails
+the day it is used for real. Because it is so easy to miss a warning, the safe
+behaviour (`block`) is the default. You do not need to repeat the warn run.
+
+What it means and what to do: see "Leakage block" in
+[When things go wrong](WHEN_THINGS_GO_WRONG.md). In short: for each suspect
+ask "would I know this value before the voyage?". We would not, so we declare
+both off limits in Step 6. First, let us see what the plan says about them.
+
+## Step 5. Plan (nothing is trained yet): why it refused
 
 ```bash runnable
 scmle plan titanic.csv --target survived
 ```
 
-This takes about 7 seconds. It prints about 70 lines: each model SCMLE could
+This takes about 7 seconds and trains nothing. It prints about 70 lines: each model SCMLE could
 try and whether it will, then warnings. Here is the start and the end:
 
 ```text
@@ -188,37 +229,6 @@ What could go wrong: if it picks the wrong metric or task, tell it with
 `--metric` or `--task`. If the target is a column with many numbers, check
 that it says `regression` and not `classification`.
 
-## Step 5. See SCMLE refuse a leak
-
-By default, a warning does not stop a run. Turn the warnings into a stop with
-`--leakage-policy block`. (The author ran the default once, without the flag:
-it finished with a test score of 0.988 and printed nothing alarming at the
-end. That is the trap. You do not need to repeat it.)
-
-```bash runnable
-scmle run titanic.csv --target survived --leakage-policy block \
-  --time-budget 120 --workers 2 --output-dir runs_blocked
-echo "exit code: $?"
-```
-
-What you should see (last two lines):
-
-```text
-[run_20261105_001] state.BLOCKED: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
-blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
-```
-
-and `exit code: 2`.
-
-What to look at: `BLOCKED` is a safe stop, not a crash. No model was built.
-The names after the colon are the suspect columns. `boat` appears three times
-because three different checks flagged it.
-
-What it means and what to do: see "Leakage block" in
-[When things go wrong](WHEN_THINGS_GO_WRONG.md). Here, we decide `boat` and
-`body` are not known before the voyage, so we declare them off limits in the
-next step.
-
 ## Step 6. Run for real
 
 Tell SCMLE those two columns are only known after the outcome:
@@ -226,7 +236,7 @@ Tell SCMLE those two columns are only known after the outcome:
 ```bash runnable
 scmle run titanic.csv --target survived \
   --unavailable-at-prediction boat body \
-  --leakage-policy block --time-budget 120 --workers 2 --output-dir runs
+  --time-budget 120 --workers 2 --output-dir runs
 ```
 
 This takes two to four minutes, depending on your computer. Lines scroll by

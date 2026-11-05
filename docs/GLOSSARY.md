@@ -212,7 +212,8 @@ single biggest cause of too-good results. See
 **Meaning.** A feature SCMLE's statistical screen flags as probably a leak.
 **Example.** `boat` and `body`.
 **Why it matters.** It is a suspicion, not proof. A genuinely strong feature
-looks the same. A person must decide. See "unverified" and "attestation".
+looks the same. By default a suspect stops the run (`leakage_policy` is
+`block`); a person must decide. See "unverified" and "attestation".
 
 ### split
 

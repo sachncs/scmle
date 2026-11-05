@@ -79,12 +79,14 @@ tail -n 1 runs/run_*/events.jsonl
 blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
 ```
 
-**What it means.** You used `--leakage-policy block` (or `leakage_policy=
-"block"`), and a statistical screen found columns that predict the target
+**What it means.** The leakage policy is `block`, which is the default (you
+did not turn it off with `--leakage-policy warn`), and a statistical screen found columns that predict the target
 suspiciously well, or whose "is it recorded?" pattern gives the answer away.
 The names are the suspects. A name repeats when more than one test flagged it.
 **Why it exists.** A leaked column makes a model look wonderful and then fail.
-The default setting only warns, which is easy to miss; `block` makes it a stop.
+A warning is easy to miss, so a stop is the default; `--leakage-policy warn`
+(or `leakage_policy="warn"`) is the opt-out. With `warn` the run finishes and
+its last line ends with `WARNING N leakage suspect(s) kept in: ...`.
 Only checks with a measured error rate (a certificate) are allowed to block.
 **What to do.** Ask for each suspect: "Would I know this value at the moment I
 use the model?"
