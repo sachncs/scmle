@@ -1,0 +1,122 @@
+# Local environment: the API, a mock object store, a mock metrics sink and a
+# test runner, all built from the same image. No cloud account is involved.
+#
+#   make image && make demo-compose        # needs Docker with Compose v2
+#
+# Set SCMLE_PLATFORM=linux/arm64 (default linux/amd64) to build and run the
+# other architecture. The base image digest is the multi-architecture index,
+# so both use the same pinned base.
+name: scmle-local
+
+x-image: &image
+  image: scmle-local:dev
+  platform: ${SCMLE_PLATFORM:-linux/amd64}
+
+x-hardened: &hardened
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 256
+  user: "10001:10001"
+
+services:
+  object-store:
+    <<: [*image, *hardened]
+    command: ["python", "-m", "scmle.deploy.mocks", "object-store",
+              "--root", "/data", "--host", "0.0.0.0", "--port", "9000"]
+    volumes: ["object-store:/data"]
+    tmpfs: ["/tmp:size=16m"]
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  metrics-sink:
+    <<: [*image, *hardened]
+    command: ["python", "-m", "scmle.deploy.mocks", "metrics-sink",
+              "--file", "/data/metrics.jsonl", "--host", "0.0.0.0",
+              "--port", "9100"]
+    volumes: ["metrics:/data"]
+    tmpfs: ["/tmp:size=16m"]
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9100/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Trains, evaluates, registers and packages onto the shared volume, then exits.
+  builder:
+    <<: *image
+    command: ["python", "-m", "scmle.deploy.demo", "prepare",
+              "--workdir", "/work"]
+    volumes: ["work:/work"]
+    tmpfs: ["/tmp:size=512m"]
+    mem_limit: 2g
+    cpus: 2
+    user: "10001:10001"
+
+  # The churn model service, run under the production rules: the bundle must
+  # be signed, provenance must verify and SCMLE_TRUSTED is refused.
+  api:
+    <<: [*image, *hardened]
+    command: ["python", "/work/service/serve.py"]
+    depends_on:
+      builder: {condition: service_completed_successfully}
+    env_file: deploy/local/demo.env
+    environment: {SCMLE_ENV: production, PORT: "8000"}
+    volumes: ["work:/work:ro"]
+    tmpfs: ["/tmp:size=64m"]
+    mem_limit: 512m
+    cpus: 1
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  # The hand-written golden-record model, for the parity check.
+  golden-api:
+    <<: [*image, *hardened]
+    command: ["python", "/work/golden-service/serve.py"]
+    depends_on:
+      builder: {condition: service_completed_successfully}
+    env_file: deploy/local/demo.env
+    environment: {SCMLE_ENV: production, PORT: "8001"}
+    volumes: ["work:/work:ro"]
+    tmpfs: ["/tmp:size=64m"]
+    mem_limit: 512m
+    cpus: 0.5
+
+  # Calls the services over the network, runs monitor and the rollback drill.
+  test-runner:
+    <<: *image
+    profiles: ["test"]
+    command: ["python", "-m", "scmle.deploy.demo", "verify",
+              "--workdir", "/work", "--api-url", "http://api:8000",
+              "--golden-api-url", "http://golden-api:8001",
+              "--metrics-url", "http://metrics-sink:9100"]
+    depends_on:
+      api: {condition: service_healthy}
+      golden-api: {condition: service_started}
+      metrics-sink: {condition: service_healthy}
+      object-store: {condition: service_healthy}
+    env_file: deploy/local/demo.env
+    volumes: ["work:/work"]
+    tmpfs: ["/tmp:size=256m"]
+    mem_limit: 1g
+    cpus: 1
+    user: "10001:10001"
+
+volumes:
+  object-store:
+  metrics:
+  work:

@@ -13,6 +13,8 @@ test under `tests/unit/`. Run any script with `uv run python scripts/<name>.py`.
 | `check_mutation_score.sh` | Mutation score of the critical modules in `setup.cfg` is at least the given minimum (default 70). | `full-suite.yml` |
 | `check_dependency_licenses.py` | The runtime dependency closure has a license record and no copyleft license. | `ci.yml` |
 | `vuln_gate.py` | A scanner report (pip-audit or Trivy JSON) has no blocking finding under `deploy/vuln-policy.json`; fails closed on an empty or unreadable report. Implementation: `scmle.deploy.vuln_gate`. | generated `build.sh` |
+| `make_demo_data.py` | The datasets of the local demo in `deploy/local/data/` match their generator (`--check`). | tests |
+| `export_locked_requirements.sh` | `deploy/requirements.lock` equals the hashed export of `uv.lock` (`--check`). | `make lock-check` |
 | `make_serving_golden.py` | The golden expected outputs in `deploy/local/golden/` equal the closed form of the hand-written reference model (`--check`). | tests |
 | `check_serving_parity.py` | A running service returns the golden labels and probabilities within the declared tolerance, with version and artifact digest. | local demo, tests |
 | `verify_hosted_controls.py` | Workflows pin every action to a commit SHA, never use `pull_request_target`, and keep their required control steps; optionally probes a live Pages URL with unauthenticated GETs. | `ci.yml`, `pages.yml`, `site.yml` |

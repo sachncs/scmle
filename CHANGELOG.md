@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+* Local environment (F14 item 1; `compose.yaml`, `Makefile`, `deploy/`,
+  `scmle.deploy.demo`, `scmle.deploy.mocks`, `docs/LOCAL.md`). `make demo` trains
+  and evaluates a good model and a bad release from explicit datasets in
+  `deploy/local/data/`, packages and registers them, round-trips the service
+  folder through a mock object store by digest, serves it under the production
+  rules, predicts online and in batch, checks the golden records, shows that a
+  corrupted and an unsigned copy never become ready, monitors the bad release
+  on fresh labelled data, rolls back with a signed approval, serves the
+  restored model and ships metrics to a mock sink. `compose.yaml` runs the same
+  lifecycle in containers (API, object store, metrics sink, test runner) on a
+  read-only root, non-root, capability-free, with memory and CPU limits and
+  `SCMLE_PLATFORM` selecting amd64 or arm64. `deploy/requirements.lock` is the
+  hashed export of `uv.lock` (`make lock`, `make lock-check`); the image's base
+  digest is a placeholder the build refuses until `make image` resolves it. CI
+  gained the `local-demo` job. Not done: the container path
+  (`make demo-compose`, the Dockerfiles, `build.sh`) was written and its
+  compose file validated by `docker compose config`, but Docker's daemon was
+  not available, so no image was built and no container started; the arm64
+  build, the registry lookup and the scan against a live database have not
+  run.
 * Hardened service package (F14 item 2; `scmle.inference.packaging`,
   `scmle.deploy`, `scmle.governance.sbom`). `scmle package` and
   `ModelBundle.export_service(destination, signing_key=None)` now write a
@@ -22,7 +42,9 @@
   that fails verification used to exit; it now stays alive with `/livez` 200,
   `/readyz` 503 and the reason, so that it never takes traffic. New
   `scmle.deploy.vuln_gate` (and `scripts/vuln_gate.py`) fails closed on an
-  empty, unreadable or uncovered scan. Not done: the image was not built and
+  empty, unreadable or uncovered scan; the policy may waive a component the
+  scanner cannot see (the framework itself, until it is published) only
+  through an `unscanned_exceptions` entry with a reason and an expiry. Not done: the image was not built and
   nothing was scanned or attested against a real registry or vulnerability
   database in this change; the attestations are HMAC-signed, not public-key
   or transparency-log signatures; the locked install pins versions without

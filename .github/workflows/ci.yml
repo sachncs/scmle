@@ -149,6 +149,28 @@ jobs:
           path: reliability.xml
           if-no-files-found: error
 
+  local-demo:
+    name: local demo with rollback drill (Python 3.12)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --python 3.12
+      - name: Locked requirements, demo data and golden outputs match their sources
+        run: make lock-check data-check PYTHON="uv run python"
+      - name: Run the local demo end to end, including the rollback drill
+        run: make demo PYTHON="uv run python" WORKDIR=local-demo | tee demo-transcript.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: local-demo
+          path: |
+            demo-transcript.txt
+            local-demo/transcript-run.json
+          if-no-files-found: error
+
   optional-capabilities:
     name: all optional capability paths (Python 3.13)
     runs-on: ubuntu-24.04

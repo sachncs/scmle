@@ -26,6 +26,8 @@ Pick the page that matches what you are trying to do.
 | Need | Page |
 | --- | --- |
 | Threat model and controls | [`SECURITY.md`](SECURITY.md) (reporting: [`../SECURITY.md`](../SECURITY.md)) |
+| Run the whole lifecycle locally, no cloud account | [`LOCAL.md`](LOCAL.md) |
+| What the service promises: endpoints, limits, objectives | [`SERVICE_SLO.md`](SERVICE_SLO.md) |
 | Prove recovery works before release | [`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md) |
 | Cut a release | [`RELEASING.md`](RELEASING.md) and [`../scripts/`](../scripts/README.md) |
 

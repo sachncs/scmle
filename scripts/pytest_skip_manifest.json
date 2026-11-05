@@ -40,6 +40,10 @@
     {
       "category": "test-condition",
       "pattern": "^final estimator hides the graph step$"
+    },
+    {
+      "category": "environment",
+      "pattern": "^docker is not installed$"
     }
   ]
 }
