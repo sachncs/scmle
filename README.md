@@ -103,7 +103,8 @@ The hosted documentation is available at
    predictions against an explicit cost or metric, evaluates once on the
    locked test set, and explains the result (diagnostics, permutation
    importance, structure-aware confidence intervals).
-6. **Packages** a signed, checksummed bundle with schema and a monitoring
+6. **Packages** a checksummed bundle (signed when you configure a signing
+   key) with schema and a monitoring
    reference, plus a decision log with the evidence behind every choice.
 7. **Operates**: monitors drift and delayed-label performance, compares a
    challenger against the champion, versions and promotes models, and serves

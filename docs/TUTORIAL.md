@@ -194,7 +194,7 @@ scmle run   data.csv --target churn --workers 4 --time-budget 600
 scmle resume runs/run_20261015_001
 scmle catalog data.csv --label-column churn --output artifacts/catalog.json
 cat payload.bin | scmle catalog --raw-bytes
-scmle predict artifacts/churn new.csv --output scored.csv   # signed bundles
+scmle predict artifacts/churn new.csv --output scored.csv   # needs a signed bundle, or --trusted for your own
 ```
 
 ## 9. Beyond the basics

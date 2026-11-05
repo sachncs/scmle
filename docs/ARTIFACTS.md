@@ -96,7 +96,8 @@ No LLM client ships; `--replay` serves recorded drafts. Every LLM-filled field i
 
 ## The model
 
-`model/` is the signed, checksummed bundle:
+`model/` is the checksummed bundle (signed when a signing key is
+configured; an unsigned bundle is refused unless trusted):
 `pipeline.joblib` (fitted preprocessing and estimator), `schema.json`,
 `reference.json` (monitoring reference profile), `conformal.json` (pooled
 and per-class calibration scores),
@@ -121,7 +122,7 @@ Use `result.save(directory, signing_key=...)` to export one for deployment.
 
 | File | Contents |
 | --- | --- |
-| `model/` | The signed bundle. |
+| `model/` | The checksummed bundle, signed when a key is configured. |
 | `Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by a digest placeholder that the build refuses until `build.sh` resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests. |
 | `requirements.txt`, `requirements.lock`, `environment.lock` | Direct pins; the runtime closure installed with `--no-deps`; every package of the build environment. |
 | `sbom.cdx.json` | CycloneDX SBOM: runtime libraries, the bundle (by manifest digest) and the base image. |
