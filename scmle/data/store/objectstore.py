@@ -246,7 +246,12 @@ class LocalObjectStore(ObjectStore):
                 os.fsync(handle.fileno())
             try:
                 os.link(temporary, path)
-            except FileExistsError as error:
+            except (FileExistsError, PermissionError) as error:
+                # Windows reports a link onto a file that another writer is
+                # creating at that moment as PermissionError, not
+                # FileExistsError; either way the object is not ours.
+                if isinstance(error, PermissionError) and not path.exists():
+                    raise
                 raise AlreadyExistsError(
                     f"{path.name} already exists", {"key": path.name}
                 ) from error
