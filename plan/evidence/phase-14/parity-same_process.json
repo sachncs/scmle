@@ -1,0 +1,10 @@
+{
+  "artifact_digest": "sha256:5566a3d6e9f50540a2dc843d8847f6cc7c173252efd3733141a22c8763e5c6b9",
+  "level": "same_process",
+  "max_probability_error": 5.551115123125783e-17,
+  "mismatches": [],
+  "model_version": "golden-1",
+  "passed": true,
+  "records": 10,
+  "tolerance": 1e-09
+}

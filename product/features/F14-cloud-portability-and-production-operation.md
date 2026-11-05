@@ -26,18 +26,19 @@ monitoring, retraining and rollback to real operational signals.
 
 ## What is verified in the repo today
 
-- `scmle/inference/packaging.py` generates a service folder with a
-  Dockerfile and `serve.py`; the generated text still documents
-  `SCMLE_TRUSTED=1` for unsigned bundles.
-- `scmle/inference/serving.py` and `modality_serving.py` serve `/health`,
-  `/schema` and `/predict`; there is no separate liveness and readiness.
+- Items 1, 2 and 5 are built and verified locally: a typed deployment
+  contract (`scmle/deploy/contract.py`), a local environment (`make demo`,
+  `compose.yaml`), a hardened generated service (pinned-base placeholder,
+  locked install, non-root, SBOM, signed provenance, verify-before-load,
+  `SCMLE_TRUSTED` refused in production, vulnerability gate) and a versioned
+  serving contract with `/livez`, `/readyz`, limits, batch and golden-record
+  parity. Evidence: `plan/evidence/phase-14/`. The container path was not run.
 - `scmle/governance/` holds `registry.py`, `lifecycle.py`,
   `deployment_ledger.py`, `keyring.py`, `sbom.py`, `local_faults.py` and the
   closed loop. None reads a cloud control plane.
 - `scmle/data/readers/connectors.py` accepts `s3`, `gs` and `az` schemes with
   snapshot digests; it has not run against real buckets or warehouses.
-- There is no Docker Compose file, no Terraform or OpenTofu, no `deploy/`
-  folder, and no CI job that builds, scans or deploys an image.
+- There is no Terraform or OpenTofu and no CI job that deploys an image.
 
 ## Items (backlog numbers 1 to 13)
 
@@ -48,11 +49,11 @@ and a named approver.
 
 | # | Item | Build and verify locally | Needs a cloud account |
 |---|---|---|---|
-| 1 | Reproducible local environment | Locked dependencies, `compose.yaml` (API, mock object store, mock metrics sink, test runner), one command running train, evaluate, package, predict, monitor and rollback; pinned architectures (amd64, arm64) | none |
-| 2 | Immutable, secure artifacts | Pinned base digest, locked install, non-root, read-only root, resource limits, SBOM, scan gate, provenance, verify-before-deserialize, `SCMLE_TRUSTED` refused in production, secrets outside the image | Prediction parity and vulnerability gate on AWS and GCP |
+| 1 | Reproducible local environment | Built; open: run the container path on a machine with Docker, arm64 | none |
+| 2 | Immutable, secure artifacts | Built; open: build and scan a real image, attest its digest, measure two-build reproducibility | Prediction parity and vulnerability gate on AWS and GCP |
 | 3 | Infrastructure as code | Terraform or OpenTofu modules for dev, staging and production per provider; `validate`, lint, policy checks and `plan` in CI | `apply`, test, `destroy`, recorded cost |
 | 4 | Authentication, authorization, security | Token verification and rotation against a mock identity provider, scopes, tenant isolation policy, rate and size limits, safe errors, audit rows, tests for invalid, revoked and expired credentials and tampered bundles | TLS ingress, workload identity and managed keys in each cloud |
-| 5 | Online and batch inference | Versioned schemas, distinct liveness and readiness, concurrency and timeout limits, batch path sharing the online code, null, unseen-category and schema-change handling, digest and version in every response, written SLO, golden-record parity | Restart, load and scaling tests on each cloud |
+| 5 | Online and batch inference | Built (`docs/SERVICE_SLO.md`) | Restart, load and scaling tests on each cloud |
 | 6 | Portable training | A `Runner` interface (local, AWS container job, GCP job) running one project spec; checkpoints and manifests to durable storage; resume after interruption; retries; cost cap; separate training and serving roles | Same spec completing on all three with a reproducibility-tolerance report |
 | 7 | Governed data sources | Object-store interface with local, S3 and GCS backends; snapshot identity, freshness, lineage, quality gates before train and before inference; incremental processing with dedup and checkpoint recovery | One warehouse per cloud, ingest to train to trace on a controlled dataset |
 | 8 | Orchestration | One workflow definition with idempotency keys, durable run ids, dependencies, backoff, concurrency limits, cost budget and a human-approval step; a local executor | Step Functions and Cloud Workflows with Scheduler; duplicate, partial-failure, missed-schedule and interruption runs |

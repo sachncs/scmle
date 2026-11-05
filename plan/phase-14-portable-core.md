@@ -1,51 +1,39 @@
 # Phase 14: Portable core (local first)
 
 Feature: [F14](../product/features/F14-cloud-portability-and-production-operation.md)
-items 1, 2 and 5. Depends on nothing. Everything here is verifiable without a
-cloud account, and every later phase depends on it.
+items 1, 2 and 5. The code, tests and local evidence for the work packages are
+built (deployment contract, local environment, hardened artifact, serving
+contract); see `docs/LOCAL.md`, `docs/SERVICE_SLO.md` and
+`plan/evidence/phase-14/`. What remains is what could not be run without a
+container daemon or a cloud account.
 
-## Work packages
+## Open
 
-- **WP-14.1 Deployment contract.** `scmle/deploy/contract.py`: one typed spec
-  (image digest, bundle digest, configuration, secret references, resources,
-  health, version) that every provider adapter must satisfy. Mirror the
-  contract style in `scmle/contracts`. Add to the API fixture and
-  `docs/API_STABILITY.md`.
-- **WP-14.2 Local environment (item 1).** Locked dependencies exported from
-  `uv.lock`; `compose.yaml` with the API, a mock object store, a mock metrics
-  sink and a test runner; a single documented command (`scmle dev up` or a
-  make target) that trains a sample model, packages it, serves predictions,
-  runs monitor and executes a rollback drill. Pin amd64 and arm64. All test
-  datasets, mock services and configuration are explicit files.
-- **WP-14.3 Hardened artifact (item 2).** Rework the Dockerfile generated in
-  `scmle/inference/packaging.py`: pinned base-image digest, locked install,
-  non-root user, read-only root filesystem, resource limits. Produce an SBOM
-  (extend `scmle/governance/sbom.py`), a vulnerability scan with a CI gate,
-  and provenance (signed attestation). Verify signature and digest before
-  deserialization. Refuse `SCMLE_TRUSTED=1` when `SCMLE_ENV=production`, and
-  remove it from generated documentation and the Dockerfile. Keep secrets out
-  of the image and the repository (a test greps the built context).
-- **WP-14.4 Serving contract (item 5).** Versioned request and response
-  schemas; distinct `/livez` and `/readyz` (ready only after verify, load and
-  warm-up); concurrency, timeout and body-size limits; a batch command that
-  calls the same preprocessing and model path as online serving; explicit
-  handling of nulls, unseen categories and schema changes; digest and
-  version in every response; a written service SLO for CPU, memory, startup
-  and latency; a golden-record parity suite with declared tolerances.
+- **Container path, untested.** `compose.yaml`, `deploy/Dockerfile`, the
+  generated `build.sh` and `make demo-compose` were written and the compose
+  file validates, but no image was built and no container started (the Docker
+  daemon was not running). Run them once on a machine with Docker, fix what
+  breaks, and keep the transcript.
+- **Image reproducibility.** Measure and report whether two builds on the same
+  pinned inputs give the same image digest. Nothing is claimed until measured.
+- **arm64.** Build and run the demo with `PLATFORM=linux/arm64`.
+- **Image attestation.** `image-attestation.json` binds a real image digest to
+  the provenance; it needs a real build. The attestations are HMAC-signed;
+  asymmetric or keyless signing and a verifier other than this code belong to
+  Phase 16.
+- **Scan gate on a built image.** The gate ran on the runtime lock with
+  pip-audit; run it against the image (an independent scanner such as Trivy)
+  in CI.
 
-## Gate
+## Gate (still open)
 
-CI on a clean runner runs the local demo end to end including the rollback
-drill; the image builds from pinned inputs, passes the scan gate and verifies
-its own signature; the golden-record suite matches the local reference within
-tolerance; readiness stays false for an unsigned or corrupted bundle.
-
-## Evidence
-
-`plan/evidence/phase-14/`: the demo transcript, the SBOM, scan output,
-attestation, parity report.
+CI on a clean runner builds the image from pinned inputs, passes the scan gate
+and verifies its own signature; the demo then runs in containers. The native
+demo, the golden-record suite and the unready-for-corrupted-or-unsigned check
+already run in CI (`local-demo`, the unit suite).
 
 ## Not claimed
 
-No cloud result. Image reproducibility is claimed only to the extent two
-builds on the same inputs produce the same digest, measured and reported.
+No cloud result. No container result. Image reproducibility is claimed only to
+the extent two builds on the same inputs produce the same digest, measured and
+reported.

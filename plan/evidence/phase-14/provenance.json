@@ -1,0 +1,58 @@
+{
+  "algorithm": "hmac-sha256",
+  "signature": "85f6943f0b53d8ec12367dcd0aa652e2570cd972aa51b2618c0c04d40af4a8cf",
+  "statement": {
+    "_type": "https://in-toto.io/Statement/v1",
+    "predicate": {
+      "base_image": "python:3.14-slim",
+      "builder": "scmle package 0.1.0b1",
+      "materials": [
+        {
+          "digest": {
+            "sha256": "7d417cc2f18df6e72a0795d401e67ed25342a7564098f81828cabf260647eae3"
+          },
+          "name": "Dockerfile"
+        },
+        {
+          "digest": {
+            "sha256": "a53d23d45ef38b50f390fe43958693db8ecb5a8ee05d008f257f61df5488077a"
+          },
+          "name": "serve.py"
+        },
+        {
+          "digest": {
+            "sha256": "d2c94cbfe5561398927990db8c0cd0ed8a5f6100535ebc77cc35dc250716fc9d"
+          },
+          "name": "requirements.txt"
+        },
+        {
+          "digest": {
+            "sha256": "e321dd71d0497dc9421eb1b0e24970c2b330b3c2c032e829304cab7040309613"
+          },
+          "name": "requirements.lock"
+        },
+        {
+          "digest": {
+            "sha256": "ad27550bca09d2eb706824c52c8b29ea114eb5bfd422be02dbed7530fa9da731"
+          },
+          "name": "environment.lock"
+        },
+        {
+          "digest": {
+            "sha256": "5ef8bcfa2f3aa9a71e3f1d0dce418a69d59bc68516b9fb06f13494fbe4c346a5"
+          },
+          "name": "sbom.cdx.json"
+        }
+      ]
+    },
+    "predicateType": "https://scmle.dev/attestation/service-provenance/v1",
+    "subject": [
+      {
+        "digest": {
+          "sha256": "bf0232faf182e77c8ef7cead7e31209c03fc55dc07dbb7d8eed64776478d010c"
+        },
+        "name": "model"
+      }
+    ]
+  }
+}

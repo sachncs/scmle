@@ -1,0 +1,165 @@
+{
+  "passed": true,
+  "steps": [
+    {
+      "detail": {
+        "test_metrics": {
+          "bad_release": {
+            "accuracy": 0.91875,
+            "balanced_accuracy": 0.9158986175115207,
+            "f1": 0.896,
+            "log_loss": 0.20385199789504016,
+            "pr_auc": 0.969002176242234,
+            "roc_auc": 0.9774522712310731
+          },
+          "good": {
+            "accuracy": 0.85,
+            "balanced_accuracy": 0.8410332836562344,
+            "f1": 0.8787878787878788,
+            "log_loss": 0.27620214113598907,
+            "pr_auc": 0.9717145285539998,
+            "roc_auc": 0.9504884914720979
+          }
+        }
+      },
+      "name": "train and evaluate",
+      "ok": true,
+      "seconds": 9.954
+    },
+    {
+      "detail": {
+        "bundle_digest": "sha256:bf0232faf182e77c8ef7cead7e31209c03fc55dc07dbb7d8eed64776478d010c",
+        "champion": 1,
+        "files": [
+          ".dockerignore",
+          "Dockerfile",
+          "README.md",
+          "build.sh",
+          "environment.lock",
+          "model",
+          "provenance.json",
+          "requirements.lock",
+          "requirements.txt",
+          "sbom.cdx.json",
+          "serve.py",
+          "vuln-policy.json"
+        ],
+        "versions": [
+          1,
+          2
+        ]
+      },
+      "name": "register and package",
+      "ok": true,
+      "seconds": 0.117
+    },
+    {
+      "detail": {
+        "objects": 19
+      },
+      "name": "object store round trip",
+      "ok": true,
+      "seconds": 0.033
+    },
+    {
+      "detail": {
+        "artifact_digest": "sha256:bf0232faf182e77c8ef7cead7e31209c03fc55dc07dbb7d8eed64776478d010c",
+        "startup_seconds": 1.23,
+        "verify_note": "bundle sha256:bf0232faf182e77c8ef7cead7e31209c03fc55dc07dbb7d8eed64776478d010c; signed=True; provenance=True"
+      },
+      "name": "serve under production rules",
+      "ok": true,
+      "seconds": 1.24
+    },
+    {
+      "detail": {
+        "batch_matches_bundle": true,
+        "digest_in_batch_manifest": "sha256:bf0232faf182e77c8ef7cead7e31209c03fc55dc07dbb7d8eed64776478d010c",
+        "digest_in_response": "sha256:bf0232faf182e77c8ef7cead7e31209c03fc55dc07dbb7d8eed64776478d010c",
+        "max_probability_difference": 0.0,
+        "online_matches_bundle": true,
+        "same_digest": true
+      },
+      "name": "predict (online and batch)",
+      "ok": true,
+      "seconds": 0.087
+    },
+    {
+      "detail": {
+        "max_probability_error": 5.551115123125783e-17,
+        "tolerance": 1e-06
+      },
+      "name": "golden-record parity",
+      "ok": true,
+      "seconds": 1.261
+    },
+    {
+      "detail": {
+        "corrupted": {
+          "livez": 200,
+          "predict": 503,
+          "readyz": 503,
+          "reason": "artifact: checksum mismatch: pipeline.joblib was modified or corrupted"
+        },
+        "unsigned": {
+          "livez": 200,
+          "predict": 503,
+          "readyz": 503,
+          "reason": "artifact: refusing to load an unauthenticated bundle: it is pickle-based and loading executes code. Sign the bundle and set $SCMLE_SIGNING_KEY"
+        }
+      },
+      "name": "corrupted and unsigned bundles never become ready",
+      "ok": true,
+      "seconds": 3.945
+    },
+    {
+      "detail": {
+        "audit_has_rollback_check": true,
+        "bad_release_metrics_on_fresh": {
+          "accuracy": 0.0925,
+          "balanced_accuracy": 0.09893862967633459,
+          "f1": 0.08564231738035265,
+          "log_loss": 3.183469920679087,
+          "pr_auc": 0.40185375132752904,
+          "roc_auc": 0.027821563682219417
+        },
+        "champion_after_rollback": 1,
+        "champion_before_rollback": 2,
+        "monitor_reasons": [
+          "log_loss degraded 1462% vs training on 400 labeled rows"
+        ],
+        "monitor_recommendation": "retrain",
+        "restored_version": 1,
+        "rolled_back": true,
+        "serves_restored_model": true
+      },
+      "name": "monitor and rollback drill",
+      "ok": true,
+      "seconds": 2.179
+    },
+    {
+      "detail": {
+        "hundred_records": {
+          "mean_ms": 18.4,
+          "p50_ms": 18.24,
+          "p95_ms": 21.49,
+          "p99_ms": 26.08,
+          "requests": 40.0
+        },
+        "resident_mib": 290.2,
+        "samples_in_sink": 4,
+        "single_record": {
+          "mean_ms": 12.14,
+          "p50_ms": 11.01,
+          "p95_ms": 16.75,
+          "p99_ms": 21.0,
+          "requests": 120.0
+        },
+        "startup_seconds": 1.23
+      },
+      "name": "measure and ship metrics",
+      "ok": true,
+      "seconds": 2.205
+    }
+  ]
+}
