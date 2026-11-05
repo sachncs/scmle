@@ -3,52 +3,118 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
-<DocsLayout title="Quickstart" description="Run your first SCMLE project." current="quickstart">
+<DocsLayout title="Quickstart" description="Install scmle, create a 500-row example, run it with a 60-second budget, read the evidence, and score new rows with a signed bundle. Commands for macOS, Linux and Windows PowerShell." current="quickstart">
   <p class="eyebrow"><span></span> First run</p>
   <h1>From table to<br /><em>evidence.</em></h1>
-  <p class="lead">The smallest useful workflow is deliberately boring: install, point at a dataset, declare the target, and inspect what the system learned before choosing a model.</p>
+  <p class="lead">Install, create an example table, run one bounded workflow, read what it recorded, and score new rows. It takes about five minutes, of which the run itself is about half a minute. Needs Python 3.11 or newer.</p>
+  <div class="callout"><p><strong>Everything here was run.</strong> Every command and every block of output below was executed in a fresh virtual environment, in an empty folder, with the package installed from a local checkout, on macOS with Python 3.14. The PowerShell variants differ only in how the shell activates the environment and sets a variable; they were not run on Windows. Your scores can differ in the last digits and with the speed of your computer, because the search stops at a time budget.</p></div>
 
   <h2>1. Install</h2>
-  <pre><code>python -m venv .venv
+  <p>macOS and Linux:</p>
+  <pre><code>python3 -m venv .venv
 source .venv/bin/activate
 pip install "scmle @ git+https://github.com/sachncs/scmle"</code></pre>
+  <p>Windows PowerShell:</p>
+  <pre><code>py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install "scmle @ git+https://github.com/sachncs/scmle"</code></pre>
+  <p>Check it worked: <code>scmle --help</code> prints the list of commands.</p>
 
-  <h2>2. Create a tiny dataset</h2>
-  <p>Use this fixture to verify the installation before connecting a production table:</p>
-  <pre><code>cat &gt; customers.csv &lt;&lt;'CSV'
-customer_id,tenure_months,monthly_spend,churned
-c001,3,49.0,1
-c002,24,79.0,0
-c003,8,55.0,1
-c004,36,89.0,0
-CSV</code></pre>
+  <h2>2. Create an example table</h2>
+  <p>A model needs enough rows of each answer to hold some back for a final test. The script below writes 500 customers whose churn depends on tenure, spend and support tickets (<code>customers.csv</code>), and five new customers with no answer (<code>new_customers.csv</code>) that you will score at the end. It uses a fixed random seed, so you get the same files every time, and it needs nothing but Python.</p>
+  <p>Save it as <code>make_data.py</code> in an empty folder, using any text editor, then run <code>python make_data.py</code> (on Windows, <code>py make_data.py</code>).</p>
+  <pre><code>{`import csv
+import math
+import random
+
+rng = random.Random(7)
+
+
+def row(i, with_label):
+    tenure = rng.randint(1, 60)
+    spend = round(rng.uniform(20, 120), 2)
+    tickets = rng.randint(0, 6)
+    score = 0.9 - 0.06 * tenure + 0.02 * spend + 0.5 * tickets
+    out = {"customer_id": f"c{i:04d}", "tenure_months": tenure, "monthly_spend": spend, "support_tickets": tickets}
+    if with_label:
+        out["churned"] = int(rng.random() < 1 / (1 + math.exp(-score + 1.5)))
+    return out
+
+
+def write(name, n, with_label, start):
+    rows = [row(start + i, with_label) for i in range(n)]
+    with open(name, "w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+write("customers.csv", 500, True, 1)
+write("new_customers.csv", 5, False, 9001)`}</code></pre>
+  <p>Look at the first lines to be sure you have the same table:</p>
+  <pre><code>customer_id,tenure_months,monthly_spend,support_tickets,churned
+c0001,21,114.79,3,1
+c0002,5,102.13,0,1
+c0003,4,110.97,1,1</code></pre>
+  <p>The table has 500 rows and 301 of them churned. Row 1 has 21 months of tenure; your first four lines should match the ones above exactly.</p>
 
   <h2>3. Run a project</h2>
-  <p>The target is <code>churned</code>; the identifier is not a feature:</p>
-  <pre><code>scmle run customers.csv \
-  --target churned \
-  --id-columns customer_id \
-  --output-dir runs/customers</code></pre>
-  <p>The workflow profiles the table, makes a validation plan, evaluates compatible candidates, packages the winner, and writes the decisions to the run directory. On a real dataset, choose the validation strategy from how rows were generated; do not copy this tiny fixture’s defaults into production.</p>
+  <p>The target is <code>churned</code>, the column to predict. <code>customer_id</code> only names a row, so it is kept out of the features. The time budget is set explicitly to 60 seconds; without it the command line uses a much longer default.</p>
+  <pre><code>scmle run customers.csv --target churned --id-columns customer_id --time-budget 60 --output-dir runs/customers</code></pre>
+  <p>It prints one line for each step, then stops. On the author's machine it took about 30 seconds. The last lines were:</p>
+  <pre><code>[run_20261105_001] state.COMPLETED: run complete
+run_20261105_001: selected stacking (cv roc_auc=0.7739); test: roc_auc=0.7350, pr_auc=0.8141, log_loss=0.5874, f1=0.7317, balanced_accuracy=0.6500, accuracy=0.6700
+artifacts: runs/customers/run_20261105_001</code></pre>
+  <p>How to read the line: SCMLE tried seven kinds of model within the budget and kept the one with the best cross-validated ROC AUC (0.7739). It then scored that model <em>once</em> on rows it had held back from the start, and the ROC AUC there was 0.7350. The held-back score is the one to trust. The run folder is named with today's date, so yours will not say <code>20261105</code>; it is the path on the <code>artifacts:</code> line. No line mentioned leakage suspects, so the screen flagged no column.</p>
+  <p>This is a small, noisy synthetic table, so a modest score is expected. The point of the run is the evidence it leaves behind.</p>
 
   <h2>4. Inspect the evidence</h2>
-  <pre><code>runs/customers/&lt;run-id&gt;/
-├── dataset_card.json
-├── curation_report.json
-├── provenance.json
-├── sbom.json
-├── fault_injection_plan.json
-├── events.jsonl
-├── execution_plan.json
-├── evaluation.json
-├── model/
-└── config.json</code></pre>
-  <p>Start with <code>dataset_card.json</code> for intended use, exclusions, ownership, privacy, and limitations; then read <code>curation_report.json</code> for row-level decisions. If the data is not trustworthy, a better score is not a better result.</p>
+  <p>The run folder holds the decisions, not only the model. The files to open first:</p>
+  <pre><code>runs/customers/run_20261105_001/
+├── report.html            the summary to open in a browser
+├── leaderboard.parquet    every candidate and its cross-validated score
+├── evaluation.json        the one-time held-back result
+├── diagnostics/decision_log.json   what was included, rejected and why
+├── events.jsonl           the steps in order, including when the test rows were opened
+├── dataset_card.json, curation_report.json, provenance.json, sbom.json
+└── model/                 the bundle you will load to predict</code></pre>
+  <p>Open <code>report.html</code> first, then <code>diagnostics/decision_log.json</code>. If the data is not trustworthy, a better score is not a better result. The <a href={`${base}/docs/artifacts/`}>artifacts</a> page explains every file, and <a href={`${base}/docs/reading-results/`}>Reading your results</a> explains the numbers.</p>
 
   <h2>5. Score new rows</h2>
-  <pre><code>scmle predict runs/customers/&lt;run-id&gt;/model \
-  new_customers.csv \
-  --output predictions.csv</code></pre>
-  <div class="callout"><p>Bundles are pickle-based. Sign them in production and load them with the signing key; only use <code>--trusted</code> for artifacts whose source you explicitly control.</p></div>
-  <p>Next: learn how to bring <a href={`${base}/docs/data/`}>different kinds of data</a> into the curation pipeline, then use the <a href={`${base}/docs/workflows/`}>workflow guide</a> to move beyond the first run.</p>
+  <p>Find the run folder first. macOS and Linux:</p>
+  <pre><code>RUN=$(ls -d runs/customers/run_* | tail -1)
+echo $RUN</code></pre>
+  <p>Windows PowerShell:</p>
+  <pre><code>$RUN = (Get-ChildItem runs\customers\run_* | Select-Object -Last 1).FullName
+$RUN</code></pre>
+  <p>Now try to predict (use <code>"$RUN/model"</code> on macOS and Linux, <code>"$RUN\model"</code> in PowerShell):</p>
+  <pre><code>scmle predict "$RUN/model" new_customers.csv --output predictions.csv</code></pre>
+  <p>It refuses:</p>
+  <pre><code>artifact error: refusing to load an unauthenticated bundle: it is pickle-based and loading executes code. Sign bundles with $SCMLE_SIGNING_KEY, or pass trusted=True if you trust its source.</code></pre>
+  <p><strong>This refusal is a safety feature, not a fault.</strong> A bundle stores its model in Python's pickle format, and loading a pickle can run any code it contains. A bundle from someone else could therefore take over your computer. SCMLE will only load a bundle whose signature proves it was written by someone holding your key. The run you just made was written without a key, so it is unsigned.</p>
+
+  <h3>Recommended: sign the bundle, then predict with the key</h3>
+  <p>Make a secret key and keep it in the environment variable <code>SCMLE_SIGNING_KEY</code>, then run again. The bundle is signed when it is written. macOS and Linux:</p>
+  <pre><code>export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+scmle run customers.csv --target churned --id-columns customer_id --time-budget 60 --output-dir runs/signed</code></pre>
+  <p>Windows PowerShell:</p>
+  <pre><code>$env:SCMLE_SIGNING_KEY = python -c "import secrets; print(secrets.token_hex(32))"
+scmle run customers.csv --target churned --id-columns customer_id --time-budget 60 --output-dir runs/signed</code></pre>
+  <p>The run prints the same kind of last lines (the same scores, since the data and seed are the same). Then predict, with the key still set in that terminal (<code>RUN</code> now points at <code>runs/signed</code>; set it again with <code>ls -d runs/signed/run_* | tail -1</code> or the PowerShell equivalent):</p>
+  <pre><code>scmle predict "$RUN/model" new_customers.csv --output predictions.csv</code></pre>
+  <pre><code>wrote 5 predictions to predictions.csv</code></pre>
+  <p><code>predictions.csv</code> holds the predicted class and a probability for each class:</p>
+  <pre><code>prediction,proba_0,proba_1
+1,0.31868781430216964,0.6813121856978304
+1,0.23590496931089688,0.7640950306891031
+1,0.1901939121773094,0.8098060878226906
+1,0.19832177745266533,0.8016782225473347
+1,0.34441593567284423,0.6555840643271558</code></pre>
+  <p>The same signed bundle is refused without the key (the same unauthenticated error as above), and with a different key it says <code>bundle signature is invalid: the bundle was modified or signed with a different key</code>. Both were run. Keep the key secret and do not commit it. In production, load it from a secret manager.</p>
+
+  <h3>Only for a bundle you just made yourself: <code>--trusted</code></h3>
+  <p>If you are certain the bundle is the unsigned one you created a minute ago on your own computer, you can vouch for it:</p>
+  <pre><code>scmle predict "$RUN/model" new_customers.csv --trusted --output predictions.csv</code></pre>
+  <div class="callout"><p><strong>Never use <code>--trusted</code> on a model you downloaded, received, or did not create.</strong> It switches off the check that protects you from running someone else's code. A real deployment should always sign.</p></div>
+  <p>Next: learn how to bring <a href={`${base}/docs/data/`}>different kinds of data</a> into the curation pipeline, then use the <a href={`${base}/docs/workflows/`}>workflow guide</a> to move beyond the first run. If a step fails, <a href={`${base}/docs/when-things-go-wrong/`}>When things go wrong</a> lists every refusal.</p>
 </DocsLayout>
