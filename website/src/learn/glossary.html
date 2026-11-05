@@ -102,7 +102,15 @@
 <h3 id="leakage-suspect">leakage suspect</h3>
 <p><strong>Meaning.</strong> A feature SCMLE's statistical screen flags as probably a leak.</p>
 <p><strong>Example.</strong> <code>boat</code> and <code>body</code>.</p>
-<p><strong>Why it matters.</strong> It is a suspicion, not proof. A genuinely strong feature looks the same. By default a suspect stops the run (<code>leakage_policy</code> is <code>block</code>); a person must decide. See "unverified" and "attestation".</p>
+<p><strong>Why it matters.</strong> It is a suspicion, not proof. A genuinely strong feature looks the same. By default a suspect does not stop the run (<code>leakage_policy</code> is <code>warn</code>); the score is labelled provisional until a person settles it. See "unverified" and "attestation".</p>
+<h3 id="false-flag">false flag</h3>
+<p><strong>Meaning.</strong> A column the leakage screen flags although it is legitimate: its values really are known at prediction time.</p>
+<p><strong>Example.</strong> Two of the 30 breast-cancer measurements (<code>worst radius</code> and <code>worst area</code>) when the whole table is screened.</p>
+<p><strong>Why it matters.</strong> The screen cannot avoid them, because a strong honest predictor and a leak look alike in the data. See Leakage.</p>
+<h3 id="provisional">provisional</h3>
+<p><strong>Meaning.</strong> A score that may change once a person settles an open question.</p>
+<p><strong>Example.</strong> <code>test (PROVISIONAL: 2 flagged column(s) not attested: boat, body)</code>.</p>
+<p><strong>Why it matters.</strong> It tells you not to quote the number yet.</p>
 <h3 id="split">split</h3>
 <p><strong>Meaning.</strong> How rows are divided into practice and exam parts.</p>
 <p><strong>Example.</strong> <code>stratified</code>: each part keeps the same share of survivors.</p>

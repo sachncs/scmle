@@ -259,6 +259,7 @@ JOBS = [  # (source, output name, glossary layout, demote h2 to h3)
     ("BEGINNER_FINDINGS", "beginner-findings", False, True),
     ("OPERATIONS", "observability", False, False),
     ("TRAIL", "trail", False, False),
+    ("LEAKAGE", "leakage", False, False),
     ("BREADTH", "breadth", False, False),
 ]
 
