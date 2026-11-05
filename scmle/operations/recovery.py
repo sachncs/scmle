@@ -11,12 +11,21 @@ Objectives are declared in `OBJECTIVES` and are not tuned to a result. A
 local pass says the local service, emulators and files behaved within them
 under the stated method. It says nothing about a cloud, a machine crash or
 power loss, a network partition or the availability of anything.
+
+A slow shared CI runner can start a Python service several times slower than
+a workstation. ``SCMLE_RECOVERY_TIME_SCALE`` (default 1.0) multiplies the
+waits of the scenarios and the RTO each objective allows; the declared
+objectives are not edited, and the scale used is written into every
+measurement and into the report so a scaled run is visibly not a full-speed
+claim.
 """
 
 from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
+import math
+import os
 import time
 import traceback
 from typing import Any
@@ -25,6 +34,32 @@ PASSED = "passed"
 FAILED = "failed"
 NOT_RUN = "not_run"
 PROVIDERS = ("aws", "gcp")
+TIME_SCALE_ENV = "SCMLE_RECOVERY_TIME_SCALE"
+
+
+def time_scale() -> float:
+    """The factor applied to scenario waits and allowed RTO (default 1.0).
+
+    Raises:
+        ValueError: If the environment variable is not a positive number.
+    """
+    text = os.environ.get(TIME_SCALE_ENV, "").strip()
+    if not text:
+        return 1.0
+    try:
+        scale = float(text)
+    except ValueError:
+        raise ValueError(
+            f"{TIME_SCALE_ENV} is not a number: {text!r}"
+        ) from None
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError(f"{TIME_SCALE_ENV} must be positive, not {text!r}")
+    return scale
+
+
+def scaled(seconds: float) -> float:
+    """A wait in seconds multiplied by the run's time scale."""
+    return seconds * time_scale()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -306,10 +341,15 @@ class Measurement:
         found = []
         if self.rto_seconds is None:
             found.append(f"{self.component}: did not recover")
-        elif self.rto_seconds > goal.rto_seconds:
+        elif self.rto_seconds > scaled(goal.rto_seconds):
+            note = (
+                ""
+                if time_scale() == 1.0
+                else f" at time scale {time_scale():g}"
+            )
             found.append(
                 f"{self.component}: RTO {self.rto_seconds:.2f}s exceeds "
-                f"{goal.rto_seconds:.0f}s"
+                f"{scaled(goal.rto_seconds):.0f}s{note}"
             )
         if self.rpo_lost is None:
             found.append(f"{self.component}: RPO not measured")
@@ -327,6 +367,7 @@ class Measurement:
             if self.rto_seconds is None
             else round(self.rto_seconds, 3),
             "rto_objective_seconds": OBJECTIVE_OF[self.component].rto_seconds,
+            "time_scale": time_scale(),
             "rpo_lost": self.rpo_lost,
             "rpo_objective": OBJECTIVE_OF[self.component].rpo_lost,
             "rpo_unit": OBJECTIVE_OF[self.component].rpo_unit,
@@ -450,6 +491,7 @@ class Runner:
         ran = [r for r in results if r.status != NOT_RUN]
         return {
             "objectives": [dataclasses.asdict(o) for o in OBJECTIVES],
+            "time_scale": time_scale(),
             "faults": [
                 {
                     "id": f.id,

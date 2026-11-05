@@ -57,7 +57,7 @@ WRONG_KEY = "scmle-wrong-signing-key-local-recovery-run"
 MODEL = "recovery-model"
 ENVIRONMENT = "production"
 GOLDEN = pathlib.Path("deploy/local/golden")
-READY_SECONDS = 60.0
+READY_SECONDS = 60.0  # before `recovery.scaled`
 METHOD_CLOCK = "time.monotonic() in the runner"
 
 
@@ -186,22 +186,32 @@ def predict(base: str, count: int = 3) -> tuple[int, dict[str, Any]]:
     """POSTs the golden records; an unreachable service is ``(0, {})``."""
     try:
         return demo.post_json(
-            f"{base}/predict", {"records": records(count)}, timeout=5.0
+            f"{base}/predict",
+            {"records": records(count)},
+            timeout=recovery.scaled(5.0),
         )
     except OSError:
         return 0, {}
 
 
 def ready_after(
-    instance: Instance, timeout: float = READY_SECONDS
+    instance: Instance, timeout: float | None = None
 ) -> float | None:
-    """Seconds until ``/readyz`` is 200, or None."""
-    return demo.wait_ready(instance.base, instance.process, timeout)
+    """Seconds until ``/readyz`` is 200, or None (time-scaled default)."""
+    limit = recovery.scaled(READY_SECONDS) if timeout is None else timeout
+    return demo.wait_ready(instance.base, instance.process, limit)
 
 
-def await_unready(instance: Instance, timeout: float = 20.0) -> dict[str, Any]:
-    """Waits for a service to report why it will not become ready."""
-    deadline = time.monotonic() + timeout
+def await_unready(
+    instance: Instance, timeout: float | None = None
+) -> dict[str, Any]:
+    """Waits for a service to report why it will not become ready.
+
+    The default wait is 20 s, multiplied by the run's time scale.
+    """
+    deadline = time.monotonic() + (
+        recovery.scaled(20.0) if timeout is None else timeout
+    )
     seen: dict[str, Any] = {"readyz": 0, "phase": None, "reason": None}
     while time.monotonic() < deadline:
         try:
@@ -337,7 +347,7 @@ def process_kill() -> recovery.Result:
             gone = predict(first.base)[0] == 0
             second = fleet.start(service)
             after = None
-            while time.monotonic() - killed < READY_SECONDS:
+            while time.monotonic() - killed < recovery.scaled(READY_SECONDS):
                 status, body = predict(second.base)
                 if status == 200:
                     after = body.get("predictions")
@@ -998,7 +1008,9 @@ def bad_release() -> recovery.Result:
             None, charter_hash="recovery", policy={}, alpha_promo="1/20"
         )
         release = release_state.ReleaseRegistry(
-            store, ledger, control.ConfirmPolicy(attempts=12, delay=0.5)
+            store,
+            ledger,
+            control.ConfirmPolicy(attempts=12, delay=recovery.scaled(0.5)),
         )
         good_spec = golden_spec()
         third_spec = {**good_spec, "model_version": "golden-3"}

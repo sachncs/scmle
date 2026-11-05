@@ -235,3 +235,32 @@ def test_a_killed_writers_temp_file_does_not_make_the_store_unlistable(
     assert objectstore.is_temporary(".x.json.abc.tmp")
     assert not objectstore.is_temporary("x.tmp")
     assert not objectstore.is_temporary("step.json")
+
+
+def test_the_time_scale_defaults_to_one_and_is_validated(monkeypatch):
+    monkeypatch.delenv(recovery.TIME_SCALE_ENV, raising=False)
+    assert recovery.time_scale() == 1.0
+    for bad in ("0", "-1", "fast", "nan", "inf"):
+        monkeypatch.setenv(recovery.TIME_SCALE_ENV, bad)
+        with pytest.raises(ValueError, match=recovery.TIME_SCALE_ENV):
+            recovery.time_scale()
+
+
+def test_a_scaled_run_widens_the_limit_but_not_the_declared_objective(
+    monkeypatch,
+):
+    slow = recovery.Measurement("service", 40.0, 0, "t")
+    monkeypatch.delenv(recovery.TIME_SCALE_ENV, raising=False)
+    assert slow.problems() == ["service: RTO 40.00s exceeds 30s"]
+    monkeypatch.setenv(recovery.TIME_SCALE_ENV, "2")
+    assert slow.problems() == []
+    assert recovery.Measurement("service", 61.0, 0, "t").problems()
+    record = slow.to_dict()
+    assert record["time_scale"] == 2.0
+    assert record["rto_objective_seconds"] == 30.0
+    assert recovery.OBJECTIVE_OF["service"].rto_seconds == 30.0
+
+
+def test_the_report_states_its_time_scale(monkeypatch):
+    monkeypatch.setenv(recovery.TIME_SCALE_ENV, "2.5")
+    assert recovery.Runner({}).run([])["time_scale"] == 2.5

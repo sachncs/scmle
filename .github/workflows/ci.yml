@@ -51,6 +51,11 @@ jobs:
     timeout-minutes: 40
     env:
       UV_PYTHON: ${{ matrix.python }}
+      # Shared runners start a Python service several times slower than the
+      # declared objectives assume; the recovery runner multiplies its waits
+      # and the allowed RTO by this and records it in every result. The
+      # declared objectives themselves are unchanged.
+      SCMLE_RECOVERY_TIME_SCALE: "3"
     strategy:
       fail-fast: false
       matrix:
@@ -93,6 +98,11 @@ jobs:
     timeout-minutes: 40
     env:
       UV_PYTHON: ${{ matrix.python }}
+      # Shared runners start a Python service several times slower than the
+      # declared objectives assume; the recovery runner multiplies its waits
+      # and the allowed RTO by this and records it in every result. The
+      # declared objectives themselves are unchanged.
+      SCMLE_RECOVERY_TIME_SCALE: "3"
     strategy:
       fail-fast: false
       matrix:
