@@ -175,3 +175,4 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
 /* Glossary search stays visible at every width */
 .docs-content .glossary-filter { display: block !important; margin: var(--s3) 0; max-width: 28rem; }
 .docs-content .term[hidden] { display: none; }
+.docs-content blockquote { border-left: 3px solid var(--accent); margin: var(--s3) 0; padding: 0 var(--s3); }

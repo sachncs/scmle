@@ -1,0 +1,13 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import body from "../../learn/observability.html?raw";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const html = body.replaceAll("@@BASE@@", base);
+---
+
+<DocsLayout title="Observability & incident response" description="What scmle does once a model is serving: metrics, structured logs, windowed signals, fault classification, signed notifications, continuous evaluation, gated replacement and local recovery measurements. Nothing here ran on a cloud." current="observability">
+  <p class="eyebrow"><span></span> Serve and operate</p>
+  <h1>Measure it, tell a fault<br /><em>from a worse model.</em></h1>
+  <Fragment set:html={html} />
+  <p class="meta">Local evidence only; nothing here ran on AWS or GCP · 0.1 beta</p>
+</DocsLayout>

@@ -22,6 +22,7 @@ const routes = [
   "./docs/methods/",
   "./docs/dependencies/",
   "./docs/rehearsal/",
+  "./docs/observability/",
   "./docs/start-here/",
   "./docs/glossary/",
   "./docs/decisions/",

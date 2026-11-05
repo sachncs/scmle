@@ -55,6 +55,7 @@ export const docsNav: NavGroup[] = [
     pages: [
       { slug: "operations", label: "Operations", key: "operations", summary: "Resume interrupted work, verify bundles, approve promotions, and evolve safely." },
       { slug: "operating-loop", label: "Operating loop", key: "operating-loop", summary: "Measure, observe, evaluate, evolve: the evidence map and review cadence." },
+      { slug: "observability", label: "Observability & incidents", key: "observability", summary: "Metrics, signals, fault classification, notifications, continuous evaluation and local recovery measurements." },
       { slug: "service", label: "Serving contract & SLO", key: "service", summary: "Endpoints, schema, data policies, limits and declared objectives." },
       { slug: "local", label: "Local environment", key: "local", summary: "Run train, package, serve, parity and rollback on one machine." },
       { slug: "orchestration", label: "Orchestration", key: "orchestration", summary: "One workflow definition, a durable local executor, emitted cloud definitions." },
