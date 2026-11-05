@@ -353,7 +353,18 @@ def stable_annotation(annotation: Any) -> str:
 
 
 def signature_record(value: Any) -> dict[str, Any]:
-    """Return a deterministic signature record for one public object."""
+    """Return a deterministic signature record for one public object.
+
+    An enumeration is recorded by its members: `inspect.signature` of an
+    `Enum` class differs between Python versions (3.11 and 3.12 describe the
+    functional API differently), which made the same code look changed.
+    """
+    if inspect.isclass(value) and issubclass(value, enum.Enum):
+        return {
+            "members": [
+                [member.name, stable_value(member.value)] for member in value
+            ]
+        }
     signature = inspect.signature(value)
     parameters = [
         {

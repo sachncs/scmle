@@ -253,7 +253,7 @@
       },
       "Policy": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "2570a990691143ab17d0ee9cab9d5c9f377aa69f76563bf4fd75b1e128f1ffbc"
       },
       "QualityGate": {
         "kind": "class",
@@ -269,7 +269,7 @@
       },
       "Stage": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "61a7442899b1000671142d080a05ef48c7130deeadefee788b340aa26f28c65b"
       }
     },
     "scmle.data.store.snapshot": {
@@ -303,7 +303,7 @@
     "scmle.deploy.contract": {
       "Architecture": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "47924ae9d872fd9d853ca7722ad0fce81408a8241979eb84e020e0197d1d2577"
       },
       "BundleRef": {
         "kind": "class",
@@ -311,7 +311,7 @@
       },
       "DeploymentEnvironment": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "6f8af040c74cdbb63d98e0ef2641f36f34d4bd8902029838fb38a1851833d7f7"
       },
       "DeploymentSpec": {
         "kind": "class",
@@ -343,7 +343,7 @@
       },
       "SecretSource": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "8a2809b48cc3d3a1fb6ab63643a2d2ce9f7368f7697ff40d5f5f8960c6168052"
       },
       "conformance_problems": {
         "kind": "callable",
@@ -501,7 +501,7 @@
       },
       "ReleaseState": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "3716db0c6985a91a0fa3a66c9adb6fb1248008b064ed61ce456af396ae9423d7"
       },
       "RuntimeDisagrees": {
         "kind": "class",
@@ -529,7 +529,7 @@
       },
       "Verdict": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "dded0ee20b1924750ce38726979b3beb6a793a68faf2755ba0e4511cfcc3f97e"
       },
       "classify": {
         "kind": "callable",
@@ -635,7 +635,7 @@
     "scmle.operations.signals": {
       "Category": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "4ea4b0eb38bd0aa213adfd25a8d32a595fc25b4b0eb454a216b3974c1584e408"
       },
       "Signal": {
         "kind": "class",
@@ -651,7 +651,7 @@
       },
       "Status": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "104ce31b0606dc6786bf2c40b669b31352fbd75025ebea555ad74497f40a6516"
       },
       "WindowPolicy": {
         "kind": "class",
@@ -697,7 +697,7 @@
       },
       "RunState": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "63d2e21144e7c3bbffa70a6c28582ac413d734490805e327a0272f83195d662a"
       },
       "Runner": {
         "kind": "class",
@@ -837,7 +837,7 @@
     "scmle.workflow.definition": {
       "CatchUp": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "bf5b3256cd6ca225dfe658dbf1b2679e9b1b431ce805baef781e548b6742598c"
       },
       "Schedule": {
         "kind": "class",
@@ -849,7 +849,7 @@
       },
       "StepKind": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "a7125622b3576281ead876019e0ce039abda7011eab55deffb9a55332cfaf6f7"
       },
       "Workflow": {
         "kind": "class",
@@ -897,7 +897,7 @@
       },
       "RunState": {
         "kind": "class",
-        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+        "signature_sha256": "a82e13e02a2d785b71f22220b0fd4a45a0cb365960e5b7ed200152fd6791f3a2"
       },
       "StepContext": {
         "kind": "class",
