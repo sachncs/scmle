@@ -77,7 +77,7 @@ What you should see (first lines):
 
 ```text
 usage: scmle [-h] [--log-level {DEBUG,INFO,WARNING,ERROR}]
-             {plan,run,resume,catalog,predict,batch,serve,export-onnx,package,ingest,charter,claims,frame,loop,deploy} ...
+             {plan,run,resume,catalog,predict,batch,serve,export-onnx,package,ingest,charter,claims,frame,loop,deploy,trail} ...
 ```
 
 What could go wrong: `scmle: command not found` means the environment is not

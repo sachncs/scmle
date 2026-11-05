@@ -17,6 +17,7 @@ The `scmle` command mirrors the Python API. Global option:
 | `scmle charter init\|check\|sign PATH` | Create, validate or sign an analysis charter (see below). |
 | `scmle claims list\|show\|verify RUN_DIR` | List the claims of a charter run, show one with its hypothesis and checks, or verify the run's ledger and claims (see below). `verify` exits 1 when any step fails. |
 | `scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md). |
+| `scmle trail build\|verify\|show` | Join the charter, framing, cost model, claim ledger, registry, release state and deployment ledger of one model into a hash-chained, signed trail; verify a trail folder against its own records; print it. `build` and `verify` exit 1 on any finding. See [TRAIL](TRAIL.md). |
 
 `plan` and `run` take the same options; `scmle run --help` lists them all.
 The common ones:
@@ -91,6 +92,22 @@ control the ledger recorded. A step whose input is absent is reported
 `skipped`, never `pass`. This proves the artifacts agree; it does not
 recompute statistics from data, and a party who can rewrite every file
 consistently can pass it (custody is tamper-evident, not adversary-proof).
+
+## Business trail
+
+```bash
+scmle trail build trail/ --run runs/run_x --framing framing/ --registry registry/ \
+  --deployment deploy/ --inputs inputs.json --keys keys.json
+scmle trail verify trail/ --keys keys.json [--json]
+scmle trail show trail/
+```
+
+`--keys` is a JSON file mapping `analyst`, `stakeholder` and `reviewer` to the
+keys that verify their signatures; without it only `SCMLE_SIGNING_KEY` is read,
+as the analyst key, and the other signatures are reported as unverifiable.
+Findings are `missing_link`, `broken_chain`, `unsigned_step`,
+`unapproved_step`, `outcome_outside_expectation` and four more, listed in
+[TRAIL](TRAIL.md).
 
 ## Release evidence and the runtime
 

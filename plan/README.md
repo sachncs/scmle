@@ -46,7 +46,7 @@ sign-off. See [`validation-referents.md`](validation-referents.md).
 | 15 | [phase-15-security-data-training-orchestration.md](phase-15-security-data-training-orchestration.md) | F14 items 4, 6, 7, 8: security, governed data, portable training, orchestration | 14 |
 | 16 | [phase-16-infrastructure-and-release.md](phase-16-infrastructure-and-release.md) | F14 items 3, 9, 10: infrastructure as code, CI/CD gates, registry bound to the runtime | 14, 15 |
 | 17 | [phase-17-operate-and-qualify.md](phase-17-operate-and-qualify.md) | F14 items 11, 12, 13: observability, continuous evaluation, recovery; the production claim | 16, 13 |
-| 18 | [phase-18-lifecycle-evidence-and-breadth.md](phase-18-lifecycle-evidence-and-breadth.md) | F15: business trail, qualified breadth | 17 (item 14 may start earlier) |
+| 18 | [phase-18-lifecycle-evidence-and-breadth.md](phase-18-lifecycle-evidence-and-breadth.md) | F15: business trail (local half built; independent trace on a real deployment open), qualified breadth (audit and benchmark definitions built; no slice qualified) | 17 (item 14 may start earlier) |
 | 6 | [phase-6-external-validation-and-release.md](phase-6-external-validation-and-release.md) | F7: backtest, red team, replication, release | overlaps all |
 
 ```

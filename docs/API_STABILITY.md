@@ -216,6 +216,15 @@ pinned like the others. The metrics
 registry, the log writer, the cost report and the response desk are not
 pinned.
 
+## Trail surface
+
+`scmle.trail` (`build`, `seal`, `verify`, `render`, `Report`, `Finding`) and
+the command `scmle trail` are an extension surface pinned like the others.
+The trail file format (`format` 1 in `trail.json`), the finding kinds and the
+layout of `inputs.json` are documented in [TRAIL](TRAIL.md); a change to them
+needs a new `format`. The submodules (`records`, `inputs`, `outcomes`,
+`reports`, `trace`, `chain`) are not pinned.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

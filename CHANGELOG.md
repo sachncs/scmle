@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+* Breadth audit and benchmark definitions (F15 item 15, local half;
+  `docs/BREADTH.md`, `benchmarks/breadth/`, `tests/unit/test_breadth.py`).
+  The audit of clustering, association and dimensionality reduction found
+  clustering is a library function with no run, packaging or monitoring
+  wiring, and association and dimensionality reduction do not exist. Fourteen
+  definition files give each further slice (those three, forecasting, ranking,
+  documents and NLP, image, audio, video, geospatial, graph, pretrained and
+  multimodal, accelerated training, streaming) a robustness, drift,
+  explanation and monitoring benchmark with every parameter unset and nothing
+  run. Guard tests fail if an unsupported algorithm, family, modality or
+  streaming path enters the production registry. No slice is qualified, and
+  exactly-once streaming is not claimed: the only delivery path, the telemetry
+  spool, is at least once.
+* Business trail (F15 item 14, local half; `scmle.trail`, `scmle trail
+  build|verify|show`, `scripts/trace_model.py`, `docs/TRAIL.md`,
+  `plan/evidence/phase-18/local/`). One folder joins the signed charter, the
+  framing and decision-cost model, the claim ledger, the registry and its
+  signed approval, the release state and the deployment ledger of a model, with
+  the stakeholder's KPI-to-metric mapping, acceptance criteria and approved
+  expectation, the reviewer's domain thresholds and evidence, a deterministic
+  exploratory report and experiment comparison, and the observed cost per case
+  with an interval against the approved range. The verifier re-derives every
+  fact from the retained records and reports a missing link, a broken hash
+  chain, an unsigned or unapproved step and an outcome outside the expectation,
+  each with a seeded test. The committed trail follows a real run on the
+  Titanic extract. The three roles were played by the author with three keys,
+  the observed outcomes replay held-out test rows, and the release state is
+  `approved`, not `production`: no independent reviewer has traced it, and the
+  gate stays open. `scmle.trail` is a new extension surface (additions only to
+  `tests/fixtures/public_api.json`).
 * **Behaviour change: `leakage_policy` now defaults to `"block"`** (the
   `MLProject` argument, `ProblemSpec` and `scmle run --leakage-policy`). A run
   whose certified leakage screen finds a suspect column now stops with a
