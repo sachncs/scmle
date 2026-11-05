@@ -218,7 +218,7 @@ class ProjectCommand(Command):
             help="model families to skip (for example deep_learning)",
         )
         parser.add_argument(
-            "--leakage-policy", choices=["warn", "block"], default="warn"
+            "--leakage-policy", choices=["warn", "block"], default="block"
         )
         parser.add_argument(
             "--charter",

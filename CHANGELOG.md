@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+* **Behaviour change: `leakage_policy` now defaults to `"block"`** (the
+  `MLProject` argument, `ProblemSpec` and `scmle run --leakage-policy`). A run
+  whose certified leakage screen finds a suspect column now stops with a
+  `BlockedError` that names it, instead of training on it and reporting an
+  inflated score (the Titanic table scored ROC AUC 0.988 with `boat` and
+  `body`, 0.885 without). Pass `leakage_policy="warn"` to keep the old
+  behaviour. The pinned `MLProject` signature in
+  `tests/fixtures/public_api.json` was regenerated for this one default.
 * Phase 17 local evidence (`plan/evidence/phase-17/local/`,
   `scripts/make_phase17_evidence.py`, `docs/OPERATIONS.md`, `plan/phase-17-...`,
   F14). A killed local service classified as infrastructure and a shifted

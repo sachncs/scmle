@@ -27,7 +27,9 @@ def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
 
 def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
     leaky = binary_frame.assign(leak=binary_frame.y * 3.0 + 1)
-    result = support.make_project(leaky, "y", output_dir=tmp_path).run()
+    result = support.make_project(
+        leaky, "y", output_dir=tmp_path, leakage_policy="warn"
+    ).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
     assert result.profile.blocking_leaks == ("leak",)
     with pytest.raises(errors.BlockedError, match="leakage") as raised:
