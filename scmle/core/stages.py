@@ -11,6 +11,7 @@ import dataclasses
 import datetime
 import hashlib
 import json
+import logging
 import time
 from typing import Any
 from typing import ClassVar
@@ -118,6 +119,9 @@ DIAGNOSTIC_BUDGET_SHARE = 0.25
 DIAGNOSTIC_MIN_SECONDS = 30.0
 BASELINE = "dummy"
 require = context_module.require
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Stage(abc.ABC):
@@ -540,6 +544,13 @@ class ProfileStage(Stage):
                     + ", ".join(leaks),
                     {"leakage": dict(profile.leakage)},
                 )
+        elif profile.leakage.get("suspects"):
+            LOGGER.warning(
+                "leakage suspect(s) %s stay in the features; the test score "
+                "is provisional until a person settles them (declare the "
+                "column unavailable at prediction, or attest it)",
+                ", ".join(sorted(set(map(str, profile.leakage["suspects"])))),
+            )
         self.run_claim_ledger(context, task)
 
     def synthesize_features(

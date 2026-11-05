@@ -310,6 +310,7 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
     table = json.loads((folder / "admissibility_table.json").read_text())
     echo = next(d for d in table["decisions"] if d["name"] == "echo")
     assert echo["tier"] == "attested" and echo["admission"] == "admit_flagged"
+    assert "PROVISIONAL" not in result.summary()
 
 
 def test_a_malformed_attestation_file_is_a_config_error(binary_frame, tmp_path):
@@ -490,8 +491,9 @@ def test_the_summary_and_report_put_leaks_and_findings_first(
 ):
     result = run(leaky_frame(binary_frame), tmp_path, leakage_policy="warn")
 
-    assert "WARNING" in result.summary()
-    assert "echo" in result.summary()
+    assert "PROVISIONAL: 1 flagged column(s) not attested: echo" in (
+        result.summary()
+    )
     page = (pathlib.Path(result.run_dir) / "report.html").read_text()
     assert page.index("<h2>Findings</h2>") < page.index("<h2>Leaderboard</h2>")
     assert page.index("<h2>Leaderboard</h2>") < page.index("<details>")

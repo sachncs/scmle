@@ -136,6 +136,28 @@ class RunResult:
         """Whether every stated success criterion was met (True if none)."""
         return all(c["met"] for c in self.evaluation["success_criteria"])
 
+    def unattested_suspects(self) -> list[str]:
+        """Flagged columns that are in the model and that no person attested.
+
+        A column the leakage screen flagged stays a suspicion until a person
+        settles it. Columns left out of the features (quarantined, excluded
+        or declared unavailable) are not counted, nor are attested ones.
+
+        Returns:
+            Sorted column names; empty when nothing is outstanding.
+        """
+        suspects = set(map(str, self.profile.leakage.get("suspects", ())))
+        path = pathlib.Path(self.run_dir) / "admissibility_table.json"
+        if suspects and path.exists():
+            record = json.loads(path.read_text(encoding="utf-8"))
+            for decision in record.get("decisions", ()):
+                settled = decision.get("admission") == "quarantine" or (
+                    decision.get("tier") == "attested"
+                )
+                if settled:
+                    suspects.discard(str(decision.get("name")))
+        return sorted(suspects)
+
     def claim_tiers(self) -> dict[str, int]:
         """Counts the claims of a charter run by evidence tier.
 
@@ -159,10 +181,17 @@ class RunResult:
             f"{name}={value:.4f}"
             for name, value in evaluation["test_metrics"].items()
         )
+        unattested = self.unattested_suspects()
+        label = (
+            ""
+            if not unattested
+            else f" (PROVISIONAL: {len(unattested)} flagged column(s) "
+            f"not attested: {', '.join(unattested)})"
+        )
         text = (
             f"{self.run_id}: selected {self.selected_model} "
             f"(cv {evaluation['metric']}="
-            f"{evaluation['selected_cv_score']:.4f}); test: {test}"
+            f"{evaluation['selected_cv_score']:.4f}); test{label}: {test}"
         )
         missed = [
             f"{c['metric']} {c['achieved']:.4f} vs required {c['required']}"
@@ -174,12 +203,6 @@ class RunResult:
                 "; success criteria met"
                 if not missed
                 else "; success criteria NOT met: " + ", ".join(missed)
-            )
-        suspects = sorted(set(self.profile.leakage.get("suspects", ())))
-        if suspects:
-            text += (
-                f"; WARNING {len(suspects)} leakage suspect(s) kept in: "
-                + ", ".join(suspects)
             )
         tiers = self.claim_tiers()
         if tiers:
