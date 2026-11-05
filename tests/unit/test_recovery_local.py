@@ -6,6 +6,7 @@ what it starts; the last assertion is that nothing was left running.
 """
 
 import subprocess
+import sys
 
 import pytest
 
@@ -16,6 +17,10 @@ from scmle.operations import recovery
 @pytest.fixture(scope="module", autouse=True)
 def nothing_left_behind():
     yield
+    if sys.platform == "win32":
+        # There is no `ps`; each scenario still asserts that its own fleet
+        # reports zero processes alive after close.
+        return
     listing = subprocess.run(
         ["ps", "-axo", "command"], capture_output=True, text=True, check=False
     ).stdout
