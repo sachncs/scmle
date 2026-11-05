@@ -1,0 +1,55 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const config = [
+  ["<code>SCMLE_AUTH_KEYS_FILE</code>", "A JWKS file (<code>oct</code> keys give HS256, <code>RSA</code> keys give RS256; each needs a <code>kid</code>; optional <code>nbf</code> and <code>exp</code> in epoch seconds bound a key). Rotate by publishing the new key beside the old one, then set the old key's <code>exp</code>."],
+  ["<code>SCMLE_AUTH_HS256_SECRET</code>", "One HS256 secret (at least 32 bytes) with kid <code>env</code>; for local runs and small deployments."],
+  ["<code>SCMLE_AUTH_ISSUER</code>, <code>SCMLE_AUTH_AUDIENCE</code>", "Required with either key source."],
+  ["<code>SCMLE_TENANT</code>", "The tenant this deployment serves."],
+  ["<code>SCMLE_AUTH_REVOKED_FILE</code>", "JSON <code>{\"tokens\": [], \"subjects\": [], \"key_ids\": []}</code>, re-read on every request. An unreadable file refuses every token."],
+  ["<code>SCMLE_AUDIT_FILE</code>", "Audit ledger path; memory only when unset."],
+];
+---
+
+<DocsLayout title="Tenant isolation" description="What a tenant is in scmle, the nine rules that isolate tenants in the prediction service, the environment variables that configure them, and what isolation does not give you." current="tenant-isolation">
+  <p class="eyebrow"><span></span> Trust</p>
+  <h1>One deployment,<br /><em>one tenant.</em></h1>
+  <p class="lead">What "tenant" means here, what isolates tenants, and what does not. This page covers the prediction service behind the security layer. Cloud-level isolation (accounts, networks, buckets, IAM) is declared per provider in the <a href={`${base}/docs/infrastructure/`}>infrastructure</a> and is not claimed here.</p>
+
+  <h2>The model</h2>
+  <ul>
+    <li>A <strong>tenant</strong> is the owner of a deployment: its models, its data and its audit trail. A deployment serves exactly one tenant, named by <code>SCMLE_TENANT</code>. Two tenants never share a process, a model bundle, a ledger file or a signing key.</li>
+    <li>A caller proves its tenant with the <code>tenant</code> claim of a verified token. The claim is read only after the signature, issuer, audience, expiry and revocation checks pass.</li>
+    <li>The tenant is never taken from the request path, query or body. A caller cannot choose another tenant's model by naming it.</li>
+  </ul>
+
+  <h2>The rules</h2>
+  <ol>
+    <li><strong>Deny by default.</strong> A request without a valid token is refused with 401. The only public paths are <code>/livez</code> and <code>/readyz</code>, which disclose liveness and readiness (and the model version and digest once ready) and nothing else.</li>
+    <li><strong>Scope, then tenant.</strong> A route needs its scope: <code>model:read</code> for <code>/health</code> and <code>/schema</code>, <code>model:predict</code> for <code>/predict</code>. If the deployment names a tenant, a token whose tenant is absent or different is refused with 403, whatever its scopes.</li>
+    <li><strong>No cross-tenant scope.</strong> There is no wildcard tenant and no scope that spans tenants. Operating several tenants means several deployments, each with its own tenant name, key set and audit file.</li>
+    <li><strong>Separate keys.</strong> Each tenant's tokens are verified against that tenant's key set. A key shared by two tenants would let either mint the other's tokens; do not do it.</li>
+    <li><strong>Separate storage.</strong> Each tenant's bundles, snapshots, checkpoints and run manifests live under their own prefix or bucket. The storage role of the service can read only that prefix.</li>
+    <li><strong>Separate roles.</strong> Training and serving use different roles. Serving can read bundles and write nothing but its own audit trail; training can write checkpoints and manifests and cannot load or activate a service.</li>
+    <li><strong>Safe errors.</strong> A refusal says only "authentication required", "forbidden" or "too many requests". It never says which check failed, which key id was tried, or whether a tenant exists. The precise reason is written to the audit log.</li>
+    <li><strong>Audit.</strong> Every activation, access decision (allowed or denied) and administrative action (key rotation) is a hash-chained <code>audit</code> row of the deployment ledger: who, what, outcome, request id; never a credential or a request body.</li>
+    <li><strong>Limits.</strong> Per-subject rate limiting (default 20 requests per second, burst 40), per-client limiting of failed attempts (2 per second, burst 10), and the request size and record limits of the <a href={`${base}/docs/service/#limits`}>serving contract</a>.</li>
+  </ol>
+
+  <h2>What this does not give you</h2>
+  <ul>
+    <li><strong>TLS.</strong> The reference server speaks plain HTTP. Terminate TLS at the ingress; the token travels in a header and must not cross a network unencrypted.</li>
+    <li><strong>Protection from a compromised host.</strong> Whoever can read the process memory or the HS256 secret can mint tokens. Prefer RS256 with the private key held by the identity provider: the service then holds public keys only.</li>
+    <li><strong>Revocation latency.</strong> A revoked token is refused from the next request if the revocation file is current. Propagating that file to every replica is the deployment's job, and short token lifetimes bound the exposure.</li>
+    <li><strong>A tail-complete audit trail.</strong> The chain shows that rows were not edited, removed from the middle or reordered, not that the newest rows were never removed. Keep the ledger head somewhere else.</li>
+    <li><strong>Noisy-neighbour isolation</strong> between processes of the same host, and side channels.</li>
+    <li><strong>Provider-level isolation.</strong> Not tested; it needs the cloud accounts.</li>
+  </ul>
+
+  <h2>Configuration</h2>
+  <DocTable label="Authentication and tenant configuration" head={["Variable", "Meaning"]} rows={config} />
+  <div class="callout"><p><strong>Fail closed.</strong> A server that listens on anything but a loopback address without a key source refuses to start with a configuration error. No shipped configuration exposes an unauthenticated backend. The generated image defaults to every interface, so it needs these variables.</p></div>
+
+  <p class="meta">Tenant policy of the 0.1 beta line</p>
+</DocsLayout>

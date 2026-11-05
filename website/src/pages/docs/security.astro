@@ -55,6 +55,7 @@ registry.verify(payload, envelope, secrets, observed_at, historical=True)`}</cod
 
   <h2>What this page does not promise</h2>
   <p>A valid local signature does not prove that the secret manager enforced custody, that an operator performed the rotation, or that an independent reviewer approved the release. A dependency audit does not prove that a connector, plugin, container, or host is safe. Record those controls in the release decision instead of inferring them from a passing test.</p>
+  <p>The control behind each risk, the exact limits of data custody and operator guidance are on <a href={`${base}/docs/threat-model/`}>Threat model & controls</a>; caller identity, scopes and tenant rules are on <a href={`${base}/docs/tenant-isolation/`}>Tenant isolation</a>.</p>
   <p>For the operational response when a verification fails, go to <a href={`${base}/docs/recovery/`}>Recovery</a>. For the claims a reviewer must recompute, go to <a href={`${base}/docs/evidence/`}>Evidence & gates</a>.</p>
 
   <p class="meta">Security claims are scoped to the evidence that proves them · 0.1 beta</p>

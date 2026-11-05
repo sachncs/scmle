@@ -1,0 +1,80 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const controls = [
+  ["Loading a malicious bundle", "Loading is refused unless authentic: the manifest HMAC-SHA256 signature must verify (<code>$SCMLE_SIGNING_KEY</code> or <code>signing_key=</code>), or the caller vouches with <code>trusted=True</code>."],
+  ["Tampered model file", "SHA-256 per file is verified before unpickling. An invalid signature is an error even with <code>trusted=True</code>."],
+  ["Dependency drift", "The bundle records Python and scikit-learn versions; mismatches are refused unless allowed."],
+  ["SQL injection", "Tracking SQL binds every value; dynamic column names come from a fixed whitelist."],
+  ["Resource leaks", "SQLite connections are closed on every call (tested with <code>ResourceWarning</code> as an error)."],
+  ["Oversized request bodies", "The HTTP adapter answers 413 above 16 MiB instead of reading the body."],
+  ["Slow or abandoned clients", "Each connection has a positive I/O timeout and worker threads are daemonized; the adapter remains gateway-only."],
+  ["Server fingerprint disclosure", "The reference handler emits a stable minimal <code>Server</code> header without the Python runtime version."],
+  ["Secrets", "No credentials are read, stored or logged; the signing key lives only in the environment."],
+  ["Trusting an unsigned bundle in production", "<code>trusted=True</code> and <code>SCMLE_TRUSTED=1</code> are refused when <code>SCMLE_ENV=production</code>; the generated service then needs a signed bundle and a verifying provenance statement."],
+  ["Serving a modified or unattested service folder", "Before it deserializes anything, the service checks the bundle signature, the checksum of every listed file and the signed provenance statement. On failure it stays alive but never ready."],
+  ["Secrets in the image or build context", "The generated <code>.dockerignore</code> excludes credential files; a context scan looks for key material, configured secret values and secret-looking <code>ENV</code> lines before every build."],
+  ["Vulnerable dependencies in the image", "The vulnerability gate fails a build on a blocking finding, an empty scan, a finding without severity, an expired exception, or an SBOM component the scan did not cover. It does not scan; the scanner and its database date are the report's."],
+  ["Unauthenticated access", "The HTTP adapters refuse to listen beyond loopback without a gateway. Every path except <code>/livez</code> and <code>/readyz</code> needs a verified token with the route's scope. The compose file publishes no port."],
+  ["Invalid, revoked, expired or foreign credentials", "Signature, <code>alg</code> (never <code>none</code>, never confused with the key's), <code>kid</code>, key validity window, issuer, audience, expiry, not-before, and revocation by token, subject or key. Refusals say only 401, 403 or 429, never why."],
+  ["Guessing credentials, request floods", "A per-client limit on refused attempts and a per-subject request limit (429 with <code>Retry-After</code>), on top of the size, record and concurrency limits."],
+  ["Unrecorded access or administration", "Activation, access and key-rotation events are <code>audit</code> rows of the hash-chained deployment ledger, without credentials or bodies."],
+  ["Supply chain", "Releases use PyPI trusted publishing (OIDC) with no stored token; <code>pip-audit</code> gates CI."],
+  ["Reading the confirmation set early", "With a charter, the confirmation rows are sealed in a separate vault process; exploration code receives only a view with no reference to a vault, token or log; a second open is refused; every attempt is written to a hash-chained log."],
+  ["Edited charter or split manifest", "The charter carries a SHA-256 hash and an optional HMAC signature; the split manifest carries a full SHA-256. Either fails to load if a byte changes."],
+  ["Signing-key lifecycle", "Public key metadata records identity, owner, expiry, retirement, replacement and emergency revocation without storing secret material."],
+];
+const tested = [
+  ["No artifact of a full charter run contains the canary value of a sealed row", "Text search for decimal spellings of each value; a function of several rows, or another encoding, is not searched."],
+  ["After custody, no pandas object tracked by the garbage collector holds a canary of the sealed sets", "The caller's own copy is dropped by the test; buffers outside Python, the page cache and swap are not inspected."],
+  ["Detectors, admissibility and robustness modules do not import custody, the vault, the splitters or the orchestrator, directly or transitively", "Static imports only; a runtime <code>importlib</code> call would not be seen."],
+  ["The one release can be bound to a claims hash and a ledger hash; the vault refuses a release for any other pair", "The binding exists as an option, but the confirmation stage does not use it yet, so charter runs are not bound."],
+  ["Every custody log entry carries an HMAC of its hash when a signing key is available; a forger who recomputes the hash chain fails the MAC", "Without a key the log is a checksum only. Removing the newest entries is not detected by the chain or the MACs; compare the log head with a copy kept elsewhere."],
+  ["The split manifest carries a Merkle root over the canonical content of the rows; a changed value inside a row changes the root", "Embargo rows have no root; manifests written before this change have none."],
+  ["For a temporal split the embargo is at least the number of leading autocorrelation lags of the target outside +-1.96/sqrt(n)", "A rule of thumb for a stationary series; seasonal dependence is not counted and only the target is measured, not the features."],
+  ["Two fixtures (grouped, temporal) have pinned manifest hashes", "Pinned on macOS arm64 only; equality on other platforms depends on CI and has not been observed from the author's machine."],
+];
+---
+
+<DocsLayout title="Threat model & controls" description="The scmle threat model, the control behind each risk, the exact limits of data custody, and operator guidance for keys and serving." current="threat-model">
+  <p class="eyebrow"><span></span> Trust</p>
+  <h1>What is defended,<br /><em>and what is not.</em></h1>
+  <p class="lead">A review of the 0.1 beta package, its default configuration and its optional extras. Method: a manual review of every deserialization, subprocess, network, SQL and file-write path, plus <code>bandit</code> and <code>pip-audit</code>, both run in CI. The <a href={`${base}/docs/security/`}>Security</a> page explains the trust boundaries; this page lists the controls.</p>
+
+  <h2>Threat model</h2>
+  <div class="split-cards">
+    <div class="mini-card"><h3>Untrusted model bundles</h3><p>Bundles are pickle-based (joblib). Unpickling executes code, so a bundle from an untrusted source is arbitrary code execution. This is the principal risk.</p></div>
+    <div class="mini-card"><h3>Untrusted datasets</h3><p>Datasets are parsed with pandas and pyarrow. Malformed files raise <code>DataError</code>.</p></div>
+    <div class="mini-card"><h3>Unauthenticated or cross-tenant callers</h3><p>The HTTP adapters verify a bearer token (JWT, HS256 or RS256, key rotation by <code>kid</code>), check scopes and tenant, rate-limit and audit. They do not terminate TLS: run them behind an ingress that does. The policy is on the <a href={`${base}/docs/tenant-isolation/`}>Tenant isolation</a> page.</p></div>
+  </div>
+
+  <h2>Controls</h2>
+  <p>Each row names a risk and the control that addresses it. Every control has an automated test in the project's suite.</p>
+  <DocTable label="Risks and controls" head={["Risk", "Control"]} rows={controls} />
+
+  <h2 id="custody-limits">Limits of custody</h2>
+  <p>The vault is a subprocess of the same user with a key passed on standard input. It stops accidental and in-code access. It is <strong>not</strong> adversary-proof on one machine: a process with the same operating-system privileges could attach to the vault or read the original data file. This process drops its own reference to the sealed rows, but a DataFrame the caller passed in, or the data file, still holds every row. Custody against a hostile operator needs separation: another operating-system user, a service, or a write-once object store. Do not describe a confirmation set as sealed beyond this.</p>
+  <p>This is an accepted limit, recorded on 2026-11-04: the caller's copy of the data stays, because the library cannot delete a DataFrame or file its caller holds. The option that would close it is a CLI that reads the file inside the orchestrator and never returns the full frame to the caller; it is not built.</p>
+
+  <h3>What is tested about custody, and what is not</h3>
+  <DocTable label="Custody guarantees and their stated limits" head={["Guarantee", "Stated limit"]} rows={tested} rowHeads={false} />
+
+  <h2>Guidance for operators</h2>
+  <ol>
+    <li>Set <code>SCMLE_SIGNING_KEY</code> wherever bundles are produced and verified.</li>
+    <li>Rotate keys with <code>ModelBundle.rotate_signing_key(directory, old, new)</code>. Verify the new key before retiring the old one, maintain the matching <code>SigningKeyRegistry</code> record, and transition it to <code>retired</code> only after parity is confirmed.</li>
+    <li>Never pass <code>trusted=True</code> (or <code>scmle predict --trusted</code>) for a bundle you did not produce.</li>
+    <li>Serve behind an authenticating gateway; bind to loopback by default.</li>
+    <li>Treat the model registry directory as a trust boundary: it is read with <code>trusted=True</code> after checksum verification at registration time.</li>
+  </ol>
+  <p>The key registry is metadata-only; the secret stays in the deployment secret manager. An active, non-expired key may sign. A retired key cannot sign but may verify pre-retirement evidence only when a caller explicitly requests historical verification. A revoked key fails verification immediately, including historical checks. That distinction matters during emergency rotation: preserve evidence without accepting a compromised signer.</p>
+
+  <h2>Static analysis</h2>
+  <p><code>bandit</code> reports no open findings. Four low-risk findings were reviewed and annotated with their rationale: a category placeholder string (not a password), two seeded non-cryptographic random generators, and a SQL statement whose column names come from a whitelist.</p>
+
+  <h2>Reporting a vulnerability</h2>
+  <p>Report vulnerabilities privately to the maintainers rather than in a public issue. The project's issue tracker is for everything else.</p>
+
+  <p class="meta">Security review of the 0.1 beta line</p>
+</DocsLayout>
