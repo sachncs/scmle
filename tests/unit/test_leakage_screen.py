@@ -543,3 +543,25 @@ def test_r2_matches_sklearn_for_the_observed_regression_fit():
     got = screen.skill_statistic(problem, phi)(y[None, :])[0]
     pred = screen.oof_fit(y[None, :], phi, folds)[0]
     assert got == pytest.approx(r2_score(y, pred), abs=1e-12)
+
+
+def test_a_wide_multiclass_table_is_declined_quickly_and_says_so():
+    import time
+
+    import numpy as np
+    import pandas as pd
+
+    from scmle.data.admissibility import screen
+
+    rng = np.random.default_rng(0)
+    frame = pd.DataFrame(
+        rng.normal(size=(600, 64)), columns=[f"c{i}" for i in range(64)]
+    )
+    frame["y"] = rng.integers(0, 10, 600)
+    started = time.monotonic()
+    report = screen.screen_table(
+        frame, "y", "classification", [c for c in frame if c != "y"], 0
+    )
+    assert time.monotonic() - started < 20
+    assert not [f for f in report.findings if f.suspect]
+    assert any("limit is" in note for note in report.notes)

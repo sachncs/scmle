@@ -111,6 +111,11 @@ STORE_PATH = Path(__file__).with_name("screen_certificates.json")
 KNOTS = 10
 MAX_ROWS = 2000
 MAX_PERMUTATIONS = 100_000
+# Cross-fitted fits needed by the permutation test: permutations x skill
+# columns x classes (one-vs-rest when there are more than two). Measured: a
+# breast-cancer sized table (about 72,000) takes 1.4 s, so this limit is a
+# few tens of seconds; beyond it the screen declines and says so.
+MAX_WORK = 500_000
 BATCH = 200
 TIME_BLOCKS = 20
 RIDGE = 1e-3
@@ -1005,6 +1010,29 @@ def scan_frame(
                 f"the Benjamini-Yekutieli threshold; the limit is "
                 f"{MAX_PERMUTATIONS}. Nothing was flagged (power, not size, "
                 "is lost): screen fewer columns",
+            ),
+        )
+    skill_columns = sum(
+        1 for h in pending if h.mechanism == SKILL and h.statistic is not None
+    )
+    work = (
+        total * skill_columns * (problem.classes if problem.classes > 2 else 1)
+    )
+    if work > MAX_WORK:
+        return ScreenReport(
+            (),
+            n,
+            family,
+            0,
+            cfg.alpha,
+            gates,
+            ceilings,
+            (
+                f"{family} hypotheses over {max(problem.classes, 1)} classes "
+                f"need about {work} cross-fitted fits ({total} permutations "
+                f"for {skill_columns} columns); the limit is {MAX_WORK}. "
+                "Nothing was flagged (power, not size, is lost): screen "
+                "fewer columns",
             ),
         )
     draw_permutations(
