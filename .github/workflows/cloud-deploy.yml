@@ -1,0 +1,193 @@
+name: cloud-deploy
+
+# One environment of a release: admit, push the image by digest, deploy, read
+# the platform's running state, run the live checks, certify and write the
+# signed deployment record. Called by cloud-release.yml, which holds the
+# guard. The job runs in a protected GitHub environment, so its reviewers are
+# the independent approval, and it authenticates with the run's OIDC token
+# only. Nothing here has been run against a cloud account.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      provider:
+        type: string
+        required: true
+      release_dir:
+        type: string
+        required: true
+      model:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      TARGET: ${{ inputs.environment }}
+      PROVIDER: ${{ inputs.provider }}
+      RELEASE_DIR: ${{ inputs.release_dir }}
+      MODEL: ${{ inputs.model }}
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Refuse malformed inputs
+        run: |
+          [[ "${MODEL}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "bad model name"; exit 1; }
+          [[ "${VERSION}" =~ ^[0-9]+$ ]] || { echo "bad version"; exit 1; }
+          [[ "${RELEASE_DIR}" =~ ^[A-Za-z0-9._/-]+$ && "${RELEASE_DIR}" != *..* && "${RELEASE_DIR}" != /* ]] || { echo "bad release_dir"; exit 1; }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: uv sync --python 3.14
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: inputs.environment == 'production'
+        with:
+          name: record-staging
+          path: staging
+      - name: Read the independent approval of this environment
+        env:
+          SCMLE_SIGNING_KEY: ${{ secrets.SCMLE_SIGNING_KEY }}
+        run: |
+          approver="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq "[.[] | select(.state == \"approved\" and ([.environments[].name] | index(\"${TARGET}\")))] | first | .user.login // \"\"")"
+          echo "APPROVER=${approver}" >> "${GITHUB_ENV}"
+          echo "REQUESTED_BY=${GITHUB_ACTOR}" >> "${GITHUB_ENV}"
+          echo "APPROVED_AT=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" >> "${GITHUB_ENV}"
+          echo "CONTAINER_DIGEST=$(cat image.digest)" >> "${GITHUB_ENV}"
+          echo "CONFIG_DIGEST=sha256:$(find "deploy/terraform/${PROVIDER}/environments/${TARGET}" deploy/terraform/modules -type f -name '*.tf' | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)" >> "${GITHUB_ENV}"
+          umask 077
+          printf '%s' "${SCMLE_SIGNING_KEY}" > "${RUNNER_TEMP}/key"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: inputs.provider == 'aws'
+        with:
+          role-to-arn: ${{ vars.SCMLE_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.SCMLE_AWS_REGION }}
+          role-session-name: scmle-${{ inputs.environment }}
+          role-duration-seconds: 3600
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        if: inputs.provider == 'gcp'
+        with:
+          workload_identity_provider: ${{ vars.SCMLE_GCP_PROVIDER }}
+          service_account: ${{ vars.SCMLE_GCP_SERVICE_ACCOUNT }}
+
+      - name: Write the release manifest
+        run: |
+          cat > "${RELEASE_DIR}/manifest.json" <<JSON
+          {
+            "environment": "${TARGET}",
+            "provider": "${PROVIDER}",
+            "source_commit": "${GITHUB_SHA}",
+            "registry": "registry",
+            "model": "${MODEL}",
+            "version": ${VERSION},
+            "container_digest": "${CONTAINER_DIGEST}",
+            "config_digest": "${CONFIG_DIGEST}",
+            "requested_by": "${REQUESTED_BY}",
+            "approver": "${APPROVER}",
+            "approved_at": "${APPROVED_AT}",
+            "approval": "approval.json",
+            "scan_report": "${GITHUB_WORKSPACE}/scan.json",
+            "scan_policy": "${GITHUB_WORKSPACE}/deploy/vuln-policy.json"
+          }
+          JSON
+          if [ "${TARGET}" = "production" ]; then
+            jq --arg path "${GITHUB_WORKSPACE}/staging/record.json" '. + {staging_record: $path}' "${RELEASE_DIR}/manifest.json" > "${RUNNER_TEMP}/m.json"
+            mv "${RUNNER_TEMP}/m.json" "${RELEASE_DIR}/manifest.json"
+          fi
+      - name: Gate 1 - may this build be deployed here?
+        run: uv run scmle deploy gate admit "${RELEASE_DIR}/manifest.json" --key-file "${RUNNER_TEMP}/key"
+
+      - name: Push the image and deploy it (AWS)
+        if: inputs.provider == 'aws'
+        env:
+          CLUSTER: ${{ vars.SCMLE_ECS_CLUSTER }}
+          SERVICE: ${{ vars.SCMLE_ECS_SERVICE }}
+          REPOSITORY: ${{ vars.SCMLE_ECR_REPOSITORY }}
+        run: |
+          sudo apt-get install -y skopeo
+          aws ecr get-login-password | skopeo login --username AWS --password-stdin "${REPOSITORY%%/*}"
+          skopeo copy --preserve-digests "oci-archive:image.tar" "docker://${REPOSITORY}:${GITHUB_SHA}"
+          pushed="$(skopeo inspect --format '{{.Digest}}' "docker://${REPOSITORY}:${GITHUB_SHA}")"
+          [ "${pushed}" = "${CONTAINER_DIGEST}" ] || { echo "registry digest ${pushed} != built ${CONTAINER_DIGEST}"; exit 1; }
+          current="$(aws ecs describe-services --cluster "${CLUSTER}" --services "${SERVICE}" --query 'services[0].taskDefinition' --output text)"
+          aws ecs describe-task-definition --task-definition "${current}" --query taskDefinition > td.json
+          jq --arg image "${REPOSITORY}@${CONTAINER_DIGEST}" \
+            '.containerDefinitions[0].image = $image | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            td.json > td-new.json
+          new="$(aws ecs register-task-definition --cli-input-json file://td-new.json --query taskDefinition.taskDefinitionArn --output text)"
+          aws ecs update-service --cluster "${CLUSTER}" --service "${SERVICE}" --task-definition "${new}"
+          aws ecs wait services-stable --cluster "${CLUSTER}" --services "${SERVICE}"
+          aws ecs describe-services --cluster "${CLUSTER}" --services "${SERVICE}" > runtime.json
+          aws ecs describe-task-definition --task-definition "${new}" > task-definition.json
+
+      - name: Push the image and deploy it (GCP)
+        if: inputs.provider == 'gcp'
+        env:
+          SERVICE: ${{ vars.SCMLE_CLOUD_RUN_SERVICE }}
+          REGION: ${{ vars.SCMLE_GCP_REGION }}
+          REPOSITORY: ${{ vars.SCMLE_GCP_REPOSITORY }}
+        run: |
+          sudo apt-get install -y skopeo
+          skopeo copy --preserve-digests --dest-registry-token "$(gcloud auth print-access-token)" \
+            "oci-archive:image.tar" "docker://${REPOSITORY}/serve:${GITHUB_SHA}"
+          pushed="$(skopeo inspect --format '{{.Digest}}' --registry-token "$(gcloud auth print-access-token)" "docker://${REPOSITORY}/serve:${GITHUB_SHA}")"
+          [ "${pushed}" = "${CONTAINER_DIGEST}" ] || { echo "registry digest ${pushed} != built ${CONTAINER_DIGEST}"; exit 1; }
+          gcloud run deploy "${SERVICE}" --region "${REGION}" --image "${REPOSITORY}/serve@${CONTAINER_DIGEST}" --quiet
+          gcloud run services describe "${SERVICE}" --region "${REGION}" --format=json > runtime.json
+
+      - name: Read what the platform says is running
+        run: uv run scmle deploy observe --provider "${PROVIDER}" --input runtime.json --output "${RELEASE_DIR}/observation.json"
+
+      - name: Live schema, inference, security and health tests
+        env:
+          SCMLE_LIVE_TOKEN: ${{ secrets.SCMLE_LIVE_TOKEN }}
+          SCMLE_LIVE_READONLY_TOKEN: ${{ secrets.SCMLE_LIVE_READONLY_TOKEN }}
+          SERVICE_URL: ${{ vars.SCMLE_SERVICE_URL }}
+        run: |
+          umask 077
+          printf '%s' "${SCMLE_LIVE_TOKEN}" > "${RUNNER_TEMP}/token"
+          printf '%s' "${SCMLE_LIVE_READONLY_TOKEN}" > "${RUNNER_TEMP}/token-readonly"
+          model_digest="$(uv run scmle deploy model-digest "${RELEASE_DIR}/registry" --model "${MODEL}" --version "${VERSION}")"
+          uv run scmle deploy live --url "${SERVICE_URL}" \
+            --token-file "${RUNNER_TEMP}/token" --read-only-token-file "${RUNNER_TEMP}/token-readonly" \
+            --environment "${TARGET}" --commit "${GITHUB_SHA}" \
+            --container-digest "${CONTAINER_DIGEST}" --model-digest "${model_digest}" \
+            --output "${RELEASE_DIR}/checks.json"
+        # A failed live check still writes checks.json; the next gate reads it
+        # and refuses with the reasons, so the failure is not lost.
+        continue-on-error: true
+
+      - name: Gate 2 - did the deployment pass? Write the signed record
+        run: |
+          jq '. + {checks: "checks.json", observation: "observation.json"}' "${RELEASE_DIR}/manifest.json" > "${RUNNER_TEMP}/m.json"
+          mv "${RUNNER_TEMP}/m.json" "${RELEASE_DIR}/manifest.json"
+          uv run scmle deploy gate certify "${RELEASE_DIR}/manifest.json" --key-file "${RUNNER_TEMP}/key" --output record.json
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: record-${{ inputs.environment }}
+          path: |
+            record.json
+            ${{ inputs.release_dir }}/checks.json
+            ${{ inputs.release_dir }}/observation.json
+            runtime.json

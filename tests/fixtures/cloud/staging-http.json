@@ -1,0 +1,265 @@
+{
+  "base_url": "https://staging.example.test",
+  "description": "Responses shaped by docs/SERVICE_SLO.md and the golden records in deploy/local/golden. Assembled from the documented contract; not captured from a cloud service, a gateway or a load balancer.",
+  "environment": "staging",
+  "exchanges": [
+    {
+      "auth": "none",
+      "body": {
+        "status": "alive"
+      },
+      "headers": {
+        "content-type": "application/json"
+      },
+      "method": "GET",
+      "path": "/livez",
+      "status": 200
+    },
+    {
+      "auth": "none",
+      "body": {
+        "artifact_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+        "model_version": "3",
+        "phase": "ready",
+        "ready": true,
+        "steps": [
+          "verify",
+          "load",
+          "warmup"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json"
+      },
+      "method": "GET",
+      "path": "/readyz",
+      "status": 200
+    },
+    {
+      "auth": "valid",
+      "body": {
+        "artifact_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+        "model_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "model_version": "3",
+        "status": "ok",
+        "task": "classification"
+      },
+      "headers": {
+        "content-type": "application/json"
+      },
+      "method": "GET",
+      "path": "/health",
+      "status": 200
+    },
+    {
+      "auth": "valid",
+      "body": {
+        "artifact_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+        "limits": {},
+        "model_version": "3",
+        "request_schema": {},
+        "response_schema": {},
+        "schema": {},
+        "schema_digest": "sha256:3d54d3b6376b8f6a85ca302411a588a9632b21fbb1e8898c8c3fb2481eeec7a8",
+        "schema_version": "1"
+      },
+      "headers": {
+        "content-type": "application/json"
+      },
+      "method": "GET",
+      "path": "/schema",
+      "status": 200
+    },
+    {
+      "auth": "none",
+      "body": {
+        "category": "auth",
+        "error": "unauthorized",
+        "request_id": "req-0002",
+        "schema_version": "1"
+      },
+      "headers": {
+        "content-type": "application/json",
+        "www-authenticate": "Bearer realm=\"scmle\""
+      },
+      "method": "GET",
+      "path": "/schema",
+      "status": 401
+    },
+    {
+      "auth": "valid",
+      "body": {
+        "artifact_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+        "classes": [
+          0,
+          1
+        ],
+        "diagnostics": {
+          "ignored_columns": [],
+          "unseen_categories": {}
+        },
+        "model_version": "3",
+        "predictions": [
+          1,
+          0,
+          0,
+          1,
+          1,
+          0,
+          1,
+          1,
+          0,
+          0
+        ],
+        "probabilities": [
+          [
+            0.23866728515708957,
+            0.7613327148429104
+          ],
+          [
+            0.6530561132866128,
+            0.3469438867133872
+          ],
+          [
+            0.6456563062257954,
+            0.35434369377420455
+          ],
+          [
+            0.25445338587359734,
+            0.7455466141264027
+          ],
+          [
+            0.47190462559161295,
+            0.528095374408387
+          ],
+          [
+            0.5430183807243099,
+            0.4569816192756901
+          ],
+          [
+            0.4013123398875479,
+            0.5986876601124521
+          ],
+          [
+            0.33989772984670663,
+            0.6601022701532934
+          ],
+          [
+            0.9999314240438636,
+            6.857595613644077e-05
+          ],
+          [
+            0.7920785167252806,
+            0.20792148327471938
+          ]
+        ],
+        "record_count": 10,
+        "request_id": "req-0001",
+        "rows": [
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          },
+          {
+            "missing": [],
+            "unseen": []
+          }
+        ],
+        "schema_digest": "sha256:3d54d3b6376b8f6a85ca302411a588a9632b21fbb1e8898c8c3fb2481eeec7a8",
+        "schema_valid": true,
+        "schema_version": "1"
+      },
+      "headers": {
+        "content-type": "application/json"
+      },
+      "method": "POST",
+      "path": "/predict",
+      "status": 200
+    },
+    {
+      "auth": "none",
+      "body": {
+        "category": "auth",
+        "error": "unauthorized",
+        "request_id": "req-0002",
+        "schema_version": "1"
+      },
+      "headers": {
+        "content-type": "application/json",
+        "www-authenticate": "Bearer realm=\"scmle\""
+      },
+      "method": "POST",
+      "path": "/predict",
+      "status": 401
+    },
+    {
+      "auth": "forged",
+      "body": {
+        "category": "auth",
+        "error": "unauthorized",
+        "request_id": "req-0002",
+        "schema_version": "1"
+      },
+      "headers": {
+        "content-type": "application/json",
+        "www-authenticate": "Bearer realm=\"scmle\""
+      },
+      "method": "POST",
+      "path": "/predict",
+      "status": 401
+    },
+    {
+      "auth": "readonly",
+      "body": {
+        "category": "auth",
+        "error": "forbidden",
+        "request_id": "req-0002",
+        "schema_version": "1"
+      },
+      "headers": {
+        "content-type": "application/json"
+      },
+      "method": "POST",
+      "path": "/predict",
+      "status": 403
+    }
+  ],
+  "model_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+  "tokens": {
+    "forged": "forged.token.x",
+    "readonly": "ro-token",
+    "valid": "good-token"
+  }
+}

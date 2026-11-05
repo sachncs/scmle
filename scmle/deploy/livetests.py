@@ -17,10 +17,10 @@ from collections.abc import Mapping
 import dataclasses
 import hashlib
 import json
+from typing import Any
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
 
 from scmle.contracts import errors
 from scmle.contracts import serving as serving_contract
@@ -63,6 +63,7 @@ class CheckResult:
     environment: str
     source_commit: str
     container_digest: str
+    model_digest: str
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-ready record."""
@@ -149,6 +150,7 @@ def finish(
         target.environment,
         target.source_commit,
         target.container_digest,
+        target.model_digest,
     )
 
 
@@ -302,7 +304,7 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
         headers: Mapping[str, str],
         body: bytes | None,
     ) -> Response:
-        request = urllib.request.Request(  # noqa: S310
+        request = urllib.request.Request(
             root + path, data=body, headers=dict(headers), method=method
         )
         try:

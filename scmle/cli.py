@@ -37,9 +37,15 @@ from scmle.data.ingest import budget as ingest_budget
 from scmle.data.ingest import grain as ingest_grain
 from scmle.data.ingest import plan as ingest_plan
 from scmle.data.readers import tabular
+from scmle.deploy import gate as deploy_gate
+from scmle.deploy import livetests
+from scmle.deploy import record as deploy_record
+from scmle.deploy import release as deploy_release
 from scmle.governance import deployment_ledger
 from scmle.governance import loop as loop_module
+from scmle.governance import registry as registry_module
 from scmle.inference import mapping as mapping_module
+from scmle.inference import parity
 from scmle.inference import serving
 from scmle.optimization import optimizers
 from scmle.security import access
@@ -942,6 +948,126 @@ class LoopCommand(Command):
         return EXIT_OK
 
 
+class DeployCommand(Command):
+    """Release evidence: live checks, the promotion gate, deployment records."""
+
+    name = "deploy"
+    help = "live checks of a service, the promotion gate, deployment records"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the `live`, `gate` and `verify-record` actions."""
+        actions = parser.add_subparsers(dest="deploy_action", required=True)
+        live = actions.add_parser(
+            "live", help="health, schema, inference and security checks"
+        )
+        live.add_argument("--url", required=True, help="base URL (https)")
+        live.add_argument("--token-file", required=True)
+        live.add_argument("--read-only-token-file")
+        live.add_argument("--golden", default="deploy/local/golden")
+        live.add_argument("--environment", required=True)
+        live.add_argument("--commit", required=True)
+        live.add_argument("--container-digest", required=True)
+        live.add_argument("--model-digest", required=True)
+        live.add_argument("--timeout", type=float, default=30.0)
+        live.add_argument("--output", required=True, help="results JSON")
+        decide = actions.add_parser(
+            "gate", help="allow or refuse a release from its evidence"
+        )
+        decide.add_argument("stage", choices=["admit", "certify"])
+        decide.add_argument("manifest", help="release manifest JSON")
+        decide.add_argument("--key-file", required=True)
+        decide.add_argument("--output", help="signed record (certify)")
+        digest = actions.add_parser(
+            "model-digest", help="digest a service reports for a version"
+        )
+        digest.add_argument("registry", help="registry directory")
+        digest.add_argument("--model", required=True)
+        digest.add_argument("--version", type=int, required=True)
+        verify = actions.add_parser(
+            "verify-record", help="check a deployment record's signature"
+        )
+        verify.add_argument("record")
+        verify.add_argument("--key-file", required=True)
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Runs the chosen action."""
+        action = getattr(self, f"run_{args.deploy_action.replace('-', '_')}")
+        return action(args)
+
+    @staticmethod
+    def read_key(path: str) -> str:
+        """Reads a key from a file (never from the command line)."""
+        key = pathlib.Path(path).read_text(encoding="utf-8").strip()
+        if not key:
+            raise errors.ConfigError(f"{path} holds no key")
+        return key
+
+    @staticmethod
+    def run_live(args: argparse.Namespace) -> int:
+        """Runs the four live checks; exit 1 if any failed."""
+        read_only = (
+            DeployCommand.read_key(args.read_only_token_file)
+            if args.read_only_token_file
+            else None
+        )
+        target = livetests.Target(
+            environment=args.environment,
+            source_commit=args.commit,
+            container_digest=args.container_digest,
+            model_digest=args.model_digest,
+            token=DeployCommand.read_key(args.token_file),
+            base_url=args.url,
+            read_only_token=read_only,
+        )
+        golden = parity.load_golden(args.golden)
+        expected = parity.read_json(pathlib.Path(args.golden) / "expected.json")
+        results = livetests.run_checks(
+            livetests.http_fetch(args.url, args.timeout),
+            target,
+            golden,
+            expected,
+        )
+        payload = [item.to_dict() for item in results]
+        pathlib.Path(args.output).write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps({item.name: item.passed for item in results}))
+        return EXIT_OK if all(item.passed for item in results) else EXIT_FAILED
+
+    @staticmethod
+    def run_gate(args: argparse.Namespace) -> int:
+        """Prints the decision; a refusal exits with the blocked status."""
+        key = DeployCommand.read_key(args.key_file)
+        candidate = deploy_release.load_candidate(args.manifest)
+        if args.stage == "admit":
+            decision = deploy_gate.admit(candidate, key)
+        else:
+            decision = deploy_gate.certify(candidate, key)
+        print(json.dumps(decision.to_dict(), indent=2, sort_keys=True))
+        if not decision.allowed:
+            return EXIT_BLOCKED
+        if decision.record is not None and args.output:
+            deploy_record.write_record(args.output, decision.record)
+        return EXIT_OK
+
+    @staticmethod
+    def run_model_digest(args: argparse.Namespace) -> int:
+        """Prints the digest a service running this version reports."""
+        store = registry_module.ModelRegistryStore(args.registry)
+        version = store.resolve(args.model, args.version)
+        print(deploy_gate.model_digest_of(store, version))
+        return EXIT_OK
+
+    @staticmethod
+    def run_verify_record(args: argparse.Namespace) -> int:
+        """Exits 0 only if the record's signature verifies."""
+        record = deploy_record.read_record(args.record)
+        valid = record.verify(DeployCommand.read_key(args.key_file))
+        print(json.dumps({"valid": valid, "digest": record.digest()}))
+        return EXIT_OK if valid else EXIT_FAILED
+
+
 class ClaimsCommand(Command):
     """Lists, shows and verifies the claims of a charter run."""
 
@@ -1131,6 +1257,7 @@ COMMANDS: tuple[Command, ...] = (
     ClaimsCommand(),
     FrameCommand(),
     LoopCommand(),
+    DeployCommand(),
 )
 
 

@@ -340,6 +340,32 @@
         "signature_sha256": "930c30c0dd0681f2b0fa82a9df84c9a892051a01444545223a9f5fe9a1981311"
       }
     },
+    "scmle.deploy.gate": {
+      "Candidate": {
+        "kind": "class",
+        "signature_sha256": "b76b4b346d11cf48184ed7a4b0994be7332c0df4ebbc6893fc5f51857768dfe7"
+      },
+      "GateDecision": {
+        "kind": "class",
+        "signature_sha256": "3738782be5f7afb622e47e54bf8bf781b8888b51e5609083fe3285b312ed43ec"
+      },
+      "ImageScan": {
+        "kind": "class",
+        "signature_sha256": "818de1ff0aa867b189cea8b8dd97d5cf952dd0f644fb3c8c7906f96eda566670"
+      },
+      "admit": {
+        "kind": "callable",
+        "signature_sha256": "965430072afe04985ecd8a6940a1a3ea864ecf09b5926536318b57f78048f24a"
+      },
+      "certify": {
+        "kind": "callable",
+        "signature_sha256": "52f5f3e58049c7328115f9abb0591e30e30b98f41e127f0a9e677e45dbeca415"
+      },
+      "model_digest_of": {
+        "kind": "callable",
+        "signature_sha256": "89fca9f414e9ca0fbde3ec22acbd8514acf2bfcb80aefee14db3dd877f12b331"
+      }
+    },
     "scmle.deploy.iac_policy": {
       "Violation": {
         "kind": "class",
@@ -348,6 +374,38 @@
       "check_tree": {
         "kind": "callable",
         "signature_sha256": "cf15f1c456297fcc84567bc98a0c0516e22d397dd87a85bf2d3f0d545cda628f"
+      }
+    },
+    "scmle.deploy.livetests": {
+      "CheckResult": {
+        "kind": "class",
+        "signature_sha256": "d5d87db18acdfa8b5c5129b5d381cf9ee784c7ecb219f7f1ae2b0d5e07f782d5"
+      },
+      "Response": {
+        "kind": "class",
+        "signature_sha256": "4eb854be6b8e3ea80d411414e5981b062ab2bfb9ceb090facb134b3e34efcd87"
+      },
+      "Target": {
+        "kind": "class",
+        "signature_sha256": "839bdffcecc93c85ccce4fa941be791dcc2e86148fae35e09ce176eb651d17db"
+      },
+      "http_fetch": {
+        "kind": "callable",
+        "signature_sha256": "710d16568b4e09301870730f8db9ac42f51732b298ccf02a1886982bfe8a7143"
+      },
+      "run_checks": {
+        "kind": "callable",
+        "signature_sha256": "b33e06fa98202aada38c7bef819d6f714b2e9aee410663a97f79ce39b4540a16"
+      }
+    },
+    "scmle.deploy.observation": {
+      "Observation": {
+        "kind": "class",
+        "signature_sha256": "60ce5b4a6dd8bb917a8376e9f6f7299b464c2010fc2c5a4eadfba3d577b3c865"
+      },
+      "Traffic": {
+        "kind": "class",
+        "signature_sha256": "f97ba6bed09e7c181aa0d6985a4ef5c7c751e34bf7acee15ee683c19aa75104d"
       }
     },
     "scmle.deploy.orphans": {
@@ -362,6 +420,20 @@
       "find_orphans": {
         "kind": "callable",
         "signature_sha256": "9fab9239f9ab51c4ba91d4aa646b49e599d327302a797e938eb4a19612260ffa"
+      }
+    },
+    "scmle.deploy.record": {
+      "DeploymentRecord": {
+        "kind": "class",
+        "signature_sha256": "6d5d8ade8acb7b7bf1dcce3529c1c03f2adea209c286b3cca3e4172868ef8cae"
+      },
+      "read_record": {
+        "kind": "callable",
+        "signature_sha256": "547ff217434e1d59e15949e7d83cde69773cf143a09088fb5fc28dff30af2da7"
+      },
+      "write_record": {
+        "kind": "callable",
+        "signature_sha256": "90a5e36c1fd90e32db8c2f2442231f2cb73d63ef1910618a5dad488a0679b2ad"
       }
     },
     "scmle.runners.aws": {

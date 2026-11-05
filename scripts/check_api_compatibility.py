@@ -17,8 +17,12 @@ from scmle.data.store import processing as store_processing
 from scmle.data.store import quality as store_quality
 from scmle.data.store import snapshot as store_snapshot
 from scmle.deploy import contract as deploy_contract
+from scmle.deploy import gate as deploy_gate
 from scmle.deploy import iac_policy as deploy_iac_policy
+from scmle.deploy import livetests as deploy_livetests
+from scmle.deploy import observation as deploy_observation
 from scmle.deploy import orphans as deploy_orphans
+from scmle.deploy import record as deploy_record
 from scmle.runners import aws as runners_aws
 from scmle.runners import base as runners_base
 from scmle.runners import checkpoint as runners_checkpoint
@@ -53,6 +57,29 @@ EXTENSION_SURFACES = {
             "SecretSource",
             "conformance_problems",
         ),
+    ),
+    "scmle.deploy.gate": (
+        deploy_gate,
+        (
+            "Candidate",
+            "GateDecision",
+            "ImageScan",
+            "admit",
+            "certify",
+            "model_digest_of",
+        ),
+    ),
+    "scmle.deploy.record": (
+        deploy_record,
+        ("DeploymentRecord", "read_record", "write_record"),
+    ),
+    "scmle.deploy.livetests": (
+        deploy_livetests,
+        ("CheckResult", "Response", "Target", "http_fetch", "run_checks"),
+    ),
+    "scmle.deploy.observation": (
+        deploy_observation,
+        ("Observation", "Traffic"),
     ),
     "scmle.deploy.iac_policy": (
         deploy_iac_policy,
