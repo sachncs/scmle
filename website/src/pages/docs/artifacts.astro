@@ -1,0 +1,140 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const readFirst = [
+  ["<code>report.html</code>", "Human-readable summary: leaderboard, test result, diagnostics."],
+  ["<code>leaderboard.parquet</code>", "Every candidate with status and cross-validation score."],
+  ["<code>evaluation.json</code>", "The one-time locked-test result and confidence intervals."],
+  ["<code>diagnostics/decision_log.json</code>", "The evidence behind each choice: what was included, rejected, deferred."],
+  ["<code>events.jsonl</code>", "Append-only state transitions and audit events (<code>split.created</code>, <code>selection.frozen</code>, <code>test.opened</code>, <code>policy.*</code>)."],
+];
+const inputs = [
+  ["<code>config.json</code>", "The complete project specification. <code>scmle resume</code> and <code>scmle run --config</code> read the same format."],
+  ["<code>execution_plan.json</code>", "The plan: resolved task, metric, validation strategy, candidate models."],
+  ["<code>dataset_manifest.json</code>, <code>dataset_profile.json</code>, <code>dataset_card.json</code>", "Row and column counts, hashes, resolved column kinds and findings. The profile also holds <code>leakage</code>: the screen's level, family size, suspects and the suspects that may block a run (only mechanisms with a passing certificate can)."],
+  ["<code>source_registry.json</code>", "Source identities and the snapshots seen."],
+  ["<code>curation_report.json</code>", "What curation found and changed: missingness, duplicates, drift, representativeness."],
+  ["<code>validation_manifest.json</code>", "Which rows went to development folds and to the locked test set."],
+];
+const charterFiles = [
+  ["<code>analysis_charter.json</code>, <code>error_budget.json</code>, <code>feasibility.json</code>", "The verified charter (hash and optional signature), its error budget, and whether the confirmation set supports the promised power."],
+  ["<code>split_manifest.json</code>", "Exploration, confirmation, embargo and final-test ids, the isolation level of each sealed set, and a full 64-hex SHA-256 over all of it. Version 1 manifests stay readable."],
+  ["<code>custody_log.jsonl</code>", "A hash-chained record of every seal, token issue, open and refused attempt. It holds ids and counts, never row values."],
+  ["<code>admissibility_table.json</code>", "One decision per feature (<code>admit</code>, <code>admit_flagged</code>, <code>quarantine</code>) with tier and reasons. A field is quarantined only by a leakage suspicion that a current, passing certificate lets gate, and only unless a valid per-column attestation keeps it."],
+  ["<code>detector_certificates.json</code>", "The certificate store the run used. When it is absent every detector is descriptive and the <code>admissibility.completed</code> event says so."],
+  ["<code>stability_report.json</code>", "Each exploration survivor re-run over the grid the charter declared (imputation, outlier rule, inclusion). Per finding: the specification curve, a verdict (<code>stable</code>, <code>fragile</code> or <code>not_evaluable</code>) with the numbers behind it, a permutation test of the whole curve, and which choice moves the estimate. Stability is relative to the declared set. A fragile verdict is a warning unless a current passing certificate lets it gate."],
+  ["<code>shift_report.json</code>", "The exploration set against the deployment sample named by <code>reference</code>. Status is <code>pass</code>, <code>fail</code> or <code>unverifiable</code>; without a deployment sample it is <code>unverifiable</code>, never <code>pass</code>. Holds classifier and kernel two-sample tests, per-feature tests under Benjamini-Hochberg, and subgroup coverage. Per-period drift is not implemented."],
+  ["<code>framing_link.json</code>", "Whether the charter's target, prediction moment and unit name real columns (<code>resolved</code>) or not (<code>unresolved</code>). Matches column names only; nothing is gated on it."],
+  ["<code>identification_plan.json</code>, <code>identification_report.json</code>, <code>falsification_report.json</code>, <code>sensitivity_report.json</code>, <code>causal_claims.json</code>", "With a charter whose estimand carries a causal block (format 4): the strategy chosen from the charter alone, the design diagnostics, the falsification battery, the sensitivity result, and the claim file with its tier, the five conditions for <code>confirmed</code>, the attestors and the hashes of the other four files. A charter no strategy identifies is <code>not_identified</code>: no estimate, action <code>refuse_claim</code>."],
+];
+const decisionKeys = [
+  ["<code>evaluation.json</code> (decision keys)", "With a charter that has a decision block and a binary task: <code>decision</code> holds the objective <code>chartered_cost</code>, the cut on the raw probability, the cost-model hash and <code>f11</code> (calibration check, rule hash, tier, expected cost with a bootstrap interval, and the span of cost ratios on which the rule beats treat-all and treat-none on development data). <code>net_benefit</code> holds the simultaneous band on the locked test set, computed once, with the claim <code>useful</code> or <code>not_useful_in_range</code>. Costs are inputs: the tier is <code>attested</code> only if every cost came from a person."],
+  ["<code>decision_report.json</code>, <code>policy_value.json</code>", "With a decision block on a binary task: cost-model hash, threshold and net benefit, the fairness result per declared constraint (<code>satisfied</code>, <code>not_satisfied</code>, <code>not_assessable</code>), and the off-policy value of the frozen rule from a randomized log (otherwise <code>not_assessable</code>). Computed once on the locked rows."],
+  ["<code>rollout_design.json</code>, <code>rollout_decisions.jsonl</code>", "With a rollout plan: the plan, its hash, the fixed-horizon sample size and the simulated expected sample number, and a hash-chained log holding the registration of the plan. No experiment ran, so there are no assignments or decisions in it."],
+];
+const ingestFiles = [
+  ["<code>ingest_catalog.json</code>", "Per table: rows and, per column, kind, non-null and distinct counts, minimum and maximum, all from aggregate queries run in the source, plus a fingerprint of those aggregates. <code>partial</code> when the budget stopped profiling."],
+  ["<code>grain_report.json</code>", "Minimal approximate keys per table, and the verdict on the charter unit (<code>match</code>, <code>finer</code>, <code>coarser</code>, <code>unknown</code>). A <code>coarser</code> or <code>unknown</code> verdict exits 2."],
+  ["<code>join_graph.json</code>", "Measured links with containment, cardinality, whether declared or name-supported, and the decision (<code>accepted</code>, <code>candidate</code>, <code>many_to_many</code>, <code>declared_violated</code>). Candidates are listed as questions."],
+  ["<code>ingest_budget.json</code>", "Queries, rows scanned and seconds spent against the limits, and where each stage stopped."],
+];
+const framingFiles = [
+  ["<code>framing_draft.json</code>", "The draft: the unsigned charter and its hash, the source of every field (<code>template</code>, <code>llm</code>, <code>data</code> or <code>human</code>), the data-side checks, and the slots left as placeholders."],
+  ["<code>charter.json</code>", "The draft charter, unsigned, readable by <code>scmle charter check</code> and signable by <code>scmle charter sign</code>. Absent when the draft is refused."],
+  ["<code>decision_cost_model.json</code>", "With <code>--cost-model</code>: the four costs and the plausible threshold range, each with its source."],
+  ["<code>baseline_report.json</code>", "With <code>--cost-model</code> and <code>--baseline-column</code>: the current process measured on the exploration rows and the selective-label finding. In a charter run it instead holds the claim, tested once on the confirmation set, that a frozen rule beats the current process over the cost range. A selective-label flag or fewer than 20 clusters makes it <code>not_issued</code> and untested."],
+  ["<code>framing_provenance.json</code>", "The highest tier the baseline claim could reach, given which fields came from a model, whether the charter is signed, and which cost entries did not come from a person."],
+  ["<code>framing_questions.json</code>", "Questions that change the verdict (with the tipping value), unknowns whose range leaves the verdict unchanged, and the open items."],
+  ["<code>framing_refusal.json</code>", "When refused: the reason (a named column the source lacks, a blocking data check, an unfillable critical slot, or language-model ambiguity above the threshold)."],
+];
+const loopFiles = [
+  ["<code>deployment_ledger.jsonl</code>", "The hash-chained record of the deployment: the charter hash, the policy and its hash, the fingerprints of keys the system holds, then observe, alarm, retrain, challenger, promotion, rollback, escalation, attestation, halt and incident rows. An attestation is bound to one escalation, carries an expiry, and is refused if signed with a key the system holds. The chain shows edits, deletions in the middle and reordering; it cannot show that the newest rows were never removed."],
+  ["<code>loop_state.json</code>", "The running state of the monitors and the batches awaiting maturity, with the ledger head it belongs to. If the head differs at the next open the loop starts halted."],
+  ["<code>risk_coverage.json</code>", "After calibration: the risk-coverage curve, its area, and the selected threshold with the fixed-sequence steps that led to it."],
+  ["<code>label_mechanism.json</code>", "How the labels of the newest usable batch were selected (<code>complete</code>, <code>logged_propensity</code>, <code>audit_slice</code> or <code>unverified</code>), whether actions may rest on it, and that a feedback loop is undetectable without a randomized bypass slice."],
+];
+const search = [
+  ["<code>trials/trial_*.json</code>", "One record per trial; finished trials are reused on resume."],
+  ["<code>diagnostics/*.json</code>", "Calibration, thresholds, classification report, error analysis, robustness, slice performance, adversarial validation, fairness, permutation importance, partial dependence, recommendations."],
+  ["<code>diagnostics/data_access.json</code>", "What every fitted operation could see, verified against the split."],
+  ["<code>explanations/</code>", "Permutation importance, partial dependence and pairwise interaction as JSON and HTML."],
+];
+const provenance = [
+  ["<code>provenance.json</code>", "Run id, software version, config hash, dataset snapshot."],
+  ["<code>release_attestation.json</code>, <code>evidence_graph.json</code>", "Digests binding the bundle, provenance and evidence together."],
+  ["<code>model_card.json</code>", "Intended use, metrics, limitations."],
+  ["<code>release_evaluation.json</code>", "Whether declared success criteria were met. With none declared it reports <code>policy_not_declared</code> and blocks; thresholds are never invented from observed metrics."],
+  ["<code>sbom.json</code>, <code>environment.lock</code>", "Dependency inventory and the exact installed versions."],
+  ["<code>capability_registry.json</code>", "Model families available, their extras and resource needs."],
+  ["<code>fault_injection_plan.json</code>", "Failure scenarios and the evidence each needs."],
+  ["<code>parameter_estimation_declaration.*</code>", "The declaration (or its absence) for parameter-estimation runs."],
+];
+const service = [
+  ["<code>model/</code>", "The signed bundle."],
+  ["<code>Dockerfile</code>, <code>.dockerignore</code>, <code>build.sh</code>", "Base image pinned by a digest placeholder that the build refuses until <code>build.sh</code> resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests."],
+  ["<code>requirements.txt</code>, <code>requirements.lock</code>, <code>environment.lock</code>", "Direct pins; the runtime closure installed with <code>--no-deps</code>; every package of the build environment."],
+  ["<code>sbom.cdx.json</code>", "CycloneDX SBOM: runtime libraries, the bundle (by manifest digest) and the base image."],
+  ["<code>provenance.json</code>", "Signed statement: the subject is the bundle digest; the materials are the files above. Verified by the service at start."],
+  ["<code>vuln-policy.json</code>", "The gate policy: block at HIGH and above, no exceptions."],
+  ["<code>base-image.lock.json</code>, <code>scan.json</code>, <code>build-metadata.json</code>, <code>image-attestation.json</code>", "Written by <code>build.sh</code>: the resolved base digest, the scanner report, the build's image digest, and the signed statement binding the image to the provenance."],
+];
+---
+
+<DocsLayout title="Artifacts & bundles" description="Every file a scmle run, ingestion, framing pass, closed loop and service package writes, and what each one proves." current="artifacts">
+  <p class="eyebrow"><span></span> Reference</p>
+  <h1>Nothing is hidden<br /><em>in memory.</em></h1>
+  <p class="lead">Every <code>MLProject.run()</code> (or <code>scmle run</code>) creates <code>runs/run_&lt;date&gt;_&lt;n&gt;/</code> under the output directory. That directory is the evidence for the result and is what <code>resume</code> and <code>verify_replay</code> read. A sibling file, <code>runs/experiments.sqlite</code>, tracks run and trial rows.</p>
+  <div class="callout"><p><strong>Reading order.</strong> Open <code>report.html</code>, then <code>diagnostics/decision_log.json</code>. Everything else is there so that a reviewer can check those two.</p></div>
+
+  <h2>Read first</h2>
+  <DocTable label="Files to read first" head={["File", "Contents"]} rows={readFirst} />
+
+  <h2>Configuration and inputs</h2>
+  <DocTable label="Configuration and input files" head={["File", "Contents"]} rows={inputs} />
+
+  <h2 id="charter-run">Extra files in a charter run</h2>
+  <p>With <code>--charter</code> a run also writes the files below. They record how the data was split, what was admitted, and what a claim rests on. See the <a href={`${base}/docs/qualification/`}>qualification instrument</a> for how they fit together.</p>
+  <DocTable label="Files written by a charter run" head={["File", "Contents"]} rows={charterFiles} />
+  <h3>Decision files</h3>
+  <DocTable label="Decision-layer files" head={["File", "Contents"]} rows={decisionKeys} />
+
+  <h2 id="ingest">Raw-data ingestion (<code>scmle ingest</code>)</h2>
+  <p><code>scmle ingest --sqlite FILE --tables a,b</code> (a read-only connection) or <code>IngestPlan</code> writes into <code>--output</code>:</p>
+  <DocTable label="Ingestion files" head={["File", "Contents"]} rows={ingestFiles} />
+  <p>Entity resolution, the feature manifest and the reconciliation report come from library modules and are written by the caller; a charter run does not produce them yet. With a charter that has an <code>ingest</code> block and <code>--ingest-plan</code>, a <code>feature_manifest.json</code> (one record per proposed feature, with its cutoff rule, as-of evidence, tier and the reason it was dropped, if it was) and <code>ingest_field_provenance.json</code> are written beside the four files above.</p>
+
+  <h2 id="framing">Problem framing (<code>scmle frame</code>)</h2>
+  <p><code>scmle frame</code> reads a request, a source description and exploration rows only, and writes into <code>--output</code>:</p>
+  <DocTable label="Framing files" head={["File", "Contents"]} rows={framingFiles} />
+  <div class="callout"><p><strong>Honest boundary.</strong> No language-model client ships; <code>--replay</code> serves recorded drafts. Every model-filled field is <code>unverified</code> until a person signs the charter. There is no calibrated threshold and no gold corpus yet, so a replayed model draft without a threshold is always refused.</p></div>
+
+  <h2 id="loop">Closed loop (<code>scmle loop</code>)</h2>
+  <p><code>Loop.open</code> (or <code>scmle loop init</code>) writes into the deployment directory:</p>
+  <DocTable label="Closed-loop files" head={["File", "Contents"]} rows={loopFiles} />
+  <p>The measured gates for the loop (H1 to H10) are recorded with the simulator and code hashes: eight passed and two, H2 and H10 (detection delay within the charter's limit), missed their floor. Agreement with a domain owner's audit and replay of recorded incident streams have not been measured, so the loop's escalation rule is not certified against a human.</p>
+
+  <h2>Search and results</h2>
+  <DocTable label="Search and result files" head={["Path", "Contents"]} rows={search} />
+
+  <h2 id="bundle">The model bundle</h2>
+  <p><code>model/</code> is the signed, checksummed bundle: <code>pipeline.joblib</code> (fitted preprocessing and estimator), <code>schema.json</code>, <code>reference.json</code> (monitoring reference profile), <code>conformal.json</code> (pooled and per-class calibration scores), <code>novelty.joblib</code> and <code>model_manifest.json</code> (checksums and signature). Bundles are pickle-based; the loading rules are on the <a href={`${base}/docs/threat-model/`}>threat model</a> page. Use <code>result.save(directory, signing_key=...)</code> to export one for deployment.</p>
+
+  <h2>Provenance and governance</h2>
+  <DocTable label="Provenance and governance files" head={["File", "Contents"]} rows={provenance} />
+
+  <h2 id="package">The service folder (<code>scmle package</code>)</h2>
+  <DocTable label="Service folder files" head={["File", "Contents"]} rows={service} />
+  <p>The attestations are HMAC-signed: they prove possession of the signing key and that the statement is unchanged. They are not public-key signatures or a transparency log, and they do not prove the build host was honest.</p>
+
+  <h2>Serving outputs</h2>
+  <ul>
+    <li><code>&lt;output&gt;.manifest.json</code> from <code>scmle batch</code>: schema version, model version, artifact digest (SHA-256 of the canonical bundle manifest), schema digest, row count, rows with nulls and with unseen categories, and the output file's digest.</li>
+    <li><code>deploy/local/golden/</code>: the hand-written reference model, golden records, closed-form expected outputs and the declared tolerances used by the <a href={`${base}/docs/service/#parity`}>parity check</a>.</li>
+  </ul>
+
+  <h2>Cleanup</h2>
+  <p><code>runs/</code> is safe to delete once you no longer need to resume or replay a run. Keep the directory of any run whose model you deployed.</p>
+
+  <p class="meta">Artifact layout of the 0.1 beta line</p>
+</DocsLayout>

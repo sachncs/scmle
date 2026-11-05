@@ -1,0 +1,98 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const commands = [
+  ["<code>scmle plan DATA --target COL</code>", "Profile the data and print the proposed plan. Trains nothing."],
+  ["<code>scmle run DATA --target COL</code>", "Execute the full workflow and write a <code>runs/run_*</code> directory."],
+  ["<code>scmle resume RUN_DIR</code>", "Continue a cancelled, failed or crashed run, reusing finished trials."],
+  ["<code>scmle catalog INPUT</code>", "Catalog a local table (or raw bytes) into a JSON artifact."],
+  ["<code>scmle predict BUNDLE DATA</code>", "Score a file with a saved bundle."],
+  ["<code>scmle batch BUNDLE DATA</code>", "Score a file through the same code path as the online service. Writes <code>--output</code> and <code>&lt;output&gt;.manifest.json</code> (model version, artifact digest, row counts). <code>--on-null</code> and <code>--on-unseen</code> accept <code>reject</code>."],
+  ["<code>scmle serve BUNDLE</code>", "Serve a bundle over HTTP: <code>/livez</code>, <code>/readyz</code>, <code>/predict</code>. See the <a href=\"" + base + "/docs/service/\">serving contract</a>."],
+  ["<code>scmle export-onnx BUNDLE</code>", "Export an ONNX graph (needs the <code>onnx</code> extra)."],
+  ["<code>scmle package BUNDLE</code>", "Write a hardened service folder: pinned-base Dockerfile, locked requirements, SBOM, signed provenance and <code>build.sh</code>. Sign with <code>SCMLE_SIGNING_KEY</code>."],
+  ["<code>scmle charter init|check|sign PATH</code>", "Create, validate or sign an analysis charter."],
+  ["<code>scmle claims list|show|verify RUN_DIR</code>", "List the claims of a charter run, show one with its hypothesis and checks, or verify the run's ledger and claims. <code>verify</code> exits 1 when any step fails."],
+  ["<code>scmle frame REQUEST --source S --data X --output DIR</code>", "Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused."],
+  ["<code>scmle ingest</code>", "Profile a read-only SQLite source, find grain and joins, and write the ingestion catalog (see <a href=\"" + base + "/docs/artifacts/#ingest\">artifacts</a>)."],
+  ["<code>scmle loop init|verify</code>", "Open and verify the hash-chained deployment ledger of the closed loop."],
+  ["<code>scmle deploy …</code>", "Live checks, the promotion gate, signed deployment records, platform observation and reconcile. See <a href=\"" + base + "/docs/cloud-release/\">Cloud release</a>."],
+];
+const options = [
+  ["<code>--target COL [COL …]</code>", "Target column(s). Required."],
+  ["<code>--task</code>, <code>--metric</code>", "Override the resolved task or metric."],
+  ["<code>--time-budget S</code>, <code>--workers N</code>", "Search budget in seconds and parallel trials."],
+  ["<code>--validation</code>", "<code>auto</code>, <code>stratified</code>, <code>random</code>, <code>group</code>, <code>temporal</code>, <code>rolling</code> and more."],
+  ["<code>--group-column</code>, <code>--time-column</code>, <code>--weight-column</code>", "Describe the structure of the data."],
+  ["<code>--exclude</code>, <code>--id-columns</code>, <code>--unavailable-at-prediction</code>", "Keep columns out of the features."],
+  ["<code>--leakage-policy {warn,block}</code>", "<code>block</code> stops the run on suspicious features that have a passing certificate."],
+  ["<code>--charter FILE</code>", "Govern the run by an analysis charter: a sealed confirmation set is split off before profiling."],
+  ["<code>--exclude-models</code>, <code>--exclude-families</code>", "Restrict the search."],
+  ["<code>--output-dir</code>, <code>--seed</code>", "Where runs go; reproducibility."],
+  ["<code>--config FILE</code>", "Read a complete project specification (the format of <code>config.json</code>)."],
+];
+---
+
+<DocsLayout title="Command line" description="Every scmle command and the common run options: plan, run, resume, catalog, predict, batch, serve, package, charter, claims, frame, loop and deploy." current="cli">
+  <p class="eyebrow"><span></span> Reference</p>
+  <h1>Run it from<br /><em>a shell.</em></h1>
+  <p class="lead">The <code>scmle</code> command mirrors the Python API. One global option, <code>--log-level {`{DEBUG,INFO,WARNING,ERROR}`}</code>, goes before the sub-command.</p>
+
+  <h2>Commands</h2>
+  <DocTable label="scmle commands" head={["Command", "Purpose"]} rows={commands} />
+
+  <h2>Options for plan and run</h2>
+  <p><code>plan</code> and <code>run</code> take the same options; <code>scmle run --help</code> lists them all. The common ones:</p>
+  <DocTable label="Common plan and run options" head={["Option", "Meaning"]} rows={options} />
+
+  <h2>Examples</h2>
+  <pre><code>{`scmle plan data.csv --target churn
+scmle run data.csv --target churn --workers 4 --time-budget 600
+scmle resume runs/run_20261015_001
+scmle catalog data.csv --label-column churn --output catalog.json
+cat payload.bin | scmle catalog --raw-bytes`}</code></pre>
+
+  <h2 id="charter">Analysis charter</h2>
+  <p>A charter fixes the question, the estimand (population, target, prediction moment, intercurrent events, summary measure), the decision map, the set sizes and the error budget before any data is profiled. The <a href={`${base}/docs/qualification/`}>qualification instrument</a> page explains what the run does with it.</p>
+  <pre><code>{`scmle charter init charter.json                 # a template that fails \`check\` until filled in
+scmle charter check charter.json --rows 5000    # validate; report whether the
+                                                # confirmation set can support the promised power
+SCMLE_SIGNING_KEY=... scmle charter sign charter.json   # add an HMAC-SHA256 signature
+scmle run data.csv --target churn --charter charter.json`}</code></pre>
+  <p><code>check</code> verifies the charter hash and, when a key is configured, the signature; a one-byte edit fails verification. The signature proves possession of the key, not the signer's identity. If the confirmation set is too small to support the promised power the run still completes: the scope becomes <code>exploratory_unconfirmed</code> and <code>feasibility.json</code> reports the detectable effect.</p>
+  <p>Format 3 charters may carry a <code>rules</code> object that fixes, before data, the online rule of the ledger (<code>ledger_rule</code>), the confirmation rule (<code>confirmation_rule</code>), the failure policy, whether <code>fragile</code> survivors are withdrawn before the confirmation set opens (<code>stability_filter</code>) and the stability thresholds (<code>s_min</code>, <code>band</code>, <code>q_min</code>). The charter hash and signature cover them. A charter without <code>rules</code> is hashed, signed and loaded exactly as before and the run uses the defaults, reporting <code>"rules": "not chartered"</code>. A run specification that names a different non-default rule than the charter is refused. The filter acts only if the stability rule has a current passing certificate for the chartered thresholds; otherwise it is recorded as requested and not applied, and the verdicts stay warnings.</p>
+
+  <h2 id="claims">Claims of a charter run</h2>
+  <pre><code>{`scmle claims list runs/run_x [--tier confirmed] [--json]
+scmle claims show runs/run_x h000003
+SCMLE_SIGNING_KEY=... scmle claims verify runs/run_x [--json]`}</code></pre>
+  <p><code>verify</code> reads the run directory only. It checks that:</p>
+  <ul>
+    <li>the ledger's hash chain verifies and every recorded decision replays;</li>
+    <li><code>confirmed_claims.json</code> names the ledger head, the survivor hash, the outcome and the confirmed set of the sealed ledger;</li>
+    <li>the multiplicity rule replayed on the recorded p-values on the confirmation set gives the recorded adjusted p-values and tiers;</li>
+    <li>the second-stage family (survivors minus withdrawn) and its hash are consistent, and no withdrawn survivor was tested on the confirmation set;</li>
+    <li>the custody log verifies, froze the selection before the confirmation set opened and opened it at most once;</li>
+    <li>the charter verifies (signature checked when a key is configured) and, if it fixes rules, the ledger and claims used them;</li>
+    <li>claims registered by hash (baseline, causal primary) are stated by the sealed ledger and their report files hash to the values it holds, and <code>negative_control.json</code> is the control the ledger recorded.</li>
+  </ul>
+  <p>A step whose input is absent is reported <code>skipped</code>, never <code>pass</code>. This proves the artifacts agree; it does not recompute statistics from data, and a party who can rewrite every file consistently can pass it. Custody is tamper-evident, not adversary-proof.</p>
+
+  <h2 id="deploy">Release evidence and the runtime</h2>
+  <pre><code>{`scmle deploy live --url https://staging.example --token-file token --environment staging \\
+  --commit <sha> --container-digest sha256:... --model-digest sha256:... --output checks.json
+scmle deploy gate admit|certify manifest.json --key-file key [--output record.json]
+scmle deploy verify-record record.json --key-file key
+scmle deploy model-digest REGISTRY --model churn --version 3
+scmle deploy observe --provider aws --input services.json --tasks tasks.json [--task-definition td.json] --output observed.json
+scmle deploy observe --provider gcp --input service.json --revisions revisions.json --output observed.json
+scmle deploy reconcile REGISTRY --model churn --environment production --observation observed.json [--ledger deployment_ledger.jsonl]`}</code></pre>
+  <p><code>live</code> runs the health, schema, inference and security checks and exits 1 if any fails. <code>gate</code> reads a release manifest and the evidence it names and exits 2 with every reason when the release is refused; <code>certify</code> writes the signed deployment record. Keys are read from files, never from the command line. <code>reconcile</code> exits 1 when the registry, the ledger and the observation disagree. The <a href={`${base}/docs/cloud-release/`}>Cloud release</a> page walks through the whole chain.</p>
+
+  <h2 id="bundles">Bundles: signed versus trusted</h2>
+  <p><code>predict</code>, <code>serve</code>, <code>export-onnx</code> and <code>package</code> load a bundle. Bundles are pickle-based, so loading requires a valid signature (set <code>SCMLE_SIGNING_KEY</code>). <code>--trusted</code> skips that for an unsigned bundle you produced yourself; never use it on a bundle from elsewhere. When <code>SCMLE_ENV=production</code>, <code>--trusted</code> (and <code>SCMLE_TRUSTED=1</code>) is refused for every command: sign the bundle and supply <code>SCMLE_SIGNING_KEY</code> instead. <code>predict</code> also takes <code>--rename INCOMING=EXPECTED</code>, <code>--case-insensitive</code> and <code>--strip-whitespace</code> for explicit column mapping.</p>
+  <div class="callout"><p><strong>Serving boundary.</strong> <code>serve</code> is a minimal reference server without TLS. On loopback it needs no credentials; on any other address it refuses to start unless the <code>SCMLE_AUTH_*</code> variables configure token verification (see <a href={`${base}/docs/tenant-isolation/`}>Tenant isolation</a>). Terminate TLS at an ingress.</p></div>
+
+  <p class="meta">Command surface of the 0.1 beta line</p>
+</DocsLayout>

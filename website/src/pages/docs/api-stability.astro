@@ -1,0 +1,74 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const surfaces = [
+  ["Qualification", "<code>scmle.contracts.qualification</code> (<code>Check</code>, <code>Claim</code>, <code>Certificate</code>, <code>Tier</code>, <code>Decision</code>, <code>SetId</code>), <code>scmle.data.ledger.budget</code>, <code>scmle.core.randomness</code>, <code>scmle.data.charter</code>, <code>scmle.data.custody</code>"],
+  ["Causal identification", "<code>scmle.data.identification</code> (<code>select</code>, <code>aipw</code>, <code>did</code>, <code>iv</code>, <code>rd</code>, <code>synth</code>, <code>sensitivity</code>, <code>battery</code>, <code>tier</code>, <code>run</code>, <code>certified</code>)"],
+  ["Decision layer", "<code>scmle.decision</code>, <code>scmle.data.charter.decision</code>"],
+  ["Closed loop", "<code>scmle.monitoring.sequential_tests</code>, <code>scmle.monitoring.labels</code>, <code>scmle.governance.escalation</code>, <code>deployment_ledger</code>, <code>never_list</code>, <code>loop</code>, and the <code>scmle loop</code> command"],
+  ["Deployment contract", "<code>scmle.deploy.contract</code>: <code>DeploymentSpec</code> with <code>ImageRef</code>, <code>BundleRef</code>, <code>SecretRef</code>, <code>Resources</code>, <code>HealthSpec</code>; <code>RuntimeReport</code>; <code>conformance_problems</code>; <code>ProviderAdapter</code>"],
+  ["Security", "<code>scmle.security.tokens</code> (<code>TokenVerifier</code>, <code>KeySet</code>, <code>VerificationKey</code>, <code>RevocationList</code>, <code>Principal</code>), <code>access</code> (<code>Gateway</code>, <code>RateLimiter</code>, <code>AccessDenied</code>), <code>audit</code> (<code>AuditLog</code>)"],
+  ["Governed data", "<code>scmle.data.store</code> (<code>objectstore</code>, <code>cloud</code>, <code>snapshot</code>, <code>quality</code>, <code>processing</code>) and <code>scmle.core.retry</code>"],
+  ["Training runners", "<code>scmle.runners</code> (<code>base</code>, <code>local</code>, <code>aws</code>, <code>gcp</code>, <code>roles</code>, <code>checkpoint</code>, <code>reproducibility</code>); the entrypoint, project workload and fakes are not pinned"],
+  ["Workflow", "<code>scmle.workflow.definition</code> (<code>Workflow</code>, <code>Step</code>, <code>StepKind</code>, <code>Schedule</code>, <code>CatchUp</code>), <code>executor</code>, <code>schedule</code>, <code>emit</code>"],
+  ["Infrastructure and release", "<code>scmle.deploy.iac_policy</code>, <code>orphans</code>, <code>gate</code>, <code>record</code>, <code>livetests</code>, <code>observation</code>, <code>control</code>, <code>ecs</code>, <code>cloudrun</code>, and <code>scmle.governance.release_state</code>. The Terraform reader and the release-manifest loader are not pinned."],
+];
+---
+
+<DocsLayout title="API stability" description="What scmle pins as its supported Python API, which modules are extension surfaces, how changes are recorded, and how to migrate an older bundle." current="api-stability">
+  <p class="eyebrow"><span></span> Reference</p>
+  <h1>Depend on<br /><em>what is pinned.</em></h1>
+  <p class="lead">The project is at <code>0.1.0b1</code>. A small top-level surface is pinned and tested; everything below it is an extension surface until it is deliberately promoted.</p>
+
+  <h2>The supported top-level API</h2>
+  <p>The supported surface is whatever <code>scmle.__all__</code> exports:</p>
+  <ul>
+    <li><code>MLProject</code>, <code>RunResult</code> and <code>ModelBundle</code> for lifecycle and artifacts;</li>
+    <li><code>load_model</code> and <code>predict</code> for inference;</li>
+    <li><code>register_estimator</code>, <code>unregister_estimator</code> and <code>register_metric</code> for extension.</li>
+  </ul>
+  <p>A test pins these exports against a committed snapshot. Removing or changing one requires a changelog entry, a migration note, and a deliberate versioning decision. Modules below <code>scmle.core</code>, <code>scmle.data</code>, <code>scmle.models</code> and the other package namespaces are extension surfaces for advanced users, but their concrete internals are not stable until they are promoted to the top level or documented as a contract. The <a href={`${base}/docs/api/`}>Python API</a> page shows the supported objects in use.</p>
+
+  <h2>Extension surfaces</h2>
+  <p>These modules are pinned the same way, in a separate block of the snapshot that records the signature of each name. A change is reported as <em>extension added</em>, <em>extension removed</em> or <em>extension contract changed</em>. None of them is part of the top-level export list, so none can change the pinned exports.</p>
+  <DocTable label="Extension surfaces" head={["Area", "Modules and names"]} rows={surfaces} />
+  <p>Pinned signatures avoid function-valued defaults (a <code>None</code> default is resolved in the body), because a function's representation carries an address and would make the snapshot differ between runs. The deployment spec format is versioned and <code>from_dict</code> refuses any other format.</p>
+  <p><strong>The rule for qualification names:</strong> new names are added without touching any entry of the pinned snapshot, and a name is promoted to the top level only deliberately, with a changelog entry and a regenerated snapshot. A test enforces both halves.</p>
+
+  <h2>Deliberate changes to the pinned surface</h2>
+  <p>Each change below added an optional keyword with a <code>None</code> default, so every existing call is unchanged, and regenerated the snapshot for the <code>MLProject</code> entry alone.</p>
+  <DocTable label="Changes to the MLProject entry" head={["Keyword", "Added for", "Also"]} rows={[
+    ["<code>charter</code>", "The analysis charter and custody", "Charter and custody modules are extension surfaces."],
+    ["<code>leakage_attestations</code>", "Per-column attestation that keeps a certified suspect", "<code>ProjectSpec</code> field; CLI flag <code>--leakage-attestations</code>."],
+    ["<code>baseline_column</code>, <code>framing_draft</code>", "Problem framing and the baseline claim", "<code>DataSpec</code> fields; CLI flags on <code>plan</code>, <code>run</code>, <code>resume</code>."],
+    ["<code>ingest_plan</code>", "Raw-data ingestion", "Charter format 7 gained an optional <code>ingest</code> field; a charter without it keeps its hash."],
+    ["<code>logged_action_column</code>, <code>propensity_column</code>", "Off-policy value of a decision rule", "A charter run with a decision block also writes the decision, policy-value and rollout files."],
+  ]} />
+
+  <h2>The leakage screen</h2>
+  <p>The profiler's fixed leakage cutoffs are gone. <code>leakage_policy</code> keeps its values and meaning, but what blocks is now a typed result, <code>DatasetProfile.blocking_leaks</code>, from a permutation screen. Behaviour you may notice:</p>
+  <ul>
+    <li>Blocking needs a passing certificate for the mechanism, which exists for binary classification only. Regression and multiclass targets get warnings with p-values.</li>
+    <li>The screen also reports a value recorded only for some outcomes when most rows are blank.</li>
+    <li><code>DatasetProfile</code> gained the optional field <code>leakage</code> (default empty). <code>target_association</code> is still computed as a descriptive statistic with no cutoff, and <code>risk.leakage_hypotheses</code> now counts screen suspects, so stored fingerprints of data that crossed a retired cutoff can differ in that one count.</li>
+    <li>In a charter run the leakage test is the same screen, so a charter run and a run without one flag the same columns.</li>
+  </ul>
+
+  <h2>Other recorded behaviour changes</h2>
+  <ul>
+    <li><strong>Uncertainty.</strong> <code>ModelBundle.predict_set</code> gained the optional argument <code>conditional</code>. <code>conformal.json</code> gained <code>class_scores</code>: bundles saved earlier load and answer pooled queries, and <code>conditional="class"</code> raises for them. The metric named <code>mase</code> is the same-rows score (the model's error divided by the no-change error on the evaluation rows); it is not the usual MASE and is not comparable with published values. Use <code>proper_scores.mase</code> or <code>mase_insample</code> for that. The <code>interval_coverage</code> reliability check now requires coverage of at least 0.88 instead of 0.85.</li>
+    <li><strong>Closed loop.</strong> No pinned entry changed. <code>ModelMonitor.performance</code> gained optional <code>propensity</code> and <code>maturity</code> arguments. Retraining now holds fresh rows out by time or by whole groups when the champion's schema has them. A <code>LoopPolicy</code> does not let an alarm retrain unless <code>alarm_gates_retrain</code> is set, and it should be set only when the detection-delay gate H2 is listed as passed for the policy's settings; today it is descriptive.</li>
+    <li><strong>Causal identification.</strong> The estimand gained an optional <code>causal</code> block, omitted from the record when unset, so charters of format 1 to 3 keep their hash and signature. A charter that carries it is format 4. <code>DecisionAction</code> gained <code>refuse_claim</code>.</li>
+    <li><strong>Decision layer.</strong> The charter gained an optional <code>decision</code> block (format 5). <code>choose_decision_threshold</code> takes the threshold from the charter's cost model when there is a decision block and the task is binary. <code>evaluation.json</code> gained <code>net_benefit</code> and, inside <code>decision</code>, <code>f11</code>.</li>
+    <li><strong>Serving.</strong> <code>HttpServing</code> gained the keyword-only <code>gateway</code> and refuses a non-loopback host without one; <code>ModalityHttpServing</code> gained <code>set_gateway</code>. The deployment ledger gained the row kind <code>audit</code> and, with the release work, <code>deployment</code>; existing ledgers and registries load unchanged.</li>
+  </ul>
+
+  <h2>What is not promised</h2>
+  <p>The project does not claim a stable v1 API until its release, compatibility, security and operational evidence is complete.</p>
+
+  <h2 id="bundle-migration">Bundle migration</h2>
+  <p>Bundle format 2 authenticates <code>schema.json</code>. Format 1 bundles are refused by default. To migrate a format 1 bundle from a source you explicitly trust, load it with <code>trusted=True, allow_legacy_format=True</code> and immediately call <code>save()</code> to write a format 2 bundle. Then verify the migrated bundle through the normal signed loading path. The <a href={`${base}/docs/migrations/`}>Migrations</a> page covers upgrade practice in general.</p>
+
+  <p class="meta">Stability policy of the 0.1 beta line</p>
+</DocsLayout>
