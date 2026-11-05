@@ -518,7 +518,7 @@ class MLProject:
         problem: tasks.ProblemSpec | None = None,
         estimand: parameter_estimation.EstimandSpec | None = None,
         estimation_policy: parameter_estimation.EstimationPolicy | None = None,
-        leakage_policy: LeakagePolicy = "block",
+        leakage_policy: LeakagePolicy = "warn",
         charter: str | pathlib.Path | None = None,
         leakage_attestations: str | pathlib.Path | None = None,
         baseline_column: str | None = None,

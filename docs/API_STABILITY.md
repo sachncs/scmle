@@ -38,9 +38,8 @@ like the other qualification modules.
 The profiler's fixed leakage cutoffs (`LEAK_ASSOCIATION`, `MISSINGNESS_LEAK`,
 the `leakage_findings` method and the `"leakage"` string match that drove
 `leakage_policy="block"`) are gone. `leakage_policy` keeps its values and its
-meaning at the top level; its default changed from `"warn"` to `"block"`
-(see the changelog), so the `MLProject` signature in
-`tests/fixtures/public_api.json` was regenerated once for that default; what blocks is now a typed
+meaning at the top level (`MLProject(...)` and the snapshot in
+`tests/fixtures/public_api.json` are unchanged); what blocks is now a typed
 result, `DatasetProfile.blocking_leaks`, from the permutation screen in
 `scmle.data.admissibility.screen`. Behaviour changes that users may notice:
 blocking needs a passing certificate for the mechanism (binary

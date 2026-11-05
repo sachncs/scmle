@@ -32,14 +32,16 @@
   `approved`, not `production`: no independent reviewer has traced it, and the
   gate stays open. `scmle.trail` is a new extension surface (additions only to
   `tests/fixtures/public_api.json`).
-* **Behaviour change: `leakage_policy` now defaults to `"block"`** (the
-  `MLProject` argument, `ProblemSpec` and `scmle run --leakage-policy`). A run
-  whose certified leakage screen finds a suspect column now stops with a
-  `BlockedError` that names it, instead of training on it and reporting an
-  inflated score (the Titanic table scored ROC AUC 0.988 with `boat` and
-  `body`, 0.885 without). Pass `leakage_policy="warn"` to keep the old
-  behaviour. The pinned `MLProject` signature in
-  `tests/fixtures/public_api.json` was regenerated for this one default.
+* `leakage_policy` stays `"warn"` by default. A flagged column is a
+  statistical suspicion, not a finding: from the data alone a leaked column
+  and a strong legitimate predictor are indistinguishable (see
+  `docs/LEAKAGE.md`), so the screen cannot be made to block without refusing
+  good columns (it flagged `worst radius`, `worst perimeter` and `worst area`
+  on the breast-cancer table). Instead the run summary now ends with a
+  `WARNING N leakage suspect(s) kept in: ...` line and `report.html` opens
+  with the findings; `block` and per-column leakage attestations remain the
+  way to act on a suspicion.
+
 * Phase 17 local evidence (`plan/evidence/phase-17/local/`,
   `scripts/make_phase17_evidence.py`, `docs/OPERATIONS.md`, `plan/phase-17-...`,
   F14). A killed local service classified as infrastructure and a shifted
