@@ -1,0 +1,90 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const endpoints = [
+  ["<code>GET /livez</code>", "200 while the process runs. Never depends on the model."],
+  ["<code>GET /readyz</code>", "200 only after <strong>verify, load and warm-up</strong> finished, in that order. Otherwise 503 with the phase, the steps done and, after a failure, the reason. A bundle that is unsigned, tampered with or the wrong digest leaves the service alive and never ready."],
+  ["<code>GET /health</code>", "Status, model version, model checksum, artifact digest (503 until ready). Kept for existing probes."],
+  ["<code>GET /schema</code>", "Input schema, <code>schema_digest</code>, request and response schemas, limits and policies (503 until ready)."],
+  ["<code>POST /predict</code>, <code>POST /v1/predict</code>", "Score records. Request schema version 1."],
+];
+const policies = [
+  ["Null in a feature", "Default policy <code>impute</code>: the fitted imputers handle it and the row's <code>rows[i].missing</code> lists the column. Policy <code>reject</code> (<code>--on-null reject</code>, <code>on_null=\"reject\"</code>): 422 <code>data_policy</code>."],
+  ["Category never seen in training", "Default <code>report</code>: scored as the encoder treats unknown values and listed in <code>rows[i].unseen</code> and <code>diagnostics.unseen_categories</code>. Policy <code>reject</code>: 422 <code>data_policy</code>."],
+  ["Extra column", "Ignored and listed in <code>diagnostics.ignored_columns</code>."],
+  ["Required key absent in some record", "422 <code>schema</code> with <code>details.missing</code> and the record positions."],
+  ["Required column absent", "422 <code>schema</code>."],
+  ["Non-numeric value in a numeric column", "422 <code>schema</code>."],
+  ["Caller expects another model schema", "The caller sends <code>expected_schema_digest</code>; a mismatch is 409 <code>schema_change</code> with both digests."],
+  ["Unknown <code>schema_version</code>", "409 <code>schema_change</code>."],
+];
+const limits = [
+  ["Request body", "16 MiB", "413"],
+  ["Records per request", "10,000", "413"],
+  ["Requests in flight", "8", "429 with <code>Retry-After: 1</code>; the request is not queued"],
+  ["Scoring time", "30 s", "504; the caller is answered, but the computation cannot be cancelled and holds its worker until it returns"],
+  ["Request I/O", "10 s", "connection closed"],
+];
+const objectives = [
+  ["Startup: process start to <code>/readyz</code> 200", "at most 30 s (verify and load dominate; grows with bundle size)"],
+  ["Latency, 1 record, p95", "at most 100 ms"],
+  ["Latency, 100 records, p95", "at most 500 ms"],
+  ["Resident memory after warm-up", "at most 400 MiB"],
+  ["CPU at idle", "under 5% of one core"],
+  ["Availability", "not claimed: it depends on the platform and replica count"],
+  ["Error rate from the service itself (5xx)", "0 on valid requests; every 5xx is a defect"],
+];
+---
+
+<DocsLayout title="Serving contract & SLO" description="What the scmle prediction service promises: endpoints, request and response schema, data policies, limits, declared objectives and parity checks, and what it does not claim." current="service">
+  <p class="eyebrow"><span></span> Serve and operate</p>
+  <h1>What the service<br /><em>promises.</em></h1>
+  <p class="lead">The generated prediction service is a reference HTTP adapter built on the standard library, for tabular bundles and for signed modality packages. Authentication, scopes, per-caller rate limits and audit come from the security layer (see <a href={`${base}/docs/tenant-isolation/`}>Tenant isolation</a>). TLS belongs to the ingress.</p>
+
+  <h2>Endpoints</h2>
+  <DocTable label="Service endpoints" head={["Path", "Meaning"]} rows={endpoints} />
+  <p><code>/livez</code> is for the orchestrator's restart decision and <code>/readyz</code> for its routing decision. Do not point both at the same path.</p>
+
+  <h2>Authentication</h2>
+  <p>With a gateway configured (required beyond loopback) every path except <code>/livez</code> and <code>/readyz</code> needs <code>Authorization: Bearer &lt;JWT&gt;</code>. The answers are 401 without a valid token (with <code>WWW-Authenticate</code>), 403 when the scope or tenant is wrong, and 429 with <code>Retry-After</code> over the per-subject rate or after repeated failures. The body is a fixed message and never says which check failed. Scopes: <code>model:read</code> for <code>/health</code> and <code>/schema</code>, <code>model:predict</code> for <code>/predict</code>.</p>
+
+  <h2>Schema version 1</h2>
+  <p><strong>Request.</strong> A <code>records</code> list of objects, plus an optional <code>schema_version</code> (<code>"1"</code>) and an optional <code>expected_schema_digest</code> (<code>"sha256:..."</code>). Unknown fields are refused. Every record must carry every required feature; a feature that is unknown for a record is sent as <code>null</code>, never omitted.</p>
+  <pre><code>{`POST /v1/predict
+{
+  "records": [{"age": 41, "plan": "pro", "tenure": null}],
+  "schema_version": "1",
+  "expected_schema_digest": "sha256:..."
+}`}</code></pre>
+  <p><strong>Response (200).</strong> <code>schema_version</code>, <code>request_id</code>, <code>model_version</code>, <code>artifact_digest</code>, <code>schema_digest</code>, <code>record_count</code>, <code>predictions</code>, <code>classes</code> and <code>probabilities</code> (classifiers), <code>schema_valid</code>, <code>diagnostics</code> and <code>rows</code> (one entry per record). The <code>artifact_digest</code> is the SHA-256 of the canonical JSON of the bundle manifest, which lists the checksum of every file, so it names the exact bundle that answered. Errors carry <code>schema_version</code>, <code>request_id</code>, <code>error</code> and <code>category</code>.</p>
+  <p>The machine-readable schemas are served at <code>/schema</code>. A change that removes or retypes a field needs a new schema version; the service refuses a <code>schema_version</code> it does not serve with 409 <code>schema_change</code>.</p>
+
+  <h2>Nulls, unseen categories and schema changes</h2>
+  <DocTable label="Data policy behaviour" head={["Input", "Behaviour"]} rows={policies} />
+
+  <h2 id="limits">Limits</h2>
+  <DocTable label="Service limits" head={["Limit", "Default", "Over the limit"]} rows={limits} />
+  <p>Scoring is serialized by a lock because the bundle may update its series history, so throughput on one process is that of one scoring thread. Scale by adding replicas, not threads.</p>
+
+  <h2>Batch scoring</h2>
+  <p><code>scmle batch BUNDLE DATA</code> scores a file through the same function the online path calls: the same validation, preprocessing, model call and policies. The output CSV is written atomically with <code>&lt;output&gt;.manifest.json</code> (model version, artifact digest, schema digest, row counts, output digest).</p>
+
+  <h2>Objectives</h2>
+  <p>These are declared targets for one replica of the container, with the limits in the deployment spec (0.5 CPU request, 1 CPU limit, 512 MiB memory limit), a tabular bundle of up to 50 MiB and requests of up to 100 records. They were set before measurement and not tuned afterwards. Numbers measured on a developer machine were recorded during the project; shared CI runners are too noisy to gate on them, so the test suite checks the mechanisms (limits, readiness, parity) and reports the timings.</p>
+  <DocTable label="Service objectives" head={["Objective", "Target"]} rows={objectives} />
+  <div class="callout"><p><strong>Not claimed.</strong> Latency under load on any cloud, autoscaling behaviour, or availability. Those need cloud tests that have not been run, and will be reported per provider without being equalised.</p></div>
+
+  <h2 id="parity">Parity</h2>
+  <p>The local deployment files hold a hand-written model, records that include nulls, an unseen category, an extra column and extreme values, expected outputs computed in closed form with numpy alone, and tolerances declared in advance: labels exact, probabilities within 1e-9 inside one process and within 1e-6 across environments. Tests check the in-process, online, batch and packaged-service paths against them, and a script can run the same check against any running service by URL.</p>
+
+  <h2>The signing key and scan exceptions are yours to configure</h2>
+  <ul>
+    <li><strong>Signing key.</strong> Set <code>SCMLE_SIGNING_KEY</code>, or point <code>SCMLE_SIGNING_KEY_FILE</code> at a file a secret manager mounts, so the key never sits in an environment variable or an image. The key signs bundles, provenance and image attestations and is read the same way when the service verifies them.</li>
+    <li><strong>Published demo key.</strong> The local demo environment file holds a key that is public. With <code>SCMLE_ENV=production</code> the service refuses to start with it, unless <code>SCMLE_ALLOW_PUBLISHED_KEY=1</code>, which only the local demo files set.</li>
+    <li><strong>What the signature proves.</strong> The signing is HMAC, so it shows the statement was made by a holder of the key and was not altered. It does not show who built the model beyond that. Do not call an image "signed and verified" in release notes until a key you manage replaces the demo key and an independent signer is in place.</li>
+    <li><strong>Scan exceptions.</strong> The vulnerability policy lists findings and unscannable packages that are waived, each with a reason and an expiry date. The <code>scmle</code> entry exists only because the scanner cannot see an unpublished package; remove it once the package is on an index.</li>
+  </ul>
+
+  <p class="meta">Serving contract of the 0.1 beta line</p>
+</DocsLayout>

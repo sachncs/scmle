@@ -1,0 +1,66 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/DocTable.astro";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const files = [
+  ["<code>deploy/local/data/*.csv</code>", "The four datasets, made by a script with fixed seeds. A check proves they still match."],
+  ["<code>deploy/local/golden/</code>", "The hand-written reference model, golden records, closed-form expected outputs and declared tolerances."],
+  ["<code>deploy/local/demo.env</code>", "The demo signing key. It is a published fixture, not a secret, and protects nothing."],
+  ["<code>compose.yaml</code>", "The API, a mock object store, a mock metrics sink and a test runner, plus the builder and the golden service."],
+  ["<code>deploy/Dockerfile</code>, <code>.dockerignore</code>", "The local image: the repository's source on hash-locked dependencies."],
+  ["<code>deploy/requirements.lock</code>", "An export of the lock file with hashes. <code>make lock</code> rewrites it, <code>make lock-check</code> fails if stale."],
+  ["<code>deploy/vuln-policy.json</code>", "The vulnerability gate policy."],
+  ["<code>scmle/deploy/mocks.py</code>", "The mock object store and metrics sink (standard library only)."],
+];
+---
+
+<DocsLayout title="Local environment" description="Run the whole scmle lifecycle on one machine with no cloud account: the make demo steps, the explicit files, the container variant, and what has and has not been run." current="local">
+  <p class="eyebrow"><span></span> Serve and operate</p>
+  <h1>The whole lifecycle,<br /><em>on one machine.</em></h1>
+  <p class="lead">Everything here runs locally with no cloud account. It is the portable core that the AWS and GCP work builds on: the same bundle, service and contracts, run locally first.</p>
+
+  <h2>One command</h2>
+  <pre><code>make demo        # native: needs only the project's Python environment</code></pre>
+  <p>Run it from the repository root, because the data and golden files are read from <code>deploy/local/</code>. It runs the steps below in order and fails if any step does not hold.</p>
+  <ol>
+    <li><strong>Train and evaluate</strong> a good model and a bad release (the same rows with the label relationship reversed).</li>
+    <li><strong>Register and package</strong> both, promote the good one with a signed approval, and write the hardened service folder (signed bundle, locked requirements, SBOM, signed provenance).</li>
+    <li><strong>Object store round trip:</strong> upload the folder to the mock object store and fetch it back by digest, refusing any file whose digest differs.</li>
+    <li><strong>Serve under production rules:</strong> <code>SCMLE_ENV=production</code>, no <code>SCMLE_TRUSTED</code>. The service verifies, loads and warms up, and <code>/readyz</code> turns 200.</li>
+    <li><strong>Predict</strong> online and in batch and compare both with the bundle.</li>
+    <li><strong>Golden-record parity</strong> against the hand-written reference model.</li>
+    <li><strong>Corrupted and unsigned copies never become ready</strong> (<code>/livez</code> 200, <code>/readyz</code> 503, <code>/predict</code> 503).</li>
+    <li><strong>Monitor and rollback drill:</strong> promote the bad release, monitor it on fresh labelled data, roll back to the good one with a signed approval, and serve the restored model.</li>
+    <li><strong>Measure and ship metrics</strong> to the mock metrics sink (startup, latency, memory).</li>
+  </ol>
+  <p>The transcript is printed and saved as <code>runs/local-demo/transcript-run.json</code>.</p>
+
+  <h2>Explicit files</h2>
+  <p>Nothing is generated at run time except the models.</p>
+  <DocTable label="Local environment files" head={["File", "What it is"]} rows={files} />
+
+  <h2>In containers</h2>
+  <pre><code>{`make demo-compose                      # linux/amd64
+make demo-compose PLATFORM=linux/arm64`}</code></pre>
+  <p><code>make image</code> resolves the base image tag to the digest of its multi-architecture index (this needs network access to the registry), writes <code>deploy/base-image.lock.json</code>, and builds with that digest. The Dockerfile's default is a placeholder digest that the build refuses, so an unresolved build cannot succeed by accident. Because the digest is the index digest, amd64 and arm64 builds share one pinned base, and the dependency lock carries wheel hashes for both.</p>
+  <p>In compose the services run as user 10001 on a read-only root filesystem with all capabilities dropped, <code>no-new-privileges</code>, memory and CPU limits, a <code>tmpfs</code> for <code>/tmp</code>, and the API under <code>SCMLE_ENV=production</code>. The builder trains and packages onto a shared volume; the test runner then calls the API over the network, checks golden parity, runs the rollback drill and ships metrics. The compose API runs the generated folder with the project's own image. The hardened image that <code>scmle package</code> describes (its own Dockerfile, SBOM, scan and attestation) is built separately by the folder's <code>build.sh</code>.</p>
+
+  <h2>What has and has not been run</h2>
+  <div class="callout"><p><strong>Recorded plainly.</strong> The point of this page is not to overclaim.</p></div>
+  <ul>
+    <li><strong>Run on a developer machine:</strong> <code>make demo</code> end to end, the unit and integration tests, and the parsing of <code>compose.yaml</code> plus client-side <code>docker compose config</code> validation.</li>
+    <li><strong>Docker was not run.</strong> The CLI was installed but its daemon was not running, so no image was built and no container started. The compose file, the Dockerfiles, <code>build.sh</code> and <code>make demo-compose</code> are therefore untested as a whole. Treat the first container run as the first test of them.</li>
+    <li><strong>Not run:</strong> the registry lookup of the base digest, the vulnerability scan against a live database, the image attestation of a real build, the arm64 build, and the two-build digest comparison. Image reproducibility is not claimed.</li>
+    <li><strong>Nothing here touches AWS or GCP.</strong></li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <ul>
+    <li><code>refusing to load an unauthenticated bundle</code>: the service runs under production rules. Package with a signing key and give the service the same key in <code>SCMLE_SIGNING_KEY</code>.</li>
+    <li><code>BASE_IMAGE is the placeholder</code>: build through <code>make image</code>, not a bare <code>docker build</code>.</li>
+    <li><code>/readyz</code> stays 503: read the <code>reason</code> in its body. The service is alive on purpose so that you can.</li>
+  </ul>
+  <p>The service behaves as described on the <a href={`${base}/docs/service/`}>serving contract</a> page; more failure patterns are on <a href={`${base}/docs/troubleshooting/`}>Troubleshooting</a>.</p>
+
+  <p class="meta">Local environment of the 0.1 beta line</p>
+</DocsLayout>
