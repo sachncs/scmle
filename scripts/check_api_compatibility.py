@@ -17,6 +17,8 @@ from scmle.data.store import processing as store_processing
 from scmle.data.store import quality as store_quality
 from scmle.data.store import snapshot as store_snapshot
 from scmle.deploy import contract as deploy_contract
+from scmle.deploy import iac_policy as deploy_iac_policy
+from scmle.deploy import orphans as deploy_orphans
 from scmle.runners import aws as runners_aws
 from scmle.runners import base as runners_base
 from scmle.runners import checkpoint as runners_checkpoint
@@ -51,6 +53,14 @@ EXTENSION_SURFACES = {
             "SecretSource",
             "conformance_problems",
         ),
+    ),
+    "scmle.deploy.iac_policy": (
+        deploy_iac_policy,
+        ("Violation", "check_tree"),
+    ),
+    "scmle.deploy.orphans": (
+        deploy_orphans,
+        ("Leftover", "OrphanReport", "find_orphans"),
     ),
     "scmle.security.tokens": (
         security_tokens,

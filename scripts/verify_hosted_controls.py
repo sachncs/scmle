@@ -118,6 +118,8 @@ def workflow_failures(root: Path) -> list[str]:
             "permissions:\n  contents: read",
             "scripts/check_pytest_skips.py",
             "scripts/verify_hosted_controls.py",
+            "scripts/check_terraform_policy.py",
+            "scripts/terraform_checks.sh",
             "scripts/verify_release_artifacts.sh",
             "-W error::ResourceWarning",
         ),

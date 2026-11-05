@@ -340,6 +340,30 @@
         "signature_sha256": "930c30c0dd0681f2b0fa82a9df84c9a892051a01444545223a9f5fe9a1981311"
       }
     },
+    "scmle.deploy.iac_policy": {
+      "Violation": {
+        "kind": "class",
+        "signature_sha256": "a68772373bdd191226fc9cbbeaeb4881d6db7b7e3005810f96c696a7897ec330"
+      },
+      "check_tree": {
+        "kind": "callable",
+        "signature_sha256": "cf15f1c456297fcc84567bc98a0c0516e22d397dd87a85bf2d3f0d545cda628f"
+      }
+    },
+    "scmle.deploy.orphans": {
+      "Leftover": {
+        "kind": "class",
+        "signature_sha256": "e3a176e0826d9026fdad9df7fe383d833818c0b2dd4143cdbda8036b894f7b28"
+      },
+      "OrphanReport": {
+        "kind": "class",
+        "signature_sha256": "133c6cace0d5742ffb2f43d323ffca4432301c76c211152e3834aba9a81c7722"
+      },
+      "find_orphans": {
+        "kind": "callable",
+        "signature_sha256": "9fab9239f9ab51c4ba91d4aa646b49e599d327302a797e938eb4a19612260ffa"
+      }
+    },
     "scmle.runners.aws": {
       "AwsContainerJobRunner": {
         "kind": "class",
