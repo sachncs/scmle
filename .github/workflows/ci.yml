@@ -28,6 +28,8 @@ jobs:
     name: infrastructure policy, fmt and validate (no credentials)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -47,6 +49,8 @@ jobs:
     name: lint, types, tests (Python ${{ matrix.python }})
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    env:
+      UV_PYTHON: ${{ matrix.python }}
     strategy:
       fail-fast: false
       matrix:
@@ -87,6 +91,8 @@ jobs:
     name: ${{ matrix.os }} (Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
+    env:
+      UV_PYTHON: ${{ matrix.python }}
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +119,8 @@ jobs:
     name: lowest supported dependency versions (Python 3.11)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      UV_PYTHON: "3.11"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -129,6 +137,8 @@ jobs:
     name: PyTorch model families (CPU)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -146,6 +156,8 @@ jobs:
     name: bounded fault and recovery matrix
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -172,6 +184,8 @@ jobs:
     name: local demo with rollback drill (Python 3.12)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -194,6 +208,8 @@ jobs:
     name: all optional capability paths (Python 3.13)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -255,6 +271,8 @@ jobs:
     name: base install without extras
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -270,6 +288,8 @@ jobs:
     name: dataset formats and optional curation dependencies
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -287,6 +307,8 @@ jobs:
     name: benchmark regression gate
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -305,6 +327,8 @@ jobs:
     name: qualification verification harness
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -328,6 +352,8 @@ jobs:
     name: static analysis and dependency audit
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
