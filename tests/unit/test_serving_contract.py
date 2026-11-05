@@ -562,3 +562,10 @@ def test_the_golden_expected_file_is_current():
     assert (
         make_serving_golden.main(["--check", "--directory", str(GOLDEN)]) == 0
     )
+
+
+def test_the_demo_override_is_explicit_and_named():
+    from scmle.deploy import verify
+
+    demo = next(iter(verify.PUBLISHED_KEYS))
+    verify.refuse_published_key(demo, True, allowed=True)

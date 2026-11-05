@@ -156,6 +156,7 @@ def start_service(
         "PORT": str(port),
         "SCMLE_ENV": environment,
         "SCMLE_SIGNING_KEY": DEMO_SIGNING_KEY,
+        "SCMLE_ALLOW_PUBLISHED_KEY": "1",
     }
     env.pop("SCMLE_TRUSTED", None)
     folder = folder.resolve()

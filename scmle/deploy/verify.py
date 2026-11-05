@@ -38,9 +38,18 @@ class Verified:
 PUBLISHED_KEYS = frozenset({"scmle-local-demo-signing-key-published-fixture"})
 
 
-def refuse_published_key(key: str | None, production: bool) -> None:
-    """Raises when production is given a key that is published in the repo."""
-    if production and key in PUBLISHED_KEYS:
+ALLOW_PUBLISHED_KEY = "SCMLE_ALLOW_PUBLISHED_KEY"
+
+
+def refuse_published_key(
+    key: str | None, production: bool, allowed: bool = False
+) -> None:
+    """Raises when production is given a key that is published in the repo.
+
+    `allowed` is the explicit, named opt-out the local demo sets; nothing
+    else should.
+    """
+    if production and key in PUBLISHED_KEYS and not allowed:
         raise errors.ArtifactError(
             "the signing key is the published demo fixture; configure a "
             f"managed key with ${SIGNING_KEY} or "
@@ -100,7 +109,9 @@ def verify_service(
     model_directory = root / "model"
     production = is_production(environ)
     key = signing.key_from_environment(environ)
-    refuse_published_key(key, production)
+    refuse_published_key(
+        key, production, environ.get(ALLOW_PUBLISHED_KEY) == "1"
+    )
     digest = provenance.bundle_digest(model_directory)
     signed = bundle_module.verify_signature(model_directory, key)
     trusted = environ.get(TRUSTED) == "1"
