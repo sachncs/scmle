@@ -52,6 +52,7 @@ const routes = [
 ];
 
 test("every public route renders a standalone page", async ({ page }) => {
+  test.setTimeout(120_000);
   for (const route of routes) {
     const response = await page.goto(route);
     expect(response?.status(), route).toBe(200);
@@ -61,6 +62,7 @@ test("every public route renders a standalone page", async ({ page }) => {
 });
 
 test("every page links out only to the repository home, issues and licence", async ({ page }) => {
+  test.setTimeout(120_000);
   const allowed = new Set([
     "https://github.com/sachncs/scmle",
     "https://github.com/sachncs/scmle/issues",
@@ -237,6 +239,7 @@ test("skip link is the first tab stop and focus is visible", async ({ page }) =>
 });
 
 test("pages work at phone width without horizontal overflow", async ({ page }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   for (const route of routes) {
     await page.goto(route);

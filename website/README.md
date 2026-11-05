@@ -38,6 +38,10 @@ production dependency audit, and `npm run build`.
 * Every number on the landing page comes from the repository README,
   `docs/BENCHMARKS.md`, or a real local run that is labelled as such. Keep it that way.
 
+`tests/axe.spec.mjs` runs axe-core (`@axe-core/playwright`, pinned) over every sitemap route in
+two states, desktop light and phone dark, and fails on any violation. Run `npm audit --omit=dev
+--audit-level=high` as the workflow does after changing dependencies.
+
 `npm run preview` backgrounds itself when it detects an AI-agent environment
 (`AI_AGENT`, `CLAUDECODE`), which makes Playwright's web server exit early; unset
 those variables when running `npm run test:e2e` locally.

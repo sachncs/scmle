@@ -67,8 +67,8 @@ const layout = [
   </div>
 
   <h2>What a dataset becomes</h2>
-  <figure class="diagram data-path" role="region" tabindex="0" aria-label="Data hand-off diagram, scrolls sideways on narrow screens">
-    <figcaption class="diagram-caption"><span>DATA HAND-OFF</span><strong>Each boundary makes an assumption explicit.</strong></figcaption>
+  <div class="diagram data-path" role="region" tabindex="0" aria-label="Data hand-off diagram, scrolls sideways on narrow screens">
+    <div class="diagram-caption"><span>DATA HAND-OFF</span><strong>Each boundary makes an assumption explicit.</strong></div>
     <div class="path-step"><span>source</span><b>CSV · JSONL · Parquet · Excel · table</b></div>
     <div class="path-line"></div>
     <div class="path-step"><span>adapter</span><b>common table contract</b></div>
@@ -78,7 +78,7 @@ const layout = [
     <div class="path-step"><span>evaluation</span><b>split · candidates · metrics · uncertainty</b></div>
     <div class="path-line"></div>
     <div class="path-step"><span>release</span><b>bundle · signature · monitor</b></div>
-  </figure>
+  </div>
   <p>Readers are deliberately boring: they translate many input forms into one internal table contract. The valuable reasoning starts after that boundary, where curation records what the rows mean and what the model is allowed to see.</p>
 
   <h2>Where the evidence lives</h2>
