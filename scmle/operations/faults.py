@@ -1029,10 +1029,11 @@ def bad_release() -> recovery.Result:
         detected_at = None
         for step in range(60):
             served = predict(plane.base(), 3)[1].get("predictions") or []
-            truth = [
-                p if rng.random() > 0.05 else 1 - p
-                for p in (known_good or [])[: len(served)]
-            ]
+            if not known_good or len(served) != len(known_good):
+                # A request that failed or came back short has no labels to
+                # compare with; it must not abort the run with a mismatch.
+                continue
+            truth = [p if rng.random() > 0.05 else 1 - p for p in known_good]
             watch.observe_outcomes(
                 float(step), signals.zero_one_losses(served, truth)
             )
@@ -1057,6 +1058,9 @@ def bad_release() -> recovery.Result:
         result.checks = {
             "the first and the bad release were promoted": first.done
             and promoted.done,
+            "the known good release answered the labelling requests": bool(
+                known_good
+            ),
             "the bad release served different answers": wrong != known_good,
             "the loss signal classified it as model performance": (
                 detected_after is not None
