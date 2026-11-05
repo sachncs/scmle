@@ -176,10 +176,10 @@ scmle loop pending deploy_c</code></pre>
 from scmle.governance import deployment_ledger as dl
 
 reply = dl.Attestation.create(
-    "alices-own-secret",          # your key, never the system's
+    "alices-own-secret",  # your key, never the system's
     escalation_id="esc-5",
-    question_hash="d1044b61...",   # copy from `scmle loop pending`
-    decision="approve",            # approve | override | reject | cannot_decide
+    question_hash="d1044b61...",  # copy from `scmle loop pending`
+    decision="approve",  # approve | override | reject | cannot_decide
     statement="I looked at the batch: the labels were mis-keyed, not the model.",
     evidence="ticket-1234",
     role="model owner",

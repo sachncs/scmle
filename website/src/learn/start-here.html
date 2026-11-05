@@ -22,7 +22,7 @@ pip install .</code></pre>
 <pre><code class="language-bash">scmle --help</code></pre>
 <p>What you should see (first lines):</p>
 <pre><code class="language-text">usage: scmle [-h] [--log-level {DEBUG,INFO,WARNING,ERROR}]
-             {plan,run,resume,catalog,predict,batch,serve,export-onnx,package,ingest,charter,claims,frame,loop,deploy} ...</code></pre>
+             {plan,run,resume,catalog,predict,batch,serve,export-onnx,package,ingest,charter,claims,frame,loop,deploy,trail} ...</code></pre>
 <p>What could go wrong: <code>scmle: command not found</code> means the environment is not active. Run the <code>source</code> line again. Every new terminal needs it.</p>
 <p>Make a working folder and copy the data into it. The data file lives in the repository's test folder:</p>
 <pre><code class="language-bash">mkdir -p ~/first-model
@@ -107,7 +107,12 @@ ev = json.loads((run / "evaluation.json").read_text())
 print("run folder       :", run)
 print("chosen model     :", ev["selected_model"])
 print("metric           :", ev["metric"])
-print("practice score   :", round(ev["selected_cv_score"], 3), "+/-", round(ev["selected_cv_std"], 3))
+print(
+    "practice score   :",
+    round(ev["selected_cv_score"], 3),
+    "+/-",
+    round(ev["selected_cv_std"], 3),
+)
 low, high = ev["cv_confidence"]["interval"]
 print("practice 95% band:", round(low, 3), "to", round(high, 3))
 print("exam score       :", round(ev["test_metrics"]["roc_auc"], 3))
@@ -115,15 +120,27 @@ unc = json.loads((run / "diagnostics" / "metric_uncertainty.json").read_text())
 print("exam 95% band    :", [round(x, 3) for x in unc["ci_95"]])
 print("dummy baseline   :", ev["baseline_cv_score"])
 print("fit health       :", ev["fit_health"]["verdict"])
-print("rows             :", ev["n_dev"], "to learn from,", ev["n_test"], "kept for the exam")
-cm = json.loads((run / "diagnostics" / "classification_report.json").read_text())
+print(
+    "rows             :",
+    ev["n_dev"],
+    "to learn from,",
+    ev["n_test"],
+    "kept for the exam",
+)
+cm = json.loads(
+    (run / "diagnostics" / "classification_report.json").read_text()
+)
 print("confusion matrix :", cm["confusion_matrix"])
-imp = json.loads((run / "diagnostics" / "permutation_importance.json").read_text())
+imp = json.loads(
+    (run / "diagnostics" / "permutation_importance.json").read_text()
+)
 if imp["truncated"]:
     print("importance       : not finished in time; raise --time-budget")
 for row in imp["features"][:4]:
     print("importance       :", row["feature"], round(row["importance"], 3))
-for item in json.loads((run / "diagnostics" / "recommendations.json").read_text()):
+for item in json.loads(
+    (run / "diagnostics" / "recommendations.json").read_text()
+):
     print("recommendation   :", item["message"])</code></pre>
 <p>Run it:</p>
 <pre><code class="language-bash">python read_results.py</code></pre>
@@ -271,13 +288,19 @@ def main():
 
     batch = data.sample(300, random_state=0)
     report = watcher.assess(batch.drop(columns=["survived"]), batch["survived"])
-    print("normal batch :", report.recommendation.action, report.recommendation.reasons)
+    print(
+        "normal batch :",
+        report.recommendation.action,
+        report.recommendation.reasons,
+    )
 
     changed = batch.copy()
     changed["fare"] = changed["fare"] * 8
     changed["pclass"] = 3
     changed["age"] = changed["age"] + 30
-    report = watcher.assess(changed.drop(columns=["survived"]), changed["survived"])
+    report = watcher.assess(
+        changed.drop(columns=["survived"]), changed["survived"]
+    )
     print("changed batch:", report.recommendation.action)
     for reason in report.recommendation.reasons:
         print("   -", reason)
@@ -305,7 +328,9 @@ import scmle
 
 def main():
     data = pd.read_csv("titanic.csv")
-    data["survived"] = data["survived"].sample(frac=1, random_state=1).to_numpy()
+    data["survived"] = (
+        data["survived"].sample(frac=1, random_state=1).to_numpy()
+    )
     project = scmle.MLProject(
         data,
         target="survived",
@@ -352,9 +377,19 @@ def main():
         store.promote("titanic", 1)
     except Exception as error:
         print("without approval:", error)
-    store.promote("titanic", 1, approval=approval_for(v1, "first release"), signing_key=KEY)
+    store.promote(
+        "titanic",
+        1,
+        approval=approval_for(v1, "first release"),
+        signing_key=KEY,
+    )
     print("after promoting v1:", store.aliases("titanic"))
-    store.promote("titanic", 2, approval=approval_for(v2, "second release"), signing_key=KEY)
+    store.promote(
+        "titanic",
+        2,
+        approval=approval_for(v2, "second release"),
+        signing_key=KEY,
+    )
     print("after promoting v2:", store.aliases("titanic"))
     previous = store.resolve("titanic", "previous")
     note = approval_for(previous, "roll back: v2 is worse")
