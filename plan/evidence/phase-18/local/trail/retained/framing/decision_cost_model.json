@@ -1,0 +1,15 @@
+{
+  "c_00": 0.0,
+  "c_01": 5.0,
+  "c_10": 1.0,
+  "c_11": 0.0,
+  "range_source": "human",
+  "sources": [
+    "human",
+    "human",
+    "human",
+    "human"
+  ],
+  "t_hi": 0.5,
+  "t_lo": 0.05
+}

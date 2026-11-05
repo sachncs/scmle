@@ -45,6 +45,7 @@ from scmle.runners import roles as runners_roles
 from scmle.security import access as security_access
 from scmle.security import audit as security_audit
 from scmle.security import tokens as security_tokens
+import scmle.trail as trail
 from scmle.workflow import definition as workflow_definition
 from scmle.workflow import emit as workflow_emit
 from scmle.workflow import executor as workflow_executor
@@ -281,6 +282,10 @@ EXTENSION_SURFACES = {
     "scmle.operations.spool": (
         operations_spool,
         ("FlushResult", "MetricsSpool"),
+    ),
+    "scmle.trail": (
+        trail,
+        ("Finding", "Report", "build", "render", "seal", "verify"),
     ),
     "scmle.operations.claim": (
         operations_claim,

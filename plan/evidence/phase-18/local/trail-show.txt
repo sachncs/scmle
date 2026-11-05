@@ -1,0 +1,141 @@
+Trail for titanic_survival v1
+charter fc0aaf6b55fb4ea2f4b07713c5d916c9ccdba0a93feb28050bd8f640cf7271c6
+head    d9d2e4e172c77d858c3e62b0ece44baea491374c5d82eb1d5848bc4d3edfbe42
+
+1. The business question and the signed charter  [question]
+    alpha_confirm: 1/20
+    charter_hash: fc0aaf6b55fb4ea2f4b07713c5d916c9ccdba0a93feb28050bd8f640c...
+    population: all rows of file://titanic_extract.csv
+    prediction_moment: boarding_date
+    question: Predict `survived` for each passenger at boarding, so the pur...
+    summary_measure: net benefit over thresholds [0.05, 0.5]
+    target: survived
+    unit: passenger_id
+    record run/analysis_charter.json  4df5c9ae690a
+
+2. Problem framing and the decision-cost model  [framing]
+    cost_sources: ['human', 'human', 'human', 'human']
+    costs: {'c_00': 0.0, 'c_01': 5.0, 'c_10': 1.0, 'c_11': 0.0}
+    data_checks_passed: True
+    field_sources: ['template']
+    framing_status: issued_with_questions
+    llm_filled: []
+    open_items: ['population', 'deployment_population', 'intercurrent_event...
+    open_questions: 0
+    threshold: 0.16666666666666666
+    record framing/decision_cost_model.json  0e949805821c
+    record framing/framing_draft.json  bbe18a2f8f2d
+    record framing/framing_questions.json  f2c7b8315b41
+
+3. KPIs, acceptance criteria and the approved expectation  [stakeholder]
+    [ok  ] A1: run/evaluation.json#test_metrics.roc_auc >= 0.8 (observed 0.903616573033708)
+    [ok  ] A2: outcomes#cases >= 200 (observed 217)
+    [ok  ] A3: outcomes#mean_cost <= 0.52 (observed 0.4009216589861751)
+    expectation: {'basis': '95% normal interval of the cost per case of the...
+    kpis: [{'direction': 'lower_is_better', 'kpi': 'Expected cost of mis-pr...
+    signed: True
+    stakeholder: stakeholder-role (the author, with the stakeholder key)
+    record inputs.json  1c9b22e073a5
+
+4. Exploratory report on the exploration rows  [exploration]
+    report: reports/exploratory_report.json
+    sha256: 5fd5f30e3b4a6707f0c26da7a287dc3f55521f248c9efad78eee3d971b276d13
+    record run/confirmed_claims.json  14b5ad47e82c
+    record run/curation_report.json  a01b562d7546
+    record run/dataset_manifest.json  7f1a92507adf
+    record run/feasibility.json  b2cda9c718d6
+    record run/hypothesis_ledger.jsonl  e9a87c39262b
+
+5. Experiment comparison  [experiments]
+    report: reports/experiment_comparison.json
+    sha256: 17f52d6b63c5eab16b0a4e9c26a39d2b26829d35b4f7b09be1ea58ad8c539183
+    record run/evaluation.json  64f615d526f0
+    record run/trials/trial_001.json  26df8f7eeb93
+    record run/trials/trial_002.json  802b89ad41f8
+    record run/trials/trial_003.json  988fa703bb3d
+    record run/trials/trial_004.json  72fbb518d5d5
+    record run/trials/trial_005.json  c051d3b342f0
+    record run/trials/trial_006.json  3ab70597a402
+    record run/trials/trial_007.json  25a9789ba843
+    record run/trials/trial_008.json  41d849f716d1
+    record run/trials/trial_009.json  002303608103
+    record run/trials/trial_010.json  f0dd2544aa5b
+    record run/trials/trial_011.json  9fcb1ffa07e7
+    record run/trials/trial_012.json  4fa007041bc4
+    record run/trials/trial_013.json  89e5981efafd
+    record run/trials/trial_014.json  e9a36920d67b
+
+6. Domain quality thresholds with reviewer evidence  [quality]
+    reviewer: reviewer-role (the author, with the reviewer key)
+    signed: True
+    statement: Read the listed records. The confirmation set (273 rows) was...
+    [ok  ] Q1: run/dataset_manifest.json#row_count >= 1000 (observed 1309)
+    [ok  ] Q2: run/evaluation.json#fit_health.verdict == healthy (observed healthy)
+    [ok  ] Q3: run/evaluation.json#cv_confidence.interval.0 >= 0.75 (observed 0.7898062883802117)
+    [ok  ] Q4: run/evaluation.json#n_test >= 200 (observed 217)
+    record framing/decision_cost_model.json  0e949805821c
+    record inputs.json  1c9b22e073a5
+    record run/confirmed_claims.json  14b5ad47e82c
+    record run/curation_report.json  a01b562d7546
+    record run/dataset_manifest.json  7f1a92507adf
+    record run/evaluation.json  64f615d526f0
+    record run/feasibility.json  b2cda9c718d6
+
+7. Model selection, claims and the bundle identity  [selection]
+    claims_outcome: confirmed
+    claims_steps: [['ledger chain verifies and decisions replay', 'pass'], ...
+    confirmation_tiers: ['confirmed', 'unverified']
+    content_id: 75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7...
+    cv_interval: [0.7898062883802117, 0.9318629898555293]
+    cv_score: 0.8608346391178705
+    metric: roc_auc
+    n_test: 217
+    run_id: run_20261105_001
+    selected_model: stacking
+    test_metrics: {'accuracy': 0.8294930875576036, 'balanced_accuracy': 0.8...
+    record run/confirmed_claims.json  14b5ad47e82c
+    record run/custody_log.jsonl  e8aef9d74a48
+    record run/evaluation.json  64f615d526f0
+    record run/hypothesis_ledger.jsonl  e9a87c39262b
+    record run/model/model_manifest.json  75aa558252e8
+    record run/split_manifest.json  6be8e318be3b
+
+8. Deployment approval and release state  [approval]
+    approval: {'approved_at': '2026-11-05T07:16:57.315236+00:00', 'decision...
+    bundle_signed: True
+    champion_version: 1
+    model: titanic_survival
+    registered_content_id: 75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b0...
+    release_state: approved
+    run_id: run_20261105_001
+    version: 1
+    record registry/audit.jsonl  70245a00e726
+    record registry/registry.json  0b5394195714
+    record registry/release_state.json  59bd3627bdb3
+
+9. Production decisions in the deployment ledger  [deployment]
+    answered: 217
+    batches: 7
+    cases: 217
+    charter_hash: fc0aaf6b55fb4ea2f4b07713c5d916c9ccdba0a93feb28050bd8f640c...
+    escalated: 0
+    halted: False
+    ledger_head: c807a20051baf4611172980d0258b4fd87d34d91bbf64b71f68f6ac652...
+    ledger_rows: 8
+    row_kinds: {'observe_summary': 7, 'open': 1}
+    scope: 75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4...
+    record deployment/deployment_ledger.jsonl  6c3a69797fbc
+    record deployment/loop_state.json  39d7827ea9e9
+    record deployment/observed_outcomes.json  0cb5a6e0c786
+
+10. Observed outcomes against the approved expectation  [outcomes]
+    approved_range: [0.28, 0.52]
+    cases: 217
+    interval: [0.28926509807597345, 0.5125782198963768]
+    mean_cost: 0.4009216589861751
+    report: reports/outcome_tracking.json
+    sha256: 4f8f25428291d56955e7727e1dbd312ec9d42b7f250c4c04b5823fb16e3bbf01
+    status: within
+    record deployment/observed_outcomes.json  0cb5a6e0c786
+    record framing/decision_cost_model.json  0e949805821c
+

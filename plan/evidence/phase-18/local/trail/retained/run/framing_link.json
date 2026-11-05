@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "fields": {
+    "target": {
+      "text": "survived",
+      "columns": [
+        "survived"
+      ],
+      "status": "resolved"
+    },
+    "prediction_moment": {
+      "text": "boarding_date",
+      "columns": [
+        "boarding_date"
+      ],
+      "status": "resolved"
+    },
+    "unit": {
+      "text": "passenger_id",
+      "columns": [
+        "passenger_id"
+      ],
+      "status": "resolved"
+    }
+  },
+  "gating": false
+}

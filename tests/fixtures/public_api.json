@@ -808,6 +808,32 @@
         "signature_sha256": "a2595b470c83be98251c6957c3531977742fb0bf4d0d4247b3fed996757cdb54"
       }
     },
+    "scmle.trail": {
+      "Finding": {
+        "kind": "class",
+        "signature_sha256": "af1cc5a9881d4adc9bc98134b183db70e27de50716127d29c83acadbf64745bf"
+      },
+      "Report": {
+        "kind": "class",
+        "signature_sha256": "2e2bc0d3d0450b162162e731b3fcd4f02f5040562b2c7a17748c9bddd9eb5e61"
+      },
+      "build": {
+        "kind": "callable",
+        "signature_sha256": "61f1b2fafa75940157cffac318f9e0012213e6d5af41b746afbd09d93ba71961"
+      },
+      "render": {
+        "kind": "callable",
+        "signature_sha256": "267d9e0f37c939abe722413d469fe9dea8e95952e30593895d79eafd0c6d1b3f"
+      },
+      "seal": {
+        "kind": "callable",
+        "signature_sha256": "1128197e207f27fd24a3553ba0adc5b9fbfbbdaa013d2d36b347a35c910cd654"
+      },
+      "verify": {
+        "kind": "callable",
+        "signature_sha256": "1128197e207f27fd24a3553ba0adc5b9fbfbbdaa013d2d36b347a35c910cd654"
+      }
+    },
     "scmle.workflow.definition": {
       "CatchUp": {
         "kind": "class",

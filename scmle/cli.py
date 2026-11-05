@@ -53,6 +53,9 @@ from scmle.inference import parity
 from scmle.inference import serving
 from scmle.optimization import optimizers
 from scmle.security import access
+from scmle.trail import builder as trail_build
+from scmle.trail import chain as trail_chain
+from scmle.trail import show as trail_show
 
 LOGGER = logging.getLogger(__name__)
 EXIT_OK = 0
@@ -1327,6 +1330,83 @@ class FrameCommand(Command):
         )
 
 
+class TrailCommand(Command):
+    """Builds, verifies and prints the trail of one deployed model."""
+
+    name = "trail"
+    help = "build, verify or show the business trail of a deployed model"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the `build`, `verify` and `show` actions."""
+        actions = parser.add_subparsers(dest="trail_action", required=True)
+        build = actions.add_parser(
+            "build", help="copy the retained records and seal the trail"
+        )
+        build.add_argument("output", help="trail folder to write")
+        build.add_argument("--run", required=True, help="charter run folder")
+        build.add_argument("--framing", required=True, help="frame output")
+        build.add_argument("--registry", required=True, help="registry root")
+        build.add_argument(
+            "--deployment",
+            required=True,
+            help="loop folder with observed_outcomes.json",
+        )
+        build.add_argument("--inputs", required=True, help="signed inputs")
+        verify = actions.add_parser(
+            "verify", help="check a trail folder against its own records"
+        )
+        verify.add_argument("trail_dir")
+        show = actions.add_parser("show", help="print the trail")
+        show.add_argument("trail_dir")
+        for sub in (build, verify):
+            sub.add_argument(
+                "--keys",
+                help="JSON file mapping analyst, stakeholder and reviewer "
+                "to keys; default: SCMLE_SIGNING_KEY for the analyst only",
+            )
+            sub.add_argument("--json", action="store_true")
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Runs the chosen action."""
+        if args.trail_action == "show":
+            print(trail_show.render(args.trail_dir))
+            return EXIT_OK
+        keys = self.keys(args.keys)
+        if args.trail_action == "build":
+            report = trail_build.build(
+                args.output,
+                run_dir=args.run,
+                framing_dir=args.framing,
+                registry_dir=args.registry,
+                deployment_dir=args.deployment,
+                inputs_file=args.inputs,
+                keys=keys,
+            )
+        else:
+            report = trail_chain.verify(args.trail_dir, keys)
+        if args.json:
+            print(json.dumps(report.to_dict(), indent=2))
+        else:
+            for found in report.findings:
+                print(f"{found.kind:<30}{found.step}: {found.detail}")
+            print(
+                f"{report.steps} steps, head {report.head[:12]}; "
+                + ("verified" if report.ok else "NOT verified")
+            )
+        if not report.ok:
+            raise errors.ArtifactError("trail verification failed")
+        return EXIT_OK
+
+    @staticmethod
+    def keys(path: str | None) -> dict[str, str | None]:
+        """Keys by role from a file, else the environment key as analyst."""
+        if path:
+            loaded = json.loads(pathlib.Path(path).read_text("utf-8"))
+            return {str(k): str(v) for k, v in loaded.items()}
+        configured = signing.key_from_environment(os.environ)
+        return {"analyst": configured}
+
+
 COMMANDS: tuple[Command, ...] = (
     PlanCommand(),
     RunCommand(),
@@ -1343,6 +1423,7 @@ COMMANDS: tuple[Command, ...] = (
     FrameCommand(),
     LoopCommand(),
     DeployCommand(),
+    TrailCommand(),
 )
 
 

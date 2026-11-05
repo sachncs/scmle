@@ -1,0 +1,45 @@
+{
+  "trial_id": "trial_011",
+  "model_name": "hist_gradient_boosting",
+  "status": "pruned",
+  "metric": "roc_auc",
+  "score_mean": 0.8365614674718013,
+  "score_std": 0.0,
+  "fold_scores": [
+    0.8365614674718013
+  ],
+  "fit_seconds": 0.15154324998729862,
+  "error": "pruned after the first rung",
+  "params": {
+    "learning_rate": 0.048071412104777535,
+    "max_leaf_nodes": 17,
+    "min_samples_leaf": 30,
+    "l2_regularization": 0.04015483929661992
+  },
+  "strategy": "calibrated",
+  "observed_access": [
+    {
+      "fit": {
+        "rows": 621,
+        "digest": "4f624ed98e819e2e"
+      },
+      "evaluate": {
+        "rows": 198,
+        "digest": "60a66d708031485a"
+      }
+    }
+  ],
+  "evaluation_config": {
+    "metric": "roc_auc",
+    "folds": 1,
+    "seed": 7,
+    "weighted": false
+  },
+  "runtime": {
+    "python": "3.14.7",
+    "libraries": {}
+  },
+  "train_scores": [
+    0.9283554951915705
+  ]
+}

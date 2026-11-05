@@ -1,0 +1,32 @@
+{
+  "models": {
+    "titanic_survival": {
+      "versions": {
+        "1": {
+          "model": "titanic_survival",
+          "version": 1,
+          "registered_at": "2026-11-05T07:16:57.314580+00:00",
+          "metrics": {
+            "roc_auc": 0.903616573033708,
+            "pr_auc": 0.8910016298936917,
+            "log_loss": 0.3995155174707099,
+            "f1": 0.7978142076502732,
+            "balanced_accuracy": 0.8280811095505618,
+            "accuracy": 0.8294930875576036
+          },
+          "config": {
+            "seed": 7,
+            "charter": "framing/charter.json"
+          },
+          "run_id": "run_20261105_001",
+          "path": "titanic_survival/v1",
+          "content_id": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+          "signed": true
+        }
+      },
+      "aliases": {
+        "champion": 1
+      }
+    }
+  }
+}

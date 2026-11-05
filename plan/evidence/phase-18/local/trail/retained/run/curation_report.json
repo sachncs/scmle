@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "manifest": {
+    "dataset_id": "ds_3b4683ab",
+    "schema_hash": "8ca499be89ce8a75",
+    "data_hash": "3b4683ab7409c5be",
+    "row_count": 1309,
+    "column_count": 12,
+    "target": "survived",
+    "uri": "/var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/tmpp_k9tjxm/data.csv",
+    "snapshot_id": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+    "modality": "tabular",
+    "task": "",
+    "schema_version": 1,
+    "source": {
+      "owner": "",
+      "acquisition_method": "local-file",
+      "captured_at": "",
+      "timezone": "",
+      "sampling_frame": "",
+      "units": {},
+      "semantic_definitions": {},
+      "extraction_query": "",
+      "object_prefix": "",
+      "license": "",
+      "access_policy": ""
+    },
+    "lineage": {
+      "source_snapshot": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+      "parent_datasets": [],
+      "transformations": [],
+      "label_source": "",
+      "label_generator_version": "",
+      "annotator_version": "",
+      "adjudication_status": "",
+      "partition_ids": [],
+      "object_hashes": {
+        "tabular-frame": "3b4683ab7409c5be",
+        "raw-source": "bba014e8a773a4a80c0935fa1905f75ae7323a96571b0c42d2493cfeed9a3794"
+      },
+      "schema_evolution": ""
+    },
+    "privacy": {
+      "classification": "unclassified",
+      "contains_pii": false,
+      "sensitive_fields": [],
+      "consent_basis": "",
+      "retention_period": "",
+      "deletion_policy": "",
+      "access_policy": "",
+      "redaction_required": false
+    },
+    "findings": []
+  },
+  "source_rows": 1309,
+  "profiled_rows": 819,
+  "read_seconds": 0.0032745829958003014,
+  "streamed": false,
+  "cleaning_notes": [],
+  "quality_findings": [
+    {
+      "id": "quality.af3a0f3e1ef833ee",
+      "rule_version": "pipeline-observation.v1",
+      "severity": "warning",
+      "confidence": 1.0,
+      "affected_scope": {
+        "category": "quality"
+      },
+      "evidence": {
+        "message": "111 duplicate rows"
+      },
+      "remediation": "Review the observation and record a disposition.",
+      "owner": "pipeline",
+      "reviewer": null,
+      "disposition": "open",
+      "blocking": false,
+      "timestamp": "2026-11-05T07:16:18.056486+00:00"
+    },
+    {
+      "id": "quality.e34b339f69aba194",
+      "rule_version": "pipeline-observation.v1",
+      "severity": "warning",
+      "confidence": 1.0,
+      "affected_scope": {
+        "category": "quality"
+      },
+      "evidence": {
+        "message": "21 feature combinations have inconsistent labels"
+      },
+      "remediation": "Review the observation and record a disposition.",
+      "owner": "pipeline",
+      "reviewer": null,
+      "disposition": "open",
+      "blocking": false,
+      "timestamp": "2026-11-05T07:16:18.056509+00:00"
+    },
+    {
+      "id": "quality.23665cf238d32e12",
+      "rule_version": "pipeline-observation.v1",
+      "severity": "warning",
+      "confidence": 1.0,
+      "affected_scope": {
+        "category": "quality"
+      },
+      "evidence": {
+        "message": "missingness of 'age' is associated with the target (chi-square, effect 0.12, p=8.7e-04)"
+      },
+      "remediation": "Review the observation and record a disposition.",
+      "owner": "pipeline",
+      "reviewer": null,
+      "disposition": "open",
+      "blocking": false,
+      "timestamp": "2026-11-05T07:16:18.056520+00:00"
+    },
+    {
+      "id": "quality.7e5b1533cc71fd1a",
+      "rule_version": "pipeline-observation.v1",
+      "severity": "warning",
+      "confidence": 1.0,
+      "affected_scope": {
+        "category": "quality"
+      },
+      "evidence": {
+        "message": "label noise: 20% of 819 checked rows have a label that a model trained without them contradicts confidently; review before trusting scores"
+      },
+      "remediation": "Review the observation and record a disposition.",
+      "owner": "pipeline",
+      "reviewer": null,
+      "disposition": "open",
+      "blocking": false,
+      "timestamp": "2026-11-05T07:16:18.056526+00:00"
+    }
+  ],
+  "risk_findings": [],
+  "feature_columns": {
+    "numeric": [
+      "pclass",
+      "age",
+      "sibsp",
+      "parch",
+      "fare"
+    ],
+    "categorical": [
+      "sex",
+      "embarked"
+    ],
+    "text": []
+  },
+  "dropped_columns": {
+    "passenger_id": "id column",
+    "boarding_date": "excluded by user",
+    "boat": "not available at prediction time (feature-availability contract)",
+    "body": "not available at prediction time (feature-availability contract)"
+  },
+  "release_ready": true,
+  "unresolved_blocking_findings": []
+}
