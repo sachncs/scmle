@@ -10,6 +10,7 @@ import sys
 import joblib
 import pytest
 
+import scmle
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
 from scmle.deploy import attest
@@ -100,6 +101,10 @@ def test_the_placeholder_digest_stops_the_build(signed_service):
             check=False,
         )
 
+    assert block.index(PLACEHOLDER) < block.index("*@sha256:*)")
+    assert "exit 1" in block
+    if shutil.which("sh") is None:
+        return
     stopped = run(f"python:3.12-slim@{PLACEHOLDER}")
     assert stopped.returncode == 1 and "placeholder" in stopped.stderr
     assert run("python:3.12-slim").returncode == 1
@@ -514,7 +519,9 @@ def test_the_gate_checks_that_the_scan_covered_the_sbom(signed_service):
         ]
     }
     assert vuln_gate.evaluate(covered, POLICY, document, TODAY)["passed"]
-    covered["dependencies"].pop()
+    covered["dependencies"] = [
+        item for item in covered["dependencies"] if item["name"] != "numpy"
+    ]
     verdict = vuln_gate.evaluate(covered, POLICY, document, TODAY)
     assert not verdict["passed"] and verdict["sbom_components_not_scanned"]
 
@@ -549,3 +556,30 @@ def test_the_shipped_policy_is_valid():
     policy = json.loads((ROOT / "deploy" / "vuln-policy.json").read_text())
     vuln_gate.check_policy(policy, TODAY)
     assert policy["fail_at_or_above"] == "HIGH"
+
+
+def test_the_framework_may_be_unscanned_only_while_its_exception_lives(
+    signed_service,
+):
+    document = json.loads((signed_service / "sbom.cdx.json").read_text())
+    scanned = {
+        "dependencies": [
+            {"name": item["name"], "version": item["version"], "vulns": []}
+            for item in document["components"]
+            if item["type"] == "library" and item["name"] != "scmle"
+        ]
+    }
+    assert "scmle" in {item["name"] for item in document["components"]}
+    waived = vuln_gate.evaluate(
+        scanned, vuln_gate.DEFAULT_POLICY, document, TODAY
+    )
+    assert waived["passed"] and not waived["sbom_components_not_scanned"]
+    expired = vuln_gate.evaluate(
+        scanned, vuln_gate.DEFAULT_POLICY, document, datetime.date(2028, 1, 1)
+    )
+    assert not expired["passed"]
+    assert expired["sbom_components_not_scanned"] == [
+        f"scmle=={scmle.__version__}"
+    ]
+    no_waiver = vuln_gate.evaluate(scanned, POLICY, document, TODAY)
+    assert not no_waiver["passed"]

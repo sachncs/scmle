@@ -22,7 +22,19 @@ import sys
 from typing import Any
 
 SEVERITIES = ("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL")
-DEFAULT_POLICY = {"fail_at_or_above": "HIGH", "exceptions": []}
+DEFAULT_POLICY: dict[str, Any] = {
+    "fail_at_or_above": "HIGH",
+    "exceptions": [],
+    "unscanned_exceptions": [
+        {
+            "name": "scmle",
+            "reason": "the framework is installed from the project's own "
+            "build, not from an index a scanner can query; its dependencies "
+            "are scanned",
+            "expires": "2027-06-30",
+        }
+    ],
+}
 
 
 class GateError(Exception):
@@ -109,6 +121,24 @@ def sbom_components(sbom: dict[str, Any]) -> set[str]:
     }
 
 
+def active_entries(
+    items: list[dict[str, Any]], key: str, today: datetime.date
+) -> dict[str, str]:
+    """Return the unexpired entries of an exception list by `key`."""
+    active = {}
+    for item in items:
+        for field in (key, "reason", "expires"):
+            if not str(item.get(field, "")).strip():
+                raise GateError(f"exception lacks {field!r}: {item}")
+        try:
+            expires = datetime.date.fromisoformat(item["expires"])
+        except ValueError as error:
+            raise GateError(f"bad expiry in {item[key]}") from error
+        if expires >= today:
+            active[item[key]] = item["reason"]
+    return active
+
+
 def check_policy(
     policy: dict[str, Any], today: datetime.date
 ) -> dict[str, str]:
@@ -116,18 +146,8 @@ def check_policy(
     threshold = policy.get("fail_at_or_above")
     if threshold not in SEVERITIES:
         raise GateError(f"fail_at_or_above must be one of {SEVERITIES}")
-    active = {}
-    for item in policy.get("exceptions", []):
-        for key in ("id", "reason", "expires"):
-            if not str(item.get(key, "")).strip():
-                raise GateError(f"exception lacks {key!r}: {item}")
-        try:
-            expires = datetime.date.fromisoformat(item["expires"])
-        except ValueError as error:
-            raise GateError(f"bad expiry in {item['id']}") from error
-        if expires >= today:
-            active[item["id"]] = item["reason"]
-    return active
+    active_entries(policy.get("unscanned_exceptions", []), "name", today)
+    return active_entries(policy.get("exceptions", []), "id", today)
 
 
 def evaluate(
@@ -162,7 +182,16 @@ def evaluate(
             raise GateError(
                 "cannot check SBOM coverage: the report lists no packages"
             )
-        uncovered = sorted(sbom_components(sbom) - scanned)
+        waived = set(
+            active_entries(
+                policy.get("unscanned_exceptions", []), "name", today
+            )
+        )
+        uncovered = sorted(
+            item
+            for item in sbom_components(sbom) - scanned
+            if item.split("==")[0] not in waived
+        )
     passed = not blocking and not uncovered
     return {
         "passed": passed,
