@@ -134,6 +134,7 @@ def project(
     """A project with the suite's shared settings."""
     kw.setdefault("time_budget", BUDGET)
     kw.setdefault("workers", 2)
+    kw.setdefault("leakage_policy", "warn")  # public tables, see run_benchmarks
     return scmle.MLProject(frame, target, output_dir=root, **kw)
 
 
@@ -424,6 +425,7 @@ def streaming_case(root: pathlib.Path) -> Row:
         task="classification",
         time_budget=BUDGET,
         workers=2,
+        leakage_policy="warn",
         output_dir=root,
         memory_budget_gb=0.05,
     ).run()

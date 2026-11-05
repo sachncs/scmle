@@ -120,6 +120,9 @@ def run_one(
                 time_budget=budget,
                 workers=workers,
                 time_column=dataset.time_column,
+                # The benchmark measures model quality on public tables whose
+                # strong legitimate predictors the leakage screen flags.
+                leakage_policy="warn",
                 time_as_feature=dataset.time_as_feature,
                 seed=seed,
                 output_dir=root / f"{dataset.name}-{seed}",

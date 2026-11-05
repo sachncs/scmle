@@ -118,6 +118,7 @@ def fast_project(
     )
     kwargs.setdefault("enforcement", "cooperative")
     kwargs.setdefault("time_budget", 120)
+    kwargs.setdefault("leakage_policy", "warn")  # the checks set it themselves
     return scmle.MLProject(data, target, output_dir=directory, **kwargs)
 
 
