@@ -18,7 +18,7 @@ data "aws_caller_identity" "current" {}
 # of plain-HTTP bucket access.
 data "aws_iam_policy_document" "kms" {
   statement {
-    sid       = "Administer"
+    sid = "Administer"
     actions = [
       "kms:CancelKeyDeletion",
       "kms:CreateAlias",
