@@ -596,6 +596,28 @@
         "signature_sha256": "5b41904b25ac2a8c010ef4fc88e3e2143e5423bde07e22e66d9f2b2323571da8"
       }
     },
+    "scmle.operations.recovery": {
+      "Fault": {
+        "kind": "class",
+        "signature_sha256": "e8821365971dba8585b9463bd5ef9cd95c7d6a407b5e5ce4883b3b2e67587ece"
+      },
+      "Measurement": {
+        "kind": "class",
+        "signature_sha256": "9531acd319438b6d787c5133acc3d930ac72a8dfb5609b1613d200ddd8bc561d"
+      },
+      "Objective": {
+        "kind": "class",
+        "signature_sha256": "aa97f472dfb3fea3bd67323da7ce6500152f03ff290f3f16c68ac0b19dc09306"
+      },
+      "Result": {
+        "kind": "class",
+        "signature_sha256": "176e321df6010b47367cb503d67c30e3f7e36daf346b8c82edaff170ffcbeb0e"
+      },
+      "Runner": {
+        "kind": "class",
+        "signature_sha256": "1e541c96ee0750a82c865b1528c18fa85a6b2d908177b771b08f36460376265e"
+      }
+    },
     "scmle.operations.signals": {
       "Category": {
         "kind": "class",
@@ -620,6 +642,16 @@
       "WindowPolicy": {
         "kind": "class",
         "signature_sha256": "972e5a4bdb41576807e677b5a561976d6f71e7f456595490c1632b67fd971c59"
+      }
+    },
+    "scmle.operations.spool": {
+      "FlushResult": {
+        "kind": "class",
+        "signature_sha256": "177e6e7e0a4d53c8f45a40a297e39eb46eeb5cfc2a49bdd2511a1f6e9040374f"
+      },
+      "MetricsSpool": {
+        "kind": "class",
+        "signature_sha256": "d940b79a4ce3286b98be6c94b7d98fc823819b6971dda22692912d7f1baee9c4"
       }
     },
     "scmle.runners.aws": {

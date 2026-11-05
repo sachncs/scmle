@@ -31,7 +31,9 @@ from scmle.operations import classify as operations_classify
 from scmle.operations import continuous as operations_continuous
 from scmle.operations import exporters as operations_exporters
 from scmle.operations import notify as operations_notify
+from scmle.operations import recovery as operations_recovery
 from scmle.operations import signals as operations_signals
+from scmle.operations import spool as operations_spool
 from scmle.runners import aws as runners_aws
 from scmle.runners import base as runners_base
 from scmle.runners import checkpoint as runners_checkpoint
@@ -270,6 +272,14 @@ EXTENSION_SURFACES = {
             "TrainingHistory",
             "post_promotion_check",
         ),
+    ),
+    "scmle.operations.recovery": (
+        operations_recovery,
+        ("Fault", "Measurement", "Objective", "Result", "Runner"),
+    ),
+    "scmle.operations.spool": (
+        operations_spool,
+        ("FlushResult", "MetricsSpool"),
     ),
     "scmle.operations.notify": (
         operations_notify,

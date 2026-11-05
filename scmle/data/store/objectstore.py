@@ -106,6 +106,19 @@ def check_key(key: str) -> str:
     return key
 
 
+def is_temporary(name: str) -> bool:
+    """Whether a file name is a half-written temp file, not an object.
+
+    Both the exclusive-create path (``.put-*``) and
+    `scmle.durability.write_atomically` (``.<name>.<random>.tmp``) write a
+    temp file first. A writer killed between the two steps leaves one behind;
+    it must not make the store unlistable.
+    """
+    return name.startswith(".put-") or (
+        name.startswith(".") and name.endswith(".tmp")
+    )
+
+
 def check_prefix(prefix: str) -> str:
     """Returns `prefix` (empty, or a key optionally ending in `/`)."""
     if prefix:
@@ -258,7 +271,7 @@ class LocalObjectStore(ObjectStore):
         check_prefix(prefix)
         found = []
         for path in sorted(self.root.rglob("*")):
-            if not path.is_file() or path.name.startswith(".put-"):
+            if not path.is_file() or is_temporary(path.name):
                 continue
             key = path.relative_to(self.root).as_posix()
             if key.startswith(prefix):
