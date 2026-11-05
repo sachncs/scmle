@@ -1,0 +1,161 @@
+{
+  "blocks_parsed": 260,
+  "files_parsed": 33,
+  "resources": {
+    "aws/dev": {},
+    "aws/module": {
+      "aws_apigatewayv2_api": 1,
+      "aws_apigatewayv2_authorizer": 1,
+      "aws_apigatewayv2_integration": 1,
+      "aws_apigatewayv2_route": 1,
+      "aws_apigatewayv2_stage": 1,
+      "aws_apigatewayv2_vpc_link": 1,
+      "aws_appautoscaling_policy": 1,
+      "aws_appautoscaling_target": 1,
+      "aws_budgets_budget": 1,
+      "aws_cloudwatch_log_group": 2,
+      "aws_cloudwatch_metric_alarm": 3,
+      "aws_ecr_repository": 1,
+      "aws_ecs_cluster": 1,
+      "aws_ecs_service": 1,
+      "aws_ecs_task_definition": 1,
+      "aws_eip": 1,
+      "aws_iam_role": 4,
+      "aws_iam_role_policy": 4,
+      "aws_internet_gateway": 1,
+      "aws_kms_alias": 1,
+      "aws_kms_key": 1,
+      "aws_lb": 1,
+      "aws_lb_listener": 1,
+      "aws_lb_target_group": 1,
+      "aws_nat_gateway": 1,
+      "aws_route_table": 2,
+      "aws_route_table_association": 2,
+      "aws_s3_bucket": 1,
+      "aws_s3_bucket_policy": 1,
+      "aws_s3_bucket_public_access_block": 1,
+      "aws_s3_bucket_server_side_encryption_configuration": 1,
+      "aws_s3_bucket_versioning": 1,
+      "aws_secretsmanager_secret": 1,
+      "aws_security_group": 3,
+      "aws_sns_topic": 1,
+      "aws_sns_topic_subscription": 1,
+      "aws_subnet": 2,
+      "aws_vpc": 1,
+      "aws_vpc_endpoint": 1,
+      "aws_vpc_security_group_egress_rule": 3,
+      "aws_vpc_security_group_ingress_rule": 2
+    },
+    "aws/production": {},
+    "aws/staging": {},
+    "gcp/dev": {},
+    "gcp/module": {
+      "google_artifact_registry_repository": 1,
+      "google_artifact_registry_repository_iam_member": 2,
+      "google_billing_budget": 1,
+      "google_cloud_run_v2_service": 1,
+      "google_cloud_run_v2_service_iam_member": 2,
+      "google_compute_network": 1,
+      "google_compute_subnetwork": 1,
+      "google_iam_workload_identity_pool": 1,
+      "google_iam_workload_identity_pool_provider": 1,
+      "google_kms_crypto_key": 1,
+      "google_kms_crypto_key_iam_member": 1,
+      "google_kms_key_ring": 1,
+      "google_monitoring_alert_policy": 2,
+      "google_monitoring_notification_channel": 1,
+      "google_project_service": 1,
+      "google_secret_manager_secret": 1,
+      "google_secret_manager_secret_iam_member": 1,
+      "google_service_account": 3,
+      "google_service_account_iam_member": 2,
+      "google_storage_bucket": 1,
+      "google_storage_bucket_iam_member": 3
+    },
+    "gcp/production": {},
+    "gcp/staging": {}
+  },
+  "seeded": {
+    "allUsers on Cloud Run": {
+      "caught": true,
+      "messages": [
+        "allUsers binding"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "ingress"
+      ]
+    },
+    "image by tag": {
+      "caught": true,
+      "messages": [
+        "image uses the latest tag"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "image"
+      ]
+    },
+    "no budget": {
+      "caught": true,
+      "messages": [
+        "monthly_budget_usd is not positive"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "budget"
+      ]
+    },
+    "public ingress": {
+      "caught": true,
+      "messages": [
+        "public ingress CIDR"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "ingress"
+      ]
+    },
+    "route without authentication": {
+      "caught": true,
+      "messages": [
+        "route without an authorizer"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "ingress"
+      ]
+    },
+    "secret in a file": {
+      "caught": true,
+      "messages": [
+        "credential-shaped text"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "secrets"
+      ]
+    },
+    "unencrypted bucket": {
+      "caught": true,
+      "messages": [
+        "bucket not encrypted with KMS"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "encryption"
+      ]
+    },
+    "wildcard IAM action": {
+      "caught": true,
+      "messages": [
+        "wildcard action s3:*"
+      ],
+      "mutation_applied": true,
+      "rules": [
+        "iam"
+      ]
+    }
+  },
+  "violations_in_the_committed_tree": []
+}

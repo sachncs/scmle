@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "static_controls": {
+    "action_references": 79,
+    "failures": [],
+    "passed": true,
+    "workflow_files": [
+      "ci.yml",
+      "cloud-deploy.yml",
+      "cloud-release.yml",
+      "full-suite.yml",
+      "pages.yml",
+      "release.yml",
+      "site.yml"
+    ]
+  }
+}

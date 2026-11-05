@@ -43,10 +43,23 @@ monitoring, retraining and rollback to real operational signals.
   ran only against scripted or in-memory stand-ins.
 - `scmle/governance/` holds `registry.py`, `lifecycle.py`,
   `deployment_ledger.py`, `keyring.py`, `sbom.py`, `local_faults.py` and the
-  closed loop. None reads a cloud control plane.
+  closed loop. `release_state.py` (Phase 16) binds the registry to a runtime
+  through a control-plane interface; its ECS and Cloud Run adapters have read
+  only recorded and scripted answers.
 - `scmle/data/readers/connectors.py` accepts `s3`, `gs` and `az` schemes with
   snapshot digests; it has not run against real buckets or warehouses.
-- There is no Terraform or OpenTofu and no CI job that deploys an image.
+- The local halves of items 3, 9 and 10 are built and verified without a
+  cloud account: Terraform modules for AWS and GCP with dev, staging and
+  production environments, a Python policy check over the files and a
+  destroy-orphan checker (`deploy/terraform/`, `scmle.deploy.iac_policy`,
+  `scmle.deploy.orphans`, `docs/INFRASTRUCTURE.md`); manual, guarded release
+  workflows, live checks, a promotion gate and a signed deployment record
+  (`.github/workflows/cloud-release.yml`, `scmle.deploy.gate`,
+  `scmle.deploy.record`); ECS and Cloud Run adapters, release states,
+  confirmed promotion, rollback and `scmle deploy reconcile`
+  (`scmle.governance.release_state`, `docs/CLOUD_RELEASE.md`). Evidence:
+  `plan/evidence/phase-16/`. Terraform itself was not run, the workflows never
+  ran, and every cloud answer is a recorded or scripted shape.
 
 ## Items (backlog numbers 1 to 13)
 
@@ -59,14 +72,14 @@ and a named approver.
 |---|---|---|---|
 | 1 | Reproducible local environment | Built; open: run the container path on a machine with Docker, arm64 | none |
 | 2 | Immutable, secure artifacts | Built; open: build and scan a real image, attest its digest, measure two-build reproducibility | Prediction parity and vulnerability gate on AWS and GCP |
-| 3 | Infrastructure as code | Terraform or OpenTofu modules for dev, staging and production per provider; `validate`, lint, policy checks and `plan` in CI | `apply`, test, `destroy`, recorded cost |
+| 3 | Infrastructure as code | Built locally (`deploy/terraform/`, `docs/INFRASTRUCTURE.md`); open: run `fmt`, `validate` and `plan` with the tool installed and commit the lock files | `apply`, test, `destroy`, recorded cost |
 | 4 | Authentication, authorization, security | Built locally (`scmle.security`, `docs/TENANT_ISOLATION.md`); open: OIDC discovery and a network JWKS, revocation distribution, an independent review | TLS ingress, workload identity and managed keys in each cloud |
 | 5 | Online and batch inference | Built (`docs/SERVICE_SLO.md`) | Restart, load and scaling tests on each cloud |
 | 6 | Portable training | Built locally (`scmle.runners`, `docs/PORTABLE_TRAINING.md`); open: exercise the AWS and GCP adapters and their SDK factories against real services | Same spec completing on all three with a reproducibility-tolerance report |
 | 7 | Governed data sources | Built locally (`scmle.data.store`, `docs/GOVERNED_DATA.md`); open: the conformance suite against MinIO and the GCS emulator | One warehouse per cloud, ingest to train to trace on a controlled dataset |
 | 8 | Orchestration | Built locally (`scmle.workflow`, `docs/ORCHESTRATION.md`); open: have the services accept the emitted definitions | Step Functions and Cloud Workflows with Scheduler; duplicate, partial-failure, missed-schedule and interruption runs |
-| 9 | CI/CD release gates | Image build and scan, evidence chain binding commit, model digest, image digest and approver; refusal on any failed gate; workflow linting | Federated short-lived credentials, staging then production, live tests |
-| 10 | Registry bound to the runtime | Reconcile command comparing registry state with a runtime report; states candidate, challenger, approved, production, retired; promotion and rollback that change registry state only after the runtime confirms | Reading the real revision from ECS and Cloud Run, traffic split, previous-revision rollback |
+| 9 | CI/CD release gates | Built locally (`cloud-release.yml`, `scmle.deploy.gate`, `docs/CLOUD_RELEASE.md`); open: run the workflows, build and scan a real image | Federated short-lived credentials, staging then production, live tests |
+| 10 | Registry bound to the runtime | Built locally (`scmle.governance.release_state`, `scmle deploy reconcile`); open: staged traffic on ECS | Reading the real revision from ECS and Cloud Run, traffic split, previous-revision rollback |
 | 11 | Observability and incidents | Structured logs, trace ids, version attribution, metric exporters, alert rules, pager and ticket webhooks, a classifier separating infrastructure, data-quality and model faults, cost by service and version | CloudWatch and Cloud Monitoring; injected failure and controlled drift |
 | 12 | Continuous evaluation | Delayed labels and business outcomes into the F13 loop, retrain recommendation policy, champion and challenger comparison, approval before replacement, post-promotion metric check | Controlled degradation scenario in staging |
 | 13 | Failure recovery and DR | Fault catalogue and runner (process kill, bad release, lost storage access, corrupted bundle, schema break, job interruption, secret rotation); RTO and RPO per stateful component | Independent passes on AWS and GCP staging with reviewer-approved evidence |

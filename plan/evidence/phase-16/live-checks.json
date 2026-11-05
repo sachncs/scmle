@@ -1,0 +1,83 @@
+{
+  "recorded_responses": [
+    {
+      "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "environment": "staging",
+      "evidence_digest": "sha256:2a2ad7ab6167ee15cd86b6b945361c3886acc067402b9925b9c7e27379cb9290",
+      "model_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+      "name": "health",
+      "passed": true,
+      "problems": [],
+      "source_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    },
+    {
+      "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "environment": "staging",
+      "evidence_digest": "sha256:9d914ae9bc612ae77282b2aa2c48f225dfeac1794c16cadfa10e361cdc1d2ea2",
+      "model_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+      "name": "schema",
+      "passed": true,
+      "problems": [],
+      "source_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    },
+    {
+      "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "environment": "staging",
+      "evidence_digest": "sha256:bc4f6c180b22fda9265ecc8a949e776bee4f19660eb22dbd5d5f5036368e6c72",
+      "model_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+      "name": "inference",
+      "passed": true,
+      "problems": [],
+      "source_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    },
+    {
+      "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "environment": "staging",
+      "evidence_digest": "sha256:a08043686a7414001a205a1b429d26199baa6ce210bd2fc621b9255f85bb8c6e",
+      "model_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+      "name": "security",
+      "passed": true,
+      "problems": [],
+      "source_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+  ],
+  "seeded_failures": {
+    "anonymous predict allowed": {
+      "health": true,
+      "inference": true,
+      "schema": true,
+      "security": false
+    },
+    "forged token allowed": {
+      "health": true,
+      "inference": true,
+      "schema": true,
+      "security": false
+    },
+    "predict answers 500": {
+      "health": true,
+      "inference": false,
+      "schema": true,
+      "security": true
+    },
+    "read-only token reaches predict": {
+      "health": true,
+      "inference": true,
+      "schema": true,
+      "security": false
+    },
+    "readyz 503": {
+      "health": false,
+      "inference": true,
+      "schema": true,
+      "security": true
+    },
+    "schema without a token allowed": {
+      "health": true,
+      "inference": true,
+      "schema": true,
+      "security": false
+    }
+  },
+  "source": "tests/fixtures/cloud/staging-http.json, assembled from docs/SERVICE_SLO.md; not captured from a cloud"
+}

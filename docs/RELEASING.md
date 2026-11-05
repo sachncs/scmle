@@ -34,6 +34,13 @@ unless the evidence holds. The checks live in [`scripts/`](../scripts/README.md)
 PyPI publishing uses OIDC trusted publishing; no token is stored. The `pypi`
 GitHub environment should require approval.
 
+## Releasing a model to a cloud
+
+That is a different release from the package. The model path, its gate and its
+records are in [`CLOUD_RELEASE.md`](CLOUD_RELEASE.md); the infrastructure is in
+[`INFRASTRUCTURE.md`](INFRASTRUCTURE.md). `cloud-release.yml` does nothing
+unless `SCMLE_CLOUD_RELEASE` is set and runs only by hand.
+
 ## Evidence the pipeline cannot produce
 
 Two controls need people, and the release stays open without them:

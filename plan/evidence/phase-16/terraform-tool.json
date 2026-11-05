@@ -1,0 +1,8 @@
+{
+  "fmt_validate_plan_ran": false,
+  "found": {
+    "terraform": null,
+    "tofu": null
+  },
+  "note": "scripts/terraform_checks.sh skips when neither tool is installed; the policy check does not need one"
+}

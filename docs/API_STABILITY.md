@@ -183,6 +183,22 @@ entrypoint, project workload and fakes are not pinned.
 (the two emitters and validators) are extension surfaces pinned like the
 others.
 
+## Infrastructure and release surfaces
+
+`scmle.deploy.iac_policy` (`check_tree`, `Violation`), `orphans` (`find_orphans`),
+`gate` (`admit`, `certify`, `Candidate`, `GateDecision`, `ImageScan`,
+`model_digest_of`), `record` (`DeploymentRecord`), `livetests` (`run_checks`,
+`Target`, `CheckResult`, `Response`, `http_fetch`), `observation`
+(`Observation`, `Traffic`), `control` (`ControlPlane`, `confirm`,
+`expecting`, `ConfirmPolicy`), `ecs` (`EcsControlPlane`, `observe_services`),
+`cloudrun` (`CloudRunControlPlane`, `observe_service`) and
+`scmle.governance.release_state` (`ReleaseRegistry`, `ReleaseState`,
+`Outcome`, `ReconcileReport`, `Finding`, `RuntimeDisagrees`) are extension
+surfaces pinned like the others. The Terraform reader (`hcl`) and the release
+manifest loader (`release`) are not pinned. The `deployment` row kind of the
+deployment ledger and the `release_state.json` file are additions; existing
+ledgers and registries load unchanged.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

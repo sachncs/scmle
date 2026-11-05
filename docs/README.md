@@ -32,6 +32,8 @@ Pick the page that matches what you are trying to do.
 | One workflow for ingest, train, evaluate, monitor, batch predict; approval, schedule | [`ORCHESTRATION.md`](ORCHESTRATION.md) |
 | Run one job spec locally, on AWS or on GCP; roles, budget, resume | [`PORTABLE_TRAINING.md`](PORTABLE_TRAINING.md) |
 | Object stores, snapshots, quality gates, incremental processing | [`GOVERNED_DATA.md`](GOVERNED_DATA.md) |
+| Terraform for AWS and GCP, the policy check, destroy without orphans | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md) |
+| Release a model to a cloud: gate, live tests, record, promote, roll back, reconcile | [`CLOUD_RELEASE.md`](CLOUD_RELEASE.md) |
 | Prove recovery works before release | [`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md) |
 | Cut a release | [`RELEASING.md`](RELEASING.md) and [`../scripts/`](../scripts/README.md) |
 

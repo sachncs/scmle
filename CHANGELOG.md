@@ -2,6 +2,69 @@
 
 ## Unreleased
 
+* Phase 16 local evidence (`plan/evidence/phase-16/`,
+  `scripts/make_phase16_evidence.py`, `plan/phase-16-...`, F14). The policy
+  check over all Terraform and eight seeded violations, the seeded orphan
+  listings, the live checks over recorded responses and twelve seeded
+  failures, the gate's decision for a complete release and each seeded failed
+  gate, reconcile reports after a success, a failed release, a rollback and a
+  seeded disagreement on both providers, the workflow controls and the
+  results of the Phase 16 tests. The phase plan and F14 now list only what is
+  open: Terraform `fmt`, `validate` and `plan` (the tool was not installed),
+  every apply and destroy, the workflows on GitHub, real ECS and Cloud Run
+  answers, and the cloud gate. None of those ran; AWS and GCP accounts, a
+  spending cap and a named approver are needed.
+* Registry bound to the runtime (F14 item 10, local half;
+  `scmle.governance.release_state`, `scmle.deploy.control`, `ecs`,
+  `cloudrun`, `observation`, `docs/CLOUD_RELEASE.md`). `ReleaseRegistry` keeps
+  the states candidate, challenger, approved, production and retired beside
+  `registry.json`. `promote` deploys and moves traffic in steps through a
+  `ControlPlane`, reads the platform back after each request and changes the
+  state, the champion alias and the ledger only after it confirms the revision,
+  its image digest, readiness and the full share; otherwise the previous
+  revision is restored and nothing in the registry changes. `rollback`
+  restores the previous known-good revision under the same rule. `reconcile`
+  lists every disagreement between registry, ledger and an observation, and
+  `deployed_version` refuses to call an alias deployed when the runtime
+  disagrees. The deployment ledger gains a `deployment` row kind. ECS and
+  Cloud Run adapters read the documented response shapes; ECS cannot split
+  traffic. CLI: `scmle deploy observe` and `scmle deploy reconcile`. Not done:
+  the adapters have read no real ECS or Cloud Run response, and no promotion
+  or rollback ran on a cloud.
+* CI/CD release gates (F14 item 9, local half; `.github/workflows/cloud-release.yml`,
+  `cloud-deploy.yml`, `scmle.deploy.gate`, `record`, `livetests`, `release`).
+  A manual workflow that does nothing unless `SCMLE_CLOUD_RELEASE` is set:
+  build and scan the image, deploy to staging and then production in
+  protected environments with the run's OIDC token (no stored key), push by
+  digest, read the platform, run live health, schema, inference and security
+  checks and write a signed deployment record binding commit, model digest,
+  container digest, configuration digest and approver. The pure promotion
+  gate (`admit`, `certify`) refuses on an unsigned or unapproved model, a
+  missing or failed scan, an approver who is the requester, a missing or
+  failed live check, evidence for another build, a platform that runs another
+  image, and production without a matching signed staging record, and returns
+  every reason. CLI: `scmle deploy live`, `gate`, `verify-record`,
+  `model-digest`. `scripts/verify_hosted_controls.py` also checks the two new
+  workflows (manual trigger, guards, environment, no long-lived key). Not
+  done: the workflows never ran; the live-check responses are assembled from
+  the service contract, not captured.
+* Infrastructure as code (F14 item 3, local half; `deploy/terraform/`,
+  `docs/INFRASTRUCTURE.md`). Shared Terraform modules for AWS (ECR, ECS
+  Fargate behind an internal load balancer and a JWT-authorized API Gateway,
+  S3, KMS, IAM with separate execution, serve, train and deploy roles,
+  Secrets Manager, CloudWatch, a budget) and GCP (Artifact Registry, Cloud
+  Run with IAM-only invocation, Cloud Storage with a customer key, service
+  accounts with resource-level grants, workload identity federation, Secret
+  Manager, Cloud Monitoring, a billing budget), with dev, staging and
+  production configurations per provider. `scripts/check_terraform_policy.py`
+  (`scmle.deploy.hcl`, `iac_policy`) parses the files and refuses public
+  ingress without authentication, missing encryption, wildcard IAM, missing
+  budgets, images by tag and secrets in files; `scripts/terraform_checks.sh`
+  runs `fmt` and `validate` when Terraform or OpenTofu is installed;
+  `scripts/check_destroy_orphans.py` lists what a destroy left from saved
+  listings. A CI job runs them. Not done: Terraform was not available here, so
+  `fmt`, `validate` and `plan` never ran on these hand-written files, and
+  nothing was applied or destroyed.
 * Phase 15 local evidence (`plan/evidence/phase-15/`,
   `scripts/make_phase15_evidence.py`, `plan/phase-15-...`, F14). The conformance
   suite on the local directory and on S3 and GCS in-memory clients, an

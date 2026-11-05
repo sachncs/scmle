@@ -1,0 +1,159 @@
+{
+  "runs": {
+    "cloudrun": {
+      "failed release v3 (the platform runs another image)": {
+        "outcome": {
+          "done": false,
+          "reasons": [
+            "the platform did not confirm: revision scmle-staging-serve-00014-new runs sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          ],
+          "restored": true,
+          "revision": null,
+          "version": null
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "promote v1": {
+        "outcome": {
+          "done": true,
+          "reasons": [],
+          "restored": null,
+          "revision": "scmle-staging-serve-00012-new",
+          "version": 1
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "promote v2": {
+        "outcome": {
+          "done": true,
+          "reasons": [],
+          "restored": null,
+          "revision": "scmle-staging-serve-00013-new",
+          "version": 2
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "rollback to v1": {
+        "outcome": {
+          "done": true,
+          "reasons": [],
+          "restored": null,
+          "revision": "scmle-staging-serve-00012-new",
+          "version": 1
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "seeded: alias moved around the runtime": {
+        "reconcile": {
+          "consistent": false,
+          "environment": "production",
+          "findings": [
+            {
+              "detail": "the champion alias points at v3, which the runtime has not confirmed (confirmed: 1)",
+              "kind": "alias_not_deployed"
+            }
+          ],
+          "model": "churn"
+        }
+      }
+    },
+    "ecs": {
+      "failed release v3 (the platform runs another image)": {
+        "outcome": {
+          "done": false,
+          "reasons": [
+            "the platform did not confirm: revision scmle-staging-serve:15 runs sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          ],
+          "restored": true,
+          "revision": null,
+          "version": null
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "promote v1": {
+        "outcome": {
+          "done": true,
+          "reasons": [],
+          "restored": null,
+          "revision": "scmle-staging-serve:13",
+          "version": 1
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "promote v2": {
+        "outcome": {
+          "done": true,
+          "reasons": [],
+          "restored": null,
+          "revision": "scmle-staging-serve:14",
+          "version": 2
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "rollback to v1": {
+        "outcome": {
+          "done": true,
+          "reasons": [],
+          "restored": null,
+          "revision": "scmle-staging-serve:13",
+          "version": 1
+        },
+        "reconcile": {
+          "consistent": true,
+          "environment": "production",
+          "findings": [],
+          "model": "churn"
+        }
+      },
+      "seeded: alias moved around the runtime": {
+        "reconcile": {
+          "consistent": false,
+          "environment": "production",
+          "findings": [
+            {
+              "detail": "the champion alias points at v3, which the runtime has not confirmed (confirmed: 1)",
+              "kind": "alias_not_deployed"
+            }
+          ],
+          "model": "churn"
+        }
+      }
+    }
+  },
+  "source": "recorded ECS and Cloud Run answers changed by the scripted platforms in tests/support_runtime.py"
+}

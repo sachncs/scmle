@@ -1,0 +1,153 @@
+{
+  "note": "the signing key is the fixed test key in tests/support_release.py; the records are of recorded evidence",
+  "production_allowed": {
+    "allowed": true,
+    "reasons": [],
+    "record": {
+      "approved_at": "2026-11-05T10:00:00+00:00",
+      "approver": "release-manager",
+      "config_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "environment": "production",
+      "evidence": {
+        "health": "sha256:2a2ad7ab6167ee15cd86b6b945361c3886acc067402b9925b9c7e27379cb9290",
+        "inference": "sha256:bc4f6c180b22fda9265ecc8a949e776bee4f19660eb22dbd5d5f5036368e6c72",
+        "schema": "sha256:9d914ae9bc612ae77282b2aa2c48f225dfeac1794c16cadfa10e361cdc1d2ea2",
+        "security": "sha256:a08043686a7414001a205a1b429d26199baa6ce210bd2fc621b9255f85bb8c6e"
+      },
+      "format": 1,
+      "model": "churn",
+      "model_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+      "model_version": 3,
+      "provider": "aws",
+      "recorded_at": "2026-11-05T10:00:00+00:00",
+      "requested_by": "author",
+      "revision": "serve:12",
+      "signature": "82c3f13bebafd83728e5bee49681484719ba3b76ddaf68f3daa1e4e9e15ba9a8",
+      "source_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+  },
+  "refusals": {
+    "a failed security check": {
+      "allowed": false,
+      "reasons": [
+        "live check security failed: seeded"
+      ],
+      "record": null
+    },
+    "approval of another bundle": {
+      "allowed": false,
+      "reasons": [
+        "the model approval is not valid: promotion approval does not match bundle identity"
+      ],
+      "record": null
+    },
+    "approver is the requester": {
+      "allowed": false,
+      "reasons": [
+        "the approver is the person who requested the release"
+      ],
+      "record": null
+    },
+    "failed scan": {
+      "allowed": false,
+      "reasons": [
+        "the image scan did not pass"
+      ],
+      "record": null
+    },
+    "no approval": {
+      "allowed": false,
+      "reasons": [
+        "the model has no approval"
+      ],
+      "record": null
+    },
+    "no live checks": {
+      "allowed": false,
+      "reasons": [
+        "live check health is missing",
+        "live check schema is missing",
+        "live check inference is missing",
+        "live check security is missing"
+      ],
+      "record": null
+    },
+    "no platform observation": {
+      "allowed": false,
+      "reasons": [
+        "the platform's running state was not read"
+      ],
+      "record": null
+    },
+    "no scan": {
+      "allowed": false,
+      "reasons": [
+        "the image has no scan result"
+      ],
+      "record": null
+    },
+    "platform runs another image": {
+      "allowed": false,
+      "reasons": [
+        "the platform runs sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd, not sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "record": null
+    },
+    "production with a forged staging record": {
+      "allowed": false,
+      "reasons": [
+        "the staging record's signature is not valid"
+      ],
+      "record": null
+    },
+    "production without a staging record": {
+      "allowed": false,
+      "reasons": [
+        "production needs a staging deployment record"
+      ],
+      "record": null
+    },
+    "rejected approval": {
+      "allowed": false,
+      "reasons": [
+        "the model approval is not valid: promotion was rejected by the reviewer"
+      ],
+      "record": null
+    },
+    "unsigned model": {
+      "allowed": false,
+      "reasons": [
+        "the model artifact is unsigned"
+      ],
+      "record": null
+    }
+  },
+  "staging_allowed": {
+    "allowed": true,
+    "reasons": [],
+    "record": {
+      "approved_at": "2026-11-05T10:00:00+00:00",
+      "approver": "release-manager",
+      "config_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "container_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "environment": "staging",
+      "evidence": {
+        "health": "sha256:2a2ad7ab6167ee15cd86b6b945361c3886acc067402b9925b9c7e27379cb9290",
+        "inference": "sha256:bc4f6c180b22fda9265ecc8a949e776bee4f19660eb22dbd5d5f5036368e6c72",
+        "schema": "sha256:9d914ae9bc612ae77282b2aa2c48f225dfeac1794c16cadfa10e361cdc1d2ea2",
+        "security": "sha256:a08043686a7414001a205a1b429d26199baa6ce210bd2fc621b9255f85bb8c6e"
+      },
+      "format": 1,
+      "model": "churn",
+      "model_digest": "sha256:a88504ad12b5d85c4321da226feef12c446663b8ae4af483d8fb10cab3bdc84c",
+      "model_version": 3,
+      "provider": "aws",
+      "recorded_at": "2026-11-05T10:00:00+00:00",
+      "requested_by": "author",
+      "revision": "serve:12",
+      "signature": "6010fcd2bd740c5e425571680098a057ca9b717a05f8b9ecdfb5c7bb5fb2f71d",
+      "source_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+  }
+}

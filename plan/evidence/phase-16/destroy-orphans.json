@@ -1,0 +1,71 @@
+{
+  "cases": {
+    "aws clean except a key in its deletion window": {
+      "clean": true,
+      "environment": "dev",
+      "orphans": [],
+      "pending": [
+        {
+          "identifier": "arn:aws:kms:eu-west-1:111:key/abc",
+          "kind": "kms",
+          "reason": "tagged scmle-environment=dev; provider state PendingDeletion"
+        }
+      ],
+      "provider": "aws",
+      "state": []
+    },
+    "aws leftover bucket": {
+      "clean": false,
+      "environment": "dev",
+      "orphans": [
+        {
+          "identifier": "arn:aws:s3:::scmle-dev-111-data",
+          "kind": "s3",
+          "reason": "tagged scmle-environment=dev"
+        }
+      ],
+      "pending": [
+        {
+          "identifier": "arn:aws:kms:eu-west-1:111:key/abc",
+          "kind": "kms",
+          "reason": "tagged scmle-environment=dev; provider state PendingDeletion"
+        }
+      ],
+      "provider": "aws",
+      "state": []
+    },
+    "aws state not empty": {
+      "clean": false,
+      "environment": "dev",
+      "orphans": [],
+      "pending": [],
+      "provider": "aws",
+      "state": [
+        "module.environment.aws_vpc.this"
+      ]
+    },
+    "gcp leftover bucket": {
+      "clean": false,
+      "environment": "dev",
+      "orphans": [
+        {
+          "identifier": "//storage.googleapis.com/scmle-dev-1-data",
+          "kind": "storage.googleapis.com/Bucket",
+          "reason": "tagged scmle-environment=dev"
+        }
+      ],
+      "pending": [],
+      "provider": "gcp",
+      "state": []
+    },
+    "gcp other environment is not an orphan": {
+      "clean": true,
+      "environment": "staging",
+      "orphans": [],
+      "pending": [],
+      "provider": "gcp",
+      "state": []
+    }
+  },
+  "note": "listings are seeded, not read from an account"
+}
