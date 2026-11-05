@@ -27,6 +27,10 @@ from scmle.runners import roles as runners_roles
 from scmle.security import access as security_access
 from scmle.security import audit as security_audit
 from scmle.security import tokens as security_tokens
+from scmle.workflow import definition as workflow_definition
+from scmle.workflow import emit as workflow_emit
+from scmle.workflow import executor as workflow_executor
+from scmle.workflow import schedule as workflow_schedule
 
 # Extension surfaces: documented contracts below the top-level API. Their
 # signatures are pinned too, without changing any `scmle.__all__` entry.
@@ -132,6 +136,33 @@ EXTENSION_SURFACES = {
     "scmle.runners.reproducibility": (
         runners_reproducibility,
         ("Tolerances", "compare"),
+    ),
+    "scmle.workflow.definition": (
+        workflow_definition,
+        (
+            "CatchUp",
+            "Schedule",
+            "Step",
+            "StepKind",
+            "Workflow",
+            "standard_workflow",
+        ),
+    ),
+    "scmle.workflow.executor": (
+        workflow_executor,
+        ("ApprovalError", "LocalExecutor", "RunState", "StepContext"),
+    ),
+    "scmle.workflow.schedule": (workflow_schedule, ("Scheduler", "TickReport")),
+    "scmle.workflow.emit": (
+        workflow_emit,
+        (
+            "cron_for",
+            "eventbridge_rate",
+            "to_cloud_workflows",
+            "to_step_functions",
+            "validate_cloud_workflows",
+            "validate_step_functions",
+        ),
     ),
     "scmle.data.store.processing": (
         store_processing,

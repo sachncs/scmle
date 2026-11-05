@@ -29,6 +29,7 @@ Pick the page that matches what you are trying to do.
 | Run the whole lifecycle locally, no cloud account | [`LOCAL.md`](LOCAL.md) |
 | What the service promises: endpoints, limits, objectives | [`SERVICE_SLO.md`](SERVICE_SLO.md) |
 | Who may call the service, tenant isolation, audit | [`TENANT_ISOLATION.md`](TENANT_ISOLATION.md) |
+| One workflow for ingest, train, evaluate, monitor, batch predict; approval, schedule | [`ORCHESTRATION.md`](ORCHESTRATION.md) |
 | Run one job spec locally, on AWS or on GCP; roles, budget, resume | [`PORTABLE_TRAINING.md`](PORTABLE_TRAINING.md) |
 | Object stores, snapshots, quality gates, incremental processing | [`GOVERNED_DATA.md`](GOVERNED_DATA.md) |
 | Prove recovery works before release | [`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md) |

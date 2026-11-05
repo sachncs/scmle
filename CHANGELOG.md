@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+* Orchestration (F14 item 8, local half; `scmle.workflow`,
+  `docs/ORCHESTRATION.md`). One `Workflow` type for ingest, train, evaluate,
+  monitor, batch-predict and approval steps with dependencies, per-step
+  retries with backoff, timeouts, cost budgets, concurrency groups, a schedule
+  with a declared catch-up policy, and a rule that an `approved` action must
+  sit behind an approval step. `LocalExecutor` runs it against an
+  `ObjectStore` with durable run ids from trigger keys, idempotency keys per
+  step, leases (a second executor is refused, a dead one is taken over),
+  skip-on-failure and resume of only what has not succeeded, run and step cost
+  budgets, bounded parallelism and group limits, and signed approvals from a
+  listed approver who did not request the run (rejection and expiry end the
+  run). `Scheduler` handles missed slots; `runner_handler` runs a training
+  step through a `Runner`. `emit.to_step_functions` and
+  `emit.to_cloud_workflows` produce the AWS and GCP definitions as JSON data
+  with structural validators; limits the languages cannot express are returned
+  as `controls`. Not done: neither definition was deployed or accepted by a
+  service, no scheduler job exists, no scenario ran on a cloud engine, and
+  the cloud definitions do not enforce cost budgets or concurrency limits.
 * Portable training (F14 item 6, local half; `scmle.runners`,
   `docs/PORTABLE_TRAINING.md`). One `JobSpec` and a `Runner` template that
   stores the spec and a manifest under a durable run id, retries interrupted

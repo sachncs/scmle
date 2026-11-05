@@ -176,6 +176,13 @@ snapshot differ between runs.
 `reproducibility`) is an extension surface pinned like the others; the
 entrypoint, project workload and fakes are not pinned.
 
+## Workflow surface
+
+`scmle.workflow.definition` (`Workflow`, `Step`, `StepKind`, `Schedule`,
+`CatchUp`), `executor` (`LocalExecutor`), `schedule` (`Scheduler`) and `emit`
+(the two emitters and validators) are extension surfaces pinned like the
+others.
+
 The project will not claim a stable v1 API until its release, compatibility,
 security, and operational evidence is complete.
 

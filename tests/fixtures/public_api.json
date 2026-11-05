@@ -479,6 +479,86 @@
         "kind": "callable",
         "signature_sha256": "a2595b470c83be98251c6957c3531977742fb0bf4d0d4247b3fed996757cdb54"
       }
+    },
+    "scmle.workflow.definition": {
+      "CatchUp": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "Schedule": {
+        "kind": "class",
+        "signature_sha256": "049337efc1100ba48f2e597156d06d85de8030944a249fc06357e86327a9bee8"
+      },
+      "Step": {
+        "kind": "class",
+        "signature_sha256": "851db06638c5c338a5e27f0b893a4c421b30452eee53ae46b62370d063ae4125"
+      },
+      "StepKind": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "Workflow": {
+        "kind": "class",
+        "signature_sha256": "1f9663e9642102525497dff0a0d9f878a5fdac140a7eb574afcac67494980c44"
+      },
+      "standard_workflow": {
+        "kind": "callable",
+        "signature_sha256": "280fc87ae13a35e92d6f63df75278d5a20204fc6a2ea928f02c72bec37746551"
+      }
+    },
+    "scmle.workflow.emit": {
+      "cron_for": {
+        "kind": "callable",
+        "signature_sha256": "e5bc1f1986207ea56a0eb605b436d92a0945b2eb2c1989af06bca5efe4aa7b2a"
+      },
+      "eventbridge_rate": {
+        "kind": "callable",
+        "signature_sha256": "e5bc1f1986207ea56a0eb605b436d92a0945b2eb2c1989af06bca5efe4aa7b2a"
+      },
+      "to_cloud_workflows": {
+        "kind": "callable",
+        "signature_sha256": "17128aef41dd58f75a95ac6654e491636fb47099ea9a7b830189427ddaf1c5e7"
+      },
+      "to_step_functions": {
+        "kind": "callable",
+        "signature_sha256": "17128aef41dd58f75a95ac6654e491636fb47099ea9a7b830189427ddaf1c5e7"
+      },
+      "validate_cloud_workflows": {
+        "kind": "callable",
+        "signature_sha256": "4f42cadc690b20fce1b4bacaf29a2659b2294dbc43fbf8846082afe6a4751c8c"
+      },
+      "validate_step_functions": {
+        "kind": "callable",
+        "signature_sha256": "c3e5322d7994d640448c701feb8da0e425db646b650c94d88ad8fd1bca94082a"
+      }
+    },
+    "scmle.workflow.executor": {
+      "ApprovalError": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      },
+      "LocalExecutor": {
+        "kind": "class",
+        "signature_sha256": "12606ea666a53435bbf211c95014377a64b30cb6b18246af7e7e9c0927bc83df"
+      },
+      "RunState": {
+        "kind": "class",
+        "signature_sha256": "6dc2f82e792be25846d0332a506d2ed65f289bea47b89a444a66f4372a150a37"
+      },
+      "StepContext": {
+        "kind": "class",
+        "signature_sha256": "b13b6ac7859f8adb74cb633b6e87c2a530872ef9d43a75fca5e1a1c795b533ae"
+      }
+    },
+    "scmle.workflow.schedule": {
+      "Scheduler": {
+        "kind": "class",
+        "signature_sha256": "c2982ecbf87dcf389bb20305fd6f31a09d111dbd4d3e2eaa803edbeabc13d655"
+      },
+      "TickReport": {
+        "kind": "class",
+        "signature_sha256": "464f940ad1967830a5472da83b5a21c502b98768a3ff43dd3d5311316f527c19"
+      }
     }
   },
   "release": "0.1.0b1",
