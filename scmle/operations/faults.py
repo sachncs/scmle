@@ -22,7 +22,6 @@ import json
 import os
 import pathlib
 import shutil
-import signal
 import subprocess  # nosec B404 - runs our own interpreter and serve.py
 import sys
 import tempfile
@@ -35,6 +34,7 @@ import numpy as np
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
 from scmle.contracts import observability
+from scmle.core import limits
 from scmle.data.store import objectstore
 from scmle.deploy import control
 from scmle.deploy import demo
@@ -285,7 +285,7 @@ def kill_after(
         last = int(line)
         if last + 1 >= acknowledged:
             break
-    process.send_signal(signal.SIGKILL)
+    process.kill()
     process.wait(timeout=15)
     return last
 
@@ -332,7 +332,7 @@ def process_kill() -> recovery.Result:
                 raise errors.ScmleError("the service did not become ready")
             before = predict(first.base)[1].get("predictions")
             killed = time.monotonic()
-            first.process.send_signal(signal.SIGKILL)
+            first.process.kill()
             first.process.wait(timeout=15)
             gone = predict(first.base)[0] == 0
             second = fleet.start(service)
@@ -1085,8 +1085,15 @@ def bad_release() -> recovery.Result:
 
 # ---- jobs and ledgers --------------------------------------------------
 
+# POSIX reports death by signal N as -N; Windows has no signals, so
+# `os.kill(pid, N)` terminates the process with exit code N.
+KILLED_RETURN_CODE = (
+    int(limits.KILL_SIGNAL) if limits.WINDOWS else -int(limits.KILL_SIGNAL)
+)
+
 JOB_CHILD = """
-import json, os, signal, sys, time
+import json, os, sys, time
+from scmle.core import limits
 from scmle.data.store import objectstore
 from scmle.workflow import definition as wd
 from scmle.workflow import executor as ex
@@ -1109,7 +1116,7 @@ def handler(name):
             handle.flush()
             os.fsync(handle.fileno())
         if name == "train" and kill:
-            os.kill(os.getpid(), signal.SIGKILL)
+            os.kill(os.getpid(), limits.KILL_SIGNAL)
             time.sleep(60)  # delivery is asynchronous; do not return
         return {"step": name}
     return run
@@ -1136,7 +1143,7 @@ def job_interruption() -> recovery.Result:
         state = base / "state"
         first = fleet.child(JOB_CHILD, str(state), str(marker), "1")
         first.wait(timeout=60)
-        killed = first.returncode == -signal.SIGKILL
+        killed = first.returncode == KILLED_RETURN_CODE
         after_kill = marker.read_text(encoding="utf-8").split()
         started = time.monotonic()
         time.sleep(1.5)  # the lease is 1 s; a live run would hold it
