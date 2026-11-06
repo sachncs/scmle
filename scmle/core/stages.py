@@ -65,6 +65,7 @@ from scmle.data.profiling import representativeness
 from scmle.data.readers import registry as source_registry
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
+from scmle.data.robustness import html_report as robustness_html
 from scmle.data.robustness import prefilter as robustness_prefilter
 from scmle.data.robustness import qualify as robustness_qualify
 from scmle.data.robustness import report as robustness_report
@@ -1119,10 +1120,14 @@ class ProfileStage(Stage):
         robustness_report.validate_shift(shift_document)
         context.write_json("stability_report.json", stability_document)
         context.write_json("shift_report.json", shift_document)
+        context.write_text(
+            "eda_report.html",
+            robustness_html.render(stability_document, shift_document),
+        )
         context.emit(
             "robustness.completed",
             "stability and shift were assessed on the exploration set",
-            ("stability_report.json", "shift_report.json"),
+            ("stability_report.json", "shift_report.json", "eda_report.html"),
             {
                 "stability": stability_document["status"],
                 "stability_counts": stability_document["counts"],

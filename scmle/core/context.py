@@ -517,6 +517,11 @@ class RunContext:
         if self.store is not None:
             self.store.write_json(relative, payload)
 
+    def write_text(self, relative: str, text: str) -> None:
+        """Writes a text artifact if the run is persisted."""
+        if self.store is not None:
+            self.store.write_text(relative, text)
+
     def persist_capability_observation(self) -> None:
         """Persist the runtime facts immediately before capability planning."""
         observation = require(

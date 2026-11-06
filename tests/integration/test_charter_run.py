@@ -215,6 +215,9 @@ def test_a_charter_run_writes_the_admissibility_artifacts(
     done = event(result.run_dir, "admissibility.completed")["data"]
     assert done["quarantined"] == {}
     assert set(done["detector_status"]) >= {"f5-sentinel", "f5-missingness"}
+    page = (folder / "eda_report.html").read_text(encoding="utf-8")
+    assert page.startswith("<!doctype html>") and "<script" not in page
+    assert "Stability" in page and "Shift" in page
 
 
 def test_a_certified_leakage_suspect_is_quarantined_and_ledgered(
