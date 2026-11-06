@@ -85,6 +85,7 @@ PROMOTION_PROPOSAL = "promotion_proposal"
 ROLLBACK_PROPOSAL = "rollback_proposal"
 ESCALATION = "escalation"
 ATTESTATION = "attestation"
+ATTESTATION_USED = "attestation_used"
 HALT = "halt"
 INCIDENT = "incident"
 AUDIT = "audit"
@@ -102,6 +103,7 @@ KINDS = (
     ROLLBACK_PROPOSAL,
     ESCALATION,
     ATTESTATION,
+    ATTESTATION_USED,
     HALT,
     INCIDENT,
     AUDIT,
@@ -267,6 +269,7 @@ class DeploymentLedger:
         self.escalations: dict[str, dict[str, Any]] = {}
         self.closed: dict[str, str] = {}
         self.attestations: dict[str, dict[str, Any]] = {}
+        self.used: dict[str, dict[str, Any]] = {}
         self.promotion: sequential_tests.PromotionSequence | None = None
         self.registered: list[str] = []
         self.decided: dict[str, dict[str, Any]] = {}
@@ -405,6 +408,7 @@ class DeploymentLedger:
             CHALLENGER_RESULT: self.apply_challenger,
             ESCALATION: self.apply_escalation,
             ATTESTATION: self.apply_attestation,
+            ATTESTATION_USED: self.apply_used,
             HALT: self.apply_halt,
             ROLLOUT_EXPERIMENT: self.apply_experiment,
             ROLLOUT_ASSIGNMENT: self.apply_assignment,
@@ -511,6 +515,17 @@ class DeploymentLedger:
             )
         self.closed[reply.escalation_id] = ATTESTATION
         self.attestations[reply.escalation_id] = dict(body)
+
+    def apply_used(self, body: Mapping[str, Any]) -> None:
+        """Marks an answered escalation's attestation as spent, once."""
+        identity = str(body["escalation_id"])
+        if identity not in self.attestations:
+            raise DeploymentLedgerError(
+                "an attestation can only be spent after it was recorded"
+            )
+        if identity in self.used:
+            raise DeploymentLedgerError("the attestation is already spent")
+        self.used[identity] = dict(body)
 
     def apply_experiment(self, body: Mapping[str, Any]) -> None:
         """Starts an experiment once, at a positive level."""

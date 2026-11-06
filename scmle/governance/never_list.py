@@ -14,8 +14,11 @@ performed. A valid attestation is one that
   guard holds one; and
 * was not signed with a key the system holds (the ledger refuses such rows).
 
-An attestation stays valid for the identical question until it expires (there
-is no single-use marker). The
+By default an attestation stays valid for the identical question until it
+expires. A guard made with `single_use=True` spends it: the first action it
+allows writes an `attestation_used` row, and the same reply allows nothing
+afterwards (a new escalation and a new reply are needed). The marker is in the
+hash-chained ledger, so reopening the ledger keeps it. The
 registry's own signed-approval check for the champion alias and the custody
 log's one-time open of a sealed set stay in force underneath; the guard only
 adds the deployment ledger's attestation in front of them.
@@ -95,6 +98,7 @@ class Guard:
         ledger: ledger_module.DeploymentLedger,
         today: Callable[[], datetime.date] = datetime.date.today,
         verification_keys: Mapping[str, str | bytes] | None = None,
+        single_use: bool = False,
     ) -> None:
         """Creates the guard.
 
@@ -105,8 +109,10 @@ class Guard:
                 verifies attestations signed under it. When given, an
                 attestation whose key id is missing or whose signature does
                 not verify is not valid.
+            single_use: Whether an attestation allows one action only.
         """
         self.ledger = ledger
+        self.single_use = single_use
         self.today = today
         self.verification_keys = dict(verification_keys or {})
         self.on_write: Callable[[], None] | None = None
@@ -120,7 +126,7 @@ class Guard:
             if row["question_hash"] != digest:
                 continue
             body = self.ledger.attestations.get(identity)
-            if body is None:
+            if body is None or identity in self.ledger.used:
                 continue
             reply = ledger_module.Attestation.from_dict(body)
             if self.accepts(reply, question["scope"]):
@@ -176,6 +182,16 @@ class Guard:
         question = question_for(action, detail, scope)
         reply = self.valid_attestation(question)
         if reply is not None:
+            if self.single_use:
+                self.ledger.commit(
+                    ledger_module.ATTESTATION_USED,
+                    {
+                        "escalation_id": reply.escalation_id,
+                        "action": action.value,
+                    },
+                )
+                if self.on_write is not None:
+                    self.on_write()
             return reply
         pending = self.pending_for(question)
         if pending is None:

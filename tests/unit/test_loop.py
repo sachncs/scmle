@@ -722,6 +722,63 @@ def test_an_expired_attestation_no_longer_allows(tmp_path):
         loop.move_champion(registry, "m", 3, None)
 
 
+def single_use_loop(tmp_path):
+    return loop_module.Loop.open(
+        tmp_path / "d",
+        CHARTER,
+        make_policy(),
+        verification_keys={dl.key_fingerprint(HUMAN_KEY): HUMAN_KEY},
+        system_keys=[SYSTEM_KEY],
+        today=lambda: TODAY,
+        single_use_attestations=True,
+    )
+
+
+def test_a_single_use_attestation_allows_one_action_and_is_ledgered(tmp_path):
+    loop = single_use_loop(tmp_path)
+    registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
+    with pytest.raises(never_list.AttestationRequired):
+        loop.move_champion(registry, "m", 3, None)
+    esc = loop.pending_escalations()[0]
+    loop.reply(esc.id, reply_to(esc))
+    assert loop.move_champion(registry, "m", 3, None) == "moved"
+    assert len(rows(loop, dl.ATTESTATION_USED)) == 1
+    with pytest.raises(never_list.AttestationRequired):
+        loop.move_champion(registry, "m", 3, None)
+    # asking again needs a new escalation and a new reply
+    assert len(loop.pending_escalations()) == 1
+
+
+def test_the_default_keeps_an_attestation_valid_until_it_expires(tmp_path):
+    loop, esc = pending_one(tmp_path)
+    loop.reply(esc.id, reply_to(esc))
+    registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
+    assert loop.move_champion(registry, "m", 3, None) == "moved"
+    assert loop.move_champion(registry, "m", 3, None) == "moved"
+    assert rows(loop, dl.ATTESTATION_USED) == []
+
+
+def test_a_used_marker_survives_reopening_the_ledger(tmp_path):
+    loop = single_use_loop(tmp_path)
+    registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
+    with pytest.raises(never_list.AttestationRequired):
+        loop.move_champion(registry, "m", 3, None)
+    loop.reply(
+        loop.pending_escalations()[0].id,
+        reply_to(loop.pending_escalations()[0]),
+    )
+    loop.move_champion(registry, "m", 3, None)
+    again = single_use_loop(tmp_path)
+    with pytest.raises(never_list.AttestationRequired):
+        again.move_champion(registry, "m", 3, None)
+
+
+def test_a_used_marker_for_an_unanswered_escalation_is_refused(tmp_path):
+    loop = single_use_loop(tmp_path)
+    with pytest.raises(dl.DeploymentLedgerError):
+        loop.ledger.commit(dl.ATTESTATION_USED, {"escalation_id": "esc-9"})
+
+
 def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
     calls = []
     loop = open_loop(

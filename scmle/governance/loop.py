@@ -360,6 +360,7 @@ class Loop:
         verification_keys: Mapping[str, str | bytes] | None = None,
         system_keys: Sequence[str | bytes] = (),
         today: Callable[[], datetime.date] = datetime.date.today,
+        single_use_attestations: bool = False,
     ) -> "Loop":
         """Opens the loop of a deployment, creating its ledger on first use.
 
@@ -375,6 +376,9 @@ class Loop:
             system_keys: Keys the system itself holds; attestations signed
                 with them (or with `SCMLE_SIGNING_KEY`) are refused.
             today: Clock, replaceable in tests.
+            single_use_attestations: Spend an attestation on the first action
+                it allows (an `attestation_used` row) instead of leaving it
+                valid until it expires.
 
         Raises:
             DeploymentLedgerError: If an existing ledger fails verification
@@ -412,7 +416,9 @@ class Loop:
                 alpha_promo=policy.alpha_promo,
                 system_keys=sorted(set(fingerprints)),
             )
-        guard = never_list.Guard(ledger, today, keys)
+        guard = never_list.Guard(
+            ledger, today, keys, single_use=single_use_attestations
+        )
         loop = cls(
             directory, ledger, policy, guard, hooks or Hooks(), keys, today
         )
@@ -429,6 +435,7 @@ class Loop:
         verification_keys: Mapping[str, str | bytes] | None = None,
         system_keys: Sequence[str | bytes] = (),
         today: Callable[[], datetime.date] = datetime.date.today,
+        single_use_attestations: bool = False,
     ) -> "Loop":
         """Opens an existing deployment from what its ledger records.
 
@@ -457,6 +464,7 @@ class Loop:
             verification_keys=verification_keys,
             system_keys=system_keys,
             today=today,
+            single_use_attestations=single_use_attestations,
         )
 
     def build_monitors(self) -> None:
