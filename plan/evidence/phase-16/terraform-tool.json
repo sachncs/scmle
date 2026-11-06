@@ -1,8 +1,24 @@
 {
-  "fmt_validate_plan_ran": false,
+  "fmt_and_validate": {
+    "directories_validated": [
+      "deploy/terraform/modules/aws_environment",
+      "deploy/terraform/modules/gcp_environment",
+      "deploy/terraform/aws/environments/dev",
+      "deploy/terraform/aws/environments/production",
+      "deploy/terraform/aws/environments/staging",
+      "deploy/terraform/gcp/environments/dev",
+      "deploy/terraform/gcp/environments/production",
+      "deploy/terraform/gcp/environments/staging"
+    ],
+    "exit_code": 0,
+    "fmt_check_and_validate_passed": true,
+    "ran": true,
+    "version": "OpenTofu v1.13.5"
+  },
   "found": {
     "terraform": null,
-    "tofu": null
+    "tofu": "/opt/homebrew/bin/tofu"
   },
-  "note": "scripts/terraform_checks.sh skips when neither tool is installed; the policy check does not need one"
+  "note": "scripts/terraform_checks.sh runs fmt -check and init -backend=false + validate; it skips when neither tool is installed. plan and apply need provider credentials and were not run.",
+  "plan_ran": false
 }

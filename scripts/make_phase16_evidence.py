@@ -7,8 +7,8 @@ Writes, under the output folder:
 * ``policy-check.json``: the Terraform policy check over deploy/terraform, the
   resources each environment declares, and each seeded violation with whether
   the check caught it;
-* ``terraform-tool.json``: whether terraform or tofu is installed, and so
-  whether fmt and validate could run;
+* ``terraform-tool.json``: whether terraform or tofu is installed, and the
+  result of ``fmt -check`` and ``validate`` when it is (``plan`` never runs);
 * ``destroy-orphans.json``: the orphan checker over seeded post-destroy
   listings;
 * ``live-checks.json``: the four live checks over recorded responses and each
@@ -102,6 +102,9 @@ SEEDED_POLICY = {
     ),
 }
 RAN = [
+    "tofu fmt -check, init -backend=false and validate on both modules and "
+    "all six environments (only when terraform or tofu is installed; see "
+    "terraform-tool.json)",
     "static policy check over every Terraform file, with 8 seeded violations",
     "orphan checker over seeded post-destroy listings",
     "live health, schema, inference and security checks over recorded "
@@ -112,11 +115,9 @@ RAN = [
     "static check of every workflow and its guards",
 ]
 NOT_RUN = [
-    "terraform or tofu: fmt, init, validate and plan were not run (the tool "
-    "is not installed on the machine that generated this evidence)",
-    "terraform apply and destroy in any account; no resource was created, "
-    "so no destroy was checked against a real account and no cost was "
-    "recorded",
+    "terraform or tofu plan, apply and destroy in any account; plan needs "
+    "provider credentials, and no resource was created, so no destroy was "
+    "checked against a real account and no cost was recorded",
     "any AWS or GCP account: ECR, ECS, API Gateway, Cloud Run, IAM, KMS, "
     "Secrets Manager, Secret Manager, CloudWatch, Cloud Monitoring, budgets",
     "the cloud-release and cloud-deploy workflows on GitHub: no protected "
@@ -191,18 +192,48 @@ def policy_check(out: Path) -> dict[str, object]:
 
 
 def tool_availability(out: Path) -> dict[str, object]:
-    """Record whether terraform or tofu could have been run."""
+    """Record whether terraform or tofu is installed and run fmt and validate.
+
+    `plan` needs provider credentials and is never run here.
+    """
     found = {name: shutil.which(name) for name in ("terraform", "tofu")}
+    tool = found["terraform"] or found["tofu"]
+    checks: dict[str, object] = {"ran": False}
+    if tool:
+        version = subprocess.run(  # nosec B603
+            [tool, "version"], capture_output=True, text=True, check=False
+        )
+        script = subprocess.run(  # nosec B603 B607
+            ["bash", "scripts/terraform_checks.sh", "deploy/terraform"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        validated = [
+            line.split(" ", 1)[1]
+            for line in script.stdout.splitlines()
+            if line.startswith("validate ")
+        ]
+        checks = {
+            "ran": True,
+            "version": version.stdout.splitlines()[0] if version.stdout else "",
+            "exit_code": script.returncode,
+            "fmt_check_and_validate_passed": script.returncode == 0,
+            "directories_validated": validated,
+        }
     write_json(
         out / "terraform-tool.json",
         {
             "found": found,
-            "fmt_validate_plan_ran": any(found.values()),
-            "note": "scripts/terraform_checks.sh skips when neither tool is "
-            "installed; the policy check does not need one",
+            "fmt_and_validate": checks,
+            "plan_ran": False,
+            "note": "scripts/terraform_checks.sh runs fmt -check and "
+            "init -backend=false + validate; it skips when neither tool is "
+            "installed. plan and apply need provider credentials and were "
+            "not run.",
         },
     )
-    return {"tool_installed": any(found.values())}
+    return {"tool_installed": bool(tool)}
 
 
 def destroy_orphans(out: Path) -> dict[str, bool]:
@@ -571,8 +602,21 @@ def main(arguments: list[str]) -> int:
             "platform": platform.platform(),
             "local_checks_passed": ok,
             "checks": checks,
-            "ran": RAN,
-            "not_run": NOT_RUN,
+            "ran": [
+                item
+                for item in RAN
+                if checks["terraform"]["tool_installed"]  # type: ignore[index]
+                or not item.startswith("tofu fmt")
+            ],
+            "not_run": (
+                NOT_RUN
+                if checks["terraform"]["tool_installed"]  # type: ignore[index]
+                else [
+                    "terraform or tofu: fmt, init, validate and plan were "
+                    "not run (the tool is not installed here)",
+                    *NOT_RUN,
+                ]
+            ),
         },
     )
     print(

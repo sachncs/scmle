@@ -42,15 +42,14 @@
       "tests": 173
     },
     "terraform": {
-      "tool_installed": false
+      "tool_installed": true
     }
   },
-  "commit": "7acfd28c4c13b12dedf281bbb69e6adec10d3e07",
-  "generated": "2026-11-05T04:59:28+00:00",
+  "commit": "2596263adb55a5cd761b0566367377b2513eb4a1",
+  "generated": "2026-11-06T14:30:17+00:00",
   "local_checks_passed": true,
   "not_run": [
-    "terraform or tofu: fmt, init, validate and plan were not run (the tool is not installed on the machine that generated this evidence)",
-    "terraform apply and destroy in any account; no resource was created, so no destroy was checked against a real account and no cost was recorded",
+    "terraform or tofu plan, apply and destroy in any account; plan needs provider credentials, and no resource was created, so no destroy was checked against a real account and no cost was recorded",
     "any AWS or GCP account: ECR, ECS, API Gateway, Cloud Run, IAM, KMS, Secrets Manager, Secret Manager, CloudWatch, Cloud Monitoring, budgets",
     "the cloud-release and cloud-deploy workflows on GitHub: no protected environment, OIDC federation, image push, scan of a real image or live test against a deployed service",
     "real ECS DescribeServices or Cloud Run responses: every answer is a recorded or scripted shape of the documented API",
@@ -59,9 +58,10 @@
     "an approver other than the author for staging or production evidence",
     "multi-region availability and any cost or latency comparison of providers (not claimed)"
   ],
-  "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
-  "python": "3.14.7",
+  "platform": "macOS-26.7.2-arm64-arm-64bit",
+  "python": "3.11.16",
   "ran": [
+    "tofu fmt -check, init -backend=false and validate on both modules and all six environments (only when terraform or tofu is installed; see terraform-tool.json)",
     "static policy check over every Terraform file, with 8 seeded violations",
     "orphan checker over seeded post-destroy listings",
     "live health, schema, inference and security checks over recorded responses, with 12 seeded failures",
