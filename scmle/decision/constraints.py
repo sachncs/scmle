@@ -42,6 +42,7 @@ INCOMPATIBLE = (
     frozenset({"equalized_odds", "predictive_parity"}),
 )
 GRID = 99
+MIN_CLUSTERS = 20
 
 
 class InfeasibleConstraintsError(ValueError):
@@ -193,6 +194,117 @@ def satisfaction_test(
                 abs(table[a][0] / table[a][1] - table[b][0] / table[b][1]),
             )
             upper = max(upper, abs(lo), abs(hi))
+    status = SATISFIED if upper <= constraint.max_gap else NOT_SATISFIED
+    return SatisfactionTest(
+        status,
+        constraint.criterion,
+        constraint.max_gap,
+        point,
+        upper,
+        (),
+        alpha,
+    )
+
+
+RATE_PARTS = {
+    "selection": lambda y, a: (a, np.ones_like(a)),
+    "tpr": lambda y, a: (a * y, y),
+    "fpr": lambda y, a: (a * (1.0 - y), 1.0 - y),
+    "ppv": lambda y, a: (a * y, a),
+}
+CRITERION_RATES = {
+    "demographic_parity": ("selection",),
+    "equal_opportunity": ("tpr",),
+    "equalized_odds": ("tpr", "fpr"),
+    "predictive_parity": ("ppv",),
+}
+
+
+def cluster_satisfaction_test(
+    y: ArrayLike,
+    acts: ArrayLike,
+    groups: ArrayLike,
+    clusters: ArrayLike,
+    constraint: charter_decision.FairnessConstraint,
+    alpha: float = 0.05,
+    draws: int = 1000,
+    seed: int = 0,
+) -> SatisfactionTest:
+    """Satisfaction test that resamples whole clusters of rows.
+
+    `satisfaction_test` takes rows as independent, so rows that share a
+    cluster (a branch, a household, a repeated customer) make its interval
+    too narrow and can call a rule fair that is not. Here the clusters are
+    resampled with replacement `draws` times, the largest absolute gap over
+    group pairs and rates is recomputed on each resample, and the upper bound
+    is the larger of the observed gap and the `1 - alpha` quantile of those
+    resampled gaps. The claim is `satisfied` only if that bound is at most
+    `constraint.max_gap`. A group whose denominator is below `min_group`
+    rows is `not_assessable`, as in the row-wise test.
+
+    The bound is a percentile bootstrap of the maximum gap: it is not exact,
+    its false-satisfaction rate in a clustered world is checked by simulation
+    in `tests/unit/test_decision_constraints.py`, and it makes no claim about
+    a handful of clusters (fewer than 20 clusters are reported
+    `not_assessable`).
+    """
+    outcomes, actions, labels = prepared(y, acts, groups)
+    keys = np.asarray(clusters)
+    if keys.shape != outcomes.shape:
+        raise ValueError("clusters must have the length of y")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be strictly between 0 and 1")
+    if draws < 1:
+        raise ValueError("draws must be positive")
+    tables = rate_tables(outcomes, actions, labels, constraint.criterion)
+    names = sorted(np.unique(labels).tolist())
+    small = sorted(
+        {
+            str(g)
+            for table in tables.values()
+            for g, (ignored, total) in table.items()
+            if total < constraint.min_group
+        }
+    )
+    cluster_ids, inverse = np.unique(keys, return_inverse=True)
+    if small or len(names) < 2 or len(cluster_ids) < MIN_CLUSTERS:
+        return SatisfactionTest(
+            NOT_ASSESSABLE,
+            constraint.criterion,
+            constraint.max_gap,
+            None,
+            None,
+            tuple(small),
+            alpha,
+        )
+    columns = []
+    for rate in CRITERION_RATES[constraint.criterion]:
+        numerator, denominator = RATE_PARTS[rate](outcomes, actions)
+        for name in names:
+            inside = (labels == name).astype(float)
+            for part in (numerator, denominator):
+                sums = np.zeros(len(cluster_ids))
+                np.add.at(sums, inverse, part * inside)
+                columns.append(sums)
+    matrix = np.column_stack(columns).reshape(
+        len(cluster_ids), -1, len(names), 2
+    )
+
+    def largest_gap(totals: NDArray[np.float64]) -> NDArray[np.float64]:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rates = totals[..., 0] / totals[..., 1]
+        spread = np.nanmax(rates, axis=-1) - np.nanmin(rates, axis=-1)
+        return np.asarray(np.nanmax(spread, axis=-1))
+
+    point = float(largest_gap(matrix.sum(axis=0)))
+    rng = randomness.component_rng(seed, "decision.constraints.cluster", 0)
+    weights = rng.multinomial(
+        len(cluster_ids),
+        np.full(len(cluster_ids), 1.0 / len(cluster_ids)),
+        size=draws,
+    ).astype(float)
+    resampled = largest_gap(np.einsum("dk,krgp->drgp", weights, matrix))
+    upper = max(point, float(np.quantile(resampled, 1.0 - alpha)))
     status = SATISFIED if upper <= constraint.max_gap else NOT_SATISFIED
     return SatisfactionTest(
         status,

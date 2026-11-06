@@ -136,3 +136,90 @@ def test_inputs_are_validated():
         c.satisfaction_test(
             [1.0, 0.0], [1.0, 0.0], [0, 1], constraint(), alpha=1.0
         )
+
+
+def clustered_world(seed, gap=0.06, clusters=30, size=100, spread=0.2):
+    """Selection varies by cluster; each cluster belongs to one group."""
+    rng = np.random.default_rng(seed)
+    group_of = np.repeat([0, 1], clusters)
+    mean = np.where(group_of == 0, 0.30, 0.30 + gap)
+    prob = np.clip(mean + spread * rng.standard_normal(2 * clusters), 0.0, 1.0)
+    cluster = np.repeat(np.arange(2 * clusters), size)
+    groups = np.repeat(group_of, size)
+    acts = (rng.random(len(cluster)) < prob[cluster]).astype(float)
+    outcomes = (rng.random(len(cluster)) < 0.4).astype(float)
+    return outcomes, acts, groups, cluster
+
+
+def test_clustered_rows_are_not_declared_satisfied_more_often_than_alpha():
+    # Pre-registered before the first run: the true gap is 0.06 against a
+    # bound of 0.05, so every "satisfied" is a false claim; the cluster-aware
+    # test may make it in at most 7 percent of 400 worlds, and the row-wise
+    # test, which treats the rows as independent, makes it at least 3 points
+    # more often.
+    rule = constraint("demographic_parity", gap=0.05, min_group=30)
+    worlds = 400
+    rows = cluster_aware = 0
+    for seed in range(worlds):
+        y, acts, groups, cluster = clustered_world(seed)
+        rows += c.satisfaction_test(y, acts, groups, rule).status == (
+            c.SATISFIED
+        )
+        cluster_aware += c.cluster_satisfaction_test(
+            y, acts, groups, cluster, rule, draws=400, seed=seed
+        ).status == (c.SATISFIED)
+    assert cluster_aware / worlds <= 0.07
+    assert rows / worlds >= cluster_aware / worlds + 0.03
+
+
+def test_a_clearly_fair_clustered_rule_is_satisfied():
+    y, acts, groups, cluster = clustered_world(1, gap=0.0, spread=0.02)
+    result = c.cluster_satisfaction_test(
+        y, acts, groups, cluster, constraint("demographic_parity", gap=0.2)
+    )
+    assert result.status == c.SATISFIED
+    assert result.point_gap is not None and result.upper_bound is not None
+    assert result.upper_bound >= result.point_gap
+
+
+def test_cluster_aware_small_groups_and_bad_inputs():
+    y, acts, groups, cluster = clustered_world(2)
+    small = c.cluster_satisfaction_test(
+        y,
+        acts,
+        groups,
+        cluster,
+        constraint("demographic_parity", min_group=5000),
+    )
+    assert small.status == c.NOT_ASSESSABLE
+    with pytest.raises(ValueError):
+        c.cluster_satisfaction_test(
+            y, acts, groups, cluster[:-1], constraint("demographic_parity")
+        )
+    with pytest.raises(ValueError):
+        c.cluster_satisfaction_test(
+            y, acts, groups, cluster, constraint("demographic_parity"), alpha=2
+        )
+    with pytest.raises(ValueError):
+        c.cluster_satisfaction_test(
+            y, acts, groups, cluster, constraint("demographic_parity"), draws=0
+        )
+
+
+def test_the_cluster_test_is_reproducible_and_reads_every_criterion():
+    y, acts, groups, cluster = clustered_world(3)
+    for criterion in (
+        "demographic_parity",
+        "equal_opportunity",
+        "equalized_odds",
+        "predictive_parity",
+    ):
+        rule = constraint(criterion, gap=0.5, min_group=30)
+        first = c.cluster_satisfaction_test(
+            y, acts, groups, cluster, rule, draws=200, seed=4
+        )
+        again = c.cluster_satisfaction_test(
+            y, acts, groups, cluster, rule, draws=200, seed=4
+        )
+        assert first == again
+        assert first.criterion == criterion
