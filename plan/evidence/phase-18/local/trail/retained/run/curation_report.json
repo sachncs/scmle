@@ -7,8 +7,8 @@
     "row_count": 1309,
     "column_count": 12,
     "target": "survived",
-    "uri": "/var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/tmpp_k9tjxm/data.csv",
-    "snapshot_id": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+    "uri": "/var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/tmp0dyz5gre/data.csv",
+    "snapshot_id": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
     "modality": "tabular",
     "task": "",
     "schema_version": 1,
@@ -26,7 +26,7 @@
       "access_policy": ""
     },
     "lineage": {
-      "source_snapshot": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+      "source_snapshot": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
       "parent_datasets": [],
       "transformations": [],
       "label_source": "",
@@ -54,7 +54,7 @@
   },
   "source_rows": 1309,
   "profiled_rows": 819,
-  "read_seconds": 0.0032745829958003014,
+  "read_seconds": 0.0029559580143541098,
   "streamed": false,
   "cleaning_notes": [],
   "quality_findings": [
@@ -74,7 +74,7 @@
       "reviewer": null,
       "disposition": "open",
       "blocking": false,
-      "timestamp": "2026-11-05T07:16:18.056486+00:00"
+      "timestamp": "2026-11-06T08:23:41.223304+00:00"
     },
     {
       "id": "quality.e34b339f69aba194",
@@ -92,7 +92,7 @@
       "reviewer": null,
       "disposition": "open",
       "blocking": false,
-      "timestamp": "2026-11-05T07:16:18.056509+00:00"
+      "timestamp": "2026-11-06T08:23:41.223318+00:00"
     },
     {
       "id": "quality.23665cf238d32e12",
@@ -110,7 +110,7 @@
       "reviewer": null,
       "disposition": "open",
       "blocking": false,
-      "timestamp": "2026-11-05T07:16:18.056520+00:00"
+      "timestamp": "2026-11-06T08:23:41.223322+00:00"
     },
     {
       "id": "quality.7e5b1533cc71fd1a",
@@ -128,7 +128,7 @@
       "reviewer": null,
       "disposition": "open",
       "blocking": false,
-      "timestamp": "2026-11-05T07:16:18.056526+00:00"
+      "timestamp": "2026-11-06T08:23:41.223325+00:00"
     }
   ],
   "risk_findings": [],

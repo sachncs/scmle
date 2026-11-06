@@ -12,7 +12,7 @@
     0.9004948364888125,
     0.8657079993713657
   ],
-  "fit_seconds": 1.0160753749951255,
+  "fit_seconds": 0.9640112500055693,
   "error": "",
   "params": {
     "learning_rate": 0.0243344580885978,
@@ -80,7 +80,7 @@
     "weighted": false
   },
   "runtime": {
-    "python": "3.14.7",
+    "python": "3.11.16",
     "libraries": {}
   },
   "train_scores": [

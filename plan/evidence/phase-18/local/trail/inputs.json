@@ -7,15 +7,15 @@
       "reviewed": {
         "framing/decision_cost_model.json": "0e949805821c910588acfc9806623142b5ed42144e93ed7ec6dfcc89bb2080c3",
         "run/confirmed_claims.json": "14b5ad47e82c09cf02899b2a239d52ffae7c753282686c6f0f0ddb4bfe47de11",
-        "run/curation_report.json": "a01b562d75461ee3134ec77522468f442f43623c4acc0938d3f7876a882623da",
-        "run/dataset_manifest.json": "7f1a92507adf8ab7406c0a877ac928ab96585a930e3475cfb214d9f8b21265e8",
-        "run/evaluation.json": "64f615d526f075cc4f8f17496baaf29588640719588c48a9003539a02229b2e1",
+        "run/curation_report.json": "1fbea8e3d281c12cbf3484952417e18f9905286d6f80917a89d30489ba03e689",
+        "run/dataset_manifest.json": "c493eeb8bc9e0b2403c6b93974a83b37f2eab64b010a29b6a8863110aeb32f36",
+        "run/evaluation.json": "958226495038977a613ed6a5c72b412f4a0b5a3a36a380879a14078cb4c8d058",
         "run/feasibility.json": "b2cda9c718d646ceecf1d888421dc78b46375829a61b8036131a51c00479c14d"
       },
       "statement": "Read the listed records. The confirmation set (273 rows) was smaller than the 333 the chartered power needs, so the charter run's scope is exploratory_unconfirmed and its claims are tiered accordingly. The extract has no timestamp or key, so the row number and boarding date are assumptions, and the row number correlates with the target because the extract is ordered. Played by the author."
     },
     "name": "reviewer-role (the author, with the reviewer key)",
-    "signature": "2fc00696ad84f115552c3be7537c675176ccb7be622d16d38b612ea0e5b0aaf5",
+    "signature": "d0f2e772d48549d18671d553d5a512265d0d9867fe988785431567bfbb929b9e",
     "thresholds": [
       {
         "id": "Q1",

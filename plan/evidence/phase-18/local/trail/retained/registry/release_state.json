@@ -6,8 +6,8 @@
       "versions": {
         "1": {
           "approval": {
-            "approved_at": "2026-11-05T07:16:57.315236+00:00",
-            "content_id": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+            "approved_at": "2026-11-06T08:24:18.090036+00:00",
+            "content_id": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
             "decision": "approved",
             "evidence": [
               "run/evaluation.json",
@@ -17,12 +17,12 @@
             "model": "titanic_survival",
             "reason": "test ROC AUC and the held-out cost per case met the stakeholder's acceptance criteria",
             "reviewer": "reviewer-role (the author, with the reviewer key)",
-            "signature": "4d58f29493bdd0e7a25ce0bfc286f88c18938bb2abb22a2430936fe11fcfc296",
+            "signature": "4ca4338b5a8a2b7a8dd6abd388824bc3119b6f5fe7771e68c074aeea41c48c14",
             "version": 1
           },
           "history": [
             {
-              "at": "2026-11-05T07:16:57.315577+00:00",
+              "at": "2026-11-06T08:24:18.090277+00:00",
               "from": "candidate",
               "reason": "approved",
               "to": "approved"

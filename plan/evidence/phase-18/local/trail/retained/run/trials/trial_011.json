@@ -8,7 +8,7 @@
   "fold_scores": [
     0.8365614674718013
   ],
-  "fit_seconds": 0.15154324998729862,
+  "fit_seconds": 0.1436104579770472,
   "error": "pruned after the first rung",
   "params": {
     "learning_rate": 0.048071412104777535,
@@ -36,7 +36,7 @@
     "weighted": false
   },
   "runtime": {
-    "python": "3.14.7",
+    "python": "3.11.16",
     "libraries": {}
   },
   "train_scores": [

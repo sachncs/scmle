@@ -12,7 +12,7 @@
     0.9117900172117039,
     0.826968411126827
   ],
-  "fit_seconds": 0.32601537500158884,
+  "fit_seconds": 0.3170048330212012,
   "error": "",
   "params": {},
   "strategy": "default",
@@ -75,7 +75,7 @@
     "weighted": false
   },
   "runtime": {
-    "python": "3.14.7",
+    "python": "3.11.16",
     "libraries": {}
   },
   "train_scores": [

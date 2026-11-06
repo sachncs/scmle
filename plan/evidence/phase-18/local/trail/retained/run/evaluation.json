@@ -1,5 +1,5 @@
 {
-  "run_id": "run_20261105_001",
+  "run_id": "run_20261106_001",
   "task": "binary_classification",
   "metric": "roc_auc",
   "metric_greater_is_better": true,
@@ -76,14 +76,14 @@
   "net_benefit": null,
   "resources": {
     "model_mb": 0.3869171142578125,
-    "p95_latency_ms": 20.93040625477442,
+    "p95_latency_ms": 14.296193904010579,
     "rows_timed": 30,
-    "machine": "arm64 Darwin python 3.14.7"
+    "machine": "arm64 Darwin python 3.11.16"
   },
   "resource_limits": {
     "time_budget": {
       "limit_seconds": 40,
-      "elapsed_seconds": 30.764298958994914,
+      "elapsed_seconds": 34.12470095799654,
       "enforcement": "no trial starts past the limit; running trials are killed at the hard ceiling (remaining budget + 10% grace)",
       "within_limit": true
     },
@@ -95,7 +95,7 @@
     },
     "memory": {
       "limit_gb": 8.0,
-      "observed_peak_gb": 0.2753753662109375,
+      "observed_peak_gb": 0.2459564208984375,
       "enforcement": "no trial starts past the limit; running trials above the limit are killed (resident memory sampled while they run)",
       "within_limit": true
     },
@@ -119,27 +119,9 @@
     "slice_performance",
     "threshold_analysis"
   ],
-  "elapsed_seconds": 30.764334708976094,
+  "elapsed_seconds": 34.1247226659907,
   "reproducibility": "same seed/data/environment replays; threaded backends may differ",
-  "learning_curve": {
-    "sizes": [
-      124,
-      248,
-      372,
-      496,
-      621
-    ],
-    "scores": [
-      0.7429075994075425,
-      0.8063689187649539,
-      0.8258516577418251,
-      0.8356499943032928,
-      0.8708556454369374
-    ],
-    "verdict": "more data likely helps",
-    "last_gain": 0.0352056511336446,
-    "total_gain": 0.1279480460293949
-  },
+  "learning_curve": null,
   "nested_cv": null,
   "bias_variance": null,
   "sensitivity": null,
@@ -147,11 +129,11 @@
     "schema_version": 1,
     "model_name": "stacking",
     "model_version": "v1",
-    "model_fingerprint": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+    "model_fingerprint": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
     "task": "binary_classification",
     "metric": "roc_auc",
     "dataset_id": "ds_3b4683ab",
-    "snapshot_id": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+    "snapshot_id": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
     "intended_use": "Inference for the declared binary_classification task using the packaged schema and preprocessing pipeline.",
     "out_of_scope": [
       "It is not evidence of causal effect or fairness outside the declared evaluation slices.",
@@ -200,9 +182,9 @@
     },
     "resources": {
       "model_mb": 0.3869171142578125,
-      "p95_latency_ms": 20.93040625477442,
+      "p95_latency_ms": 14.296193904010579,
       "rows_timed": 30,
-      "machine": "arm64 Darwin python 3.14.7"
+      "machine": "arm64 Darwin python 3.11.16"
     },
     "evidence_artifacts": [
       "dataset_card.json",
@@ -219,7 +201,7 @@
     ],
     "support_status": "tabular_beta_library_inference",
     "review_status": "machine_generated_unreviewed",
-    "generated_at": "2026-11-05T07:16:54.405041+00:00"
+    "generated_at": "2026-11-06T08:24:15.876396+00:00"
   },
   "reliability_plan": {
     "schema_version": 1,
@@ -427,11 +409,11 @@
   "sbom": {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:4679a46a-b120-5931-95be-dcddcdf13dce",
+    "serialNumber": "urn:uuid:1cc82dba-1e84-5105-83a3-8cb3d9bf0ca4",
     "version": 1,
     "$schema": "https://cyclonedx.org/schema/bom-1.5.schema.json",
     "metadata": {
-      "timestamp": "2026-11-05T07:16:54.406194+00:00",
+      "timestamp": "2026-11-06T08:24:15.877384+00:00",
       "component": {
         "type": "application",
         "name": "scmle",
@@ -440,7 +422,7 @@
       "properties": [
         {
           "name": "scmle.run_id",
-          "value": "run_20261105_001"
+          "value": "run_20261106_001"
         }
       ]
     },
@@ -458,6 +440,13 @@
         "name": "ast-serialize",
         "version": "0.13.0",
         "purl": "pkg:pypi/ast-serialize@0.13.0"
+      },
+      {
+        "type": "library",
+        "bom-ref": "pkg:pypi/backports.tarfile@1.2.0",
+        "name": "backports.tarfile",
+        "version": "1.2.0",
+        "purl": "pkg:pypi/backports.tarfile@1.2.0"
       },
       {
         "type": "library",
@@ -563,6 +552,13 @@
         "name": "idna",
         "version": "3.20",
         "purl": "pkg:pypi/idna@3.20"
+      },
+      {
+        "type": "library",
+        "bom-ref": "pkg:pypi/importlib-metadata@9.0.1",
+        "name": "importlib-metadata",
+        "version": "9.0.1",
+        "purl": "pkg:pypi/importlib-metadata@9.0.1"
       },
       {
         "type": "library",
@@ -706,10 +702,10 @@
       },
       {
         "type": "library",
-        "bom-ref": "pkg:pypi/numpy@2.5.4",
+        "bom-ref": "pkg:pypi/numpy@2.4.6",
         "name": "numpy",
-        "version": "2.5.4",
-        "purl": "pkg:pypi/numpy@2.5.4"
+        "version": "2.4.6",
+        "purl": "pkg:pypi/numpy@2.4.6"
       },
       {
         "type": "library",
@@ -909,10 +905,10 @@
       },
       {
         "type": "library",
-        "bom-ref": "pkg:pypi/scipy@1.18.1",
+        "bom-ref": "pkg:pypi/scipy@1.17.1",
         "name": "scipy",
-        "version": "1.18.1",
-        "purl": "pkg:pypi/scipy@1.18.1"
+        "version": "1.17.1",
+        "purl": "pkg:pypi/scipy@1.17.1"
       },
       {
         "type": "library",
@@ -1004,35 +1000,42 @@
         "name": "urllib3",
         "version": "2.8.0",
         "purl": "pkg:pypi/urllib3@2.8.0"
+      },
+      {
+        "type": "library",
+        "bom-ref": "pkg:pypi/zipp@4.1.1",
+        "name": "zipp",
+        "version": "4.1.1",
+        "purl": "pkg:pypi/zipp@4.1.1"
       }
     ]
   },
   "provenance": {
     "schema_version": 1,
-    "run_id": "run_20261105_001",
+    "run_id": "run_20261106_001",
     "software_version": "0.1.0b1",
-    "config_hash": "4baab9b7c6d32d7f",
+    "config_hash": "c0d434384a95c71b",
     "dataset": {
-      "snapshot_id": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+      "snapshot_id": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
       "dataset_id": "ds_3b4683ab",
       "data_hash": "3b4683ab7409c5be",
       "raw_source_hash": "bba014e8a773a4a80c0935fa1905f75ae7323a96571b0c42d2493cfeed9a3794"
     },
     "model": {
       "manifest_path": "model/model_manifest.json",
-      "manifest_sha256": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+      "manifest_sha256": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
       "model_name": "stacking",
       "model_version": "v1"
     },
     "environment": {
-      "python": "3.14.7",
-      "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+      "python": "3.11.16",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
       "libraries": {
-        "numpy": "2.5.4",
-        "scipy": "1.18.1",
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
         "joblib": "1.6.0"
       },
-      "lock": "# scmle environment lock\n# python 3.14.7\n# platform macOS-26.7.2-arm64-arm-64bit-Mach-O\n# scmle 0.1.0b1\nannotated-types==0.8.0\nast-serialize==0.13.0\nbandit==1.9.4\nboolean.py==5.0\ncachecontrol==0.14.4\ncertifi==2026.10.19\ncharset-normalizer==3.5.2\nclick==8.5.0\ncloudpickle==3.1.2\ncoverage==7.16.2\ncyclonedx-python-lib==11.12.0\ndefusedxml==0.7.1\ndocutils==0.23\nfilelock==4.2.4\nhypothesis==6.169.4\nid==1.6.1\nidna==3.20\niniconfig==2.3.1\njaraco.classes==3.4.0\njaraco.context==6.1.2\njaraco.functools==4.6.0\njoblib==1.6.0\nkeyring==25.7.0\nlibcst==1.9.0\nlibrt==0.16.0\nlicense-expression==30.4.4\nlinkify-it-py==2.2.0\nmarkdown-it-py==4.2.0\nmdit-py-plugins==0.6.1\nmdurl==0.1.2\nmore-itertools==11.2.1\nmsgpack==1.2.3\nmutmut==3.8.0\nmypy==2.4.0\nmypy-extensions==1.1.0\nnarwhals==2.27.1\nnh3==0.3.7\nnumpy==2.5.4\npackageurl-python==0.17.6\npackaging==26.3\npandas==3.0.6\npandas-stubs==3.0.5.260914\npathspec==1.1.1\npip==26.2.1\npip-api==0.0.35\npip-audit==2.10.1\npip-requirements-parser==32.0.1\nplatformdirs==4.13.0\npluggy==1.7.0\npy-serializable==2.1.0\npyarrow==25.0.1\npydantic==2.14.1\npydantic-core==2.50.1\npygments==2.21.0\npyparsing==3.3.3\npytest==9.1.1\npytest-cov==7.1.0\npython-dateutil==2.9.0.post0\npyyaml==6.0.3\nreadme-renderer==46.0\nrequests==2.34.2\nrequests-toolbelt==1.0.0\nrfc3986==2.0.0\nrich==15.0.0\nruff==0.17.0\nscikit-learn==1.9.1\nscipy==1.18.1\nscmle==0.1.0b1\nsetproctitle==1.3.8\nsix==1.17.0\nsortedcontainers==2.4.0\nstevedore==5.9.1\ntextual==8.2.8\nthreadpoolctl==3.7.0\ntomli==2.5.0\ntomli-w==1.2.0\ntwine==7.0.0\ntyping-extensions==4.16.0\ntyping-inspection==0.4.4\nurllib3==2.8.0\n"
+      "lock": "# scmle environment lock\n# python 3.11.16\n# platform macOS-26.7.2-arm64-arm-64bit\n# scmle 0.1.0b1\nannotated-types==0.8.0\nast-serialize==0.13.0\nbackports.tarfile==1.2.0\nbandit==1.9.4\nboolean.py==5.0\ncachecontrol==0.14.4\ncertifi==2026.10.19\ncharset-normalizer==3.5.2\nclick==8.5.0\ncloudpickle==3.1.2\ncoverage==7.16.2\ncyclonedx-python-lib==11.12.0\ndefusedxml==0.7.1\ndocutils==0.23\nfilelock==4.2.4\nhypothesis==6.169.4\nid==1.6.1\nidna==3.20\nimportlib-metadata==9.0.1\niniconfig==2.3.1\njaraco.classes==3.4.0\njaraco.context==6.1.2\njaraco.functools==4.6.0\njoblib==1.6.0\nkeyring==25.7.0\nlibcst==1.9.0\nlibrt==0.16.0\nlicense-expression==30.4.4\nlinkify-it-py==2.2.0\nmarkdown-it-py==4.2.0\nmdit-py-plugins==0.6.1\nmdurl==0.1.2\nmore-itertools==11.2.1\nmsgpack==1.2.3\nmutmut==3.8.0\nmypy==2.4.0\nmypy-extensions==1.1.0\nnarwhals==2.27.1\nnh3==0.3.7\nnumpy==2.4.6\npackageurl-python==0.17.6\npackaging==26.3\npandas==3.0.6\npandas-stubs==3.0.5.260914\npathspec==1.1.1\npip==26.2.1\npip-api==0.0.35\npip-audit==2.10.1\npip-requirements-parser==32.0.1\nplatformdirs==4.13.0\npluggy==1.7.0\npy-serializable==2.1.0\npyarrow==25.0.1\npydantic==2.14.1\npydantic-core==2.50.1\npygments==2.21.0\npyparsing==3.3.3\npytest==9.1.1\npytest-cov==7.1.0\npython-dateutil==2.9.0.post0\npyyaml==6.0.3\nreadme-renderer==46.0\nrequests==2.34.2\nrequests-toolbelt==1.0.0\nrfc3986==2.0.0\nrich==15.0.0\nruff==0.17.0\nscikit-learn==1.9.1\nscipy==1.17.1\nscmle==0.1.0b1\nsetproctitle==1.3.8\nsix==1.17.0\nsortedcontainers==2.4.0\nstevedore==5.9.1\ntextual==8.2.8\nthreadpoolctl==3.7.0\ntomli==2.5.0\ntomli-w==1.2.0\ntwine==7.0.0\ntyping-extensions==4.16.0\ntyping-inspection==0.4.4\nurllib3==2.8.0\nzipp==4.1.1\n"
     },
     "signature": {
       "path": "model/signature.json",
@@ -1041,27 +1044,27 @@
   },
   "release_attestation": {
     "schema_version": 1,
-    "run_id": "run_20261105_001",
+    "run_id": "run_20261106_001",
     "subjects": {
-      "model_manifest_sha256": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
-      "provenance_sha256": "a64c2950958860e4f466219d0d412389de2229c016dc25d7ac771038e85086cf",
-      "sbom_sha256": "ac1b6549704ca58a415b680bfe60b493a1ca34816533f479ebc1527cf0ac4456"
+      "model_manifest_sha256": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+      "provenance_sha256": "469d4f9a175b1e863b9d06e0da7ef65632b5a36848a789d5fbc50400187f27e4",
+      "sbom_sha256": "cd20026eceba6b00a0761176d497dc19a8cf6c89d5e6edbed3d50f2818887096"
     },
     "signature_present": true,
     "signature": {
       "algorithm": "hmac-sha256",
-      "value": "aa1f87c0267579853921d9888764b5391ba6a355ad15307e5ee2046ef2aca38d"
+      "value": "8835e212cbf6951c530ed2dbc165efe6fc080ef640c1c0f11cc16b618d567359"
     }
   },
   "explanation_evidence": {
     "permutation_importance": {
       "schema_version": 1,
-      "model_fingerprint": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
-      "bundle_digest": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+      "model_fingerprint": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+      "bundle_digest": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
       "input_fingerprint": "828fd6867c6d1c1c",
       "dataset_snapshot": {
         "identifier": "ds_3b4683ab",
-        "version": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+        "version": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
         "digest": "3b4683ab7409c5be"
       },
       "feature_graph": {
@@ -1117,7 +1120,7 @@
           }
         ]
       },
-      "timestamp": "2026-11-05T07:16:54.408404Z",
+      "timestamp": "2026-11-06T08:24:15.878884Z",
       "software_version": "0.1.0b1",
       "uncertainty": {
         "status": "not_estimated",
@@ -1147,12 +1150,12 @@
     },
     "partial_dependence": {
       "schema_version": 1,
-      "model_fingerprint": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
-      "bundle_digest": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+      "model_fingerprint": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+      "bundle_digest": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
       "input_fingerprint": "828fd6867c6d1c1c",
       "dataset_snapshot": {
         "identifier": "ds_3b4683ab",
-        "version": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+        "version": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
         "digest": "3b4683ab7409c5be"
       },
       "feature_graph": {
@@ -1215,7 +1218,7 @@
           }
         }
       },
-      "timestamp": "2026-11-05T07:16:54.409798Z",
+      "timestamp": "2026-11-06T08:24:15.879895Z",
       "software_version": "0.1.0b1",
       "uncertainty": {
         "status": "not_estimated",
@@ -1245,12 +1248,12 @@
     },
     "pairwise_interaction": {
       "schema_version": 1,
-      "model_fingerprint": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
-      "bundle_digest": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+      "model_fingerprint": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+      "bundle_digest": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
       "input_fingerprint": "828fd6867c6d1c1c",
       "dataset_snapshot": {
         "identifier": "ds_3b4683ab",
-        "version": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+        "version": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
         "digest": "3b4683ab7409c5be"
       },
       "feature_graph": {
@@ -1351,7 +1354,7 @@
           "Categorical and raw-modality interactions are not measured."
         ]
       },
-      "timestamp": "2026-11-05T07:16:54.410942Z",
+      "timestamp": "2026-11-06T08:24:15.880846Z",
       "software_version": "0.1.0b1",
       "uncertainty": {
         "status": "not_estimated",

@@ -5,8 +5,8 @@
   "row_count": 1309,
   "column_count": 12,
   "target": "survived",
-  "uri": "/var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/tmpp_k9tjxm/data.csv",
-  "snapshot_id": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+  "uri": "/var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/tmp0dyz5gre/data.csv",
+  "snapshot_id": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
   "modality": "tabular",
   "task": "",
   "schema_version": 1,
@@ -24,7 +24,7 @@
     "access_policy": ""
   },
   "lineage": {
-    "source_snapshot": "snap_20d69fc3da9cfed7c813f96e19b806b27a9d8f6ad833054ae8b90a6a8d72eb1a",
+    "source_snapshot": "snap_95dfc9517ce00f62b0ca9cfc2acf54710d8149d487faebabb74c234028791a67",
     "parent_datasets": [],
     "transformations": [],
     "label_source": "",

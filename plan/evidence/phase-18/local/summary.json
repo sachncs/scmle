@@ -68,6 +68,6 @@
     0.5125782198963768
   ],
   "replay_mean_cost": 0.4009216589861751,
-  "verify_output": "10 steps, head d9d2e4e172c7; verified",
+  "verify_output": "10 steps, head d75a704650bd; verified",
   "version": 1
 }

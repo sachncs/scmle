@@ -5,7 +5,7 @@
         "1": {
           "model": "titanic_survival",
           "version": 1,
-          "registered_at": "2026-11-05T07:16:57.314580+00:00",
+          "registered_at": "2026-11-06T08:24:18.089424+00:00",
           "metrics": {
             "roc_auc": 0.903616573033708,
             "pr_auc": 0.8910016298936917,
@@ -18,9 +18,9 @@
             "seed": 7,
             "charter": "framing/charter.json"
           },
-          "run_id": "run_20261105_001",
+          "run_id": "run_20261106_001",
           "path": "titanic_survival/v1",
-          "content_id": "75aa558252e892b6bb767d9bc778c4c81f27a79ec19b88b06dd694157e7c3ad4",
+          "content_id": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
           "signed": true
         }
       },
