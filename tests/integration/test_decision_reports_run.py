@@ -112,3 +112,31 @@ def test_without_a_log_the_value_is_not_assessable_and_no_plan_no_design(
     assert not (folder / "rollout_design.json").exists()
     assert not (folder / "rollout_decisions.jsonl").exists()
     assert read(result, "decision_report.json")["rollout"] is None
+
+
+def test_the_four_decision_files_are_registered_and_verified(tmp_path):
+    from scmle.artifacts import claims_audit
+
+    result = run(
+        tmp_path, logged_action_column="treat", propensity_column="prop"
+    )
+    folder = pathlib.Path(result.run_dir)
+
+    assert read(result, "decision_threshold.json")["threshold"] is not None
+    assert read(result, "net_benefit.json")["rule_hash"]
+    found = {
+        f.name: f
+        for f in claims_audit.verify(folder).findings
+        if f.name.startswith("decision files")
+    }
+    assert (
+        found["decision files: hashes match the custody log"].status == "pass"
+    )
+    (folder / "policy_value.json").write_text("{}", encoding="utf-8")
+    after = claims_audit.verify(folder)
+    assert not after.ok
+    assert any(
+        "policy_value.json" in f.detail
+        for f in after.findings
+        if f.status == "fail"
+    )

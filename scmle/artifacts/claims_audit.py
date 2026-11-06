@@ -16,6 +16,9 @@ the files agree with each other, from the files alone:
 * the claims registered by hash (the F8 baseline comparison, the F10 primary
   causal hypothesis) are stated by the confirmation row, and the report
   files they produced hash to the values the sealed ledger holds;
+* the four decision files of F11 (threshold, net benefit, policy value,
+  rollout design) hash to what the custody log registered when they were
+  written; an edited, removed or added file fails with its name;
 * a causal claim above `unverified` rests on attestors the charter names:
   every accepted attestation is by a listed attestor for that assumption,
   carries this charter's hash, was valid on the run date and (given the
@@ -38,6 +41,7 @@ from typing import Any
 
 from scmle.contracts import errors
 from scmle.contracts import signing
+from scmle.core import decision_reports
 from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import sealing as charter_sealing
 from scmle.data.custody import sealed
@@ -471,6 +475,60 @@ def check_custody(
     return step(name, PASS, f"{len(log.entries)} entries, chain verified")
 
 
+def check_decision_files(
+    run_dir: Path, signing_key: str | bytes | None
+) -> Finding | None:
+    """The four decision files hash to what the custody log registered.
+
+    None when the run registered no decision files and holds none.
+    """
+    name = "decision files: hashes match the custody log"
+    path = run_dir / CUSTODY_FILE
+    entries: list[dict[str, Any]] = []
+    if path.exists():
+        try:
+            log = sealed.OpenLog(path, signing_key)
+        except errors.ScmleError as error:
+            return step(name, FAIL, str(error))
+        entries = [
+            e
+            for e in log.entries
+            if e.get("event") == decision_reports.REGISTRATION_EVENT
+        ]
+    present = [
+        n for n in decision_reports.DECISION_FILES if (run_dir / n).exists()
+    ]
+    if not entries:
+        if not present:
+            return None
+        return step(
+            name,
+            SKIPPED,
+            "the run registered no decision file hashes (older run)",
+        )
+    if len(entries) > 1:
+        return step(name, FAIL, "the decision files were registered twice")
+    registered = entries[0].get("detail", {}).get("files", {})
+    problems = []
+    for file_name in decision_reports.DECISION_FILES:
+        expected = registered.get(file_name)
+        try:
+            found = decision_reports.file_digest(run_dir / file_name)
+        except ValueError as error:
+            problems.append(f"{file_name}: unreadable ({error})")
+            continue
+        if expected is None and found is not None:
+            problems.append(f"{file_name}: not registered")
+        elif expected is not None and found is None:
+            problems.append(f"{file_name}: missing")
+        elif found != expected:
+            problems.append(f"{file_name}: differs from the registered hash")
+    if problems:
+        return step(name, FAIL, "; ".join(problems))
+    count = sum(1 for v in registered.values() if v is not None)
+    return step(name, PASS, f"{count} file(s) hash to the registration")
+
+
 def check_registered(
     run_dir: Path, document: dict[str, Any], ledger: ledger_module.Ledger
 ) -> Finding:
@@ -634,4 +692,7 @@ def verify(
         findings.append(check_registered(folder, document, ledger))
     findings.append(check_control(folder, ledger))
     findings.append(check_attestations(folder, signing_key))
+    decided = check_decision_files(folder, signing_key)
+    if decided is not None:
+        findings.append(decided)
     return Verification(str(folder), tuple(findings))

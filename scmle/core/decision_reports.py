@@ -20,8 +20,16 @@ Built once from the locked test set after the frozen rule exists, inside
 * `rollout_decisions.jsonl`: the hash-chained decision log, holding one row,
   the registration of the plan. Experiment assignments and e-process
   snapshots are written to it by whoever runs the rollout, not by this run.
+* `decision_threshold.json` and `net_benefit.json`: the frozen threshold rule
+  and the net benefit of the rule on the locked rows, as their own files.
 * `decision_report.json`: the cost model hash, the threshold and net benefit
   already computed, the three results above and what each does not show.
+
+The hashes of the four files that carry a result (threshold, net benefit,
+policy value, rollout design) are appended to the custody log as one
+`decision_files` event right after they are written, so `claims verify` can
+tell an edited, removed or added file from the registration. A file that does
+not exist (no rollout plan, say) is registered as absent.
 
 Costs, margins and propensities are inputs. Nothing here is gated on a file
 that did not pass its own declared gates.
@@ -29,6 +37,8 @@ that did not pass its own declared gates.
 
 from collections.abc import Mapping
 import hashlib
+import json
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -37,6 +47,7 @@ import pandas as pd
 from scmle.contracts import signing
 from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import decision as charter_decision
+from scmle.data.ledger import ledger as ledger_module
 from scmle.decision import constraints
 from scmle.decision import design
 from scmle.decision import ope
@@ -46,6 +57,31 @@ NOT_ASSESSABLE = "not_assessable"
 ESTIMATOR = "snips"
 SIMULATION_RUNS = 200
 FIRST_EXPERIMENT = "design-1"
+THRESHOLD_FILE = "decision_threshold.json"
+NET_BENEFIT_FILE = "net_benefit.json"
+POLICY_FILE = "policy_value.json"
+DESIGN_FILE = "rollout_design.json"
+DECISION_FILES = (THRESHOLD_FILE, NET_BENEFIT_FILE, POLICY_FILE, DESIGN_FILE)
+REGISTRATION_EVENT = "decision_files"
+
+
+def file_digest(path: Path) -> str | None:
+    """Hash of a JSON file's content (`ledger.digest`), None if absent.
+
+    Raises:
+        ValueError: If the file is not a JSON object.
+    """
+    if not path.exists():
+        return None
+    body = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(body, dict):
+        raise ValueError(f"{path.name} is not a JSON object")
+    return ledger_module.digest(body)
+
+
+def file_digests(folder: str | Path) -> dict[str, str | None]:
+    """The hash of each of the four decision files, None where absent."""
+    return {name: file_digest(Path(folder) / name) for name in DECISION_FILES}
 
 
 def policy_value(

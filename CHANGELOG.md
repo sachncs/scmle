@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+* `claims verify` checks the four decision files (F11, W2). A charter run with
+  a decision block now writes `decision_threshold.json` and `net_benefit.json`
+  next to `policy_value.json` and `rollout_design.json`, and appends one
+  `decision_files` event to the hash-chained custody log with the hash of each
+  (`decision_reports.file_digests`, the same digest the ledger uses; a file
+  that does not exist, for example the design without a rollout plan, is
+  registered as absent). The new step "decision files: hashes match the
+  custody log" fails by file name when a registered file differs
+  ("differs from the registered hash"), is gone ("missing") or appeared
+  although none was registered ("not registered"), or when the files were
+  registered twice. It is absent from a run with no decision files and
+  `skipped` for an older run that has the files but no registration. The
+  hashes sit in the custody log and not in the hypothesis ledger because the
+  ledger is sealed at the confirmation, before the locked rows these files
+  come from are opened. Limit: the custody log is tamper-evident, not
+  adversary-proof (canon P6). No certified source changed. The two tests that
+  counted `claims verify` steps now expect ten (the causal attestation step of
+  the previous change had made them nine and wrong).
+
 * Propensity-logged assignment rows for a decision rollout (F11, W2;
   `RolloutHook.assign`, deployment ledger kind `rollout_assignment`). When a
   rollout runs, units are assigned by the plan's salted hash

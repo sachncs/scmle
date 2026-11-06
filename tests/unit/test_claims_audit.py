@@ -74,7 +74,7 @@ def test_a_consistent_run_verifies_every_step(tmp_path):
 
     assert result.ok
     assert statuses(result).pop("chartered rules were used") == "skipped"
-    assert len(result.findings) == 9
+    assert len(result.findings) == 10
     assert result.verified == 8
     assert "signature verified" in next(
         f.detail for f in result.findings if f.name.startswith("charter")
@@ -258,7 +258,7 @@ def test_the_cli_lists_shows_and_verifies(tmp_path, capsys, monkeypatch):
     assert json.loads(capsys.readouterr().out)["claim"]["claim_id"] == claim
 
     assert cli.main(["claims", "verify", str(tmp_path)]) == 0
-    assert "8 of 9 steps passed" in capsys.readouterr().out
+    assert "8 of 10 steps passed" in capsys.readouterr().out
     assert cli.main(["claims", "verify", str(tmp_path), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
 
@@ -266,3 +266,88 @@ def test_the_cli_lists_shows_and_verifies(tmp_path, capsys, monkeypatch):
     assert cli.main(["claims", "verify", str(tmp_path)]) == 1
     assert "FAILED" in capsys.readouterr().out
     assert cli.main(["claims", "show", str(tmp_path), "h999999"]) == 1
+
+
+DECISION = "decision files: hashes match the custody log"
+
+
+def register_decision_files(tmp_path, files):
+    """Writes the files and the custody event that registers their hashes."""
+    from scmle.core import decision_reports
+
+    for name, body in files.items():
+        (tmp_path / name).write_text(json.dumps(body), encoding="utf-8")
+    log = sealed.OpenLog(tmp_path / claims_audit.CUSTODY_FILE, KEY)
+    log.append(
+        "final_test",
+        "decision_files",
+        "scmle.decision",
+        {"files": decision_reports.file_digests(tmp_path)},
+    )
+
+
+FOUR = {
+    "decision_threshold.json": {"threshold": 0.3},
+    "net_benefit.json": {"claim": "useful"},
+    "policy_value.json": {"status": "issued"},
+    "rollout_design.json": {"plan_hash": "ab"},
+}
+
+
+def test_the_four_decision_files_are_checked_against_the_registration(
+    tmp_path,
+):
+    make_run(tmp_path)
+    register_decision_files(tmp_path, FOUR)
+
+    result = claims_audit.verify(tmp_path, KEY)
+
+    assert result.ok
+    assert statuses(result)[DECISION] == "pass"
+
+
+def test_a_tampered_decision_file_fails_with_its_name(tmp_path):
+    make_run(tmp_path)
+    register_decision_files(tmp_path, FOUR)
+    (tmp_path / "net_benefit.json").write_text(
+        json.dumps({"claim": "not_useful_in_range"}), encoding="utf-8"
+    )
+
+    result = claims_audit.verify(tmp_path, KEY)
+
+    assert not result.ok
+    found = next(f for f in result.findings if f.name == DECISION)
+    assert found.status == "fail"
+    assert "net_benefit.json: differs from the registered hash" in found.detail
+
+
+def test_a_missing_decision_file_fails_with_its_name(tmp_path):
+    make_run(tmp_path)
+    register_decision_files(tmp_path, FOUR)
+    (tmp_path / "policy_value.json").unlink()
+
+    result = claims_audit.verify(tmp_path, KEY)
+
+    found = next(f for f in result.findings if f.name == DECISION)
+    assert found.status == "fail"
+    assert "policy_value.json: missing" in found.detail
+
+
+def test_an_unregistered_absent_file_that_appears_fails(tmp_path):
+    make_run(tmp_path)
+    files = {k: v for k, v in FOUR.items() if k != "rollout_design.json"}
+    register_decision_files(tmp_path, files)
+    (tmp_path / "rollout_design.json").write_text("{}", encoding="utf-8")
+
+    found = next(
+        f
+        for f in claims_audit.verify(tmp_path, KEY).findings
+        if f.name == DECISION
+    )
+    assert found.status == "fail"
+    assert "rollout_design.json: not registered" in found.detail
+
+
+def test_no_decision_files_adds_no_step(tmp_path):
+    make_run(tmp_path)
+    assert DECISION not in statuses(claims_audit.verify(tmp_path, KEY))

@@ -2625,6 +2625,20 @@ class FinalEvaluationStage(Stage):
         record["pseudo_rows"] = count
         return augmented
 
+    def register_decision_files(
+        self, context: context_module.RunContext
+    ) -> None:
+        """Appends the hashes of the four decision files to the custody log."""
+        vault = context.custody_vault
+        if vault is None or context.store is None:
+            return
+        vault.log.append(
+            "final_test",
+            decision_reports.REGISTRATION_EVENT,
+            "scmle.decision",
+            {"files": decision_reports.file_digests(context.store.directory)},
+        )
+
     def write_decision_reports(
         self,
         context: context_module.RunContext,
@@ -2686,8 +2700,14 @@ class FinalEvaluationStage(Stage):
             satisfaction,
             None if built is None else built[0],
         )
-        context.write_json("policy_value.json", value)
-        written = ["decision_report.json", "policy_value.json"]
+        context.write_json(decision_reports.POLICY_FILE, value)
+        written = ["decision_report.json", decision_reports.POLICY_FILE]
+        if decision is not None:
+            context.write_json(decision_reports.THRESHOLD_FILE, decision)
+            written.append(decision_reports.THRESHOLD_FILE)
+        if net_benefit is not None:
+            context.write_json(decision_reports.NET_BENEFIT_FILE, net_benefit)
+            written.append(decision_reports.NET_BENEFIT_FILE)
         if built is not None:
             design_record, log = built
             context.write_json("rollout_design.json", design_record)
@@ -2695,6 +2715,7 @@ class FinalEvaluationStage(Stage):
                 log.write(context.store.directory / "rollout_decisions.jsonl")
             written += ["rollout_design.json", "rollout_decisions.jsonl"]
         context.write_json("decision_report.json", report)
+        self.register_decision_files(context)
         context.emit(
             "decision.reported",
             "policy value, fairness satisfaction and rollout design written",
