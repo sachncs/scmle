@@ -1,0 +1,77 @@
+{
+  "g3_floor": 0.87,
+  "note": "analysis of a published miss; no gate, no certificate",
+  "registered": "2026-11-07",
+  "replicates": 600,
+  "seconds": 410.3,
+  "seeds": [
+    10000,
+    10600
+  ],
+  "variants": {
+    "both": {
+      "constant_width_top_decile": {
+        "mean": 0.6893416666666667,
+        "se": 0.0015205556477266547
+      },
+      "cqr_marginal": {
+        "mean": 0.9001054166666668,
+        "se": 0.0005562693348439075
+      },
+      "cqr_top_decile": {
+        "mean": 0.8339166666666668,
+        "se": 0.0016724163483470595
+      },
+      "max_depth": 4,
+      "n_estimators": 200
+    },
+    "deeper": {
+      "constant_width_top_decile": {
+        "mean": 0.7074750000000001,
+        "se": 0.0014250053695629536
+      },
+      "cqr_marginal": {
+        "mean": 0.9002091666666666,
+        "se": 0.0005456826415664998
+      },
+      "cqr_top_decile": {
+        "mean": 0.8523458333333331,
+        "se": 0.001408957540557705
+      },
+      "max_depth": 4,
+      "n_estimators": 40
+    },
+    "gate": {
+      "constant_width_top_decile": {
+        "mean": 0.7191666666666666,
+        "se": 0.001382547664599536
+      },
+      "cqr_marginal": {
+        "mean": 0.9001325000000001,
+        "se": 0.0005560662732038053
+      },
+      "cqr_top_decile": {
+        "mean": 0.8650041666666668,
+        "se": 0.0012536743321377476
+      },
+      "max_depth": 2,
+      "n_estimators": 40
+    },
+    "more_trees": {
+      "constant_width_top_decile": {
+        "mean": 0.7002041666666666,
+        "se": 0.0014668415748990574
+      },
+      "cqr_marginal": {
+        "mean": 0.8999754166666668,
+        "se": 0.0005530256481804855
+      },
+      "cqr_top_decile": {
+        "mean": 0.8561791666666666,
+        "se": 0.0014632123942904002
+      },
+      "max_depth": 2,
+      "n_estimators": 200
+    }
+  }
+}
