@@ -1,6 +1,7 @@
 """The decision layer's rollout through LifecycleManager and the ledger (F11)."""
 
 from fractions import Fraction
+import json
 import types
 
 import numpy as np
@@ -215,3 +216,97 @@ def test_the_budget_survives_in_the_ledger_rows(tmp_path):
     row = next(r for r in ledger.rows if r["kind"] == "rollout_experiment")
     restored = budget_module.DecisionBudget.from_dict(row["body"]["budget"])
     assert restored == hook.budget
+
+
+def broken_champion(tmp_path):
+    """A registry whose new champion is clearly worse than the previous."""
+    good = bundle_of("logistic_regression", rows())
+    broken = bundle_of("logistic_regression", rows(seed=0, flip=True))
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
+    for index, model in enumerate((good, broken), start=1):
+        record = store.register(
+            "m", model.save(tmp_path / f"export{index}"), trusted=True
+        )
+        store.promote(
+            "m",
+            record.version,
+            approval=approval_for(record),
+            signing_key=APPROVAL_KEY,
+        )
+    return store, manager
+
+
+def audit_rows(store, action):
+    lines = (store.root / registry_module.AUDIT_FILE).read_text().splitlines()
+    found = [json.loads(line) for line in lines]
+    return [r for r in found if r["action"] == action]
+
+
+def test_binding_a_hook_makes_the_bootstrap_rules_descriptive(tmp_path):
+    ignored, manager = broken_champion(tmp_path)
+    assert manager.rollout_decides is False
+    rollout_hook.RolloutHook(manager, make_plan(), ledger_for())
+    assert manager.rollout_decides is True
+
+
+def test_the_bootstrap_rollback_check_never_moves_the_alias_once_a_hook_is_bound(
+    tmp_path,
+):
+    store, manager = broken_champion(tmp_path)
+    ledger = ledger_for()
+    hook = rollout_hook.RolloutHook(manager, make_plan(), ledger)
+
+    outcome = hook.check_rollback(
+        rows(1200, seed=20),
+        "y",
+        approval=approval_for(store.resolve("m", 1)),
+        signing_key=APPROVAL_KEY,
+    )
+
+    assert outcome.rolled_back is False and outcome.restored_version is None
+    assert "descriptive" in outcome.reason
+    assert outcome.comparison is not None and outcome.comparison.interval[1] < 0
+    assert store.resolve("m").version == 2
+    checked = audit_rows(store, "lifecycle.rollback_check")[-1]
+    assert checked["descriptive"] is True and checked["rolled_back"] is False
+    assert checked["rollback_required"] is True
+    assert not audit_rows(store, "lifecycle.rollback_pending_approval")
+    diagnostic = hook.log.rows[-1]
+    assert diagnostic["kind"] == "bootstrap_diagnostic"
+    assert diagnostic["body"]["stage"] == "rollback"
+    assert diagnostic["body"]["descriptive"] is True
+    assert diagnostic["body"]["decides"] is False
+    assert hook.log.verify()
+
+
+def test_the_hook_is_the_only_decider_of_promotion_and_rollback(tmp_path):
+    env = hook_for(tmp_path, n_max=5000, tolerance=0.01)
+    store, manager, hook = env.store, env.manager, env.hook
+    challenger = env.challenger
+    hook.start("exp-1")
+    arm, primary, guards = traffic(40000, 5, lift=0.05)
+    hook.observe(arm, primary, guards)
+    hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
+    fresh = rows(1200, seed=20)
+
+    bootstrap = manager.check_rollback(
+        fresh,
+        "y",
+        approval=approval_for(store.resolve("m", 1)),
+        signing_key=APPROVAL_KEY,
+    )
+    assert bootstrap.rolled_back is False
+    assert store.resolve("m").version == challenger.version
+    with pytest.raises(errors.ScmleError, match="rollback"):
+        hook.roll_back(approval_for(store.resolve("m", 1)), APPROVAL_KEY)
+
+    rng = np.random.default_rng(6)
+    watch_arm = (rng.random(20000) < 0.5).astype(float)
+    outcome = (rng.random(20000) < 0.30 - 0.15 * watch_arm).astype(float)
+    assert hook.watch(watch_arm, outcome) == rollout.ROLLBACK
+    assert store.resolve("m").version == challenger.version
+    hook.roll_back(
+        approval_for(store.resolve("m", 1)), signing_key=APPROVAL_KEY
+    )
+    assert store.resolve("m").version == 1

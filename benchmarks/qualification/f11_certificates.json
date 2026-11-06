@@ -615,7 +615,7 @@
         ],
         "rate": 0.001
       },
-      "code_hash": "e0d7084dc37d51993c7375d189c30f699c9aac63519fe13c07fbd95c0d59276d",
+      "code_hash": "46647b2502a805d34c23e5c47fab6a85ae2561c81706a29ea4f1dd0c16f1df9e",
       "false_rollback": {
         "interval": [
           8.826773070546787e-05,
@@ -624,6 +624,7 @@
         "rate": 0.0005,
         "rollbacks": 1
       },
+      "hook_agrees": true,
       "no_effect": {
         "false_promotions": 3,
         "hold_final_share": 0.9985,
@@ -637,11 +638,61 @@
       "promote_bound": 0.026260990336999412,
       "replicates": 2000,
       "rollback_bound": 0.014449719092257398,
-      "seconds": 14.1,
+      "seconds": 64.8,
       "seeds": [
         0,
         2000
       ],
+      "through_hook": {
+        "below_delta_min": {
+          "agree": 100,
+          "decided": 100,
+          "hold_invalid": 0,
+          "hook_decisions": 0,
+          "interval": [
+            0.0,
+            0.03699349820698568
+          ],
+          "rate": 0.0,
+          "worlds": 100
+        },
+        "false_rollback": {
+          "agree": 100,
+          "decided": 100,
+          "hold_invalid": 0,
+          "hook_decisions": 0,
+          "interval": [
+            0.0,
+            0.03699349820698568
+          ],
+          "rate": 0.0,
+          "worlds": 100
+        },
+        "no_effect": {
+          "agree": 100,
+          "decided": 100,
+          "hold_invalid": 0,
+          "hook_decisions": 0,
+          "interval": [
+            0.0,
+            0.03699349820698568
+          ],
+          "rate": 0.0,
+          "worlds": 100
+        },
+        "true_loss_rollback": {
+          "agree": 100,
+          "decided": 100,
+          "hold_invalid": 0,
+          "hook_decisions": 0,
+          "interval": [
+            0.0,
+            0.03699349820698568
+          ],
+          "rate": 0.0,
+          "worlds": 100
+        }
+      },
       "true_loss_rollback_share": 0.008
     }
   },

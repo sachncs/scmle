@@ -92,7 +92,11 @@ signature.
 extension surface; the snapshot is unchanged).
 
 `scmle.governance.rollout_hook.RolloutHook` and
-`LifecycleManager.restore_previous` are additions (extension surfaces); the
+`LifecycleManager.restore_previous` are additions (extension surfaces), as
+are `LifecycleManager.defer_to_rollout` (called by `RolloutHook`; it makes
+the bootstrap rules of `review` and `check_rollback` descriptive, and a
+manager without a bound hook behaves as before) and
+`RolloutHook.review` and `RolloutHook.check_rollback`; the
 deployment ledger gained the row kinds `rollout_experiment`,
 `rollout_assignment` and `rollout_decision`, and a ledger without them loads unchanged.
 

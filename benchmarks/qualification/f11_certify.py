@@ -101,6 +101,21 @@ Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
   (c) a champion drifting from 0 to -0.015 (never beyond `tau`): false
   rollback `<= 0.01 + tol(0.01, R)`. (d) drifting from 0 to -0.06: rollback
   share filed.
+  Amendment of 2026-11-06, written before the first run of the hook path
+  and leaving the four floors above as they were: the same worlds are also
+  run through `RolloutHook` on a real `LifecycleManager` and a registry of
+  two small bundles (`through_hook`). Per scenario `HOOK_WORLDS = 100`
+  worlds (seeds `0 .. 99` of the scenario's stream, the first worlds of the
+  vectorised run), fed in batches of 500 to `hook.observe` (promotion
+  scenarios a, b) or `hook.watch` after a real `hook.promote` with a signed
+  approval (rollback scenarios c, d). The hook's decision in each world is
+  compared with the vectorised e-process on the same world at the level the
+  hook assigned (its experiment's or its monitor's own target). Added pass
+  condition: the two agree in every world (`agree == worlds`) in each of the
+  four scenarios; the hook-path false promotion and false rollback counts are
+  filed with Wilson intervals and are not gated (100 worlds cannot bound a
+  rate of 0.01). A world in which the hook stops on the sample-ratio check
+  (`hold_invalid`) is counted separately and not as a disagreement.
 * B10 determinism: two runs of a fixed battery give the same SHA-256 of the
   report, and no module of `scmle.decision` imports custody, vault or ledger
   code. The check ran on one interpreter (the one that measured).
@@ -124,6 +139,7 @@ import json
 import math
 from pathlib import Path
 import sys
+import tempfile
 import time
 from typing import Any
 
@@ -132,10 +148,13 @@ import pandas as pd
 from scipy import stats
 
 from benchmarks.qualification import f11_generators as worlds
+from scmle.artifacts import bundle as bundle_module
+from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
 from scmle.core import randomness
 from scmle.data.charter import decision as charter_decision
 from scmle.data.charter import feasibility
+from scmle.data.curation import preprocessing
 from scmle.data.detectors import certificates
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
@@ -146,6 +165,11 @@ from scmle.decision import netbenefit
 from scmle.decision import ope
 from scmle.decision import rollout
 from scmle.decision import threshold
+from scmle.governance import deployment_ledger
+from scmle.governance import lifecycle
+from scmle.governance import registry as registry_module
+from scmle.governance import rollout_hook
+from scmle.models import registry as models_module
 from scmle.monitoring import abtest
 
 STORE_PATH = Path(__file__).with_name("f11_certificates.json")
@@ -1257,6 +1281,177 @@ def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
 # --- B9, B10 -----------------------------------------------------------------
 
 
+HOOK_WORLDS = 100
+HOOK_BATCH = 500
+HOOK_KEY = "f11-b9-approval-key"
+
+
+def hook_bundle(seed: int) -> bundle_module.ModelBundle:
+    """A small fitted logistic model for the registry the hook runs on."""
+    rng = np.random.default_rng(seed)
+    frame = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
+    frame["y"] = (frame.a + 0.3 * frame.b + rng.normal(0, 0.5, 300) > 0).astype(
+        int
+    )
+    plan = data_contracts.FeaturePlan(("a", "b"), ())
+    models = models_module.ModelRegistry.with_builtins()
+    features = frame.drop(columns="y")
+    fitted = preprocessing.build_pipeline(
+        plan, models.get("logistic_regression"), tasks.TaskType.BINARY, 0
+    ).fit(features, frame.y)
+    return bundle_module.ModelBundle.create(
+        fitted,
+        plan,
+        features,
+        "y",
+        "binary_classification",
+        "roc_auc",
+        "logistic_regression",
+    )
+
+
+def hook_approval(record: Any) -> registry_module.PromotionApproval:
+    """A signed independent approval for one registered version."""
+    return registry_module.PromotionApproval(
+        model=record.model,
+        version=record.version,
+        content_id=record.content_id,
+        reviewer="f11-b9-reviewer",
+        decision=registry_module.PromotionDecision.APPROVED,
+        reason="benchmark fixture",
+        evidence=("f11_certify.py",),
+        approved_at="2026-11-06T00:00:00+00:00",
+    ).sign(HOOK_KEY)
+
+
+def hook_registry(root: Path) -> tuple[Any, Any, Any]:
+    """A registry with champion v1 and a staged challenger v2."""
+    store = registry_module.ModelRegistryStore(root / "registry")
+    manager = lifecycle.LifecycleManager(store, "m", str(root / "work"))
+    first = store.register(
+        "m", hook_bundle(0).save(root / "export1"), trusted=True
+    )
+    store.promote(
+        "m", first.version, approval=hook_approval(first), signing_key=HOOK_KEY
+    )
+    second = store.register(
+        "m", hook_bundle(1).save(root / "export2"), trusted=True
+    )
+    store.promote("m", second.version, registry_module.CHALLENGER)
+    return store, manager, second
+
+
+def hook_in(manager: Any, plan: Any) -> rollout_hook.RolloutHook:
+    """A fresh hook, with its own in-memory ledger, on the shared manager."""
+    ledger = deployment_ledger.DeploymentLedger.create(
+        None, charter_hash="b" * 64, policy={"b9": 1}, alpha_promo="1/20"
+    )
+    return rollout_hook.RolloutHook(manager, plan, ledger)
+
+
+def hook_promotes(
+    hook: rollout_hook.RolloutHook, record: Any, seed: int
+) -> None:
+    """Starts an experiment, wins it on strong traffic and promotes."""
+    hook.start(f"promote-{seed}")
+    rng = np.random.default_rng(seed)
+    arm = (rng.random(6000) < 0.5).astype(float)
+    outcome = (rng.random(6000) < 0.15 + 0.25 * arm).astype(float)
+    hook.observe(arm, outcome)
+    hook.promote(hook_approval(record), signing_key=HOOK_KEY)
+
+
+def hook_path(base: int = 0) -> dict[str, Any]:
+    """The four B9 scenarios run through `RolloutHook` on a real registry.
+
+    Each of the first `HOOK_WORLDS` worlds of a scenario is fed to the hook in
+    batches; the hook's decision is compared with the vectorised e-process on
+    the same world at the level the hook itself assigned.
+    """
+    n = 6000
+    plan = plan_for(delta_min=0.02, n_max=n)
+    scenarios = {
+        "no_effect": ("promotion", 0.0, 0.0),
+        "below_delta_min": ("promotion", 0.01, 0.01),
+        "false_rollback": ("rollback", 0.0, -0.015),
+        "true_loss_rollback": ("rollback", 0.0, -0.06),
+    }
+    stream_names = {
+        "no_effect": "b9.no_effect",
+        "below_delta_min": "b9.below_delta_min",
+        "false_rollback": "b9.rollback",
+        "true_loss_rollback": "b9.harm",
+    }
+    out: dict[str, Any] = {}
+    with tempfile.TemporaryDirectory() as scratch:
+        store, manager, challenger = hook_registry(Path(scratch))
+        for label, (kind, start, end) in scenarios.items():
+            arm, y = worlds.drifting_experiment(
+                rng_for(base, stream_names[label], 0),
+                HOOK_WORLDS,
+                n,
+                0.5,
+                start,
+                end,
+            )
+            hits = agree = invalid = 0
+            for world in range(HOOK_WORLDS):
+                hook = hook_in(manager, plan)
+                if kind == "promotion":
+                    hook.start(f"w{world}")
+                    status = ""
+                    for first in range(0, n, HOOK_BATCH):
+                        window = slice(first, first + HOOK_BATCH)
+                        status = hook.observe(
+                            arm[world, window], y[world, window]
+                        ).status
+                    target = hook.started().target
+                    path = peeking_paths(
+                        arm[world], y[world], 0.5, plan.delta_min
+                    )
+                    expected = bool(path.max() >= target)
+                    won = status == rollout.PROMOTE
+                else:
+                    hook_promotes(hook, challenger, base + world)
+                    monitor = hook.monitor
+                    assert monitor is not None
+                    status = ""
+                    for first in range(0, n, HOOK_BATCH):
+                        window = slice(first, first + HOOK_BATCH)
+                        status = hook.watch(
+                            arm[world, window], y[world, window]
+                        )
+                    target = monitor.target
+                    path = rollback_paths(arm[world], y[world], 0.02)
+                    expected = bool(path.max() >= target)
+                    won = status == rollout.ROLLBACK
+                    store.promote(
+                        "m",
+                        1,
+                        approval=hook_approval(store.resolve("m", 1)),
+                        signing_key=HOOK_KEY,
+                    )
+                    store.promote(
+                        "m", challenger.version, registry_module.CHALLENGER
+                    )
+                if status == rollout.HOLD_INVALID:
+                    invalid += 1
+                    continue
+                hits += int(won)
+                agree += int(won == expected)
+            decided = HOOK_WORLDS - invalid
+            out[label] = {
+                "worlds": HOOK_WORLDS,
+                "decided": decided,
+                "hold_invalid": invalid,
+                "hook_decisions": hits,
+                "agree": agree,
+                "rate": hits / max(1, decided),
+                "interval": wilson(hits, max(1, decided)),
+            }
+    return out
+
+
 def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
     """Promotion and rollback under a wandering control rate."""
     n = 6000
@@ -1322,10 +1517,15 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
             (rollback_paths(arm, y, 0.02).max(axis=1) >= target_r).sum()
         )
     result["true_loss_rollback_share"] = caught / harm_runs
+    result["through_hook"] = hook_path(base)
+    hook_agrees = all(
+        v["agree"] == v["decided"] for v in result["through_hook"].values()
+    )
     promote_bound = ALPHA_PROMOTE + tol(ALPHA_PROMOTE, runs)
     rollback_bound = ALPHA_ROLLBACK + tol(ALPHA_ROLLBACK, runs)
     meets = (
-        result["no_effect"]["rate"] <= promote_bound
+        hook_agrees
+        and result["no_effect"]["rate"] <= promote_bound
         and result["below_delta_min"]["rate"] <= promote_bound
         and result["below_delta_min"]["hold_final_share"] >= 1 - promote_bound
         and result["false_rollback"]["rate"] <= rollback_bound
@@ -1334,6 +1534,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
         {
             "promote_bound": promote_bound,
             "rollback_bound": rollback_bound,
+            "hook_agrees": hook_agrees,
             "passed": bool(meets),
             "replicates": runs,
         }
@@ -1551,6 +1752,16 @@ def sources() -> dict[str, list[Any]]:
             anytime.centered_paths,
             anytime.centered_stream,
             rollback_paths,
+            rollout.Rollout,
+            rollout.RollbackMonitor,
+            rollout_hook.RolloutHook,
+            lifecycle.LifecycleManager.defer_to_rollout,
+            hook_bundle,
+            hook_approval,
+            hook_registry,
+            hook_in,
+            hook_promotes,
+            hook_path,
             gate_b9,
         ],
         "B10": [battery_digest, forbidden_imports, gate_b10],

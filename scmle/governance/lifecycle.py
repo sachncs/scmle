@@ -162,6 +162,20 @@ class LifecycleManager:
         self.model = model
         self.work_dir = work_dir
         self.policy = policy or RetrainPolicy()
+        self.rollout_decides = False
+
+    def defer_to_rollout(self) -> None:
+        """Makes the bootstrap promotion and rollback rules descriptive.
+
+        Once a charter rollout is bound to this manager (`RolloutHook` calls
+        this on construction), the e-processes of `scmle.decision.rollout`
+        are the only deciders. `review` then stages the retrained challenger
+        whatever its bootstrap comparison says, so the e-process can test
+        it, and `check_rollback` never moves the alias; both audit the
+        bootstrap result as a descriptive diagnostic (`descriptive: true`,
+        `decides: false`). Without a bound rollout nothing changes.
+        """
+        self.rollout_decides = True
 
     @property
     def state_path(self) -> pathlib.Path:
@@ -345,7 +359,16 @@ class LifecycleManager:
             current, challenger_run.bundle
         ).compare(holdout.drop(columns=[target]), holdout[target])
         evidence = dataclasses.asdict(comparison)
-        if comparison.decision != "promote":
+        if self.rollout_decides:
+            self.registry.audit(
+                "lifecycle.bootstrap_diagnostic",
+                model=self.model,
+                stage="review",
+                descriptive=True,
+                decides=False,
+                **evidence,
+            )
+        if comparison.decision != "promote" and not self.rollout_decides:
             self.registry.audit(
                 "lifecycle.challenger_rejected",
                 model=self.model,
@@ -364,6 +387,11 @@ class LifecycleManager:
             version=record.version,
             **evidence,
         )
+        if self.rollout_decides:
+            notes.append(
+                f"bootstrap comparison says {comparison.decision!r} "
+                "(descriptive only); the rollout e-process decides promotion"
+            )
         notes.append(
             f"staged challenger as v{record.version}; independent approval "
             "required before champion promotion"
@@ -379,6 +407,10 @@ class LifecycleManager:
         signing_key: str | bytes | None = None,
     ) -> RollbackOutcome:
         """Takes the previous champion back if the new one is clearly worse.
+
+        With a charter rollout bound (`defer_to_rollout`) this is a
+        descriptive diagnostic: it audits the comparison and never moves the
+        alias or asks for approval.
 
         Both versions score the same fresh labeled rows. The previous version
         returns only when the new champion's advantage over it is negative
@@ -413,6 +445,27 @@ class LifecycleManager:
             fresh.drop(columns=[target]), fresh[target]
         )
         worse = comparison.interval[1] < -rule.tolerance
+        if self.rollout_decides:
+            self.registry.audit(
+                "lifecycle.rollback_check",
+                model=self.model,
+                current=aliases[registry_module.CHAMPION],
+                previous=previous,
+                rollback_required=worse,
+                rolled_back=False,
+                descriptive=True,
+                decides=False,
+                **dataclasses.asdict(comparison),
+            )
+            return RollbackOutcome(
+                False,
+                comparison,
+                None,
+                "descriptive: the bootstrap interval "
+                f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}]"
+                f" {'is' if worse else 'is not'} below the tolerance; "
+                "nothing moved, the rollback e-process decides",
+            )
         self.registry.audit(
             "lifecycle.rollback_check",
             model=self.model,

@@ -12,13 +12,6 @@ charter run, and certificates with pre-registered floors (`--check f11`).
 
 ## Work still to do
 
-**W1 Lifecycle hook, remainder** (one agent). `RolloutHook` calls `Rollout`
-and `RollbackMonitor` through `LifecycleManager` with independent approval
-kept. Left: make the bootstrap promotion and rollback rules of
-`LifecycleManager.review` and `check_rollback` descriptive, and run B9 through
-the hook. Done when: B9 runs through `LifecycleManager` and existing lifecycle
-tests are unchanged where no charter rollout is set.
-
 **W2 remainder** (one agent). The files and the one-time policy value and
 fairness tests are written by a charter run, a rollout run through
 `RolloutHook` logs its assignments, and `claims verify` checks the four
@@ -47,7 +40,7 @@ uv run python -m benchmarks.qualification --check f11
 ```
 
 passes today with `A3` descriptive. The phase closes when W4's outside
-reproduction is on file, W1 and W2 are done, and the A3 gate either passes a
+reproduction is on file, W2 is done, and the A3 gate either passes a
 re-registered floor or the band stays descriptive on purpose.
 
 ## Risks that remain

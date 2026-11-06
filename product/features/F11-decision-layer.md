@@ -17,7 +17,6 @@ recalled, not checked against a source.
 
 | Item | State |
 |---|---|
-| `LifecycleManager` bootstrap paths | `scmle.governance.rollout_hook.RolloutHook` now runs `Rollout` and `RollbackMonitor` through `LifecycleManager` and the deployment ledger with the `DecisionBudget`, but `LifecycleManager.check_rollback` still decides by the bootstrap interval and `review` by the fixed-sample comparison; those two paths are not yet descriptive. Independent approval is unchanged. |
 | `DecisionSpec` migration | The run spec's `threshold_objective`, `false_positive_cost` and `false_negative_cost` (`scmle/contracts/tasks.py:493-500`) remain the source when no charter exists; a charter with a decision block overrides them. They are not removed or deprecated. |
 | Ledger rows | A charter run still writes only the rollout plan and a one-row `rollout_decisions.jsonl` (the registration): no experiment runs inside a charter run. When `RolloutHook` runs an experiment, each batch of units is written to the deployment ledger as a `rollout_assignment` row (unit, arm, the probability that arm had) and the e-process decisions as `rollout_decision` rows. |
 | Existing fairness code | `evaluation/fairness.py` constants (0.10 gap, 0.80 ratio), `mitigation.py` (`trigger_gap`, `min_reduction`, `max_accuracy_cost`) and `reweighing.py` still gate or report as before; they are not clients of `decision.constraints`. Reweighing as a mechanism is accepted in the charter but only `group_thresholds` is solved. |

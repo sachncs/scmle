@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+* The bootstrap promotion and rollback rules of the lifecycle manager are
+  descriptive once a charter rollout is bound, and B9 runs through the hook
+  (F11, W1; `LifecycleManager.defer_to_rollout`, `RolloutHook.review` and
+  `check_rollback`). Constructing a `RolloutHook` binds its manager:
+  `review` then stages the retrained challenger whatever the fixed-sample
+  comparison says (so the e-process can test it) and audits that comparison
+  as `lifecycle.bootstrap_diagnostic` (`descriptive: true`, `decides:
+  false`); `check_rollback` audits its interval with `rolled_back: false` and
+  `descriptive: true`, never moves the alias and never asks for approval,
+  even when given one. The hook's own `review` and `check_rollback` also
+  append a `bootstrap_diagnostic` row to the hash-chained decision log. Only
+  `RolloutHook.promote`, `watch` and `roll_back` (the e-processes, with the
+  registry's independent approval) decide; a test drives a worse champion
+  past an approved `check_rollback` and shows the alias stays until the
+  monitor decides. A manager with no bound hook behaves exactly as before
+  (the existing lifecycle tests are unchanged). Certificate B9 was re-issued
+  with the same seeds and floors plus an amendment written before its first
+  run: 100 worlds per scenario also run through `RolloutHook` on a real
+  registry (promotion by `observe`, rollback by `watch` after a real signed
+  `promote`), and the hook's decision must equal the vectorised e-process on
+  the same world at the level the hook assigned. Measured: 400 of 400 worlds
+  agree, B9 still passes with the same four numbers (false promotion
+  0.0015 and 0.001, false rollback 0.0005, true-loss rollback share 0.008).
+  No hook world reached a decision in the null scenarios, so the agreement
+  there is on "no decision"; the promote path is exercised by the real
+  `promote` each rollback world needs. No other certificate changed.
+
 * The charter-run ingest stage queries the source database for the quantities
   a `reconcile` block declares (F9, WP-9.9; `declared.reconcile_source`,
   built on `reconcile.reconcile_extract`). For each declared view it asks the

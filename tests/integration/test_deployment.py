@@ -479,3 +479,39 @@ def test_too_few_labeled_rows_do_not_trigger_training(
     )
 
     assert outcome.skipped == "too_few_rows" and not runs
+
+
+def test_a_bound_rollout_stages_the_challenger_whatever_the_bootstrap_says(
+    trained, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        champion_module.ChampionChallenger,
+        "compare",
+        lambda self, data, outcomes, metric_name=None: (
+            champion_module.Comparison(
+                "roc_auc", len(data), 0.9, 0.9, 0.0, (-0.01, 0.01), 0.5, "keep"
+            )
+        ),
+    )
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
+    register_champion(manager, store, trained)
+    manager.defer_to_rollout()
+
+    outcome = manager.review(
+        make_frame(1200, 5, relabel=True), "y", project_options=FAST_OPTIONS
+    )
+
+    assert outcome.retrained and outcome.promoted_version is None
+    assert store.resolve("churn").version == 1
+    assert store.resolve("churn", registry_module.CHALLENGER).version == 2
+    actions = audit_actions(store)
+    assert "lifecycle.challenger_rejected" not in actions
+    assert "lifecycle.challenger_staged" in actions
+    lines = (store.root / registry_module.AUDIT_FILE).read_text().splitlines()
+    diagnostic = next(
+        json.loads(line) for line in lines if "bootstrap_diagnostic" in line
+    )
+    assert diagnostic["descriptive"] is True and diagnostic["decides"] is False
+    assert diagnostic["decision"] == "keep"
+    assert any("descriptive" in note for note in outcome.notes)

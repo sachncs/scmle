@@ -12,6 +12,11 @@ registries. This hook is the one place that joins the two:
 * a `promote` decision is a proposal row; the alias moves only through
   `LifecycleManager.promote_challenger`, which still needs the registry's
   independent signed approval (and the attestation of a guarded registry);
+* binding the hook makes the manager's bootstrap rules descriptive
+  (`LifecycleManager.defer_to_rollout`): `review` and `check_rollback` no
+  longer decide promotion or rollback, and the hook's `review` and
+  `check_rollback` write their results to the decision log as
+  `bootstrap_diagnostic` rows with `descriptive: true` and `decides: false`;
 * a promoted champion gets its rollback monitor at the plan's rollback level
   (once per champion); a rollback decision is a proposal row, and the alias
   moves back only through `LifecycleManager.restore_previous`.
@@ -26,6 +31,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
+import pandas as pd
 
 from scmle.contracts import errors
 from scmle.data.charter import decision as charter_decision
@@ -60,6 +66,7 @@ class RolloutHook:
             log: The decision log to continue (a new one when omitted).
         """
         self.manager = manager
+        manager.defer_to_rollout()
         self.plan = plan
         self.ledger = ledger
         self.budget = budget if budget is not None else plan.budget()
@@ -71,6 +78,58 @@ class RolloutHook:
         self.monitor: rollout.RollbackMonitor | None = None
         self.champion_id: str | None = None
         self.units = 0
+
+    def diagnose(self, stage: str, comparison: Any) -> None:
+        """Logs a bootstrap result as a descriptive diagnostic."""
+        body: dict[str, Any] = {
+            "stage": stage,
+            "descriptive": True,
+            "decides": False,
+        }
+        if comparison is not None:
+            body.update(
+                decision=comparison.decision,
+                advantage=comparison.advantage,
+                interval=list(comparison.interval),
+            )
+        self.log.append("bootstrap_diagnostic", body)
+
+    def review(
+        self,
+        fresh: pd.DataFrame,
+        target: str,
+        retrain: bool = True,
+        project_options: dict[str, Any] | None = None,
+    ) -> lifecycle.LifecycleOutcome:
+        """Runs `LifecycleManager.review` and logs its comparison.
+
+        The challenger is staged for the rollout; the bootstrap comparison
+        decides nothing and goes to the decision log as a diagnostic.
+        """
+        outcome = self.manager.review(fresh, target, retrain, project_options)
+        if outcome.comparison is not None:
+            self.diagnose("review", outcome.comparison)
+        return outcome
+
+    def check_rollback(
+        self,
+        fresh: pd.DataFrame,
+        target: str,
+        policy: lifecycle.RollbackPolicy | None = None,
+        approval: registry_module.PromotionApproval | None = None,
+        signing_key: str | bytes | None = None,
+    ) -> lifecycle.RollbackOutcome:
+        """Runs `LifecycleManager.check_rollback` as a logged diagnostic.
+
+        Nothing moves, whatever the approval: only `watch` and `roll_back`
+        take the previous champion back.
+        """
+        outcome = self.manager.check_rollback(
+            fresh, target, policy, approval, signing_key
+        )
+        if outcome.comparison is not None:
+            self.diagnose("rollback", outcome.comparison)
+        return outcome
 
     def started(self) -> rollout.Rollout:
         """The running experiment.
