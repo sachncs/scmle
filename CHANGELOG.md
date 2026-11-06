@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+* Rollout decisions through the lifecycle manager and the deployment ledger
+  (F11, W1; `scmle.governance.rollout_hook.RolloutHook`,
+  `LifecycleManager.restore_previous`). The hook starts an experiment with the
+  level `assign_experiment` takes from the plan's `DecisionBudget` (spent
+  whether or not it promotes) and writes the level and the budget after it to
+  the deployment ledger (`rollout_experiment`); each batch's decision is a
+  chained `rollout_decision` row and a row of the hash-chained decision log. A
+  `promote` decision writes a `promotion_proposal` and moves nothing; the alias
+  moves only through `LifecycleManager.promote_challenger`, which still needs
+  the registry's independent signed approval (and the attestation of a guarded
+  registry). A promoted champion gets its `RollbackMonitor` once, at the plan's
+  rollback level; a rollback decision writes a `rollback_proposal` and the
+  alias moves back only through `restore_previous`, which `check_rollback`
+  now also uses (its behaviour is unchanged). The deployment ledger gained the
+  row kinds `rollout_experiment` and `rollout_decision`, with checks that a
+  decision names a started experiment; an older ledger loads as before. Not
+  done: the bootstrap rules of `review` and `check_rollback` are still the
+  decision paths when the hook is not used. No certified source changed.
+
 * The baseline claim can be about the selected model (F8, wiring;
   `--baseline-subject selected_model`, `MLProject(baseline_subject=...)`,
   `DataSpec.baseline_subject`, default `frozen_rule`). The default is

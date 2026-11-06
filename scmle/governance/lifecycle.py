@@ -439,18 +439,8 @@ class LifecycleManager:
                 None,
                 "rollback requires independent approval",
             )
-        self.registry.promote(
-            self.model,
-            previous,
-            approval=approval,
-            signing_key=signing_key,
-            guard_detail={
-                "rollback": {
-                    "model": self.model,
-                    "from_version": aliases[registry_module.CHAMPION],
-                    "to_version": previous,
-                }
-            },
+        self.restore_previous(
+            approval, signing_key, aliases[registry_module.CHAMPION], previous
         )
         return RollbackOutcome(
             True,
@@ -460,6 +450,62 @@ class LifecycleManager:
             f"{-comparison.advantage:.4f} (interval "
             f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}])",
         )
+
+    def restore_previous(
+        self,
+        approval: registry_module.PromotionApproval,
+        signing_key: str | bytes | None = None,
+        current: int | None = None,
+        previous: int | None = None,
+    ) -> int:
+        """Points the champion alias back at the previous version.
+
+        The decision to do so (the bootstrap interval of `check_rollback` or
+        the rollback e-process of `scmle.governance.rollout_hook`) is made by
+        the caller; this is the one place the alias moves, with the same
+        independent approval and the guarded registry's attestation naming
+        this rollback.
+
+        Args:
+            approval: Independent approval for the previous version.
+            signing_key: HMAC key for the approval signature.
+            current: The version being replaced (read when omitted).
+            previous: The version restored (read when omitted).
+
+        Returns:
+            The restored version.
+
+        Raises:
+            ArtifactError: If there is no previous version or the approval
+                is invalid.
+        """
+        aliases = self.registry.aliases(self.model)
+        target = (
+            previous
+            if previous is not None
+            else aliases.get(registry_module.PREVIOUS)
+        )
+        if target is None:
+            raise errors.ArtifactError("no previous version to restore")
+        replaced = (
+            current
+            if current is not None
+            else aliases.get(registry_module.CHAMPION)
+        )
+        self.registry.promote(
+            self.model,
+            target,
+            approval=approval,
+            signing_key=signing_key,
+            guard_detail={
+                "rollback": {
+                    "model": self.model,
+                    "from_version": replaced,
+                    "to_version": target,
+                }
+            },
+        )
+        return int(target)
 
     def note_rows(self, state: dict[str, Any], fresh: pd.DataFrame) -> None:
         """Counts fresh rows toward the cooldown after an attempt."""

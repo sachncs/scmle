@@ -83,6 +83,11 @@ optional `attestors` and `attestations` fields
 (`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`);
 a format 4 causal charter keeps its hash and signature.
 
+`scmle.governance.rollout_hook.RolloutHook` and
+`LifecycleManager.restore_previous` are additions (extension surfaces); the
+deployment ledger gained the row kinds `rollout_experiment` and
+`rollout_decision`, and a ledger without them loads unchanged.
+
 `MLProject` gained the optional keyword `baseline_subject` (`frozen_rule`,
 the default, or `selected_model`), `DataSpec` the field of the same name, and
 `plan`, `run` and `resume` the flag `--baseline-subject`; `tests/fixtures/public_api.json`

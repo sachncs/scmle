@@ -36,6 +36,13 @@ Row kinds (``open`` first and only once):
     status ``open``. It is a record that a person must look, not an incident
     workflow (`scmle.monitoring.incidents` wants an SLO evaluation, which a
     halt does not have).
+``rollout_experiment``, ``rollout_decision``
+    The decision layer's rollout (F11): an experiment is started with the
+    level the `DecisionBudget` assigned and the budget after the assignment;
+    the decision
+    (`hold`, `promote`, `hold_final`, `hold_invalid`, or a rollback) is
+    chained with the e-process values. A promotion or rollback still needs the
+    registry's signed approval.
 ``deployment``
     A release event confirmed or rejected by the runtime (`ReleaseRegistry`):
     the model, version, environment, revision and image digest, and whether
@@ -53,6 +60,7 @@ from collections.abc import Sequence
 import dataclasses
 import datetime
 import enum
+from fractions import Fraction
 import hashlib
 import hmac
 import json
@@ -80,6 +88,8 @@ HALT = "halt"
 INCIDENT = "incident"
 AUDIT = "audit"
 DEPLOYMENT = "deployment"
+ROLLOUT_EXPERIMENT = "rollout_experiment"
+ROLLOUT_DECISION = "rollout_decision"
 KINDS = (
     OPEN,
     OBSERVE_SUMMARY,
@@ -94,6 +104,8 @@ KINDS = (
     INCIDENT,
     AUDIT,
     DEPLOYMENT,
+    ROLLOUT_EXPERIMENT,
+    ROLLOUT_DECISION,
 )
 REGISTERED = "registered"
 DECIDED = "decided"
@@ -256,6 +268,7 @@ class DeploymentLedger:
         self.registered: list[str] = []
         self.decided: dict[str, dict[str, Any]] = {}
         self.halted = False
+        self.experiments: dict[str, dict[str, Any]] = {}
 
     @classmethod
     def create(
@@ -390,6 +403,8 @@ class DeploymentLedger:
             ESCALATION: self.apply_escalation,
             ATTESTATION: self.apply_attestation,
             HALT: self.apply_halt,
+            ROLLOUT_EXPERIMENT: self.apply_experiment,
+            ROLLOUT_DECISION: self.apply_rollout_decision,
         }
         try:
             if not isinstance(body, dict):
@@ -492,6 +507,23 @@ class DeploymentLedger:
             )
         self.closed[reply.escalation_id] = ATTESTATION
         self.attestations[reply.escalation_id] = dict(body)
+
+    def apply_experiment(self, body: Mapping[str, Any]) -> None:
+        """Starts an experiment once, at a positive level."""
+        name = str(body["experiment_id"])
+        if name in self.experiments:
+            raise DeploymentLedgerError(f"experiment {name!r} already started")
+        if not 0 < float(Fraction(body["level"])) < 1:
+            raise DeploymentLedgerError("an experiment level lies in (0, 1)")
+        self.experiments[name] = dict(body)
+
+    def apply_rollout_decision(self, body: Mapping[str, Any]) -> None:
+        """A decision names a started experiment or a monitored champion."""
+        name = str(body["experiment_id"])
+        if name not in self.experiments:
+            raise DeploymentLedgerError(
+                f"decision for {name!r}, which was not started"
+            )
 
     def apply_halt(self, body: Mapping[str, Any]) -> None:
         """Enters or leaves the halted state."""

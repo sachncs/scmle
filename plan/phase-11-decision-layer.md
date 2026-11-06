@@ -12,11 +12,12 @@ charter run, and certificates with pre-registered floors (`--check f11`).
 
 ## Work still to do
 
-**W1 Lifecycle hook** (one agent). Call `Rollout` and `RollbackMonitor` from
-`LifecycleManager` (`scmle/governance/lifecycle.py`), make the bootstrap
-promotion and rollback rules descriptive, keep independent approval, write the
-assignments to the decision log. Done when: B9 runs through `LifecycleManager`
-and existing lifecycle tests are unchanged where no charter rollout is set.
+**W1 Lifecycle hook, remainder** (one agent). `RolloutHook` calls `Rollout`
+and `RollbackMonitor` through `LifecycleManager` with independent approval
+kept. Left: make the bootstrap promotion and rollback rules of
+`LifecycleManager.review` and `check_rollback` descriptive, and run B9 through
+the hook. Done when: B9 runs through `LifecycleManager` and existing lifecycle
+tests are unchanged where no charter rollout is set.
 
 **W2 remainder** (one agent). The files and the one-time policy value and
 fairness tests are written by a charter run. Left: experiment assignments in
