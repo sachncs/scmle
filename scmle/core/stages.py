@@ -536,6 +536,7 @@ class ProfileStage(Stage):
         )
         card = data_contracts.DatasetCard.from_curation(curation)
         context.profile = profile
+        context.curation = curation
         context.write_json("dataset_profile.json", profile.to_dict())
         context.write_json("curation_report.json", curation.to_dict())
         context.write_json("dataset_card.json", card.to_dict())
@@ -1346,6 +1347,24 @@ class ProfileStage(Stage):
             profile = dataclasses.replace(profile, feature_plan=plan)
             context.profile = profile
             context.write_json("dataset_profile.json", profile.to_dict())
+            curation = context.curation
+            if curation is not None:
+                amended = dataclasses.replace(
+                    curation,
+                    feature_columns={
+                        "numeric": plan.numeric,
+                        "categorical": plan.categorical,
+                        "text": plan.text,
+                    },
+                    dropped_columns=plan.dropped,
+                )
+                context.curation = amended
+                context.write_json("curation_report.json", amended.to_dict())
+                context.write_json(
+                    "dataset_card.json",
+                    data_contracts.DatasetCard.from_curation(amended).to_dict(),
+                )
+                written.extend(["curation_report.json", "dataset_card.json"])
         context.emit(
             "admissibility.completed",
             "admissibility and detectors ran on the exploration set",

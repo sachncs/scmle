@@ -243,6 +243,22 @@ def test_a_certified_leakage_suspect_is_quarantined_and_ledgered(
     )
 
 
+def test_the_curation_report_and_card_list_the_final_feature_plan(
+    binary_frame, tmp_path
+):
+    result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
+    folder = pathlib.Path(result.run_dir)
+
+    plan = json.loads((folder / "dataset_profile.json").read_text())
+    curation = json.loads((folder / "curation_report.json").read_text())
+    card = json.loads((folder / "dataset_card.json").read_text())
+    for key in ("numeric", "categorical", "text"):
+        assert curation["feature_columns"][key] == plan["feature_plan"][key]
+        assert card["feature_summary"][key] == plan["feature_plan"][key]
+    assert "echo" not in curation["feature_columns"]["numeric"]
+    assert "quarantined by admissibility" in curation["dropped_columns"]["echo"]
+
+
 def test_an_uncertified_mechanism_logs_the_suspicion_but_keeps_the_field(
     binary_frame, tmp_path, monkeypatch
 ):

@@ -353,6 +353,8 @@ class RunContext:
         manifest: Dataset identity.
         task: Resolved task type.
         profile: Dataset profile.
+        curation: Curation report as first written, kept so that later
+            stages can amend it when they change the feature plan.
         split: Split result with development data and locked test.
         custody: Three-way split outcome when a charter governs the run.
         custody_vault: Holds the sealed confirmation set of a charter run.
@@ -427,6 +429,7 @@ class RunContext:
     )
     task: tasks.TaskType | None = None
     profile: data_contracts.DatasetProfile | None = None
+    curation: data_contracts.CurationReport | None = None
     split: splitters.SplitResult | None = None
     custody: custody_pipeline.CustodyOutcome | None = None
     custody_vault: custody_sealed.CustodyVault | None = None
