@@ -36,9 +36,9 @@ protected against silent faults. Nothing here adds user-facing analysis.
 | Corpora | All entries are `candidate`; no source URL, licence or hash is filled in | `benchmarks/qualification/corpora.json` |
 | R oracles | Not generated; `onlineFDR` and `knockoff` listed as pending | `benchmarks/qualification/oracles.py:42-50`; frozen scipy fixtures only in `tests/fixtures/oracles/` (12 files, none from R) |
 | SOTA campaign | Driver, runners and statistics exist; protocol tagged `sota-protocol-v1`; no result file is committed under `benchmarks/sota/` | `git log -- benchmarks/sota`, directory listing |
-| Mutation scope | `setup.cfg` `source_paths` covers harness, ledger, admissibility, detectors, robustness modules; it does **not** list `scmle/data/custody/*`, `scmle/data/charter/*`, `scmle/governance/vault.py`, `scmle/data/ledger/__init__.py`, or the uncommitted `scmle/data/admissibility/screen.py` | `setup.cfg:1-58` |
-| Mutation score | Gate script default minimum 70; nightly runs it at 70. No survivor counts are recorded in the repo | `scripts/check_mutation_score.sh:6`, `.github/workflows/full-suite.yml:41` |
-| Windows CI runtime | `cross-platform` has `timeout-minutes: 20`. Last completed master run `41748161942`: Windows 3.11 took 15 min 31 s, Windows 3.14 16 min 36 s; macOS 3.11 11 min, 3.14 12 min 26 s. Earlier run `41697834426`: Windows 3.11 15 min 38 s | `.github/workflows/ci.yml:67-70`; `gh run view` job timestamps |
+| Mutation scope | `setup.cfg` `source_paths` covers harness, ledger, admissibility (including `screen.py`), detectors, robustness, custody, charter, vault, framing, ingest, identification, decision, loop and uncertainty modules (corrected 2026-11-06; it was listed as missing custody, charter, vault and screen) | `setup.cfg` |
+| Mutation score | Gate script default minimum 70; nightly runs it at 70. Per-module survivor tables exist in `tests/unit/MUTANTS_*.md`; no repo-wide `mutation_survivors.json` | `scripts/check_mutation_score.sh:6`, `.github/workflows/full-suite.yml:41` |
+| Windows CI runtime | `cross-platform` has a 60 minute limit (raised from 20 as the suite grew); on master run 42227276889 Windows 3.11 took 23 minutes and 3.14 29 minutes, so the "under 14 minutes" acceptance fails | `.github/workflows/ci.yml`; `gh run view 42227276889` |
 | Independent replication | `benchmarks/sota/PROTOCOL.md` exists; no replication record | no such file |
 
 ## Work items
@@ -156,7 +156,7 @@ survivor either killed by a new test or justified in one line.
 
 ### W7. Windows and macOS CI runtime headroom
 
-Windows 3.11 and 3.14 take 15-17 minutes of a 20-minute limit; each new
+Windows 3.11 and 3.14 take 23 and 29 minutes of a 60-minute limit; each new
 F-feature test file adds to it. Before adding the W6 tests, either (a) split
 the cross-platform job into two (unit vs property/leakage/end-to-end) or (b)
 move slow property tests to the nightly job, keeping a Windows custody and

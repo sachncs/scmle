@@ -55,8 +55,8 @@ can start now)
 **Smaller open items**
 - `--check ingest` runs a small live check; the full 500/1000/10,000-case
   measurement is rerun only by `ingest_certify --write`.
-- Mutation testing: 152 mutants of 762 survive in `asof_view.py` and
-  `synthesize.py`; none changes the cutoff comparison (they are in messages,
+- Mutation testing: 136 of 769 scored mutants survive in `asof_view.py` and
+  `synthesize.py` (`tests/unit/MUTANTS_framing_ingest.md`); none changes the cutoff comparison (they are in messages,
   `reset_index`, `merge` defaults and the evidence record). No survivor
   bound is fixed in the build configuration.
 - Wall-time stops repeat only with a fixed clock; the budget unit is rows

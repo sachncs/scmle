@@ -371,8 +371,8 @@ G13 (simulation) are in the certificate file. Open:
    documented tie-handling difference.
 2. (Built for a charter that asks for it: the coverage claim is registered
    before `C` is read and tested on its one opening.)
-3. `ModelBundle` round-trip preserves fold-model hashes; tamper on one fold
-   model fails verification (extends the checksum in `bundle.py`).
+3. (Built: `tests/integration/test_cv_plus_bundle.py` round-trips the fold
+   models and refuses a changed file.)
 4. G8: our MASE, sMAPE and WIS reproduce the official Naive and Seasonal-naive
    scores on the M4 subset; mismatch fails the build.
 5. G10, G11(ii), G12 differential tests pass against their references.

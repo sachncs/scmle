@@ -125,8 +125,9 @@ floors. Nothing below was run on real data.
   (one random held-out row per entity) for `new_entity`. Built
   2026-11-06: `known_entity_future` protocol (entities are not split units;
   confirmation rows are time blocks with an embargo; the entity and time
-  columns and a time-ordered validation are required). Open: cluster-bootstrap
-  metric intervals, the check that the entity-wise choice does not
+  columns and a time-ordered validation are required). The generic cluster and time-block resampler
+  (`diagnostics.resample_rows`, `MetricUncertainty`) exists. Open: feeding
+  the entity column of a `known_entity_future` run into it, the check that the entity-wise choice does not
   under-cover in a real panel, and the same check for known entities (no real
   panel has been run).
 

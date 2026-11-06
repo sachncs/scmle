@@ -58,8 +58,9 @@ monitoring, retraining and rollback to real operational signals.
   `scmle.deploy.record`); ECS and Cloud Run adapters, release states,
   confirmed promotion, rollback and `scmle deploy reconcile`
   (`scmle.governance.release_state`, `docs/CLOUD_RELEASE.md`). Evidence:
-  `plan/evidence/phase-16/`. Terraform itself was not run, the workflows never
-  ran, and every cloud answer is a recorded or scripted shape.
+  `plan/evidence/phase-16/`. OpenTofu ran `fmt` and `validate` only (no
+  `plan`), the workflows never ran, and every cloud answer is a recorded or
+  scripted shape.
 - The local halves of items 11, 12 and 13 and the production-claim checker are
   built and verified without a cloud account (`scmle.operations`,
   `docs/OPERATIONS.md`, `docs/RELEASING.md`): metrics with Prometheus text,
@@ -84,7 +85,7 @@ and a named approver.
 |---|---|---|---|
 | 1 | Reproducible local environment | Built; open: run the container path on a machine with Docker, arm64 | none |
 | 2 | Immutable, secure artifacts | Built; open: build and scan a real image, attest its digest, measure two-build reproducibility | Prediction parity and vulnerability gate on AWS and GCP |
-| 3 | Infrastructure as code | Built locally (`deploy/terraform/`, `docs/INFRASTRUCTURE.md`); open: run `fmt`, `validate` and `plan` with the tool installed and commit the lock files | `apply`, test, `destroy`, recorded cost |
+| 3 | Infrastructure as code | Built locally (`deploy/terraform/`, `docs/INFRASTRUCTURE.md`); `tofu fmt`, `validate` pass and the lock files are committed; open: `plan` with credentials | `apply`, test, `destroy`, recorded cost |
 | 4 | Authentication, authorization, security | Built locally (`scmle.security`, `docs/TENANT_ISOLATION.md`); open: OIDC discovery and a network JWKS, revocation distribution, an independent review | TLS ingress, workload identity and managed keys in each cloud |
 | 5 | Online and batch inference | Built (`docs/SERVICE_SLO.md`) | Restart, load and scaling tests on each cloud |
 | 6 | Portable training | Built locally (`scmle.runners`, `docs/PORTABLE_TRAINING.md`); open: exercise the AWS and GCP adapters and their SDK factories against real services | Same spec completing on all three with a reproducibility-tolerance report |

@@ -13,17 +13,18 @@ a reconcile command (`docs/CLOUD_RELEASE.md`). Evidence:
 `plan/evidence/phase-16/` (regenerate with `scripts/make_phase16_evidence.py`).
 Every cloud answer in the tests is a recorded or scripted shape of the
 documented API, not a capture. The Terraform was never run through
-`terraform`; the workflows never ran on GitHub. What remains needs an AWS
-account, a GCP account, a spending cap and a named approver, or a machine with
-Terraform and Docker.
+`plan`; OpenTofu 1.13.5 has run `fmt -check` and `validate` on both modules
+and all six environments (lock files committed, CI job "infrastructure
+policy, fmt and validate"). The workflows never ran on GitHub. What remains
+needs an AWS account, a GCP account, a spending cap and a named approver, or
+a machine with Docker. Item classes are in
+[`COMPLETION_AUDIT.md`](COMPLETION_AUDIT.md).
 
 ## Open
 
-- **WP-16.1 Infrastructure, with the tool and in each account.** Install
-  Terraform or OpenTofu and run `scripts/terraform_checks.sh`: the files were
-  written by hand and `fmt -check` and `validate` have never run, so expect
-  fixes; commit the provider lock files. Run `plan` for each environment with
-  that environment's credentials. Then, per provider, in a sandbox account with
+- **WP-16.1 Infrastructure, in each account (C).** `fmt -check` and
+  `validate` pass and the lock files are committed. Run `plan` for each
+  environment with that environment's credentials. Then, per provider, in a sandbox account with
   a spending cap: apply a new environment, deploy, test, destroy, run
   `scripts/check_destroy_orphans.py` on real listings and record the
   infrastructure and the cost against the bill. Known gaps to close or accept:
@@ -63,6 +64,6 @@ failed gate) passes; see the evidence summary.
 
 ## Not claimed
 
-Anything that ran on a cloud, Terraform validity, workflow behavior on GitHub,
+Anything that ran on a cloud, a Terraform `plan`, workflow behavior on GitHub,
 multi-region availability and any cost or latency equivalence between
 providers.

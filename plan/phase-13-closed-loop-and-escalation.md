@@ -74,9 +74,9 @@ against 0.119; the best-observed-risk cut 0.464).
   `alarm_gates_retrain` stays False.
 
 **WP-13.5a Escalation inputs**
-- Feed `Loop.observe` the F12 class-conditional set size and the novelty flag
-  from a bundle (`set_size`, `novel` columns are supplied by the caller
-  today), and give the out-of-support bound `novelty_bound` a certified
+- `UncertaintyFeed` (`governance/uncertainty_feed.py`) feeds `Loop.observe`
+  the class-conditional set size and the novelty flag of a classification
+  bundle; regression bundles are not fed. Give the out-of-support bound `novelty_bound` a certified
   value (it is a charter input, not a measured one).
 - Weighted threshold selection uses Kish effective sizes and a rounded-up
   error count; replace it with an exact or conservative weighted test and

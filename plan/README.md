@@ -35,18 +35,18 @@ sign-off. See [`validation-referents.md`](validation-referents.md).
 
 | Phase | File | Feature | Depends on |
 |---|---|---|---|
-| 7 | [phase-7-instrument-residuals.md](phase-7-instrument-residuals.md) | R1: open items of the built instrument (in progress: leakage screen wired into charter runs, attestations built; A3-A6, B, C, D, E open) | none |
-| 8 | [phase-8-problem-framing.md](phase-8-problem-framing.md) | F8: framing and the decision-cost model (partly built: cost model, baseline claim, drafter, questions; gold corpus, LLM gate and run wiring open) | 7 |
-| 9 | [phase-9-raw-data-ingestion.md](phase-9-raw-data-ingestion.md) | F9: raw data, grain, joins, point-in-time features (library built; corpus gates and run wiring open) | 7 |
-| 10 | [phase-10-causal-identification.md](phase-10-causal-identification.md) | F10: causal identification | 8, 9 |
-| 11 | [phase-11-decision-layer.md](phase-11-decision-layer.md) | F11: decisions, OPE, A/B, rollout | 8, 10 |
-| 12 | [phase-12-uncertainty-and-breadth.md](phase-12-uncertainty-and-breadth.md) | F12: coverage guarantees, problem types (partly built: library methods and simulation gates; run wiring and outside-data gates open) | 7 |
-| 13 | [phase-13-closed-loop-and-escalation.md](phase-13-closed-loop-and-escalation.md) | F13: production loop, escalation | 11, 12 |
+| 7 | [phase-7-instrument-residuals.md](phase-7-instrument-residuals.md) | R1: open items of the built instrument (screen, attestations, custody and charter rules built; open: A5, A6 and B2-B14 (A, local), D1-D2 and E2, E5 (B), D4 (A and B), E1, E3, E4 (A)) | none |
+| 8 | [phase-8-problem-framing.md](phase-8-problem-framing.md) | F8: framing and the decision-cost model (built and wired into the charter run; open: gold corpus and the LLM gate (B), 3.11/3.14 hash identity (A)) | 7 |
+| 9 | [phase-9-raw-data-ingestion.md](phase-9-raw-data-ingestion.md) | F9: raw data, grain, joins, point-in-time features (built and wired into the charter run on SQLite; open: outside corpora and reviewers (B), a second backend (D), budget charging per step (A)) | 7 |
+| 10 | [phase-10-causal-identification.md](phase-10-causal-identification.md) | F10: causal identification (built and wired into the charter run; open: gold standards and references (B), method gaps (A))| 8, 9 |
+| 11 | [phase-11-decision-layer.md](phase-11-decision-layer.md) | F11: decisions, OPE, A/B, rollout (built and wired; open: fairness integration, policy classes, band re-registration (A), referents (B)) | 8, 10 |
+| 12 | [phase-12-uncertainty-and-breadth.md](phase-12-uncertainty-and-breadth.md) | F12: coverage guarantees, problem types (built and wired for regression and classification, including the coverage claim on `C`; open: other task types in the run (A), outside-data gates (B)) | 7 |
+| 13 | [phase-13-closed-loop-and-escalation.md](phase-13-closed-loop-and-escalation.md) | F13: production loop, escalation (built; H2 and H10 missed; open: re-registered alarm design (A), owner audit and replay (B)) | 11, 12 |
 | 14 | [phase-14-portable-core.md](phase-14-portable-core.md) | F14 items 1, 2, 5: local environment, hardened artifact, serving contract | none |
 | 15 | [phase-15-security-data-training-orchestration.md](phase-15-security-data-training-orchestration.md) | F14 items 4, 6, 7, 8: security, governed data, portable training, orchestration | 14 |
 | 16 | [phase-16-infrastructure-and-release.md](phase-16-infrastructure-and-release.md) | F14 items 3, 9, 10: infrastructure as code, CI/CD gates, registry bound to the runtime | 14, 15 |
 | 17 | [phase-17-operate-and-qualify.md](phase-17-operate-and-qualify.md) | F14 items 11, 12, 13: observability, continuous evaluation, recovery; the production claim | 16, 13 |
-| 18 | [phase-18-lifecycle-evidence-and-breadth.md](phase-18-lifecycle-evidence-and-breadth.md) | F15: business trail (local half built; independent trace on a real deployment open), qualified breadth (audit and benchmark definitions built; no slice qualified) | 17 (item 14 may start earlier) |
+| 18 | [phase-18-lifecycle-evidence-and-breadth.md](phase-18-lifecycle-evidence-and-breadth.md) | F15: business trail (local half built; independent trace on a real deployment open (B, C)), qualified breadth (audit and benchmark definitions built; no slice qualified (D)) | 17 (item 14 may start earlier) |
 | 6 | [phase-6-external-validation-and-release.md](phase-6-external-validation-and-release.md) | F7: backtest, red team, replication, release | overlaps all |
 
 ```
@@ -56,6 +56,10 @@ sign-off. See [`validation-referents.md`](validation-referents.md).
     +--> 12 -----------------+
                     6 (external gates, throughout; release last)
 ```
+
+The per-item audit with classes A (buildable here), B (outside people or
+data), C (cloud account, spending cap, approver or container daemon) and D
+(owner decision) is [`COMPLETION_AUDIT.md`](COMPLETION_AUDIT.md).
 
 Cloud track (independent of 8 to 13 except where noted): 14 → 15 → 16 → 17 →
 18. Phases 14 and 15 are verifiable without a cloud account; 16 and 17 need

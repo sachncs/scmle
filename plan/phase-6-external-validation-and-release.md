@@ -2,8 +2,9 @@
 
 Canon: [`00-canon.md`](00-canon.md). Features: F7 work items W1-W7 in
 `product/features/F7-verification-harness.md`. Residual instrument items are
-Phase 7 and are not repeated here. Everything below is **proposed**; nothing
-in it has been done.
+Phase 7 and are not repeated here. Everything below is
+**proposed** except where marked; item classes are in
+[`COMPLETION_AUDIT.md`](COMPLETION_AUDIT.md).
 
 ## Goal
 
@@ -41,8 +42,8 @@ release checklist.
 1. Phase 7 groups A and C closed or accepted: certificates for the gating
    detectors are on file and the open limits are written in docs. (A detector
    that is `descriptive` does not block the phase; a claim that it gates does.)
-2. The uncommitted leakage screen (R1 A7) is committed, or is removed from the
-   working tree; the release is cut from a clean tree.
+2. The leakage screen (R1 A7) is committed (done); the release is cut from a
+   clean tree.
 3. `benchmarks/qualification/PROTOCOL.md` is committed and tagged
    `qualification-protocol-v1` before any backtest or replication result exists.
 
