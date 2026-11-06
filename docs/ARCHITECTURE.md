@@ -75,7 +75,9 @@ imports no connector or reader and never sees a frame. What the view cannot
 know is whether the recorded time is true, so every feature carries the
 weakest tier among the tables it reads. Keys, links and entity matches are
 statements about the snapshot read, with their measures; an unlabelled entity
-resolution is `unverified`. The package is not yet called from a charter run.
+resolution is `unverified`. A charter run with an `ingest` block calls it
+(`scmle.core.ingest_stage`); when the block carries an `entity` sub-block the
+resolved entity becomes the split's group column.
 
 ## Leakage guarantees
 

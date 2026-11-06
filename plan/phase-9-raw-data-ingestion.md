@@ -48,8 +48,6 @@ warehouse.
 
 **WP-9.9 Wiring into a run** (after WP-9.8 only for the gates; the plumbing
 can start now)
-- Set the split's group column from the resolved entity (`entities.resolve`
-  is not called by the stage) and test that the chosen splitter receives it.
 - Run the extract reconciliation in the stage.
 - Acceptance criterion 14 on Python 3.11 and 3.14: a charter run exists
   (`tests/integration/test_ingest_charter_run.py`, SQLite, one interpreter);

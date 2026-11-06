@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+* The resolved entity becomes the split's group column (F9, charter format 8;
+  `IngestSpec.entity`, `scmle.core.ingest_stage.resolve_entities`). The
+  `ingest` block gained the optional `entity` sub-block (comparison fields,
+  blocking passes, group column name). It is omitted when unset, so a format 7
+  ingest charter keeps its hash and signature (both pinned by a test); a
+  wrapper below format 8 that carries it is refused. In a run, the stage
+  resolves the run table's rows, adds the group column, sets
+  `data.group_column` to it (a conflicting caller value is a `ConfigError`),
+  and writes `entity_resolution.json`. On a table where each customer from 250
+  up repeats the email of another key, the default run splits 250 duplicate
+  pairs across development and test, and the run with the block splits none
+  (`tests/integration/test_ingest_charter_run.py`). The result is
+  `unverified` (no clerical sample in a run) and is not measured on labelled
+  benchmarks.
+
 * Breadth audit and benchmark definitions (F15 item 15, local half;
   `docs/BREADTH.md`, `benchmarks/breadth/`, `tests/unit/test_breadth.py`).
   The audit of clustering, association and dimensionality reduction found

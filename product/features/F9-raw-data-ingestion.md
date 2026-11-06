@@ -28,8 +28,11 @@ This file keeps only what is not yet true.
    grain, join and entity gates are descriptive (P1). The synthetic numbers in
    `ingest_measurements.json` show the mechanisms work on worlds we built; they
    say nothing about prevalence in real warehouses.
-3. **The resolved entity does not reach the split**: the stage does not call
-   entity resolution, so the group column is the caller's.
+3. **Entity resolution in a run is unlabelled.** The charter's `entity`
+   block (format 8) makes the resolved entity the split's group column, but a
+   run has no clerical sample, so the grouping is `unverified` and errs toward
+   keeping records together; the labelled benchmarks of item 2 are still
+   needed before it may count as measured.
 4. **No real known-time.** The view's guarantee is about the code and holds
    only if the recorded time is true. No serving-time feature log has been
    compared with the view's output.

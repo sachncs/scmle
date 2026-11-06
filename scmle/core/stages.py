@@ -45,6 +45,7 @@ from scmle.core import state as run_state
 from scmle.data.admissibility import attestations
 from scmle.data.admissibility import qualify
 from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import ingest as charter_ingest
 from scmle.data.charter import sealing as charter_sealing
 from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
@@ -601,6 +602,8 @@ class ProfileStage(Stage):
         merged = pd.concat(
             [frame.reset_index(drop=True), result.features], axis=1
         )
+        if block.entity is not None:
+            merged = self.assign_entity_groups(context, block.entity, merged)
         context.frame = merged
         context.ingest = result
         for name, document in result.documents.items():
@@ -612,6 +615,47 @@ class ProfileStage(Stage):
             result.summary,
         )
         return merged
+
+    def assign_entity_groups(
+        self,
+        context: context_module.RunContext,
+        entity: charter_ingest.EntitySpec,
+        frame: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """Makes the resolved entity the split's group column (F9).
+
+        Raises:
+            ConfigError: If the data spec names a group column, or the
+                resolved column collides with a column of the table.
+        """
+        data = context.spec.data
+        if data.group_column:
+            raise errors.ConfigError(
+                f"data.group_column {data.group_column!r} conflicts with the "
+                "charter's entity block, which supplies the group column "
+                f"{entity.column!r}"
+            )
+        if entity.column in frame.columns:
+            raise errors.ConfigError(
+                f"the entity group column {entity.column!r} collides with a "
+                "column of the table"
+            )
+        groups, document = ingest_stage.resolve_entities(frame, entity)
+        frame = frame.assign(**{entity.column: groups})
+        context.spec = context.spec.model_copy(
+            update={
+                "data": data.model_copy(update={"group_column": entity.column})
+            }
+        )
+        context.write_json("entity_resolution.json", document)
+        context.emit(
+            "ingest.entities",
+            f"{document['records']} rows resolved to {document['groups']} "
+            f"entities; the split groups by {entity.column!r}",
+            ("entity_resolution.json",),
+            {"tier": document["tier"], "groups": document["groups"]},
+        )
+        return frame
 
     def run_claim_ledger(
         self, context: context_module.RunContext, task: tasks.TaskType

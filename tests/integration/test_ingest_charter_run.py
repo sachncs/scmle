@@ -94,8 +94,10 @@ def plan_file(tmp_path, unit="customer"):
     return path
 
 
-def charter_file(tmp_path, block=True):
-    spec = ingest.IngestSpec(feature_budget=40, windows=(30.0, 90.0), lag=1.0)
+def charter_file(tmp_path, block=True, entity=None):
+    spec = ingest.IngestSpec(
+        feature_budget=40, windows=(30.0, 90.0), lag=1.0, entity=entity
+    )
     path = tmp_path / "charter.json"
     sealing.write_charter(
         path,
@@ -190,3 +192,65 @@ def test_the_plan_and_the_charter_block_must_come_together(tmp_path):
             output_dir=tmp_path / "out2",
             charter=charter_file(tmp_path),
         ).run()
+
+
+def with_emails(frame):
+    """Customers 250 and up repeat the email of customer i - 250."""
+    frame = frame.copy()
+    frame["email"] = [
+        f"user{i % 250}@example.com" for i in frame["customer_id"]
+    ]
+    return frame
+
+
+def entity_block():
+    return ingest.EntitySpec(
+        fields=(ingest.EntityField("email", False),),
+        passes=(ingest.EntityPass("email"),),
+    )
+
+
+def split_sets(result):
+    manifest = read(result, "split_manifest.json")
+    out = {}
+    for name in ("exploration_ids", "confirmation_ids", "final_test_ids"):
+        out.update(dict.fromkeys(manifest[name], name))
+    return out
+
+
+def straddling(result):
+    sets = split_sets(result)
+    return [
+        i
+        for i in range(250)
+        if sets.get(i) is not None
+        and sets.get(i + 250) is not None
+        and (sets[i] == "final_test_ids") != (sets[i + 250] == "final_test_ids")
+    ]
+
+
+def run_with_emails(tmp_path, entity):
+    rate = database(tmp_path / "w.sqlite")
+    return support.make_project(
+        with_emails(table(rate)),
+        "y",
+        time_budget=300,
+        output_dir=tmp_path / "out",
+        charter=charter_file(tmp_path, entity=entity),
+        id_columns=["customer_id", "moment", "email"],
+        ingest_plan=plan_file(tmp_path),
+        group_column=None,
+    ).run()
+
+
+def test_without_the_entity_block_duplicates_straddle_the_split(tmp_path):
+    result = run_with_emails(tmp_path, None)
+    assert straddling(result)
+
+
+def test_the_resolved_entity_keeps_duplicates_on_one_side(tmp_path):
+    result = run_with_emails(tmp_path, entity_block())
+    document = read(result, "entity_resolution.json")
+    assert document["group_column"] == "entity_group"
+    assert document["groups"] == 250 and document["records"] == CUSTOMERS
+    assert straddling(result) == []

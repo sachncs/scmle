@@ -22,6 +22,7 @@ CAUSAL_FORMAT = 4
 DECISION_FORMAT = 5
 UNIT_FORMAT = 6
 INGEST_FORMAT = 7
+INGEST_ENTITY_FORMAT = 8
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -87,7 +88,8 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
 
     A wrapper without a `format` is read as format 1. Format 3 added `rules`,
     format 4 the causal block, format 5 the decision layer, format 6 the unit
-    of prediction and format 7 the ingest block; an older wrapper that
+    of prediction, format 7 the ingest block and format 8 its entity
+    sub-block; an older wrapper that
     carries one of them was edited or mislabelled.
 
     Raises:
@@ -127,6 +129,12 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
         raise errors.ConfigError(
             f"charter {path} declares format {declared} but carries "
             f"'ingest', which needs format {INGEST_FORMAT}"
+        )
+    block = record.get("charter", {}).get("ingest") or {}
+    if declared < INGEST_ENTITY_FORMAT and "entity" in block:
+        raise errors.ConfigError(
+            f"charter {path} declares format {declared} but its ingest block "
+            f"carries 'entity', which needs format {INGEST_ENTITY_FORMAT}"
         )
 
 

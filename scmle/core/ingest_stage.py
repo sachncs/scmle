@@ -33,8 +33,12 @@ budget, windows, lag and tolerances, so they are hashed and signed:
      "nests": [{"mid": 0, "table": "events", "order_by": "order_id, created",
                 "key": "order_id", "mid_id": "order_id", ...same view keys}]}
 
-Not done here: entity resolution (the resolved entity does not become the
-split's group column) and extract reconciliation against source totals.
+Entity resolution (charter format 8) runs on the run table itself:
+`resolve_entities` compares the declared fields, groups records linked above
+the lower threshold, and the caller makes the result the split's group column,
+so duplicates of one real-world entity under different keys never straddle
+development and test. Extract reconciliation against source totals is not
+done here.
 """
 
 import dataclasses
@@ -51,6 +55,7 @@ from scmle.data.admissibility import provenance
 from scmle.data.charter import ingest as charter_ingest
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import budget as budgets
+from scmle.data.ingest import entities
 from scmle.data.ingest import plan as ingest_plan
 from scmle.data.ingest import profile
 from scmle.data.ingest import synthesize
@@ -233,6 +238,43 @@ def run(
             "proposed": len(found.manifest),
         },
     )
+
+
+def resolve_entities(
+    frame: pd.DataFrame, spec: charter_ingest.EntitySpec
+) -> tuple[pd.Series, dict[str, Any]]:
+    """Group id per row of the run table, from the charter's entity block.
+
+    Without a clerical sample the result is `unverified`: the links serve only
+    to keep records of one entity together (link-then-group errs toward
+    merging), and no attribute value is ever merged.
+
+    Args:
+        frame: The run table.
+        spec: Fields and blocking passes the charter fixed.
+
+    Returns:
+        The group ids indexed like `frame`, and the `entity_resolution.json`
+        document.
+
+    Raises:
+        ConfigError: If a declared field or pass column is absent.
+    """
+    needed = [f.name for f in spec.fields] + [p.field for p in spec.passes]
+    missing = sorted({c for c in needed if c not in frame.columns})
+    if missing:
+        raise errors.ConfigError(
+            f"the charter's entity block names columns {missing} that the "
+            "run table lacks"
+        )
+    records = frame.reset_index(drop=True)
+    found = entities.resolve(
+        records,
+        [entities.Field(f.name, f.fuzzy) for f in spec.fields],
+        [entities.Pass(p.field, p.kind, p.size) for p in spec.passes],
+    )
+    groups = pd.Series(found.groups, index=frame.index, name=spec.column)
+    return groups, {**found.to_dict(), "group_column": spec.column}
 
 
 def check_multiplicity(
