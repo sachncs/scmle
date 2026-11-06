@@ -88,6 +88,9 @@ Charter format 10 adds the optional `uncertainty` block
 snapshot is unchanged); a charter of format 9 or older keeps its hash and
 signature.
 
+`scmle.governance.uncertainty_feed.UncertaintyFeed` is an addition (an
+extension surface; the snapshot is unchanged).
+
 `scmle.governance.rollout_hook.RolloutHook` and
 `LifecycleManager.restore_previous` are additions (extension surfaces); the
 deployment ledger gained the row kinds `rollout_experiment`,

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+* The coverage monitor feeds the closed loop (F12 and F13;
+  `scmle.governance.uncertainty_feed.UncertaintyFeed`). For a classification
+  bundle, `observe` sends the loop each served case's conformal set size and
+  out-of-distribution flag (the inputs `Loop.observe` already routes on), and
+  `mature` counts the cases whose label fell outside the set as coverage
+  violations, chains one `observe_summary` row (`source`, cases, violations,
+  nominal, `gates_retrain: false`) in the deployment ledger and passes the
+  coverage flags to `Loop.mature`, so the loop's existing coverage monitor
+  (`LoopPolicy.coverage_target`) can escalate `coverage_below_nominal`. It
+  gates nothing: nothing is retrained from it and `alarm_gates_retrain` is
+  neither read nor changed (it stays False by default). Labels for cases the
+  feed did not serve are refused. Regression bundles are not covered (their
+  intervals have no size to route on). No certified source changed.
+
 * Adversarial validation reports the odds (F12, WP-12.3;
   `AdversarialValidation.odds`, `odds` in `adversarial_validation.json`).
   From the same out-of-fold probabilities it already computes, the report
