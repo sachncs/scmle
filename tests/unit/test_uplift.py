@@ -73,6 +73,7 @@ def test_randomized_treatment_looks_randomized():
     found = uplift.check_propensity(pd.DataFrame(d.x), d.arm)
 
     assert found.randomized and found.auc < 0.56
+    assert found.balance_p_value is not None and found.balance_p_value > 0.05
     assert "consistent with randomization" in found.note
 
 
@@ -84,6 +85,7 @@ def test_assignment_driven_by_covariates_is_flagged():
     found = uplift.check_propensity(pd.DataFrame(d.x), chosen)
 
     assert not found.randomized and found.auc > 0.8
+    assert found.balance_p_value is not None and found.balance_p_value <= 0.05
     assert "confounded" in found.note
 
 
@@ -94,3 +96,4 @@ def test_a_tiny_arm_is_reported_not_modelled():
     found = uplift.check_propensity(pd.DataFrame(d.x), sparse)
 
     assert not found.randomized and np.isnan(found.auc)
+    assert found.balance_p_value is None

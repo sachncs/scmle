@@ -17,6 +17,7 @@ from sklearn import metrics as sk_metrics
 from sklearn import model_selection
 
 from scmle.contracts import metrics as metric_contracts
+from scmle.evaluation import balance
 
 TOP_SHARE = 0.3
 PROPENSITY_AUC_LIMIT = 0.6
@@ -94,15 +95,20 @@ class Propensity:
     Attributes:
         treated_share: Share of rows treated.
         auc: Cross-validated ROC-AUC of predicting treatment from features
-            (0.5 in a randomized experiment).
-        randomized: Whether the treatment looks randomized.
+            (0.5 in a randomized experiment); a description, not the rule.
+        randomized: Whether the treatment looks randomized: the permutation
+            balance test of `balance.balance_test` does not reject at its
+            level (an exact test for randomized assignment). When it cannot
+            run (no numeric covariate) the AUC cutoff decides.
         note: What to make of it.
+        balance_p_value: Permutation p-value of the balance test, or None.
     """
 
     treated_share: float
     auc: float
     randomized: bool
     note: str
+    balance_p_value: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record."""
@@ -134,14 +140,25 @@ def check_propensity(
         method="predict_proba",
     )[:, 1]
     auc = float(sk_metrics.roc_auc_score(arm, scores))
-    randomized = auc <= PROPENSITY_AUC_LIMIT
-    note = (
-        "covariates do not predict treatment; consistent with randomization"
-        if randomized
-        else f"covariates predict treatment (AUC {auc:.2f}): assignment was "
-        "not random, so the estimates may be confounded"
+    found = balance.balance_test(features, arm, seed)
+    p_value = found["p_value"]
+    evidence = (
+        "AUC rule" if p_value is None else f"permutation p = {p_value:.3g}"
     )
-    return Propensity(share, auc, randomized, note)
+    randomized = (
+        bool(found["balanced"])
+        if found["balanced"] is not None
+        else auc <= PROPENSITY_AUC_LIMIT
+    )
+    note = (
+        "covariates are balanced across the arms (permutation test); "
+        "consistent with randomization"
+        if randomized
+        else f"covariates differ across the arms ({evidence}, AUC "
+        f"{auc:.2f}): assignment was not random, so the estimates may be "
+        "confounded"
+    )
+    return Propensity(share, auc, randomized, note, p_value)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
