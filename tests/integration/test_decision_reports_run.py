@@ -34,7 +34,7 @@ def frame():
     return table
 
 
-def charter_file(tmp_path, plan=True):
+def charter_file(tmp_path, plan=True, uncertainty=None):
     human = (costs.CostSource.HUMAN,) * 4
     model = costs.DecisionCostModel(
         0.0, 2.0, 1.0, 0.0, 0.05, 0.9, human, costs.CostSource.HUMAN
@@ -61,7 +61,13 @@ def charter_file(tmp_path, plan=True):
     path = tmp_path / "charter.json"
     sealing.write_charter(
         path,
-        make_charter(min_effect=0.5, k_max=3, cost_model=model, decision=layer),
+        make_charter(
+            min_effect=0.5,
+            k_max=3,
+            cost_model=model,
+            decision=layer,
+            uncertainty=uncertainty,
+        ),
         signing_key=KEY,
     )
     return path
@@ -73,7 +79,9 @@ def run(tmp_path, **kwargs):
         "y",
         time_budget=300,
         output_dir=tmp_path / "out",
-        charter=charter_file(tmp_path, kwargs.pop("plan", True)),
+        charter=charter_file(
+            tmp_path, kwargs.pop("plan", True), kwargs.pop("uncertainty", None)
+        ),
         **kwargs,
     ).run()
 

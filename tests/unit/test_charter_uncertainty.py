@@ -96,3 +96,20 @@ def test_the_stage_reads_the_cap_from_the_charter(tmp_path):
     assert package.cv_plus_cap(stage_context(str(path))) == 1234
     assert package.cv_plus_cap(stage_context(str(plain))) == cv_plus.MAX_BYTES
     assert package.cv_plus_cap(stage_context(None)) == cv_plus.MAX_BYTES
+
+
+def test_slice_columns_round_trip_and_leave_a_cap_only_charter_alone():
+    spec = uncertainty.UncertaintySpec(5_000_000, ("grp", "region"))
+    charter = make_charter(uncertainty=spec)
+    record = json.loads(json.dumps(charter.to_dict()))
+    assert record["uncertainty"]["slice_columns"] == ["grp", "region"]
+    assert c.AnalysisCharter.from_dict(record) == charter
+    assert charter.charter_hash != FORMAT_TEN_HASH
+    assert "slice_columns" not in with_cap().to_dict()["uncertainty"]
+    assert with_cap().charter_hash == FORMAT_TEN_HASH
+
+
+@pytest.mark.parametrize("bad", [("a", "a"), ("",), (" ",), ["a"]])
+def test_slice_columns_are_distinct_non_blank_names(bad):
+    with pytest.raises((ValueError, TypeError)):
+        uncertainty.UncertaintySpec(None, bad)

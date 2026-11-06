@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+* Coverage and set size per declared slice column (F12, WP-12.2;
+  `scmle.evaluation.coverage_slices`, `UncertaintySpec.slice_columns`,
+  `declared_slices` in `coverage_report.json`). The charter's `uncertainty`
+  block lists columns (distinct, non-blank; omitted when empty, so the format
+  10 pin is unchanged); they are part of the hashed coverage claim. For each
+  method and level the report gives, per level of the column (a numeric column
+  in four bands cut at quantiles of the development rows, never the final
+  rows), the rows, the share covered with its exact Clopper-Pearson interval
+  and the mean width or set size. Slices under 30 rows are counted and not
+  shown; a column the rows lack or with more than 12 levels is
+  `not_assessable`. Descriptive only: the Holm under-coverage flag is not
+  used, because its familywise false-flag rate missed its bound (G5, 0.0755
+  against 0.0597), and the report says so in a note. No certified source
+  changed.
+
 * The leakage screen now runs inside the declared time budget and is loud when
   it does not run. `MAX_WORK = 500_000` is replaced by a cap derived from the
   budget: `time_budget_seconds * SCREEN_SHARE (0.15) * FITS_PER_SECOND

@@ -65,7 +65,7 @@ to a bundle (`shift=True`), a `coverage_report.json` is measured on the final
 test rows (`evaluation/coverage_run.py`), and `unit_of_prediction:
 new_entity` in the charter calibrates on one score per entity. **Still not
 in the run:** coverage is measured on the final test rows only (not on
-`C`), slices are not reported, and the seven task types above still get no
+`C`), slices are described but never flagged, and the seven task types above still get no
 interval. Since 2026-11-06 the coverage claim (`coverage_claim.json`: levels,
 methods, tolerance, rule) is hashed and registered in the custody log and the
 event log before the final rows are released, the report names its hash and

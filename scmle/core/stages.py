@@ -79,6 +79,7 @@ from scmle.evaluation import confidence
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage as coverage_module
 from scmle.evaluation import coverage_run
+from scmle.evaluation import coverage_slices
 from scmle.evaluation import criteria
 from scmle.evaluation import cv_plus
 from scmle.evaluation import diagnostics
@@ -2146,6 +2147,38 @@ def reference_scores(
     return pd.Series(predicted, name="prediction")
 
 
+def declared_slice_columns(
+    context: context_module.RunContext,
+) -> tuple[str, ...]:
+    """The slice columns the charter's uncertainty block declares."""
+    path = context.spec.charter_path
+    if not path:
+        return ()
+    block = charter_sealing.read_verified(str(path)).charter.uncertainty
+    return () if block is None else block.slice_columns
+
+
+def slice_labels(
+    context: context_module.RunContext, features: pd.DataFrame
+) -> dict[str, Any]:
+    """Slice label of each final test row for every declared column.
+
+    Bands of a numeric column are cut at quantiles of the development rows.
+    A column the rows lack, or that has too many levels, maps to None.
+    """
+    split = require(context.split, "split")
+    found: dict[str, Any] = {}
+    for column in declared_slice_columns(context):
+        found[column] = (
+            coverage_slices.labels_for(
+                features[column], split.dev_features.get(column)
+            )
+            if column in features.columns
+            else None
+        )
+    return found
+
+
 def chartered_decision_model(
     context: context_module.RunContext,
 ) -> charter_contracts.AnalysisCharter | None:
@@ -2647,6 +2680,7 @@ class FinalEvaluationStage(Stage):
             tolerance=coverage_module.DEFAULT_TOLERANCE,
             split_fingerprint=split.manifest.fingerprint,
             charter_hash=charter_hash,
+            slice_columns=declared_slice_columns(context),
         )
         if claim is None:
             return
@@ -3905,6 +3939,7 @@ class PackageStage(Stage):
                 *context.test_rows,
                 COVERAGE_LEVELS,
                 claim_sha256=context.coverage_claim_sha256,
+                slices=slice_labels(context, context.test_rows[0]),
             )
             if measured is not None:
                 bundle.coverage_report = measured

@@ -20,6 +20,7 @@ nominal level less the tolerance. A shortfall is reported as `unverified`,
 and nothing here tunes a level or an interval after seeing the rows.
 """
 
+from collections.abc import Mapping
 from collections.abc import Sequence
 from typing import Any
 
@@ -29,6 +30,7 @@ import pandas as pd
 from scmle.contracts import errors
 from scmle.data.ledger import ledger as ledger_module
 from scmle.evaluation import coverage
+from scmle.evaluation import coverage_slices
 
 REGRESSION_METHODS = ("residual", "cv_plus", "quantile")
 SET_MODES = (None, "class")
@@ -47,8 +49,12 @@ def claim_document(
     tolerance: float,
     split_fingerprint: str,
     charter_hash: str | None,
+    slice_columns: Sequence[str] = (),
 ) -> dict[str, Any] | None:
     """The coverage claim, fixed before the final rows are read.
+
+    `slice_columns` are the charter's declared slice columns; they are part
+    of the hashed document, so the slices read are the slices declared.
 
     Returns:
         The document, or None for a task that stores no interval or set.
@@ -72,6 +78,7 @@ def claim_document(
         "rows_read": "once, by the final evaluation",
         "split_fingerprint": split_fingerprint,
         "charter_hash": charter_hash,
+        **({"slice_columns": list(slice_columns)} if slice_columns else {}),
     }
 
 
@@ -80,11 +87,33 @@ def claim_hash(claim: dict[str, Any]) -> str:
     return ledger_module.digest(claim)
 
 
+def declared_slices(
+    inside: np.ndarray,
+    sizes: np.ndarray,
+    labels: Mapping[str, Any],
+    level: float,
+) -> dict[str, Any]:
+    """The slice descriptions of one method and level, per declared column."""
+    found: dict[str, Any] = {}
+    for column, assigned in labels.items():
+        if assigned is None:
+            found[column] = {
+                "status": "not_assessable",
+                "reason": "the column is missing or has too many levels",
+            }
+        else:
+            found[column] = coverage_slices.summary(
+                inside, sizes, assigned, level
+            )
+    return found
+
+
 def regression_reports(
     bundle: Any,
     features: pd.DataFrame,
     target: Any,
     levels: Sequence[float],
+    slices: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Coverage reports of each interval method the bundle holds."""
     values = np.asarray(target, dtype=float)
@@ -105,6 +134,10 @@ def regression_reports(
             by_level[f"{level:g}"] = coverage.coverage_report(
                 inside, widths, level
             )
+            if slices:
+                by_level[f"{level:g}"]["declared_slices"] = declared_slices(
+                    inside, widths, slices, level
+                )
         if by_level:
             reports[method] = by_level
     return reports
@@ -115,6 +148,7 @@ def classification_reports(
     features: pd.DataFrame,
     target: Any,
     levels: Sequence[float],
+    slices: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Coverage reports of pooled and class-conditional prediction sets."""
     truth = list(target)
@@ -133,6 +167,10 @@ def classification_reports(
             by_level[f"{level:g}"] = coverage.coverage_report(
                 inside, sizes, level, true_classes=[str(t) for t in truth]
             )
+            if slices:
+                by_level[f"{level:g}"]["declared_slices"] = declared_slices(
+                    inside, sizes, slices, level
+                )
         reports["pooled" if mode is None else "class_conditional"] = by_level
     return reports
 
@@ -143,11 +181,14 @@ def run_report(
     target: Any,
     levels: Sequence[float],
     claim_sha256: str | None = None,
+    slices: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """The `coverage_report.json` body, or None without intervals or sets.
 
     `claim_sha256` is the hash of the claim registered before the rows were
-    read; the report repeats it.
+    read; the report repeats it. `slices` maps each declared slice column to
+    the slice label of every row (or None when it cannot be sliced); each
+    level then also gets `declared_slices`, descriptive only.
     """
     if bundle.conformal is None and bundle.quantile is None:
         return None
@@ -157,9 +198,9 @@ def run_report(
         else ("regression")
     )
     body = (
-        regression_reports(bundle, features, target, levels)
+        regression_reports(bundle, features, target, levels, slices)
         if kind == "regression"
-        else classification_reports(bundle, features, target, levels)
+        else classification_reports(bundle, features, target, levels, slices)
     )
     return {
         "kind": kind,

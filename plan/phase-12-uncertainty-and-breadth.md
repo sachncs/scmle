@@ -75,8 +75,10 @@ floors. Nothing below was run on real data.
   measured on the final test rows that the evaluation opens (read once, no
   second read), for every interval method the bundle holds and for pooled and
   class-conditional sets. `coverage_claim.json` is hashed and registered before the rows
-  are read (`claims verify` checks it). Open: coverage on `C`; slices (the report has the
-  per-class split only); extend `SliceReport` (`slices.py`).
+  are read (`claims verify` checks it). Declared
+  slice columns (charter `uncertainty.slice_columns`) get coverage and set size
+  per level, descriptive only. Open: coverage on `C`; extend `SliceReport`
+  (`slices.py`) to the coverage flag once it has a pre-registered design.
 - Decide the G5 redesign above before the slice flag may gate.
 
 **WP-12.3 Shift weights in the bundle**
