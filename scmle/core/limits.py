@@ -266,6 +266,12 @@ class TrialSupervisor:
                     os.kill(pid, KILL_SIGNAL)
                 except ProcessLookupError:
                     continue
+                except PermissionError:
+                    # Windows reports a process that has just exited (or one
+                    # that is exiting) as access denied. A descendant we
+                    # cannot signal because it is already gone is not an
+                    # error; one that is alive and protected is left alone.
+                    continue
 
     def violation(
         self, process: multiprocessing.process.BaseProcess, elapsed: float
