@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+* The CV+ size cap is a charter field (F12, charter format 10;
+  `scmle.data.charter.uncertainty.UncertaintySpec`,
+  `AnalysisCharter.uncertainty`, `PackageStage.cv_plus_cap`). The optional
+  `uncertainty` block holds `cv_plus_max_bytes`, the most bytes of fold models
+  a regression bundle keeps for CV+; the run reads it from the verified
+  charter and otherwise uses `cv_plus.MAX_BYTES`. A model set above the cap is
+  not kept and `cv_plus.skipped` says so. The block is omitted when unset, so
+  every charter of format 1 to 9 keeps its hash and signature (the pin of
+  `make_charter()` and the format 7, 8 and 9 pins still pass, and a new test
+  pins the hash and signature of a format 10 charter); a wrapper below format
+  10 that carries `uncertainty` is refused. Nothing a certificate hashes
+  changed.
+
 * Conformal score source is chosen by a tested rule and recorded (F12,
   WP-12.1; `cv_plus.plan_scores`, `conformal.scores` event). From 1000
   calibration rows (`cv_plus.MIN_ROWS_FOR_SPLIT`) the bundle serves the pooled

@@ -24,6 +24,7 @@ UNIT_FORMAT = 6
 INGEST_FORMAT = 7
 INGEST_ENTITY_FORMAT = 8
 SUBGROUP_FORMAT = 9
+UNCERTAINTY_FORMAT = 10
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -90,7 +91,8 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
     A wrapper without a `format` is read as format 1. Format 3 added `rules`,
     format 4 the causal block, format 5 the decision layer, format 6 the unit
     of prediction, format 7 the ingest block and format 8 its entity
-    sub-block; an older wrapper that
+    sub-block, format 9 causal subgroups and attestors and format 10 the
+    uncertainty block; an older wrapper that
     carries one of them was edited or mislabelled.
 
     Raises:
@@ -130,6 +132,13 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
         raise errors.ConfigError(
             f"charter {path} declares format {declared} but carries "
             f"'ingest', which needs format {INGEST_FORMAT}"
+        )
+    if declared < UNCERTAINTY_FORMAT and "uncertainty" in record.get(
+        "charter", {}
+    ):
+        raise errors.ConfigError(
+            f"charter {path} declares format {declared} but carries "
+            f"'uncertainty', which needs format {UNCERTAINTY_FORMAT}"
         )
     block = record.get("charter", {}).get("ingest") or {}
     causal_block = estimand.get("causal") or {}

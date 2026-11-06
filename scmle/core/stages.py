@@ -3423,7 +3423,12 @@ class PackageStage(Stage):
         )
 
     def cv_plus_cap(self, context: context_module.RunContext) -> int:
-        """The most bytes of fold models to keep: the charter's, else default."""
+        """The most bytes of fold models to keep (charter's, else default)."""
+        path = context.spec.charter_path
+        if path:
+            block = charter_sealing.read_verified(str(path)).charter.uncertainty
+            if block is not None and block.cv_plus_max_bytes is not None:
+                return block.cv_plus_max_bytes
         return cv_plus.MAX_BYTES
 
     def quantile_intervals(

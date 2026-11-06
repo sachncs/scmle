@@ -60,9 +60,9 @@ floors. Nothing below was run on real data.
   calibration rows the pooled out-of-fold scores alone are served and no
   fold model is kept (`cv_plus.plan_scores`, recorded in the `conformal.scores`
   event); a separate refit was considered and not built, since every pooled
-  score already comes from a model that did not see its row. Open: a charter
-  size cap (the cap is a module constant, `cv_plus.MAX_BYTES`, with a
-  skipped-event fallback).
+  score already comes from a model that did not see its row. The size cap is
+  a charter field (`uncertainty.cv_plus_max_bytes`, format 10; default
+  `cv_plus.MAX_BYTES`).
 - Tie the CQR base levels to the requested level (`quantile.py` fixes
   0.05/0.95).
 - Differential test against MAPIE on three frozen datasets (`1e-9`).

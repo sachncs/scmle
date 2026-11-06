@@ -83,6 +83,11 @@ optional `attestors` and `attestations` fields
 (`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`);
 a format 4 causal charter keeps its hash and signature.
 
+Charter format 10 adds the optional `uncertainty` block
+(`scmle.data.charter.uncertainty.UncertaintySpec`, an extension surface; the
+snapshot is unchanged); a charter of format 9 or older keeps its hash and
+signature.
+
 `scmle.governance.rollout_hook.RolloutHook` and
 `LifecycleManager.restore_previous` are additions (extension surfaces); the
 deployment ledger gained the row kinds `rollout_experiment`,

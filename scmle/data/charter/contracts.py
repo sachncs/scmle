@@ -29,10 +29,11 @@ from scmle.data.charter import causal as causal_module
 from scmle.data.charter import decision as decision_module
 from scmle.data.charter import ingest as ingest_module
 from scmle.data.charter import rules as rules_module
+from scmle.data.charter import uncertainty as uncertainty_module
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 9
+FORMAT_VERSION = 10
 OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
@@ -343,6 +344,10 @@ class AnalysisCharter:
             windows, lag, reconciliation delay and key tolerances; None for
             a charter that reads a file, which serialises, hashes and loads
             as a format 1-6 charter did.
+        uncertainty: The uncertainty block (format 10): the cap on the fold
+            models a bundle keeps for CV+; None for a charter that does not
+            fix it, which serialises, hashes and loads as a format 1-9
+            charter did.
     """
 
     question: str
@@ -363,6 +368,7 @@ class AnalysisCharter:
     decision: decision_module.DecisionLayer | None = None
     unit_of_prediction: str | None = None
     ingest: ingest_module.IngestSpec | None = None
+    uncertainty: uncertainty_module.UncertaintySpec | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint."""
@@ -460,6 +466,8 @@ class AnalysisCharter:
             record["unit_of_prediction"] = self.unit_of_prediction
         if self.ingest is not None:
             record["ingest"] = self.ingest.to_dict()
+        if self.uncertainty is not None:
+            record["uncertainty"] = self.uncertainty.to_dict()
         return record
 
     @property
@@ -469,7 +477,7 @@ class AnalysisCharter:
         2; 3 with rules; 4 with a causal block; 5 with a decision layer; 6
         with a unit of prediction; 7 with an ingest block; 8 when the ingest
         block carries an entity or reconcile sub-block; 9 when the causal
-        block carries subgroups or attestors.
+        block carries subgroups or attestors; 10 with an uncertainty block.
         """
         found = 2 if self.rules is None else 3
         causal_block = self.estimand.causal
@@ -487,6 +495,8 @@ class AnalysisCharter:
         if self.ingest is not None:
             sub = self.ingest.entity or self.ingest.reconcile
             found = max(found, 7 if sub is None else 8)
+        if self.uncertainty is not None:
+            found = max(found, 10)
         return found
 
     @classmethod
@@ -498,6 +508,7 @@ class AnalysisCharter:
             "decision": None,
             "unit_of_prediction": None,
             "ingest": None,
+            "uncertainty": None,
             **record,
         }
         qualification.require_fields(cls, record)
@@ -505,6 +516,7 @@ class AnalysisCharter:
         chosen = record["rules"]
         layer = record["decision"]
         block = record["ingest"]
+        bounds = record["uncertainty"]
         return cls(
             question=record["question"],
             estimand=AnalysisEstimand.from_dict(record["estimand"]),
@@ -543,6 +555,11 @@ class AnalysisCharter:
                 None
                 if block is None
                 else ingest_module.IngestSpec.from_dict(block)
+            ),
+            uncertainty=(
+                None
+                if bounds is None
+                else uncertainty_module.UncertaintySpec.from_dict(bounds)
             ),
         )
 
