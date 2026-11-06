@@ -32,11 +32,13 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from scmle.contracts import tasks
 from scmle.data.ledger import confirm
 from scmle.data.ledger import ledger as ledger_module
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_run
+from scmle.evaluation import task_gate
 
 KIND = "coverage"
 CLAIM_ID = "coverage_nominal"
@@ -125,6 +127,17 @@ def decide(
     }
 
 
+def capped(task: str, status: str) -> str:
+    """The status after the task type's gate (`task_gate.tier_ceiling`).
+
+    A task type that has not passed its measured gate cannot carry a
+    `confirmed` status; the cap never raises a status.
+    """
+    if status != CONFIRMED:
+        return status
+    return task_gate.tier_ceiling(tasks.TaskType(task), status)
+
+
 def inside_of(
     bundle: Any,
     features: pd.DataFrame,
@@ -157,10 +170,18 @@ def evaluate_document(
     target: Any,
     claim_sha256: str,
     choice: Mapping[str, Any],
+    task: str = "regression",
 ) -> dict[str, Any]:
-    """`coverage_confirmation.json` for the released rows of `C`."""
+    """`coverage_confirmation.json` for the released rows of `C`.
+
+    The task type's gate (`task_gate_status.json`) caps the status: a type
+    that has not passed its gate is reported `unverified` whatever the test
+    says, and the document records the gate and whether the cap applied.
+    """
     inside = inside_of(bundle, features, target, choice)
     result = decide(int(inside.sum()), len(inside), choice)
+    tested = result["status"]
+    result["status"] = capped(task, tested)
     kind = (
         bundle.conformal.kind if bundle.conformal is not None else "regression"
     )
@@ -178,6 +199,11 @@ def evaluate_document(
         "coverage_claim_sha256": claim_sha256,
         "primary": dict(choice),
         **result,
+        "task_gate": {
+            "task": task,
+            "gate": task_gate.status(tasks.TaskType(task)),
+            "capped": result["status"] != tested,
+        },
         "rows_read": "once, by the ledger's opening of C",
         "note": NOTE,
         "described_on_the_same_rows": {
@@ -215,7 +241,7 @@ def build_runner(
 
     def evaluate(features: pd.DataFrame, target: pd.Series) -> confirm.ClaimRun:
         document = evaluate_document(
-            bundle, features, target, claim_sha256, choice
+            bundle, features, target, claim_sha256, choice, task
         )
         return confirm.ClaimRun(
             {CLAIM_ID: str(document["status"])}, {DOCUMENT: document}

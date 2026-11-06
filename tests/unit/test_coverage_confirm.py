@@ -6,6 +6,7 @@ from scipy import stats
 
 from scmle.data.ledger import confirm
 from scmle.evaluation import coverage_confirm
+from scmle.evaluation import task_gate
 
 CHOICE = coverage_confirm.primary_choice("regression")
 
@@ -57,6 +58,7 @@ def test_the_registration_hash_depends_on_the_claim_and_the_choice():
 
 class Calibrator:
     kind = "regression"
+    scores = tuple(np.linspace(0.0, 1.0, 100))
 
 
 class Band:
@@ -65,7 +67,13 @@ class Band:
 
     def predict_interval(self, features, coverage, method):
         centre = features["x"].to_numpy(dtype=float)
-        return pd.DataFrame({"lower": centre - 1.0, "upper": centre + 1.0})
+        return pd.DataFrame(
+            {
+                "prediction": centre,
+                "lower": centre - 1.0,
+                "upper": centre + 1.0,
+            }
+        )
 
 
 def test_the_runner_tests_the_released_rows_once():
@@ -89,3 +97,40 @@ def test_no_calibration_or_no_interval_task_gives_no_runner():
     assert (
         coverage_confirm.not_evaluated("x")["status"] == confirm.NOT_EVALUATED
     )
+
+
+def run_band_rows():
+    rng = np.random.default_rng(0)
+    x = pd.DataFrame({"x": rng.normal(size=400)})
+    y = x["x"] + rng.uniform(-1.0, 1.0, 400)
+    runner = coverage_confirm.build_runner(Band(), "regression", "c" * 64)
+    return runner.run(x, y)
+
+
+def test_a_passed_task_type_keeps_the_status_and_records_its_gate():
+    document = run_band_rows().documents[coverage_confirm.DOCUMENT]
+    assert document["status"] == "confirmed"
+    assert document["task_gate"] == {
+        "task": "regression",
+        "gate": "passed",
+        "capped": False,
+    }
+
+
+def test_a_task_type_that_has_not_passed_its_gate_is_capped_at_unverified(
+    monkeypatch,
+):
+    monkeypatch.setattr(task_gate, "status", lambda task: "no_referent")
+    ran = run_band_rows()
+    document = ran.documents[coverage_confirm.DOCUMENT]
+    assert ran.statuses == {"coverage_nominal": "unverified"}
+    assert document["status"] == "unverified"
+    assert document["task_gate"]["capped"] is True
+    assert document["task_gate"]["gate"] == "no_referent"
+    assert document["covered"] == document["rows"] == 400
+
+
+def test_the_cap_never_raises_a_status():
+    assert coverage_confirm.capped("regression", "unverified") == "unverified"
+    assert coverage_confirm.capped("regression", "confirmed") == "confirmed"
+    assert coverage_confirm.capped("ordinal", "confirmed") == "unverified"

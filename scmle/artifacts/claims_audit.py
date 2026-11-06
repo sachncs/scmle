@@ -627,7 +627,11 @@ def check_coverage_confirmation(
         return step(name, FAIL, "the document is malformed")
     if abs(redone["p_value"] - float(document["p_value"])) > TOLERANCE:
         problems.append("the p-value does not recompute from the counts")
-    if redone["status"] != document.get("status"):
+    gate = document.get("task_gate")
+    expected = redone["status"]
+    if isinstance(gate, dict) and "task" in gate:
+        expected = coverage_confirm.capped(str(gate["task"]), expected)
+    if expected != document.get("status"):
         problems.append("the status does not follow from the test")
     sealed_row = (ledger.confirmation or {}).get("claims", {})
     stated = (sealed_row.get(coverage_confirm.CLAIM_ID) or {}).get("status")
