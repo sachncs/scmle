@@ -33,7 +33,7 @@ from scmle.data.charter import uncertainty as uncertainty_module
 from scmle.data.framing import costs
 from scmle.data.ledger import budget as budget_module
 
-FORMAT_VERSION = 10
+FORMAT_VERSION = 11
 OLDEST_READABLE_FORMAT = 1
 ESTIMAND_KINDS = ("predictive", "causal")
 MAX_CONFIRMATION_FRACTION = 0.5
@@ -344,7 +344,8 @@ class AnalysisCharter:
             windows, lag, reconciliation delay and key tolerances; None for
             a charter that reads a file, which serialises, hashes and loads
             as a format 1-6 charter did.
-        uncertainty: The uncertainty block (format 10): the cap on the fold
+        uncertainty: The uncertainty block (format 10, 11 with the claim on the
+            confirmation rows): the cap on the fold
             models a bundle keeps for CV+; None for a charter that does not
             fix it, which serialises, hashes and loads as a format 1-9
             charter did.
@@ -477,7 +478,8 @@ class AnalysisCharter:
         2; 3 with rules; 4 with a causal block; 5 with a decision layer; 6
         with a unit of prediction; 7 with an ingest block; 8 when the ingest
         block carries an entity or reconcile sub-block; 9 when the causal
-        block carries subgroups or attestors; 10 with an uncertainty block.
+        block carries subgroups or attestors; 10 with an uncertainty block; 11
+        when that block asks for the coverage claim on the confirmation rows.
         """
         found = 2 if self.rules is None else 3
         causal_block = self.estimand.causal
@@ -496,7 +498,9 @@ class AnalysisCharter:
             sub = self.ingest.entity or self.ingest.reconcile
             found = max(found, 7 if sub is None else 8)
         if self.uncertainty is not None:
-            found = max(found, 10)
+            found = max(
+                found, 11 if self.uncertainty.coverage_on_confirmation else 10
+            )
         return found
 
     @classmethod

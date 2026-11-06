@@ -92,6 +92,16 @@ Charter format 10 adds the optional `uncertainty` block
 snapshot is unchanged); a charter of format 9 or older keeps its hash and
 signature.
 
+Charter format 11 adds the optional `coverage_on_confirmation` field of the
+`uncertainty` block (`scmle.data.charter.uncertainty.UncertaintySpec`, an
+extension surface; a format 10 charter keeps its hash and signature, both
+pinned). `scmle.evaluation.coverage_confirm`, `coverage.slice_flag`,
+`coverage_slices.flag_gate` and `FlagGate` are additions (extension
+surfaces); the per-slice records of `coverage_report.json` gained `flag`,
+`flag_p_value` and `flag_certified`, and the slice summary `flagged`,
+`flag_margin` and `flag_gate`. `claims verify` gained the step "coverage claim
+on C: registered, recomputed, status matches". The snapshot is unchanged.
+
 `scmle.governance.uncertainty_feed.UncertaintyFeed` is an addition (an
 extension surface; the snapshot is unchanged).
 

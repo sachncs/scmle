@@ -36,6 +36,11 @@ floors. Nothing below was run on real data.
 - G13: row-wise calibration did not under-cover a new entity in the
   30-entity, 40-row world (0.9042); the claim that it is anti-conservative is
   not supported by that world.
+- G5b (the redesign, margin 0.05 fixed in advance) passed: false-flag 0.0005
+  (bound 0.0597) and detection 0.992 or more from 30 rows at 3x noise; it
+  detects a 1.5x noise slice (true coverage about 0.73) in 71 percent of
+  cases at 100 rows and a 1.25x slice (about 0.81) in 37 percent at 400 rows,
+  by design.
 
 ## Work packages still open
 
@@ -77,9 +82,14 @@ floors. Nothing below was run on real data.
   class-conditional sets. `coverage_claim.json` is hashed and registered before the rows
   are read (`claims verify` checks it). Declared
   slice columns (charter `uncertainty.slice_columns`) get coverage and set size
-  per level, descriptive only. Open: coverage on `C`; extend `SliceReport`
-  (`slices.py`) to the coverage flag once it has a pre-registered design.
-- Decide the G5 redesign above before the slice flag may gate.
+  per level. Built 2026-11-06: coverage on `C` (charter format 11,
+  `uncertainty.coverage_on_confirmation`; `coverage_confirm.py`; the claim is a
+  registered claim of the ledger, tested by an exact one-sided binomial test on
+  the one opening of `C`, which waits for the bundle and its calibration;
+  `coverage_confirmation.json`, checked by `claims verify`), and the per-slice
+  margin flag of the declared-slice report (`coverage.slice_flag`,
+  certificate G5b, which passed). The metric slicer `slices.SliceReport` is a
+  different report (score per slice) and has no coverage in it.
 
 **WP-12.3 Shift weights in the bundle**
 - Built 2026-11-04: `ModelBundle.attach_shift_weights` stores the calibration

@@ -32,6 +32,24 @@ Gates (worlds are simulated; real data may violate them):
   `<= 0.05 + 2 sqrt(0.05 * 0.95 / R)`; (ii) one slice at 3x noise, recall by
   slice size. The flag is certified only from the smallest tested size whose
   Wilson lower bound is `>= 0.80`; below it, descriptive.
+* G5b slice flag with a margin fixed in advance (registered 2026-11-06,
+  before its first run; the redesign that the G5 miss called for, and G5
+  itself is neither changed nor re-run). `coverage.slice_flag` tests, for
+  each slice of at least 30 rows, the one-sided exact binomial hypothesis
+  "coverage `>= nominal - 0.05`" (`SLICE_MARGIN = 0.05`, about 3.7 standard
+  deviations of the calibration-conditional coverage at `n_cal = 500`,
+  `Beta(451, 50)` sd 0.0134) and flags by Holm at familywise 0.05 over all
+  slices of at least 30 rows. Worlds as G5 but with the harder `n_cal =
+  500` (G5 used 1000): (i) 8 exchangeable slices of 200 rows, `R = 2000`,
+  familywise false-flag rate `<= 0.05 + 2 sqrt(0.05 * 0.95 / R)`; (ii) one
+  slice of 30, 50, 100, 200 or 400 rows at 3x noise (true coverage about
+  0.42), `R = 2000` each, detection of that slice. Pass: (i) within its
+  bound and (ii) with Wilson lower bound `>= 0.80` at some size; the flag is
+  certified from the smallest such size (`min_certified_rows`) and
+  descriptive below it. Filed, not gated: detection at 1.5x noise (true
+  coverage about 0.73) and at 1.25x (about 0.81). By construction the flag
+  cannot see a shortfall under about 0.05; it says "below nominal by more
+  than the margin", not "below nominal".
 * G6 weighted conformal: Gaussian mean shift in 3 features, noise sd
   `exp(0.6 x1)`. Known ratio: shifted-test coverage `>= 0.9 - 3 se` with the
   unweighted version lower. Estimated ratio (logistic discriminator, clipped
@@ -73,6 +91,7 @@ from sklearn import neighbors
 from scmle.data.detectors import certificates
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
+from scmle.evaluation import coverage_slices
 from scmle.evaluation import ipcw
 from scmle.evaluation import quantile
 from scmle.evaluation import reconcile
@@ -92,6 +111,7 @@ GATES = (
     "G3",
     "G4",
     "G5",
+    "G5b",
     "G6",
     "G9",
     "G11i",
@@ -357,6 +377,57 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
     }
 
 
+def gate_g5b(replicates: int, base: int = 0) -> dict[str, Any]:
+    """Slice flag with a margin: false flags and detection by slice size."""
+    size, calibration = 200, 500
+    bound = 0.05 + 2 * math.sqrt(0.05 * 0.95 / replicates)
+
+    def flagged_slices(rows: int, noise: float, index: int) -> set[str]:
+        rng = np.random.default_rng(base + index)
+        q = conformal.finite_sample_quantile(
+            np.abs(rng.standard_normal(calibration)), LEVEL
+        )
+        err = np.abs(rng.standard_normal(8 * rows))
+        err[:rows] *= noise
+        report = coverage.slice_flag(
+            err <= q, np.repeat(np.arange(8), rows).tolist(), LEVEL
+        )
+        return {str(name) for name in report["flagged"]}
+
+    false_flags = sum(
+        bool(flagged_slices(size, 1.0, index)) for index in range(replicates)
+    )
+    detection: dict[str, Any] = {}
+    for noise in (3.0, 1.5, 1.25):
+        by_rows = {}
+        for rows in (30, 50, 100, 200, 400):
+            hits = sum(
+                "0" in flagged_slices(rows, noise, index)
+                for index in range(replicates)
+            )
+            by_rows[str(rows)] = {
+                "recall": hits / replicates,
+                "wilson_lower": wilson_lower(hits, replicates),
+            }
+        detection[f"noise_{noise:g}x"] = by_rows
+    certified = [
+        int(k)
+        for k, v in detection["noise_3x"].items()
+        if v["wilson_lower"] >= 0.80
+    ]
+    return {
+        "replicates": replicates,
+        "calibration_rows": calibration,
+        "margin": coverage.SLICE_MARGIN,
+        "familywise_false_flag": false_flags / replicates,
+        "false_flag_bound": bound,
+        "detection_by_slice_rows": detection,
+        "min_certified_rows": min(certified) if certified else None,
+        "method_hash": coverage_slices.flag_method_hash(),
+        "passed": bool(false_flags / replicates <= bound and certified),
+    }
+
+
 def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
     """Weighted conformal under a known and an estimated ratio."""
     mu = np.array([1.0, 0.5, 0.5])
@@ -543,6 +614,7 @@ RUNNERS = {
     "G3": (gate_g3, CQR_REPLICATES),
     "G4": (gate_g4, 300),
     "G5": (gate_g5, REPLICATES),
+    "G5b": (gate_g5b, REPLICATES),
     "G6": (gate_g6, REPLICATES),
     "G9": (gate_g9, REPLICATES),
     "G11i": (gate_g11i, SURVIVAL_REPLICATES),
@@ -558,6 +630,12 @@ def sources() -> dict[str, list[Any]]:
         "G3": [quantile.QuantileBand, gate_g3],
         "G4": [conformal.ConformalCalibrator, gate_g4, class_world],
         "G5": [coverage.slice_coverage, coverage.holm_rejections, gate_g5],
+        "G5b": [
+            coverage.slice_flag,
+            coverage.holm_rejections,
+            coverage.undercoverage_p_value,
+            gate_g5b,
+        ],
         "G6": [
             conformal.weighted_margins,
             conformal.weighted_quantile,

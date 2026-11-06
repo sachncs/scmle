@@ -78,6 +78,7 @@ from scmle.evaluation import bias_variance
 from scmle.evaluation import confidence
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage as coverage_module
+from scmle.evaluation import coverage_confirm
 from scmle.evaluation import coverage_run
 from scmle.evaluation import coverage_slices
 from scmle.evaluation import criteria
@@ -336,6 +337,10 @@ class PendingLedger:
         signed: Whether the charter signature was verified.
         baseline: The baseline claim about the logistic rule, or None.
         causal: The primary causal claim, or None.
+        subject: The rule the baseline claim is about once the model is
+            selected, or None.
+        holds_for_coverage: Whether `C` stays sealed until the bundle and its
+            calibration exist, so the coverage claim can be tested on it.
     """
 
     explored: ledger_governed.Explored
@@ -349,6 +354,8 @@ class PendingLedger:
     signed: bool
     baseline: ledger_confirm.ClaimRunner | None
     causal: ledger_confirm.ClaimRunner | None
+    subject: Any = None
+    holds_for_coverage: bool = False
 
 
 class ProfileStage(Stage):
@@ -791,13 +798,23 @@ class ProfileStage(Stage):
             verified.signed,
             baseline,
             causal,
+            holds_for_coverage=coverage_on_confirmation(charter, task),
         )
-        if data.baseline_column and data.baseline_subject == "selected_model":
+        selected = bool(
+            data.baseline_column and data.baseline_subject == "selected_model"
+        )
+        if selected or pending.holds_for_coverage:
             context.pending_ledger = pending
             context.emit(
                 "ledger.deferred",
-                "the confirmation set stays sealed until the model selection "
-                "is frozen, so the baseline claim can be about that model",
+                "the confirmation set stays sealed until "
+                + (
+                    "the model and its calibration are frozen, so the "
+                    "coverage claim can be tested on it"
+                    if pending.holds_for_coverage
+                    else "the model selection is frozen, so the baseline "
+                    "claim can be about that model"
+                ),
             )
             return
         self.complete_claim_ledger(context, pending)
@@ -807,6 +824,7 @@ class ProfileStage(Stage):
         context: context_module.RunContext,
         pending: "PendingLedger",
         subject: framing_claim.Rule | None = None,
+        extra: ledger_confirm.ClaimRunner | None = None,
     ) -> None:
         """Registers the claims and opens `C` once (F3), then the reports.
 
@@ -815,6 +833,8 @@ class ProfileStage(Stage):
             pending: The exploration, finished on `X` alone.
             subject: The rule the baseline claim is about, when it is not
                 the logistic rule frozen on `X`.
+            extra: A further registered claim tested in the same opening
+                (the coverage claim).
         """
         charter = pending.charter
         view = pending.view
@@ -830,7 +850,7 @@ class ProfileStage(Stage):
                 signed=pending.signed,
                 subject=subject,
             )
-        runner = ledger_confirm.merge_runners(baseline, pending.causal)
+        runner = ledger_confirm.merge_runners(baseline, pending.causal, extra)
         vault = require(context.custody_vault, "custody vault")
         run = ledger_governed.confirm_explored(
             pending.explored,
@@ -2024,9 +2044,28 @@ class SelectStage(Stage):
         pending = context.pending_ledger
         if pending is None:
             return
-        context.pending_ledger = None
         selected = require(context.selected, "selected")
         split = require(context.split, "split")
+        data = context.spec.data
+        subject = None
+        if data.baseline_column and data.baseline_subject == "selected_model":
+            subject = self.selected_rule(context, pending, selected, split)
+        if pending.holds_for_coverage:
+            context.pending_ledger = dataclasses.replace(
+                pending, subject=subject
+            )
+            return
+        context.pending_ledger = None
+        ProfileStage().complete_claim_ledger(context, pending, subject)
+
+    def selected_rule(
+        self,
+        context: context_module.RunContext,
+        pending: "PendingLedger",
+        selected: experiments.TrialResult,
+        split: Any,
+    ) -> framing_claim.SelectedModelRule:
+        """The selected model as the rule the baseline claim is about."""
         pipeline = context.refits.get(selected.trial_id)
         if pipeline is None:
             pipeline = strategies.get_strategy(selected.strategy).build(
@@ -2040,7 +2079,7 @@ class SelectStage(Stage):
             context.refits[selected.trial_id] = pipeline
         model = require(pending.charter.cost_model, "cost_model")
         classes = sorted(pending.view.target.dropna().unique(), key=str)
-        subject = framing_claim.SelectedModelRule(
+        return framing_claim.SelectedModelRule(
             pipeline,
             classes[-1],
             float(model.threshold),
@@ -2053,7 +2092,6 @@ class SelectStage(Stage):
                 "seed": context.spec.validation.seed,
             },
         )
-        ProfileStage().complete_claim_ledger(context, pending, subject)
 
     def choose(self, context: context_module.RunContext) -> None:
         """Chooses the best trial that satisfies the serving constraints.
@@ -2189,6 +2227,18 @@ def reference_scores(
     if predicted.ndim == 2:
         predicted = predicted[:, 0]  # The primary target stands for all.
     return pd.Series(predicted, name="prediction")
+
+
+def coverage_on_confirmation(
+    charter: charter_contracts.AnalysisCharter, task: tasks.TaskType
+) -> bool:
+    """Whether the charter asks for the coverage claim on `C` for this task."""
+    block = charter.uncertainty
+    return (
+        block is not None
+        and block.coverage_on_confirmation
+        and coverage_confirm.primary_choice(task.value) is not None
+    )
 
 
 def declared_slice_columns(
@@ -3544,6 +3594,39 @@ class PackageStage(Stage):
             tuple(models), plan.folds, np.abs(observed - predicted)
         )
 
+    def complete_held_ledger(
+        self,
+        context: context_module.RunContext,
+        bundle: bundle_module.ModelBundle,
+    ) -> None:
+        """Opens `C` once the bundle and its calibration are frozen (F12).
+
+        Only for a charter that asked for the coverage claim on `C`: the
+        ledger was held back, and now registers the coverage claim with the
+        others and tests everything in the one opening.
+        """
+        pending = context.pending_ledger
+        if pending is None:
+            return
+        context.pending_ledger = None
+        task = require(context.task, "task")
+        runner = None
+        if context.coverage_claim_sha256 is not None:
+            runner = coverage_confirm.build_runner(
+                bundle, task.value, context.coverage_claim_sha256
+            )
+        if runner is None:
+            context.write_json(
+                coverage_confirm.DOCUMENT,
+                coverage_confirm.not_evaluated(
+                    "the bundle holds no conformal calibration, so there is "
+                    "no interval or set to test on C"
+                ),
+            )
+        ProfileStage().complete_claim_ledger(
+            context, pending, pending.subject, runner
+        )
+
     def cv_plus_cap(self, context: context_module.RunContext) -> int:
         """The most bytes of fold models to keep (charter's, else default)."""
         path = context.spec.charter_path
@@ -3965,6 +4048,7 @@ class PackageStage(Stage):
         evaluation["sensitivity"] = self.sensitivity(context, selected)
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.quantile = self.quantile_intervals(context)
+        self.complete_held_ledger(context, bundle)
         if require(context.task, "task") is tasks.TaskType.FORECAST:
             evaluation["forecast_backtest"] = self.forecast_backtest(
                 context, selected

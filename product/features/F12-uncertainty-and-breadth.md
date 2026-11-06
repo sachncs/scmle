@@ -64,13 +64,16 @@ residuals are stored for regression with fewer than 1000 calibration rows
 to a bundle (`shift=True`), a `coverage_report.json` is measured on the final
 test rows (`evaluation/coverage_run.py`), and `unit_of_prediction:
 new_entity` in the charter calibrates on one score per entity. **Still not
-in the run:** coverage is measured on the final test rows only (not on
-`C`), slices are described but never flagged, and the seven task types above still get no
-interval. Since 2026-11-06 the coverage claim (`coverage_claim.json`: levels,
+in the run:** the seven task types above still get no interval. Since 2026-11-06 the coverage claim (`coverage_claim.json`: levels,
 methods, tolerance, rule) is hashed and registered in the custody log and the
 event log before the final rows are released, the report names its hash and
 `claims verify` checks it; above 1000 rows the pooled out-of-fold scores are
-the served source by design (`conformal.scores` event).
+the served source by design (`conformal.scores` event). With the charter's
+`uncertainty.coverage_on_confirmation` (format 11) the coverage claim is also
+a registered claim of the ledger, tested on the one opening of `C` after the
+model and its calibration are frozen (`coverage_confirmation.json`, status
+`confirmed` or `unverified`, checked by `claims verify`), and the per-slice
+margin flag (G5b) is certified.
 
 ### Problem-type breadth
 
@@ -294,7 +297,7 @@ G13 (simulation) are in the certificate file. Open:
 | G2 | Differential: CV+ intervals equal MAPIE's (not installed; existence and version to verify) on three frozen datasets to `1e-9`; the jackknife+ paper's datasets. | MAPIE; the paper. |
 | G3 | **Missed**: CQR in the highest-noise decile covered 0.864 (floor 0.87, 150 replicates). Re-register a design before it claims conditional coverage. | Romano et al. datasets (names unverified). |
 | G4 | Differential against a class-conditional reference (MAPIE mode, if any). | Sadinle et al. construction. |
-| G5 | **Missed**: familywise false-flag 0.0755 (bound 0.0597). Redesign and re-certify before the flag gates; recall was 1.0 from 30 rows in the 3x-noise world. | Exact binomial test; Holm. |
+| G5 | **Missed**: familywise false-flag 0.0755 (bound 0.0597); the Holm flag against the nominal level stays unused. Its redesign with a margin fixed in advance, G5b, passed (see the certificate file). | Exact binomial test; Holm. |
 | G6 | Real covariate-shift data; tier of the estimated-ratio claim follows A5. | Closed-form ratio; the paper. |
 | G7 | 5 regression and 3 classification datasets with time or group structure; coverage on `C`/`F`; gate only on "no `confirmed` claim below `1 - a - tol` on `F`"; every violation a published miss. | Held-out `F`. |
 | G8 | Reproduce the official Naive and Seasonal-naive scores on an M4 subset (MASE, sMAPE, WIS) to the published precision; then system minus best baseline with a series bootstrap, upper limit `< 0` or the forecast is `unverified`. M5 with 9 quantiles. | M4/M5 data and published tables (details unverified). |
@@ -366,8 +369,8 @@ G13 (simulation) are in the certificate file. Open:
 
 1. G2 and G4 differentials pass against a reference implementation, or the
    documented tie-handling difference.
-2. A coverage claim is registered before `C` is read; a second read of `C`
-   raises (F2/F3 mechanism, reused).
+2. (Built for a charter that asks for it: the coverage claim is registered
+   before `C` is read and tested on its one opening.)
 3. `ModelBundle` round-trip preserves fold-model hashes; tamper on one fold
    model fails verification (extends the checksum in `bundle.py`).
 4. G8: our MASE, sMAPE and WIS reproduce the official Naive and Seasonal-naive
@@ -375,8 +378,8 @@ G13 (simulation) are in the certificate file. Open:
 5. G10, G11(ii), G12 differential tests pass against their references.
 6. G14: planted duplicates are recovered; leak inflation is shown, then
    removed by the grouped split.
-7. The slice check refuses to gate below its certified size once G5 is
-   redesigned and passes.
+7. (Built: the slice flag reports `flag_certified` false below the certified
+   size of G5b.)
 8. A type not `passed` in `task_gate_status.json` yields only `unverified`
    outputs *from the run* (`task_gate.tier_ceiling` exists and is tested over
    `TaskType`, but no run output calls it yet).

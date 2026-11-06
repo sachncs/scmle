@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+* The coverage claim is tested on the sealed rows `C`, and the slice flag has
+  a certificate (F12, WP-12.2; charter format 11,
+  `UncertaintySpec.coverage_on_confirmation`,
+  `scmle.evaluation.coverage_confirm`, `coverage.slice_flag`, gate G5b).
+  With `coverage_on_confirmation` the coverage claim is a registered claim of
+  the ledger next to the baseline and causal claims: it is about one served
+  interval or set named in advance (the `residual` interval for regression,
+  the pooled set for classification, level 0.9, tolerance 0.02), its
+  registration hashes that choice with the hash of `coverage_claim.json`, `C`
+  stays sealed until the bundle and its calibration are frozen (the ledger
+  completes at the end of the packaging stage, not before training), and the
+  one opening of `C` runs an exact one-sided binomial test of "coverage is at
+  most level less tolerance" at 0.05. The status is `confirmed` when it
+  rejects and `unverified` otherwise (reported either way, with the other
+  methods and levels described on the same rows); `coverage_confirmation.json`
+  is hashed into the sealed confirmation row and `claims verify` recomputes
+  the p-value from the counts and checks the registration hash and the status.
+  The test level 0.05 is fixed in the module and not drawn from the error
+  budget. A charter without the flag is unchanged (a test pins that `C` is not
+  held back and no file is written); a format 10 charter keeps its hash and
+  signature. In a small test run (120 rows of `C`) 110 were covered, p =
+  0.134, so the claim was reported `unverified`: too few rows to exceed 0.88.
+  The slice flag: the Holm flag against the nominal level (G5) still missed
+  its bound and stays unused; its redesign tests each slice of at least 30
+  rows against the nominal level less a margin of 0.05 fixed in advance, Holm
+  over the family. Gate G5b, with its plan and floors written in the module
+  docstring before its first run (`n_cal = 500`, R = 2000): familywise
+  false-flag rate 0.0005 against the bound 0.0597, detection of a slice at 3x
+  noise (true coverage about 0.42) 0.992 at 30 rows and 1.0 from 50 rows
+  (Wilson lower 0.986), so the gate passed and is certified from 30 rows;
+  detection at 1.5x noise (about 0.73) is 0.17, 0.38, 0.71, 0.93, 1.0 at 30,
+  50, 100, 200, 400 rows and at 1.25x (about 0.81) 0.02 to 0.37, filed and
+  not gated: the flag cannot see a shortfall under about 0.05 by design. The
+  declared-slice records carry `flag`, `flag_certified` and a `flag_gate`
+  (`gating` only while the stored certificate is current and passing; the
+  summary's `descriptive` key follows it). Only one new gate entry was added
+  to `uncertainty_certificates.json`; no other certificate changed. The metric
+  slicer `slices.SliceReport` (score per slice) is a different report and was
+  not changed.
+
 * A certificate for the Holm family of subgroup hypotheses (F10;
   `benchmarks/qualification/subgroup_certify.py`,
   `subgroup_certificates.json`, `certified.subgroup_gate`). The plan, seeds

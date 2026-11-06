@@ -1,4 +1,6 @@
-"""Coverage and set size per declared slice, descriptive only."""
+"""Coverage and set size per declared slice, descriptive unless the flag is certified."""
+
+import json
 
 import numpy as np
 import pandas as pd
@@ -32,13 +34,19 @@ def test_too_many_levels_is_not_assessable():
     assert coverage_slices.labels_for(reference, reference) is None
 
 
-def test_the_summary_gives_coverage_interval_and_size_and_no_flags():
+def descriptive_gate():
+    return coverage_slices.FlagGate(coverage_slices.DESCRIPTIVE, "test")
+
+
+def test_the_summary_gives_coverage_interval_size_and_a_descriptive_flag():
     rng = np.random.default_rng(0)
     labels = np.array(["x"] * 200 + ["y"] * 200 + ["z"] * 5)
     inside = rng.random(405) < 0.9
     sizes = np.where(labels == "x", 1.0, 2.0)
 
-    found = coverage_slices.summary(inside, sizes, labels, 0.9)
+    found = coverage_slices.summary(
+        inside, sizes, labels, 0.9, gate=descriptive_gate()
+    )
 
     assert found["descriptive"] is True
     assert found["skipped_for_support"] == 1
@@ -50,10 +58,63 @@ def test_the_summary_gives_coverage_interval_and_size_and_no_flags():
         <= by_name["x"]["coverage"]
         <= by_name["x"]["upper"]
     )
-    assert all(
-        "flagged" not in s and "p_value" not in s for s in found["slices"]
+    assert found["flagged"] == []
+    assert all(not s["flag_certified"] for s in found["slices"])
+    assert found["flag_gate"]["status"] == "descriptive"
+
+
+def test_a_badly_undercovered_slice_is_flagged_and_certified_only_when_gating():
+    rng = np.random.default_rng(1)
+    labels = np.array(["ok"] * 300 + ["bad"] * 300)
+    inside = np.concatenate([rng.random(300) < 0.9, rng.random(300) < 0.5])
+    sizes = np.ones(600)
+
+    loose = coverage_slices.summary(
+        inside, sizes, labels, 0.9, gate=descriptive_gate()
     )
-    assert "not a test" in found["note"]
+    gated = coverage_slices.summary(
+        inside,
+        sizes,
+        labels,
+        0.9,
+        gate=coverage_slices.FlagGate(coverage_slices.GATING, "test", 200),
+    )
+
+    assert loose["flagged"] == ["bad"] == gated["flagged"]
+    assert loose["descriptive"] is True and gated["descriptive"] is False
+    assert not any(s["flag_certified"] for s in loose["slices"])
+    assert all(s["flag_certified"] for s in gated["slices"])
+
+
+def test_a_slice_below_the_certified_size_is_not_certified():
+    labels = np.array(["a"] * 60 + ["b"] * 300)
+    inside = np.ones(360, dtype=bool)
+    gate = coverage_slices.FlagGate(coverage_slices.GATING, "test", 100)
+    found = coverage_slices.summary(
+        inside, np.ones(360), labels, 0.9, gate=gate
+    )
+    by_name = {s["slice"]: s for s in found["slices"]}
+    assert by_name["a"]["flag_certified"] is False
+    assert by_name["b"]["flag_certified"] is True
+
+
+def test_the_flag_gate_follows_the_stored_certificate(tmp_path):
+    path = tmp_path / "c.json"
+    assert coverage_slices.flag_gate(path).status == "descriptive"
+    entry = {
+        "method_hash": coverage_slices.flag_method_hash(),
+        "passed": True,
+        "min_certified_rows": 100,
+    }
+    path.write_text(json.dumps({"gates": {"G5b": entry}}))
+    gate = coverage_slices.flag_gate(path)
+    assert gate.status == "gating" and gate.min_rows == 100
+    entry["passed"] = False
+    path.write_text(json.dumps({"gates": {"G5b": entry}}))
+    assert coverage_slices.flag_gate(path).status == "descriptive"
+    entry.update(passed=True, method_hash="0" * 64)
+    path.write_text(json.dumps({"gates": {"G5b": entry}}))
+    assert "stale" in coverage_slices.flag_gate(path).reason
 
 
 def test_infinite_sizes_give_no_mean():

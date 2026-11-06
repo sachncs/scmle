@@ -22,6 +22,7 @@ from scipy import stats
 
 DEFAULT_TOLERANCE = 0.02
 DEFAULT_FAMILYWISE = 0.05
+SLICE_MARGIN = 0.05
 MIN_SLICE_ROWS = 30
 CONFIRMED = "confirmed"
 ATTESTED = "attested"
@@ -190,6 +191,67 @@ def slice_coverage(
         "skipped": skipped,
         "slices": found,
         "flagged": [item["slice"] for item in found if item["flagged"]],
+    }
+
+
+def slice_flag(
+    covered: np.ndarray,
+    labels: Sequence[Any],
+    nominal: float = 0.9,
+    margin: float = SLICE_MARGIN,
+    familywise: float = DEFAULT_FAMILYWISE,
+    min_rows: int = MIN_SLICE_ROWS,
+) -> dict[str, Any]:
+    """Slices whose coverage is below nominal by more than a fixed margin.
+
+    `slice_coverage` compares each slice with the nominal level itself, but
+    the conformal quantile varies with the calibration sample, so the slice
+    coverages move together and that test flags too often (G5). Here each
+    slice of at least `min_rows` rows is tested against `nominal - margin`
+    (one-sided exact binomial, "coverage is at least that"), the margin fixed
+    in advance, and Holm at `familywise` is applied over the whole family. A
+    flag therefore says "below nominal by more than the margin"; a shortfall
+    smaller than the margin is not seen.
+
+    Args:
+        covered: Boolean array, one entry per scored row.
+        labels: Slice label of each row.
+        nominal: The requested coverage.
+        margin: Slack below nominal that is not flagged.
+        familywise: Familywise error rate of the Holm step-down.
+        min_rows: Smallest slice that is tested.
+
+    Returns:
+        `slices` (name to `p_value` and `flagged`), `flagged` (the names),
+        `floor`, `margin` and the number of tests.
+    """
+    flags = np.asarray(covered, dtype=bool)
+    names = np.asarray([str(label) for label in labels])
+    floor = nominal - margin
+    found: dict[str, dict[str, Any]] = {}
+    for name in sorted(set(names)):
+        mask = names == name
+        rows = int(mask.sum())
+        if rows >= min_rows:
+            found[name] = {
+                "rows": rows,
+                "p_value": undercoverage_p_value(
+                    int(flags[mask].sum()), rows, floor
+                ),
+            }
+    rejected = holm_rejections(
+        [item["p_value"] for item in found.values()], familywise
+    )
+    for item, flag in zip(found.values(), rejected, strict=True):
+        item["flagged"] = bool(flag)
+    return {
+        "nominal": nominal,
+        "margin": margin,
+        "floor": floor,
+        "familywise": familywise,
+        "tests": len(found),
+        "slices": found,
+        "flagged": [name for name, item in found.items() if item["flagged"]],
     }
 
 

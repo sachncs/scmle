@@ -67,7 +67,7 @@ def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
     assert order.index("coverage.registered") < order.index("test.opened")
 
 
-def test_declared_slices_are_in_the_claim_and_described_without_flags(tmp_path):
+def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
     from scmle.data.charter import uncertainty
 
     result = charter_run(
@@ -83,7 +83,6 @@ def test_declared_slices_are_in_the_claim_and_described_without_flags(tmp_path):
     method = next(iter(report["methods"].values()))
     level = method["0.9"]["declared_slices"]
     assert level["ghost"]["status"] == "not_assessable"
-    assert level["grp"]["descriptive"] is True
     assert {s["slice"] for s in level["grp"]["slices"]} <= {"a", "b"}
     assert {s["slice"] for s in level["z"]["slices"]} <= {
         "band 1",
@@ -91,5 +90,67 @@ def test_declared_slices_are_in_the_claim_and_described_without_flags(tmp_path):
         "band 3",
         "band 4",
     }
-    assert '"flagged"' not in json.dumps(level)
+    assert level["grp"]["flag_gate"]["status"] in ("gating", "descriptive")
+    assert all("flag" in s for s in level["grp"]["slices"])
     assert "by_slice" not in method["0.9"]
+
+
+def confirmation_run(tmp_path):
+    from scmle.data.charter import uncertainty
+
+    return charter_run(
+        tmp_path,
+        plan=False,
+        uncertainty=uncertainty.UncertaintySpec(None, (), True),
+    )
+
+
+def finding(folder, name):
+    return next(
+        f for f in claims_audit.verify(folder).findings if f.name == name
+    )
+
+
+ON_C = "coverage claim on C: registered, recomputed, status matches"
+
+
+def test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen(
+    tmp_path,
+):
+    result = confirmation_run(tmp_path)
+    folder = pathlib.Path(result.run_dir)
+
+    document = read(folder, "coverage_confirmation.json")
+    assert document["claim_id"] == "coverage_nominal"
+    assert document["status"] in ("confirmed", "unverified")
+    assert document["rows"] > 0 and document["alpha"] == 0.05
+    claim = read(folder, "coverage_claim.json")
+    assert document["coverage_claim_sha256"] == coverage_run.claim_hash(claim)
+    registered = read(folder, "confirmed_claims.json")["registered_claims"]
+    assert registered["coverage_nominal"]["status"] == document["status"]
+    assert registered["coverage_nominal"]["kind"] == "coverage"
+    order = kinds(folder)
+    assert order.count("ledger.completed") == 1
+    assert order.index("ledger.deferred") < order.index("coverage.registered")
+    assert order.index("coverage.registered") < order.index("ledger.completed")
+    assert finding(folder, ON_C).status == "pass"
+    assert finding(folder, "registered claims: files hash to the sealed ledger")
+
+
+def test_an_edited_confirmation_document_fails_the_verification(tmp_path):
+    result = confirmation_run(tmp_path)
+    folder = pathlib.Path(result.run_dir)
+    path = folder / "coverage_confirmation.json"
+    document = json.loads(path.read_text())
+    document["covered"] = document["rows"]
+    path.write_text(json.dumps(document))
+
+    assert finding(folder, ON_C).status == "fail"
+
+
+def test_without_the_flag_c_is_not_held_back_for_coverage(tmp_path):
+    result = charter_run(tmp_path, plan=False)
+    folder = pathlib.Path(result.run_dir)
+
+    assert not (folder / "coverage_confirmation.json").exists()
+    assert "ledger.deferred" not in kinds(folder)

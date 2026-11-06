@@ -236,6 +236,89 @@
         2000
       ]
     },
+    "G5b": {
+      "calibration_rows": 500,
+      "code_hash": "7c1d6d388a77eefc0b06ed6a188cdc9cdf4a81f606ca70d3fdac68bc3c07435c",
+      "detection_by_slice_rows": {
+        "noise_1.25x": {
+          "100": {
+            "recall": 0.095,
+            "wilson_lower": 0.08291479680735943
+          },
+          "200": {
+            "recall": 0.1935,
+            "wilson_lower": 0.17678106379716146
+          },
+          "30": {
+            "recall": 0.0185,
+            "wilson_lower": 0.013451349814109871
+          },
+          "400": {
+            "recall": 0.3655,
+            "wilson_lower": 0.3446711541986199
+          },
+          "50": {
+            "recall": 0.0475,
+            "wilson_lower": 0.03901402059617837
+          }
+        },
+        "noise_1.5x": {
+          "100": {
+            "recall": 0.709,
+            "wilson_lower": 0.6887075345662707
+          },
+          "200": {
+            "recall": 0.9335,
+            "wilson_lower": 0.9217283654429757
+          },
+          "30": {
+            "recall": 0.1735,
+            "wilson_lower": 0.15753398905899782
+          },
+          "400": {
+            "recall": 0.9955,
+            "wilson_lower": 0.9914694867812403
+          },
+          "50": {
+            "recall": 0.3815,
+            "wilson_lower": 0.3604576198164759
+          }
+        },
+        "noise_3x": {
+          "100": {
+            "recall": 1.0,
+            "wilson_lower": 0.9980829527187469
+          },
+          "200": {
+            "recall": 1.0,
+            "wilson_lower": 0.9980829527187469
+          },
+          "30": {
+            "recall": 0.9915,
+            "wilson_lower": 0.9864293102622139
+          },
+          "400": {
+            "recall": 1.0,
+            "wilson_lower": 0.9980829527187469
+          },
+          "50": {
+            "recall": 1.0,
+            "wilson_lower": 0.9980829527187469
+          }
+        }
+      },
+      "false_flag_bound": 0.059746794344808965,
+      "familywise_false_flag": 0.0005,
+      "margin": 0.05,
+      "method_hash": "3aff7f2053ef1927aea3d84c5b77e4240808dade4fc92c80fb04092e8cbd7fa8",
+      "min_certified_rows": 30,
+      "passed": true,
+      "replicates": 2000,
+      "seeds": [
+        0,
+        2000
+      ]
+    },
     "G6": {
       "code_hash": "eef7a8d8be020d86d36f8a1d427a51c18c92def6d2b7769d457dd405ddaf4b38",
       "estimated_passed": true,

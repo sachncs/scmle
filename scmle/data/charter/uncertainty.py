@@ -28,13 +28,23 @@ class UncertaintySpec:
             (`scmle.evaluation.cv_plus.MAX_BYTES`).
         slice_columns: Columns of the features whose levels (numeric columns
             in four bands) get a coverage and set-size description.
+        coverage_on_confirmation: Also test the registered coverage claim on
+            the sealed confirmation rows `C` (format 11): the claim becomes a
+            registered claim of the ledger, `C` stays sealed until the model
+            and its calibration are frozen, and the claim is `confirmed` only
+            if a one-sided exact binomial test passes on the one opening of
+            `C`. False (the default) keeps the claim on the final test rows
+            alone.
     """
 
     cv_plus_max_bytes: int | None = None
     slice_columns: tuple[str, ...] = ()
+    coverage_on_confirmation: bool = False
 
     def __post_init__(self) -> None:
         """Validates the block."""
+        if not isinstance(self.coverage_on_confirmation, bool):
+            raise ValueError("coverage_on_confirmation must be a bool")
         qualification.require_tuple(self.slice_columns, "slice_columns")
         if len(set(self.slice_columns)) != len(self.slice_columns) or any(
             not isinstance(c, str) or not c.strip() for c in self.slice_columns
@@ -52,15 +62,22 @@ class UncertaintySpec:
             record["cv_plus_max_bytes"] = self.cv_plus_max_bytes
         if self.slice_columns:
             record["slice_columns"] = list(self.slice_columns)
+        if self.coverage_on_confirmation:
+            record["coverage_on_confirmation"] = True
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the block, rejecting unknown fields."""
-        unknown = set(record) - {"cv_plus_max_bytes", "slice_columns"}
+        unknown = set(record) - {
+            "cv_plus_max_bytes",
+            "slice_columns",
+            "coverage_on_confirmation",
+        }
         if unknown:
             raise ValueError(f"unknown uncertainty fields {sorted(unknown)}")
         return cls(
             record.get("cv_plus_max_bytes"),
             tuple(record.get("slice_columns", ())),
+            record.get("coverage_on_confirmation", False),
         )

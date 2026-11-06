@@ -30,7 +30,7 @@ def test_a_charter_without_the_block_keeps_its_hash_and_format():
     assert charter.charter_hash == PINNED_HASH
     assert "uncertainty" not in charter.to_dict()
     assert charter.format_version == 2
-    assert c.FORMAT_VERSION == 10
+    assert c.FORMAT_VERSION == 11
 
 
 def test_an_empty_block_is_an_empty_record_and_still_format_ten():
@@ -113,3 +113,41 @@ def test_slice_columns_round_trip_and_leave_a_cap_only_charter_alone():
 def test_slice_columns_are_distinct_non_blank_names(bad):
     with pytest.raises((ValueError, TypeError)):
         uncertainty.UncertaintySpec(None, bad)
+
+
+def test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips():
+    spec = uncertainty.UncertaintySpec(None, (), True)
+    charter = make_charter(uncertainty=spec)
+    assert charter.format_version == 11
+    record = json.loads(json.dumps(charter.to_dict()))
+    assert record["uncertainty"] == {"coverage_on_confirmation": True}
+    assert c.AnalysisCharter.from_dict(record) == charter
+    assert (
+        charter.charter_hash
+        != make_charter(uncertainty=uncertainty.UncertaintySpec()).charter_hash
+    )
+
+
+def test_without_the_flag_a_format_ten_charter_keeps_its_hash():
+    off = uncertainty.UncertaintySpec(5_000_000, (), False)
+    charter = make_charter(uncertainty=off)
+    assert charter.format_version == 10
+    assert charter.charter_hash == FORMAT_TEN_HASH
+    assert "coverage_on_confirmation" not in charter.to_dict()["uncertainty"]
+
+
+def test_the_flag_in_an_older_format_is_refused(tmp_path):
+    path = tmp_path / "charter.json"
+    on = make_charter(uncertainty=uncertainty.UncertaintySpec(None, (), True))
+    sealing.write_charter(path, on, signing_key="k")
+    wrapper = json.loads(path.read_text())
+    wrapper["format"] = 10
+    path.write_text(json.dumps(wrapper))
+    with pytest.raises(errors.ConfigError, match="needs format 11"):
+        sealing.read_verified(path, signing_key="k")
+
+
+@pytest.mark.parametrize("bad", [1, "yes", None])
+def test_the_flag_must_be_a_bool(bad):
+    with pytest.raises(ValueError):
+        uncertainty.UncertaintySpec(None, (), bad)

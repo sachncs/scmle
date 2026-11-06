@@ -22,6 +22,9 @@ the files agree with each other, from the files alone:
 * the coverage claim (levels, methods, rule) hashes to what the custody log
   registered before the final rows were released, and the coverage report
   names that hash;
+* the coverage claim on `C` (charter format 11) was registered before `C`
+  opened (its registration hash is the ledger's), its test recomputes from the
+  stored counts and its status is the ledger's;
 * a causal claim above `unverified` rests on attestors the charter names:
   every accepted attestation is by a listed attestor for that assumption,
   carries this charter's hash, was valid on the run date and (given the
@@ -53,6 +56,7 @@ from scmle.data.ledger import budget as budget_module
 from scmle.data.ledger import confirm
 from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import multiplicity
+from scmle.evaluation import coverage_confirm
 from scmle.evaluation import coverage_run
 
 CHARTER_FILE = "analysis_charter.json"
@@ -586,6 +590,59 @@ def check_coverage_claim(
     return step(name, PASS, "claim hash registered; the report names it")
 
 
+def check_coverage_confirmation(
+    run_dir: Path, ledger: ledger_module.Ledger
+) -> Finding | None:
+    """The coverage claim on `C`: registered, recomputed and consistent.
+
+    None when the run holds no `coverage_confirmation.json`.
+    """
+    name = "coverage claim on C: registered, recomputed, status matches"
+    document = read_optional(run_dir / coverage_confirm.DOCUMENT)
+    if document is None:
+        return None
+    registered = ledger.claims.get(coverage_confirm.CLAIM_ID)
+    if document.get("status") == confirm.NOT_EVALUATED:
+        if registered is not None:
+            return step(
+                name, FAIL, "a registered claim has no evaluation document"
+            )
+        return step(name, SKIPPED, "the claim could not be tested on C")
+    if registered is None:
+        return step(name, FAIL, "the claim is not registered in the ledger")
+    problems = []
+    claim = read_optional(run_dir / coverage_run.CLAIM_FILE)
+    try:
+        claim_hash = coverage_run.claim_hash(claim or {})
+        choice = document["primary"]
+        body = coverage_confirm.registration_body(claim_hash, choice)
+        if document.get("coverage_claim_sha256") != claim_hash:
+            problems.append("the document names another coverage claim")
+        if ledger_module.digest(body) != registered["sha256"]:
+            problems.append("the registration hash differs from the ledger's")
+        redone = coverage_confirm.decide(
+            int(document["covered"]), int(document["rows"]), choice
+        )
+    except (KeyError, TypeError, ValueError):
+        return step(name, FAIL, "the document is malformed")
+    if abs(redone["p_value"] - float(document["p_value"])) > TOLERANCE:
+        problems.append("the p-value does not recompute from the counts")
+    if redone["status"] != document.get("status"):
+        problems.append("the status does not follow from the test")
+    sealed_row = (ledger.confirmation or {}).get("claims", {})
+    stated = (sealed_row.get(coverage_confirm.CLAIM_ID) or {}).get("status")
+    if stated != document.get("status"):
+        problems.append("the status differs from the sealed ledger row")
+    if problems:
+        return step(name, FAIL, "; ".join(problems))
+    return step(
+        name,
+        PASS,
+        f"{document['covered']} of {document['rows']} covered; "
+        f"status {document['status']}",
+    )
+
+
 def check_registered(
     run_dir: Path, document: dict[str, Any], ledger: ledger_module.Ledger
 ) -> Finding:
@@ -755,4 +812,7 @@ def verify(
     measured = check_coverage_claim(folder, signing_key)
     if measured is not None:
         findings.append(measured)
+    on_c = check_coverage_confirmation(folder, ledger)
+    if on_c is not None:
+        findings.append(on_c)
     return Verification(str(folder), tuple(findings))
