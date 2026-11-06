@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+* The charter-run ingest stage queries the source database for the quantities
+  a `reconcile` block declares (F9, WP-9.9; `declared.reconcile_source`,
+  built on `reconcile.reconcile_extract`). For each declared view it asks the
+  source for the row count, the declared column sums and the key checksum and
+  compares them with the frame it extracted (counts and checksums exactly,
+  sums within `delta_rec`; a source total of zero is compared as an absolute
+  gap instead of being skipped). A mismatch against either the declared
+  numbers or the source stops the run with a `BlockedError` naming each
+  quantity and which side differs; `extract_reconciliation.json` gains
+  `source_checks` and `source_passed`. A test seeds a corrupted extract (rows
+  dropped, a sum shifted) while the declared totals are the source's. This is
+  agreement of aggregates, so offsetting row errors pass. No charter field,
+  hashed source or certificate changed.
+
 * The `known_entity_future` unit of prediction has a protocol (F12, WP-12.7;
   `ProfileStage.check_known_entity`, `custody.pipeline.apply_custody`). A
   charter with `unit_of_prediction: known_entity_future` predicts a later row

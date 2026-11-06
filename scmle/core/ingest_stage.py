@@ -38,8 +38,11 @@ Entity resolution (charter format 8) runs on the run table itself:
 the lower threshold, and the caller makes the result the split's group column,
 so duplicates of one real-world entity under different keys never straddle
 development and test. With a `reconcile` block the extracted views are
-compared with the totals it declares before anything is synthesized, and a
-mismatch stops the run (`declared.require`).
+compared with the totals it declares and with the source database itself,
+which is queried for the row count, the declared column sums and the key
+checksum of each declared view (`declared.reconcile_source`, built on
+`reconcile.reconcile_extract`), before anything is synthesized; a mismatch
+stops the run and names each quantity (`declared.require`).
 """
 
 import dataclasses
@@ -209,13 +212,30 @@ def run(
     extracts = [read_frame(entry, factory) for entry in entries]
     report = None
     if spec.reconcile is not None:
+        frames_by_name = {
+            str(entry.get("name", entry["table"])): extract
+            for entry, extract in zip(entries, extracts, strict=True)
+        }
+        tables_by_name = {
+            str(entry.get("name", entry["table"])): identifier(
+                entry["table"], "table"
+            )
+            for entry in entries
+        }
         report = declared.reconcile(
-            {
-                str(entry.get("name", entry["table"])): extract
-                for entry, extract in zip(entries, extracts, strict=True)
-            },
+            frames_by_name,
             spec.reconcile,
             spec.delta_rec,
+        )
+        report["source_checks"] = declared.reconcile_source(
+            frames_by_name,
+            tables_by_name,
+            spec.reconcile,
+            factory,
+            spec.delta_rec,
+        )
+        report["source_passed"] = all(
+            c["passed"] for c in report["source_checks"]
         )
         declared.require(report)
     count = len(plan_document["views"])

@@ -50,7 +50,7 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 | `join_graph.json` | Measured links with containment, cardinality, whether declared or name-supported, and the decision (`accepted`, `candidate`, `many_to_many`, `declared_violated`); candidates are listed as questions. |
 | `ingest_budget.json` | Queries, rows scanned and seconds spent against the limits, source queries counted, and where each stage stopped. |
 
-Entity resolution (`entity_resolution.json`), the feature manifest (`feature_manifest.json`) and the reconciliation (`reconciliation.json`, extended) come from `scmle.data.ingest.entities`, `synthesize` and `reconcile` and are written by the caller; a charter run does not produce them yet.
+Entity resolution (`entity_resolution.json`), the feature manifest (`feature_manifest.json`) and the reconciliation (`reconciliation.json`, extended) come from `scmle.data.ingest.entities`, `synthesize` and `reconcile` and are written by the caller; a charter run does not produce them yet. A charter run with a `reconcile` block writes `extract_reconciliation.json`: the totals the charter declared and, under `source_checks`, the same quantities queried from the source database, each compared with the extract.
 
 ### Problem framing (`scmle frame`)
 

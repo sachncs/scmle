@@ -78,3 +78,44 @@ def test_an_unknown_view_or_column_is_a_config_error():
         declared.reconcile(
             {"orders": orders().drop(columns=["amount"])}, spec(), 0.0
         )
+
+
+def source_factory(amounts):
+    import sqlite3
+
+    def connect():
+        connection = sqlite3.connect(":memory:")
+        connection.execute(
+            "CREATE TABLE orders (order_id INTEGER, amount REAL)"
+        )
+        connection.executemany(
+            "INSERT INTO orders VALUES (?, ?)",
+            list(zip(range(1, 101), amounts, strict=True)),
+        )
+        return connection
+
+    return connect
+
+
+def test_the_source_is_queried_and_a_zero_total_is_compared_not_skipped():
+    block = ingest.ReconcileSpec(
+        (
+            ingest.TableTotals(
+                "orders",
+                sums=(ingest.ColumnTotal("amount", 0.0),),
+                checksum_column="order_id",
+                checksum=declared.key_checksum(orders()["order_id"]),
+            ),
+        )
+    )
+    frame = orders().assign(amount=0.0)
+    ok = declared.reconcile_source(
+        {"orders": frame}, {"orders": "orders"}, block,
+        source_factory([0.0] * 100), 0.0,
+    )  # fmt: skip
+    assert all(c["passed"] for c in ok) and len(ok) == 3
+    bad = declared.reconcile_source(
+        {"orders": frame.assign(amount=1.0)}, {"orders": "orders"}, block,
+        source_factory([0.0] * 100), 0.0,
+    )  # fmt: skip
+    assert [c["name"] for c in bad if not c["passed"]] == ["orders.sum.amount"]

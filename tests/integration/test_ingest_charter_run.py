@@ -305,3 +305,43 @@ def test_the_extract_is_reconciled_to_the_declared_totals(tmp_path):
 def test_a_total_the_extract_does_not_reproduce_stops_the_run(tmp_path):
     with pytest.raises(errors.BlockedError, match=r"orders\.row_count"):
         run_reconciled(tmp_path, 1)
+
+
+def run_with_corrupted_extract(tmp_path, monkeypatch, damage):
+    from scmle.core import ingest_stage
+
+    real = ingest_stage.read_frame
+
+    def corrupted(entry, factory):
+        frame = real(entry, factory)
+        return damage(frame) if entry["table"] == "orders" else frame
+
+    monkeypatch.setattr(ingest_stage, "read_frame", corrupted)
+    return run_reconciled(tmp_path, 0)
+
+
+def test_a_corrupted_extract_is_named_by_the_source_queries(
+    tmp_path, monkeypatch
+):
+    def damage(frame):
+        frame = frame.iloc[5:].copy()
+        frame["amount"] = frame["amount"] + 1.0
+        return frame
+
+    with pytest.raises(errors.BlockedError) as raised:
+        run_with_corrupted_extract(tmp_path, monkeypatch, damage)
+    message = str(raised.value)
+    for name in ("row_count", "sum.amount", "checksum.order_id"):
+        assert f"orders.{name}" in message
+    assert "source query" in message
+
+
+def test_a_faithful_extract_passes_the_source_queries(tmp_path):
+    result = run_reconciled(tmp_path, 0)
+    report = read(result, "extract_reconciliation.json")
+    assert report["source_passed"] is True
+    assert {c["name"] for c in report["source_checks"]} == {
+        "orders.row_count",
+        "orders.sum.amount",
+        "orders.checksum.order_id",
+    }

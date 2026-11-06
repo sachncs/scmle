@@ -48,10 +48,6 @@ warehouse.
 
 **WP-9.9 Wiring into a run** (after WP-9.8 only for the gates; the plumbing
 can start now)
-- The stage reconciles the extract to totals the charter declares; it does not
-  yet run `reconcile.reconcile_extract`, which queries the source (the
-  declared numbers cover the same ground only when the data's owner supplies
-  them).
 - Acceptance criterion 14 on Python 3.11 and 3.14: a charter run exists
   (`tests/integration/test_ingest_charter_run.py`, SQLite, one interpreter);
   identity across interpreters and a non-SQLite source are not measured.
