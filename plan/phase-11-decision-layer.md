@@ -19,7 +19,8 @@ files.
 
 **W3 Fairness integration** (one agent). Make `evaluation/fairness.py` and
 `mitigation.py` clients of `decision.constraints`; stop their constants gating;
-solve the `reweighing` mechanism; add a cluster-aware satisfaction test.
+solve the `reweighing` mechanism. The cluster-aware satisfaction test
+(`constraints.cluster_satisfaction_test`) is built.
 
 **W4 Referents** (one person outside the author). Obtain Criteo (after the
 licence check) and the Open Bandit Dataset, add manifests with hash and licence
@@ -30,7 +31,8 @@ until the reproduction exists.
 **W5 Statistics** (one agent). Re-register and re-measure the net benefit band
 (coverage miss at `n = 2000`, low power); read the cited confidence-sequence
 papers and the e-LOND treatment of overlapping tests before enabling the
-rejection boost; a rule for differential missingness; policy trees of depth
+rejection boost; `decision/missing.py` is built as a description (the rollout rule does not
+correct for missingness); policy trees of depth
 two; check the three incompatible fairness pairs against the sources.
 
 ## Exit gate still to pass

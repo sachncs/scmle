@@ -46,10 +46,17 @@ recalled, not checked against a source.
 - **Non-stationarity.** The bounds cover the running average of the effect;
   the drift worlds measured false promotion and false rollback under a
   drifting effect, not detection under a changing one.
-- **Missing outcomes.** No rule for outcomes missing differentially across
-  arms; the `missingness_not_handled` label of the plan is not implemented.
-- **Fairness bounds** treat rows as independent (Newcombe intervals); no
-  cluster-aware satisfaction test. The infeasibility check uses three
+- **Missing outcomes.** `decision/missing.py` checks anytime-validly whether
+  outcomes go missing differently by arm (the sample-ratio Bayes factor on the
+  units with a missing outcome) and labels a flag `missingness_not_handled`;
+  the rollout rule itself still analyses observed units only and does not
+  correct for missingness, so a person decides.
+- **Fairness bounds** treat rows as independent (Newcombe intervals);
+  `constraints.cluster_satisfaction_test` resamples whole clusters (a
+  percentile bootstrap of the largest gap, fewer than 20 clusters are not
+  assessable; on 400 simulated clustered worlds with a true gap above the
+  bound the row-wise test called the rule satisfied in 22 percent, the
+  cluster-aware test in 0). The infeasibility check uses three
   incompatible pairs recalled from the impossibility literature (*unverified*).
 - **OPE** is certified on simulated binary-action bandits and on one real
   randomized data set (Hillstrom) whose fitted policy treats 98 percent of rows,

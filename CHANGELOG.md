@@ -2,6 +2,53 @@
 
 ## Unreleased
 
+* Completion audit and the locally buildable remainder (2026-11-07,
+  `plan/COMPLETION_AUDIT.md`). Every open item of the plans and feature files
+  is listed with a class (A buildable here, B outside people or data, C cloud
+  account, spending cap, approver or container daemon, D owner decision), and
+  the plan statements that contradicted the code were corrected (OpenTofu
+  `fmt` and `validate` pass and the lock files are committed; the leakage
+  screen is committed; the mutation scope and the Windows CI times; R1 C11 is
+  closed by the green cross-platform jobs of run 42227276889). Built:
+  `curation_report.json` and `dataset_card.json` are rewritten after
+  quarantine (R1 B10); a charter run writes `eda_report.html`, a static page
+  from the stability and shift reports (R1 B14); `python -m
+  benchmarks.qualification --check all` runs the framing, ingestion, causal,
+  decision and loop certificate checks beside the default one, in CI and in
+  the release preflight (they were not run by either before); an attestation
+  can be spent once (`Loop.open(single_use_attestations=True)`, an
+  `attestation_used` ledger row); the seeded framing draft's hash and artifact
+  digests are pinned and checked on Python 3.11 to 3.14; `CITATION.cff`; the
+  coverage claim's status is capped by the task type's gate
+  (`coverage_confirm.capped`) and the confirmation document describes whether
+  the released scores look exchangeable with the calibration scores
+  (`evaluation/exchangeability.py`, no status); the many-to-many search is
+  charged to the ingestion budget (the ingestion measurements were re-run with
+  the same seeds and floors, numbers unchanged); the betting capital's
+  martingale and Ville properties are checked by exact enumeration; the
+  subgroup Holm family was measured with unequal levels and with overlapping
+  columns on designs registered before the run (family-wise error 0.039,
+  0.044, 0.0535 and 0.022 against the bound 0.0597; filed in
+  `subgroup_extended_measurements.json`, the certificate and its gate are
+  unchanged); `decision/missing.py` checks anytime-validly for differential
+  missingness of outcomes by arm and labels a flag `missingness_not_handled`;
+  `constraints.cluster_satisfaction_test` resamples whole clusters (on 400
+  simulated clustered worlds with a true gap above the bound the row-wise test
+  called the rule satisfied in 22 percent, the cluster-aware test in none);
+  the metric interval of a `known_entity_future` run resamples whole
+  entities; `evaluation/balance.py` replaces the AUC cutoff as the judge of
+  "looks randomized" for uplift treatment (exact permutation test); the JWKS,
+  the OIDC discovery document and the revocation list can be fetched with a
+  cache and fail-closed staleness (`scmle.security.remote`); a hashed holdback
+  assignment and a concurrent holdback check with a sample-ratio guard; the
+  generated service feeds the operations signals from its real requests and
+  scored rows (`SCMLE_SIGNALS_FILE`); a filed analysis of the G3 miss
+  (`cqr_analysis.py`: the miss is about four standard errors, not noise, and
+  more model capacity makes it larger); Sargan and Hansen J overidentification
+  tests for several instruments (`identification/overid.py`, descriptive).
+  Nothing here changes a certificate;
+  the Phase 16 evidence now records the `tofu` result.
+
 * The coverage claim is tested on the sealed rows `C`, and the slice flag has
   a certificate (F12, WP-12.2; charter format 11,
   `UncertaintySpec.coverage_on_confirmation`,

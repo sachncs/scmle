@@ -62,8 +62,10 @@ against 0.119; the best-observed-risk cut 0.464).
   (`docs/LITERATURE_CHECK.md`). Replace the remaining "from memory" in
   `labels.py` and the Chow note in `escalation.py` with a citation.
 - Pin an independent implementation of the betting bound (library and
-  version) or derive a brute-force reference for a differential test (the
-  unit tests compare only with a plain loop of the same recurrence).
+  version). Built: the martingale and Ville properties are checked by exact
+  enumeration of every Bernoulli sequence of length 12
+  (`test_sequential_tests.py`), which does not use the recurrence's
+  arithmetic; no library comparison exists.
 - Verify existence, licence and SHA-256 of each replay stream; keep as
   `candidate` in `corpora.json` until then.
 
@@ -85,7 +87,9 @@ against 0.119; the best-observed-risk cut 0.464).
 **WP-13.6a Reach of the guards**
 - The custody API is not routed through the guards (documented in
   `never_list.py`). An attestation stays valid for the identical question
-  until it expires (no single-use marker).
+  until it expires unless the loop is opened with
+  `single_use_attestations=True`, which spends it on the first action it
+  allows (an `attestation_used` ledger row).
 - `Loop.check_feedback` needs next-period features from the caller; `step`
   does not supply them. `escalation_audit.json` is still not written (H11).
 
@@ -102,8 +106,12 @@ against 0.119; the best-observed-risk cut 0.464).
 - A halt writes an `incident` ledger row only; connecting it to
   `monitoring/incidents.py` needs an SLO evaluation, which a halt does not
   have.
-- Run the ledger replay on Python 3.11 (only 3.14 ran here).
-- Include `loop_certificates.json` in the release evidence index.
+- The ledger replay snapshots (`tests/fixtures/loop_golden.json`, every row
+  hash included) are checked by the unit suite on Python 3.11 to 3.14 in CI,
+  so replay identity across those interpreters holds as far as those
+  scenarios go.
+- `python -m benchmarks.qualification --check all` (CI, `release_preflight.sh`)
+  checks `loop_certificates.json` with the other certificate families.
 
 ## Exit gate
 

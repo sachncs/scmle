@@ -25,7 +25,8 @@ other than the author.
   payload shapes. Inject a service failure and a controlled drift event in
   each provider's staging, keep the alert and telemetry captures, and have an
   operator acknowledge and resolve them. Close the known gaps: the signals
-  are not yet wired into the generated service (a deployment calls them); the
+  are wired into the generated service (`HttpServing(monitor=...)`,
+  `runtime.run` writes JSON lines to `SCMLE_SIGNALS_FILE`) but nothing reads them from a cloud; the
   cost report needs the provider's real rates and a comparison with the bill;
   the incident classifier's rules are untuned and have met no real incident.
 - **WP-17.2 Continuous evaluation, in staging.** Run the controlled
@@ -35,8 +36,10 @@ other than the author.
   does not gate retraining (`alarm_gates_retrain` stays False) until its
   detection-delay certificate passes on a re-measurement; until then
   retraining proposals go through the escalation path. Decide per product
-  which business metrics and margins `post_promotion_check` watches, and add
-  a holdback so its answer can be attributed to the model.
+  which business metrics and margins `post_promotion_check` watches (the
+  owner's decision). The holdback is built (`holdback_assignment`,
+  `holdback_check` with a sample-ratio guard); a deployment has to route the
+  held-back units to the previous model.
 - **WP-17.3 Recovery, on each provider.** Run every catalogued fault in each
   provider's staging and record RTO and RPO per stateful component against
   the objectives in `recovery.OBJECTIVES`: process and task kill, an unhealthy

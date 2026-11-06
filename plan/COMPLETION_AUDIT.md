@@ -52,6 +52,49 @@ phases 14 to 18, `plan/evidence/phase-14..18` (phase-17 `aws/` and `gcp/` hold
 only a README, which is the stated state), `fairness`/`reweighing` code, the
 CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 
+
+## Counts
+
+| Class | Rows |
+|---|---|
+| A, built in this pass (fully, partly or as a description) | 20 |
+| A, still open (includes rows that mix A with B, C or D: only the A part is open) | 47 |
+| B, outside people or data | 43 |
+| C, cloud account, spending cap, approver or container daemon | 24 |
+| D, owner decision | 23 |
+| closed (the document was stale) | 5 |
+| total rows | 162 |
+
+A row that mixes classes is counted once, under its first letter.
+
+## What was built in this pass, and what class A remains
+
+Built, one atomic commit each, gates run before every commit (`ruff check`,
+`ruff format --check`, `mypy`, `bandit`, the API check, hosted controls,
+`qualification --check`, the convention, CLI and beginner-doc tests and the
+tests of the change): see the rows marked **Done** and `CHANGELOG.md`
+(Unreleased). Nothing changed a certificate. The two hashed sources that
+changed (`ingest/joins.py`, the ingestion measurements) were re-measured with
+the same seeds and floors and the numbers did not move. Each new check that
+has a false-alarm or detection claim has its floors written in its test or
+module before the first run; none was lowered or retuned, and one test world
+was rebuilt after its first draft turned out to be degenerate (the cluster
+fairness comparison, where the row-wise test could never reach the bound at
+20 rows per cluster); the floors were not changed.
+
+Class A that remains open is open because of size, not because it needs
+anything outside this machine: statistical methods that each need their own
+registered design, certificate and re-issue (R1 A5, A6, B2, B5, B7, B8, B12,
+B13; F10 DiD, RD, synthetic control, negative-control exposures,
+`sequential_ipw`; F11 band re-registration, policy trees, empirical-Bernstein
+bounds; F12 intervals for the other task types, forecast, hierarchy, survival,
+ranking and multilabel items, near-duplicate grouping; F13 re-registered alarm
+design, weighted threshold test, novelty bound), the repository-wide mutation
+run (many hours), D4 producers, the trail's explanation and source-data
+records, torn-write simulation, and the 3.11/3.14 identity of the ingestion and
+causal reports (only the framing draft, the loop and decision snapshots are
+pinned across interpreters). These stay in the documents with their class.
+
 ## Items
 
 ### Phase 6 / F7 (external validation and release)
@@ -72,7 +115,7 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | 6.9-2 | changelog moved under the new version | D | follows 6.9-1 |
 | 6.9-3 | annotated tag `v<version>` | D | follows 6.9-1; tagging is not pushing |
 | 6.9-5 | `SECURITY.md` supported-versions text | D | follows 6.9-1 |
-| 6.9-6 | `CITATION.cff` validated | A | file absent; `cffconvert` is not installed so a schema test is written instead |
+| 6.9-6 | `CITATION.cff` validated | A (built) | file absent; `cffconvert` is not installed so a schema test is written instead **Done:** `49d9884`: `CITATION.cff` and `tests/unit/test_citation_file.py` (required keys, version, licence, date); `cffconvert` itself was not run |
 | 6.9-7 | docs describe each artifact a charter run writes | A | `docs/ARTIFACTS.md` exists; a test that every file a charter run writes is named there is buildable |
 | 6.9-8 | `scripts/release_preflight.sh` exits 0 | C | needs `npm ci` of the website, `uv sync --all-extras` on 3.14, pip-audit; not run here, CI covers its pieces |
 | 6.9-9..12 | publish to PyPI, site snippet, operational rehearsal by a non-author, independent review | B | outside people and a PyPI project |
@@ -86,14 +129,14 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | R1-A6 | sentinel detector flags clean rows of natural tables (29/150, 34/178, 1797/1797); one-corpus certificates | A | `f5_corpora_measurements.json`; fix or limit the detector, re-issue its certificate with the same seeds and floors |
 | R1-B2 | per-period drift with a permutation null and calibrated PSI | A | `robustness/report.py` says `not_run` |
 | R1-B3 | forward check always skipped | D | `robustness/qualify.py` builds `forward.skipped(...)`; `F` is the final test set and opens once (`forward_check` opens its own source); letting the final evaluation hand its rows to the forward check, or running it as a separate step, changes who owns the single opening, which is the owner's custody decision |
-| R1-B4 | Thresholdout not implemented | A | `confirm.py` raises `ConfigError`; closure is to delete the option from F3 and the docs or implement it |
+| R1-B4 | Thresholdout not implemented | D | `confirm.py` raises `ConfigError`; the option is refused with an explicit error and pinned by tests; deleting it or implementing it is the owner's choice |
 | R1-B5 | resampling negative control for a feature-only finding family | A | blocked by B2 (needs a ledgered per-period drift family) |
 | R1-B7 | multiverse covers three choices | A | `stability.py` `IMPLEMENTED`; needs the stability certificate re-issued with the same seeds and floors |
 | R1-B8 | multiclass stability | A | `qualify.py`; a new pre-registered estimator and certificate |
-| R1-B10 | `curation_report.json` stale after quarantine | A | **built** in this pass |
+| R1-B10 | `curation_report.json` stale after quarantine | A (built) | **built** in this pass **Done:** `2596263`: `curation_report.json` and `dataset_card.json` are rewritten after quarantine; test `test_the_curation_report_and_card_list_the_final_feature_plan` |
 | R1-B12 | MinHash text near-duplicates | A | `duplicates.py:13` states it is not implemented |
 | R1-B13 | instance-dependent label noise not modelled | A | no such plant in `inject.py`; closure by a plant and a measurement, or a stated limit |
-| R1-B14 | static `eda_report.html` | A | no string `eda_report` in `scmle/` or `docs/` |
+| R1-B14 | static `eda_report.html` | A (built) | no string `eda_report` in `scmle/` or `docs/` **Done:** `b3a5545`: `scmle/data/robustness/html_report.py`, written by the charter run as `eda_report.html`; `test_robustness_html_report.py` |
 | R1-C11 | identical manifest hash on three platforms | closed | run 42227276889: Windows 3.11 and 3.14, macOS 3.11 and 3.14, lowest dependencies 3.11 all green, `test_custody_golden.py` included |
 | R1-D1 | sample run signed by an independent holder | B | a person who holds their own key |
 | R1-D2 | red-team log | B | the red-team analyst |
@@ -113,7 +156,7 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | F8-5b | LLM adapter behind `refusal.SlotSampler`, risk-coverage curve and `tau` certificate | B | needs the gold corpus and a model account; the interface, `ReplaySampler` and `calibrate_tau` exist |
 | F8-c7,c8 | gold-corpus gate and LLM-vs-deterministic paired bootstrap | B | gold corpus |
 | F8-c9c | planted-omission test on gold requests | B | gold corpus (the synthetic version passes) |
-| F8-c10 | charter hash identical on Python 3.11 and 3.14 | A | `tests/unit/test_framing_draft.py` compares only inside one interpreter; both interpreters are available here |
+| F8-c10 | charter hash identical on Python 3.11 and 3.14 | A (partly built) | `tests/unit/test_framing_draft.py` compares only inside one interpreter; both interpreters are available here **Done:** `b19eb19`: the seeded draft's charter hash and four artifact digests are pinned in `tests/fixtures/replay_golden.json` and the unit suite runs on 3.11 to 3.14 in CI; identical on 3.11 and 3.14 locally. Only the deterministic drafter is covered |
 | F8-8a | `net_benefit` vs R `rmda`/`dcurves` and Vickers' code | B | R absent |
 | F8-8b | Berger citation, 0.90 factor review, weaker selection recall, owner sign-off on cost range, outcome check | B | statistician, domain owner, deployed problem; the weaker-selection recall (outcome observed for 70 percent of rows with `b = 0`) is a simulation and is A |
 | F8-sel | selective-label detector recall under weaker selection (simulation) | A | `framing_measurements.json` measured strong plants only |
@@ -131,7 +174,7 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | F9-14 | charter run identical on Python 3.11 and 3.14; non-SQLite source | A (interpreters) / D (source) | `tests/integration/test_ingest_charter_run.py` runs one interpreter |
 | F9-m | `--check ingest` full measurement only by `ingest_certify --write` | A | by design; recorded |
 | F9-mut | survivor bound in the build configuration for `asof_view.py`, `synthesize.py` (136 of 769 survive) | A | `setup.cfg` has no per-module bound |
-| F9-bud | `many_to_many` and entity resolution do not charge the budget per step | A | `ingest/joins.py:418`, `entities.py:488` reference no meter |
+| F9-bud | `many_to_many` and entity resolution do not charge the budget per step | A (partly built) | `ingest/joins.py:418`, `entities.py:488` reference no meter **Done:** `50ebdb2`: `many_to_many` charges the budget per column pair (`test_many_to_many_charges_the_budget_per_pair_and_stops_at_a_boundary`); entity resolution is not charged (its unit would be candidate pairs, not rows scanned: owner's decision, class D) |
 | F9-ro | read-only is a textual allow-list and query-only session; a read-only role cannot be verified | C | needs a real database role |
 | F9-w | wall-time stops repeat only with a fixed clock; budget unit is rows | D | DB-API reports no bytes; accepted limit |
 
@@ -144,13 +187,13 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | F10-aipw | re-measure `coverage_aipw` (boosted learner world missed its floor) | A | `f10_certificates.json`; a new pre-registration and run |
 | F10-gold | `--f10-gold`, outside-party run, literature claims "from memory" (Callaway-Sant'Anna etc.) | B | people and papers |
 | F10-11 | reports bit-identical on Python 3.11 and 3.14 | A | both interpreters available |
-| F10-sub | subgroups: unequal or overlapping levels, strategies other than the difference in means | A | `subgroup_certify.py` covers equal levels only |
+| F10-sub | subgroups: unequal or overlapping levels, strategies other than the difference in means | A (partly built) | `subgroup_certify.py` covers equal levels only **Done:** `c6cce76`: unequal sizes and two overlapping columns measured on registered designs, all four error rates inside the bound (0.039, 0.044, 0.0535, 0.022 against 0.0597); strategies other than the difference in means are not covered |
 | F10-att | per-person or asymmetric attestation keys; revocation list; attestor identity check | D | needs `cryptography` (not a dependency) for asymmetric signing; the HMAC key is project-shared |
 | F10-dag | `Dag.from_artifact` loads the DAG the charter names, no check it is the intended file | D | an owner's decision on what to check |
-| F10-bal | balance check on randomized data with a measured false-alarm rate replacing the AUC rule in `uplift.py` | A | `evaluation/uplift.py` `check_propensity` |
+| F10-bal | balance check on randomized data with a measured false-alarm rate replacing the AUC rule in `uplift.py` | A (built) | `evaluation/uplift.py` `check_propensity` **Done:** `5bb6787`: `evaluation/balance.py`, wired into `uplift.check_propensity`; false alarms checked over 1000 worlds, detection over 200 |
 | F10-seq | register `evaluation/sequential.py` as strategy `sequential_ipw` | A | not registered |
 | F10-did | DiD: Rambachan-Roth conditional procedure, covariates, not-yet-treated group, simultaneous bands | A | `identification/did.py` |
-| F10-iv | IV: Sargan/Hansen J, effective F for several instruments, exclusion sensitivity, battery | A | no such code |
+| F10-iv | IV: Sargan/Hansen J, effective F for several instruments, exclusion sensitivity, battery | A (partly built) | no such code **Done:** `scmle/data/identification/overid.py` (Sargan and Hansen J, descriptive; floors registered before the run, both met). Not done: 2SLS with several instruments, effective F, exclusion sensitivity, battery |
 | F10-rd | RD: MSE-optimal bandwidth, McCrary or Cattaneo-Jansson-Ma density test | A | `identification/rd.py:24` |
 | F10-syn | synthetic control: predictors, battery | A | `identification/synth.py` |
 | F10-sens | sensitivity: Cinelli-Hazlett conversions are from memory, Rosenbaum bounds | B | needs the papers (sensemakr output) for the conversions; Rosenbaum bounds are A but cut unless chartered |
@@ -161,23 +204,23 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
 | F11-W2 | charter run runs no experiment; ledger rows only through `RolloutHook` | D | an experiment needs live units; the hook is built |
-| F11-W3 | `fairness.py`, `mitigation.py` clients of `decision.constraints`; solve `reweighing`; cluster-aware satisfaction test | A | neither file mentions `constraints` |
+| F11-W3 | `fairness.py`, `mitigation.py` clients of `decision.constraints`; solve `reweighing`; cluster-aware satisfaction test | A (partly built) | neither file mentions `constraints` **Done:** `6e1b147`: `constraints.cluster_satisfaction_test`; `fairness.py`, `mitigation.py` as clients and the `reweighing` mechanism are not done |
 | F11-W4 | Criteo, Open Bandit, R `dcurves`/`rmda`, OBP, outside reproduction of A6, B1, B7 | B | data, R, a person |
 | F11-W5a | re-register and re-measure the net benefit band (A3 gate) | A | `f11_certificates.json` A3 descriptive |
 | F11-W5b | read the confidence-sequence papers; e-LOND overlapping tests; compare with `confseq` | B | `confseq` absent; papers read from abstracts |
-| F11-W5c | rule for differential missingness of outcomes | A | `decision/rollout.py:67` |
+| F11-W5c | rule for differential missingness of outcomes | A (built as a description) | `decision/rollout.py:67` **Done:** `edc4de7`: `decision/missing.py`; the rollout rule does not correct for missingness |
 | F11-W5d | policy trees of depth two | A | only `fit_threshold_policy` |
 | F11-W5e | three incompatible fairness pairs checked against sources | B | literature |
 | F11-ebl | empirical-Bernstein lower bounds for OPE | A | not in `decision/` |
 | F11-mig | `DecisionSpec` migration: remove or deprecate the run spec's cost fields | D | API change |
-| F11-py | ledger replay identical on 3.11 and 3.14 | A | one interpreter measured |
+| F11-py | ledger replay identical on 3.11 and 3.14 | closed | `tests/fixtures/decision_golden.json` (rounded to 9 digits) is checked by the unit suite on 3.11 to 3.14 in CI |
 
 ### Phase 12 / F12
 
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
 | F12-0 | read Romano, Uno, Wickramasuriya (JASA), Gneiting-Raftery, M4/M5; confirm corpora licence and hash; MAPIE version | B | papers, data, MAPIE absent |
-| F12-1a | CQR base levels tied to the requested level | A | `quantile.py:21-22` fixes 0.05 and 0.95 |
+| F12-1a | CQR base levels tied to the requested level | D | `quantile.py:21-22` fixes 0.05 and 0.95; a run has no requested level (it is chosen at predict time), so tying them needs a charter field and a format bump |
 | F12-1b | differential test against MAPIE (G2, G4) | B | MAPIE is not installed and not an extra |
 | F12-1c | intervals or sets for ordinal, multioutput, multilabel, forecast | A | `stages.py:443-448` skips them |
 | F12-2 | metric slicer has no coverage | D | the two reports are separate by design |
@@ -185,15 +228,15 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | F12-4 | forecast: per-horizon calibrated quantiles, WIS in the run, `mase` scale from training history, official M4 scores | A (WIS and scale) / B (M4 data) | `proper_scores.weighted_interval_score` is not called in the run |
 | F12-5 | hierarchy: charter hierarchy and summing matrix, WIS, `hts`/`fable`, M5 | A (charter field, WIS) / B (M5, R) | |
 | F12-6 | survival: charter `tau`, IPCW inside Brier and AUC, scikit-survival and R differential, GBSG2/METABRIC | A (charter field, IPCW use) / B (references, data) | |
-| F12-7a | cluster-bootstrap metric intervals for panel runs | A | generic resampler exists; entity column not fed |
+| F12-7a | cluster-bootstrap metric intervals for panel runs | A (built) | generic resampler exists; entity column not fed **Done:** `575db7f`: a `known_entity_future` run's metric interval resamples whole entities (`test_the_metric_interval_resamples_whole_entities`) |
 | F12-7b | real-panel check that entity-wise calibration does not under-cover | B | a real panel |
 | F12-7c | G10 NDCG@10 vs sklearn on frozen lists | A | `test_ranking.py` compares one query at k=5; G10 published figures on a public LTR set are B |
 | F12-7d | G12 per-label support rule, thresholds and sets; Yeast, Scene | A (rule) / B (data) | |
 | F12-8 | near-duplicate grouper, one frozen image and one text encoder (G14, G15) | A (grouper, planted duplicates) / B (encoder weights, model card) | |
-| F12-9a | `task_gate.tier_ceiling` applied to run outputs (acceptance 8) | A | no module in `scmle/` imports `task_gate` |
+| F12-9a | `task_gate.tier_ceiling` applied to run outputs (acceptance 8) | A (built) | no module in `scmle/` imports `task_gate` **Done:** `0e0823c`: `coverage_confirm.capped`; the confirmation document records the gate; `claims verify` applies the same cap |
 | F12-9b | G7 over real datasets | B | datasets |
 | F12-9c | G3 at `R = 2000` after re-registration; analysis of the miss | A | published miss 0.864 vs 0.87 |
-| F12-xch | exchangeability checks of `C` and of calibration rows | A | no such check |
+| F12-xch | exchangeability checks of `C` and of calibration rows | A (built as a description) | no such check **Done:** `c4f3f24`: `evaluation/exchangeability.py` beside the coverage claim, no status, no power certificate |
 | F12-G6 | real covariate-shift data | B | data |
 | F12-G13 | entity-level calibration wired; claim "row-wise anti-conservative" unsupported | A | simulation shows no under-coverage; wire statement only |
 | F12-3m | acceptance 3 fold-model hash round trip | closed | `test_cv_plus_bundle.py` |
@@ -204,19 +247,19 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
 | F13-0a | read Begg-Greenes 1983, Chow 1957/1970; replace "from memory" in `labels.py`, `escalation.py` | B | papers not openly available |
-| F13-0b | independent betting-bound implementation (library) or brute-force derivation | A | `test_sequential_tests.py` has a same-recurrence loop only; a derivation by exact enumeration is buildable |
+| F13-0b | independent betting-bound implementation (library) or brute-force derivation | A (partly built) | `test_sequential_tests.py` has a same-recurrence loop only; a derivation by exact enumeration is buildable **Done:** `390d720`: exact enumeration of the martingale and Ville properties; no independent library was pinned |
 | F13-0c | verify replay streams' existence, licence, SHA-256 | B | outside data |
 | F13-3a | re-registered design for the L1 and selective alarms so that H2 and H10 pass | A | simulation; a new pre-registration |
 | F13-5a1 | novelty and set size for regression bundles; certified `novelty_bound` | A | `UncertaintyFeed` handles classification; `loop.py:160` default 0.05 |
 | F13-5a2 | exact or conservative weighted threshold test, certified | A | `escalation.py:36,122,237` Kish and rounding |
 | F13-6a1 | custody API routed through the guards | D | architecture decision (documented limit) |
-| F13-6a2 | single-use marker for an attestation | A | `never_list.py:18` |
+| F13-6a2 | single-use marker for an attestation | A (built) | `never_list.py:18` **Done:** `e952b4e`: `Loop.open(single_use_attestations=True)` and an `attestation_used` ledger row |
 | F13-6a3 | `check_feedback` needs next-period features from the caller | D | interface decision |
 | F13-6a4 | `escalation_audit.json` (H11) | B | needs the owner's audit |
 | F13-7 | replay and domain-owner audit (H11) | B | owner |
 | F13-8a | halt connected to `monitoring/incidents.py` | D | a halt has no SLO evaluation; which SLO is the owner's |
-| F13-8b | ledger replay identical on 3.11 and 3.14 | A | |
-| F13-8c | `loop_certificates.json` in the release evidence index | A | not in `docs/RELEASING.md` or `scripts/` |
+| F13-8b | ledger replay identical on 3.11 and 3.14 | closed | `tests/fixtures/loop_golden.json` snapshots every ledger row including hashes and runs in the unit suite on 3.11 to 3.14 in CI (run 42227276889) |
+| F13-8c | `loop_certificates.json` in the release evidence index | A (built) | not in `docs/RELEASING.md` or `scripts/` **Done:** `a4c401a`: `python -m benchmarks.qualification --check all`, run by CI and `release_preflight.sh`, covers `loop_certificates.json` and the other families; there was no separate evidence index |
 
 ### Phase 14 / F14 items 1, 2, 5
 
@@ -235,8 +278,8 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
 | 15.1a | TLS ingress, workload identity, managed keys on AWS and GCP | C | accounts |
-| 15.1b | OIDC discovery and a network-fetched JWKS (the key set is a file) | A | stdlib `urllib` and a local HTTP server verify it; a real identity provider is C |
-| 15.1c | revocation distribution to every replica | A (list format, pull, cache, tests) / C (replicas in a cloud) | |
+| 15.1b | OIDC discovery and a network-fetched JWKS (the key set is a file) | A (built) | stdlib `urllib` and a local HTTP server verify it; a real identity provider is C **Done:** `e6c60fb`: `scmle.security.remote.discover` and `RemoteKeySet`, tested against a local server; a real identity provider is class C |
+| 15.1c | revocation distribution to every replica | A (built) |  **Done:** `e6c60fb`: `RemoteRevocations` (pull, cache, bounded staleness, fail closed); replicas in a cloud are class C |
 | 15.1d | pen-test style review of the gateway by someone other than the author | B | a reviewer |
 | 15.2a | conformance suite against MinIO, GCS emulator, real S3 and GCS | C | none installed; no daemon |
 | 15.2b | one warehouse per cloud; ingest, train, trace on a cloud dataset | C | accounts (and an owner's choice) |
@@ -260,12 +303,12 @@ CV+ and coverage-claim modules, `RiskAlarm`, `escalation`, `never_list`.
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
 | 17.1a | CloudWatch / Cloud Monitoring, real pager and ticket endpoint, injected failure and drift on staging, operator response | C | accounts, operator |
-| 17.1b | signals wired into the generated service | A | `docs/OPERATIONS.md`: a deployment calls them, the generated service does not |
+| 17.1b | signals wired into the generated service | A (built) | `docs/OPERATIONS.md`: a deployment calls them, the generated service does not **Done:** `67c0d99`: `HttpServing(monitor=...)` and `runtime.run` write JSON lines of the signals to `SCMLE_SIGNALS_FILE` |
 | 17.1c | cost report with real rates vs a bill; classifier tuned on real incidents | C | bill, incidents |
 | 17.2a | controlled degradation in staging with real delayed labels | C | staging |
 | 17.2b | F13 alarm gates retraining after H2 passes | A | follows F13-3a |
 | 17.2c | business metrics and margins `post_promotion_check` watches | D | per product |
-| 17.2d | holdback so the post-promotion answer can be attributed | A | `operations/continuous.py` notes it is missing; a simulated-traffic design |
+| 17.2d | holdback so the post-promotion answer can be attributed | A (built) | `operations/continuous.py` notes it is missing; a simulated-traffic design **Done:** `f05e5e5`: `holdback_assignment` and `holdback_check` with a sample-ratio guard; routing held-back units is the deployment's job |
 | 17.3a | every catalogued fault in each provider's staging; RTO/RPO there | C | accounts |
 | 17.3b | machine crash or power loss; zone or region loss | A (torn-write simulation) / C (real) | the ledger and state files are shown to survive a killed process only |
 | 17.3c | revisit `recovery.OBJECTIVES` with the owner | D | |

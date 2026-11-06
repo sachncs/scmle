@@ -21,6 +21,10 @@ defines only those.
   own benchmarks, which are not a head-to-head with people (see F7).
 - Not adversary-proof custody on a single machine.
 
+The per-item audit of everything still open, with a class for each (A buildable
+here, B outside people or data, C cloud account or approver, D owner decision),
+is [`../plan/COMPLETION_AUDIT.md`](../plan/COMPLETION_AUDIT.md).
+
 ## Features still to build
 
 | ID | Feature | One line |

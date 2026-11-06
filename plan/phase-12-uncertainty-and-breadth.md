@@ -26,7 +26,16 @@ floors. Nothing below was run on real data.
 
 - G3: CQR coverage in the highest-noise decile 0.864 against the floor 0.87
   (150 replicates, 40-tree boosted quantile models). The conditional claim
-  of CQR is descriptive until a re-registered design passes.
+  of CQR is descriptive until a re-registered design passes. Filed analysis
+  (`cqr_analysis.py`, written before it ran, development seeds, 600
+  replicates per variant, no gate): the gate's configuration gives 0.8650 with
+  a standard error of 0.0013, so the miss is not sampling noise (about four
+  standard errors below 0.87). More capacity does not repair it: 200 trees
+  0.8562, depth 4 0.8523, both 0.8339 (the constant-width control stays
+  0.69 to 0.72, marginal coverage 0.900 throughout). A single additive margin
+  fixed on marginal coverage cannot equalize coverage where the noise is
+  largest; a locally weighted or asymmetric design would be a new method
+  with its own pre-registration.
 - G5: familywise false-flag rate of the slice flag 0.0755 against the bound
   0.0597. The flag compares each slice with the nominal level although the
   conformal quantile itself varies with the calibration sample, so slice
@@ -136,9 +145,16 @@ floors. Nothing below was run on real data.
   and one text encoder behind the extras, licence recorded (G14, G15).
 
 **WP-12.9 Wiring and real-data record**
-- Put `task_gate.tier_ceiling` on the outputs of a run; G7 over real
-  datasets with published misses; run the certification at `R = 2000` for G3
-  (it ran 150) after re-registration.
+- Built 2026-11-07: `task_gate.tier_ceiling` caps the status of the coverage
+  claim on `C` (the confirmation document records the gate;
+  `claims verify` applies the same cap), and the document describes, without a
+  status, whether the released scores look exchangeable with the calibration
+  scores (`evaluation/exchangeability.py`: Kolmogorov-Smirnov and
+  Mann-Whitney, doubled minimum p against 0.05; the false-flag rate is checked
+  by simulation, there is no power certificate). The cap is inert for the two
+  supported task types and bites only for a type that is not `passed`.
+- Open: G7 over real datasets with published misses (B); a G3 certification at
+  `R = 2000` after a re-registered design (see the G3 analysis above).
 
 ## Exit gate
 

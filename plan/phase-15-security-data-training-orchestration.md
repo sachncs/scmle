@@ -16,10 +16,12 @@ container daemon.
 ## Open
 
 - **WP-15.1 Security, in each cloud.** TLS ingress, workload identity and
-  managed keys on AWS and GCP. A real identity provider (OIDC discovery and
-  fetching a JWKS over the network; the key set is a file today). Revocation
-  distribution to every replica, and a pen-test style review of the gateway by
-  someone other than the author.
+  managed keys on AWS and GCP. A real identity provider: OIDC discovery, a
+  JWKS fetched with a cache and a pulled revocation list are built
+  (`scmle.security.remote`, tested against a local server, fail-closed after a
+  bounded staleness; the documents are not signed, so their integrity is
+  that of the TLS connection). A pen-test style review of the gateway by
+  someone other than the author is open.
 - **WP-15.2 Governed data, against real services.** Run
   `scripts/run_object_store_conformance.py` against MinIO, the GCS emulator
   and a real S3 bucket and a real GCS bucket, and fix what differs (error

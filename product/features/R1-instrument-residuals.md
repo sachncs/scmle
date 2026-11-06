@@ -56,7 +56,7 @@ and its assumption are in `confirm.py` and `robustness/prefilter.py`, and it
 acts only while the stability rule has a current certificate for the chartered
 thresholds), B6 (charter format 3 `rules`: ledger rule, confirmation rule,
 failure policy, stability thresholds; older charters keep their hash and load)
-B10 (closed 2026-11-06: `curation_report.json` and `dataset_card.json` are rewritten after quarantine; `test_the_curation_report_and_card_list_the_final_feature_plan`) and B9 (stability and shift results, including per-column shift p-values,
+B14 (closed 2026-11-07: `eda_report.html`, a static page from the stability and shift reports, is written by a charter run; `scmle/data/robustness/html_report.py`, `tests/unit/test_robustness_html_report.py`), B10 (closed 2026-11-06: `curation_report.json` and `dataset_card.json` are rewritten after quarantine; `test_the_curation_report_and_card_list_the_final_feature_plan`) and B9 (stability and shift results, including per-column shift p-values,
 are wealth-free diagnostic rows written before the survivors are frozen).
 
 | ID | Item | Lives in | State (verified) | Closing criterion |
@@ -69,7 +69,6 @@ are wealth-free diagnostic rows written before the survivors are frozen).
 | B8 | Stability not available for multiclass targets | `scmle/data/robustness/qualify.py:138-142` | Note: Kruskal-Wallis findings are not re-run. Not built on 2026-11-04: the survival rule reads the sign and size of one signed effect, which a Kruskal-Wallis statistic does not have, so a multiclass rule (for example epsilon squared with a bootstrap interval and a size band) would be a new pre-registered rule with its own planted multiclass worlds, floors and certificate, and an edit to `stability.py` that stales the existing certificate | An estimator for the multiclass finding (the ledger's Kruskal-Wallis, `bivariate.py`) with a certificate; otherwise the limit stays documented |
 | B12 | MinHash text near-duplicates | `scmle/data/detectors/duplicates.py:13` states it is not implemented; text columns block exact matches only | Verified | Implemented, with a planted near-duplicate-text defect, a certificate and a cross-check against an exact Jaccard computation |
 | B13 | Instance-dependent label noise not modelled | `scmle/data/detectors/labels.py`; certificates cover symmetric and class-conditional flips only (`detector_certificates.json`) | Verified from certificate defect types | A planted instance-dependent flip type in `inject.py` with a certificate, or an explicit statement in `ARTIFACTS.md` that this noise is not covered |
-| B14 | Spec-curve plots and `eda_report.html` do not exist | no file or string `eda_report` anywhere in `scmle/`, `docs/` | Verified by search. The specification curve data is inside `stability_report.json` findings | Either a static HTML report written from `stability_report.json` and `shift_report.json` with a test that it renders without network, or the plan item is dropped |
 
 ## C. F2 custody: which stated gaps still hold
 

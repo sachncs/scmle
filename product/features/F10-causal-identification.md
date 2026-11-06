@@ -24,8 +24,14 @@ frame `C` releases (`scmle/core/causal_claim.py`). Left:
 - Subgroup hypotheses are registered and reported (Holm at the primary
   level) and describe heterogeneity only: they do not enter the tier. Their
   family-wise error and power are certified on simulated randomized worlds
-  with equal levels (`subgroup_certificates.json`); not measured: unequal or
-  overlapping subgroups, strategies other than the difference in means, and
+  with equal levels (`subgroup_certificates.json`). Unequal level sizes and two
+  overlapping columns were measured on designs registered before the run
+  (`subgroup_extended.py`, `subgroup_extended_measurements.json`, filed beside
+  the certificate and not changing its gate): family-wise error 0.039 and
+  0.044 for unequal levels, 0.0535 and 0.022 for overlapping columns, all
+  inside the bound 0.0597 (R = 2000); power for a 0.5 sd effect reaches the
+  0.80 Wilson floor from 400 rows in the planted level. Not measured:
+  strategies other than the difference in means, heteroscedastic outcomes and
   the subgroups of a real trial.
 - Attestations are signed with the project's shared HMAC key: a verifying
   signature shows the statement was issued unchanged by a holder of the key,
@@ -37,18 +43,24 @@ frame `C` releases (`scmle/core/causal_claim.py`). Left:
 
 ## Open: method gaps (each needs its own certificate before it may gate)
 
-- Randomized data: the difference in means exists; the balance check that
-  replaces the uncertified AUC rule at `evaluation/uplift.py:112` (a test with
-  a measured false-alarm rate on randomized data) does not. The sequential
-  estimator (`evaluation/sequential.py:500`) is not registered as the strategy
+- Randomized data: the difference in means exists. The balance check that
+  replaced the uncertified AUC rule in `uplift.check_propensity` is built
+  (`evaluation/balance.py`, an exact permutation test of standardized mean
+  differences; false-alarm rate checked by simulation over 1000 randomized
+  worlds, detection of covariate-driven assignment over 200); it sees numeric
+  covariates and differences in means only. The sequential estimator (`evaluation/sequential.py:500`) is not registered as the strategy
   `sequential_ipw`.
 - Difference in differences: the sensitivity bound is a simplified
   relative-magnitudes bound that ignores the noise in the largest pre-period
   change, not the Rambachan-Roth conditional or fixed-length procedure; no
   covariates, no not-yet-treated comparison group, simultaneous bands are not
   computed (the pre-period Wald test is).
-- Instrumental variables: one instrument and one endogenous regressor only;
-  no Sargan or Hansen J, no Olea-Pflueger effective F for several instruments,
+- Instrumental variables: one endogenous regressor; `iv.py` takes one
+  instrument. `overid.py` adds Sargan and Hansen J for several instruments as
+  descriptive tests (false-alarm rate 0.05 or below over 1000 worlds with
+  valid instruments, detection above 0.80 of one instrument with a direct
+  effect; floors written before the run); there is no 2SLS estimate with
+  several instruments, no Olea-Pflueger effective F for several instruments,
   no exclusion-violation sensitivity (so the claim stays `attested`), no
   battery (`battery_iv` is not measured).
 - Regression discontinuity: the bandwidth is a cross-validated grid choice,

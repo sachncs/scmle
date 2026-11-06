@@ -380,9 +380,9 @@ G13 (simulation) are in the certificate file. Open:
    removed by the grouped split.
 7. (Built: the slice flag reports `flag_certified` false below the certified
    size of G5b.)
-8. A type not `passed` in `task_gate_status.json` yields only `unverified`
-   outputs *from the run* (`task_gate.tier_ceiling` exists and is tested over
-   `TaskType`, but no run output calls it yet).
+8. (Built for the coverage claim: `coverage_confirm.capped` applies
+   `task_gate.tier_ceiling` to its status and the document records the gate;
+   other outputs of a run carry no tier.)
 
 ## External referent
 
