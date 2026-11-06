@@ -14,7 +14,9 @@ import json
 import logging
 import pathlib
 import threading
+import time
 from typing import Any
+from typing import Protocol
 
 import pandas as pd
 
@@ -312,6 +314,18 @@ class BatchServing(ServingAdapter):
         return len(output)
 
 
+class RequestObserver(Protocol):
+    """What `HttpServing` tells an operations monitor (duck-typed)."""
+
+    def record_request(
+        self, at: float, route: str, status: int, seconds: float
+    ) -> None:
+        """One finished request."""
+
+    def observe_features(self, at: float, frame: pd.DataFrame) -> int:
+        """The rows of a scored batch."""
+
+
 class HttpServing(ServingAdapter):
     """JSON-over-HTTP serving on a background thread.
 
@@ -346,6 +360,7 @@ class HttpServing(ServingAdapter):
         on_unseen: str = "report",
         warmup_records: list[dict[str, Any]] | None = None,
         gateway: access.Gateway | None = None,
+        monitor: RequestObserver | None = None,
     ) -> None:
         """Initializes the adapter.
 
@@ -370,6 +385,10 @@ class HttpServing(ServingAdapter):
             gateway: Authenticates, authorizes, rate-limits and audits every
                 request except `/livez` and `/readyz`. Without it the server
                 may only bind a loopback address.
+            monitor: Receives every finished request (route, status, seconds)
+                and the rows of every scored batch, for the operations
+                signals. A monitor that raises is logged and ignored: it
+                never changes a response.
 
         Raises:
             ConfigError: If neither or both of `bundle` and `loader` are
@@ -388,6 +407,7 @@ class HttpServing(ServingAdapter):
         access.require_authentication_for(host, gateway)
         super().__init__(bundle, on_null, on_unseen, warmup_records)
         self.gateway = gateway
+        self.monitor = monitor
         self.loader = loader
         self.host = host
         self.port = port
@@ -467,6 +487,24 @@ class HttpServing(ServingAdapter):
                 reason=str(snapshot.get("reason", "not ready")),
             )
 
+    def observe_request(self, route: str, status: int, seconds: float) -> None:
+        """Passes a finished request to the monitor; never raises."""
+        if self.monitor is None:
+            return
+        try:
+            self.monitor.record_request(time.time(), route, status, seconds)
+        except Exception:  # monitoring must not change a response
+            LOGGER.exception("the signal monitor failed on a request")
+
+    def observe_rows(self, records: list[dict[str, Any]]) -> None:
+        """Passes the rows of a scored batch to the monitor; never raises."""
+        if self.monitor is None:
+            return
+        try:
+            self.monitor.observe_features(time.time(), pd.DataFrame(records))
+        except Exception:  # monitoring must not change a response
+            LOGGER.exception("the signal monitor failed on features")
+
     def score(self, request: serving_contract.ScoreRequest) -> dict[str, Any]:
         """Scores a parsed request within the concurrency and time limits."""
         if (
@@ -481,7 +519,9 @@ class HttpServing(ServingAdapter):
                     "served": self.schema_digest,
                 },
             )
-        return self.respond(request.records)
+        response = self.respond(request.records)
+        self.observe_rows(request.records)
+        return response
 
     def start(self) -> None:
         """Binds the socket and serves in a daemon thread."""
@@ -497,6 +537,7 @@ class HttpServing(ServingAdapter):
 
         class Handler(server.BaseHTTPRequestHandler):
             request_id = ""
+            started = 0.0
 
             def setup(self) -> None:
                 super().setup()
@@ -525,6 +566,9 @@ class HttpServing(ServingAdapter):
                     self.send_header(name, value)
                 self.end_headers()
                 self.wfile.write(body)
+                adapter.observe_request(
+                    self.path, status, time.monotonic() - self.started
+                )
 
             def fail(
                 self,
@@ -544,6 +588,7 @@ class HttpServing(ServingAdapter):
                 self.send_json(status, payload, headers)
 
             def identify(self) -> bool:
+                self.started = time.monotonic()
                 caller = self.headers.get("X-Request-ID")
                 if caller is None:
                     self.request_id = guard.new_request_id()

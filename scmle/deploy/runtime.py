@@ -8,12 +8,14 @@ orchestrator keeps it out of rotation and an operator can read why.
 """
 
 from collections.abc import Mapping
+import json
 import logging
 import os
 import pathlib
 import signal
 import sys
 import threading
+import time
 from typing import Any
 import urllib.request
 
@@ -22,6 +24,7 @@ from scmle.contracts import errors
 from scmle.deploy import verify
 from scmle.inference import guard
 from scmle.inference import serving
+from scmle.operations import signals
 from scmle.security import access
 
 LOGGER = logging.getLogger("service")
@@ -73,6 +76,47 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
+def signal_settings(environ: Mapping[str, str]) -> dict[str, Any]:
+    """Where and how often the evaluated signals are written."""
+    return {
+        "path": environ.get("SCMLE_SIGNALS_FILE") or None,
+        "interval": number(environ, "SCMLE_SIGNALS_INTERVAL", 60.0),
+    }
+
+
+def emit_signals(
+    monitor: signals.SignalMonitor,
+    now: float,
+    path: pathlib.Path | str | None,
+) -> int:
+    """Evaluates the monitor and appends one JSON line; returns the count.
+
+    The line goes to `path` when given and to the service log otherwise.
+    """
+    found = [item.to_dict() for item in monitor.evaluate(now)]
+    line = json.dumps({"at": now, "signals": found}, sort_keys=True)
+    if path is None:
+        LOGGER.info("signals %s", line)
+    else:
+        with open(path, "a", encoding="utf-8", newline="\n") as handle:
+            handle.write(line + "\n")
+    return len(found)
+
+
+def signal_loop(
+    monitor: signals.SignalMonitor,
+    stop: threading.Event,
+    path: pathlib.Path | str | None,
+    interval: float,
+) -> None:
+    """Evaluates and writes the signals every `interval` seconds."""
+    while not stop.wait(interval):
+        try:
+            emit_signals(monitor, time.time(), path)
+        except Exception:  # the loop must outlive one bad evaluation
+            LOGGER.exception("could not write the signals")
+
+
 def make_loader(
     folder: pathlib.Path, environ: Mapping[str, str]
 ) -> serving.Loader:
@@ -102,11 +146,20 @@ def make_loader(
 def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
     """Serves the folder until the process is told to stop."""
     logging.basicConfig(level=logging.INFO)
+    monitor = signals.SignalMonitor()
     adapter = serving.HttpServing(
-        loader=make_loader(folder, environ), **settings(environ)
+        loader=make_loader(folder, environ),
+        monitor=monitor,
+        **settings(environ),
     )
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda signum, frame: stop.set())
+    chosen = signal_settings(environ)
+    threading.Thread(
+        target=signal_loop,
+        args=(monitor, stop, chosen["path"], chosen["interval"]),
+        daemon=True,
+    ).start()
     adapter.start()
     LOGGER.info("listening on %s; not ready until verified", adapter.address)
     try:
