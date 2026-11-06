@@ -81,6 +81,7 @@ scmle = "scmle.cli:main"
 dev = [
     "pytest>=9.0",
     "pytest-cov>=6.0",
+    "pytest-timeout>=2.3",
     "hypothesis>=6.140",
     "ruff>=0.14",
     "mypy>=1.18",
