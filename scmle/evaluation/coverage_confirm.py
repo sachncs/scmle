@@ -38,6 +38,7 @@ from scmle.data.ledger import ledger as ledger_module
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_run
+from scmle.evaluation import exchangeability
 from scmle.evaluation import task_gate
 
 KIND = "coverage"
@@ -209,6 +210,9 @@ def evaluate_document(
         "described_on_the_same_rows": {
             "note": "description only; these carry no status",
             "methods": others,
+            "exchangeability": exchangeability.describe(
+                bundle, features, target
+            ),
         },
     }
 
