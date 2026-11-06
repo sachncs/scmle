@@ -426,3 +426,67 @@ def test_the_check_is_deterministic_and_validates_inputs(tmp_path):
         recorded["overall"]
         == ev.history.of_kind("post_promotion_check")[0]["facts"]["overall"]
     )
+
+
+# ---- holdback ----------------------------------------------------------
+
+
+def test_holdback_assignment_is_deterministic_and_hits_its_fraction():
+    ids = [f"user-{k}" for k in range(20000)]
+    first = continuous.holdback_assignment(ids, 0.1, "release-7")
+    assert (
+        first == continuous.holdback_assignment(ids, 0.1, "release-7")
+    ).all()
+    assert abs(first.mean() - 0.1) < 0.01
+    other = continuous.holdback_assignment(ids, 0.1, "release-8")
+    assert (first != other).any()
+    # a unit's side does not depend on the other units in the call
+    assert (
+        first[17]
+        == continuous.holdback_assignment(ids[17:18], 0.1, "release-7")[0]
+    )
+
+
+def test_holdback_assignment_rejects_a_fraction_outside_the_open_unit_interval():
+    for bad in (0.0, 1.0, -0.2, 1.5):
+        with pytest.raises(ValueError):
+            continuous.holdback_assignment(["a"], bad, "s")
+
+
+def test_a_concurrent_holdback_attributes_the_change_to_the_model():
+    rng = np.random.default_rng(0)
+    holdback = {
+        "conversion": rng.binomial(1, 0.10, 400).astype(float),
+        "latency_ms": rng.normal(120, 20, 400),
+    }
+    promoted = {
+        "conversion": rng.binomial(1, 0.25, 3600).astype(float),
+        "latency_ms": rng.normal(120, 20, 3600),
+    }
+    result = continuous.holdback_check(
+        SPECS, holdback, promoted, expected_fraction=0.1
+    )
+    assert result["overall"] == "helped"
+    assert result["design"] == "concurrent_holdback"
+    assert "attributable" in result["statement"]
+    assert "cannot separate the model" not in result["statement"]
+    assert result["ratio_check"]["flag"] is False
+    assert result["ratio_check"]["holdback_units"] == 400
+
+
+def test_a_holdback_of_the_wrong_size_is_flagged_and_blocks_a_helped_verdict():
+    rng = np.random.default_rng(1)
+    holdback = {
+        "conversion": rng.binomial(1, 0.10, 100).astype(float),
+        "latency_ms": rng.normal(120, 20, 100),
+    }
+    promoted = {
+        "conversion": rng.binomial(1, 0.30, 3900).astype(float),
+        "latency_ms": rng.normal(120, 20, 3900),
+    }
+    result = continuous.holdback_check(
+        SPECS, holdback, promoted, expected_fraction=0.2
+    )
+    assert result["ratio_check"]["flag"] is True
+    assert result["overall"] == "inconclusive"
+    assert "assignment" in result["statement"]

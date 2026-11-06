@@ -37,6 +37,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from scmle import durability
 from scmle.deploy import control
@@ -411,6 +412,115 @@ def post_promotion_check(
             "model."
         ),
     }
+
+
+def holdback_assignment(
+    unit_ids: Sequence[Any], fraction: float, salt: str
+) -> np.ndarray:
+    """Which units stay on the previous model: a keyed hash of the unit id.
+
+    The side of a unit depends only on its id and the `salt` (for example the
+    release id), so every replica of the service and any later audit agree
+    without sharing state, and a unit keeps its side for the life of the
+    release. The hash is uniform, so each unit is held back independently
+    with probability `fraction`.
+
+    Raises:
+        ValueError: If `fraction` is not strictly between 0 and 1.
+    """
+    if not 0.0 < fraction < 1.0:
+        raise ValueError("fraction must lie strictly between 0 and 1")
+    draws = np.array(
+        [
+            int.from_bytes(
+                hashlib.sha256(f"{salt}:{unit}".encode()).digest()[:8], "big"
+            )
+            / 2.0**64
+            for unit in unit_ids
+        ]
+    )
+    return draws < fraction
+
+
+def holdback_check(
+    specs: Sequence[MetricSpec],
+    holdback: Mapping[str, Sequence[float]],
+    promoted: Mapping[str, Sequence[float]],
+    *,
+    expected_fraction: float,
+    alpha: float = 0.05,
+    min_samples: int = 30,
+    resamples: int = 2000,
+    seed: int = 0,
+    ratio_level: float = 0.001,
+) -> dict[str, Any]:
+    """Did the promoted model help, against units kept on the old model?
+
+    The comparison is concurrent: units were assigned to the previous model
+    (`holdback`) or to the promoted one at random by `holdback_assignment`,
+    so seasonality, traffic mix and other changes affect both sides alike and
+    the difference is attributable to the model, to the extent that the
+    assignment was random and the units do not influence each other.
+
+    The check first compares the observed split with `expected_fraction` by an
+    exact two-sided binomial test at `ratio_level` (a sample-ratio check). A
+    split that does not match means the assignment was not what was declared:
+    the verdict is then capped at ``inconclusive`` and the statement says so.
+    Otherwise the metric intervals and verdicts are those of
+    `post_promotion_check`, with the holdback as the reference period.
+
+    Raises:
+        ValueError: As `post_promotion_check`, and for an
+            ``expected_fraction`` outside the open unit interval.
+    """
+    if not 0.0 < expected_fraction < 1.0:
+        raise ValueError("expected_fraction must lie strictly between 0 and 1")
+    first = specs[0].name if specs else ""
+    held = len(holdback.get(first, ()))
+    moved = len(promoted.get(first, ()))
+    total = held + moved
+    p_value = (
+        float(stats.binomtest(held, total, expected_fraction).pvalue)
+        if total
+        else 1.0
+    )
+    flag = p_value < ratio_level
+    result = post_promotion_check(
+        specs,
+        holdback,
+        promoted,
+        alpha=alpha,
+        min_samples=min_samples,
+        resamples=resamples,
+        seed=seed,
+    )
+    overall = "inconclusive" if flag else result["overall"]
+    result["design"] = "concurrent_holdback"
+    result["overall"] = overall
+    result["ratio_check"] = {
+        "holdback_units": held,
+        "promoted_units": moved,
+        "expected_fraction": expected_fraction,
+        "p_value": p_value,
+        "level": ratio_level,
+        "flag": flag,
+    }
+    result["statement"] = (
+        f"Overall: {overall}. Each interval is the difference in the mean "
+        "between units served by the promoted model and units kept on the "
+        f"previous model at the same time, at joint confidence "
+        f"{1 - alpha:.0%} over {len(specs)} metrics. "
+        + (
+            "The observed split differs from the declared fraction "
+            f"(p = {p_value:.2g}), so the assignment was not what was "
+            "declared and no verdict is given. "
+            if flag
+            else "The change is attributable to the model if units were "
+            "assigned at random and do not influence one another. "
+        )
+        + "The check does not look at metrics that were not selected."
+    )
+    return result
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
