@@ -9,5 +9,8 @@ const html = body.replaceAll("@@BASE@@", base);
   <p class="eyebrow"><span></span> Serve and operate</p>
   <h1>Measure it, tell a fault<br /><em>from a worse model.</em></h1>
   <Fragment set:html={html} />
+  <h2 id="since">Signals from the running service, and holdbacks</h2>
+  <p>The generated service can feed the signal monitors from its real requests and scored rows: set <code>SCMLE_SIGNALS_FILE</code> and the service writes them there. A hashed holdback assignment and a concurrent holdback check, with a sample-ratio guard, can keep a share of cases on the old behaviour so that a change is compared against units that did not receive it. These were exercised locally only.</p>
+
   <p class="meta">Local evidence only; nothing here ran on AWS or GCP · 0.1 beta</p>
 </DocsLayout>

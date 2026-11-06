@@ -22,6 +22,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   </ol>
 
   <h2>The pipeline</h2>
+  <p>The preflight also runs <code>python -m benchmarks.qualification --check all</code> (the detector, shift, screen, uncertainty and subgroup certificates plus the framing, ingestion, causal, decision and closed-loop families). The repository carries a <code>CITATION.cff</code> with the package version, licence and release date; it is checked by a test of its required keys, and it has not been run through the official validator.</p>
   <p>The release workflow runs on a <code>v*</code> tag, in four stages:</p>
   <ol>
     <li><strong>verify:</strong> the tag equals the package version, the in-code version and a changelog section.</li>

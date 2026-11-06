@@ -46,6 +46,7 @@ const evidence = [
     <li>Every release requires the declared release checks to be complete (see <a href={`${base}/docs/releasing/`}>Releasing the package</a>).</li>
   </ul>
 
+  <p>An escalation reply (an attestation) can be made single-use: with <code>Loop.open(single_use_attestations=True)</code> a spent attestation is recorded as an <code>attestation_used</code> row in the deployment ledger and cannot be spent again.</p>
   <div class="callout"><p><strong>When a signal changes:</strong> preserve the evidence first, identify the smallest reproducible cause, and then evolve the system with a focused test or control.</p></div>
   <p>The benchmark gates in this loop are described on <a href={`${base}/docs/benchmarks/`}>Benchmarks</a>, and the production half of the loop (drift, delayed labels, retrain, gated promotion, escalation) is covered on <a href={`${base}/docs/operations/`}>Operations</a> and <a href={`${base}/docs/qualification/#loop`}>the qualification instrument</a>.</p>
 

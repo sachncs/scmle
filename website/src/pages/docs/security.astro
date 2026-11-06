@@ -44,6 +44,9 @@ registry.revoke(key_id, changed_at, "credential compromise")
 registry.verify(payload, envelope, secrets, observed_at, historical=True)`}</code></pre>
   <p>Retirement stops new signatures while preserving auditable historical proof. Revocation is immediate, including historical verification. That is the intended emergency boundary: rotate forward without silently accepting evidence from a compromised signer.</p>
 
+  <h2>Remote keys and revocation</h2>
+  <p>The key set (JWKS), the OIDC discovery document and the revocation list can be fetched from a remote location, with a cache and fail-closed staleness: when the cache is too old and a fresh copy cannot be fetched, requests are refused rather than served on stale trust. This has been exercised only against recorded responses and local fixtures, not against a real identity provider.</p>
+
   <h2>Data and dependency controls</h2>
   <ul>
     <li>Keep raw source bytes and derived evidence separate; redact PII in logs and sidecars according to the retention policy.</li>

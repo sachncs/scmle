@@ -47,6 +47,9 @@ const config = [
     <li><strong>Provider-level isolation.</strong> Not tested; it needs the cloud accounts.</li>
   </ul>
 
+  <h2>Remote keys, discovery and revocation</h2>
+  <p>Instead of local files, the key set, the OIDC discovery document and the revocation list can be fetched remotely, with a cache that fails closed on staleness. That narrows the revocation-latency gap above, but it does not remove it, and it has not been tested against a real identity provider. Each tenant still needs its own key set.</p>
+
   <h2>Configuration</h2>
   <DocTable label="Authentication and tenant configuration" head={["Variable", "Meaning"]} rows={config} />
   <div class="callout"><p><strong>Fail closed.</strong> A server that listens on anything but a loopback address without a key source refuses to start with a configuration error. No shipped configuration exposes an unauthenticated backend. The generated image defaults to every interface, so it needs these variables.</p></div>

@@ -19,7 +19,7 @@ const matrix = [
   <p class="eyebrow"><span></span> Cloud and release</p>
   <h1>The same service,<br /><em>declared twice.</em></h1>
   <p class="lead">Terraform (or OpenTofu) declares the same prediction service on AWS and on GCP. This page says what is declared, what is checked without an account, and what is not checked at all.</p>
-  <div class="callout"><p><strong>Nothing has been applied to an account.</strong> OpenTofu <code>fmt</code> and <code>validate</code> have been run and pass for every module and environment, and the provider lock files are committed. <code>plan</code> and <code>apply</code> have not been run, so no resource exists and no cost has been measured.</p></div>
+  <div class="callout"><p><strong>Nothing has been applied to an account.</strong> OpenTofu 1.13.5 passes <code>fmt -check</code> and <code>init -backend=false</code> plus <code>validate</code> on both modules and all six environments, the provider lock files are committed, and the continuous-integration job for infrastructure policy, format and validate passed on the audited commit; the result is recorded in the Phase 16 evidence. <code>plan</code> and <code>apply</code> have not been run, so no resource exists and no cost has been measured.</p></div>
 
   <h2>Layout</h2>
   <pre><code>{`deploy/terraform/

@@ -31,7 +31,7 @@ const gates = [
   ["Causal identification", "16", "15", "The AIPW coverage gate missed its floor."],
   ["Decision layer", "20", "16", "Four gates missed their floors."],
   ["Uncertainty and breadth", "10", "8", "Two gates missed: CQR conditional coverage in the highest-noise decile, and the original slice flag's familywise false-flag rate (G5), which stays descriptive. A separate margin-based slice flag (G5b) passed its gate."],
-  ["Subgroup Holm family", "1", "1", "Passed its gate; certified from 400 rows per level. Below that the result is descriptive."],
+  ["Subgroup Holm family", "1", "1", "Passed its gate; certified from 400 rows per level. Below that the result is descriptive. It was also measured with unequal levels and with overlapping columns, on designs registered before the run: family-wise error 0.039, 0.044, 0.0535 and 0.022 against the bound 0.0597. The certificate and its gate are unchanged."],
   ["Closed loop", "10", "8", "Detection delay (H2, H10) missed its floor."],
 ];
 ---
@@ -106,12 +106,13 @@ const gates = [
   <p>Everything else is descriptive analysis: shown, never gating. A certificate records a detector's size and recall by defect type, with Wilson 95% intervals, the policy it had to meet, the corpus hash and the code hash. It goes stale when the code changes. A freshly installed package does not carry the certificate store; it is read from a source checkout, and when it is absent every detector is descriptive and the run says so.</p>
   <DocTable label="Detector certificates and their status" head={["Detector", "Id", "Policy", "Status"]} rows={certs} />
   <p>The shipped detector certificates use a single corpus, breast cancer. Repeating the plants on three other tables, duplicates and outlier triage still pass, label noise passes on one, and the sentinel detector flags the clean rows. A certificate says the detector met its floors on planted defects of that type in that corpus; it is not a claim about your data.</p>
+  <p>The qualification check can be run over every family at once (<code>python -m benchmarks.qualification --check all</code>): the detector, shift, screen, uncertainty and subgroup certificates plus the framing, ingestion, causal, decision and closed-loop families. CI and the release preflight now run it; before, they did not.</p>
   <p>Statistical routines are also compared with frozen reference outputs from scipy (Clopper-Pearson, Wilson, multiplicity adjustment, Spearman, Kruskal-Wallis, harmonic numbers) to within 1e-15 relative difference. That shows two computations match, not that either is correct. Several cited methods were checked against their primary papers, and a few sources could not be retrieved; those are marked not verified.</p>
 
   <h3>Measured gates for the later features</h3>
   <p>The causal, decision, uncertainty and closed-loop features each have a table of gates with pre-registered floors, measured by simulation. Misses are reported, and a missed gate leaves its mechanism descriptive.</p>
   <DocTable label="Measured gates and misses" head={["Feature", "Gates", "Passed", "Misses"]} rows={gates} />
-  <p>Items that need outside data or tools are listed as not measured: real-covariate causal worlds, frozen outputs from R reference packages (rdrobust, sensemakr, did, HonestDiD, onlineFDR), outside-party reproduction, and agreement with a domain owner's escalation audit.</p>
+  <p>A filed analysis of the CQR conditional-coverage miss (G3) finds that it is about four standard errors, so it is not noise, and that giving the model more capacity makes it larger. G3 stays descriptive. The betting capital used by the sequential tests has its martingale and Ville properties checked by exact enumeration. Items that need outside data or tools are listed as not measured: real-covariate causal worlds, frozen outputs from R reference packages (rdrobust, sensemakr, did, HonestDiD, onlineFDR), outside-party reproduction, and agreement with a domain owner's escalation audit.</p>
 
   <h2 id="loop">7. The closed loop</h2>
   <p>After deployment, a loop opens a hash-chained deployment ledger that records the charter hash, the policy, the keys the system holds, and then observation summaries, alarms, retraining, challenger results, promotion and rollback proposals, escalations, attestations, halts and incidents. A challenger is registered before it is scored and its anytime-valid decision is replayed on load. An attestation is bound to one escalation, expires, and is refused if signed with a key the system holds. If the ledger head at the next open differs from the saved state, the loop starts halted.</p>
