@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use SCMLE, please cite it as below."
+title: "SCMLE: an autonomous, leakage-safe machine-learning lifecycle for tabular data"
+type: software
+version: 0.1.0b1
+date-released: 2026-11-06
+license: Apache-2.0
+repository-code: "https://github.com/sachncs/scmle"
+url: "https://sachncs.github.io/scmle/"
+abstract: "A machine-learning lifecycle with a data-stage qualification instrument: signed analysis charter, custody-controlled data sets, a hash-chained hypothesis ledger with one-time confirmation, and detectors certified against planted defects."
+keywords:
+  - automl
+  - machine-learning
+  - tabular
+  - mlops
+  - leakage
+authors:
+  - family-names: Sachin
+    email: "sch.cs.96@gmail.com"
