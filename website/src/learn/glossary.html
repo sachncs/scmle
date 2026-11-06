@@ -180,7 +180,7 @@
 <h3 id="attestation-attestor">attestation (attestor)</h3>
 <p><strong>Meaning.</strong> A signed statement by a named person about something data cannot prove.</p>
 <p><strong>Example.</strong> "I confirm that column <code>fare</code> is known at boarding."</p>
-<p><strong>Why it matters.</strong> It moves a claim from <code>unverified</code> to <code>attested</code>, and makes a person responsible. SCMLE refuses an attestation signed with a key the system itself holds.</p>
+<p><strong>Why it matters.</strong> It moves a claim from <code>unverified</code> to <code>attested</code>, and makes a person responsible. SCMLE refuses an attestation signed with a key the system itself holds. <strong>Attestor.</strong> The person or role who signs. For a causal claim the charter names the attestors in advance and says which assumption each may vouch for; a statement from anyone else, for another charter, past its expiry date, or with a signature that does not verify, does not count, and the assumption then has no named attestor (the claim stays <code>unverified</code>). A valid signature shows the statement was issued unchanged by someone holding the signing key. It does not show who that was, or that the assumption is true.</p>
 <h3 id="admissibility">admissibility</h3>
 <p><strong>Meaning.</strong> The check, per feature, of whether the model may use it: <code>admit</code>, <code>admit_flagged</code> (allowed with a warning) or <code>quarantine</code> (kept out).</p>
 <p><strong>Example.</strong> <code>boat</code> was quarantined; <code>sex</code> was <code>admit_flagged</code>.</p>
@@ -188,7 +188,7 @@
 <h3 id="causal-claim">causal claim</h3>
 <p><strong>Meaning.</strong> A claim that changing X changes Y, not just that they move together.</p>
 <p><strong>Example.</strong> "Giving the discount raised sales" versus "customers who got the discount bought more".</p>
-<p><strong>Why it matters.</strong> Prediction does not tell you what would happen if you acted. A causal claim needs a design (an experiment or assumptions that someone names). SCMLE gives it a tier. Without a named person for each assumption, it stays <code>unverified</code>. A held-out set alone can never confirm a causal effect.</p>
+<p><strong>Why it matters.</strong> Prediction does not tell you what would happen if you acted. A causal claim needs a design (an experiment or assumptions that someone names). SCMLE gives it a tier. Without a named attestor with a verified signed statement for each assumption, it stays <code>unverified</code>. A held-out set alone can never confirm a causal effect.</p>
 <h3 id="negative-control">negative control</h3>
 <p><strong>Meaning.</strong> A test where the answer is known to be "no effect", to see if the method wrongly finds one. SCMLE shuffles the target and re-runs the search.</p>
 <p><strong>Example.</strong> 20 shuffled re-runs found 0 discoveries. The real run found 3.</p>
