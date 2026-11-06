@@ -182,12 +182,16 @@ class RunResult:
             for name, value in evaluation["test_metrics"].items()
         )
         unattested = self.unattested_suspects()
-        label = (
-            ""
-            if not unattested
-            else f" (PROVISIONAL: {len(unattested)} flagged column(s) "
-            f"not attested: {', '.join(unattested)})"
-        )
+        warning = self.profile.screen_warning
+        reasons = []
+        if unattested:
+            reasons.append(
+                f"{len(unattested)} flagged column(s) not attested: "
+                f"{', '.join(unattested)}"
+            )
+        if warning:
+            reasons.append("leakage screen incomplete")
+        label = f" (PROVISIONAL: {'; '.join(reasons)})" if reasons else ""
         text = (
             f"{self.run_id}: selected {self.selected_model} "
             f"(cv {evaluation['metric']}="
@@ -209,4 +213,6 @@ class RunResult:
             text += "; claims: " + ", ".join(
                 f"{count} {tier}" for tier, count in sorted(tiers.items())
             )
+        if warning:
+            text += f"; WARNING {warning}"
         return text

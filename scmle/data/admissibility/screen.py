@@ -112,10 +112,17 @@ KNOTS = 10
 MAX_ROWS = 2000
 MAX_PERMUTATIONS = 100_000
 # Cross-fitted fits needed by the permutation test: permutations x skill
-# columns x classes (one-vs-rest when there are more than two). Measured: a
-# breast-cancer sized table (about 72,000) takes 1.4 s, so this limit is a
-# few tens of seconds; beyond it the screen declines and says so.
-MAX_WORK = 500_000
+# columns x classes (one-vs-rest when there are more than two). The screen
+# runs inside the declared time budget by a deterministic cap, never by a
+# clock: work_cap = time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND.
+# Measured on the development machine (2026-11-06): a breast-cancer sized
+# table, 72,000 fits, takes 1.4 s, i.e. about 51,000 fits per second.
+# FITS_PER_SECOND is declared at about half of that so a slower machine still
+# finishes inside the share. A cap from the clock would make the flags differ
+# between machines; this one does not. The default budget of 1800 s allows
+# 6.75 million fits, the 120 s budget of the CI benchmark 450,000.
+SCREEN_SHARE = 0.15
+FITS_PER_SECOND = 25_000
 BATCH = 200
 TIME_BLOCKS = 20
 RIDGE = 1e-3
@@ -661,6 +668,9 @@ class ScreenReport:
         gates: Gate status per mechanism.
         ceilings: Pre-registered ceilings by mechanism.
         notes: Plain statements of what was not done.
+        unchecked: Columns the screen declined to test; they are unchecked,
+            not clean.
+        unchecked_reason: Why they were declined, for the warning.
     """
 
     findings: tuple[Finding, ...]
@@ -671,6 +681,19 @@ class ScreenReport:
     gates: Mapping[str, certificates.GateStatus]
     ceilings: Mapping[str, float]
     notes: tuple[str, ...] = ()
+    unchecked: tuple[str, ...] = ()
+    unchecked_reason: str = ""
+
+    @property
+    def warning(self) -> str:
+        """The loud statement of an incomplete screen, or an empty string."""
+        if not self.unchecked:
+            return ""
+        return (
+            f"leakage screen NOT RUN for {len(self.unchecked)} columns "
+            f"({self.unchecked_reason}): these columns are unchecked, not "
+            "clean; raise --time-budget or screen fewer columns"
+        )
 
     @property
     def suspects(self) -> tuple[Finding, ...]:
@@ -700,6 +723,8 @@ class ScreenReport:
             "gates": {k: v.value for k, v in self.gates.items()},
             "ceilings": dict(self.ceilings),
             "notes": list(self.notes),
+            "unchecked": list(self.unchecked),
+            "warning": self.warning,
             "suspects": [f.feature for f in self.suspects],
             "blocking": [f.feature for f in self.blocking],
             "findings": [
@@ -811,6 +836,23 @@ def shipped_store() -> certificates.CertificateStore | None:
     return load_store()
 
 
+def work_cap(time_budget_seconds: float | None) -> int | None:
+    """Most cross-fitted fits the screen may use under a time budget.
+
+    Deterministic: the budget alone decides, not the machine's speed.
+
+    Args:
+        time_budget_seconds: The declared budget, or None for no cap beyond
+            `MAX_PERMUTATIONS` (the certification paths).
+
+    Returns:
+        The cap, or None for no cap.
+    """
+    if time_budget_seconds is None:
+        return None
+    return int(time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND)
+
+
 def screen_table(
     frame: pd.DataFrame,
     target: str,
@@ -820,6 +862,7 @@ def screen_table(
     group_column: str | None = None,
     time_column: str | None = None,
     store: certificates.CertificateStore | None = None,
+    time_budget_seconds: float | None = None,
 ) -> ScreenReport:
     """Screens training data with the certified settings.
 
@@ -835,9 +878,13 @@ def screen_table(
         group_column: Entity column, or None.
         time_column: Time column, or None.
         store: Certificates for gating; defaults to the shipped ones.
+        time_budget_seconds: The project's declared time budget; it bounds
+            the screen's work by `work_cap`. None means no cap beyond
+            `MAX_PERMUTATIONS`.
 
     Returns:
-        The report, using `CERTIFIED` settings with `seed`.
+        The report, using `CERTIFIED` settings with `seed`. A screen that was
+        declined says so in `unchecked` and `warning`.
     """
     cfg = dataclasses.replace(CERTIFIED, run_seed=seed)
     chosen = store if store is not None else shipped_store()
@@ -860,6 +907,7 @@ def screen_table(
         None if groups is None else groups.iloc[order],
         block_size,
         chosen,
+        time_budget_seconds,
     )
 
 
@@ -930,6 +978,7 @@ def scan_frame(
     groups: np.ndarray | None,
     block_size: int | None,
     gates: Mapping[str, certificates.GateStatus],
+    time_budget_seconds: float | None = None,
 ) -> ScreenReport:
     """Runs the screen on rows that are already chosen."""
     n = len(frame)
@@ -996,6 +1045,7 @@ def scan_frame(
     if family == 0:
         return empty_report(cfg, gates, n, "no column could be tested")
     total = max(cfg.permutations, required_permutations(family, alpha))
+    declined = tuple(dict.fromkeys(h.feature for h in pending))
     if total > MAX_PERMUTATIONS:
         return ScreenReport(
             (),
@@ -1011,6 +1061,8 @@ def scan_frame(
                 f"{MAX_PERMUTATIONS}. Nothing was flagged (power, not size, "
                 "is lost): screen fewer columns",
             ),
+            declined,
+            "permutation limit",
         )
     skill_columns = sum(
         1 for h in pending if h.mechanism == SKILL and h.statistic is not None
@@ -1018,7 +1070,8 @@ def scan_frame(
     work = (
         total * skill_columns * (problem.classes if problem.classes > 2 else 1)
     )
-    if work > MAX_WORK:
+    cap = work_cap(time_budget_seconds)
+    if cap is not None and work > cap:
         return ScreenReport(
             (),
             n,
@@ -1030,10 +1083,12 @@ def scan_frame(
             (
                 f"{family} hypotheses over {max(problem.classes, 1)} classes "
                 f"need about {work} cross-fitted fits ({total} permutations "
-                f"for {skill_columns} columns); the limit is {MAX_WORK}. "
+                f"for {skill_columns} columns); the limit is {cap}. "
                 "Nothing was flagged (power, not size, is lost): screen "
                 "fewer columns",
             ),
+            declined,
+            f"work limit for a {time_budget_seconds:g} s time budget",
         )
     draw_permutations(
         pending, problem.y, class_codes, strata, total, alpha, cfg.run_seed
@@ -1093,6 +1148,7 @@ def screen(
     groups: pd.Series | None = None,
     block_size: int | None = None,
     store: certificates.CertificateStore | None = None,
+    time_budget_seconds: float | None = None,
 ) -> ScreenReport:
     """Screens the candidate columns of training data for leakage suspicion.
 
@@ -1109,6 +1165,8 @@ def screen(
         block_size: Consecutive rows per time block; exclusive with `groups`.
         store: Certificates for gating; None means every mechanism is
             descriptive.
+        time_budget_seconds: Declared time budget; bounds the work through
+            `work_cap`. None means no cap beyond `MAX_PERMUTATIONS`.
 
     Returns:
         The report. Nothing is raised for a degenerate target or too few
@@ -1134,5 +1192,13 @@ def screen(
     sample = frame.iloc[rows].reset_index(drop=True)
     sample_groups = None if group_values is None else group_values[rows]
     return scan_frame(
-        sample, target, task, cfg, chosen, sample_groups, blocks, gates
+        sample,
+        target,
+        task,
+        cfg,
+        chosen,
+        sample_groups,
+        blocks,
+        gates,
+        time_budget_seconds,
     )

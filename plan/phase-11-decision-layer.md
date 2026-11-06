@@ -20,9 +20,9 @@ the hook. Done when: B9 runs through `LifecycleManager` and existing lifecycle
 tests are unchanged where no charter rollout is set.
 
 **W2 remainder** (one agent). The files and the one-time policy value and
-fairness tests are written by a charter run. Left: experiment assignments in
-the F3 ledger (no experiment runs inside a charter run) and `claims verify`
-checking the four files.
+fairness tests are written by a charter run, and a rollout run through
+`RolloutHook` logs its assignments. Left: `claims verify` checking the four
+files.
 
 **W3 Fairness integration** (one agent). Make `evaluation/fairness.py` and
 `mitigation.py` clients of `decision.constraints`; stop their constants gating;

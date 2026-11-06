@@ -341,6 +341,7 @@ class DatasetProfiler:
             self.spec.validation.seed,
             data.group_column,
             data.time_column,
+            time_budget_seconds=self.spec.resources.time_budget_seconds,
         )
 
     def profile(
@@ -399,6 +400,8 @@ class DatasetProfiler:
         self.describe_associations(frame, statistics, usable, task)
         report = self.leakage_screen(frame, usable, task)
         risks = [] if report is None else list(report.sentences())
+        if report is not None and report.warning:
+            risks.insert(0, report.warning)
         if report is not None:
             quality += [f"leakage screen: {note}" for note in report.notes]
         target_summary, target_risks = summarize_target(target, task)

@@ -567,6 +567,18 @@ class ProfileStage(Stage):
         context.track(
             fingerprint=knowledge.fingerprint(profile, task), task=task.value
         )
+        if profile.unchecked_columns:
+            if spec.leakage_policy == "block":
+                raise errors.BlockedError(
+                    f"WARNING {profile.screen_warning}; leakage_policy="
+                    "'block' does not train on unchecked suspicion (use "
+                    "'warn' to proceed with the columns unchecked)",
+                    {"leakage": dict(profile.leakage)},
+                )
+            LOGGER.warning(
+                "WARNING %s; the test score is provisional",
+                profile.screen_warning,
+            )
         if spec.leakage_policy == "block":
             leaks = profile.blocking_leaks
             if leaks:

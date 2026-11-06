@@ -89,6 +89,45 @@ def test_the_level_is_spent_even_without_a_promotion(tmp_path):
     assert hook.budget.spent == Fraction(1, 100) + Fraction(1, 300)
 
 
+def test_assignment_rows_hold_arm_and_probability_per_unit(tmp_path):
+    env = hook_for(tmp_path, assignment_prob=0.3)
+    ledger = env.ledger
+    hook = env.hook
+    hook.start("exp-1")
+    ids = [f"user-{i}" for i in range(50)]
+
+    arms = hook.assign(ids)
+
+    rows_ = [r for r in ledger.rows if r["kind"] == "rollout_assignment"]
+    assert len(rows_) == 1
+    body = rows_[0]["body"]
+    assert body["experiment_id"] == "exp-1"
+    assert body["units"] == ids
+    assert body["arm"] == [int(a) for a in arms]
+    expected = [0.3 if a else 0.7 for a in arms]
+    assert body["probability"] == pytest.approx(expected)
+    ledger.verify()
+
+
+def test_an_assignment_for_an_unstarted_experiment_is_refused(tmp_path):
+    env = hook_for(tmp_path)
+    ledger = env.ledger
+    hook = env.hook
+    with pytest.raises(deployment_ledger.DeploymentLedgerError):
+        ledger.commit(
+            "rollout_assignment",
+            {
+                "experiment_id": "ghost",
+                "first_unit": 0,
+                "units": ["a"],
+                "arm": [1],
+                "probability": [0.5],
+            },
+        )
+    with pytest.raises(errors.ScmleError):
+        hook.assign(["a"])
+
+
 def test_a_promotion_decision_goes_through_the_manager_and_needs_approval(
     tmp_path,
 ):

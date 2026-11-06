@@ -6,6 +6,9 @@ registries. This hook is the one place that joins the two:
 * an experiment is started with the level the `DecisionBudget` assigns, spent
   whether or not the experiment promotes (the budget after the assignment is
   written to the deployment ledger);
+* units are assigned by the salted hash of the plan and every batch is
+  written to the deployment ledger with the arm and the probability that arm
+  had (the propensity), and to the hash-chained decision log;
 * a `promote` decision is a proposal row; the alias moves only through
   `LifecycleManager.promote_challenger`, which still needs the registry's
   independent signed approval (and the attestation of a guarded registry);
@@ -20,11 +23,14 @@ to at most `alpha_promote` by the union bound over experiments.
 
 from typing import Any
 
+import numpy as np
 from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 
 from scmle.contracts import errors
 from scmle.data.charter import decision as charter_decision
 from scmle.data.ledger import budget as budget_module
+from scmle.decision import design
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle
@@ -64,6 +70,7 @@ class RolloutHook:
         self.challenger: registry_module.VersionRecord | None = None
         self.monitor: rollout.RollbackMonitor | None = None
         self.champion_id: str | None = None
+        self.units = 0
 
     def started(self) -> rollout.Rollout:
         """The running experiment.
@@ -104,6 +111,7 @@ class RolloutHook:
             self.plan, experiment_id, float(level)
         )
         self.decision = None
+        self.units = 0
         self.ledger.commit(
             deployment_ledger.ROLLOUT_EXPERIMENT,
             {
@@ -123,6 +131,33 @@ class RolloutHook:
             },
         )
         return float(level)
+
+    def assign(self, unit_ids: ArrayLike) -> NDArray[np.float64]:
+        """Assigns units and writes the propensity-logged batch.
+
+        Args:
+            unit_ids: Identifiers of the randomisation unit.
+
+        Returns:
+            1 for the challenger and 0 for the champion, per unit.
+        """
+        self.started()
+        names = [str(u) for u in np.asarray(unit_ids).ravel()]
+        arms = design.assign(names, self.plan.salt, self.plan.assignment_prob)
+        q = self.plan.assignment_prob
+        odds = [q if a else 1.0 - q for a in arms]
+        self.ledger.commit(
+            deployment_ledger.ROLLOUT_ASSIGNMENT,
+            {
+                "experiment_id": self.experiment_id,
+                "first_unit": self.units,
+                "units": names,
+                "arm": [int(a) for a in arms],
+                "probability": odds,
+            },
+        )
+        self.units += len(names)
+        return arms
 
     def observe(
         self,

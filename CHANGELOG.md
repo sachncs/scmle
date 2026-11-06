@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+* Propensity-logged assignment rows for a decision rollout (F11, W2;
+  `RolloutHook.assign`, deployment ledger kind `rollout_assignment`). When a
+  rollout runs, units are assigned by the plan's salted hash
+  (`design.assign`) and each batch is chained in the deployment ledger with
+  the unit ids, the arm of each and the probability that arm had (`q` for the
+  challenger, `1 - q` for the champion), so an off-policy estimate can be made
+  from the ledger. The ledger refuses a batch for an experiment that was not
+  started, a list of different length, an arm other than 0 or 1 and a
+  probability outside (0, 1). A charter run itself runs no experiment, so it
+  still writes only the registration row. No certified source changed.
+
 * Rollout decisions through the lifecycle manager and the deployment ledger
   (F11, W1; `scmle.governance.rollout_hook.RolloutHook`,
   `LifecycleManager.restore_previous`). The hook starts an experiment with the

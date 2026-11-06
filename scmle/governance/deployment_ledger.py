@@ -36,10 +36,11 @@ Row kinds (``open`` first and only once):
     status ``open``. It is a record that a person must look, not an incident
     workflow (`scmle.monitoring.incidents` wants an SLO evaluation, which a
     halt does not have).
-``rollout_experiment``, ``rollout_decision``
+``rollout_experiment``, ``rollout_assignment``, ``rollout_decision``
     The decision layer's rollout (F11): an experiment is started with the
     level the `DecisionBudget` assigned and the budget after the assignment;
-    the decision
+    each batch of units is logged with the arm and the probability that arm
+    had (the propensity), and only for a started experiment; the decision
     (`hold`, `promote`, `hold_final`, `hold_invalid`, or a rollback) is
     chained with the e-process values. A promotion or rollback still needs the
     registry's signed approval.
@@ -89,6 +90,7 @@ INCIDENT = "incident"
 AUDIT = "audit"
 DEPLOYMENT = "deployment"
 ROLLOUT_EXPERIMENT = "rollout_experiment"
+ROLLOUT_ASSIGNMENT = "rollout_assignment"
 ROLLOUT_DECISION = "rollout_decision"
 KINDS = (
     OPEN,
@@ -105,6 +107,7 @@ KINDS = (
     AUDIT,
     DEPLOYMENT,
     ROLLOUT_EXPERIMENT,
+    ROLLOUT_ASSIGNMENT,
     ROLLOUT_DECISION,
 )
 REGISTERED = "registered"
@@ -404,6 +407,7 @@ class DeploymentLedger:
             ATTESTATION: self.apply_attestation,
             HALT: self.apply_halt,
             ROLLOUT_EXPERIMENT: self.apply_experiment,
+            ROLLOUT_ASSIGNMENT: self.apply_assignment,
             ROLLOUT_DECISION: self.apply_rollout_decision,
         }
         try:
@@ -516,6 +520,23 @@ class DeploymentLedger:
         if not 0 < float(Fraction(body["level"])) < 1:
             raise DeploymentLedgerError("an experiment level lies in (0, 1)")
         self.experiments[name] = dict(body)
+
+    def apply_assignment(self, body: Mapping[str, Any]) -> None:
+        """Checks a batch of propensity-logged assignments."""
+        name = str(body["experiment_id"])
+        if name not in self.experiments:
+            raise DeploymentLedgerError(
+                f"assignment for {name!r}, which was not started"
+            )
+        units, arms, odds = body["units"], body["arm"], body["probability"]
+        if not len(units) == len(arms) == len(odds):
+            raise DeploymentLedgerError("assignment lists differ in length")
+        if any(a not in (0, 1) for a in arms) or any(
+            not 0 < float(p) < 1 for p in odds
+        ):
+            raise DeploymentLedgerError(
+                "arms are 0 or 1 and probabilities lie strictly in (0, 1)"
+            )
 
     def apply_rollout_decision(self, body: Mapping[str, Any]) -> None:
         """A decision names a started experiment or a monitored champion."""

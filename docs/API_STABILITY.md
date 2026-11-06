@@ -85,8 +85,8 @@ a format 4 causal charter keeps its hash and signature.
 
 `scmle.governance.rollout_hook.RolloutHook` and
 `LifecycleManager.restore_previous` are additions (extension surfaces); the
-deployment ledger gained the row kinds `rollout_experiment` and
-`rollout_decision`, and a ledger without them loads unchanged.
+deployment ledger gained the row kinds `rollout_experiment`,
+`rollout_assignment` and `rollout_decision`, and a ledger without them loads unchanged.
 
 `MLProject` gained the optional keyword `baseline_subject` (`frozen_rule`,
 the default, or `selected_model`), `DataSpec` the field of the same name, and

@@ -660,6 +660,12 @@ class Planner:
             )
             for a in candidates
         ]
+        if profile.screen_warning:
+            decisions.append(
+                experiments.Decision(
+                    "leakage_screen", Action.DEFER, profile.screen_warning
+                )
+            )
         names = tuple(a.name for a in candidates)
         strategy = splitters.resolve_strategy_name(spec, task)
         resolved = tasks.ProjectSpec.model_validate(

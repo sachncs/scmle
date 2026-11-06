@@ -744,6 +744,16 @@ class DatasetProfile:
         """Columns whose leakage suspicion is certified and may block a run."""
         return tuple(self.leakage.get("blocking", ()))
 
+    @property
+    def unchecked_columns(self) -> tuple[str, ...]:
+        """Columns the leakage screen declined to test (unchecked, not clean)."""
+        return tuple(map(str, self.leakage.get("unchecked", ())))
+
+    @property
+    def screen_warning(self) -> str:
+        """The loud statement of an incomplete screen, or an empty string."""
+        return str(self.leakage.get("warning", ""))
+
     def __post_init__(self) -> None:
         """Validate and detach structured quality evidence."""
         normalized = tuple(
