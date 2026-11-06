@@ -1,0 +1,115 @@
+{
+  "code_hash": "784057f4c4680decefff0487d2d6044e57efb7f6920939f758e2cc04dfe3dc60",
+  "not_measured": [
+    "strategies other than the randomized difference in means",
+    "heteroscedastic or heavy-tailed outcomes",
+    "non-randomized assignment",
+    "a real trial's subgroups"
+  ],
+  "note": "description beside subgroup_certificates.json; it does not change the gate that labels a report gating or descriptive",
+  "overlapping_columns": {
+    "familywise_bound": 0.059746794344809014,
+    "familywise_error_null": {
+      "hits": 107,
+      "n": 2000,
+      "rate": 0.0535,
+      "wilson": [
+        0.04446618753651597,
+        0.06424573568564287
+      ]
+    },
+    "familywise_error_true_nulls_with_effect_in_g0": {
+      "hits": 44,
+      "n": 2000,
+      "rate": 0.022,
+      "wilson": [
+        0.0164289081143177,
+        0.0294037890865601
+      ]
+    },
+    "levels_per_column": 4,
+    "passed": true,
+    "replicates": 2000,
+    "rows": 800
+  },
+  "registered": "2026-11-07",
+  "seconds": 21.7,
+  "seeds": [
+    0,
+    2000
+  ],
+  "unequal_levels": {
+    "familywise_bound": 0.059746794344809014,
+    "familywise_error_null": {
+      "hits": 78,
+      "n": 2000,
+      "rate": 0.039,
+      "wilson": [
+        0.03136143254939691,
+        0.04840608504391829
+      ]
+    },
+    "familywise_error_partial_null": {
+      "hits": 88,
+      "n": 2000,
+      "rate": 0.044,
+      "wilson": [
+        0.03585182041641652,
+        0.05389652670408614
+      ]
+    },
+    "min_rows_power_80": 400,
+    "passed": true,
+    "power_at_effect_half_sd": {
+      "100": {
+        "hits": 219,
+        "n": 500,
+        "rate": 0.438,
+        "wilson": [
+          0.39514834408666566,
+          0.48179707413056694
+        ]
+      },
+      "200": {
+        "hits": 379,
+        "n": 500,
+        "rate": 0.758,
+        "wilson": [
+          0.7185836488729677,
+          0.7934821914488713
+        ]
+      },
+      "400": {
+        "hits": 492,
+        "n": 500,
+        "rate": 0.984,
+        "wilson": [
+          0.9687488914666058,
+          0.9918707469666117
+        ]
+      },
+      "50": {
+        "hits": 81,
+        "n": 500,
+        "rate": 0.162,
+        "wilson": [
+          0.13230178838983928,
+          0.19685226576217005
+        ]
+      }
+    },
+    "power_replicates": 500,
+    "replicates": 2000,
+    "sizes": [
+      20,
+      30,
+      50,
+      80,
+      120,
+      200,
+      300,
+      500
+    ]
+  },
+  "version": 1
+}
