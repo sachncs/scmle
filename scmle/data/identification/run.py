@@ -854,6 +854,7 @@ def assemble(
             "alpha": subgroups["alpha"],
             "family_size": subgroups["family_size"],
             "rejected": list(subgroups["rejected"]),
+            "gate": subgroups["gate"]["status"],
         }
     if attestation_report is not None:
         claims["attestations"] = dict(attestation_report)
@@ -981,6 +982,55 @@ def subgroup_report(
     }
 
 
+def label_subgroups(
+    found: dict[str, Any], named: tuple[str, ...] | None
+) -> None:
+    """Says whether the subgroup family gates or only describes.
+
+    The Holm family is certified by `subgroup_certificates.json` (gate
+    `subgroup_holm`): both its error rates and its power met their
+    pre-registered floors on this code. With the certificate the word is
+    `gating`, and a subgroup with at least the certified number of rows is
+    marked `certified_size`; without it the family is `descriptive`. The tier
+    is not read from this: the tier rule has no subgroup input.
+
+    Args:
+        found: The `subgroup_report` result, labelled in place.
+        named: The certified gates the caller names (as `identify`'s
+            `certified`), or None to read the shipped certificate.
+    """
+    from scmle.data.identification import certified as loader
+
+    gate = loader.subgroup_gate(subgroup_report)
+    if named is not None:
+        listed = loader.SUBGROUP_GATE in named
+        gate = loader.SubgroupGate(
+            loader.GATING if listed else loader.DESCRIPTIVE,
+            "named among the certified gates"
+            if listed
+            else "the caller named the certified gates and this is not one",
+            gate.min_rows,
+        )
+    found["gate"] = gate.to_dict()
+    gating = gate.status == loader.GATING
+    for row in found["hypotheses"]:
+        size = row.get("n")
+        row["certified_size"] = bool(
+            gating
+            and size is not None
+            and (gate.min_rows is None or size >= gate.min_rows)
+        )
+    found["statement_gate"] = (
+        "gating: the family-wise error and the power at the certified size "
+        "met their pre-registered floors (a result for a subgroup under "
+        "`min_rows` is still descriptive)"
+        if gating
+        else "descriptive: the family-wise error and power of the subgroup "
+        "tests are not certified, so read a rejected level as exploratory; "
+        f"{gate.reason}"
+    )
+
+
 def identify(
     spec: causal.CausalSpec,
     x: pd.DataFrame,
@@ -1021,6 +1071,7 @@ def identify(
     plan = select.select(spec, dag)
     if plan.primary is None:
         return refusal_outcome(plan, spec, dag_checks=dag_checks)
+    named = certified
     if certified is None:
         from scmle.data.identification import certified as loader
 
@@ -1072,6 +1123,8 @@ def identify(
         if spec.subgroups and not adapter.single_unit
         else None
     )
+    if subgroup_found is not None:
+        label_subgroups(subgroup_found, named)
     verdict = verdict_of(spec, primary)
     verdict_sig = primary.excludes_zero() if np.isfinite(primary.low) else None
     verdict["interval_excludes_zero"] = verdict_sig

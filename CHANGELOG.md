@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+* A certificate for the Holm family of subgroup hypotheses (F10;
+  `benchmarks/qualification/subgroup_certify.py`,
+  `subgroup_certificates.json`, `certified.subgroup_gate`). The plan, seeds
+  and floors were written in the module docstring before the first run and
+  were not changed. Randomized worlds with eight equal levels of a declared
+  column, difference in means, Holm at 0.05 over the whole family (R = 2000):
+  family-wise error with no effect in any level 0.0555 (Wilson 0.046 to
+  0.066), with two real effects of 0.5 sd and six true nulls 0.0480 (0.039 to
+  0.058), both within the floor 0.0597. Power for one planted effect of 0.5
+  sd (R = 500): 0.420 at 100 rows per level, 0.764 at 200 (Wilson lower 0.725,
+  below the 0.80 floor) and 0.986 at 400 (lower 0.971), so the power is
+  certified from 400 rows per level; at 0.3 sd and 0.8 sd the numbers are
+  filed, not gated. The gate passed. It decides only the word in the report:
+  `identification_report.json`'s `subgroups` key has `gate` (`gating` with a
+  current passing certificate, `descriptive` without, with a stale one or one
+  that missed a floor), `statement_gate`, and per hypothesis `certified_size`
+  (the level has at least the certified rows); `causal_claims.json` repeats
+  the gate. An explicit `certified=` tuple given to `identify` is read as
+  before: it must list `subgroup_holm` for `gating`. The tier is unchanged
+  whatever the gate (the tier rule has no subgroup input and none was added;
+  a test pins identical decisions). `python -m benchmarks.qualification
+  --check` now includes `subgroup_problems` and `subgroup_descriptive_only`.
+  Not measured: unequal levels, overlapping columns, other strategies, a real
+  trial. No other certificate changed.
+
 * The bootstrap promotion and rollback rules of the lifecycle manager are
   descriptive once a charter rollout is bound, and B9 runs through the hook
   (F11, W1; `LifecycleManager.defer_to_rollout`, `RolloutHook.review` and

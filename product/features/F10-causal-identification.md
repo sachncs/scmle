@@ -22,9 +22,11 @@ The estimate, battery, replication, sensitivity and tier are computed on the
 frame `C` releases (`scmle/core/causal_claim.py`). Left:
 
 - Subgroup hypotheses are registered and reported (Holm at the primary
-  level), but they describe heterogeneity only: they do not enter the tier,
-  their power at the subgroup sizes of a real run is not measured, and no
-  certificate covers the Holm family of subgroup estimates.
+  level) and describe heterogeneity only: they do not enter the tier. Their
+  family-wise error and power are certified on simulated randomized worlds
+  with equal levels (`subgroup_certificates.json`); not measured: unequal or
+  overlapping subgroups, strategies other than the difference in means, and
+  the subgroups of a real trial.
 - Attestations are signed with the project's shared HMAC key: a verifying
   signature shows the statement was issued unchanged by a holder of the key,
   not which person signed. Per-person keys or asymmetric signatures, a

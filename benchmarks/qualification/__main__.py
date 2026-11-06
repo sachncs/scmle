@@ -29,6 +29,11 @@ The F12 coverage and breadth gates (`uncertainty_certify.py`) are checked
 against `uncertainty_certificates.json`: a certificate is stale when the code
 it measured changed. A gate that missed its floor is listed as descriptive and
 does not fail the check.
+The Holm family of subgroup hypotheses (`subgroup_certify.py`) is checked
+against `subgroup_certificates.json`: a certificate is stale when the method
+code changed; a family that missed its floors is listed as descriptive and
+does not fail the check, and the causal report then labels subgroups
+`descriptive`.
 The F8 framing methods (`framing_certify.py`) are checked by `--check framing`
 against `framing_certificates.json` and `framing_measurements.json`: stale
 code, a `MIN_CLUSTERS` that differs from the measured minimum, or an accepted
@@ -65,6 +70,7 @@ from benchmarks.qualification import loop_certify
 from benchmarks.qualification import screen_certify
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
+from benchmarks.qualification import subgroup_certify
 from benchmarks.qualification import uncertainty_certify
 from scmle.data.detectors import certificates
 
@@ -86,6 +92,7 @@ def check_certificates() -> int:
     ingest_store = certificates.CertificateStore.load(ingest_certify.STORE_PATH)
     ingest_problems = ingest_certify.problems(ingest_store)
     uncertainty_problems = uncertainty_certify.problems()
+    subgroup_problems = subgroup_certify.problems()
     corpora_stale = f5_corpora.stale()
     ok = (
         not corpora_stale
@@ -95,6 +102,7 @@ def check_certificates() -> int:
         and not f6_problems
         and not screen_problems
         and not uncertainty_problems
+        and not subgroup_problems
     )
     print(
         json.dumps(
@@ -111,6 +119,12 @@ def check_certificates() -> int:
                 "uncertainty_problems": uncertainty_problems,
                 "uncertainty_descriptive_only": (
                     uncertainty_certify.descriptive_only()
+                ),
+                "subgroup_problems": subgroup_problems,
+                "subgroup_descriptive_only": (
+                    subgroup_certify.descriptive_only()
+                    if not subgroup_problems
+                    else []
                 ),
                 "f6_problems": f6_problems,
                 "f6_descriptive_only": f6_certify.audit_labels(f6_store)[

@@ -9,6 +9,7 @@ The certificate file is not part of the installed package: without it no gate
 is certified and every causal claim stays at most `attested`.
 """
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from scmle.data.identification import select
 from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.identification import tier
+from scmle.data.ledger import multiplicity
 
 STORE_PATH = (
     Path(__file__).resolve().parents[3]
@@ -85,3 +87,74 @@ def certified_gates(path: Path | None = None) -> set[str]:
         for name, entry in document.get("gates", {}).items()
         if entry.get("passed") and entry.get("method_hash") == current.get(name)
     }
+
+
+SUBGROUP_STORE_PATH = STORE_PATH.with_name("subgroup_certificates.json")
+SUBGROUP_GATE = "subgroup_holm"
+GATING = "gating"
+DESCRIPTIVE = "descriptive"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SubgroupGate:
+    """Whether the Holm family of subgroup estimates is certified.
+
+    Attributes:
+        status: `gating` when the stored certificate passed its
+            pre-registered floors on the current code, else `descriptive`.
+        reason: One sentence saying why.
+        min_rows: The smallest subgroup size (rows of `C` in the subgroup)
+            at which the power floor was met, or None.
+    """
+
+    status: str
+    reason: str
+    min_rows: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return dataclasses.asdict(self)
+
+
+def subgroup_method_hash(report: Any) -> str:
+    """Hash of the code a subgroup certificate measured.
+
+    Args:
+        report: `scmle.data.identification.run.subgroup_report`, passed in
+            because that module imports this one's loader.
+    """
+    return certificates.code_hash(
+        report, battery.wald_test, multiplicity.adjust
+    )
+
+
+def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
+    """Whether subgroup results gate or only describe.
+
+    The subgroup family never changes the tier (the tier rule has no
+    subgroup input); this decides only which word the report carries.
+
+    Args:
+        report: `scmle.data.identification.run.subgroup_report`.
+        path: Certificate file; the shipped one when omitted.
+    """
+    target = SUBGROUP_STORE_PATH if path is None else path
+    if not target.exists():
+        return SubgroupGate(DESCRIPTIVE, "no subgroup certificate file")
+    document = json.loads(target.read_text(encoding="utf-8"))
+    entry = document.get("gates", {}).get(SUBGROUP_GATE)
+    if entry is None:
+        return SubgroupGate(DESCRIPTIVE, "no subgroup certificate")
+    if entry.get("method_hash") != subgroup_method_hash(report):
+        return SubgroupGate(
+            DESCRIPTIVE, "stale: the code changed since it was measured"
+        )
+    if not entry.get("passed"):
+        return SubgroupGate(
+            DESCRIPTIVE, "the certificate missed its pre-registered floor"
+        )
+    return SubgroupGate(
+        GATING,
+        "family-wise error and power met their pre-registered floors",
+        entry.get("min_certified_rows"),
+    )

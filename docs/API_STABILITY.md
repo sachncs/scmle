@@ -81,7 +81,11 @@ Charter format 9 adds the optional `subgroups` field of the causal block
 (`scmle.data.charter.causal.Subgroup`, an extension surface) and the
 optional `attestors` and `attestations` fields
 (`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`);
-a format 4 causal charter keeps its hash and signature.
+a format 4 causal charter keeps its hash and signature. The `subgroups` key
+of `identification_report.json` gained `gate`, `statement_gate` and a per
+hypothesis `certified_size`, and the summary in `causal_claims.json` a `gate`;
+`scmle.data.identification.certified.subgroup_gate` and `SubgroupGate` are
+additions (extension surfaces).
 
 Charter format 10 adds the optional `uncertainty` block
 (`scmle.data.charter.uncertainty.UncertaintySpec`, an extension surface; the

@@ -1,0 +1,134 @@
+{
+  "dev_seed_base": 10000,
+  "gates": {
+    "subgroup_holm": {
+      "alpha": 0.050000000000000044,
+      "code_hash": "8b5b0a356a3853a795d83cf3e863872d6c82e47091761191b5886861a0cd5dec",
+      "familywise_bound": 0.059746794344809014,
+      "familywise_error_null": {
+        "hits": 111,
+        "n": 2000,
+        "rate": 0.0555,
+        "wilson": [
+          0.04629144858684901,
+          0.06641280644618483
+        ]
+      },
+      "familywise_error_partial_null": {
+        "hits": 96,
+        "n": 2000,
+        "rate": 0.048,
+        "wilson": [
+          0.03946691899074102,
+          0.05826609175151162
+        ]
+      },
+      "method_hash": "12ce1ad46589b16b05415ad1437136bc33aa1ba659ba750acf033fab70e44fe2",
+      "min_certified_rows": 400,
+      "passed": true,
+      "power_at_effect_half_sd": {
+        "100": {
+          "hits": 210,
+          "n": 500,
+          "rate": 0.42,
+          "wilson": [
+            0.37750935127740226,
+            0.4637105431964461
+          ]
+        },
+        "200": {
+          "hits": 382,
+          "n": 500,
+          "rate": 0.764,
+          "wilson": [
+            0.7248556437078593,
+            0.7991187045284411
+          ]
+        },
+        "400": {
+          "hits": 493,
+          "n": 500,
+          "rate": 0.986,
+          "wilson": [
+            0.9713869308622147,
+            0.9932022102091564
+          ]
+        }
+      },
+      "power_other_effects_filed": {
+        "0.3": {
+          "100": {
+            "hits": 50,
+            "n": 500,
+            "rate": 0.1,
+            "wilson": [
+              0.07667756273730172,
+              0.1294219096319401
+            ]
+          },
+          "200": {
+            "hits": 135,
+            "n": 500,
+            "rate": 0.27,
+            "wilson": [
+              0.2329485392031058,
+              0.3105586574092084
+            ]
+          },
+          "400": {
+            "hits": 293,
+            "n": 500,
+            "rate": 0.586,
+            "wilson": [
+              0.5423312223504144,
+              0.6283573910901985
+            ]
+          }
+        },
+        "0.8": {
+          "100": {
+            "hits": 446,
+            "n": 500,
+            "rate": 0.892,
+            "wilson": [
+              0.8617453267151934,
+              0.9162771903629497
+            ]
+          },
+          "200": {
+            "hits": 498,
+            "n": 500,
+            "rate": 0.996,
+            "wilson": [
+              0.9855342847848231,
+              0.9989023694773173
+            ]
+          },
+          "400": {
+            "hits": 500,
+            "n": 500,
+            "rate": 1.0,
+            "wilson": [
+              0.9923756595384479,
+              1.0
+            ]
+          }
+        }
+      },
+      "power_replicates": 500,
+      "replicates": 2000,
+      "seconds": 21.0,
+      "seeds": [
+        0,
+        2000
+      ]
+    }
+  },
+  "not_measured": [
+    "unequal subgroup sizes",
+    "strategies other than the randomized difference in means",
+    "overlapping subgroup columns",
+    "a real trial's subgroups"
+  ],
+  "version": 1
+}
