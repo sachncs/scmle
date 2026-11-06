@@ -1,7 +1,7 @@
 {
   "certificates": [
     {
-      "code_hash": "6ff1d51e9e04611d98ef076ea7ea4d16293a240755da0978668318b6cfedcd7f",
+      "code_hash": "679aa48892d49439b88e7047ccdc9f3807a57a7a23e2c9857f1f9a928eb8b327",
       "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
       "created": null,
       "detector_id": "f4-leakage-screen",

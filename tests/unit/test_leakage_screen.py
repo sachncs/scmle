@@ -560,8 +560,14 @@ def test_a_wide_multiclass_table_is_declined_quickly_and_says_so():
     frame["y"] = rng.integers(0, 10, 600)
     started = time.monotonic()
     report = screen.screen_table(
-        frame, "y", "classification", [c for c in frame if c != "y"], 0
+        frame,
+        "y",
+        "classification",
+        [c for c in frame if c != "y"],
+        0,
+        time_budget_seconds=120,
     )
     assert time.monotonic() - started < 20
     assert not [f for f in report.findings if f.suspect]
     assert any("limit is" in note for note in report.notes)
+    assert len(report.unchecked) == 64

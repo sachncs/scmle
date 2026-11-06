@@ -144,6 +144,34 @@ Read this carefully:
   very strong honest predictors. Do not read 6.7 percent as a general rate. It
   says: where honest predictors are very strong, expect some false flags.
 
+### The screen runs inside the time budget
+
+The screen is part of the run, so it is bounded by the project's
+`--time-budget` (default 1800 seconds) and not by the clock. Its work is the
+number of cross-fitted fits: permutations x skill columns x classes (one
+versus rest above two classes). The cap is
+`time_budget_seconds * 0.15 * 25,000`: 15 percent of the budget at a declared
+25,000 fits per second. That rate is about half of what was measured here (a
+breast-cancer sized table, 72,000 fits, took 1.4 s, about 51,000 fits per
+second), so a slower machine still finishes inside its share. The cap is
+arithmetic on the budget, so the same table gets the same flags on every
+machine. The default budget allows 6.75 million fits; a 120 second budget
+allows 450,000. Digits (64 columns, 10 classes) needs about 3.6 million: it is
+screened under the default budget and **not run** under `--time-budget 120`.
+
+A screen that does not run is never a clean bill. The run says so in the last
+line of its summary, for example `WARNING leakage screen NOT RUN for 64 columns
+(work limit for a 120 s time budget): these columns are unchecked, not clean;
+raise --time-budget or screen fewer columns`. The same sentence is the first
+warning of the plan and the profile, the first finding of `report.html` and a
+`leakage_screen` entry in `diagnostics/decision_log.json`; the test score is
+labelled `PROVISIONAL: leakage screen incomplete`. `--leakage-policy warn`
+trains on and says so; `--leakage-policy block` **refuses** to run, because
+`block` means do not train on unchecked suspicion (choose `warn`, or raise the
+budget, to proceed). A table that needs more than 100,000 permutations is
+reported the same way. The statistics of the screen did not change; only the
+point at which it declines did, so the certificate is unchanged in content.
+
 ### Reproduce
 
 ```bash

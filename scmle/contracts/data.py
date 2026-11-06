@@ -746,7 +746,7 @@ class DatasetProfile:
 
     @property
     def unchecked_columns(self) -> tuple[str, ...]:
-        """Columns the leakage screen declined to test (unchecked, not clean)."""
+        """Columns the leakage screen declined to test (not clean)."""
         return tuple(map(str, self.leakage.get("unchecked", ())))
 
     @property

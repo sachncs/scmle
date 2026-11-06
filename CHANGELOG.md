@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+* The leakage screen now runs inside the declared time budget and is loud when
+  it does not run. `MAX_WORK = 500_000` is replaced by a cap derived from the
+  budget: `time_budget_seconds * SCREEN_SHARE (0.15) * FITS_PER_SECOND
+  (25,000)` cross-fitted fits, deterministic (arithmetic on the budget, never
+  the clock). Measured: 72,000 fits of a breast-cancer sized table take 1.4 s
+  (about 51,000 per second); the declared rate is about half. The default
+  1800 s allows 6.75 million fits, the CI benchmark's 120 s allows 450,000.
+  `screen_table` and `screen` take `time_budget_seconds`; the profiler passes
+  the project's; omitted, nothing is capped beyond `MAX_PERMUTATIONS`, so the
+  certification paths behave as before. A declined table (work or permutation
+  limit) sets `ScreenReport.unchecked` and `warning`: the last line of
+  `RunResult.summary` ends `WARNING leakage screen NOT RUN for N columns
+  (...): these columns are unchecked, not clean; ...`, the same sentence is the
+  first plan and profile warning, the first finding of `report.html` and a
+  `leakage_screen` entry of the decision log, and the test score is labelled
+  `PROVISIONAL: leakage screen incomplete`. `leakage_policy="block"` refuses
+  an unchecked screen; `warn` proceeds loudly. The run clock already starts
+  when the run context is created, so profiling time was always deducted from
+  the trial budget; the screen simply used it all (digits: 7 trials). The
+  statistics did not change; the screen's code hash did, so
+  `screen_certificates.json` was rewritten with the same seeds and floors and
+  `screen_measurements.json` is byte-identical.
+
 * The coverage claim is registered before it is read (F12, WP-12.2;
   `coverage_run.claim_document`, `coverage_claim.json`, `claims verify`).
   Before `FinalEvaluationStage` opens the final test rows it writes
