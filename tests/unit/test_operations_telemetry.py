@@ -115,14 +115,21 @@ def test_logs_carry_trace_version_and_digest_and_never_a_secret():
         "serve", "v1", "sha256:" + "a" * 64, sink=lines.append
     )
     trace = logs.new_trace_id()
-    log.request(trace, "/predict", 500, 0.25, authorization="Bearer abc", n=3)
+    log.request(
+        trace,
+        "/predict",
+        500,
+        0.25,
+        authorization="Bearer not-a-digest-zq",
+        n=3,
+    )
     record = json.loads(lines[0])
     assert record["trace_id"] == trace and record["level"] == "error"
     assert record["model_version"] == "v1"
     assert record["artifact_digest"].startswith("sha256:")
     assert record["duration_ms"] == 250.0
     assert record["authorization"] == logs.REDACTED
-    assert "abc" not in lines[0]
+    assert "not-a-digest-zq" not in lines[0]
     nested = log.emit("info", "x", None, context={"api_key": "k", "ok": 1})
     assert nested["context"] == {"api_key": logs.REDACTED, "ok": 1}
 
