@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+* The `known_entity_future` unit of prediction has a protocol (F12, WP-12.7;
+  `ProfileStage.check_known_entity`, `custody.pipeline.apply_custody`). A
+  charter with `unit_of_prediction: known_entity_future` predicts a later row
+  of an entity seen in training, so the entity is no longer tied to one side:
+  the carve of `C` (contiguous time blocks with an embargo) ignores the
+  group column and an entity's rows may sit in `X` and in `C`, while the
+  final test rows are the latest period of the time-ordered split. The run
+  refuses the charter without `data.group_column` or `data.time_column` or
+  with a validation that is not temporal or rolling (an entity-disjoint split
+  would test new entities), and emits `unit.known_entity_future`. Without
+  the field, or with `new_entity`, nothing changes (a test pins the
+  entity-disjoint carve). Not measured on a real panel; the hash of a charter
+  with the field is unchanged (format 6). No certified source changed.
+
 * The coverage monitor feeds the closed loop (F12 and F13;
   `scmle.governance.uncertainty_feed.UncertaintyFeed`). For a classification
   bundle, `observe` sends the loop each served case's conformal set size and

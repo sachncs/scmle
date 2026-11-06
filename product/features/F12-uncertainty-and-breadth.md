@@ -268,7 +268,10 @@ models, set-level (joint) conformal guarantees.
 calibration uses calibration points from entities not in training and
 **one score per entity cluster is the exchangeable unit** (the effective
 `n` is the number of entities). `known_entity_future`: temporal split within
-entity with embargo. Metric intervals by cluster bootstrap (as
+entity with embargo (built: the entity is not a split unit, `C` is time blocks
+with an embargo, the final rows are the latest period, and the run refuses a
+charter without the entity and time columns or with an entity-disjoint
+validation; not yet measured on a real panel). Metric intervals by cluster bootstrap (as
 `champion.py:110-120` already does for model comparison). Cut: mixed-effects
 prediction as a model family.
 

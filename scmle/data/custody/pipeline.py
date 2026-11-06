@@ -149,9 +149,14 @@ def apply_custody(
         if task.is_classification
         else None
     )
+    known_entity = (
+        charter.unit_of_prediction == charter_contracts.KNOWN_ENTITY_FUTURE
+    )
+    # A known entity is not a unit: its rows may sit in X and in C, so the
+    # carve (time blocks, with an embargo) does not tie them together.
     groups = (
         frame[data.group_column].iloc[dev_ids].to_numpy()
-        if data.group_column
+        if data.group_column and not known_entity
         else None
     )
     times = (

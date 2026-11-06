@@ -1477,6 +1477,7 @@ class ProfileStage(Stage):
                 "data.group_column so that entities are split and calibrated "
                 "as units"
             )
+        self.check_known_entity(context, charter, split)
         log = custody_sealed.OpenLog(
             context.store.directory / "custody_log.jsonl"
             if context.store is not None
@@ -1528,6 +1529,49 @@ class ProfileStage(Stage):
             },
         )
         return outcome.split
+
+    def check_known_entity(
+        self,
+        context: context_module.RunContext,
+        charter: charter_contracts.AnalysisCharter,
+        split: splitters.SplitResult,
+    ) -> None:
+        """Requires the data a known-entity-future charter needs (F12).
+
+        A later row of an entity seen in training is predicted, so the
+        entity column and the time column must be named and validation must
+        be time-ordered: an entity-disjoint split would test the wrong unit
+        (that is `new_entity`).
+
+        Raises:
+            ConfigError: If a column is missing or the split is entity-disjoint.
+        """
+        if charter.unit_of_prediction != charter_contracts.KNOWN_ENTITY_FUTURE:
+            return
+        data = context.spec.data
+        for role, column in (
+            ("group_column", data.group_column),
+            ("time_column", data.time_column),
+        ):
+            if not column:
+                raise errors.ConfigError(
+                    "the charter's unit_of_prediction is known_entity_future, "
+                    f"which needs data.{role} (the entity and the time order)"
+                )
+        if split.manifest.strategy not in custody_pipeline.TEMPORAL:
+            raise errors.ConfigError(
+                "known_entity_future needs time-ordered validation "
+                "(temporal or rolling), not "
+                f"'{split.manifest.strategy}': an entity-disjoint split tests "
+                "new entities"
+            )
+        context.emit(
+            "unit.known_entity_future",
+            "entities are not split units: their rows sit on both sides, "
+            "the confirmation rows are time blocks with an embargo and the "
+            "final test rows are the latest period",
+            data={"entity_column": data.group_column},
+        )
 
     def make_split(
         self,

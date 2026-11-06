@@ -112,10 +112,13 @@ floors. Nothing below was run on real data.
 - G10 against one public LTR set with published figures; per-label support
   rule and per-label thresholds and sets (G12). Built 2026-11-04: the
   `unit_of_prediction` charter field (format 6) and entity-wise calibration
-  (one random held-out row per entity) for `new_entity`. Open:
-  `known_entity_future` has no protocol of its own yet (it changes nothing
-  in the run), cluster-bootstrap metric intervals, and the check that the
-  entity-wise choice does not under-cover in a real panel.
+  (one random held-out row per entity) for `new_entity`. Built
+  2026-11-06: `known_entity_future` protocol (entities are not split units;
+  confirmation rows are time blocks with an embargo; the entity and time
+  columns and a time-ordered validation are required). Open: cluster-bootstrap
+  metric intervals, the check that the entity-wise choice does not
+  under-cover in a real panel, and the same check for known entities (no real
+  panel has been run).
 
 **WP-12.8 Near-duplicate grouping and text/image encoders** (not started)
 - Duplicate grouper (hash + embedding cosine), group split; one frozen image
