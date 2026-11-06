@@ -37,8 +37,9 @@ Entity resolution (charter format 8) runs on the run table itself:
 `resolve_entities` compares the declared fields, groups records linked above
 the lower threshold, and the caller makes the result the split's group column,
 so duplicates of one real-world entity under different keys never straddle
-development and test. Extract reconciliation against source totals is not
-done here.
+development and test. With a `reconcile` block the extracted views are
+compared with the totals it declares before anything is synthesized, and a
+mismatch stops the run (`declared.require`).
 """
 
 import dataclasses
@@ -55,6 +56,7 @@ from scmle.data.admissibility import provenance
 from scmle.data.charter import ingest as charter_ingest
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import budget as budgets
+from scmle.data.ingest import declared
 from scmle.data.ingest import entities
 from scmle.data.ingest import plan as ingest_plan
 from scmle.data.ingest import profile
@@ -127,19 +129,27 @@ def rule_of(
     )
 
 
-def read_view(
-    entry: dict[str, Any],
-    factory: Any,
-    spec: charter_ingest.IngestSpec,
-) -> asof_view.AsOfView:
-    """One table as an as-of view, read once with a snapshot check."""
+def read_frame(entry: dict[str, Any], factory: Any) -> pd.DataFrame:
+    """One table, read once with a snapshot check."""
     table = identifier(entry["table"], "table")
     order = str(entry["order_by"])
     if not ORDER.match(order):
         raise errors.ConfigError(f"ingest plan order_by {order!r} is invalid")
     query = f"SELECT * FROM {table} ORDER BY {order}"  # nosec B608
     connector = connectors.DbApiConnector("sqlite://ingest", query, factory)
-    frame = profile.consistent_read(connector, BATCH_ROWS).frame
+    return profile.consistent_read(connector, BATCH_ROWS).frame
+
+
+def read_view(
+    entry: dict[str, Any],
+    factory: Any,
+    spec: charter_ingest.IngestSpec,
+    frame: pd.DataFrame | None = None,
+) -> asof_view.AsOfView:
+    """One table as an as-of view; `frame` is the extract if already read."""
+    table = identifier(entry["table"], "table")
+    if frame is None:
+        frame = read_frame(entry, factory)
     return asof_view.AsOfView(
         frame,
         entry["key"],
@@ -195,7 +205,26 @@ def run(
             f"the target table ({verdict.verdict}): {verdict.reason}",
             {"questions": list(verdict.questions)},
         )
-    views = [read_view(v, factory, spec) for v in plan_document["views"]]
+    entries = [*plan_document["views"], *plan_document.get("nests", [])]
+    extracts = [read_frame(entry, factory) for entry in entries]
+    report = None
+    if spec.reconcile is not None:
+        report = declared.reconcile(
+            {
+                str(entry.get("name", entry["table"])): extract
+                for entry, extract in zip(entries, extracts, strict=True)
+            },
+            spec.reconcile,
+            spec.delta_rec,
+        )
+        declared.require(report)
+    count = len(plan_document["views"])
+    views = [
+        read_view(v, factory, spec, extract)
+        for v, extract in zip(
+            plan_document["views"], extracts[:count], strict=True
+        )
+    ]
     sources = [
         synthesize.Source(
             view,
@@ -205,7 +234,10 @@ def run(
         for view, entry in zip(views, plan_document["views"], strict=True)
     ]
     leaves = [
-        read_view(n, factory, spec) for n in plan_document.get("nests", [])
+        read_view(n, factory, spec, extract)
+        for n, extract in zip(
+            plan_document.get("nests", []), extracts[count:], strict=True
+        )
     ]
     nests = [
         synthesize.Nest(sources[n["mid"]], leaf, n["mid_id"])
@@ -227,6 +259,8 @@ def run(
         MANIFEST: found.to_dict(),
         PROVENANCE: table.to_dict(),
     }
+    if report is not None:
+        documents[declared.FILE] = report
     return IngestResult(
         found.frame,
         found.declared_family_size,

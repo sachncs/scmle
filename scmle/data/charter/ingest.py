@@ -13,12 +13,14 @@ columns are not here; they are in the plan file the data spec names.
 
 from collections.abc import Mapping
 import dataclasses
+import re
 from typing import Any
 from typing import Self
 
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
 PASS_KINDS = ("exact", "prefix", "soundex")
 DEFAULT_WINDOWS = (7.0, 30.0, 90.0)
 DEFAULT_FEATURE_BUDGET = 200
@@ -138,6 +140,120 @@ class EntitySpec:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class ColumnTotal:
+    """The total of one column that the source system owns.
+
+    Attributes:
+        column: Column of the extracted view.
+        total: Its sum in the source system.
+    """
+
+    column: str
+    total: float
+
+    def __post_init__(self) -> None:
+        """Validates the record."""
+        evidence.require_text(self.column, "column")
+        qualification.finite(self.total, "total")
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds the record, rejecting unknown or missing fields."""
+        qualification.require_fields(cls, record)
+        return cls(**record)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class TableTotals:
+    """What the source system says one extracted view must contain.
+
+    Attributes:
+        view: Name of a view (or nest) of the ingest plan.
+        rows: Row count in the source, or None.
+        sums: Column totals in the source.
+        checksum_column: Column whose values are checksummed.
+        checksum: SHA-256 of the sorted values of that column as text, joined
+            by newlines (`scmle.data.ingest.declared.key_checksum`).
+    """
+
+    view: str
+    rows: int | None = None
+    sums: tuple[ColumnTotal, ...] = ()
+    checksum_column: str | None = None
+    checksum: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validates the record."""
+        evidence.require_text(self.view, "view")
+        qualification.require_tuple(self.sums, "sums")
+        if self.rows is not None:
+            qualification.count(self.rows, "rows")
+        if (self.checksum_column is None) != (self.checksum is None):
+            raise ValueError("checksum and checksum_column go together")
+        if self.checksum is not None and not HEX64.match(self.checksum):
+            raise ValueError("checksum must be 64 lower-case hex digits")
+        if self.rows is None and not self.sums and self.checksum is None:
+            raise ValueError(f"nothing is declared for view {self.view!r}")
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return {
+            "view": self.view,
+            "rows": self.rows,
+            "sums": [s.to_dict() for s in self.sums],
+            "checksum_column": self.checksum_column,
+            "checksum": self.checksum,
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds the record, rejecting unknown or missing fields."""
+        qualification.require_fields(cls, record)
+        return cls(
+            record["view"],
+            record["rows"],
+            tuple(ColumnTotal.from_dict(s) for s in record["sums"]),
+            record["checksum_column"],
+            record["checksum"],
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ReconcileSpec:
+    """Totals the extract must reproduce, or the run stops (format 8).
+
+    Attributes:
+        tables: One record per view; the relative gap allowed in a sum is the
+            ingest block's `delta_rec`, counts and checksums are exact.
+    """
+
+    tables: tuple[TableTotals, ...]
+
+    def __post_init__(self) -> None:
+        """Validates the block."""
+        qualification.require_tuple(self.tables, "tables")
+        if not self.tables:
+            raise ValueError("a reconcile block needs at least one table")
+        names = [t.view for t in self.tables]
+        if len(set(names)) != len(names):
+            raise ValueError("duplicate view in the reconcile block")
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return {"tables": [t.to_dict() for t in self.tables]}
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds the block, rejecting unknown or missing fields."""
+        qualification.require_fields(cls, record)
+        return cls(tuple(TableTotals.from_dict(t) for t in record["tables"]))
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class IngestSpec:
     """Budget, windows and tolerances of an ingestion.
 
@@ -156,6 +272,8 @@ class IngestSpec:
         strict: Drop features whose weakest source is `unverified`.
         entity: Entity resolution on the run table whose groups become the
             split's group column (format 8), or None.
+        reconcile: Source totals the extracted views must reproduce
+            (format 8), or None.
     """
 
     max_queries: int | None = None
@@ -170,6 +288,7 @@ class IngestSpec:
     eps_fk: float = 0.0
     strict: bool = False
     entity: EntitySpec | None = None
+    reconcile: ReconcileSpec | None = None
 
     def __post_init__(self) -> None:
         """Validates the block."""
@@ -193,19 +312,25 @@ class IngestSpec:
         """JSON-ready record."""
         record = dataclasses.asdict(self)
         record["windows"] = list(self.windows)
-        del record["entity"]
+        del record["entity"], record["reconcile"]
         if self.entity is not None:
             record["entity"] = self.entity.to_dict()
+        if self.reconcile is not None:
+            record["reconcile"] = self.reconcile.to_dict()
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the block, rejecting unknown or missing fields."""
-        values = {"entity": None, **record}
+        values = {"entity": None, "reconcile": None, **record}
         qualification.require_fields(cls, values)
         values["windows"] = tuple(values["windows"])
         block = values["entity"]
         values["entity"] = (
             None if block is None else EntitySpec.from_dict(block)
+        )
+        totals = values["reconcile"]
+        values["reconcile"] = (
+            None if totals is None else ReconcileSpec.from_dict(totals)
         )
         return cls(**values)

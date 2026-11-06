@@ -468,10 +468,15 @@ class AnalysisCharter:
 
         2; 3 with rules; 4 with a causal block; 5 with a decision layer; 6
         with a unit of prediction; 7 with an ingest block; 8 when the ingest
-        block carries an entity-resolution sub-block.
+        block carries an entity or reconcile sub-block.
         """
         if self.ingest is not None:
-            return 8 if self.ingest.entity is not None else 7
+            if (
+                self.ingest.entity is not None
+                or self.ingest.reconcile is not None
+            ):
+                return 8
+            return 7
         if self.unit_of_prediction is not None:
             return 6
         if self.decision is not None:

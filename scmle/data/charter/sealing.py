@@ -131,11 +131,13 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
             f"'ingest', which needs format {INGEST_FORMAT}"
         )
     block = record.get("charter", {}).get("ingest") or {}
-    if declared < INGEST_ENTITY_FORMAT and "entity" in block:
-        raise errors.ConfigError(
-            f"charter {path} declares format {declared} but its ingest block "
-            f"carries 'entity', which needs format {INGEST_ENTITY_FORMAT}"
-        )
+    for name in ("entity", "reconcile"):
+        if declared < INGEST_ENTITY_FORMAT and name in block:
+            raise errors.ConfigError(
+                f"charter {path} declares format {declared} but its ingest "
+                f"block carries {name!r}, which needs format "
+                f"{INGEST_ENTITY_FORMAT}"
+            )
 
 
 def read_verified(

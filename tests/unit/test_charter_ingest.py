@@ -132,3 +132,62 @@ def test_the_entity_block_in_format_seven_is_refused(tmp_path):
 def test_an_invalid_entity_block_is_refused(build):
     with pytest.raises(ValueError):
         build()
+
+
+def reconcile_block():
+    return ingest.ReconcileSpec(
+        (
+            ingest.TableTotals(
+                "orders",
+                rows=100,
+                sums=(ingest.ColumnTotal("amount", 5000.0),),
+                checksum_column="order_id",
+                checksum="ab" * 32,
+            ),
+        )
+    )
+
+
+def test_the_reconcile_block_needs_format_eight_and_round_trips():
+    spec = ingest.IngestSpec(reconcile=reconcile_block())
+    charter = make_charter(ingest=spec)
+    assert charter.format_version == 8
+    assert charter.charter_hash != FORMAT_SEVEN_HASH
+    record = json.loads(json.dumps(charter.to_dict()))
+    assert c.AnalysisCharter.from_dict(record) == charter
+    plain = make_charter(ingest=ingest.IngestSpec(feature_budget=50, lag=1.0))
+    assert "reconcile" not in plain.to_dict()["ingest"]
+    assert plain.charter_hash == FORMAT_SEVEN_HASH
+
+
+def test_the_reconcile_block_in_format_seven_is_refused(tmp_path):
+    charter = make_charter(
+        ingest=ingest.IngestSpec(reconcile=reconcile_block())
+    )
+    path = tmp_path / "charter.json"
+    sealing.write_charter(path, charter, signing_key="k")
+    wrapper = json.loads(path.read_text())
+    wrapper["format"] = 7
+    path.write_text(json.dumps(wrapper))
+    with pytest.raises(errors.ConfigError, match="reconcile"):
+        sealing.read_verified(path, signing_key="k")
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: ingest.ReconcileSpec(()),
+        lambda: ingest.TableTotals("t"),
+        lambda: ingest.TableTotals("t", rows=-1),
+        lambda: ingest.TableTotals("t", checksum_column="k"),
+        lambda: ingest.TableTotals("t", checksum="ab" * 32),
+        lambda: ingest.TableTotals("t", checksum_column="k", checksum="zz"),
+        lambda: ingest.ColumnTotal("a", float("nan")),
+        lambda: ingest.ReconcileSpec(
+            (ingest.TableTotals("t", rows=1), ingest.TableTotals("t", rows=2))
+        ),
+    ],
+)
+def test_an_invalid_reconcile_block_is_refused(build):
+    with pytest.raises(ValueError):
+        build()

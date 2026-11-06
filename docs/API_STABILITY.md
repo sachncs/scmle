@@ -74,8 +74,9 @@ gained one step, present only when a claim was registered.
 the charter gained the optional field `ingest` (format 7) and a charter
 without it keeps its hash. `tests/fixtures/public_api.json` was regenerated
 for the `MLProject` entry alone. Charter format 8 adds the optional
-`entity` sub-block of `ingest` (`scmle.data.charter.ingest.EntitySpec`, an
-extension surface); a format 7 ingest charter keeps its hash and signature.
+`entity` and `reconcile` sub-blocks of `ingest`
+(`scmle.data.charter.ingest.EntitySpec`, `ReconcileSpec`, extension
+surfaces); a format 7 ingest charter keeps its hash and signature.
 
 `MLProject` gained the optional keywords `logged_action_column` and
 `propensity_column` (default `None`), `DataSpec` the fields of the same names,

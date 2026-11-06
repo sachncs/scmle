@@ -12,6 +12,7 @@ import support
 from scmle.contracts import errors
 from scmle.data.charter import ingest
 from scmle.data.charter import sealing
+from scmle.data.ingest import declared
 from scmle.data.ledger import ledger as ledger_module
 from tests.unit.test_charter_contracts import make_charter
 
@@ -94,9 +95,13 @@ def plan_file(tmp_path, unit="customer"):
     return path
 
 
-def charter_file(tmp_path, block=True, entity=None):
+def charter_file(tmp_path, block=True, entity=None, reconcile=None):
     spec = ingest.IngestSpec(
-        feature_budget=40, windows=(30.0, 90.0), lag=1.0, entity=entity
+        feature_budget=40,
+        windows=(30.0, 90.0),
+        lag=1.0,
+        entity=entity,
+        reconcile=reconcile,
     )
     path = tmp_path / "charter.json"
     sealing.write_charter(
@@ -254,3 +259,49 @@ def test_the_resolved_entity_keeps_duplicates_on_one_side(tmp_path):
     assert document["group_column"] == "entity_group"
     assert document["groups"] == 250 and document["records"] == CUSTOMERS
     assert straddling(result) == []
+
+
+def declared_totals(path, rows_off=0):
+    with sqlite3.connect(path) as connection:
+        keys = pd.read_sql("SELECT order_id, amount FROM orders", connection)
+    return ingest.ReconcileSpec(
+        (
+            ingest.TableTotals(
+                "orders",
+                rows=len(keys) + rows_off,
+                sums=(ingest.ColumnTotal("amount", float(keys.amount.sum())),),
+                checksum_column="order_id",
+                checksum=declared.key_checksum(keys.order_id),
+            ),
+        )
+    )
+
+
+def run_reconciled(tmp_path, rows_off):
+    rate = database(tmp_path / "w.sqlite")
+    block = declared_totals(tmp_path / "w.sqlite", rows_off)
+    return support.make_project(
+        table(rate),
+        "y",
+        time_budget=300,
+        output_dir=tmp_path / "out",
+        charter=charter_file(tmp_path, reconcile=block),
+        id_columns=["customer_id", "moment"],
+        ingest_plan=plan_file(tmp_path),
+    ).run()
+
+
+def test_the_extract_is_reconciled_to_the_declared_totals(tmp_path):
+    result = run_reconciled(tmp_path, 0)
+    report = read(result, "extract_reconciliation.json")
+    assert report["passed"] is True
+    assert {c["name"] for c in report["checks"]} == {
+        "orders.row_count",
+        "orders.sum.amount",
+        "orders.checksum.order_id",
+    }
+
+
+def test_a_total_the_extract_does_not_reproduce_stops_the_run(tmp_path):
+    with pytest.raises(errors.BlockedError, match=r"orders\.row_count"):
+        run_reconciled(tmp_path, 1)

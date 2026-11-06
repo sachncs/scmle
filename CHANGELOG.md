@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+* Extract reconciliation in a charter run (F9, charter format 8;
+  `IngestSpec.reconcile`, `scmle.data.ingest.declared`). The `ingest` block
+  gained the optional `reconcile` sub-block: per view a row count, column sums
+  and a checksum of a key column (SHA-256 of the sorted values as text), as the
+  source system's owner states them. The stage compares them with the frames
+  it read, before synthesizing anything: counts and checksums exactly, sums
+  within `delta_rec`. A mismatch raises a `BlockedError` that names each
+  quantity; a pass writes `extract_reconciliation.json`. Omitted when unset, so
+  a format 7 ingest charter keeps its hash and signature; an older wrapper
+  that carries it is refused. Tests drop a row from the declared count and see
+  the run stop. Not done: the stage does not call `reconcile_extract`, which
+  queries the source, and ingest beyond SQLite is still open (DuckDB is not a
+  dependency, so no second backend was added).
+
 * The resolved entity becomes the split's group column (F9, charter format 8;
   `IngestSpec.entity`, `scmle.core.ingest_stage.resolve_entities`). The
   `ingest` block gained the optional `entity` sub-block (comparison fields,
