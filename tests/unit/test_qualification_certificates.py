@@ -298,3 +298,75 @@ def test_audit_reports_missing_and_stale_gating_detectors():
     uncertified = certificates.audit(store, {"d1": (HASH_A, "sentinel")})
     assert uncertified.uncertified == ("d1",)
     assert certificates.audit(store, {}).ok
+
+
+class TestCheckAll:
+    """`--check all` runs every certificate family and fails on any."""
+
+    @staticmethod
+    def patch(monkeypatch, failing=None):
+        from benchmarks.qualification import __main__ as entry
+
+        calls = []
+
+        def fake(name):
+            def check():
+                calls.append(name)
+                return {"ok": name != failing}
+
+            return check
+
+        monkeypatch.setattr(
+            entry,
+            "check_certificates",
+            lambda: (
+                calls.append("certificates") or int(failing == "certificates")
+            ),
+        )
+        for name, module in (
+            ("f10", entry.f10_certify),
+            ("f11", entry.f11_certify),
+            ("loop", entry.loop_certify),
+            ("framing", entry.framing_certify),
+            ("ingest", entry.ingest_certify),
+        ):
+            if name == "f10":
+                monkeypatch.setattr(
+                    module,
+                    "problems",
+                    lambda: (
+                        calls.append("f10")
+                        or (["x"] if failing == "f10" else [])
+                    ),
+                )
+                monkeypatch.setattr(module, "descriptive_only", lambda: [])
+            else:
+                monkeypatch.setattr(module, "check", fake(name))
+        return entry, calls
+
+    def test_every_family_is_run_and_all_passing_exits_zero(
+        self, monkeypatch, capsys
+    ):
+        entry, calls = self.patch(monkeypatch)
+        assert entry.main(["--check", "all"]) == 0
+        assert sorted(calls) == [
+            "certificates",
+            "f10",
+            "f11",
+            "framing",
+            "ingest",
+            "loop",
+        ]
+        assert '"ok": true' in capsys.readouterr().out
+
+    @pytest.mark.parametrize(
+        "failing",
+        ["certificates", "f10", "f11", "loop", "framing", "ingest"],
+    )
+    def test_one_failing_family_fails_the_run_and_the_rest_still_run(
+        self, monkeypatch, capsys, failing
+    ):
+        entry, calls = self.patch(monkeypatch, failing)
+        assert entry.main(["--check", "all"]) == 1
+        assert len(calls) == 6
+        assert failing in capsys.readouterr().out

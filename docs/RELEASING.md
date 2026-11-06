@@ -18,7 +18,10 @@ unless the evidence holds. The checks live in [`scripts/`](../scripts/README.md)
    ```
 
    It builds the artifacts and the site, then runs lint, types, `bandit`,
-   `pip-audit`, the API check and the complete test suite.
+   `pip-audit`, the API check, `python -m benchmarks.qualification --check
+   all` (the detector, F6, screen, uncertainty and subgroup certificates plus
+   the framing, ingestion, causal, decision and closed-loop families,
+   including `loop_certificates.json`) and the complete test suite.
 
 ## The pipeline (`release.yml`, on a `v*` tag)
 

@@ -366,6 +366,8 @@ jobs:
         run: uv run python -m benchmarks.qualification --smoke
       - name: Require a current certificate for every gating detector
         run: uv run python -m benchmarks.qualification --check
+      - name: Require current certificates for framing, ingestion, causal, decision and loop gates
+        run: uv run python -m benchmarks.qualification --check all
 
   security:
     name: static analysis and dependency audit

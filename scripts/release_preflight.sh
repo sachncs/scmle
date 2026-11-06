@@ -25,6 +25,9 @@ uv run --python "$python_version" pip-audit --skip-editable
 uv run --python "$python_version" python scripts/check_api_compatibility.py \
   tests/fixtures/public_api.json
 
+echo "== certificates (F4 to F6, framing, ingestion, causal, decision, loop) =="
+uv run --python "$python_version" python -m benchmarks.qualification --check all
+
 echo "== focused tests =="
 uv run --python "$python_version" pytest -q \
   -W error::ResourceWarning \

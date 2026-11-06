@@ -9,6 +9,7 @@
     python -m benchmarks.qualification --check loop       # closed loop (F13)
     python -m benchmarks.qualification --check f10        # causal (F10)
     python -m benchmarks.qualification --check f11        # decision layer (F11)
+    python -m benchmarks.qualification --check all        # every family above
     python -m benchmarks.qualification --write-sample F   # stand-in sample
     python -m benchmarks.qualification --write-f5 F       # F5 certificates
 
@@ -145,6 +146,41 @@ def check_certificates() -> int:
     return 0 if ok else 1
 
 
+def check_all() -> int:
+    """Runs every certificate family and fails if any of them fails.
+
+    The families are the default certificate check and `fdr`-free checks of
+    F10, F11, F13, F8 and F9; each runs even when an earlier one failed, and
+    the combined result is printed last.
+    """
+    results: dict[str, bool] = {}
+    results["certificates"] = check_certificates() == 0
+    issues = f10_certify.problems()
+    print(
+        json.dumps(
+            {
+                "ok": not issues,
+                "problems": issues,
+                "descriptive_only": f10_certify.descriptive_only(),
+            },
+            indent=2,
+        )
+    )
+    results["f10"] = not issues
+    for name, check in (
+        ("f11", f11_certify.check),
+        ("loop", loop_certify.check),
+        ("framing", framing_certify.check),
+        ("ingest", ingest_certify.check),
+    ):
+        found = check()
+        print(json.dumps(found, indent=2))
+        results[name] = bool(found["ok"])
+    ok = all(results.values())
+    print(json.dumps({"all": results, "ok": ok}, indent=2))
+    return 0 if ok else 1
+
+
 def main(arguments: list[str] | None = None) -> int:
     """Runs the requested action and returns a process exit code."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -162,6 +198,7 @@ def main(arguments: list[str] | None = None) -> int:
             "framing",
             "ingest",
             "loop",
+            "all",
         ),
     )
     action.add_argument("--write-sample", type=Path, metavar="FILE")
@@ -175,6 +212,8 @@ def main(arguments: list[str] | None = None) -> int:
         report = smoke.run_smoke(options.runs, options.seed, options.full)
         print(json.dumps(report.to_dict(), indent=2))
         return 0 if report.ok else 1
+    if options.check == "all":
+        return check_all()
     if options.check == "fdr":
         findings = ledger_checks.run_all(
             options.runs, options.seed, options.repeats
