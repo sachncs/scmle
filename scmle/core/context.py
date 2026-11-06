@@ -368,6 +368,8 @@ class RunContext:
         diagnostics: Post-selection diagnostic reports by name.
         reference_scores: Model scores / predicted classes on the held-out
             rows, the reference for output-drift monitoring.
+        pending_ledger: The exploration of a charter run whose opening of the
+            confirmation set waits for the model selection, or None.
         refits: Candidates already refit on development data during
             constraint checks, by trial id (reused by the final evaluation).
         final_pipeline: Selected pipeline refit on development data.
@@ -445,6 +447,7 @@ class RunContext:
     )
     reference_scores: pd.Series | None = None
     refits: dict[str, Any] = dataclasses.field(default_factory=dict)
+    pending_ledger: Any = None
     final_pipeline: Any = None
     test_rows: tuple[pd.DataFrame, pd.Series] | None = None
     stream: tuple[streaming.ChunkSource, streaming.Totals] | None = None

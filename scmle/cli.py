@@ -107,6 +107,11 @@ class ProjectCommand(Command):
         parser.add_argument("--query-column")
         parser.add_argument("--treatment-column")
         parser.add_argument("--baseline-column")
+        parser.add_argument(
+            "--baseline-subject",
+            choices=("frozen_rule", "selected_model"),
+            default="frozen_rule",
+        )
         parser.add_argument("--framing-draft")
         parser.add_argument("--propensity-column")
         parser.add_argument("--logged-action-column")
@@ -308,6 +313,7 @@ class ProjectCommand(Command):
             charter=args.charter,
             leakage_attestations=args.leakage_attestations,
             baseline_column=args.baseline_column,
+            baseline_subject=args.baseline_subject,
             framing_draft=args.framing_draft,
             propensity_column=args.propensity_column,
             logged_action_column=args.logged_action_column,

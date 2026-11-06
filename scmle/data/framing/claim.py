@@ -13,8 +13,13 @@ this:
 3. The runner receives the frame `C` releases for the confirmation, in the
    same opening, and tests both ends of the cost range.
 
-The claim is about this frozen rule, not about the model the run goes on to
-select and train later; the later model is judged on the locked test set. The
+By default the claim is about this frozen rule, not about the model the run
+goes on to select and train later; the later model is judged on the locked
+test set. With `data.baseline_subject = "selected_model"` the claim is about
+the selected model instead: the opening of `C` is deferred until the
+selection is frozen (`selection.frozen`), the registration hashes the
+selection (model, strategy, parameters, trial and the split it was made on),
+and the logistic rule above is reported next to it as the default reference. The
 selection of outcomes on `X` and on the rows set aside for a missing target is
 checked on those rows (`C` has no unlabeled rows, they are removed before the
 split), and a flag there makes the claim `not_issued` without a test.
@@ -26,8 +31,10 @@ when the data spec names it.
 
 Limits. The level of this claim is the charter's `alpha_confirm`, spent on
 this one claim; the guarantee of the bivariate family is separate and no
-joint correction across the two is claimed. The rule is a plain linear model:
-a claim that it beats the current process says nothing about a better model.
+joint correction across the two is claimed. The default rule is a plain linear
+model: a claim that it beats the current process says nothing about a better
+model. The selected-model mode is valid because the selection used `X`
+only; a selection that read `C` would void it.
 """
 
 from collections.abc import Mapping
@@ -36,6 +43,7 @@ import dataclasses
 import json
 from pathlib import Path
 from typing import Any
+from typing import Protocol
 
 import numpy as np
 import pandas as pd
@@ -48,8 +56,11 @@ from scmle.data.framing import costs
 from scmle.data.framing import provenance
 from scmle.data.ledger import confirm
 from scmle.data.ledger import explore
+from scmle.data.ledger import ledger as ledger_module
 
 DOCUMENT = "baseline_report.json"
+SELECTED = "selected_model"
+FROZEN = "frozen_rule"
 PROVENANCE = "framing_provenance.json"
 KIND = "baseline"
 RIDGE = 1.0
@@ -105,6 +116,59 @@ class FrozenRule:
         """0/1 actions on any rows."""
         score = self.matrix(features) @ np.asarray(self.coefficients)
         probability = 1.0 / (1.0 + np.exp(-(score + self.intercept)))
+        return (probability >= self.cut).astype(float)
+
+
+class Rule(Protocol):
+    """What the claim needs of the rule it is about."""
+
+    def describe(self) -> dict[str, Any]:
+        """JSON-ready description, the thing that is hashed."""
+
+    def actions(self, features: pd.DataFrame) -> np.ndarray:
+        """0/1 actions on any rows."""
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SelectedModelRule:
+    """The model a run selected, as the rule of the claim.
+
+    The model was chosen and fitted on the development rows (never on `C`)
+    and the selection was frozen before the claim was registered. `identity`
+    names the choice and the data it was made on; its hash is part of the
+    registration.
+
+    Attributes:
+        pipeline: The fitted candidate with `predict_proba` and `classes_`.
+        positive: The positive class label.
+        cut: Probability at which the model acts (the cost model's
+            implied threshold).
+        identity: Model name, strategy, parameters, trial id and the split
+            fingerprint the selection was made on.
+    """
+
+    pipeline: Any
+    positive: Any
+    cut: float
+    identity: Mapping[str, Any]
+
+    def describe(self) -> dict[str, Any]:
+        """JSON-ready description, the thing that is hashed."""
+        document = jsonable(
+            {"kind": SELECTED, **self.identity, "cut": self.cut}
+        )
+        document["selection_sha256"] = ledger_module.digest(
+            jsonable(self.identity)
+        )
+        return document
+
+    def actions(self, features: pd.DataFrame) -> np.ndarray:
+        """0/1 actions on any rows."""
+        classes = list(self.pipeline.classes_)
+        column = classes.index(self.positive)
+        probability = np.asarray(self.pipeline.predict_proba(features))[
+            :, column
+        ]
         return (probability >= self.cut).astype(float)
 
 
@@ -218,7 +282,8 @@ def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
 
 def build_runner(
     *,
-    rule: FrozenRule,
+    rule: Rule,
+    reference: FrozenRule | None = None,
     model: costs.DecisionCostModel,
     alpha: float,
     baseline_column: str,
@@ -231,7 +296,10 @@ def build_runner(
     """The registered baseline claim and the function that tests it on `C`.
 
     Args:
-        rule: The rule frozen on `X`.
+        rule: The rule the claim is about: the one frozen on `X`, or the
+            model the run selected.
+        reference: The frozen logistic rule, reported next to a selected
+            model as the default declared reference (descriptive).
         model: The charter's cost model.
         alpha: The confirmation level.
         baseline_column: Column of the current process's 0/1 decisions.
@@ -276,6 +344,14 @@ def build_runner(
             )
             document = report.to_dict()
         document["rule"] = description
+        if reference is not None:
+            document["reference_rule"] = reference.describe()
+            if not selection["flagged"]:
+                document["reference_agreement"] = float(
+                    np.mean(
+                        reference.actions(features) == rule.actions(features)
+                    )
+                )
         document["selection_on_x"] = dict(selection)
         document["tier_ceiling"] = ceiling.value
         document = jsonable(document)

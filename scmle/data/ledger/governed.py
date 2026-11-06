@@ -118,6 +118,36 @@ def strata_labels(
     return None
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class Explored:
+    """A governed run after exploration, control and second stage.
+
+    Everything here was computed from `X` alone. `C` is still sealed;
+    `confirm_explored` opens it.
+
+    Attributes:
+        ledger: The ledger, not yet sealed by a confirmation.
+        plan: The exploration plan.
+        control: The negative control.
+        withdrawal: The second-stage withdrawal, or None.
+        scope: `strata` or `global`, how the control permuted the target.
+        charter: The governing charter.
+        classification: Whether the target holds classes.
+        classes: The target's classes in coding order, or None.
+        run_dir: Directory for the artifacts, or None.
+    """
+
+    ledger: ledger_module.Ledger
+    plan: explore.Plan
+    control: controls.ControlResult
+    withdrawal: confirm.Withdrawal | None
+    scope: str
+    charter: Any
+    classification: bool
+    classes: tuple[Any, ...] | None
+    run_dir: str | Path | None
+
+
 def run_governed(
     *,
     charter: Any,
@@ -168,6 +198,52 @@ def run_governed(
     Returns:
         The governed run; artifacts are written when `run_dir` is given.
     """
+    explored = explore_governed(
+        charter=charter,
+        features=features,
+        target=target,
+        classification=classification,
+        run_dir=run_dir,
+        exclude=exclude,
+        strata=strata,
+        rule=rule,
+        policy=policy,
+        diagnostics=diagnostics,
+        second_stage=second_stage,
+    )
+    return confirm_explored(
+        explored,
+        source=source,
+        confirmation_rule=confirmation_rule,
+        policy=policy,
+        claim_runner=claim_runner,
+    )
+
+
+def explore_governed(
+    *,
+    charter: Any,
+    features: pd.DataFrame,
+    target: pd.Series,
+    classification: bool,
+    run_dir: str | Path | None,
+    exclude: tuple[str, ...] = (),
+    strata: np.ndarray | None = None,
+    rule: str = online_fdr.DEFAULT_RULE,
+    policy: str = confirm.UNCONFIRMED,
+    diagnostics: Sequence[tuple[str, qualification.Check]] = (),
+    second_stage: Callable[
+        [Sequence[ledger_module.Hypothesis]], confirm.Withdrawal
+    ]
+    | None = None,
+) -> Explored:
+    """Everything of `run_governed` that precedes the opening of `C`.
+
+    The arguments are those of `run_governed` without the confirmation ones.
+    A caller that needs something computed after exploration (a selected
+    model) before the registered claims are fixed calls this first and
+    `confirm_explored` later; `C` is not touched in between.
+    """
     confirm.check_policy(policy)
     kind = explore.target_kind(target, classification)
     codes = explore.encode_target(target, classification)
@@ -216,9 +292,37 @@ def run_governed(
         withdrawal = second_stage(ledger.survivors())
         for source_name, found in withdrawal.diagnostics:
             ledger.record_diagnostic(found, source_name)
+    return Explored(
+        ledger=ledger,
+        plan=plan,
+        control=control,
+        withdrawal=withdrawal,
+        scope="global" if strata is None else "strata",
+        charter=charter,
+        classification=classification,
+        classes=classes,
+        run_dir=run_dir,
+    )
+
+
+def confirm_explored(
+    explored: Explored,
+    *,
+    source: confirm.ConfirmationSource | None,
+    confirmation_rule: budget_module.MultiplicityRule = (
+        multiplicity.DEFAULT_RULE
+    ),
+    policy: str = confirm.UNCONFIRMED,
+    claim_runner: confirm.ClaimRunner | None = None,
+) -> GovernedRun:
+    """Freezes the survivors and tests once on `C` (see `run_governed`)."""
+    charter = explored.charter
+    classification = explored.classification
+    classes = explored.classes
+    withdrawal = explored.withdrawal
     alpha = Fraction(charter.error_budget.confirmation.alpha_confirm)
     confirmation = confirm.confirm(
-        ledger,
+        explored.ledger,
         source,
         alpha_confirm=alpha,
         rule=confirmation_rule,
@@ -229,17 +333,18 @@ def run_governed(
         withdrawal=withdrawal if withdrawal and withdrawal.accounted else None,
         claim_runner=claim_runner,
     )
-    if run_dir is not None:
-        folder = Path(run_dir)
+    if explored.run_dir is not None:
+        folder = Path(explored.run_dir)
         confirmation.write(folder / confirm.CLAIMS_FILE)
         (folder / CONTROL_FILE).write_text(
-            json.dumps(control.to_dict(), indent=2, sort_keys=True) + "\n",
+            json.dumps(explored.control.to_dict(), indent=2, sort_keys=True)
+            + "\n",
             encoding="utf-8",
         )
     return GovernedRun(
-        ledger=ledger,
-        plan=plan,
-        control=control,
+        ledger=explored.ledger,
+        plan=explored.plan,
+        control=explored.control,
         confirmation=confirmation,
-        scope="global" if strata is None else "strata",
+        scope=explored.scope,
     )

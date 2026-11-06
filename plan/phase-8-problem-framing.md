@@ -37,9 +37,6 @@ can do it)
   release says so.
 
 **WP-8.7 (remainder) Wiring**
-- The baseline claim in a run is about a plain linear rule frozen on `X`, not
-  about the model the run selects later; testing the selected model's rule on
-  `C` needs the model before `C` opens, which the stage order does not give.
 - Reproducibility on Python 3.11 (criterion 10 was checked on one interpreter
   only).
 

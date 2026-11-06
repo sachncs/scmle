@@ -170,3 +170,43 @@ def test_claims_lists_and_verifies_the_registered_claim(tmp_path, capsys):
     report["issued"] = not report["issued"]
     (folder / "baseline_report.json").write_text(json.dumps(report))
     assert not claims_audit.verify(result.run_dir).ok
+
+
+def kinds(result):
+    lines = (pathlib.Path(result.run_dir) / "events.jsonl").read_text()
+    return [json.loads(line)["kind"] for line in lines.splitlines()]
+
+
+def test_the_selected_model_is_the_subject_of_the_claim(tmp_path):
+    result = run(
+        frame(),
+        tmp_path,
+        charter_file(tmp_path),
+        baseline_subject="selected_model",
+    )
+
+    report = read(result, "baseline_report.json")
+    assert report["status"] in {"issued", "not_shown"}
+    assert len(report["endpoints"]) == 2
+    subject = report["rule"]
+    assert subject["kind"] == "selected_model"
+    assert subject["model"] == result.selected_model
+    assert report["reference_rule"]["kind"] == "standardised_logistic"
+    order = kinds(result)
+    assert order.index("selection.frozen") < order.index("ledger.completed")
+    assert order.index("ledger.completed") < order.index("test.opened")
+    claims = read(result, "confirmed_claims.json")
+    entry = claims["registered_claims"]["baseline_vs_current_process"]
+    assert entry["sha256"] == report["registration_hash"]
+    assert subject["selection_sha256"]
+    log = (pathlib.Path(result.run_dir) / "custody_log.jsonl").read_text()
+    assert log.count('"event":"open"') + log.count('"event": "open"') == 1
+
+
+def test_the_default_subject_is_still_the_frozen_rule(tmp_path):
+    result = run(frame(), tmp_path, charter_file(tmp_path))
+
+    report = read(result, "baseline_report.json")
+    assert report["rule"]["kind"] == "standardised_logistic"
+    order = kinds(result)
+    assert order.index("ledger.completed") < order.index("selection.frozen")

@@ -284,6 +284,10 @@ class DataSpec(FrozenModel):
             A rule is frozen on the exploration rows and the claim that it
             beats the current process is registered in the ledger and tested
             once on the confirmation set (`baseline_report.json`).
+        baseline_subject: What the baseline claim is about. `frozen_rule`
+            (default) is the logistic rule frozen on the exploration rows;
+            `selected_model` defers the opening of the confirmation set until
+            the model selection is frozen and tests that model instead.
         ingest_plan: Path of an ingest plan (JSON) that names a database and
             the as-of views to synthesize features from. Needs a charter with
             an `ingest` block (format 7); the table then needs the plan's key
@@ -334,6 +338,7 @@ class DataSpec(FrozenModel):
     unlabeled: Literal["block", "ignore", "pseudo_label"] = "block"
     pseudo_label_confidence: float = pydantic.Field(default=0.9, gt=0.5, lt=1.0)
     baseline_column: str | None = None
+    baseline_subject: Literal["frozen_rule", "selected_model"] = "frozen_rule"
     framing_draft: str | None = None
     propensity_column: str | None = None
     logged_action_column: str | None = None

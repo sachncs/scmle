@@ -83,6 +83,11 @@ optional `attestors` and `attestations` fields
 (`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`);
 a format 4 causal charter keeps its hash and signature.
 
+`MLProject` gained the optional keyword `baseline_subject` (`frozen_rule`,
+the default, or `selected_model`), `DataSpec` the field of the same name, and
+`plan`, `run` and `resume` the flag `--baseline-subject`; `tests/fixtures/public_api.json`
+was regenerated for the `MLProject` entry alone.
+
 `MLProject` gained the optional keywords `logged_action_column` and
 `propensity_column` (default `None`), `DataSpec` the fields of the same names,
 and the CLI the flags `--logged-action-column` and `--propensity-column`;

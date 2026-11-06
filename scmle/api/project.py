@@ -522,6 +522,9 @@ class MLProject:
         charter: str | pathlib.Path | None = None,
         leakage_attestations: str | pathlib.Path | None = None,
         baseline_column: str | None = None,
+        baseline_subject: Literal["frozen_rule", "selected_model"] = (
+            "frozen_rule"
+        ),
         framing_draft: str | pathlib.Path | None = None,
         propensity_column: str | None = None,
         logged_action_column: str | None = None,
@@ -647,6 +650,10 @@ class MLProject:
                 exploration rows and the claim that it beats the current
                 process over the cost range is registered in the ledger and
                 tested once on the confirmation set (`baseline_report.json`).
+            baseline_subject: `frozen_rule` (default) or `selected_model`;
+                the latter defers the opening of the confirmation set until
+                the model selection is frozen and tests the selected model
+                against the current process instead of the logistic rule.
             ingest_plan: Path of an ingest plan (JSON); needs a charter with
                 an `ingest` block. Features are synthesized through the as-of
                 views of the plan's database before the data are split.
@@ -703,6 +710,7 @@ class MLProject:
                 pseudo_label_confidence=pseudo_label_confidence,
                 monotonic_constraints=monotonic_constraints or {},
                 baseline_column=baseline_column,
+                baseline_subject=baseline_subject,
                 propensity_column=propensity_column,
                 logged_action_column=logged_action_column,
                 ingest_plan=None if ingest_plan is None else str(ingest_plan),

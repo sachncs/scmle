@@ -318,6 +318,37 @@ class IngestStage(Stage):
             )
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class PendingLedger:
+    """A charter run's exploration, finished, with `C` still sealed.
+
+    Attributes:
+        explored: The exploration, control and second stage (from `X` only).
+        task: The resolved task.
+        charter: The verified charter.
+        view: The exploration rows.
+        structure: Group, time and baseline columns (never candidates).
+        graph: The declared DAG, or None.
+        found: The qualification of the exploration rows.
+        stage: The stability stage.
+        signed: Whether the charter signature was verified.
+        baseline: The baseline claim about the logistic rule, or None.
+        causal: The primary causal claim, or None.
+    """
+
+    explored: ledger_governed.Explored
+    task: tasks.TaskType
+    charter: charter_contracts.AnalysisCharter
+    view: Any
+    structure: tuple[str, ...]
+    graph: Any
+    found: qualify.Qualification
+    stage: Any
+    signed: bool
+    baseline: ledger_confirm.ClaimRunner | None
+    causal: ledger_confirm.ClaimRunner | None
+
+
 class ProfileStage(Stage):
     """Resolves the task, splits the data, and profiles the development rows.
 
@@ -704,18 +735,16 @@ class ProfileStage(Stage):
             rows=len(view.features),
             seed=charter.seed,
         )
-        runner = ledger_confirm.merge_runners(
-            self.baseline_runner(
-                context, task, charter, view, structure, signed=verified.signed
-            ),
-            self.causal_runner(context, charter, view, graph, found),
+        # Declarations are validated before the expensive exploration.
+        baseline = self.baseline_runner(
+            context, task, charter, view, structure, signed=verified.signed
         )
-        run = ledger_governed.run_governed(
+        causal = self.causal_runner(context, charter, view, graph, found)
+        explored = ledger_governed.explore_governed(
             charter=charter,
             features=view.features,
             target=view.target,
             classification=task.is_classification,
-            source=vault.sets.get("C"),
             run_dir=run_dir,
             exclude=structure + tuple(found.quarantined),
             strata=ledger_governed.strata_labels(
@@ -727,14 +756,6 @@ class ProfileStage(Stage):
                 None if rules is None else rules.ledger_rule,
                 "e-lond",
             ),
-            confirmation_rule=ledger_budget.MultiplicityRule(
-                chartered_rule(
-                    "confirmation_rule",
-                    spec.confirmation_rule,
-                    None if rules is None else rules.confirmation_rule,
-                    "by",
-                )
-            ),
             policy=chartered_rule(
                 "failure_policy",
                 spec.confirmation_failure_policy,
@@ -743,10 +764,81 @@ class ProfileStage(Stage):
             ),
             diagnostics=found.checks,
             second_stage=stage,
+        )
+        pending = PendingLedger(
+            explored,
+            task,
+            charter,
+            view,
+            structure,
+            graph,
+            found,
+            stage,
+            verified.signed,
+            baseline,
+            causal,
+        )
+        if data.baseline_column and data.baseline_subject == "selected_model":
+            context.pending_ledger = pending
+            context.emit(
+                "ledger.deferred",
+                "the confirmation set stays sealed until the model selection "
+                "is frozen, so the baseline claim can be about that model",
+            )
+            return
+        self.complete_claim_ledger(context, pending)
+
+    def complete_claim_ledger(
+        self,
+        context: context_module.RunContext,
+        pending: "PendingLedger",
+        subject: framing_claim.Rule | None = None,
+    ) -> None:
+        """Registers the claims and opens `C` once (F3), then the reports.
+
+        Args:
+            context: The run context.
+            pending: The exploration, finished on `X` alone.
+            subject: The rule the baseline claim is about, when it is not
+                the logistic rule frozen on `X`.
+        """
+        charter = pending.charter
+        view = pending.view
+        rules = charter.rules
+        baseline = pending.baseline
+        if subject is not None:
+            baseline = self.baseline_runner(
+                context,
+                pending.task,
+                charter,
+                view,
+                pending.structure,
+                signed=pending.signed,
+                subject=subject,
+            )
+        runner = ledger_confirm.merge_runners(baseline, pending.causal)
+        vault = require(context.custody_vault, "custody vault")
+        run = ledger_governed.confirm_explored(
+            pending.explored,
+            source=vault.sets.get("C"),
+            confirmation_rule=ledger_budget.MultiplicityRule(
+                chartered_rule(
+                    "confirmation_rule",
+                    context.spec.confirmation_rule,
+                    None if rules is None else rules.confirmation_rule,
+                    "by",
+                )
+            ),
+            policy=chartered_rule(
+                "failure_policy",
+                context.spec.confirmation_failure_policy,
+                None if rules is None else rules.failure_policy,
+                "unconfirmed",
+            ),
             claim_runner=runner,
         )
         self.write_registered_claims(context, run, runner)
-        self.check_ingest_family(context, run, found)
+        self.check_ingest_family(context, run, pending.found)
         context.emit(
             "ledger.completed",
             run.confirmation.reason,
@@ -760,9 +852,11 @@ class ProfileStage(Stage):
                 "rules": "chartered" if rules else "not chartered",
             },
         )
-        self.assess_robustness(context, charter, run, stage)
+        self.assess_robustness(context, charter, run, pending.stage)
         self.assess_framing(context, charter, view)
-        self.assess_identification(context, charter, view, run, graph, found)
+        self.assess_identification(
+            context, charter, view, run, pending.graph, pending.found
+        )
 
     def baseline_runner(
         self,
@@ -773,6 +867,7 @@ class ProfileStage(Stage):
         structure: tuple[str, ...],
         *,
         signed: bool,
+        subject: framing_claim.Rule | None = None,
     ) -> ledger_confirm.ClaimRunner | None:
         """Freezes the baseline rule on `X` and registers the claim (F8).
 
@@ -780,7 +875,9 @@ class ProfileStage(Stage):
         on the exploration rows, the selection of outcomes is checked on those
         rows and on the rows set aside for a missing target, and the claim is
         handed to the ledger, which registers it by hash and has it tested on
-        the one opening of `C`.
+        the one opening of `C`. With `subject` (the selected model, frozen
+        before this call) the claim is about that model and the logistic rule
+        is reported next to it as the reference.
 
         Raises:
             ConfigError: If the charter has no cost model, the task is not
@@ -827,7 +924,8 @@ class ProfileStage(Stage):
         )
         context.write_json(framing_claim.PROVENANCE, why)
         return framing_claim.build_runner(
-            rule=rule,
+            rule=rule if subject is None else subject,
+            reference=None if subject is None else rule,
             model=model,
             alpha=float(charter.error_budget.confirmation.alpha_confirm),
             baseline_column=column,
@@ -1859,6 +1957,47 @@ class SelectStage(Stage):
         self.announce(context)
 
     def execute(self, context: context_module.RunContext) -> None:
+        """Chooses the model, then opens a deferred confirmation (F8).
+
+        Raises:
+            BlockedError: If no checked candidate satisfies the constraints.
+        """
+        self.choose(context)
+        pending = context.pending_ledger
+        if pending is None:
+            return
+        context.pending_ledger = None
+        selected = require(context.selected, "selected")
+        split = require(context.split, "split")
+        pipeline = context.refits.get(selected.trial_id)
+        if pipeline is None:
+            pipeline = strategies.get_strategy(selected.strategy).build(
+                require(context.profile, "profile").feature_plan,
+                context.registry.get(selected.model_name),
+                require(context.task, "task"),
+                context.spec.validation.seed,
+                selected.params,
+            )
+            pipeline.fit(split.dev_features, split.dev_target)
+            context.refits[selected.trial_id] = pipeline
+        model = require(pending.charter.cost_model, "cost_model")
+        classes = sorted(pending.view.target.dropna().unique(), key=str)
+        subject = framing_claim.SelectedModelRule(
+            pipeline,
+            classes[-1],
+            float(model.threshold),
+            {
+                "model": selected.model_name,
+                "strategy": selected.strategy,
+                "params": selected.params,
+                "trial_id": selected.trial_id,
+                "split": split.manifest.fingerprint,
+                "seed": context.spec.validation.seed,
+            },
+        )
+        ProfileStage().complete_claim_ledger(context, pending, subject)
+
+    def choose(self, context: context_module.RunContext) -> None:
         """Chooses the best trial that satisfies the serving constraints.
 
         Candidates are walked in policy order; each is refit and measured on

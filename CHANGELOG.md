@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+* The baseline claim can be about the selected model (F8, wiring;
+  `--baseline-subject selected_model`, `MLProject(baseline_subject=...)`,
+  `DataSpec.baseline_subject`, default `frozen_rule`). The default is
+  unchanged: a logistic rule frozen on `X`. With `selected_model` the charter
+  run explores on `X` and registers everything that does not need the model,
+  then holds `C` sealed (`ledger.deferred`) until `SelectStage` has frozen the
+  selection (`selection.frozen`). Only then are the claims registered by hash
+  (the registration covers the model name, strategy, parameters, trial id,
+  the split fingerprint and the seed) and `C` is opened, once, for the
+  bivariate family and the claims together. The selected model acts where its
+  positive-class probability reaches the cost model's implied threshold. The
+  logistic rule is reported in `baseline_report.json` as `reference_rule`,
+  with its action agreement with the model on `C` (descriptive). The
+  selection used `X` only, so the intersection-union test keeps its level; a
+  selection that read `C` would void it. `governed.run_governed` is now
+  `explore_governed` followed by `confirm_explored` (same behaviour when
+  called as one). No certified source changed.
+
 * Attestors in the charter and signed attestations for causal claims (F10,
   charter format 9; `CausalSpec.attestors`, `CausalSpec.attestations`,
   `scmle.data.identification.attest`, `claims verify`). The causal block

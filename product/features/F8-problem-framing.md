@@ -73,8 +73,9 @@ requests, coverage, refusal precision and question precision and recall.
     (only one interpreter has been run).
 ### Wiring not done
 
-- The baseline claim in a run concerns a linear rule frozen on `X`, not the
-  model the run selects afterwards.
+- The baseline claim concerns the model the run selects only when
+  `baseline_subject = "selected_model"` is asked for; the default stays the
+  logistic rule frozen on `X`, which is also reported as the reference.
 - The charter's `unit`, `deployment_population` and estimand text are free
   text; a charter run only reports whether target, moment and unit match
   column names (`framing_link.json`, descriptive).
