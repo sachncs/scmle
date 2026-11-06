@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from benchmarks.qualification import ingest_worlds as worlds
+from scmle.data.ingest import budget
 from scmle.data.ingest import grain
 from scmle.data.ingest import joins
 from scmle.data.ingest import profile
@@ -118,6 +119,47 @@ def test_many_to_many_is_reported_and_never_accepted():
     assert [link.cardinality for link in found] == [joins.MANY_TO_MANY]
     assert not found[0].joinable
     assert all(link.child_columns != ("tag",) for link in graph.accepted())
+
+
+def many_to_many_world():
+    db = worlds.new_database("m2m-budget")
+    for name in ("a", "b", "c"):
+        worlds.load(
+            db,
+            name,
+            pd.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10}),
+        )
+    return db
+
+
+def test_many_to_many_charges_the_budget_per_pair_and_stops_at_a_boundary():
+    db = many_to_many_world()
+    plain = db.source()
+    catalog = profile.profile_catalog(plain, ["a", "b", "c"])
+    scans = {t.name: grain.infer_keys(plain, t) for t in catalog.tables}
+    free = joins.many_to_many(plain, catalog, scans)
+    assert len(free) == 3
+
+    # room for exactly one pair (60 rows scanned, two queries)
+    meter = budget.BudgetMeter(budget.IngestBudget(max_rows_scanned=60))
+    limited = profile.SqlSource(db.factory, meter)
+    found = joins.many_to_many(limited, catalog, scans)
+    assert len(found) == 1
+    assert meter.rows == 60
+    assert [stop.stage for stop in meter.stops] == ["many_to_many"]
+    assert meter.stops[0].reason == "rows"
+    assert meter.partial
+
+
+def test_many_to_many_without_a_meter_or_with_room_is_unchanged():
+    db = many_to_many_world()
+    plain = db.source()
+    catalog = profile.profile_catalog(plain, ["a", "b", "c"])
+    scans = {t.name: grain.infer_keys(plain, t) for t in catalog.tables}
+    meter = budget.BudgetMeter(budget.IngestBudget())
+    roomy = profile.SqlSource(db.factory, meter)
+    assert len(joins.many_to_many(roomy, catalog, scans)) == 3
+    assert not meter.partial
 
 
 def test_paths_go_up_and_down_to_depth_two_without_revisiting():

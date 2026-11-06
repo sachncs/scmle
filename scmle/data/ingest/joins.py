@@ -421,8 +421,14 @@ def many_to_many(
     scans: Mapping[str, grain.KeyScan],
     eps_fk: float = 0.0,
 ) -> list[Link]:
-    """Same-named non-key column pairs that overlap: reported, never joined."""
-    found = []
+    """Same-named non-key column pairs that overlap: reported, never joined.
+
+    Each column pair is charged to the budget (the rows of both tables and two
+    queries) under the stage `many_to_many` before it is measured. When the
+    budget cannot cover the next pair the search stops at that pair, the
+    boundary is on the meter, and the pairs found so far are returned.
+    """
+    found: list[Link] = []
     for left in catalog.tables:
         for right in catalog.tables:
             if left.name >= right.name:
@@ -438,6 +444,13 @@ def many_to_many(
                     catalog, left.name, a, right.name, a
                 ):
                     continue
+                if source.meter is not None and not source.meter.admit(
+                    "many_to_many",
+                    f"{left.name}.{column.name}~{right.name}.{column.name}",
+                    left.rows + right.rows,
+                    2,
+                ):
+                    return found
                 distinct = distinct_of(source, left.name, a)
                 if not distinct:
                     continue
