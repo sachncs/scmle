@@ -63,7 +63,15 @@ const gates = [
     <li>the <strong>set sizes</strong> and the <strong>error budget</strong> (<code>alpha_confirm</code>, the exploration wealth, detector tolerances, the permutation count);</li>
     <li>a declaration of the choices the stability check should vary, and optional <code>rules</code> that pre-register the online ledger rule, the confirmation rule, the failure policy and the stability thresholds.</li>
   </ul>
-  <p>Later formats add optional blocks for a causal estimand, a decision and cost model, and a raw-data ingestion plan. A charter without a newer block keeps its hash and signature. A one-byte edit fails verification, and the signature proves possession of the key, not the signer's identity. Commands: <a href={`${base}/docs/cli/#charter`}>charter init, check and sign</a>.</p>
+  <p>Later formats add optional blocks, and a charter without a newer block keeps its hash and signature:</p>
+  <ul>
+    <li><strong>4</strong> a causal estimand; <strong>5</strong> a decision and cost model; <strong>6</strong> the unit of prediction; <strong>7</strong> a raw-data ingestion plan.</li>
+    <li><strong>8</strong> an <code>entity</code> and a <code>reconcile</code> sub-block of the ingestion plan: the entity becomes the split&rsquo;s group column (<strong>unverified</strong>), and the extract is reconciled to declared totals, stopping the run on a mismatch.</li>
+    <li><strong>9</strong> causal <code>subgroups</code> (adjusted as one Holm family, <strong>uncertified</strong>, never changing a tier) and causal <code>attestors</code> with a file of signed attestations.</li>
+    <li><strong>10</strong> an <code>uncertainty</code> block: the most bytes of fold models a regression bundle may keep for CV+, and columns for a descriptive coverage-by-slice view.</li>
+  </ul>
+  <p>The unit of prediction <code>known_entity_future</code> predicts a later row of an entity seen in training. The carve of the confirmation set then ignores the group column, so one entity&rsquo;s rows may sit in both the exploration and confirmation sets, while the final test rows are the latest period. The run refuses it without a group and a time column, or with a validation that is not temporal or rolling. It has not been measured on a real panel.</p>
+  <p> A one-byte edit fails verification, and the signature proves possession of the key, not the signer's identity. Commands: <a href={`${base}/docs/cli/#charter`}>charter init, check and sign</a>.</p>
   <p>If the confirmation set is too small to support the promised power, the run still completes: the scope becomes <code>exploratory_unconfirmed</code> and a feasibility report states the effect that could be detected.</p>
 
   <h2 id="custody">2. Custody of the sets</h2>
@@ -76,12 +84,15 @@ const gates = [
   <p>The distinction matters for what the guarantee is. <strong>The final claim guarantee, FDR at most <code>alpha_confirm</code>, comes only from testing the exploration survivors once on the confirmation set.</strong> The exploration wealth is a triage budget that limits how many hypotheses the confirmation set must pay for. The two do not add. A multiplicity rule is replayed on the recorded p-values, and <code>scmle claims verify</code> checks that the artifacts agree with each other. It does not recompute statistics from data.</p>
   <p>When the charter sets <code>rules.stability_filter</code> and a current passing certificate covers the chartered thresholds, survivors whose estimates are <code>fragile</code> across the declared specifications are withdrawn before <code>C</code> opens, as a pre-registered second stage with its own accounting. Otherwise the filter is recorded as requested and not applied, and verdicts stay warnings.</p>
 
+  <p><code>scmle claims verify</code> checks ten steps in a full run. Beyond the chain, the confirmation row and the custody log, they cover the decision files (their hashes are registered in the custody log), the causal attestations, and the coverage claim, which is fixed and hashed before the final test rows are read. The baseline claim can be about the selected model: the confirmation set then stays sealed until the selection is frozen. The custody log is tamper-evident, not adversary-proof.</p>
+
   <h2 id="admissibility">4. Admissibility and provenance</h2>
   <p>Each feature gets one decision: <code>admit</code>, <code>admit_flagged</code> or <code>quarantine</code>, with a tier and reasons. Quarantine happens only when a leakage suspicion from the permutation screen is one a current, passing certificate lets gate, and only unless a valid per-column attestation keeps it (tier <code>attested</code>, recorded in the ledger). Because a charter carries no declared provenance per field, fields are decided in permissive mode. As-of facts, such as "this value existed at prediction time", are attestations or log-derived and tiered as such; statistics cannot prove a feature postdates nothing.</p>
 
   <h2 id="tiers">5. Evidence tiers</h2>
   <p>Every claim carries one tier, shown in the command-line summary and the report header.</p>
   <DocTable label="Evidence tiers" head={["Tier", "Meaning"]} rows={tiers} />
+  <p>An <code>attested</code> tier rests on a signed statement. Signatures are HMAC under a shared key, so they prove that a holder of the key made the statement, not which person did.</p>
   <p>Causal claims have a stricter reading, and decision claims inherit the tier of the effect they rest on when the data is not randomized. Both are described on <a href={`${base}/docs/causal-decision/`}>Causal, decision &amp; framing</a>.</p>
 
   <h2 id="certificates">6. Detector certificates and gate discipline</h2>
@@ -107,6 +118,7 @@ const gates = [
 
   <h2>What is not built or not claimed</h2>
   <ul>
+    <li>Entity grouping from ingestion is unverified, subgroup results are uncertified, and the coverage-by-slice view is descriptive because the flag that would act on it missed its certified false-flag bound.</li>
     <li>No head-to-head against practitioners on unseen raw problems has been run, so autonomy is not claimed. Each feature states its own measured operating characteristic and nothing more.</li>
     <li>The forward check on the final-test set is reported as skipped inside a run; per-period drift, Thresholdout, text near-duplicate detection and stability for multiclass targets are not implemented. The stability grid varies imputation, outlier rule and inclusion only; other declared choices are listed as not run.</li>
     <li>The confirmation stage does not yet bind the single release to a claims hash and a ledger hash, though the vault supports it.</li>

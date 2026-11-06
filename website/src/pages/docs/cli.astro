@@ -31,6 +31,9 @@ const options = [
   ["<code>--charter FILE</code>", "Govern the run by an analysis charter: a sealed confirmation set is split off before profiling."],
   ["<code>--exclude-models</code>, <code>--exclude-families</code>", "Restrict the search."],
   ["<code>--output-dir</code>, <code>--seed</code>", "Where runs go; reproducibility."],
+  ["<code>--baseline-column COL</code>, <code>--baseline-subject {frozen_rule,selected_model}</code>", "Measure the current process as a baseline. In a charter run the baseline claim is about a rule frozen on exploration rows (<code>frozen_rule</code>, the default) or, with <code>selected_model</code>, about the model the search selects: the confirmation set then stays sealed until the selection is frozen."],
+  ["<code>--logged-action-column</code>, <code>--propensity-column</code>", "Name a randomized log, so a charter run with a decision block can estimate the off-policy value of the frozen rule."],
+  ["<code>--ingest-plan FILE</code>, <code>--framing-draft FILE</code>, <code>--leakage-attestations FILE</code>", "Raw-data ingestion plan, a framing draft, and per-column attestations that keep a flagged column in the features."],
   ["<code>--config FILE</code>", "Read a complete project specification (the format of <code>config.json</code>)."],
 ];
 ---
@@ -62,7 +65,7 @@ scmle charter check charter.json --rows 5000    # validate; report whether the
 SCMLE_SIGNING_KEY=... scmle charter sign charter.json   # add an HMAC-SHA256 signature
 scmle run data.csv --target churn --charter charter.json`}</code></pre>
   <p><code>check</code> verifies the charter hash and, when a key is configured, the signature; a one-byte edit fails verification. The signature proves possession of the key, not the signer's identity. If the confirmation set is too small to support the promised power the run still completes: the scope becomes <code>exploratory_unconfirmed</code> and <code>feasibility.json</code> reports the detectable effect.</p>
-  <p>Format 3 charters may carry a <code>rules</code> object that fixes, before data, the online rule of the ledger (<code>ledger_rule</code>), the confirmation rule (<code>confirmation_rule</code>), the failure policy, whether <code>fragile</code> survivors are withdrawn before the confirmation set opens (<code>stability_filter</code>) and the stability thresholds (<code>s_min</code>, <code>band</code>, <code>q_min</code>). The charter hash and signature cover them. A charter without <code>rules</code> is hashed, signed and loaded exactly as before and the run uses the defaults, reporting <code>"rules": "not chartered"</code>. A run specification that names a different non-default rule than the charter is refused. The filter acts only if the stability rule has a current passing certificate for the chartered thresholds; otherwise it is recorded as requested and not applied, and the verdicts stay warnings.</p>
+  <p>Charter formats 1 to 10 are all accepted, and a charter without a newer field keeps its hash and signature. Format 3 charters may carry a <code>rules</code> object that fixes, before data, the online rule of the ledger (<code>ledger_rule</code>), the confirmation rule (<code>confirmation_rule</code>), the failure policy, whether <code>fragile</code> survivors are withdrawn before the confirmation set opens (<code>stability_filter</code>) and the stability thresholds (<code>s_min</code>, <code>band</code>, <code>q_min</code>). The charter hash and signature cover them. A charter without <code>rules</code> is hashed, signed and loaded exactly as before and the run uses the defaults, reporting <code>"rules": "not chartered"</code>. A run specification that names a different non-default rule than the charter is refused. The filter acts only if the stability rule has a current passing certificate for the chartered thresholds; otherwise it is recorded as requested and not applied, and the verdicts stay warnings.</p>
 
   <h2 id="claims">Claims of a charter run</h2>
   <pre><code>{`scmle claims list runs/run_x [--tier confirmed] [--json]
@@ -76,9 +79,12 @@ SCMLE_SIGNING_KEY=... scmle claims verify runs/run_x [--json]`}</code></pre>
     <li>the second-stage family (survivors minus withdrawn) and its hash are consistent, and no withdrawn survivor was tested on the confirmation set;</li>
     <li>the custody log verifies, froze the selection before the confirmation set opened and opened it at most once;</li>
     <li>the charter verifies (signature checked when a key is configured) and, if it fixes rules, the ledger and claims used them;</li>
-    <li>claims registered by hash (baseline, causal primary) are stated by the sealed ledger and their report files hash to the values it holds, and <code>negative_control.json</code> is the control the ledger recorded.</li>
+    <li>claims registered by hash (baseline, causal primary) are stated by the sealed ledger and their report files hash to the values it holds, and <code>negative_control.json</code> is the control the ledger recorded;</li>
+    <li>causal attestations: a claim above <code>unverified</code> has charter-named attestors, and every accepted statement is by a listed attestor, for this charter, within its dates, with a signature that verifies under the key;</li>
+    <li>decision files: the hashes of the decision threshold, net benefit, policy value and rollout design match what the custody log registered;</li>
+    <li>coverage claim: the claim file was registered in the custody log before the final rows were read, and the coverage report names that claim.</li>
   </ul>
-  <p>A step whose input is absent is reported <code>skipped</code>, never <code>pass</code>. This proves the artifacts agree; it does not recompute statistics from data, and a party who can rewrite every file consistently can pass it. Custody is tamper-evident, not adversary-proof.</p>
+  <p>A step whose input is absent is reported <code>skipped</code>, never <code>pass</code>. Attestations use HMAC with a shared key, so a valid one shows that a holder of the key made the statement, not which person. This proves the artifacts agree; it does not recompute statistics from data, and a party who can rewrite every file consistently can pass it. Custody is tamper-evident, not adversary-proof.</p>
 
   <h2 id="deploy">Release evidence and the runtime</h2>
   <pre><code>{`scmle deploy live --url https://staging.example --token-file token --environment staging \\

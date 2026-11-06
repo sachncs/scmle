@@ -43,8 +43,18 @@ const surfaces = [
     ["<code>leakage_attestations</code>", "Per-column attestation that keeps a certified suspect", "<code>ProjectSpec</code> field; CLI flag <code>--leakage-attestations</code>."],
     ["<code>baseline_column</code>, <code>framing_draft</code>", "Problem framing and the baseline claim", "<code>DataSpec</code> fields; CLI flags on <code>plan</code>, <code>run</code>, <code>resume</code>."],
     ["<code>ingest_plan</code>", "Raw-data ingestion", "Charter format 7 gained an optional <code>ingest</code> field; a charter without it keeps its hash."],
+    ["<code>baseline_subject</code>", "Whether the baseline claim concerns a frozen rule (the default) or the selected model", "<code>DataSpec</code> field; CLI flag <code>--baseline-subject</code> on <code>plan</code>, <code>run</code>, <code>resume</code>."],
     ["<code>logged_action_column</code>, <code>propensity_column</code>", "Off-policy value of a decision rule", "A charter run with a decision block also writes the decision, policy-value and rollout files."],
   ]} />
+
+  <h2 id="charter-formats">Charter formats and later additions</h2>
+  <p>Each format adds an optional field, so a charter of an older format keeps its hash and signature, and an older wrapper that carries a newer field is refused.</p>
+  <ul>
+    <li><strong>Format 8:</strong> optional <code>entity</code> and <code>reconcile</code> sub-blocks of the ingestion plan (extension surfaces).</li>
+    <li><strong>Format 9:</strong> optional causal <code>subgroups</code>, and <code>attestors</code> with <code>attestations</code>.</li>
+    <li><strong>Format 10:</strong> an optional <code>uncertainty</code> block. The pinned snapshot is unchanged.</li>
+    <li><strong>Additions, all extension surfaces:</strong> an uncertainty feed that sends set sizes, out-of-distribution flags and coverage violations of a served classification bundle to the closed loop without gating retraining; a rollout hook with a restore-previous method on the lifecycle manager; and the deployment-ledger row kinds <code>rollout_experiment</code>, <code>rollout_assignment</code> and <code>rollout_decision</code>. A ledger without them loads unchanged.</li>
+  </ul>
 
   <h2>The leakage screen</h2>
   <p>The profiler's fixed leakage cutoffs are gone. <code>leakage_policy</code> keeps its values and its meaning at the top level, and the pinned <code>MLProject</code> signature is unchanged. What blocks is now a typed result, <code>DatasetProfile.blocking_leaks</code>, from a permutation screen. Behaviour you may notice:</p>
