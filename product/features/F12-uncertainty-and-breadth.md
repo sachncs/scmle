@@ -64,10 +64,13 @@ residuals are stored for regression with fewer than 1000 calibration rows
 to a bundle (`shift=True`), a `coverage_report.json` is measured on the final
 test rows (`evaluation/coverage_run.py`), and `unit_of_prediction:
 new_entity` in the charter calibrates on one score per entity. **Still not
-in the run:** the pooled out-of-fold scores are still the default and the
-only source above 1000 rows (the table row above is still true), the coverage
-claim is not registered before the rows are read, and the seven task types
-above still get no interval.
+in the run:** coverage is measured on the final test rows only (not on
+`C`), slices are not reported, and the seven task types above still get no
+interval. Since 2026-11-06 the coverage claim (`coverage_claim.json`: levels,
+methods, tolerance, rule) is hashed and registered in the custody log and the
+event log before the final rows are released, the report names its hash and
+`claims verify` checks it; above 1000 rows the pooled out-of-fold scores are
+the served source by design (`conformal.scores` event).
 
 ### Problem-type breadth
 

@@ -77,6 +77,7 @@ from scmle.evaluation import backtest
 from scmle.evaluation import bias_variance
 from scmle.evaluation import confidence
 from scmle.evaluation import conformal
+from scmle.evaluation import coverage as coverage_module
 from scmle.evaluation import coverage_run
 from scmle.evaluation import criteria
 from scmle.evaluation import cv_plus
@@ -2625,6 +2626,48 @@ class FinalEvaluationStage(Stage):
         record["pseudo_rows"] = count
         return augmented
 
+    def register_coverage_claim(
+        self, context: context_module.RunContext
+    ) -> None:
+        """Fixes and hashes the coverage claim before the final rows open.
+
+        Written to `coverage_claim.json`, announced by a `coverage.registered`
+        event and, in a charter run, appended to the custody log. A task with
+        no interval or set has no claim.
+        """
+        split = require(context.split, "split")
+        charter_hash = None
+        if context.spec.charter_path:
+            charter_hash = charter_sealing.read_verified(
+                str(context.spec.charter_path)
+            ).charter_hash
+        claim = coverage_run.claim_document(
+            task=require(context.task, "task").value,
+            levels=COVERAGE_LEVELS,
+            tolerance=coverage_module.DEFAULT_TOLERANCE,
+            split_fingerprint=split.manifest.fingerprint,
+            charter_hash=charter_hash,
+        )
+        if claim is None:
+            return
+        sha = coverage_run.claim_hash(claim)
+        context.write_json(coverage_run.CLAIM_FILE, claim)
+        context.coverage_claim_sha256 = sha
+        vault = context.custody_vault
+        if vault is not None:
+            vault.log.append(
+                "final_test",
+                coverage_run.REGISTRATION_EVENT,
+                "scmle.coverage",
+                {"sha256": sha},
+            )
+        context.emit(
+            "coverage.registered",
+            "coverage claim fixed before the final test rows are released",
+            (coverage_run.CLAIM_FILE,),
+            {"sha256": sha},
+        )
+
     def register_decision_files(
         self, context: context_module.RunContext
     ) -> None:
@@ -2748,6 +2791,7 @@ class FinalEvaluationStage(Stage):
         pipeline, decision = choose_decision_threshold(context, pipeline)
         unmitigated = pipeline
         pipeline = self.mitigate_fairness(context, selected, pipeline, decision)
+        self.register_coverage_claim(context)
         locked = split.locked_test
         test_features, test_target = locked.open(locked.issue_token())
         if (
@@ -3857,7 +3901,10 @@ class PackageStage(Stage):
             )
         if context.test_rows is not None:
             measured = coverage_run.run_report(
-                bundle, *context.test_rows, COVERAGE_LEVELS
+                bundle,
+                *context.test_rows,
+                COVERAGE_LEVELS,
+                claim_sha256=context.coverage_claim_sha256,
             )
             if measured is not None:
                 bundle.coverage_report = measured

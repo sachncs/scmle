@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+* The coverage claim is registered before it is read (F12, WP-12.2;
+  `coverage_run.claim_document`, `coverage_claim.json`, `claims verify`).
+  Before `FinalEvaluationStage` opens the final test rows it writes
+  `coverage_claim.json`: task, levels, the methods the bundle may hold,
+  tolerance, the exact-lower-limit rule, the split fingerprint and the charter
+  hash. The document's hash (`ledger.digest`) is announced by a
+  `coverage.registered` event and, in a charter run, appended to the custody
+  log (`coverage_claim_registered`); `coverage_report.json` carries it as
+  `claim_sha256`. The new `claims verify` step "coverage claim: registered
+  before the rows were read" fails by file name when the claim file differs
+  from the registered hash or the report names another claim, when the custody
+  log holds no or several registrations, and is skipped for a run without a
+  custody log. The levels and the tolerance are the ones the report always
+  used (0.5, 0.8, 0.9, 0.95; 0.02), so no number changed. A task with no
+  stored interval or set has no claim. Limit: the claim is fixed before the
+  rows are read but the bundle is built after, so the claim names methods the
+  bundle may hold and the report says which it did hold. No certified source
+  changed.
+
 * The CV+ size cap is a charter field (F12, charter format 10;
   `scmle.data.charter.uncertainty.UncertaintySpec`,
   `AnalysisCharter.uncertainty`, `PackageStage.cv_plus_cap`). The optional

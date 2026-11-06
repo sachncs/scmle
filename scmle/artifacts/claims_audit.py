@@ -19,6 +19,9 @@ the files agree with each other, from the files alone:
 * the four decision files of F11 (threshold, net benefit, policy value,
   rollout design) hash to what the custody log registered when they were
   written; an edited, removed or added file fails with its name;
+* the coverage claim (levels, methods, rule) hashes to what the custody log
+  registered before the final rows were released, and the coverage report
+  names that hash;
 * a causal claim above `unverified` rests on attestors the charter names:
   every accepted attestation is by a listed attestor for that assumption,
   carries this charter's hash, was valid on the run date and (given the
@@ -50,6 +53,7 @@ from scmle.data.ledger import budget as budget_module
 from scmle.data.ledger import confirm
 from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import multiplicity
+from scmle.evaluation import coverage_run
 
 CHARTER_FILE = "analysis_charter.json"
 CUSTODY_FILE = "custody_log.jsonl"
@@ -529,6 +533,59 @@ def check_decision_files(
     return step(name, PASS, f"{count} file(s) hash to the registration")
 
 
+def check_coverage_claim(
+    run_dir: Path, signing_key: str | bytes | None
+) -> Finding | None:
+    """The coverage claim hashes to its registration and the report names it.
+
+    None when the run holds neither the claim nor a coverage report.
+    """
+    name = "coverage claim: registered before the rows were read"
+    claim_path = run_dir / coverage_run.CLAIM_FILE
+    report_path = run_dir / coverage_run.REPORT_FILE
+    if not claim_path.exists() and not report_path.exists():
+        return None
+    log_path = run_dir / CUSTODY_FILE
+    problems = []
+    try:
+        claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        found = coverage_run.claim_hash(claim)
+    except (OSError, ValueError, TypeError):
+        claim, found = None, None
+        problems.append(f"{coverage_run.CLAIM_FILE}: missing or unreadable")
+    if log_path.exists():
+        try:
+            log = sealed.OpenLog(log_path, signing_key)
+        except errors.ScmleError as error:
+            return step(name, FAIL, str(error))
+        entries = [
+            e
+            for e in log.entries
+            if e.get("event") == coverage_run.REGISTRATION_EVENT
+        ]
+        if len(entries) != 1:
+            problems.append(
+                f"{len(entries)} registrations in the custody log"
+                + (" (no registration)" if not entries else "")
+            )
+        elif claim is not None and entries[0]["detail"].get("sha256") != found:
+            problems.append(
+                f"{coverage_run.CLAIM_FILE}: differs from the registered hash"
+            )
+    else:
+        return step(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
+    if report_path.exists():
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            report = {}
+        if found is not None and report.get("claim_sha256") != found:
+            problems.append(f"{coverage_run.REPORT_FILE}: names another claim")
+    if problems:
+        return step(name, FAIL, "; ".join(problems))
+    return step(name, PASS, "claim hash registered; the report names it")
+
+
 def check_registered(
     run_dir: Path, document: dict[str, Any], ledger: ledger_module.Ledger
 ) -> Finding:
@@ -695,4 +752,7 @@ def verify(
     decided = check_decision_files(folder, signing_key)
     if decided is not None:
         findings.append(decided)
+    measured = check_coverage_claim(folder, signing_key)
+    if measured is not None:
+        findings.append(measured)
     return Verification(str(folder), tuple(findings))

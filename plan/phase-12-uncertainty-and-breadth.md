@@ -74,8 +74,8 @@ floors. Nothing below was run on real data.
 - Built 2026-11-04: `coverage_report.json` and `ModelBundle.coverage_report`,
   measured on the final test rows that the evaluation opens (read once, no
   second read), for every interval method the bundle holds and for pooled and
-  class-conditional sets. Open: `coverage_claim.json` registered as a claim
-  before the rows are read; coverage on `C`; slices (the report has the
+  class-conditional sets. `coverage_claim.json` is hashed and registered before the rows
+  are read (`claims verify` checks it). Open: coverage on `C`; slices (the report has the
   per-class split only); extend `SliceReport` (`slices.py`).
 - Decide the G5 redesign above before the slice flag may gate.
 

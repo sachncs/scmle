@@ -448,6 +448,7 @@ class RunContext:
     reference_scores: pd.Series | None = None
     refits: dict[str, Any] = dataclasses.field(default_factory=dict)
     pending_ledger: Any = None
+    coverage_claim_sha256: str | None = None
     final_pipeline: Any = None
     test_rows: tuple[pd.DataFrame, pd.Series] | None = None
     stream: tuple[streaming.ChunkSource, streaming.Totals] | None = None
