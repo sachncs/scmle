@@ -3399,27 +3399,32 @@ class PackageStage(Stage):
         """
         split = require(context.split, "split")
         held = [fold[1] for fold in split.manifest.folds]
-        folds = cv_plus.partition_folds(held, len(split.dev_features))
-        reason = None
-        if folds is None or len(folds) != len(observed):
-            reason = "held-out folds overlap; no CV+ ensemble"
-        elif len(observed) >= cv_plus.MIN_ROWS_FOR_SPLIT:
-            reason = (
-                f"{len(observed)} calibration rows; pooled margin is used "
-                f"from {cv_plus.MIN_ROWS_FOR_SPLIT}"
-            )
-        elif cv_plus.serialized_size(models) > cv_plus.MAX_BYTES:
-            reason = f"fold models exceed {cv_plus.MAX_BYTES} bytes"
-        if reason is not None or folds is None:
+        plan = cv_plus.plan_scores(
+            held,
+            len(split.dev_features),
+            len(observed),
+            models,
+            self.cv_plus_cap(context),
+        )
+        context.emit(
+            "conformal.scores",
+            f"calibration scores are {plan.mode.replace('_', ' ')}",
+            data={"source": plan.mode, "rows": len(observed)},
+        )
+        if plan.folds is None:
             context.emit(
                 "cv_plus.skipped",
-                f"CV+ ensemble not stored: {reason}",
-                data={"reason": reason},
+                f"CV+ ensemble not stored: {plan.reason}",
+                data={"reason": plan.reason},
             )
             return
         bundle.cv_plus = cv_plus.CvPlusEnsemble(
-            tuple(models), folds, np.abs(observed - predicted)
+            tuple(models), plan.folds, np.abs(observed - predicted)
         )
+
+    def cv_plus_cap(self, context: context_module.RunContext) -> int:
+        """The most bytes of fold models to keep: the charter's, else default."""
+        return cv_plus.MAX_BYTES
 
     def quantile_intervals(
         self, context: context_module.RunContext

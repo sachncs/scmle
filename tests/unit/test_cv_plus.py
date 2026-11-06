@@ -49,3 +49,41 @@ def test_too_few_rows_or_an_unknown_fold_is_refused():
 
 def test_serialized_size_is_positive():
     assert cv_plus.serialized_size([fitted(0.0)]) > 0
+
+
+def test_from_a_thousand_rows_the_scores_are_pooled_out_of_fold():
+    held = [list(range(i, 1200, 4)) for i in range(4)]
+    plan = cv_plus.plan_scores(held, 1200, 1200, [object()] * 4)
+
+    assert plan.mode == cv_plus.POOLED
+    assert plan.folds is None
+    assert str(cv_plus.MIN_ROWS_FOR_SPLIT) in plan.reason
+
+
+def test_below_a_thousand_rows_with_disjoint_folds_the_fold_models_are_kept():
+    held = [list(range(i, 200, 4)) for i in range(4)]
+    plan = cv_plus.plan_scores(held, 200, 200, [object()] * 4)
+
+    assert plan.mode == cv_plus.FOLD_MODELS
+    assert plan.folds.tolist() == [
+        i % 4 for i in range(4) for ignored in held[i]
+    ]
+    assert plan.reason is None
+
+
+def test_overlapping_folds_fall_back_to_the_pooled_scores():
+    plan = cv_plus.plan_scores([[0, 1], [1, 2]], 3, 4, [])
+    assert plan.mode == cv_plus.POOLED
+    assert "overlap" in plan.reason
+
+
+def test_a_model_set_above_the_cap_is_not_kept_and_the_cap_is_a_parameter():
+    held = [list(range(i, 200, 4)) for i in range(4)]
+    models = [fitted(float(i)) for i in range(4)]
+    size = cv_plus.serialized_size(models)
+
+    small = cv_plus.plan_scores(held, 200, 200, models, max_bytes=size - 1)
+    large = cv_plus.plan_scores(held, 200, 200, models, max_bytes=size)
+
+    assert small.mode == cv_plus.POOLED and str(size - 1) in small.reason
+    assert large.mode == cv_plus.FOLD_MODELS

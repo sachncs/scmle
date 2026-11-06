@@ -11,8 +11,11 @@ The rule needs every calibration row to be held out in exactly one fold.
 `partition_folds` checks it and returns the fold index of each row; with
 overlapping held-out sets (repeated or expanding-window folds) it returns
 None and the caller keeps the pooled split-conformal margin. The size of the
-stored models is bounded by `MAX_BYTES`: a larger ensemble is not kept and
-the run says why, so a bundle does not grow by a factor of K without notice.
+stored models is bounded by `MAX_BYTES` (a charter's `uncertainty` block may
+set another cap): a larger ensemble is not kept and the run says why, so a
+bundle does not grow by a factor of K without notice. From
+`MIN_ROWS_FOR_SPLIT` calibration rows the pooled out-of-fold scores alone are
+served and no model is kept (`plan_scores`).
 """
 
 from collections.abc import Sequence
@@ -53,6 +56,65 @@ def partition_folds(
             seen.add(position)
             order.append(index)
     return np.asarray(order, dtype=int)
+
+
+POOLED = "pooled_out_of_fold"
+FOLD_MODELS = "cv_plus"
+
+
+@dataclasses.dataclass(frozen=True)
+class ScorePlan:
+    """How the calibration scores of a regression bundle are served.
+
+    Attributes:
+        mode: `pooled_out_of_fold` (one margin from the scores of all
+            held-out rows, each scored by the model that did not see it) or
+            `cv_plus` (the margin as before, and the K fold models kept for
+            CV+ intervals).
+        folds: Fold index of each calibration row when the models are kept.
+        reason: Why the fold models are not kept, None when they are.
+    """
+
+    mode: str
+    folds: np.ndarray | None
+    reason: str | None
+
+
+def plan_scores(
+    held_out: Sequence[Sequence[int]],
+    rows: int,
+    observed: int,
+    models: Sequence[Any],
+    max_bytes: int = MAX_BYTES,
+) -> ScorePlan:
+    """Chooses between the pooled out-of-fold scores and the CV+ models.
+
+    The pooled out-of-fold margin is always available. With `MIN_ROWS_FOR_SPLIT`
+    or more calibration rows it is what the bundle serves and no fold model
+    is kept. Below that, the K fold models are kept for CV+ when the held-out
+    sets partition the rows and the models fit in `max_bytes`.
+
+    Args:
+        held_out: Positions held out by each fold, in fold order.
+        rows: Number of development rows.
+        observed: Number of calibration scores.
+        models: The fold models.
+        max_bytes: Largest serialized size of the models to keep.
+    """
+    folds = partition_folds(held_out, rows)
+    reason = None
+    if folds is None or len(folds) != observed:
+        reason = "held-out folds overlap; no CV+ ensemble"
+    elif observed >= MIN_ROWS_FOR_SPLIT:
+        reason = (
+            f"{observed} calibration rows; pooled margin is used "
+            f"from {MIN_ROWS_FOR_SPLIT}"
+        )
+    elif serialized_size(models) > max_bytes:
+        reason = f"fold models exceed {max_bytes} bytes"
+    if reason is not None or folds is None:
+        return ScorePlan(POOLED, None, reason)
+    return ScorePlan(FOLD_MODELS, folds, None)
 
 
 def serialized_size(models: Sequence[Any]) -> int:

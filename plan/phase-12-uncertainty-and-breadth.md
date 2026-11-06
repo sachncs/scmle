@@ -56,10 +56,13 @@ floors. Nothing below was run on real data.
 - Built 2026-11-04: the K fold models and residuals are stored and served
   as CV+ (`evaluation/cv_plus.py`, `predict_interval(method="cv_plus")`) for
   regression with disjoint held-out folds and fewer than 1000 calibration
-  rows; they are checksummed and a changed file is refused. Open: replace the
-  pooled out-of-fold scores with a separate refit when `n_cal >= 1000` (the
-  pooled scores are still used there), and a charter size cap (the cap is a
-  module constant, `cv_plus.MAX_BYTES`, with a skipped-event fallback).
+  rows; they are checksummed and a changed file is refused. From 1000
+  calibration rows the pooled out-of-fold scores alone are served and no
+  fold model is kept (`cv_plus.plan_scores`, recorded in the `conformal.scores`
+  event); a separate refit was considered and not built, since every pooled
+  score already comes from a model that did not see its row. Open: a charter
+  size cap (the cap is a module constant, `cv_plus.MAX_BYTES`, with a
+  skipped-event fallback).
 - Tie the CQR base levels to the requested level (`quantile.py` fixes
   0.05/0.95).
 - Differential test against MAPIE on three frozen datasets (`1e-9`).

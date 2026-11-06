@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+* Conformal score source is chosen by a tested rule and recorded (F12,
+  WP-12.1; `cv_plus.plan_scores`, `conformal.scores` event). From 1000
+  calibration rows (`cv_plus.MIN_ROWS_FOR_SPLIT`) the bundle serves the pooled
+  out-of-fold scores alone, each scored by the fold model that did not see its
+  row, and keeps no fold model; below 1000 rows, with held-out folds that
+  partition the rows and models within the size cap, the K fold models are
+  also kept for CV+ intervals; overlapping folds or an oversize set fall back
+  to the pooled scores with the reason in `cv_plus.skipped`. The behaviour is
+  the one the run already had; what is new is the pure function that decides
+  it (unit tests pin each branch and the cap as a parameter) and the event
+  that names the source. No separate refit was added: the pooled scores
+  already come from models that did not see their rows. No certified source
+  changed.
+
 * `claims verify` checks the four decision files (F11, W2). A charter run with
   a decision block now writes `decision_threshold.json` and `net_benefit.json`
   next to `policy_value.json` and `rollout_design.json`, and appends one
