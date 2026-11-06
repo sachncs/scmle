@@ -1609,6 +1609,7 @@ class ProfileStage(Stage):
                 f"'{split.manifest.strategy}': an entity-disjoint split tests "
                 "new entities"
             )
+        context.cluster_column = data.group_column
         context.emit(
             "unit.known_entity_future",
             "entities are not split units: their rows sit on both sides, "
@@ -3012,7 +3013,10 @@ class FinalEvaluationStage(Stage):
                 context.spec.validation.seed,
                 groups=(
                     test_features[context.spec.data.group_column]
-                    if split.manifest.strategy == "group"
+                    if (
+                        split.manifest.strategy == "group"
+                        or context.cluster_column
+                    )
                     and context.spec.data.group_column
                     else None
                 ),

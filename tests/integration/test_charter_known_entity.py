@@ -102,3 +102,11 @@ def test_a_known_entity_charter_refuses_an_entity_disjoint_validation(tmp_path):
     path = charter_file(tmp_path)
     with pytest.raises(errors.ConfigError, match="time-ordered"):
         run(tmp_path, path, validation="group")
+
+
+def test_the_metric_interval_resamples_whole_entities(tmp_path):
+    result = run(tmp_path, charter_file(tmp_path))
+
+    uncertainty = read(result, "diagnostics/metric_uncertainty.json")
+    assert uncertainty["resampling_unit"] == "groups"
+    assert uncertainty["independent_units"] < uncertainty["evaluation_rows"]

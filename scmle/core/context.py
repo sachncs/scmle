@@ -353,6 +353,9 @@ class RunContext:
         manifest: Dataset identity.
         task: Resolved task type.
         profile: Dataset profile.
+        cluster_column: Entity column whose rows are not independent in the
+            final evaluation (set for `known_entity_future`, where entities
+            are not split units but their rows are correlated).
         curation: Curation report as first written, kept so that later
             stages can amend it when they change the feature plan.
         split: Split result with development data and locked test.
@@ -430,6 +433,7 @@ class RunContext:
     task: tasks.TaskType | None = None
     profile: data_contracts.DatasetProfile | None = None
     curation: data_contracts.CurationReport | None = None
+    cluster_column: str | None = None
     split: splitters.SplitResult | None = None
     custody: custody_pipeline.CustodyOutcome | None = None
     custody_vault: custody_sealed.CustodyVault | None = None
