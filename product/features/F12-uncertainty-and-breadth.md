@@ -50,7 +50,7 @@ escalates it.
 | Existing coverage gate | `benchmarks/reliability.py:287-304` | One synthetic regression set, one seed; a **90%** interval passes at empirical coverage **>= 0.85** (`:292`, `:303`). Too loose to detect a 4-point undercoverage and has no operating characteristic (fails P1 as a gate). Unit tests: `tests/unit/test_conformal.py:16`, `tests/integration/test_quantile_intervals.py:29`. |
 | Slice machinery | `scmle/evaluation/slices.py:16-21` (`MIN_SUPPORT = 30`, `BANDS = 4`), `:24-77` | Scores a point metric per slice and lists worst gaps. Does not compute coverage or any interval around the slice score. |
 | Calibration of probabilities | `scmle/evaluation/reliability.py:11` (top-label curve, 10 bins) | Descriptive; no confidence interval on bins. |
-| Shift diagnostic | `scmle/evaluation/shift.py:26-31` (`AdversarialValidation`), `:93` (verdict) | An AUC and most-shifted features. It does not output density-ratio weights. |
+| Shift diagnostic | `scmle/evaluation/shift.py:26-31` (`AdversarialValidation`), `:93` (verdict) | An AUC, most-shifted features and (since 2026-11-06) the clipped, size-corrected odds of its out-of-fold discriminator with their effective sample size; the weights a bundle uses are still estimated by `attach_shift_weights`. |
 
 Built since this section was written (library code, simulation gates in
 `benchmarks/qualification/uncertainty_certificates.json`, see `CHANGELOG.md`):
@@ -185,9 +185,9 @@ distributions that differ; it needs the likelihood ratio between them, known
 or estimated from unlabeled test covariates. The abstract does not state the
 coverage form; with an **estimated** ratio the guarantee is approximate and
 that is how it is reported. Weights `w(x)` come from a probabilistic
-classifier between calibration and target covariates (`shift.py:26` already
-trains the discriminator; it must be extended to output clipped odds
-`p/(1-p)` and report the effective sample size `(sum w)^2 / sum w^2`).
+classifier between calibration and target covariates (`shift.py` reports
+the clipped odds `p/(1-p)` of its out-of-fold discriminator and the effective
+sample size `(sum w)^2 / sum w^2`, descriptively).
 
 Time-dependent drift is not covariate shift with a fixed ratio. For it the
 method is not a new interval but a detector plus F13: the system reports

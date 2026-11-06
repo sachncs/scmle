@@ -86,8 +86,9 @@ floors. Nothing below was run on real data.
   weights and discriminator (checksummed) and `predict_interval(shift=True)`
   serves weighted conformal intervals; a small effective sample is refused.
   Open: the run itself has no target covariates, so weights are attached by
-  the user from rows in score order; extend `AdversarialValidation`
-  (`shift.py`) to emit the same odds; wire the refusal to F13 escalation.
+  the user from rows in score order; wire the refusal to F13 escalation.
+  `AdversarialValidation` now reports the clipped, size-corrected odds of its
+  out-of-fold discriminator (`odds` in `adversarial_validation.json`).
 
 **WP-12.4 Forecast protocol**
 - Per-horizon calibrated quantile forecasts; WIS reporting in the run;

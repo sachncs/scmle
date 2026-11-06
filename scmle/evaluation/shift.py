@@ -15,6 +15,7 @@ from sklearn import metrics as sk_metrics
 from sklearn import model_selection
 
 from scmle.evaluation import diagnostics
+from scmle.evaluation import shift_weights
 
 FOLDS = 5
 MAX_ROWS = 4000
@@ -65,8 +66,58 @@ class AdversarialValidation(diagnostics.Diagnostic):
             "available": True,
             "auc": auc,
             "verdict": self.verdict(auc),
+            "odds": self.odds(scores, len(old)),
             "most_shifted": self.most_shifted(old, new, inputs),
             "rows": {"reference": len(old), "evaluation": len(new)},
+        }
+
+    @staticmethod
+    def odds(scores: np.ndarray, reference_rows: int) -> dict[str, Any]:
+        """The odds that weighted conformal would use, from the same scores.
+
+        The out-of-fold probability `p` that a row is an evaluation row
+        gives the odds `p / (1 - p)`, corrected for the sample sizes and
+        clipped at `shift_weights.DEFAULT_CLIP`, the ratio estimate of
+        `scmle.evaluation.shift_weights.estimate_weights` (which uses a
+        logistic discriminator fitted on all rows; this one is the boosted
+        classifier of the report, scored out of fold). Descriptive.
+        """
+        new_rows = len(scores) - reference_rows
+        clip = shift_weights.DEFAULT_CLIP
+        raw = (
+            scores / np.maximum(1.0 - scores, 1e-12) * reference_rows / new_rows
+        )
+        ratio = np.minimum(raw, clip)
+
+        def describe(
+            values: np.ndarray, unclipped: np.ndarray
+        ) -> dict[str, Any]:
+            return {
+                "mean": float(values.mean()),
+                "p95": float(np.quantile(values, 0.95)),
+                "max": float(values.max()),
+                "clipped_share": float((unclipped > clip).mean()),
+                "effective_size": shift_weights.effective_sample_size(values),
+            }
+
+        reference = describe(ratio[:reference_rows], raw[:reference_rows])
+        verdict = (
+            "possible"
+            if reference["effective_size"] >= shift_weights.MIN_EFFECTIVE_SIZE
+            else "refused"
+        )
+        return {
+            "clip": clip,
+            "size_correction": reference_rows / new_rows,
+            "reference": reference,
+            "evaluation": describe(
+                ratio[reference_rows:], raw[reference_rows:]
+            ),
+            "weighted_conformal": verdict,
+            "minimum_effective_size": shift_weights.MIN_EFFECTIVE_SIZE,
+            "note": "odds of an out-of-fold discriminator, corrected for the "
+            "sample sizes and clipped; descriptive, on the capped sample; "
+            "weights for a bundle are estimated by attach_shift_weights",
         }
 
     @staticmethod

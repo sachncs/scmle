@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+* Adversarial validation reports the odds (F12, WP-12.3;
+  `AdversarialValidation.odds`, `odds` in `adversarial_validation.json`).
+  From the same out-of-fold probabilities it already computes, the report
+  gives the odds `p / (1 - p)` corrected for the sample sizes and clipped at
+  `shift_weights.DEFAULT_CLIP` (20), as mean, 95th percentile, maximum,
+  clipped share and Kish effective size, for the reference and the evaluation
+  rows, and says whether weighted conformal would be `possible` or `refused`
+  (effective size against `MIN_EFFECTIVE_SIZE`, 50). The discriminator is the
+  report's boosted classifier scored out of fold, not the logistic one
+  `attach_shift_weights` fits, so the numbers describe the shift and do not
+  replace the bundle's weights; the sample is the report's capped one.
+  Descriptive; the verdict and the AUC are unchanged. No certified source
+  changed.
+
 * Coverage and set size per declared slice column (F12, WP-12.2;
   `scmle.evaluation.coverage_slices`, `UncertaintySpec.slice_columns`,
   `declared_slices` in `coverage_report.json`). The charter's `uncertainty`
