@@ -128,3 +128,75 @@ def test_a_causal_block_in_an_older_format_is_refused(tmp_path):
     path.write_text(json.dumps(wrapper))
     with pytest.raises(errors.ConfigError, match="causal"):
         sealing.read_verified(path, signing_key=KEY)
+
+
+# Hash and signature (key "k") of a format 4 causal charter written before
+# subgroups and attestors existed; both must survive the new fields.
+FORMAT_FOUR_HASH = (
+    "c94678dfc808151bdd4a34662ef6aed2237ed1655fa888a5c21681b292ead68f"
+)
+FORMAT_FOUR_SIGNATURE = (
+    "cc9e872b857e2892446e16dc790c21f9837b5450fa4f92ae566d4723463f9ea9"
+)
+
+
+def format_four_charter():
+    return causal_charter(
+        assumptions=("positivity",),
+        strategies=("backdoor_aipw",),
+        strata=("region",),
+        negative_controls=(),
+        sensitivity=None,
+        treatment="t",
+        outcome="y",
+    )
+
+
+def test_a_format_four_causal_charter_keeps_hash_and_signature():
+    charter = format_four_charter()
+    assert charter.charter_hash == FORMAT_FOUR_HASH
+    assert charter.format_version == 4
+    block = charter.estimand.to_dict()["causal"]
+    assert "subgroups" not in block and "attestors" not in block
+    assert sealing.envelope(charter, "k")["signature"] == FORMAT_FOUR_SIGNATURE
+
+
+SUBGROUPS = (
+    causal.Subgroup("region", ("n", "s")),
+    causal.Subgroup("tier", ("a",)),
+)
+
+
+def test_subgroups_need_format_nine_and_round_trip():
+    charter = causal_charter(subgroups=SUBGROUPS)
+    assert charter.format_version == 9
+    assert charter.charter_hash != causal_charter().charter_hash
+    record = json.loads(json.dumps(charter.to_dict()))
+    assert c.AnalysisCharter.from_dict(record) == charter
+
+
+def test_subgroups_in_an_older_format_are_refused(tmp_path):
+    path = tmp_path / "charter.json"
+    sealing.write_charter(
+        path, causal_charter(subgroups=SUBGROUPS), signing_key=KEY
+    )
+    wrapper = json.loads(path.read_text())
+    wrapper["format"] = 8
+    path.write_text(json.dumps(wrapper))
+    with pytest.raises(errors.ConfigError, match="subgroups"):
+        sealing.read_verified(path, signing_key=KEY)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: causal.Subgroup("", ("a",)),
+        lambda: causal.Subgroup("region", ()),
+        lambda: causal.Subgroup("region", ("a", "a")),
+        lambda: spec(subgroups=(SUBGROUPS[0], SUBGROUPS[0])),
+        lambda: spec(subgroups=(causal.Subgroup("coupon", ("1",)),)),
+    ],
+)
+def test_invalid_subgroups_are_refused(build):
+    with pytest.raises(ValueError):
+        build()

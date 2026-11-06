@@ -36,7 +36,7 @@ def causal_frame() -> pd.DataFrame:
     return pd.DataFrame({"x1": x1, "x2": x2, "t": t, "y": y})
 
 
-def charter_file(tmp_path, assumptions, dag=None) -> pathlib.Path:
+def charter_file(tmp_path, assumptions, dag=None, subgroups=()) -> pathlib.Path:
     base = make_charter(min_effect=0.5, k_max=3)
     estimand = dataclasses.replace(
         base.estimand,
@@ -48,6 +48,7 @@ def charter_file(tmp_path, assumptions, dag=None) -> pathlib.Path:
             assumptions=assumptions,
             strategies=("backdoor_aipw",),
             dag=dag,
+            subgroups=subgroups,
         ),
     )
     path = tmp_path / "charter.json"
@@ -57,13 +58,13 @@ def charter_file(tmp_path, assumptions, dag=None) -> pathlib.Path:
     return path
 
 
-def run(tmp_path, assumptions, dag=None):
+def run(tmp_path, assumptions, dag=None, subgroups=(), frame=None):
     return support.make_project(
-        causal_frame(),
+        causal_frame() if frame is None else frame,
         "y",
         time_budget=300,
         output_dir=tmp_path / "out",
-        charter=charter_file(tmp_path, assumptions, dag),
+        charter=charter_file(tmp_path, assumptions, dag, subgroups),
     ).run()
 
 
@@ -192,3 +193,31 @@ def test_a_charter_no_strategy_identifies_is_refused_without_an_estimate(
     assert claims["status"] == "not_identified" and claims["tier"] is None
     assert report["estimate"] is None and report["action"] == "refuse_claim"
     assert result.evaluation["test_set_opened"] is True
+
+
+def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(
+    tmp_path,
+):
+    frame = causal_frame()
+    frame["seg"] = np.where(frame["x1"] > 0, "hi", "lo")
+    plain = run(tmp_path / "plain", ASSUMPTIONS, frame=frame)
+    split = run(
+        tmp_path / "split",
+        ASSUMPTIONS,
+        subgroups=(causal.Subgroup("seg", ("hi", "lo")),),
+        frame=frame,
+    )
+    report = read(split, "identification_report.json")["subgroups"]
+    assert report["rule"] == "holm" and report["family_size"] == 2
+    assert {r["value"] for r in report["hypotheses"]} == {"hi", "lo"}
+    assert report["rejected"] == ["seg=hi", "seg=lo"]
+    claims = read(split, "causal_claims.json")
+    assert claims["subgroups"]["family_size"] == 2
+    assert "subgroups" not in read(plain, "causal_claims.json")
+    registered = {}
+    for name, result in (("plain", plain), ("split", split)):
+        folder = pathlib.Path(result.run_dir)
+        ledger = ledger_module.Ledger.load(folder / ledger_module.FILE_NAME)
+        registered[name] = ledger.claims["causal_primary_theta_zero"]["sha256"]
+    assert registered["plain"] != registered["split"]
+    assert claims_audit.verify(split.run_dir).ok

@@ -9,7 +9,9 @@ of the charter and never of the outcome values.
 
 Versioning. An estimand without the block serialises exactly as before (the
 key is omitted), so every charter signed under format 1 to 3 keeps its hash
-and its signature and loads unchanged.
+and its signature and loads unchanged. The block's own later fields
+(`subgroups`, format 9) are omitted from the record when empty, so a format 4
+causal charter keeps its hash and signature too.
 """
 
 from collections.abc import Iterable
@@ -106,6 +108,44 @@ class NegativeControl:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class Subgroup:
+    """A subgroup hypothesis: the effect among rows with given column values.
+
+    One hypothesis per listed value, `theta_g = 0` for the rows where
+    `column == value` (compared as text). Together with the primary
+    hypothesis they form the family that the multiplicity rule adjusts.
+
+    Attributes:
+        column: Column that defines the subgroups.
+        values: The levels, as text, fixed before any data is read.
+    """
+
+    column: str
+    values: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        """Validates the record."""
+        evidence.require_text(self.column, "column")
+        qualification.require_tuple(self.values, "values")
+        if not self.values:
+            raise ValueError("a subgroup needs at least one value")
+        for value in self.values:
+            evidence.require_text(value, "value")
+        if len(set(self.values)) != len(self.values):
+            raise ValueError("duplicate subgroup value")
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return {"column": self.column, "values": list(self.values)}
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds the record, rejecting unknown or missing fields."""
+        qualification.require_fields(cls, record)
+        return cls(record["column"], tuple(record["values"]))
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class SensitivitySpec:
     """How strong an unmeasured confounder the claim must survive.
 
@@ -172,6 +212,10 @@ class CausalSpec:
             estimated propensity outside `[eps, 1 - eps]` are dropped and the
             report names the changed estimand. Zero means no trimming.
         min_share: Smallest share of units that may remain after trimming.
+        subgroups: Subgroup hypotheses (format 9), registered with the
+            primary claim before `C` is opened; the effect in each declared
+            subgroup is tested and the family is adjusted by Holm's
+            step-down at the primary level.
     """
 
     treatment: str
@@ -191,6 +235,7 @@ class CausalSpec:
     sensitivity: SensitivitySpec | None = None
     trim: float = 0.0
     min_share: float = 0.5
+    subgroups: tuple[Subgroup, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates the block."""
@@ -203,6 +248,7 @@ class CausalSpec:
             "strategies",
             "negative_controls",
             "strata",
+            "subgroups",
         ):
             qualification.require_tuple(getattr(self, name), name)
         for item in self.assumptions:
@@ -211,6 +257,11 @@ class CausalSpec:
             raise ValueError("duplicate assumption")
         if len(set(self.strategies)) != len(self.strategies):
             raise ValueError("duplicate strategy")
+        columns = [g.column for g in self.subgroups]
+        if len(set(columns)) != len(columns):
+            raise ValueError("duplicate subgroup column")
+        if {self.treatment, self.outcome} & set(columns):
+            raise ValueError("a subgroup cannot be defined by the treatment")
         if self.cutoff is not None:
             qualification.finite(self.cutoff, "cutoff")
         trim = qualification.finite(self.trim, "trim")
@@ -231,6 +282,9 @@ class CausalSpec:
         )
         for name in ("assumptions", "strategies", "strata"):
             record[name] = list(record[name])
+        del record["subgroups"]
+        if self.subgroups:
+            record["subgroups"] = [g.to_dict() for g in self.subgroups]
         return record
 
     @classmethod
@@ -269,4 +323,5 @@ class CausalSpec:
             ),
             trim=record["trim"],
             min_share=record["min_share"],
+            subgroups=tuple(Subgroup.from_dict(g) for g in record["subgroups"]),
         )

@@ -21,8 +21,10 @@ writing.
 The estimate, battery, replication, sensitivity and tier are computed on the
 frame `C` releases (`scmle/core/causal_claim.py`). Left:
 
-- Subgroup and heterogeneity hypotheses are not registered or computed; the
-  replication over `strata` is only a falsifier.
+- Subgroup hypotheses are registered and reported (Holm at the primary
+  level), but they describe heterogeneity only: they do not enter the tier,
+  their power at the subgroup sizes of a real run is not measured, and no
+  certificate covers the Holm family of subgroup estimates.
 - The charter has no field for attestors, so a run reports every causal claim
   at `unverified` ("no named attestor"); `identify` takes the names, the run
   does not supply them.

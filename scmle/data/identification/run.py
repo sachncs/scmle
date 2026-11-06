@@ -20,6 +20,7 @@ and its tier is capped at `attested`.
 
 from collections.abc import Mapping
 import dataclasses
+from fractions import Fraction
 import hashlib
 import json
 from typing import Any
@@ -40,6 +41,7 @@ from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.identification import tier
 from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import multiplicity
 
 DOCUMENTS = (
     "identification_plan.json",
@@ -819,6 +821,7 @@ def assemble(
     needed: tuple[str, ...],
     attestors: Mapping[str, str] | None = None,
     certified: tuple[str, ...] = (),
+    subgroups: Mapping[str, Any] | None = None,
 ) -> Outcome:
     """Builds the documents and the claim file that hashes the others."""
     documents = {
@@ -844,6 +847,13 @@ def assemble(
         "hashes": dict(hashes),
         "limits": LIMITS,
     }
+    if subgroups is not None:
+        claims["subgroups"] = {
+            "rule": subgroups["rule"],
+            "alpha": subgroups["alpha"],
+            "family_size": subgroups["family_size"],
+            "rejected": list(subgroups["rejected"]),
+        }
     documents["causal_claims.json"] = claims
     hashes["causal_claims.json"] = digest(claims)
     return Outcome(documents, decision, hashes)
@@ -883,6 +893,89 @@ def replication(
         results[column] = rep.to_dict()
         passed = rep.passed if passed is None else (passed and rep.passed)
     return {"by_column": results, "passed": passed}
+
+
+def subgroup_report(
+    adapter: Adapter,
+    c: pd.DataFrame,
+    level: float,
+    subgroups: tuple[causal.Subgroup, ...],
+) -> dict[str, Any]:
+    """The effect in each declared subgroup, adjusted as one family.
+
+    The family is every declared (column, value) pair, fixed by the charter
+    and registered with the primary claim before `C` is opened. Each
+    hypothesis `theta_g = 0` is tested by a Wald statistic of the strategy's
+    own estimator on the rows of `C` in the subgroup, and the p-values are
+    adjusted by Holm's step-down at the primary level `1 - level`, which
+    controls the familywise error rate under any dependence. A subgroup that
+    cannot be estimated (column absent, fewer than `MIN_STRATUM_ROWS` rows, no
+    usable standard error) stays in the family with p = 1, so a missing
+    subgroup never shrinks the correction. The result describes
+    heterogeneity; it does not enter the tier.
+    """
+    saved = dict(adapter.design)
+    rows: list[dict[str, Any]] = []
+    for group in subgroups:
+        for value in group.values:
+            row: dict[str, Any] = {
+                "column": group.column,
+                "value": value,
+                "skipped": None,
+            }
+            part = None
+            if group.column not in c.columns:
+                row["skipped"] = "column not in C"
+            else:
+                part = c[c[group.column].astype(str) == value]
+                if len(part) < MIN_STRATUM_ROWS:
+                    row["skipped"] = f"fewer than {MIN_STRATUM_ROWS} rows"
+            p_value = 1.0
+            if part is not None and row["skipped"] is None:
+                try:
+                    est = adapter.estimate(part, level)
+                except ValueError as error:
+                    row["skipped"] = str(error)
+                else:
+                    if np.isfinite(est.se) and est.se > 0:
+                        test = battery.wald_test(
+                            f"{group.column}={value}",
+                            "subgroup",
+                            est.estimate,
+                            est.se,
+                        )
+                        p_value = test.p_value
+                        row.update(
+                            estimate=est.estimate,
+                            se=est.se,
+                            low=est.low,
+                            high=est.high,
+                            n=est.n,
+                        )
+                    else:
+                        row["skipped"] = "no usable standard error"
+            row["p_value"] = p_value
+            rows.append(row)
+    adapter.design = saved
+    alpha = Fraction(1.0 - level).limit_denominator(10**9)
+    adjusted = multiplicity.adjust(
+        [r["p_value"] for r in rows], multiplicity.Rule.HOLM, alpha
+    )
+    for row, p_adj, flag in zip(
+        rows, adjusted.adjusted, adjusted.rejected, strict=True
+    ):
+        row["adjusted_p"] = p_adj
+        row["rejected"] = bool(flag)
+    return {
+        "rule": multiplicity.Rule.HOLM.value,
+        "alpha": float(alpha),
+        "family_size": len(rows),
+        "statement": multiplicity.STATEMENTS[multiplicity.Rule.HOLM],
+        "hypotheses": rows,
+        "rejected": [
+            f"{r['column']}={r['value']}" for r in rows if r["rejected"]
+        ],
+    }
 
 
 def identify(
@@ -968,6 +1061,11 @@ def identify(
             "note": "single treated unit: inference is the placebo permutation",
         }
     )
+    subgroup_found = (
+        subgroup_report(adapter, c, level, spec.subgroups)
+        if spec.subgroups and not adapter.single_unit
+        else None
+    )
     verdict = verdict_of(spec, primary)
     verdict_sig = primary.excludes_zero() if np.isfinite(primary.low) else None
     verdict["interval_excludes_zero"] = verdict_sig
@@ -1022,6 +1120,8 @@ def identify(
     }
     if dag_checks is not None:
         report["dag"] = dict(dag_checks)
+    if subgroup_found is not None:
+        report["subgroups"] = subgroup_found
     falsification = {
         **report_battery.to_dict(),
         "replication": rep,
@@ -1038,6 +1138,7 @@ def identify(
         needed,
         attestors,
         certified,
+        subgroup_found,
     )
 
 

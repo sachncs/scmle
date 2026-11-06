@@ -15,9 +15,13 @@ opening that tests the bivariate family; nothing here opens `C`.
 
 The five report files returned by `identify` are handed back to the ledger,
 which writes their hashes into the confirmation row and so into the ledger
-head. Subgroup and heterogeneity hypotheses are not computed by the library
-and are not registered: the replication over `strata` is part of the
-falsification report and can only lower the tier.
+head. Subgroup hypotheses (charter format 9) are part of the registration:
+the hash of the charter's causal block, which lists the declared levels, is
+fixed before `C` opens. `identify` estimates the effect in each declared
+subgroup on the released rows and adjusts the family by Holm's step-down at
+the primary level; the result is reported in `identification_report.json`
+and summarised in `causal_claims.json`, and it does not change the tier. The
+replication over `strata` stays a falsifier that can only lower the tier.
 
 Attestors are not read from the charter (it has no field for them), so a run
 reports every causal claim at tier `unverified` unless the caller of

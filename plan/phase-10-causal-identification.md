@@ -14,8 +14,7 @@ not in the repository.
 ## Work packages still open
 
 **WP-10.6 remainder** (one agent)
-- Subgroup hypotheses paying the confirmation rule, and attestors in the
-  charter so a run can reach `attested`. The estimate on `C`, the file hashes,
+- Attestors in the charter so a run can reach `attested`. The estimate on `C`, the file hashes,
   the DAG load and the admissibility coupling are done.
 
 **WP-10.7a: corpora** (one agent, can start at once)

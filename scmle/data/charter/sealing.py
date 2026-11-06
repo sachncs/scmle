@@ -23,6 +23,7 @@ DECISION_FORMAT = 5
 UNIT_FORMAT = 6
 INGEST_FORMAT = 7
 INGEST_ENTITY_FORMAT = 8
+SUBGROUP_FORMAT = 9
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -131,6 +132,12 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
             f"'ingest', which needs format {INGEST_FORMAT}"
         )
     block = record.get("charter", {}).get("ingest") or {}
+    causal_block = estimand.get("causal") or {}
+    if declared < SUBGROUP_FORMAT and "subgroups" in causal_block:
+        raise errors.ConfigError(
+            f"charter {path} declares format {declared} but its causal block "
+            f"carries 'subgroups', which need format {SUBGROUP_FORMAT}"
+        )
     for name in ("entity", "reconcile"):
         if declared < INGEST_ENTITY_FORMAT and name in block:
             raise errors.ConfigError(

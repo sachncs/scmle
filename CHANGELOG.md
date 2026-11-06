@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+* Subgroup hypotheses in a causal claim (F10, charter format 9;
+  `CausalSpec.subgroups`, `identification.run.subgroup_report`). The causal
+  block gained the optional `subgroups` field: columns with the levels to
+  test, fixed before any data is read, so they are part of the registration
+  hash the ledger stores before `C` opens. `identify` estimates the
+  strategy's effect among the rows of `C` at each declared level and adjusts
+  the whole family by Holm's step-down at the primary level (the rule the
+  falsification battery already uses; `multiplicity.adjust` gives the adjusted
+  p-values); a level that cannot be estimated stays in the family at p = 1,
+  so a missing subgroup never shrinks the correction. The result is in
+  `identification_report.json` and summarised in `causal_claims.json`; it does
+  not change the tier. Omitted from the record when empty, so a format 4
+  causal charter keeps its hash and signature (both pinned). `tier.decide` and
+  every certified source are unchanged, so no certificate was re-issued. A
+  test with 20 null subgroups and five seeds sees at least three unadjusted
+  p < 0.05 and no Holm rejection; with one real effect of 2.0 among three
+  levels only that level is rejected. Not measured: power at real subgroup
+  sizes, or a certificate for the family.
+
 * Extract reconciliation in a charter run (F9, charter format 8;
   `IngestSpec.reconcile`, `scmle.data.ingest.declared`). The `ingest` block
   gained the optional `reconcile` sub-block: per view a row count, column sums
