@@ -200,3 +200,43 @@ def test_mixture_state_round_trips():
     assert float(again.log_capital) == pytest.approx(float(test.log_capital))
     with pytest.raises(ValueError, match="positive"):
         seq.MixtureTest(0.2, seq.LESS, 0.1, stride=0)
+
+
+def enumerate_paths(p, horizon, direction, alpha):
+    """Exact law of the capital over every Bernoulli(p) sequence.
+
+    Returns, per horizon t, the exact mean of the capital after t steps, and
+    the exact probability that the capital reached 1 / alpha by step
+    `horizon`. Nothing is sampled: every one of the 2**horizon sequences is
+    run through the test and weighted by its probability.
+    """
+    means = np.zeros(horizon)
+    crossing = 0.0
+    for code in range(2**horizon):
+        bits = [(code >> k) & 1 for k in range(horizon)]
+        probability = float(np.prod([p if bit else 1 - p for bit in bits]))
+        test = seq.BettingTest(p, direction, alpha)
+        for step, bit in enumerate(bits):
+            test.update(float(bit))
+            means[step] += probability * float(test.e_value)
+        if test.ever_crossed:
+            crossing += probability
+    return means, crossing
+
+
+@pytest.mark.parametrize("direction", [seq.GREATER, seq.LESS])
+def test_the_capital_is_a_martingale_at_the_null_mean_by_enumeration(direction):
+    means, crossing = enumerate_paths(0.4, 12, direction, 0.1)
+    assert means == pytest.approx(np.ones(12), abs=1e-12)
+    assert crossing <= 0.1
+
+
+@pytest.mark.parametrize(
+    ("direction", "p"), [(seq.GREATER, 0.3), (seq.LESS, 0.5)]
+)
+def test_the_capital_is_a_supermartingale_inside_the_null_by_enumeration(
+    direction, p
+):
+    means, crossing = enumerate_paths(p, 12, direction, 0.1)
+    assert np.all(means <= 1.0 + 1e-12)
+    assert crossing <= 0.1
