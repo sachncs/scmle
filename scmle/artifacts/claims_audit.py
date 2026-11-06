@@ -16,6 +16,10 @@ the files agree with each other, from the files alone:
 * the claims registered by hash (the F8 baseline comparison, the F10 primary
   causal hypothesis) are stated by the confirmation row, and the report
   files they produced hash to the values the sealed ledger holds;
+* a causal claim above `unverified` rests on attestors the charter names:
+  every accepted attestation is by a listed attestor for that assumption,
+  carries this charter's hash, was valid on the run date and (given the
+  signing key) has a signature that verifies;
 * the charter file verifies, matches the ledger's charter hash and, when it
   fixes rules, the ledger and the claims used them.
 
@@ -33,8 +37,11 @@ from pathlib import Path
 from typing import Any
 
 from scmle.contracts import errors
+from scmle.contracts import signing
+from scmle.data.charter import contracts as charter_contracts
 from scmle.data.charter import sealing as charter_sealing
 from scmle.data.custody import sealed
+from scmle.data.identification import attest
 from scmle.data.ledger import budget as budget_module
 from scmle.data.ledger import confirm
 from scmle.data.ledger import ledger as ledger_module
@@ -518,6 +525,78 @@ def check_control(run_dir: Path, ledger: ledger_module.Ledger) -> Finding:
     return step(name, FAIL, "the file differs from the ledger's control row")
 
 
+def check_attestations(
+    run_dir: Path, signing_key: str | bytes | None
+) -> Finding:
+    """A claim above `unverified` rests on verified, charter-named attestors."""
+    name = "causal attestations verify"
+    claims = read_optional(run_dir / CAUSAL_FILE)
+    record = read_optional(run_dir / CHARTER_FILE)
+    if claims is None or record is None:
+        return step(name, SKIPPED, "no causal claims or charter file")
+    try:
+        charter = charter_contracts.charter_from_record(
+            record.get("charter", record)
+        )
+    except errors.ConfigError as error:
+        return step(name, FAIL, str(error))
+    block = charter.estimand.causal
+    if block is None:
+        return step(name, SKIPPED, "the charter has no causal block")
+    report = claims.get("attestations") or {}
+    raised = claims.get("tier") in ("attested", "confirmed")
+    problems = []
+    if raised and not block.attestors:
+        problems.append(
+            "tier above unverified but the charter names no attestors"
+        )
+    allowed = {a.name: set(a.assumptions) for a in block.attestors}
+    accepted = {}
+    unchecked = False
+    for item in report.get("accepted", []):
+        try:
+            given = attest.Attestation.from_dict(item)
+        except (ValueError, TypeError) as error:
+            problems.append(f"malformed attestation: {error}")
+            continue
+        accepted[given.assumption] = given.attestor
+        if given.assumption not in allowed.get(given.attestor, set()):
+            problems.append(
+                f"{given.assumption}: {given.attestor} not permitted"
+            )
+        if given.scope != charter.charter_hash:
+            problems.append(f"{given.assumption}: scope is not this charter")
+        day = str(report.get("evaluated_on", ""))
+        try:
+            valid = given.date <= day <= given.expires
+        except TypeError:
+            valid = False
+        if not valid:
+            problems.append(f"{given.assumption}: not valid on {day!r}")
+        if signing_key is None and not signing.resolve_key(None):
+            unchecked = True
+        elif not given.verify(signing_key):
+            problems.append(f"{given.assumption}: signature does not verify")
+    for assumption, named in (claims.get("assumptions") or {}).items():
+        if named and accepted.get(assumption) != named:
+            problems.append(
+                f"{assumption}: {named} has no accepted attestation"
+            )
+    if raised and not accepted:
+        problems.append("tier above unverified with no accepted attestation")
+    if problems:
+        return step(name, FAIL, "; ".join(problems))
+    if unchecked:
+        return step(name, SKIPPED, "no signing key to check the signatures")
+    return step(
+        name,
+        PASS,
+        f"{len(accepted)} attestation(s), none required"
+        if not accepted
+        else f"{len(accepted)} attestation(s) verified",
+    )
+
+
 def verify(
     run_dir: str | Path, signing_key: str | bytes | None = None
 ) -> Verification:
@@ -554,4 +633,5 @@ def verify(
     if ledger.claims:
         findings.append(check_registered(folder, document, ledger))
     findings.append(check_control(folder, ledger))
+    findings.append(check_attestations(folder, signing_key))
     return Verification(str(folder), tuple(findings))

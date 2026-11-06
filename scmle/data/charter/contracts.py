@@ -469,12 +469,17 @@ class AnalysisCharter:
         2; 3 with rules; 4 with a causal block; 5 with a decision layer; 6
         with a unit of prediction; 7 with an ingest block; 8 when the ingest
         block carries an entity or reconcile sub-block; 9 when the causal
-        block carries subgroups.
+        block carries subgroups or attestors.
         """
         found = 2 if self.rules is None else 3
         causal_block = self.estimand.causal
         if causal_block is not None:
-            found = max(found, 9 if causal_block.subgroups else 4)
+            extended = (
+                causal_block.subgroups
+                or causal_block.attestors
+                or causal_block.attestations
+            )
+            found = max(found, 9 if extended else 4)
         if self.decision is not None:
             found = max(found, 5)
         if self.unit_of_prediction is not None:

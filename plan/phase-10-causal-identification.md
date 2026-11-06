@@ -9,13 +9,11 @@ files, the estimate on `C` inside the single opening and the simulation
 certificates (`f10_certificates.json`, pre-registered floors, misses
 published) are built; `CHANGELOG.md` has the record. The phase is not closed:
 the gold-standard and reference-output evidence needs data and tools that are
-not in the repository.
+not in the repository. The wiring of a charter run (estimate on `C`, file
+hashes, DAG load, admissibility coupling, subgroup hypotheses, attestors) is
+done.
 
 ## Work packages still open
-
-**WP-10.6 remainder** (one agent)
-- Attestors in the charter so a run can reach `attested`. The estimate on `C`, the file hashes,
-  the DAG load and the admissibility coupling are done.
 
 **WP-10.7a: corpora** (one agent, can start at once)
 - NSW with CPS and PSID comparison groups, Tennessee STAR, ACIC generators,

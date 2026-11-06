@@ -16,6 +16,7 @@ from scmle.core import causal_claim
 from scmle.data.admissibility import dag as dag_module
 from scmle.data.charter import causal
 from scmle.data.charter import sealing
+from scmle.data.identification import attest
 from scmle.data.ledger import ledger as ledger_module
 from tests.unit.test_charter_contracts import make_charter
 
@@ -36,7 +37,9 @@ def causal_frame() -> pd.DataFrame:
     return pd.DataFrame({"x1": x1, "x2": x2, "t": t, "y": y})
 
 
-def charter_file(tmp_path, assumptions, dag=None, subgroups=()) -> pathlib.Path:
+def charter_file(
+    tmp_path, assumptions, dag=None, subgroups=(), attestors=(), signed=None
+) -> pathlib.Path:
     base = make_charter(min_effect=0.5, k_max=3)
     estimand = dataclasses.replace(
         base.estimand,
@@ -49,6 +52,8 @@ def charter_file(tmp_path, assumptions, dag=None, subgroups=()) -> pathlib.Path:
             strategies=("backdoor_aipw",),
             dag=dag,
             subgroups=subgroups,
+            attestors=attestors,
+            attestations=None if signed is None else str(signed),
         ),
     )
     path = tmp_path / "charter.json"
@@ -58,13 +63,23 @@ def charter_file(tmp_path, assumptions, dag=None, subgroups=()) -> pathlib.Path:
     return path
 
 
-def run(tmp_path, assumptions, dag=None, subgroups=(), frame=None):
+def run(
+    tmp_path,
+    assumptions,
+    dag=None,
+    subgroups=(),
+    frame=None,
+    attestors=(),
+    signed=None,
+):
     return support.make_project(
         causal_frame() if frame is None else frame,
         "y",
         time_budget=300,
         output_dir=tmp_path / "out",
-        charter=charter_file(tmp_path, assumptions, dag, subgroups),
+        charter=charter_file(
+            tmp_path, assumptions, dag, subgroups, attestors, signed
+        ),
     ).run()
 
 
@@ -221,3 +236,97 @@ def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(
         registered[name] = ledger.claims["causal_primary_theta_zero"]["sha256"]
     assert registered["plain"] != registered["split"]
     assert claims_audit.verify(split.run_dir).ok
+
+
+ATTESTORS = (
+    causal.Attestor("Dr. A. Rivera", "study statistician", ASSUMPTIONS[:2]),
+    causal.Attestor("J. Okafor", "domain lead", ASSUMPTIONS[2:]),
+)
+
+
+def write_attestations(tmp_path, key=KEY, skip=()):
+    """Signed statements bound to the hash of the charter on disk."""
+    signed = tmp_path / "attestations.json"
+    charter = charter_file(
+        tmp_path, ASSUMPTIONS, attestors=ATTESTORS, signed=signed
+    )
+    scope = sealing.read_verified(charter).charter_hash
+    items = []
+    for number, assumption in enumerate(ASSUMPTIONS):
+        if assumption in skip:
+            continue
+        item = attest.Attestation(
+            assumption,
+            ATTESTORS[0 if number < 2 else 1].name,
+            "I judge this assumption to hold for the study population",
+            "design memo 2026-10",
+            "2020-01-01",
+            "2099-01-01",
+            scope,
+        ).signed(key)
+        items.append(item.to_dict())
+    signed.write_text(json.dumps({"format_version": 1, "attestations": items}))
+    return signed
+
+
+def attested_run(tmp_path, monkeypatch, key=KEY, skip=()):
+    monkeypatch.setenv("SCMLE_SIGNING_KEY", KEY)
+    signed = write_attestations(tmp_path, key, skip)
+    return run(tmp_path, ASSUMPTIONS, attestors=ATTESTORS, signed=signed)
+
+
+def test_verified_attestations_lift_the_claim_above_unverified(
+    tmp_path, monkeypatch
+):
+    result = attested_run(tmp_path, monkeypatch)
+    claims = read(result, "causal_claims.json")
+    assert claims["tier"] in ("attested", "confirmed")
+    assert "no named attestor" not in " ".join(claims["reasons"])
+    assert set(claims["assumptions"].values()) == {
+        "Dr. A. Rivera",
+        "J. Okafor",
+    }
+    assert len(claims["attestations"]["accepted"]) == 3
+    verified = claims_audit.verify(result.run_dir, KEY)
+    names = {f.name: f.status for f in verified.findings}
+    assert names["causal attestations verify"] == "pass"
+    assert verified.ok
+
+
+def test_a_forged_or_missing_attestation_leaves_the_claim_unverified(
+    tmp_path, monkeypatch
+):
+    forged = attested_run(tmp_path / "forged", monkeypatch, key="forger")
+    claims = read(forged, "causal_claims.json")
+    assert claims["tier"] == "unverified"
+    assert "no named attestor" in " ".join(claims["reasons"])
+    assert "signature does not verify" in " ".join(
+        claims["attestations"]["rejected"].values()
+    )
+    missing = attested_run(
+        tmp_path / "missing", monkeypatch, skip=(ASSUMPTIONS[2],)
+    )
+    claims = read(missing, "causal_claims.json")
+    assert claims["tier"] == "unverified"
+    assert list(claims["attestations"]["rejected"]) == [ASSUMPTIONS[2]]
+
+
+def test_verify_fails_when_the_attestations_do_not_check_out(
+    tmp_path, monkeypatch
+):
+    result = attested_run(tmp_path, monkeypatch)
+    wrong = claims_audit.verify(result.run_dir, "other-key")
+    status = {f.name: f.status for f in wrong.findings}
+    assert status["causal attestations verify"] == "fail"
+    monkeypatch.delenv("SCMLE_SIGNING_KEY")
+    nokey = claims_audit.verify(result.run_dir)
+    status = {f.name: f.status for f in nokey.findings}
+    assert status["causal attestations verify"] == "skipped"
+
+
+def test_a_charter_without_attestors_stays_unverified_and_verifies(tmp_path):
+    result = run(tmp_path, ASSUMPTIONS)
+    assert read(result, "causal_claims.json")["tier"] == "unverified"
+    verified = claims_audit.verify(result.run_dir)
+    names = {f.name: f.status for f in verified.findings}
+    assert names["causal attestations verify"] == "pass"

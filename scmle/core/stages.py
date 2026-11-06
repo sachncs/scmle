@@ -1056,6 +1056,7 @@ class ProfileStage(Stage):
             dag=graph,
             seed=charter.seed,
             dag_report=found.dag,
+            charter_hash=charter.charter_hash,
         )
 
     def assess_identification(

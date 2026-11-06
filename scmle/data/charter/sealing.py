@@ -133,10 +133,15 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
         )
     block = record.get("charter", {}).get("ingest") or {}
     causal_block = estimand.get("causal") or {}
-    if declared < SUBGROUP_FORMAT and "subgroups" in causal_block:
+    later = [
+        name
+        for name in ("subgroups", "attestors", "attestations")
+        if name in causal_block
+    ]
+    if declared < SUBGROUP_FORMAT and later:
         raise errors.ConfigError(
             f"charter {path} declares format {declared} but its causal block "
-            f"carries 'subgroups', which need format {SUBGROUP_FORMAT}"
+            f"carries {later}, which need format {SUBGROUP_FORMAT}"
         )
     for name in ("entity", "reconcile"):
         if declared < INGEST_ENTITY_FORMAT and name in block:

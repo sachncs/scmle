@@ -381,6 +381,13 @@ prove.
 **Why it matters.** It moves a claim from `unverified` to `attested`, and
 makes a person responsible. SCMLE refuses an attestation signed with a key the
 system itself holds.
+**Attestor.** The person or role who signs. For a causal claim the charter
+names the attestors in advance and says which assumption each may vouch for;
+a statement from anyone else, for another charter, past its expiry date, or
+with a signature that does not verify, does not count, and the assumption then
+has no named attestor (the claim stays `unverified`). A valid signature shows
+the statement was issued unchanged by someone holding the signing key. It
+does not show who that was, or that the assumption is true.
 
 ### admissibility
 
@@ -397,8 +404,8 @@ together.
 discount bought more".
 **Why it matters.** Prediction does not tell you what would happen if you
 acted. A causal claim needs a design (an experiment or assumptions that
-someone names). SCMLE gives it a tier. Without a named person for each
-assumption, it stays `unverified`. A held-out set alone can never confirm a
+someone names). SCMLE gives it a tier. Without a named attestor with a
+verified signed statement for each assumption, it stays `unverified`. A held-out set alone can never confirm a
 causal effect.
 
 ### negative control

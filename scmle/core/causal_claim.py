@@ -23,12 +23,19 @@ the primary level; the result is reported in `identification_report.json`
 and summarised in `causal_claims.json`, and it does not change the tier. The
 replication over `strata` stays a falsifier that can only lower the tier.
 
-Attestors are not read from the charter (it has no field for them), so a run
-reports every causal claim at tier `unverified` unless the caller of
-`identify` supplies names; the estimate and its interval are still reported.
+Attestors (charter format 9) are named in the causal block, and the signed
+attestations are read from the file it names before `C` opens. An attestation
+counts only if its attestor is listed for that assumption, its scope is this
+charter's hash, it is valid today and its signature verifies under the
+signing key (`scmle.data.identification.attest`); what was accepted and why
+the rest was not goes into `causal_claims.json`. A charter that names no
+attestors still reports `unverified` ("no named attestor"), and so does one
+whose attestations do not verify; the estimate and its interval are reported
+either way.
 """
 
 from collections.abc import Mapping
+import datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -38,6 +45,7 @@ import pandas as pd
 from scmle.contracts import errors
 from scmle.data.admissibility import dag as dag_module
 from scmle.data.charter import causal
+from scmle.data.identification import attest
 from scmle.data.identification import run
 from scmle.data.identification import select
 from scmle.data.ledger import budget as budget_module
@@ -98,6 +106,33 @@ def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
     return dict(json.loads(json.dumps(document, default=str)))
 
 
+def verified_attestors(
+    spec: causal.CausalSpec,
+    plan: select.Plan,
+    charter_hash: str,
+    signing_key: str | bytes | None,
+) -> attest.Applied:
+    """Which attestations count for the assumptions the chosen strategy needs.
+
+    Raises:
+        ConfigError: If the attestation file cannot be read.
+    """
+    if plan.primary is None or spec.attestations is None:
+        raise errors.ConfigError("the charter declares no attestations file")
+    try:
+        given = attest.load(spec.attestations)
+    except ValueError as error:
+        raise errors.ConfigError(str(error)) from error
+    return attest.apply(
+        spec.attestors,
+        given,
+        run.needed_assumptions(plan.primary, spec),
+        charter_hash,
+        datetime.date.today().isoformat(),
+        signing_key,
+    )
+
+
 def build_runner(
     spec: causal.CausalSpec,
     x: pd.DataFrame,
@@ -108,6 +143,8 @@ def build_runner(
     attestors: Mapping[str, str] | None = None,
     seed: int = 0,
     dag_report: Mapping[str, Any] | None = None,
+    charter_hash: str | None = None,
+    signing_key: str | bytes | None = None,
 ) -> confirm.ClaimRunner | None:
     """The registered primary claim, or None when no strategy identifies it.
 
@@ -121,6 +158,10 @@ def build_runner(
         seed: Learner seed.
         dag_report: What the admissibility stage found about the DAG on `X`,
             copied into the identification report.
+        charter_hash: The charter's hash, the scope attestations must carry;
+            needed when the block names attestors.
+        signing_key: Key the attestations are verified with; defaults to the
+            configured `SCMLE_SIGNING_KEY`.
 
     Returns:
         None for a charter nothing identifies: no estimate can exist, `C` is
@@ -130,6 +171,13 @@ def build_runner(
     if plan.primary is None:
         return None
     claim = registration(spec, plan, dag, error_budget, len(x))
+    attestation_report: Mapping[str, Any] | None = None
+    if spec.attestors and attestors is None:
+        if charter_hash is None:
+            raise errors.ConfigError("attestors need the charter hash")
+        applied = verified_attestors(spec, plan, charter_hash, signing_key)
+        attestors = applied.accepted
+        attestation_report = applied.to_dict()
 
     def evaluate(features: pd.DataFrame, target: pd.Series) -> confirm.ClaimRun:
         released = features.copy()
@@ -143,6 +191,7 @@ def build_runner(
             dag=dag,
             seed=seed,
             dag_checks=dag_report,
+            attestation_report=attestation_report,
         )
         documents = {k: jsonable(v) for k, v in outcome.documents.items()}
         return confirm.ClaimRun(

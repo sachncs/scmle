@@ -822,6 +822,7 @@ def assemble(
     attestors: Mapping[str, str] | None = None,
     certified: tuple[str, ...] = (),
     subgroups: Mapping[str, Any] | None = None,
+    attestation_report: Mapping[str, Any] | None = None,
 ) -> Outcome:
     """Builds the documents and the claim file that hashes the others."""
     documents = {
@@ -854,6 +855,8 @@ def assemble(
             "family_size": subgroups["family_size"],
             "rejected": list(subgroups["rejected"]),
         }
+    if attestation_report is not None:
+        claims["attestations"] = dict(attestation_report)
     documents["causal_claims.json"] = claims
     hashes["causal_claims.json"] = digest(claims)
     return Outcome(documents, decision, hashes)
@@ -989,6 +992,7 @@ def identify(
     learner: str = "linear",
     certified: tuple[str, ...] | None = None,
     dag_checks: Mapping[str, Any] | None = None,
+    attestation_report: Mapping[str, Any] | None = None,
 ) -> Outcome:
     """Selects, estimates, falsifies, assesses and tiers a causal claim.
 
@@ -1008,6 +1012,8 @@ def identify(
             on `X` (its hash, the conditional-independence falsification, the
             adjustment members the graph rules refused); copied into the
             identification report.
+        attestation_report: What `attest.apply` decided about the signed
+            attestations (`Applied.to_dict()`), copied into the claim file.
 
     Returns:
         The five documents, their hashes and the tier decision.
@@ -1139,6 +1145,7 @@ def identify(
         attestors,
         certified,
         subgroup_found,
+        attestation_report,
     )
 
 

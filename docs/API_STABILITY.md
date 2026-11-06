@@ -78,8 +78,10 @@ for the `MLProject` entry alone. Charter format 8 adds the optional
 (`scmle.data.charter.ingest.EntitySpec`, `ReconcileSpec`, extension
 surfaces); a format 7 ingest charter keeps its hash and signature.
 Charter format 9 adds the optional `subgroups` field of the causal block
-(`scmle.data.charter.causal.Subgroup`, an extension surface); a format 4
-causal charter keeps its hash and signature.
+(`scmle.data.charter.causal.Subgroup`, an extension surface) and the
+optional `attestors` and `attestations` fields
+(`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`);
+a format 4 causal charter keeps its hash and signature.
 
 `MLProject` gained the optional keywords `logged_action_column` and
 `propensity_column` (default `None`), `DataSpec` the fields of the same names,

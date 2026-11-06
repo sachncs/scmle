@@ -200,3 +200,63 @@ def test_subgroups_in_an_older_format_are_refused(tmp_path):
 def test_invalid_subgroups_are_refused(build):
     with pytest.raises(ValueError):
         build()
+
+
+ATTESTORS = (
+    causal.Attestor(
+        "Dr. A. Rivera",
+        "study statistician",
+        ("positivity", "no_interference"),
+    ),
+)
+
+
+def test_attestors_need_format_nine_and_round_trip():
+    charter = causal_charter(attestors=ATTESTORS, attestations="signed.json")
+    assert charter.format_version == 9
+    assert charter.charter_hash != causal_charter().charter_hash
+    record = json.loads(json.dumps(charter.to_dict()))
+    assert c.AnalysisCharter.from_dict(record) == charter
+    block = charter.estimand.to_dict()["causal"]
+    assert block["attestations"] == "signed.json"
+
+
+@pytest.mark.parametrize("field", ["attestors", "attestations"])
+def test_attestors_in_an_older_format_are_refused(tmp_path, field):
+    path = tmp_path / "charter.json"
+    sealing.write_charter(
+        path,
+        causal_charter(attestors=ATTESTORS, attestations="signed.json"),
+        signing_key=KEY,
+    )
+    wrapper = json.loads(path.read_text())
+    wrapper["format"] = 8
+    path.write_text(json.dumps(wrapper))
+    with pytest.raises(errors.ConfigError, match=field):
+        sealing.read_verified(path, signing_key=KEY)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: causal.Attestor("", "role", ("positivity",)),
+        lambda: causal.Attestor("A", "", ("positivity",)),
+        lambda: causal.Attestor("A", "role", ()),
+        lambda: causal.Attestor("A", "role", ("not_an_assumption",)),
+        lambda: spec(attestors=ATTESTORS),
+        lambda: spec(
+            attestors=(
+                causal.Attestor("A", "r", ("positivity",)),
+                causal.Attestor("A", "r", ("no_interference",)),
+            ),
+            attestations="f.json",
+        ),
+        lambda: spec(
+            attestors=(causal.Attestor("A", "r", ("exclusion",)),),
+            attestations="f.json",
+        ),
+    ],
+)
+def test_invalid_attestors_are_refused(build):
+    with pytest.raises(ValueError):
+        build()

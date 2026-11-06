@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+* Attestors in the charter and signed attestations for causal claims (F10,
+  charter format 9; `CausalSpec.attestors`, `CausalSpec.attestations`,
+  `scmle.data.identification.attest`, `claims verify`). The causal block
+  names who may vouch for which assumption and the file of signed statements.
+  Before `C` opens the run loads the file; a statement counts for an
+  assumption only if its attestor is listed for it, its scope is this
+  charter's hash, the run date is within its dates and its HMAC-SHA256
+  signature verifies under the signing key (no key, nothing counts).
+  `causal_claims.json` records the accepted statements, the reason each other
+  assumption has none, and the date checked. A claim whose assumptions are not
+  all so attested still reports `unverified` ("no named attestor"), exactly as
+  before; a charter without the fields keeps its hash and signature (pinned),
+  and the older wrapper that carries them is refused. `tier.decide` is
+  unchanged (the attestors are derived upstream of it), so the
+  `false_confirm` certificate and every other certified source stand and none
+  was re-issued. `claims verify` gained the step "causal attestations
+  verify": it fails when a claim above `unverified` has no charter-named
+  attestors, an accepted statement is by an unlisted attestor, for another
+  charter, outside its dates or with a signature that does not verify, and it
+  is skipped (not passed) without the signing key. The glossary entry
+  "attestation (attestor)" and `docs/START_HERE.md` explain the role. Limit:
+  the signature is a shared-key HMAC, so it does not identify the person.
+
 * Subgroup hypotheses in a causal claim (F10, charter format 9;
   `CausalSpec.subgroups`, `identification.run.subgroup_report`). The causal
   block gained the optional `subgroups` field: columns with the levels to

@@ -874,6 +874,11 @@ worse. See [`TUTORIAL.md`](TUTORIAL.md) section 7.
 * The "charter" and the claims it produces (the careful, pre-registered mode
   of working): see "A second mode: the charter" in
   [Reading results](READING_RESULTS.md).
+* A "did the discount cause the sales" question: a causal claim stays
+  `unverified` until the charter names the **attestors** (the people who vouch
+  for each assumption the design needs) and their signed statements verify;
+  see "causal claim" and "attestation (attestor)" in
+  [the glossary](GLOSSARY.md).
 * What this tool does not do: [What SCMLE cannot do](WHAT_SCMLE_CANNOT_DO.md).
 * Why a flag is a suspicion and not a verdict, with measured error rates:
   [Leakage](LEAKAGE.md).

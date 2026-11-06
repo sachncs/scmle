@@ -10,8 +10,9 @@ of the charter and never of the outcome values.
 Versioning. An estimand without the block serialises exactly as before (the
 key is omitted), so every charter signed under format 1 to 3 keeps its hash
 and its signature and loads unchanged. The block's own later fields
-(`subgroups`, format 9) are omitted from the record when empty, so a format 4
-causal charter keeps its hash and signature too.
+(`subgroups`, `attestors`, `attestations`, format 9) are omitted from the
+record when empty, so a format 4 causal charter keeps its hash and signature
+too.
 """
 
 from collections.abc import Iterable
@@ -146,6 +147,47 @@ class Subgroup:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class Attestor:
+    """A person or role the charter lets sign identification assumptions.
+
+    Attributes:
+        name: Who signs; an attestation counts only under this exact name.
+        role: Their role (for example "study statistician").
+        assumptions: The assumptions of the causal block they may attest.
+    """
+
+    name: str
+    role: str
+    assumptions: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        """Validates the record."""
+        evidence.require_text(self.name, "name")
+        evidence.require_text(self.role, "role")
+        qualification.require_tuple(self.assumptions, "assumptions")
+        if not self.assumptions:
+            raise ValueError("an attestor needs at least one assumption")
+        for item in self.assumptions:
+            check_assumption(item)
+        if len(set(self.assumptions)) != len(self.assumptions):
+            raise ValueError("duplicate assumption for an attestor")
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready record."""
+        return {
+            "name": self.name,
+            "role": self.role,
+            "assumptions": list(self.assumptions),
+        }
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds the record, rejecting unknown or missing fields."""
+        qualification.require_fields(cls, record)
+        return cls(record["name"], record["role"], tuple(record["assumptions"]))
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class SensitivitySpec:
     """How strong an unmeasured confounder the claim must survive.
 
@@ -216,6 +258,12 @@ class CausalSpec:
             primary claim before `C` is opened; the effect in each declared
             subgroup is tested and the family is adjusted by Holm's
             step-down at the primary level.
+        attestors: People or roles who may sign the identification
+            assumptions (format 9). A claim can rise above `unverified` only
+            when every assumption it needs carries a verified signed
+            attestation by one of them.
+        attestations: Path of the JSON file of signed attestations (see
+            `scmle.data.identification.attest`); required with attestors.
     """
 
     treatment: str
@@ -236,6 +284,8 @@ class CausalSpec:
     trim: float = 0.0
     min_share: float = 0.5
     subgroups: tuple[Subgroup, ...] = ()
+    attestors: tuple[Attestor, ...] = ()
+    attestations: str | None = None
 
     def __post_init__(self) -> None:
         """Validates the block."""
@@ -249,6 +299,7 @@ class CausalSpec:
             "negative_controls",
             "strata",
             "subgroups",
+            "attestors",
         ):
             qualification.require_tuple(getattr(self, name), name)
         for item in self.assumptions:
@@ -257,6 +308,7 @@ class CausalSpec:
             raise ValueError("duplicate assumption")
         if len(set(self.strategies)) != len(self.strategies):
             raise ValueError("duplicate strategy")
+        self.check_attestors()
         columns = [g.column for g in self.subgroups]
         if len(set(columns)) != len(columns):
             raise ValueError("duplicate subgroup column")
@@ -271,6 +323,25 @@ class CausalSpec:
         if not 0.0 < share <= 1.0:
             raise ValueError("min_share must be within (0, 1]")
 
+    def check_attestors(self) -> None:
+        """Attestors are unique, name declared assumptions, and have a file."""
+        names = [a.name for a in self.attestors]
+        if len(set(names)) != len(names):
+            raise ValueError("duplicate attestor")
+        if self.attestors and not self.attestations:
+            raise ValueError("attestors need an attestations file")
+        if self.attestations is not None:
+            evidence.require_text(self.attestations, "attestations")
+            if not self.attestors:
+                raise ValueError("an attestations file needs attestors")
+        for attestor in self.attestors:
+            unknown = set(attestor.assumptions) - set(self.assumptions)
+            if unknown:
+                raise ValueError(
+                    f"attestor {attestor.name} names assumptions the block "
+                    f"does not declare: {sorted(unknown)}"
+                )
+
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready record."""
         record = dataclasses.asdict(self)
@@ -282,9 +353,13 @@ class CausalSpec:
         )
         for name in ("assumptions", "strategies", "strata"):
             record[name] = list(record[name])
-        del record["subgroups"]
+        del record["subgroups"], record["attestors"], record["attestations"]
         if self.subgroups:
             record["subgroups"] = [g.to_dict() for g in self.subgroups]
+        if self.attestors:
+            record["attestors"] = [a.to_dict() for a in self.attestors]
+        if self.attestations is not None:
+            record["attestations"] = self.attestations
         return record
 
     @classmethod
@@ -324,4 +399,6 @@ class CausalSpec:
             trim=record["trim"],
             min_share=record["min_share"],
             subgroups=tuple(Subgroup.from_dict(g) for g in record["subgroups"]),
+            attestors=tuple(Attestor.from_dict(a) for a in record["attestors"]),
+            attestations=record["attestations"],
         )

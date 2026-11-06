@@ -25,9 +25,11 @@ frame `C` releases (`scmle/core/causal_claim.py`). Left:
   level), but they describe heterogeneity only: they do not enter the tier,
   their power at the subgroup sizes of a real run is not measured, and no
   certificate covers the Holm family of subgroup estimates.
-- The charter has no field for attestors, so a run reports every causal claim
-  at `unverified` ("no named attestor"); `identify` takes the names, the run
-  does not supply them.
+- Attestations are signed with the project's shared HMAC key: a verifying
+  signature shows the statement was issued unchanged by a holder of the key,
+  not which person signed. Per-person keys or asymmetric signatures, a
+  revocation list, and a check that an attestor is who the charter says, are
+  not built.
 - `Dag.from_artifact` loads the DAG the charter's `dag` path names; whether
   that file is the one the analyst meant is not checked beyond its hash.
 
