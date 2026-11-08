@@ -1,6 +1,7 @@
 """Certification runs and the smoke gate built from the whole harness."""
 
 import json
+import pathlib
 
 import pandas as pd
 import pytest
@@ -11,10 +12,22 @@ from benchmarks.qualification import inject
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
 from scmle.data.detectors import certificates
+from scmle.data.detectors import sentinels
 
 POLICY = certificates.CertificationPolicy(
     recall_floor=0.5, false_alarm_ceiling=0.1
 )
+
+
+def under_mutation() -> bool:
+    """Whether mutmut has instrumented the sources the certificates hash.
+
+    A certificate records the hash of its detector's source. mutmut rewrites
+    the sources in its scope (`setup.cfg`), so `--check` can only report them
+    stale there; that is the instrument working, not a regression.
+    """
+    text = pathlib.Path(sentinels.__file__).read_text(encoding="utf-8")
+    return "__mutmut_orig" in text
 
 
 def small_frame(rows: int = 120) -> pd.DataFrame:
@@ -202,6 +215,9 @@ def test_the_smoke_gate_can_fail():
     assert "null size inside the band" in failed
 
 
+@pytest.mark.skipif(
+    under_mutation(), reason="mutmut instruments the hashed detector sources"
+)
 def test_the_command_line_runs_smoke_check_and_writes_a_sample(
     tmp_path, capsys
 ):
