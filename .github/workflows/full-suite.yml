@@ -45,17 +45,35 @@ jobs:
           if-no-files-found: ignore
 
   mutation:
-    name: critical mutation score
+    name: critical mutation score (${{ matrix.shard.name }})
     runs-on: ubuntu-24.04
     timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        # one hosted job cannot finish the whole scope inside its time limit
+        # (about 42,000 mutants), so each shard runs its own mutants and is
+        # held to the same floor
+        shard:
+          - name: benchmarks
+            patterns: "benchmarks.*"
+          - name: data
+            patterns: "scmle.data.*"
+          - name: evaluation
+            patterns: "scmle.evaluation.*"
+          - name: rest
+            patterns: "scmle.contracts.* scmle.core.* scmle.artifacts.* scmle.governance.* scmle.inference.* scmle.monitoring.*"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - run: sudo apt-get update && sudo apt-get install -y libgomp1
       - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
       - name: Enforce critical mutation score
+        env:
+          PATTERNS: ${{ matrix.shard.patterns }}
         run: |
-          uv run mutmut run --max-children 4
+          # shellcheck disable=SC2086
+          uv run mutmut run --max-children 4 $PATTERNS
           scripts/check_mutation_score.sh 70
 
   clean-clone:
