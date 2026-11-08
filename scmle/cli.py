@@ -751,7 +751,8 @@ class CharterCommand(Command):
         if path.exists() and not args.force:
             raise errors.ConfigError(f"{path} exists; pass --force")
         path.write_text(
-            json.dumps(charter_contracts.template(), indent=2) + "\n"
+            json.dumps(charter_contracts.template(), indent=2) + "\n",
+            newline="\n",
         )
         LOGGER.info("wrote template charter %s", path)
         return EXIT_OK
@@ -1079,6 +1080,7 @@ class DeployCommand(Command):
         pathlib.Path(args.output).write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
+            newline="\n",
         )
         print(json.dumps({item.name: item.passed for item in results}))
         return EXIT_OK if all(item.passed for item in results) else EXIT_FAILED
@@ -1120,6 +1122,7 @@ class DeployCommand(Command):
         pathlib.Path(args.output).write_text(
             json.dumps(seen.to_dict(), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
+            newline="\n",
         )
         print(json.dumps({"revision": seen.revision, "ready": seen.ready}))
         return EXIT_OK
@@ -1141,7 +1144,9 @@ class DeployCommand(Command):
         )
         text = json.dumps(report.to_dict(), indent=2, sort_keys=True)
         if args.output:
-            pathlib.Path(args.output).write_text(text + "\n", encoding="utf-8")
+            pathlib.Path(args.output).write_text(
+                text + "\n", encoding="utf-8", newline="\n"
+            )
         print(text)
         return EXIT_OK if report.consistent else EXIT_FAILED
 
@@ -1329,6 +1334,7 @@ class FrameCommand(Command):
             (output / "charter.json").write_text(
                 json.dumps(result.charter.to_dict(), indent=2) + "\n",
                 encoding="utf-8",
+                newline="\n",
             )
         LOGGER.info("framing %s: wrote %s", result.status, ", ".join(written))
         return (

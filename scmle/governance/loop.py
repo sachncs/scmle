@@ -552,7 +552,9 @@ class Loop:
         }
         temporary = self.state_path.with_suffix(".tmp")
         temporary.write_text(
-            json.dumps(json_ready(state), sort_keys=True), encoding="utf-8"
+            json.dumps(json_ready(state), sort_keys=True),
+            encoding="utf-8",
+            newline="\n",
         )
         temporary.replace(self.state_path)
 
@@ -1285,6 +1287,7 @@ class Loop:
                 )
             ),
             encoding="utf-8",
+            newline="\n",
         )
         released = False
         if self.ledger.halted and not result.everything_escalates:
@@ -1400,7 +1403,7 @@ class Loop:
             "outcome_window": self.policy.outcome_window,
         }
         (self.directory / LABEL_MECHANISM_FILE).write_text(
-            json.dumps(record, sort_keys=True), encoding="utf-8"
+            json.dumps(record, sort_keys=True), encoding="utf-8", newline="\n"
         )
 
     # ------------------------------------------------------------------ reply

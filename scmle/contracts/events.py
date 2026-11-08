@@ -74,7 +74,7 @@ class EventLog:
         self.events.append(event)
         LOGGER.info("[%s] %s: %s", event.run_id, event.kind, event.reason)
         if self.path is not None:
-            with self.path.open("a", encoding="utf-8") as handle:
+            with self.path.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(event.to_json() + "\n")
         for listener in self.listeners:
             listener(event)

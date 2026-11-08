@@ -3550,6 +3550,7 @@ class PackagingStage(ModalityLifecycleStage):
             manifest_path.write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
+                newline="\n",
             )
             sync_file(manifest_path)
             sync_directory(temporary)
@@ -3670,7 +3671,9 @@ class RecoveryAndResourceStage(ModalityLifecycleStage):
             manifest_path = tampered / "manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["dataset_hash"] = "tampered"
-            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_path.write_text(
+                json.dumps(manifest), encoding="utf-8", newline="\n"
+            )
             rejected = False
             try:
                 load_package(tampered, context.signing_key)

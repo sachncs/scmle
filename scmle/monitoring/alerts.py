@@ -157,7 +157,7 @@ class JsonlAlertSink(AlertSink):
             "delivered_at": delivered_at,
         }
         with durability.path_lock(self.path):
-            with self.path.open("a", encoding="utf-8") as stream:
+            with self.path.open("a", encoding="utf-8", newline="\n") as stream:
                 stream.write(json.dumps(record, sort_keys=True) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
@@ -320,7 +320,9 @@ class AlertDispatcher:
         self.journal.parent.mkdir(parents=True, exist_ok=True)
         record = {"alert": alert.to_dict(), "delivery": delivery.to_dict()}
         with self.lock:
-            with self.journal.open("a", encoding="utf-8") as stream:
+            with self.journal.open(
+                "a", encoding="utf-8", newline="\n"
+            ) as stream:
                 stream.write(json.dumps(record, sort_keys=True) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())

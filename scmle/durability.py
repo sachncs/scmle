@@ -50,7 +50,7 @@ def append_text(path: str | pathlib.Path, text: str) -> None:
     target = pathlib.Path(path)
     with path_lock(target):
         target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open("a", encoding="utf-8") as handle:
+        with target.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(text)
 
 

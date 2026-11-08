@@ -370,7 +370,7 @@ class SigningKeyRegistry:
         os.close(descriptor)
         temporary = Path(temporary_name)
         try:
-            with temporary.open("w", encoding="utf-8") as stream:
+            with temporary.open("w", encoding="utf-8", newline="\n") as stream:
                 stream.write(json.dumps(self.to_dict(), indent=2) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())

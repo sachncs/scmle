@@ -452,7 +452,9 @@ class ImageClassifier:
                 "config": self.config.to_dict(),
             }
             manifest_path = temporary_directory / "manifest.json"
-            with manifest_path.open("w", encoding="utf-8") as stream:
+            with manifest_path.open(
+                "w", encoding="utf-8", newline="\n"
+            ) as stream:
                 json.dump(
                     manifest,
                     stream,

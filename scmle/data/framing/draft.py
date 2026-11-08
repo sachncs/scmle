@@ -564,7 +564,7 @@ def write_artifacts(draft: FramingDraft, directory: str | Path) -> list[str]:
         documents["framing_refusal.json"] = draft.refusal
     for name, document in documents.items():
         (target / name).write_text(
-            refusal.dump(document) + "\n", encoding="utf-8"
+            refusal.dump(document) + "\n", encoding="utf-8", newline="\n"
         )
     return sorted(documents)
 

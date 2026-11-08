@@ -378,7 +378,7 @@ class IncidentWorkflow:
         }
         event["event_digest"] = event_digest(event)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as handle:
+        with self.path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(
                 json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n"
             )

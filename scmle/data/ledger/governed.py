@@ -340,6 +340,7 @@ def confirm_explored(
             json.dumps(explored.control.to_dict(), indent=2, sort_keys=True)
             + "\n",
             encoding="utf-8",
+            newline="\n",
         )
     return GovernedRun(
         ledger=explored.ledger,

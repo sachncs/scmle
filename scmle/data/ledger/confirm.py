@@ -356,6 +356,7 @@ class Confirmation:
         target.write_text(
             json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
+            newline="\n",
         )
 
 

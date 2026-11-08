@@ -94,7 +94,9 @@ def write_json(path: Path, value: Any) -> None:
     """Writes sorted, indented JSON with a trailing newline."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(value, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
     )
 
 

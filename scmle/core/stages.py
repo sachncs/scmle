@@ -4191,7 +4191,8 @@ class PackageStage(Stage):
         board = result.leaderboard()
         board.to_parquet(store.path("leaderboard.parquet"), index=False)
         store.write_text(
-            "report.html", report.HtmlReport().render(result, board)
+            "report.html",
+            report.HtmlReport().render(result, board),
         )
         context.bundle, context.result = bundle, result
 

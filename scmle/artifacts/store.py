@@ -79,10 +79,7 @@ class RunStore:
 
         Unknown value types are rendered as strings.
         """
-        self.write_text(
-            relative,
-            json.dumps(payload, indent=2, default=str),
-        )
+        self.write_text(relative, json.dumps(payload, indent=2, default=str))
 
     def write_text(self, relative: str, text: str) -> None:
         """Atomically writes plain text.

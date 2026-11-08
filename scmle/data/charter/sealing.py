@@ -82,6 +82,7 @@ def write_charter(
         json.dumps(envelope(charter, signing_key), indent=2, sort_keys=True)
         + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     return target
 

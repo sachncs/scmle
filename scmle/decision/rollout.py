@@ -357,7 +357,7 @@ class DecisionLog:
             json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n"
             for r in self.rows
         )
-        Path(path).write_text(text, encoding="utf-8")
+        Path(path).write_text(text, encoding="utf-8", newline="\n")
 
     @classmethod
     def read(cls, path: str | Path) -> "DecisionLog":

@@ -124,7 +124,7 @@ class OpenLog:
         self.entries.append(entry)
         if self.path is not None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as handle:
+            with self.path.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(json.dumps(entry, sort_keys=True) + "\n")
         return entry
 

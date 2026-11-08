@@ -582,7 +582,7 @@ class CertificateStore:
     def save(self, path: Path) -> None:
         """Writes stable JSON, so equal stores give equal bytes."""
         text = json.dumps(self.to_dict(), indent=2, sort_keys=True)
-        path.write_text(text + "\n", encoding="utf-8")
+        path.write_text(text + "\n", encoding="utf-8", newline="\n")
 
     @classmethod
     def load(cls, path: Path) -> Self:

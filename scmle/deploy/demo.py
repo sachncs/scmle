@@ -332,7 +332,9 @@ def prepare(
         "bad_release": bad.evaluation["test_metrics"],
     }
     (workdir / "evaluation.json").write_text(
-        json.dumps(evaluation, indent=2, sort_keys=True), encoding="utf-8"
+        json.dumps(evaluation, indent=2, sort_keys=True),
+        encoding="utf-8",
+        newline="\n",
     )
     log.record(
         "train and evaluate",
@@ -874,6 +876,7 @@ def main(arguments: list[str] | None = None) -> int:
     (options.workdir / f"transcript-{options.action}.json").write_text(
         json.dumps(transcript.to_dict(), indent=2, sort_keys=True, default=str),
         encoding="utf-8",
+        newline="\n",
     )
     print("DEMO PASSED" if transcript.passed else "DEMO FAILED", flush=True)
     return 0 if transcript.passed else 1
