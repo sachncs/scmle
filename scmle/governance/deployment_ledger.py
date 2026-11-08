@@ -44,6 +44,18 @@ Row kinds (``open`` first and only once):
     (`hold`, `promote`, `hold_final`, `hold_invalid`, or a rollback) is
     chained with the e-process values. A promotion or rollback still needs the
     registry's signed approval.
+``envelope``, ``envelope_used``, ``envelope_revoked``
+    Authority a person signed in advance for an action that is not on the
+    never list (`scmle.governance.envelope`): the actions with a use limit
+    each, the scope, an expiry and the signing key's fingerprint. A use is
+    chained before the action runs and is refused at ingest when the
+    envelope is unknown, revoked, out of scope, does not cover the action or
+    has spent its limit; revoking is allowed to anyone because it only
+    removes authority.
+``controller``
+    The unattended controller's journal (`scmle.operations.controller`): the
+    intent to apply an inbox file (by content digest) and that it was
+    applied, a rejected file, and one row per tick. A digest is applied once.
 ``deployment``
     A release event confirmed or rejected by the runtime (`ReleaseRegistry`):
     the model, version, environment, revision and image digest, and whether
@@ -93,6 +105,17 @@ DEPLOYMENT = "deployment"
 ROLLOUT_EXPERIMENT = "rollout_experiment"
 ROLLOUT_ASSIGNMENT = "rollout_assignment"
 ROLLOUT_DECISION = "rollout_decision"
+ENVELOPE = "envelope"
+ENVELOPE_USED = "envelope_used"
+ENVELOPE_REVOKED = "envelope_revoked"
+CONTROLLER = "controller"
+ENVELOPE_ACTIONS = ("train_challenger",)
+INTENT = "intent"
+APPLIED = "applied"
+REJECTED = "rejected"
+TICK = "tick"
+CONTROLLER_PHASES = (INTENT, APPLIED, REJECTED, TICK)
+CONTROLLER_INPUTS = ("batch", "labels")
 KINDS = (
     OPEN,
     OBSERVE_SUMMARY,
@@ -111,6 +134,10 @@ KINDS = (
     ROLLOUT_EXPERIMENT,
     ROLLOUT_ASSIGNMENT,
     ROLLOUT_DECISION,
+    ENVELOPE,
+    ENVELOPE_USED,
+    ENVELOPE_REVOKED,
+    CONTROLLER,
 )
 REGISTERED = "registered"
 DECIDED = "decided"
@@ -257,6 +284,110 @@ class Attestation:
         return hmac.compare_digest(self.signature, expected)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class Envelope:
+    """Authority a person signs in advance for actions off the never list.
+
+    The never list (`scmle.governance.never_list`) stays as it is: an
+    envelope cannot name any of its actions, only the actions in
+    `ENVELOPE_ACTIONS`. It bounds what the unattended controller may do by
+    action, scope, count and time, and the signature covers every other
+    field. HMAC is symmetric, so the verifier must keep the key where the
+    system cannot read it (canon P6); the ledger refuses the fingerprints of
+    keys the system declared as its own.
+
+    Attributes:
+        envelope_id: Identifier, unique in the ledger.
+        limits: For each permitted action, how many times it may be used.
+        statement: What the person authorises, in words.
+        role: The person's role.
+        name_or_id: The person.
+        date: First day the envelope is valid.
+        scope: Model version hash and stream id it applies to.
+        expires: Last day the envelope is valid.
+        key_id: Fingerprint of the signing key.
+        signature: HMAC-SHA256 of the other fields.
+    """
+
+    envelope_id: str
+    limits: Mapping[str, int]
+    statement: str
+    role: str
+    name_or_id: str
+    date: str
+    scope: str
+    expires: str
+    key_id: str
+    signature: str = ""
+
+    def __post_init__(self) -> None:
+        """Validates the record's shape."""
+        for name in (
+            "envelope_id",
+            "statement",
+            "role",
+            "name_or_id",
+            "scope",
+            "key_id",
+        ):
+            if not str(getattr(self, name)).strip():
+                raise DeploymentLedgerError(f"envelope {name} is required")
+        if not self.limits:
+            raise DeploymentLedgerError(
+                "an envelope permits at least one action"
+            )
+        for action, limit in self.limits.items():
+            if action not in ENVELOPE_ACTIONS:
+                raise DeploymentLedgerError(
+                    f"{action!r} cannot be put in an envelope; only "
+                    f"{list(ENVELOPE_ACTIONS)} can"
+                )
+            if (
+                isinstance(limit, bool)
+                or not isinstance(limit, int)
+                or limit < 1
+            ):
+                raise DeploymentLedgerError(
+                    f"the limit for {action!r} must be a positive integer"
+                )
+        issued = parse_date(self.date, "date")
+        if parse_date(self.expires, "expires") < issued:
+            raise DeploymentLedgerError("expires is before the date")
+
+    def unsigned_dict(self) -> dict[str, Any]:
+        """The signed content."""
+        record = dataclasses.asdict(self)
+        record["limits"] = dict(self.limits)
+        del record["signature"]
+        return record
+
+    def to_dict(self) -> dict[str, Any]:
+        """The full record."""
+        return {**self.unsigned_dict(), "signature": self.signature}
+
+    @classmethod
+    def create(cls, key: str | bytes, **fields: Any) -> Self:
+        """Builds and signs an envelope with `key` (the person's key)."""
+        unsigned = cls(key_id=key_fingerprint(key), **fields)
+        signature = signing.sign_payload(unsigned.unsigned_dict(), key)
+        return dataclasses.replace(unsigned, signature=signature)
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds an envelope from `to_dict`."""
+        names = {f.name for f in dataclasses.fields(cls)}
+        if set(record) != names:
+            raise DeploymentLedgerError("unexpected or missing envelope fields")
+        return cls(**dict(record))
+
+    def verify(self, key: str | bytes) -> bool:
+        """Whether the signature matches under `key`."""
+        if not self.signature or self.key_id != key_fingerprint(key):
+            return False
+        expected = signing.sign_payload(self.unsigned_dict(), key)
+        return hmac.compare_digest(self.signature, expected)
+
+
 class DeploymentLedger:
     """The ledger of one deployment (file-backed or in memory)."""
 
@@ -275,6 +406,12 @@ class DeploymentLedger:
         self.decided: dict[str, dict[str, Any]] = {}
         self.halted = False
         self.experiments: dict[str, dict[str, Any]] = {}
+        self.envelopes: dict[str, dict[str, Any]] = {}
+        self.envelope_uses: dict[str, dict[str, int]] = {}
+        self.envelope_revoked: dict[str, dict[str, Any]] = {}
+        self.intents: dict[str, dict[str, Any]] = {}
+        self.consumed: dict[str, dict[str, Any]] = {}
+        self.rejected: dict[str, dict[str, Any]] = {}
 
     @classmethod
     def create(
@@ -413,6 +550,10 @@ class DeploymentLedger:
             ROLLOUT_EXPERIMENT: self.apply_experiment,
             ROLLOUT_ASSIGNMENT: self.apply_assignment,
             ROLLOUT_DECISION: self.apply_rollout_decision,
+            ENVELOPE: self.apply_envelope,
+            ENVELOPE_USED: self.apply_envelope_used,
+            ENVELOPE_REVOKED: self.apply_envelope_revoked,
+            CONTROLLER: self.apply_controller,
         }
         try:
             if not isinstance(body, dict):
@@ -526,6 +667,84 @@ class DeploymentLedger:
         if identity in self.used:
             raise DeploymentLedgerError("the attestation is already spent")
         self.used[identity] = dict(body)
+
+    def apply_envelope(self, body: Mapping[str, Any]) -> None:
+        """Records a granted envelope once, never under a system key."""
+        grant = Envelope.from_dict(body)
+        if grant.envelope_id in self.envelopes:
+            raise DeploymentLedgerError(
+                f"envelope {grant.envelope_id!r} was already granted"
+            )
+        if grant.key_id in self.system_keys:
+            raise DeploymentLedgerError(
+                "envelope is signed with a key the system holds"
+            )
+        self.envelopes[grant.envelope_id] = grant.to_dict()
+        self.envelope_uses[grant.envelope_id] = {}
+
+    def apply_envelope_used(self, body: Mapping[str, Any]) -> None:
+        """Counts one use, refusing what the envelope does not allow."""
+        identity = str(body["envelope_id"])
+        action = str(body["action"])
+        grant = self.envelopes.get(identity)
+        if grant is None:
+            raise DeploymentLedgerError(f"envelope {identity!r} is unknown")
+        if identity in self.envelope_revoked:
+            raise DeploymentLedgerError(f"envelope {identity!r} was revoked")
+        limit = grant["limits"].get(action)
+        if limit is None:
+            raise DeploymentLedgerError(
+                f"envelope {identity!r} does not cover {action!r}"
+            )
+        if body["scope"] != grant["scope"]:
+            raise DeploymentLedgerError("use is outside the envelope's scope")
+        used = self.envelope_uses[identity].get(action, 0)
+        if used >= limit:
+            raise DeploymentLedgerError(
+                f"envelope {identity!r} has spent its {limit} use(s) of "
+                f"{action!r}"
+            )
+        self.envelope_uses[identity][action] = used + 1
+
+    def apply_envelope_revoked(self, body: Mapping[str, Any]) -> None:
+        """Removes an envelope's authority, once."""
+        identity = str(body["envelope_id"])
+        if identity not in self.envelopes:
+            raise DeploymentLedgerError(f"envelope {identity!r} is unknown")
+        if identity in self.envelope_revoked:
+            raise DeploymentLedgerError(f"envelope {identity!r} is revoked")
+        self.envelope_revoked[identity] = dict(body)
+
+    def apply_controller(self, body: Mapping[str, Any]) -> None:
+        """Keeps the controller's journal: each input digest is applied once."""
+        phase = body["phase"]
+        if phase not in CONTROLLER_PHASES:
+            raise DeploymentLedgerError(
+                f"controller phase must be one of {list(CONTROLLER_PHASES)}"
+            )
+        if phase == TICK:
+            return
+        digest = str(body["digest"])
+        if body["what"] not in CONTROLLER_INPUTS:
+            raise DeploymentLedgerError(
+                f"controller input must be one of {list(CONTROLLER_INPUTS)}"
+            )
+        if digest in self.consumed:
+            raise DeploymentLedgerError(f"input {digest[:12]} was applied")
+        if phase == INTENT:
+            if digest in self.intents:
+                raise DeploymentLedgerError(
+                    f"input {digest[:12]} already has an intent"
+                )
+            self.intents[digest] = dict(body)
+        elif phase == APPLIED:
+            if digest not in self.intents:
+                raise DeploymentLedgerError(
+                    f"input {digest[:12]} was applied without an intent"
+                )
+            self.consumed[digest] = dict(body)
+        else:
+            self.rejected[digest] = dict(body)
 
     def apply_experiment(self, body: Mapping[str, Any]) -> None:
         """Starts an experiment once, at a positive level."""
