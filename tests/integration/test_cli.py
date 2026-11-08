@@ -98,6 +98,7 @@ def test_commands_are_polymorphic():
         "claims",
         "frame",
         "loop",
+        "operate",
         "deploy",
         "trail",
     ]

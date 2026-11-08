@@ -45,12 +45,14 @@ from scmle.deploy import livetests
 from scmle.deploy import record as deploy_record
 from scmle.deploy import release as deploy_release
 from scmle.governance import deployment_ledger
+from scmle.governance import envelope as envelope_module
 from scmle.governance import loop as loop_module
 from scmle.governance import registry as registry_module
 from scmle.governance import release_state
 from scmle.inference import mapping as mapping_module
 from scmle.inference import parity
 from scmle.inference import serving
+from scmle.operations import controller as controller_module
 from scmle.optimization import optimizers
 from scmle.security import access
 from scmle.trail import builder as trail_build
@@ -965,6 +967,130 @@ class LoopCommand(Command):
         return EXIT_OK
 
 
+class OperateCommand(Command):
+    """Runs the unattended controller: ticks, envelopes, status and halt."""
+
+    name = "operate"
+    help = (
+        "run the unattended controller on an inbox; grant or revoke authority"
+    )
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Adds the controller actions."""
+        actions = parser.add_subparsers(dest="operate_action", required=True)
+        tick = actions.add_parser(
+            "tick", help="apply new inbox files once and step the loop"
+        )
+        tick.add_argument("deploy_dir")
+        tick.add_argument(
+            "--inbox",
+            required=True,
+            help="folder with batches/*.csv and labels/*.csv",
+        )
+        tick.add_argument(
+            "--keys-file",
+            help="JSON map from key id to the key that verifies it",
+        )
+        status = actions.add_parser("status", help="show the controller state")
+        status.add_argument("deploy_dir")
+        grant = actions.add_parser(
+            "grant", help="record a person's signed envelope"
+        )
+        grant.add_argument("deploy_dir")
+        grant.add_argument("--envelope", required=True, help="envelope JSON")
+        grant.add_argument(
+            "--key-file",
+            required=True,
+            help="file with the key that verifies it (the person's)",
+        )
+        revoke = actions.add_parser("revoke", help="remove an envelope")
+        revoke.add_argument("deploy_dir")
+        revoke.add_argument("envelope_id")
+        revoke.add_argument("--reason", required=True)
+        halt = actions.add_parser(
+            "halt", help="stop the loop; every case is escalated"
+        )
+        halt.add_argument("deploy_dir")
+        halt.add_argument("--reason", required=True)
+
+    def execute(self, args: argparse.Namespace) -> int:
+        """Runs the chosen action."""
+        action = getattr(self, f"run_{args.operate_action}")
+        return action(args)
+
+    @staticmethod
+    def open(
+        deploy_dir: str, keys: dict[str, str] | None = None
+    ) -> controller_module.Controller:
+        """Opens the controller of a deployment, mapping ledger faults."""
+        try:
+            return controller_module.Controller(
+                deploy_dir, verification_keys=keys
+            )
+        except deployment_ledger.DeploymentLedgerError as error:
+            raise errors.ArtifactError(
+                f"cannot open the deployment: {error}"
+            ) from error
+
+    @classmethod
+    def run_tick(cls, args: argparse.Namespace) -> int:
+        """Applies the inbox once and prints what happened."""
+        keys = (
+            json.loads(pathlib.Path(args.keys_file).read_text())
+            if args.keys_file
+            else None
+        )
+        result = cls.open(args.deploy_dir, keys).tick(args.inbox)
+        print(json.dumps(result.to_dict()))
+        return EXIT_OK
+
+    @classmethod
+    def run_status(cls, args: argparse.Namespace) -> int:
+        """Prints the controller's state."""
+        print(json.dumps(cls.open(args.deploy_dir).status(), indent=2))
+        return EXIT_OK
+
+    @classmethod
+    def run_grant(cls, args: argparse.Namespace) -> int:
+        """Records an envelope after checking its signature."""
+        key = pathlib.Path(args.key_file).read_text().strip()
+        envelope = deployment_ledger.Envelope.from_dict(
+            json.loads(pathlib.Path(args.envelope).read_text())
+        )
+        controller = cls.open(
+            args.deploy_dir, {deployment_ledger.key_fingerprint(key): key}
+        )
+        try:
+            controller.envelopes.grant(envelope)
+        except (
+            envelope_module.EnvelopeRefused,
+            deployment_ledger.DeploymentLedgerError,
+        ) as error:
+            raise errors.ConfigError(f"envelope refused: {error}") from error
+        print(json.dumps(controller.status()["envelopes"]))
+        return EXIT_OK
+
+    @classmethod
+    def run_revoke(cls, args: argparse.Namespace) -> int:
+        """Removes an envelope's authority."""
+        controller = cls.open(args.deploy_dir)
+        try:
+            controller.envelopes.revoke(args.envelope_id, args.reason)
+        except deployment_ledger.DeploymentLedgerError as error:
+            raise errors.ConfigError(f"revoke refused: {error}") from error
+        print(json.dumps(controller.status()["envelopes"]))
+        return EXIT_OK
+
+    @classmethod
+    def run_halt(cls, args: argparse.Namespace) -> int:
+        """Halts the loop; only a passing recalibration releases it."""
+        controller = cls.open(args.deploy_dir)
+        controller.loop.enter_halt("operator_halt", {"reason": args.reason})
+        controller.loop.save_state()
+        print(json.dumps(controller.status()))
+        return EXIT_OK
+
+
 class DeployCommand(Command):
     """Release evidence: live checks, the promotion gate, deployment records."""
 
@@ -1434,6 +1560,7 @@ COMMANDS: tuple[Command, ...] = (
     ClaimsCommand(),
     FrameCommand(),
     LoopCommand(),
+    OperateCommand(),
     DeployCommand(),
     TrailCommand(),
 )
