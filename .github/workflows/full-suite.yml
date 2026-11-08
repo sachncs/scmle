@@ -35,10 +35,6 @@ jobs:
           --fail-under=85
       - name: Run the long qualification simulations
         run: uv run python -m benchmarks.qualification --smoke --full
-      - name: Enforce critical mutation score
-        run: |
-          uv run mutmut run --max-children 4
-          scripts/check_mutation_score.sh 70
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -47,6 +43,20 @@ jobs:
             coverage.xml
             full-suite.xml
           if-no-files-found: ignore
+
+  mutation:
+    name: critical mutation score
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1
+      - run: uv sync --python 3.14 --extra boosting --extra optimization --extra multimodal
+      - name: Enforce critical mutation score
+        run: |
+          uv run mutmut run --max-children 4
+          scripts/check_mutation_score.sh 70
 
   clean-clone:
     name: exact-SHA clean-clone rehearsal
