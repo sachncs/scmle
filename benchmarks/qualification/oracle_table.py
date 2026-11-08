@@ -10,8 +10,12 @@ reference-only R oracles that are pending are listed too.
     uv run python -m benchmarks.qualification.oracle_table --check FILE
 
 The reported difference is a power of ten that bounds the observed maximum
-(floored at 1e-16), so a change in the last bits on another platform does not
-change the file. `--check` exits 1 if FILE differs from a fresh run.
+(floored at 1e-14, about fifty units in the last place and six orders of
+magnitude below the tightest tolerance), so a change in the last bits on
+another platform or library build does not change the file. A floor at 1e-16
+did not hold: the observed gaps are one to four units in the last place and two
+rows are exactly zero, so a different libm moved rows across it. `--check`
+exits 1 if FILE differs from a fresh run.
 """
 
 import argparse
@@ -33,7 +37,7 @@ from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
 from scmle.evaluation import coverage
 
-FLOOR = 1e-16
+FLOOR = 1e-14
 Producer = Callable[[Mapping[str, Any]], Any]
 
 

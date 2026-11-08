@@ -34,7 +34,9 @@ def test_a_missing_or_edited_table_fails_the_check(tmp_path):
 
 
 def test_the_difference_bound_is_a_stable_power_of_ten():
-    assert oracle_table.bound(0.0) == "<= 1e-16"
+    # a few units in the last place must not change the reported bound
+    assert oracle_table.bound(5e-16) == oracle_table.bound(0.0)
+    assert oracle_table.bound(0.0) == "<= 1e-14"
     assert oracle_table.bound(3e-13) == "<= 1e-12"
     assert oracle_table.bound(1e-12) == "<= 1e-12"
     assert oracle_table.gap({"a": [1.0, 2.0]}, {"a": [1.0, 2.0]}) == 0.0
