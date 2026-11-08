@@ -5,8 +5,7 @@ fault from a drift from a worse model, tell people, keep evaluating, replace
 it only through the gate, recover from failures, and decide whether the
 production claim may be made. Everything here ran locally; nothing ran on AWS
 or GCP. Evidence: `plan/evidence/phase-17/local/`. Feature:
-[F14](../product/features/F14-cloud-portability-and-production-operation.md)
-items 11 to 13.
+F14 items 11 to 13.
 
 | Module | What it is |
 | --- | --- |

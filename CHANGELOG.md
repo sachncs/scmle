@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+* Unattended operation, tested on simulated streams only (`docs/AUTONOMY.md`).
+  An envelope (`scmle.governance.envelope`) is authority a person signs in
+  advance for `train_challenger`, with a scope, dates and a use limit; the
+  eleven never-list actions cannot be put in one, and promotion is unchanged:
+  every promotion needs a person's approval. A controller
+  (`scmle.operations.controller`) and `scmle operate tick | status | grant |
+  revoke | halt` apply each inbox file exactly once, spend an envelope before a
+  retrain, and escalate when data or labels stop. The deployment ledger gains
+  `envelope`, `envelope_used`, `envelope_revoked` and `controller` rows that the
+  chain itself checks. `alarm_gates_retrain` stays off because the alarm design
+  has not met its detection-delay gates, so an alarm still asks a person.
+* Text artifacts are written with LF on every platform. They were written with
+  CRLF on Windows, so the framing draft's files differed in bytes while its
+  charter hash did not (`tests/unit/test_replay_identity.py` failed on Windows
+  3.11 and 3.14); the trail and evidence digests hash raw bytes. A test scans
+  `scmle/` for any writer without `newline="\n"`. The F6 stability
+  certificates were re-issued with the same seeds and floors; no measured
+  number changed. The oracle table's reported difference is floored at 1e-14
+  instead of 1e-16, which rows crossed between platforms.
+* Planning documents consolidated to what is still to build. `plan/` now has
+  five stage documents (trustworthy evidence, autonomous operation, methods and
+  instrument, cloud and production, external validation and release) in place of
+  phases 6 to 19; `product/features.md` replaces `product/features/`;
+  `plan/COMPLETION_AUDIT.md` is an open-items register (156 rows) with the CI
+  state at `f453091`. The owner decided that every promotion stays
+  human-approved. The earlier files are in `git log`.
 * Completion audit and the locally buildable remainder (2026-11-07,
   `plan/COMPLETION_AUDIT.md`). Every open item of the plans and feature files
   is listed with a class (A buildable here, B outside people or data, C cloud

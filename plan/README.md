@@ -1,79 +1,70 @@
 # Plan: what is left to build
 
-Product definition: [`../product/README.md`](../product/README.md).
-Shared names and principles: [`00-canon.md`](00-canon.md).
+Product definition: [`../product/README.md`](../product/README.md). Features
+still to build: [`../product/features.md`](../product/features.md). Shared names
+and principles: [`00-canon.md`](00-canon.md). Every open item, with a class:
+[`COMPLETION_AUDIT.md`](COMPLETION_AUDIT.md).
 
-The data-stage qualification instrument (charter, custody, ledger and
-confirmation, admissibility, detectors, robustness) is built and its phase
-documents were removed. This plan covers only what is missing between that
-instrument and a system that can do the work of a data scientist without one,
-plus the open items of the instrument itself and the external gates no one
-inside this project can pass.
+The data-stage instrument, problem framing, ingestion, causal identification,
+the decision layer, interval guarantees, the closed loop and the local half of
+the cloud work are built. This plan covers only what is missing: trustworthy
+evidence, unattended operation, the remaining methods, evidence from a real
+cloud, and the external validation no one inside this project can supply.
 
-## Why these phases
+## State on 2026-11-08 (`master` at `f453091`)
 
-An assessment of the product against a data scientist's job found the
-mechanical middle (split, search, check, sign, monitor) covered and the rest
-missing: framing the problem, raw data, causal questions, the decision and
-rollout layer, interval guarantees, the production loop and escalation. Each
-phase below closes one of those gaps under the same rule as the built
-instrument (canon P1): nothing gates a run until its operating characteristic
-is measured and an external referent agrees.
+* `ci.yml` is **red** on this head: Windows 3.11 and 3.14 fail
+  `tests/unit/test_replay_identity.py` (text artifacts are written with CRLF),
+  and the scheduled full suite fails `tests/benchmarks/test_oracle_table.py` on
+  Linux 3.14. The last head with a fully green run is `9d4bc04`.
+* Nothing is published (PyPI returns 404); `release.yml`, `cloud-release.yml`
+  and `cloud-deploy.yml` have never run.
+* Nothing has run on AWS or GCP, and the production claim has not been made.
+* The envelope, the controller and `scmle operate` exist and are tested
+  against simulated worlds only; the F13 alarm does not gate retraining, so the
+  controller recommends instead of training, and every promotion needs a
+  person.
+* 156 open items: 53 class A, 53 class B, 26 class C, 24 class D.
+
+## Stages
+
+| Stage | File | What it delivers | Depends on | Open items |
+|---|---|---|---|---|
+| 1 | [1-trustworthy-evidence.md](1-trustworthy-evidence.md) | Green cross-platform CI, one run read job by job, a quickstart that runs as written | none | 4 |
+| 2 | [2-autonomous-operation.md](2-autonomous-operation.md) | Alarm-gated retraining, a staging run, and the controller's remaining pieces (the envelope, controller, `scmle operate`, simulation and `docs/AUTONOMY.md` are built); every promotion stays human-approved | 1 | 5 |
+| 3 | [3-methods-and-instrument.md](3-methods-and-instrument.md) | The class A methods and instrument items, each with a pre-registered design and certificate | 1 | 43 |
+| 4 | [4-cloud-and-production.md](4-cloud-and-production.md) | The container path, security, training, orchestration, infrastructure, release gates, observation, recovery and the production claim on AWS and GCP; trail and breadth | 1; 2.5 needs 4.20 | 31 |
+| 5 | [5-external-validation-and-release.md](5-external-validation-and-release.md) | Corpora, backtest, red team, replication, R references, gold corpora, owner decisions, the release | 1; the sign-offs rest on 3 | 73 |
+
+```
+1 --+--> 2 -----------------------------+
+    +--> 3 ---------------------------+ |
+    +--> 4 ---------------------------+-+--> 5 (release last)
+```
+
+Stages 2, 3 and 4 are independent of each other once stage 1 is done, except
+that item 2.5 (autonomy on a real deployment) needs 4.20. Stage 5 starts early,
+because it needs people outside the project, and finishes last.
 
 ## Raw material and referents
 
 Start from source systems, event logs with true write times, schema and ETL
-history, the business process the model must beat, and past incidents, not
-from cleaned benchmark tables. Where those are unavailable the affected claims
-are tiered `unverified` (P4). What shows a result is right, other than the
-author or the user: labelled corpora, reference implementations, randomized
-experiment outcomes, a prospective head-to-head against practitioners, a
-red-team analyst, independent replication and a domain owner's recorded
-sign-off. See [`validation-referents.md`](validation-referents.md).
-
-## Phases
-
-| Phase | File | Feature | Depends on |
-|---|---|---|---|
-| 7 | [phase-7-instrument-residuals.md](phase-7-instrument-residuals.md) | R1: open items of the built instrument (screen, attestations, custody and charter rules built; open: A5, A6 and B2-B14 (A, local), D1-D2 and E2, E5 (B), D4 (A and B), E1, E3, E4 (A)) | none |
-| 8 | [phase-8-problem-framing.md](phase-8-problem-framing.md) | F8: framing and the decision-cost model (built and wired into the charter run; open: gold corpus and the LLM gate (B), 3.11/3.14 hash identity (A)) | 7 |
-| 9 | [phase-9-raw-data-ingestion.md](phase-9-raw-data-ingestion.md) | F9: raw data, grain, joins, point-in-time features (built and wired into the charter run on SQLite; open: outside corpora and reviewers (B), a second backend (D), budget charging per step (A)) | 7 |
-| 10 | [phase-10-causal-identification.md](phase-10-causal-identification.md) | F10: causal identification (built and wired into the charter run; open: gold standards and references (B), method gaps (A))| 8, 9 |
-| 11 | [phase-11-decision-layer.md](phase-11-decision-layer.md) | F11: decisions, OPE, A/B, rollout (built and wired; open: fairness integration, policy classes, band re-registration (A), referents (B)) | 8, 10 |
-| 12 | [phase-12-uncertainty-and-breadth.md](phase-12-uncertainty-and-breadth.md) | F12: coverage guarantees, problem types (built and wired for regression and classification, including the coverage claim on `C`; open: other task types in the run (A), outside-data gates (B)) | 7 |
-| 13 | [phase-13-closed-loop-and-escalation.md](phase-13-closed-loop-and-escalation.md) | F13: production loop, escalation (built; H2 and H10 missed; open: re-registered alarm design (A), owner audit and replay (B)) | 11, 12 |
-| 14 | [phase-14-portable-core.md](phase-14-portable-core.md) | F14 items 1, 2, 5: local environment, hardened artifact, serving contract | none |
-| 15 | [phase-15-security-data-training-orchestration.md](phase-15-security-data-training-orchestration.md) | F14 items 4, 6, 7, 8: security, governed data, portable training, orchestration | 14 |
-| 16 | [phase-16-infrastructure-and-release.md](phase-16-infrastructure-and-release.md) | F14 items 3, 9, 10: infrastructure as code, CI/CD gates, registry bound to the runtime | 14, 15 |
-| 17 | [phase-17-operate-and-qualify.md](phase-17-operate-and-qualify.md) | F14 items 11, 12, 13: observability, continuous evaluation, recovery; the production claim | 16, 13 |
-| 18 | [phase-18-lifecycle-evidence-and-breadth.md](phase-18-lifecycle-evidence-and-breadth.md) | F15: business trail (local half built; independent trace on a real deployment open (B, C)), qualified breadth (audit and benchmark definitions built; no slice qualified (D)) | 17 (item 14 may start earlier) |
-| 6 | [phase-6-external-validation-and-release.md](phase-6-external-validation-and-release.md) | F7: backtest, red team, replication, release | overlaps all |
-
-```
-7 --+--> 8 --+--> 10 --> 11 --+
-    |        |               +--> 13
-    +--> 9 --+               |
-    +--> 12 -----------------+
-                    6 (external gates, throughout; release last)
-```
-
-The per-item audit with classes A (buildable here), B (outside people or
-data), C (cloud account, spending cap, approver or container daemon) and D
-(owner decision) is [`COMPLETION_AUDIT.md`](COMPLETION_AUDIT.md).
-
-Cloud track (independent of 8 to 13 except where noted): 14 → 15 → 16 → 17 →
-18. Phases 14 and 15 are verifiable without a cloud account; 16 and 17 need
-sandbox accounts, a spending cap and a named approver, and are not marked
-done on local evidence. "Production-qualified on AWS and GCP" is claimed only
-when F14 items 1 to 13 pass on both providers.
-
-Parallel lanes: after 7, phases 8, 9 and 12 run concurrently. Phase 6's gates
-need people outside the project, so they start early and finish last.
+history, the business process the model must beat, and past incidents, not from
+cleaned benchmark tables. Where those are unavailable the affected claims are
+tiered `unverified` (P4). What shows a result is right, other than the author or
+the user: labelled corpora, reference implementations, randomized experiment
+outcomes, a prospective head-to-head against practitioners, a red-team analyst,
+independent replication and a domain owner's recorded sign-off. See
+[`validation-referents.md`](validation-referents.md).
 
 ## Definition of done
 
-A phase is done only when its exit gate passes, every detector or method that
+A stage is done only when its exit gate passes, every detector or method that
 gates has a certificate on file, and its external referent has agreed. The
-release is done only when the phase 6 go/no-go checklist is signed by someone
-other than the author. No claim of autonomy is made beyond what the
-prospective head-to-head in F7 supports.
+release is done only when the stage 5 go/no-go checklist is signed by someone
+other than the author. No claim of autonomy is made beyond what a prospective
+head-to-head against practitioners supports, no claim of autonomous operation is
+made beyond the simulated worlds and the declared envelope until item 2.5 passes
+on a real deployment, and "production-qualified on AWS and GCP" is claimed only
+when F14 items 1 to 13 pass on both providers (item 4.23). A failed, cancelled
+or unread CI job is never a pass.

@@ -3,29 +3,27 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const classes = [
-  ["A", "Buildable here and verifiable here: local code, existing dependencies, and the tools on the author&rsquo;s machine (Python 3.11 and 3.14, OpenTofu, mutmut).", "20 built in the audit pass (fully, partly or as a description); 47 still open"],
-  ["B", "Needs outside people or data: labelled corpora, gold standards, reference implementations (R, MAPIE, scikit-survival), a red team, replication, a domain owner, a prospective head-to-head, real panels, external benchmarks, a reviewer other than the author, or something that exists only after a push (a CI observation, a published release).", "43"],
-  ["C", "Needs an AWS or GCP account, a spending cap, an approver, or a container daemon or scanner that is not on the author&rsquo;s machine (the Docker daemon was not running, and trivy, skopeo and MinIO were not installed).", "24"],
-  ["D", "Needs a design decision from the owner: a version number, a new dependency, a protocol&rsquo;s thresholds, a business metric.", "23"],
-  ["closed", "The item was already satisfied and the planning document was stale.", "5"],
+  ["A", "Buildable here and verifiable here: local code, existing dependencies, and the tools on the author&rsquo;s machine (Python 3.11 and 3.14, OpenTofu, mutmut).", "55"],
+  ["B", "Needs outside people or data: labelled corpora, gold standards, reference implementations (R, MAPIE, scikit-survival), a red team, replication, a domain owner, a prospective head-to-head, real panels, external benchmarks, a reviewer other than the author, or something that exists only after a push (a CI observation, a published release).", "52"],
+  ["C", "Needs an AWS or GCP account, a spending cap, an approver, or a container daemon or scanner that is not on the author&rsquo;s machine (the Docker daemon was not running, and trivy, skopeo and MinIO were not installed).", "26"],
+  ["D", "Needs a design decision from the owner: a version number, a new dependency, a protocol&rsquo;s thresholds, a business metric.", "24"],
 ];
 ---
 
-<DocsLayout title="What is still open" description="A completion audit of every open item in the scmle plans, sorted into four classes: built here, needs outside people or data, needs a cloud account or daemon, and needs an owner decision, with the counts." current="open-items">
+<DocsLayout title="What is still open" description="A register of every open item in the scmle plan, sorted into four classes: buildable here, needs outside people or data, needs a cloud account or daemon, and needs an owner decision, with the counts." current="open-items">
   <p class="eyebrow"><span></span> Reference</p>
   <h1>What is still open,<br /><em>and why.</em></h1>
-  <p class="lead">A completion audit went through every planning document and feature file, listed each remaining open item as the documents state it, and gave it a class and the evidence for it. This page summarises it. It is a status record, not a promise of dates.</p>
+  <p class="lead">The plan lists every remaining open item once, with a class and the evidence for it, grouped under five stages: trustworthy evidence, autonomous operation, methods and instrument, cloud and production, and external validation and release. This page summarises that register. It is a status record, not a promise of dates.</p>
   <div class="callout"><p><strong>Read it as a limit.</strong> Most open items are not missing code. They need people, data, accounts or decisions that the author did not have. None of them has been closed by saying so.</p></div>
 
   <h2>The four classes</h2>
   <DocTable label="Classes of open item and their row counts" head={["Class", "Meaning", "Rows"]} rows={classes} />
-  <p>A row that mixes classes is counted once, under its first letter.</p>
 
   <h2>Counts</h2>
-  <p>The audit lists 162 rows in all: 20 class A rows built in the audit pass, 47 class A rows still open (this includes rows that mix A with B, C or D, where only the A part is open), 43 class B, 24 class C, 23 class D, and 5 rows closed because the document was stale. Each row records whether it was <code>built</code> (named in the changelog), <code>closed</code>, or left <code>open</code> with its class letter. Nothing in the pass changed a certificate.</p>
+  <p>The register lists 156 open rows: 53 class A, 53 class B, 26 class C and 24 class D. By stage: 4 in trustworthy evidence, 5 in autonomous operation, 43 in methods and instrument, 31 in cloud and production, and 73 in external validation and release. A row that needs both local work and outside input is split into two rows, so each row has exactly one class. A built or closed item is deleted from the register; the record is the changelog.</p>
 
   <h2>What class A still needs</h2>
-  <p>The class A items that remain are open because of size, not because they need anything outside the machine. They are statistical methods that each need their own pre-registered design, certificate and re-issue (for example the remaining label-noise, sentinel and per-period drift detectors, difference-in-differences, regression discontinuity and synthetic control, policy trees, intervals for the other task types, and a re-registered closed-loop alarm design). They also include the repository-wide mutation run, which takes many hours, and a few pieces of evidence such as the 3.11 and 3.14 identity of the ingestion and causal reports, of which only the framing draft, the loop and decision snapshots are pinned across interpreters.</p>
+  <p>The class A items that remain are open because of size, not because they need anything outside the machine. They are statistical methods that each need their own pre-registered design, certificate and re-issue (for example the remaining label-noise, sentinel and per-period drift detectors, difference-in-differences, regression discontinuity and synthetic control, policy trees, intervals for the other task types, and a re-registered closed-loop alarm design). They also include the controller that would run the loop unattended, the repository-wide mutation run, which takes many hours, and the 3.11 and 3.14 identity of the ingestion and causal reports.</p>
 
   <h2>What needs outside people or data (class B)</h2>
   <p>The largest block is validation that the author cannot supply: a backtest on real datasets with a time axis, a red team by an analyst who did not write the instrument, an independent replication, the external AutoML campaign, reference outputs from R packages (R is not installed on the author&rsquo;s machine), a domain-owner pilot, and CI observations that exist only after a push. This is why the instrument is described as built and tested but not independently validated, and why no AutoML head-to-head result exists (see <a href={`${base}/docs/benchmarks/#what-this-shows`}>Benchmarks</a>).</p>
@@ -36,8 +34,8 @@ const classes = [
   <h2>What needs an owner decision (class D)</h2>
   <p>The choice of version for the next release, its changelog heading, tag and supported-versions text, and the pre-registered protocol for the qualification comparison, with its claim, corpus rule, thresholds and stop rules, wait on the owner.</p>
 
-  <h2>Plan statements the audit corrected</h2>
-  <p>The audit also found statements in the plans that the code contradicted, and corrected them. For example: OpenTofu formatting and validation do pass and the lock files are committed (see <a href={`${base}/docs/infrastructure/`}>Infrastructure as code</a>); the leakage screen is committed, certified and wired; the custody golden-hash tests passed on Windows, macOS and the lowest dependencies in a green CI run; and the Windows test job takes 23 minutes on Python 3.11 and 29 on 3.14, so the planned target of under 14 minutes is not met and stays open.</p>
+  <h2>State of the evidence</h2>
+  <p>The continuous-integration run on the head that this register was written against (<code>f453091</code>) is red: the Windows jobs fail a replay-identity test because text artifacts are written with Windows line endings, and the scheduled full-suite run fails the oracle-table test on Linux. The last head with a fully green run is <code>9d4bc04</code>. Making the evidence trustworthy is the first stage. OpenTofu formatting and validation pass and the lock files are committed (see <a href={`${base}/docs/infrastructure/`}>Infrastructure as code</a>), but nothing has been applied to a cloud account.</p>
 
-  <p class="meta">Counts as recorded by the completion audit of 2026-11-06</p>
+  <p class="meta">Counts as recorded by the plan register of 2026-11-08</p>
 </DocsLayout>

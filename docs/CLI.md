@@ -93,6 +93,23 @@ control the ledger recorded. A step whose input is absent is reported
 recompute statistics from data, and a party who can rewrite every file
 consistently can pass it (custody is tamper-evident, not adversary-proof).
 
+## Unattended operation
+
+`scmle operate` runs the controller of a deployment that `scmle loop init`
+created; see [Autonomous operation](AUTONOMY.md).
+
+```bash
+scmle operate tick deploy/ --inbox inbox/ [--keys-file keys.json]
+scmle operate status deploy/
+scmle operate grant deploy/ --envelope envelope.json --key-file person.key
+scmle operate revoke deploy/ ENVELOPE_ID --reason TEXT
+scmle operate halt deploy/ --reason TEXT
+```
+
+`tick` applies each new file of `inbox/batches` and `inbox/labels` once, steps
+the loop and prints what happened as JSON. Every promotion still needs a
+person's approval.
+
 ## Business trail
 
 ```bash

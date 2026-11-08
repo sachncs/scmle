@@ -43,7 +43,7 @@ schema version, observed schema digest and whether it matches, row count,
 age against the contract's `max_age_seconds` (`fresh`, `stale`, `unknown`)
 and the ids of the snapshots it derives from. `snapshot_id` hashes URI,
 content and schema, so the same bytes give the same id. `ReadLog.trace(id)`
-walks the lineage. `connector_reader(store)` plugs a store into the Phase 9
+walks the lineage. `connector_reader(store)` plugs a store into the ingestion
 `ObjectStoreConnector`.
 
 ## Quality gates

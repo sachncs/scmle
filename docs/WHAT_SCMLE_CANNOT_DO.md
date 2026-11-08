@@ -102,6 +102,10 @@ against planted problems and is on file as a certificate. Everything else is
   model.
 * Retraining, challengers and calibration are Python calls, not commands. The
   command line cannot, for example, create a signed reply or release a halt.
+* `scmle operate` runs the loop without a person at the keyboard, and it has
+  only been tried on simulated streams. **A person approves every promotion.**
+  Because the alarm missed its floors, an alarm asks a person instead of
+  training a challenger. See [Autonomous operation](AUTONOMY.md).
 
 ## Serving and security
 

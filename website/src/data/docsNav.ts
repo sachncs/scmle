@@ -48,7 +48,7 @@ export const docsNav: NavGroup[] = [
       { slug: "artifacts", label: "Artifacts & bundles", key: "artifacts", summary: "Every file a run, ingestion, framing pass, loop and service package writes." },
       { slug: "architecture", label: "Architecture", key: "architecture", summary: "See how ingestion, profiling, evaluation, packaging, and monitoring connect, and the known limits." },
       { slug: "breadth", label: "Breadth status", key: "breadth", summary: "Fourteen task and modality slices: what exists, what is missing, and why none is qualified." },
-      { slug: "open-items", label: "What is still open", key: "open-items", summary: "A completion audit of every open item, in four classes with the counts." },
+      { slug: "open-items", label: "What is still open", key: "open-items", summary: "A register of every open item, in four classes with the counts." },
       { slug: "dependencies", label: "Dependencies & extras", key: "dependencies", summary: "The light base install, every optional extra, version bounds and licence checks." },
       { slug: "benchmarks", label: "Benchmarks", key: "benchmarks", summary: "Full locked-test tables, repeated-seed intervals, new task types and the nine reliability checks." },
     ],

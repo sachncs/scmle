@@ -1,6 +1,7 @@
 # Validation referents: what shows the result is right
 
-Canon: [`00-canon.md`](00-canon.md). Feature: F7. The author and the user are
+Canon: [`00-canon.md`](00-canon.md). Feature: F7 in
+[`../product/features.md`](../product/features.md). The author and the user are
 not evidence. Each claim below is tied to something that can disagree with
 us.
 
@@ -54,7 +55,7 @@ cover that gap.
   later realized model performance with the validation estimate. A `pass`
   that is followed by a degraded out-of-time score is a recorded miss.
 - Backtest (F7): `block` vs `pass` against a pre-defined out-of-time gap, with
-  the circularity and selection rules in the F7 file.
+  the circularity and selection rules of F7 in `../product/features.md`.
 
 ## 4. Independent replication
 

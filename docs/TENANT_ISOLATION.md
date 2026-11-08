@@ -3,7 +3,7 @@
 What "tenant" means here, what isolates tenants, and what does not. It covers
 the prediction service (`scmle.inference.serving`, `modality_serving`) behind
 `scmle.security`. Cloud-level isolation (accounts, networks, buckets, IAM) is
-declared per provider in Phase 16 and is not claimed here.
+declared per provider under `deploy/terraform/` and is not claimed here.
 
 ## Model
 

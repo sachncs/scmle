@@ -9,13 +9,16 @@ instrument** for the data stage: from a signed analysis charter it fixes the
 question and the estimand, splits the data into custody-controlled sets,
 explores only the exploration set under a hypothesis ledger, certifies its own
 detectors against planted defects, and issues claims whose error rate is
-guaranteed only by a single confirmation on untouched data. What is still
-missing is everything around that instrument that a data scientist does by
-hand: framing the problem, getting from raw sources to a table, causal
-identification, the decision and rollout layer, interval guarantees across
-problem types, the production loop, and knowing when to ask a person. Those
-are the features and phases left in these folders. Whatever a charter or a
-person cannot supply is reported as `unverified`, never silently assumed.
+guaranteed only by a single confirmation on untouched data. Around that
+instrument the lifecycle is built end to end: problem framing and the
+decision-cost model, raw-data ingestion with point-in-time features, causal
+identification, the decision and rollout layer, interval guarantees, the
+closed production loop with escalation, and a local portable service with a
+release gate. What is missing is unattended operation (a controller that runs
+the loop inside a human-signed envelope), evidence from a real cloud, and
+validation by people and data outside this project. Those are the five stages
+in this folder. Whatever a charter or a person cannot supply is reported as
+`unverified`, never silently assumed.
 
 ## Principles
 
@@ -51,7 +54,7 @@ person cannot supply is reported as `unverified`, never silently assumed.
 | Charter | Signed, hashed `AnalysisCharter`: estimand, unit, population, decision map, set sizes, error budget, multiverse declaration. |
 | Estimand | Population, target variable, prediction moment, intercurrent events, summary measure (ICH E9(R1) style). Types: `predictive`, `causal`. |
 | Decision map | Table binding each gating check to the action it triggers. |
-| Sets | `X` exploration, `C` confirmation (opened once), `F` forward-in-time holdout (temporal data only). The model's final-evaluation set is `F` for temporal data and has manifest role `final_test` otherwise; `C` is a separate carve-out so confirmed claims never shape the model that `C` would score. In a charter run `C` and the final test set are held in a separate vault process regardless of `enforcement`; the residual custody gaps are listed in R1. |
+| Sets | `X` exploration, `C` confirmation (opened once), `F` forward-in-time holdout (temporal data only). The model's final-evaluation set is `F` for temporal data and has manifest role `final_test` otherwise; `C` is a separate carve-out so confirmed claims never shape the model that `C` would score. In a charter run `C` and the final test set are held in a separate vault process regardless of `enforcement`; the residual custody gaps are stated in `docs/SECURITY.md`. |
 | Check | One statistical test or estimator with null, statistic, p-value or interval, effect size, n, decision. |
 | Claim | A finding that survived exploration and is tested on `C`. |
 | Ledger | Append-only record of every hypothesis spent, with alpha-wealth accounting. |
@@ -62,6 +65,12 @@ person cannot supply is reported as `unverified`, never silently assumed.
 | Identification strategy | A causal estimator plus the assumptions that make it valid, chosen as a function of what the charter declares (F10). |
 | Decision budget | Exact-fraction budget for sequential promote, hold and rollback decisions, beside the error budget (F11). |
 | Escalation | A measured rule for when the system stops and asks a named human; the reply is recorded as an `attested` row (F13). |
+
+Feature IDs of the built instrument, kept for cross-reference: F1 charter,
+F2 custody and splits, F3 claim ledger and confirmation, F4 admissibility and
+provenance, F5 detectors with certificates, F6 robustness and shift. Their
+code is `scmle/data/{charter,custody,ledger,admissibility,detectors,robustness}/`
+and `benchmarks/qualification/`.
 
 ## Tier readings added for the new features
 
@@ -78,73 +87,35 @@ person cannot supply is reported as `unverified`, never silently assumed.
   design diagnostic failed or a falsification test rejected. `confirmed` does
   not say the assumptions are true; the held-out set alone never confirms a
   causal effect.
-- Decision claims: tiered as F11 ("Tiers for decision claims") specifies; an
-  estimate that rests on non-randomized data inherits the F10 tier of the
-  effect.
+- Decision claims: `confirmed` when a frozen rule was tested once on
+  untouched data (or an e-process crossed its level with the sample-ratio check
+  passing) and the logs are randomized with recorded probabilities; `attested`
+  when costs, margins or propensities came from a named person; `unverified`
+  for defaults, a failed calibration with the grid fallback, failed support or
+  effective-sample gates, and non-randomized logs without an eligible
+  causal strategy. An estimate that rests on non-randomized data inherits the
+  causal tier of the effect. Costs are never verified by the instrument.
 - LLM-drafted fields (F8) are `unverified` until a named human signs.
 
-## Already built (names only, for reference)
+## Stages
 
-Shared types and the exact error budget, the verification harness with
-detector certificates, the charter and custody, the hash-chained ledger with
-online FDR and one-time confirmation, admissibility and provenance, five
-certified detector families, and robustness and shift checks. Packages:
-`scmle/data/{charter,custody,ledger,admissibility,detectors,robustness}/`,
-`scmle/contracts/qualification.py`, `scmle/core/randomness.py`,
-`benchmarks/qualification/`. Their specifications were removed from these
-folders once implemented; `git log` and `CHANGELOG.md` hold the record and
-`product/features/R1-instrument-residuals.md` lists what is still open in them.
-The IDs of the built features are kept for cross-references: F1 charter, F2
-custody and splits, F3 claim ledger and confirmation, F4 admissibility and
-provenance, F5 detectors with certificates, F6 robustness and shift.
-
-## Features (product/features/)
-
-| ID | File |
-|---|---|
-| R1 | `R1-instrument-residuals.md` (open items of the built instrument) |
-| F7 | `F7-verification-harness.md` (backtest, red team, replication, campaign) |
-| F8 | `F8-problem-framing.md` |
-| F9 | `F9-raw-data-ingestion.md` |
-| F10 | `F10-causal-identification.md` |
-| F11 | `F11-decision-layer.md` |
-| F12 | `F12-uncertainty-and-breadth.md` |
-| F13 | `F13-closed-loop-and-escalation.md` |
-| F14 | `F14-cloud-portability-and-production-operation.md` (local, AWS and GCP: artifacts, security, serving, infrastructure, release, operation, recovery) |
-| F15 | `F15-operational-lifecycle-and-qualified-breadth.md` (business trail, further task families and modalities) |
-
-## Phases (plan/)
-
-| Phase | File | Features |
+| Stage | File | Contents |
 |---|---|---|
-| 6 | `phase-6-external-validation-and-release.md` | F7 (external gates, release) |
-| 7 | `phase-7-instrument-residuals.md` | R1 |
-| 8 | `phase-8-problem-framing.md` | F8 |
-| 9 | `phase-9-raw-data-ingestion.md` | F9 |
-| 10 | `phase-10-causal-identification.md` | F10 |
-| 11 | `phase-11-decision-layer.md` | F11 |
-| 12 | `phase-12-uncertainty-and-breadth.md` | F12 |
-| 13 | `phase-13-closed-loop-and-escalation.md` | F13 |
-| 14 | `phase-14-portable-core.md` | F14 items 1, 2, 5 |
-| 15 | `phase-15-security-data-training-orchestration.md` | F14 items 4, 6, 7, 8 |
-| 16 | `phase-16-infrastructure-and-release.md` | F14 items 3, 9, 10 |
-| 17 | `phase-17-operate-and-qualify.md` | F14 items 11, 12, 13 |
-| 18 | `phase-18-lifecycle-evidence-and-breadth.md` | F15 |
+| 1 | `1-trustworthy-evidence.md` | Green cross-platform CI and a quickstart that runs as written |
+| 2 | `2-autonomous-operation.md` | Envelope, alarm-gated retraining, controller, simulation, docs; promotion stays human-approved |
+| 3 | `3-methods-and-instrument.md` | Class A open items of the instrument and the framing, ingestion, causal, decision, uncertainty and loop features |
+| 4 | `4-cloud-and-production.md` | AWS and GCP evidence, the production claim, trail and breadth |
+| 5 | `5-external-validation-and-release.md` | Red team, replication, gold corpora, owner decisions, the release |
 
-Cloud track: 14 first (no cloud account needed), then 15, 16, 17; 18 after
-17. Cloud acceptance needs accounts, a budget cap and an approver.
-
-Dependencies: 7 first (closes the built instrument). 8 and 9 in parallel after
-7. 10 needs 9 (point-in-time data) and 8 (the charter's causal fields). 11
-needs 8 and 10. 12 is independent after 7. 13 needs 11 and 12. 6 runs last and
-overlaps everything it can: its release gates need people outside the
-project.
+Feature IDs F7 to F16 and R1 are used in `../product/features.md`; the item
+register is `COMPLETION_AUDIT.md`. Dependencies and the definition of done are
+in `README.md`.
 
 ## Conventions for these documents
 
-- State what is verified in the repo versus proposed. Cite `path:line` for
-  verified claims.
-- Every feature file ends with acceptance criteria that a machine can check
+- State what is verified in the repo versus proposed. Cite a file path (and a
+  symbol or test name) for verified claims.
+- Every feature entry ends with acceptance criteria that a machine can check
   and an "external referent" that is neither the author nor the user.
 - Prefer one rigorous method per need rather than a survey; say what was cut
   and why.

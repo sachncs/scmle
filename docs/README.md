@@ -34,6 +34,7 @@ in order.
 | --- | --- |
 | How the system is built and extended | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | How evidence and feedback drive changes | [`OPERATING_LOOP.md`](OPERATING_LOOP.md) |
+| What runs without a person, and what still asks one | [`AUTONOMY.md`](AUTONOMY.md) |
 | Which cited methods were checked against their papers | [`LITERATURE_CHECK.md`](LITERATURE_CHECK.md) |
 | Which task families and modalities are qualified, partial or not supported, and why none is yet qualified | [`BREADTH.md`](BREADTH.md) |
 | How well it works, and how we check | [`BENCHMARKS.md`](BENCHMARKS.md) and [`../benchmarks/`](../benchmarks/README.md) |

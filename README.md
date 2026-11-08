@@ -68,6 +68,7 @@ More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 | Know what a run writes | [`docs/ARTIFACTS.md`](docs/ARTIFACTS.md) |
 | Understand the system | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Choose an input and validation strategy | [`docs/OPERATING_LOOP.md`](docs/OPERATING_LOOP.md) |
+| Know what runs unattended and what still needs a person | [`docs/AUTONOMY.md`](docs/AUTONOMY.md) |
 | Integrate the Python API | [`docs/API_STABILITY.md`](docs/API_STABILITY.md) |
 | Run and recover safely | [`docs/OPERATIONS_REHEARSAL.md`](docs/OPERATIONS_REHEARSAL.md) |
 | Review security boundaries | [`docs/SECURITY.md`](docs/SECURITY.md) |

@@ -7,7 +7,7 @@ data, and files the counts as certificates in
 
 Pre-declared policy, fixed before any measurement and not tuned to results:
 recall lower Wilson bound at least 0.80 and false-alarm upper Wilson bound
-at most 0.05, 95 percent intervals (plan/phase-4). Development used seeds
+at most 0.05, 95 percent intervals (the F5 policy). Development used seeds
 100 and above; certification uses the seeds listed below, which are disjoint.
 
 Units. Row detectors (sentinels, duplicates, label noise, outlier error

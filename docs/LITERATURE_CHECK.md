@@ -1,6 +1,6 @@
 # Literature check of cited methods
 
-Phase 7, item 8. On 2026-11-05 the primary sources of the methods below were
+On 2026-11-05 the primary sources of the methods below were
 fetched and read (full text, not only abstracts) wherever they could be
 retrieved, and the docstrings were corrected where a claim went beyond them.
 "Verified" means a statement was read in the source and agrees with the text
