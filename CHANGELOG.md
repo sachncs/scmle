@@ -25,7 +25,7 @@
   five stage documents (trustworthy evidence, autonomous operation, methods and
   instrument, cloud and production, external validation and release) in place of
   phases 6 to 19; `product/features.md` replaces `product/features/`;
-  `plan/COMPLETION_AUDIT.md` is an open-items register (156 rows) with the CI
+  `plan/COMPLETION_AUDIT.md` is an open-items register (155 rows) with the CI
   state at `f453091`. The owner decided that every promotion stays
   human-approved. The earlier files are in `git log`.
 * Completion audit and the locally buildable remainder (2026-11-07,

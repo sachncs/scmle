@@ -10,29 +10,31 @@ A pushed head on which every CI job, on every platform, has run and passed, and
 on which the published quickstart works as written. A failed, cancelled or
 unread job is never a pass.
 
-## Starting point (2026-11-08)
+## Starting point (2026-11-08, `master` at `9356b89`)
 
-* `ci.yml` run 42282548069 (head `f453091`) was red: Windows 3.11 and 3.14
-  failed `tests/unit/test_replay_identity.py` because text artifacts were
-  written without `newline="\n"`, so Windows wrote CRLF. All 36 writers in
-  `scmle/` now set it and `tests/unit/test_text_writes_use_lf.py` keeps it so.
-  The trail records and evidence digests hash raw file bytes, so this was a
-  real cross-platform defect, not cosmetic. **Not yet seen green on Windows.**
-* `full-suite.yml` run 42356989620 was red on Linux 3.14 at
-  `tests/benchmarks/test_oracle_table.py`. The generator's floor was raised from
-  1e-16 to 1e-14 because the raw gaps are one to four units in the last place.
-  **That cause is inferred, not seen on Linux.**
-* The last head with a fully green `ci.yml` run is `9d4bc04` (run 42227276889).
-* Windows jobs take 26 to 27 minutes (6475 tests passed, one failed in run
-  42282548069); the limit is 60.
+* `ci.yml` is green: 23 of 23 jobs in run 42471349728. Four jobs first failed
+  with GitHub's own HTTP 504 before running any of our code and passed on
+  re-run. The Windows 3.11 and 3.14 jobs, which failed on `f453091` because text
+  artifacts were written with CRLF, pass: every writer in `scmle/` now sets
+  `newline="\n"` and `tests/unit/test_text_writes_use_lf.py` keeps it so.
+* `full-suite.yml` run 42476834640: the test step passed, including
+  `test_oracle_table` on Linux 3.14 (the generator's floor is now 1e-14). The
+  next step, "Enforce critical mutation score", failed: mutmut instruments the
+  sources in its scope, among them the detector and stability modules whose
+  hashes the certificates record, so `qualification --check` reports them
+  stale inside its tree. This has failed since 4 Nov (run 41805832562), before
+  the work above. `test_the_command_line_runs_smoke_check_and_writes_a_sample`
+  now skips when the sources are instrumented; **not yet seen passing**.
+* Windows jobs take 24 (3.14) and 27 (3.11) minutes; the limit is 60.
+* The last full-suite run to succeed was 3 Nov (run 41612013024).
 
 ## Work packages
 
 | WP | Items | Class | Scope | Closing criterion |
 |---|---|---|---|---|
-| 1.1 | 1.2 | B | Confirm the oracle-table fix on Linux 3.14 (the next `full-suite.yml` run, or a Linux container). If it still differs, read the diff and fix the generator; do not weaken `--check` or edit the document to match one platform | `pytest tests/benchmarks/test_oracle_table.py` passes on Linux 3.14 and macOS |
+| 1.1 | 1.4 | B | Read one `full-suite.yml` run on the head step by step. If the mutation step still fails, read why: the baseline test run, or the score below the repo floor | every step of one `full-suite.yml` run green and read |
 | 1.2 | 1.3 | A | Re-run the published quickstart (`docs/START_HERE.md`, `website/src/pages/docs/quickstart.astro`) verbatim in a clean environment on macOS, Linux and Windows. Fix the page or the code where they disagree | a transcript per platform, kept with the change |
-| 1.3 | 1.4, 1.5 | B | Push; read every job of one `ci.yml` run on the head, and the next `full-suite.yml` run. Watch the Windows duration on three consecutive master runs. If it stays above 14 minutes: split the cross-platform job (unit versus property, leakage and end-to-end) or move slow property tests to the nightly job, keeping a Windows custody and vault test in the bounded set. Do not raise `timeout-minutes`: the limit exists to catch hangs | a `ci.yml` run on the head with every job green and read; Windows jobs under 14 minutes on three consecutive master runs |
+| 1.3 | 1.5 | B | Watch the Windows duration on three consecutive master runs. If it stays above 14 minutes: split the cross-platform job (unit versus property, leakage and end-to-end) or move slow property tests to the nightly job, keeping a Windows custody and vault test in the bounded set. Do not raise `timeout-minutes`: the limit exists to catch hangs | Windows jobs under 14 minutes on three consecutive master runs |
 
 ## Exit gate
 

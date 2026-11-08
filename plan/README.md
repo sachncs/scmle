@@ -11,12 +11,15 @@ the cloud work are built. This plan covers only what is missing: trustworthy
 evidence, unattended operation, the remaining methods, evidence from a real
 cloud, and the external validation no one inside this project can supply.
 
-## State on 2026-11-08 (`master` at `f453091`)
+## State on 2026-11-08 (`master` at `9356b89`)
 
-* `ci.yml` is **red** on this head: Windows 3.11 and 3.14 fail
-  `tests/unit/test_replay_identity.py` (text artifacts are written with CRLF),
-  and the scheduled full suite fails `tests/benchmarks/test_oracle_table.py` on
-  Linux 3.14. The last head with a fully green run is `9d4bc04`.
+* `ci.yml` is green on this head: 23 of 23 jobs (run 42471349728), including
+  Windows 3.11 and 3.14, which failed on `f453091` because text artifacts were
+  written with CRLF. Windows jobs take 24 and 27 minutes.
+* The scheduled `full-suite.yml` passes its test step (the oracle table now
+  holds on Linux 3.14) but its mutation step has failed since 4 Nov because
+  mutmut instruments the hashed detector sources. A skip is committed; one more
+  run confirms it.
 * Nothing is published (PyPI returns 404); `release.yml`, `cloud-release.yml`
   and `cloud-deploy.yml` have never run.
 * Nothing has run on AWS or GCP, and the production claim has not been made.
@@ -24,13 +27,13 @@ cloud, and the external validation no one inside this project can supply.
   against simulated worlds only; the F13 alarm does not gate retraining, so the
   controller recommends instead of training, and every promotion needs a
   person.
-* 156 open items: 53 class A, 53 class B, 26 class C, 24 class D.
+* 155 open items: 53 class A, 52 class B, 26 class C, 24 class D.
 
 ## Stages
 
 | Stage | File | What it delivers | Depends on | Open items |
 |---|---|---|---|---|
-| 1 | [1-trustworthy-evidence.md](1-trustworthy-evidence.md) | Green cross-platform CI, one run read job by job, a quickstart that runs as written | none | 4 |
+| 1 | [1-trustworthy-evidence.md](1-trustworthy-evidence.md) | Green cross-platform CI, one run read job by job, a quickstart that runs as written | none | 3 |
 | 2 | [2-autonomous-operation.md](2-autonomous-operation.md) | Alarm-gated retraining, a staging run, and the controller's remaining pieces (the envelope, controller, `scmle operate`, simulation and `docs/AUTONOMY.md` are built); every promotion stays human-approved | 1 | 5 |
 | 3 | [3-methods-and-instrument.md](3-methods-and-instrument.md) | The class A methods and instrument items, each with a pre-registered design and certificate | 1 | 43 |
 | 4 | [4-cloud-and-production.md](4-cloud-and-production.md) | The container path, security, training, orchestration, infrastructure, release gates, observation, recovery and the production claim on AWS and GCP; trail and breadth | 1; 2.5 needs 4.20 | 31 |

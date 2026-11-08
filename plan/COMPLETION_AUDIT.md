@@ -1,11 +1,9 @@
 # Item register: everything still open
 
-State on 2026-11-08, `master` at `f453091`. **`ci.yml` is red at this head**:
-run 42282548069 fails on Windows 3.11 and 3.14 in
-`tests/unit/test_replay_identity.py`, because text artifacts are written
-without `newline="\n"`; the scheduled full-suite run 42356989620 fails
-`tests/benchmarks/test_oracle_table.py` on Linux 3.14. The last head with a
-fully green run is `9d4bc04`.
+State on 2026-11-08, `master` at `9356b89`. `ci.yml` is green on this head (run
+42471349728, 23 of 23 jobs). The scheduled `full-suite.yml` passes its test
+step but its mutation step has failed since 4 Nov; a fix is committed and
+unverified (item 1.4).
 
 This file lists only open items, grouped under the five stages of
 [`README.md`](README.md). A closed or built item is deleted from it; the record
@@ -39,19 +37,18 @@ stage 5.
 | Class | Stage 1 | Stage 2 | Stage 3 | Stage 4 | Stage 5 | Total |
 |---|---|---|---|---|---|---|
 | A, buildable here | 1 | 4 | 43 | 3 | 2 | 53 |
-| B, outside people or data | 3 | 0 | 0 | 0 | 50 | 53 |
+| B, outside people or data | 2 | 0 | 0 | 0 | 50 | 52 |
 | C, cloud account, cap, approver or daemon | 0 | 1 | 0 | 24 | 1 | 26 |
 | D, owner decision | 0 | 0 | 0 | 4 | 20 | 24 |
-| Total | 4 | 5 | 43 | 31 | 73 | 156 |
+| Total | 3 | 5 | 43 | 31 | 73 | 155 |
 
 ## Stage 1: trustworthy evidence ([`1-trustworthy-evidence.md`](1-trustworthy-evidence.md))
 
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
-| 1.2 | confirm on Linux 3.14 that `docs/ORACLES.md` equals a fresh `oracle_table` run | B | the generator's floor was raised from 1e-16 to 1e-14 (the raw gaps are 1 to 4 units in the last place, so rows crossed the floor between platforms); the cause was inferred from the raw gaps and no Linux run has confirmed it. `--check` must not be weakened |
 | 1.3 | the published quickstart (`docs/START_HERE.md`, `website/src/pages/docs/quickstart.astro`) runs verbatim in a clean environment on macOS, Linux and Windows | A | the 5 Nov product audit (`issues.md`) reported a four-row fixture failing the stratified split and `predict` refusing an unsigned local bundle; the page now explains `--trusted` and signing, but nothing re-ran it |
-| 1.4 | one `ci.yml` run on the pushed head with every job read and green | B | needs a push and a read of each job; the last such head is `9d4bc04` |
-| 1.5 | Windows jobs under 14 minutes on three consecutive master runs | B | 26 to 27 minutes in run 42282548069; needs pushes and observation |
+| 1.4 | one `full-suite.yml` run on the head with every step green and read | B | `ci.yml` is green on `9356b89` (run 42471349728, 23 of 23 jobs, after four jobs hit GitHub 504s and were re-run). The full-suite run 42476834640 passed its test step, including `test_oracle_table` on Linux 3.14, then failed "Enforce critical mutation score": mutmut instruments the hashed detector sources, so `qualification --check` reports them stale in its tree (failing since 4 Nov, run 41805832562). A skip under mutmut is committed; it needs one more run to confirm |
+| 1.5 | Windows jobs under 14 minutes on three consecutive master runs | B | 24 and 27 minutes in run 42471349728 (Windows 3.14 and 3.11); needs pushes and observation |
 
 ## Stage 2: autonomous operation ([`2-autonomous-operation.md`](2-autonomous-operation.md))
 
