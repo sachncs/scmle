@@ -56,7 +56,7 @@ import scmle.monitoring.reference
 # Format 2 signs and checksums the schema alongside every serialized model
 # component. Format 1 bundles did not authenticate schema.json and are refused
 # by the loader rather than silently weakening the trust boundary.
-BUNDLE_FORMAT = 2
+BUNDLE_FORMAT = 3
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
@@ -1025,7 +1025,11 @@ class Bundle:
             legacy and allow_legacy_format and trusted
         ):
             raise errors.ArtifactError(
-                f"unsupported bundle format {manifest.get('format')}"
+                f"unsupported bundle format {manifest.get('format')}: this "
+                f"build reads format {BUNDLE_FORMAT}. A bundle stores the "
+                "module path and class name of the objects inside it, and "
+                "those names changed, so a bundle written by an earlier "
+                "build cannot be loaded; retrain and save it again"
             )
         info = Manifest(**manifest)
         if SCHEMA_FILE not in info.files and not legacy:

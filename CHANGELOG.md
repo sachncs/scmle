@@ -28,10 +28,11 @@ marked `Breaking:` and listed first in their group.
 * **Public-API snapshot.** `tests/fixtures/public_api.json` is schema version 2:
   pinned names are listed under their defining module.
 
-Not yet done for these changes: the bundle and run format versions are not
-bumped, so a model bundle written by an earlier build, which embeds the module
-path and class name of the objects inside it, may fail to load, and there is no
-clear refusal message for it yet.
+* **Bundle format 3.** A model bundle stores the module path and class name of
+  every object inside it, and those names changed, so bundles written by an
+  earlier build cannot be loaded. `Bundle.load` refuses them before it
+  unpickles anything, with an `ArtifactError` that says the format it reads and
+  to retrain and save again. There is no converter.
 
 ### Added
 

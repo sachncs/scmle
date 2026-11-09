@@ -123,6 +123,23 @@ def test_invalid_bundles(tmp_path, trained):
         scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
 
 
+def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
+    tmp_path, trained
+):
+    directory = trained[0].save(tmp_path / "earlier")
+    path = directory / scmle.artifacts.bundle.MANIFEST_FILE
+    manifest = json.loads(path.read_text())
+    manifest["format"] = scmle.artifacts.bundle.BUNDLE_FORMAT - 1
+    path.write_text(json.dumps(manifest))
+
+    with pytest.raises(errors.ArtifactError) as raised:
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
+
+    message = str(raised.value)
+    assert "unsupported bundle format 2" in message
+    assert "retrain and save it again" in message
+
+
 def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
     directory = trained[0].save(tmp_path / "legacy")
     manifest_path = directory / scmle.artifacts.bundle.MANIFEST_FILE
@@ -144,7 +161,7 @@ def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
     )
     assert (
         scmle.artifacts.bundle.Bundle.load(migrated, trusted=True).info.format
-        == 2
+        == scmle.artifacts.bundle.BUNDLE_FORMAT
     )
 
 

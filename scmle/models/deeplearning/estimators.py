@@ -426,7 +426,7 @@ class NetworkEstimator(base.BaseEstimator):
 class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
     """Classifier: softmax over class scores, optional class balancing."""
 
-    engine_path = "scmle.models.deeplearning.engines.ClassifierEngine"
+    engine_path = "scmle.models.deeplearning.engines.Classifier"
 
     def __init__(
         self,
@@ -545,7 +545,7 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
 class TorchRegressor(base.RegressorMixin, NetworkEstimator):
     """Regressor trained on the standardized target with squared error."""
 
-    engine_path = "scmle.models.deeplearning.engines.RegressorEngine"
+    engine_path = "scmle.models.deeplearning.engines.Regressor"
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values in the original units.
@@ -651,7 +651,7 @@ class TabPfnEstimator(base.BaseEstimator):
 class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
     """TabPFN classifier."""
 
-    engine_path = "scmle.models.deeplearning.foundation.ClassifierEngine"
+    engine_path = "scmle.models.deeplearning.foundation.Classifier"
 
     def remember(self, state: dict[str, Any]) -> None:
         """Exposes `classes_` after fitting.
@@ -687,7 +687,7 @@ class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
 class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):
     """TabPFN regressor."""
 
-    engine_path = "scmle.models.deeplearning.foundation.RegressorEngine"
+    engine_path = "scmle.models.deeplearning.foundation.Regressor"
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.
@@ -757,7 +757,7 @@ class KerasEstimator(NetworkEstimator):
 class KerasClassifier(base.ClassifierMixin, KerasEstimator):
     """Keras classifier."""
 
-    engine_path = "scmle.models.deeplearning.keras_engine.ClassifierEngine"
+    engine_path = "scmle.models.deeplearning.keras_engine.Classifier"
 
     def remember(self, state: dict[str, Any]) -> None:
         """Exposes `classes_` after fitting.
@@ -793,7 +793,7 @@ class KerasClassifier(base.ClassifierMixin, KerasEstimator):
 class KerasRegressor(base.RegressorMixin, KerasEstimator):
     """Keras regressor."""
 
-    engine_path = "scmle.models.deeplearning.keras_engine.RegressorEngine"
+    engine_path = "scmle.models.deeplearning.keras_engine.Regressor"
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.

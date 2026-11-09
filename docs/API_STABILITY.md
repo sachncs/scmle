@@ -271,8 +271,10 @@ security, and operational evidence is complete.
 
 ## Bundle migration
 
-Bundle format 2 authenticates `schema.json`. Format 1 bundles are refused by
-default. To migrate a format 1 bundle from a source you explicitly trust,
-load it with `trusted=True, allow_legacy_format=True` and immediately call
-`save()` to write a format 2 bundle. The migrated bundle should then be
-verified with the normal signed loading path.
+Bundle format 3 is the current format. The class renames changed the module
+path and class name stored inside every bundle, so a bundle written by an
+earlier build (format 2 or 1) cannot be loaded or migrated: `Bundle.load`
+refuses it with an error that says to retrain and save again. The
+`allow_legacy_format` option remains in the loader but can only read a format 1
+bundle whose stored objects still carry the current class names, which no real
+earlier bundle does; it is a candidate for removal.
