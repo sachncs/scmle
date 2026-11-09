@@ -433,9 +433,14 @@ def base_rates(
     Returns:
         For each group label (as text), the number of positive outcomes and
         the number of rows.
+
+    Raises:
+        ValueError: If `groups` and `y` differ in length.
     """
     outcomes = costs.binary_vector(y, "y")
     labels = np.asarray(groups)
+    if labels.shape != outcomes.shape:
+        raise ValueError("groups and y must have the same length")
     return {
         str(g): (
             float(outcomes[labels == g].sum()),

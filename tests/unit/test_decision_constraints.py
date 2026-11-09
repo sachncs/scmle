@@ -223,3 +223,8 @@ def test_the_cluster_test_is_reproducible_and_reads_every_criterion():
         )
         assert first == again
         assert first.criterion == criterion
+
+
+def test_base_rates_refuse_groups_and_outcomes_of_different_length():
+    with pytest.raises(ValueError, match="same length"):
+        c.base_rates(np.array([1, 0, 1]), np.array(["a", "b"]))
