@@ -113,7 +113,14 @@ class RollbackOutcome:
 
 
 def fingerprint(frame: pd.DataFrame) -> str:
-    """Short digest of the rows, to recognise data already acted on."""
+    """Short digest of the rows, to recognise data already acted on.
+
+    Args:
+        frame: The rows to digest; the index is ignored.
+
+    Returns:
+        The first 16 hex characters of a SHA-256 over the row hashes.
+    """
     hashes = pd.util.hash_pandas_object(frame, index=False).to_numpy()
     return hashlib.sha256(hashes.tobytes()).hexdigest()[:16]
 
@@ -183,14 +190,23 @@ class LifecycleManager:
         return self.registry.root / f"{self.model}{STATE_SUFFIX}"
 
     def read_state(self) -> dict[str, Any]:
-        """The last attempt's data digest and the rows seen since."""
+        """The last attempt's data digest and the rows seen since.
+
+        Returns:
+            A dict with `last_digest`, the digest of the data of the last
+            retraining attempt (None if none), and `rows_since_attempt`.
+        """
         with durability.path_lock(self.state_path):
             if not self.state_path.exists():
                 return {"last_digest": None, "rows_since_attempt": 0}
             return json.loads(self.state_path.read_text(encoding="utf-8"))
 
     def write_state(self, state: dict[str, Any]) -> None:
-        """Saves the state atomically."""
+        """Saves the state atomically.
+
+        Args:
+            state: The state to save, as returned by `read_state`.
+        """
         durability.write_atomically(
             self.state_path, json.dumps(state).encode("utf-8")
         )
@@ -198,7 +214,17 @@ class LifecycleManager:
     def skip_reason(
         self, state: dict[str, Any], fresh: pd.DataFrame
     ) -> str | None:
-        """Why a recommended retrain should not run now, if any reason holds."""
+        """Why a recommended retrain should not run now, if any reason holds.
+
+        Args:
+            state: The saved state, as returned by `read_state`.
+            fresh: The fresh rows offered for retraining.
+
+        Returns:
+            `already_handled` if these rows were already acted on,
+            `too_few_rows` if they are fewer than the minimum, `cooldown` if
+            too few rows arrived since the last attempt, else None.
+        """
         if fingerprint(fresh) == state["last_digest"]:
             return "already_handled"
         if len(fresh) < self.policy.min_rows:
@@ -256,6 +282,13 @@ class LifecycleManager:
         `Loop.guard_registry`) it also needs a human attestation for the exact
         model and version, else `AttestationRequired` is raised and nothing
         moves.
+
+        Args:
+            approval: The independent approval of the challenger bundle.
+            signing_key: HMAC key for the approval signature.
+
+        Returns:
+            The record of the version now champion.
         """
         record = self.registry.resolve(self.model, registry_module.CHALLENGER)
         self.registry.promote(
@@ -306,7 +339,18 @@ class LifecycleManager:
         retrain: bool,
         project_options: dict[str, Any] | None,
     ) -> LifecycleOutcome:
-        """Runs `review` while holding the manager's state lock."""
+        """Runs `review` while holding the manager's state lock.
+
+        Args:
+            fresh: Fresh labelled rows, including the target.
+            target: Name of the target column.
+            retrain: Whether a recommended retrain may run.
+            project_options: Options for the retraining project.
+
+        Returns:
+            The outcome: the monitoring report, whether a retrain ran, the
+            champion-challenger comparison if there was one, and the notes.
+        """
         current = self.registry.load(self.model)
         features = fresh.drop(columns=[target])
         report = monitor_module.ModelMonitor(current).assess(
@@ -418,6 +462,10 @@ class LifecycleManager:
         clear leaves the new champion in place. Either way the evidence goes
         to the audit trail.
 
+        With a guarded registry the rollback also needs a human attestation
+        naming this rollback; without one `AttestationRequired` is raised
+        after the evidence is audited and the champion stays.
+
         Args:
             fresh: Recent served rows including the true target.
             target: Name of the target column.
@@ -425,10 +473,11 @@ class LifecycleManager:
             approval: Independent approval for the rollback promotion.
             signing_key: HMAC key for the approval signature.
 
-        With a guarded registry the rollback also needs a human attestation
-        naming this rollback (never-list item 1); without one
-        `AttestationRequired` is raised after the evidence is audited and the
-        champion stays.
+        Returns:
+            The outcome: whether the previous version was restored, the
+            comparison, the restored version and the explanation. It is not
+            restored when there is no previous version, too few rows, the new
+            champion holds up, no approval was given, or a rollout decides.
         """
         rule = policy or RollbackPolicy()
         aliases = self.registry.aliases(self.model)
@@ -561,7 +610,15 @@ class LifecycleManager:
         return int(target)
 
     def note_rows(self, state: dict[str, Any], fresh: pd.DataFrame) -> None:
-        """Counts fresh rows toward the cooldown after an attempt."""
+        """Counts fresh rows toward the cooldown after an attempt.
+
+        Does nothing if there was no attempt or these rows are the ones last
+        acted on.
+
+        Args:
+            state: The saved state, updated and written.
+            fresh: The fresh rows seen.
+        """
         if (
             state["last_digest"] is None
             or fingerprint(fresh) == (state["last_digest"])
@@ -572,7 +629,17 @@ class LifecycleManager:
 
 
 def read_run_config(result: results.RunResult) -> dict[str, Any]:
-    """Reads the saved project configuration of a run."""
+    """Reads the saved project configuration of a run.
+
+    Args:
+        result: The completed run.
+
+    Returns:
+        The content of the run's `config.json`.
+
+    Raises:
+        ArtifactError: If the run has no `config.json`.
+    """
     path = result.run_dir / "config.json"
     if not path.exists():
         raise errors.ArtifactError("run has no config.json")

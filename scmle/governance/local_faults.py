@@ -43,7 +43,22 @@ class LocalFaultExecutor:
     def execute(
         self, scenario: reliability.FaultScenario
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Execute one scenario and return exactly its declared evidence."""
+        """Execute one scenario and return exactly its declared evidence.
+
+        Args:
+            scenario: The fault scenario to rehearse.
+
+        Returns:
+            The evidence artifacts of the scenario, one for each evidence
+                type
+            its plan requires.
+
+        Raises:
+            RuntimeError: If the scenario's handler fails.
+            TypeError: If `scenario` is not a `FaultScenario`.
+            ValueError: If the evidence returned does not match the evidence
+                types its plan requires exactly.
+        """
         if not isinstance(scenario, reliability.FaultScenario):
             raise TypeError("scenario must be FaultScenario")
         handlers: dict[
@@ -112,7 +127,20 @@ class LocalFaultExecutor:
         observation: str,
         details: dict[str, Any],
     ) -> reliability_harness.FaultArtifact:
-        """Build a JSON evidence artifact for an observed safe outcome."""
+        """Build a JSON evidence artifact for an observed safe outcome.
+
+        Args:
+            scenario: The scenario the evidence belongs to.
+            evidence_type: The kind of evidence.
+            observation: What was observed.
+            details: Facts recorded with the observation; they must be JSON
+                serializable.
+
+        Returns:
+            The artifact, with canonical JSON content and a safe outcome
+                marked
+            as observed.
+        """
         content = json.dumps(
             {
                 "scenario": scenario.value,
@@ -132,7 +160,12 @@ class LocalFaultExecutor:
         )
 
     def write_json(self, path: pathlib.Path, record: dict[str, Any]) -> None:
-        """Write JSON through the same durable atomic primitive as releases."""
+        """Write JSON through the same durable atomic primitive as releases.
+
+        Args:
+            path: The destination file.
+            record: The content, written as compact sorted JSON.
+        """
         reliability_harness.FaultInjectionHarness.write_atomically(
             path,
             json.dumps(
@@ -144,7 +177,15 @@ class LocalFaultExecutor:
         )
 
     def stop_child(self) -> tuple[bool, int | None]:
-        """Terminate a real child process and return its terminal state."""
+        """Terminate a real child process and return its terminal state.
+
+        Returns:
+            A pair: whether the child had to be terminated, and its exit code.
+
+        Returns:
+            A pair: whether the child had to be terminated, and its exit
+                code.
+        """
         child = subprocess.Popen(  # nosec B603 - constant local rehearsal command.
             [sys.executable, "-c", "import time; time.sleep(60)"],
             stdout=subprocess.DEVNULL,
@@ -167,7 +208,12 @@ class LocalFaultExecutor:
     def run_process_death(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Kill a child after a durable checkpoint and resume from it."""
+        """Kill a child after a durable checkpoint and resume from it.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: process
+                termination, checkpoint resume and artifact integrity.
+        """
         scenario = reliability.FaultScenario.PROCESS_DEATH
         checkpoint = self.root / "process-death-checkpoint.json"
         self.write_json(
@@ -200,7 +246,13 @@ class LocalFaultExecutor:
     def run_stale_checkpoint(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject a checkpoint bound to a different source identity."""
+        """Reject a checkpoint bound to a different source identity.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order:
+                checkpoint identity, stale-checkpoint rejection and run
+                state.
+        """
         scenario = reliability.FaultScenario.STALE_CHECKPOINT
         checkpoint = incremental.EventCheckpoint("source-old", sequence=4)
         rejected = False
@@ -235,7 +287,16 @@ class LocalFaultExecutor:
     def run_disk_full(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Exercise a deterministic capacity boundary without filling a disk."""
+        """Exercise a deterministic capacity boundary without filling a disk.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: disk
+                capacity exhaustion, artifact integrity and resource error.
+
+        Raises:
+            OSError: Raised deliberately to simulate a full disk (ENOSPC);
+                it is caught and recorded, so it does not reach the caller.
+        """
         scenario = reliability.FaultScenario.DISK_FULL
         destination = self.root / "disk-full-public.json"
         payload = b"x" * 32
@@ -270,7 +331,12 @@ class LocalFaultExecutor:
     def run_corrupt_artifact(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Detect and quarantine an artifact whose bytes changed."""
+        """Detect and quarantine an artifact whose bytes changed.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order:
+                corruption injection, digest mismatch and quarantine record.
+        """
         scenario = reliability.FaultScenario.CORRUPT_ARTIFACT
         artifact_path = self.root / "artifact.bin"
         quarantine_path = self.root / "quarantine-artifact.bin"
@@ -307,7 +373,12 @@ class LocalFaultExecutor:
     def run_worker_loss(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Kill a worker and retry its idempotent output once."""
+        """Kill a worker and retry its idempotent output once.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: worker
+                termination, idempotent retry and event deduplication.
+        """
         scenario = reliability.FaultScenario.WORKER_LOSS
         terminated, returncode = self.stop_child()
         output = self.root / "worker-output.json"
@@ -337,7 +408,12 @@ class LocalFaultExecutor:
     def run_timeout(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Terminate a child that exceeds a bounded execution timeout."""
+        """Terminate a child that exceeds a bounded execution timeout.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: timeout
+                injection, cancellation record and resource error.
+        """
         scenario = reliability.FaultScenario.TIMEOUT
         terminated, returncode = self.stop_child()
         terminal = self.root / "timeout-terminal.json"
@@ -368,7 +444,17 @@ class LocalFaultExecutor:
     def run_memory_exhaustion(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Exercise a bounded allocator guard without risking host memory."""
+        """Exercise a bounded allocator guard without risking host memory.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: memory
+                pressure, publication absence and resource error.
+
+        Raises:
+            MemoryError: Raised deliberately when the controlled allocation
+                passes its budget; it is caught and recorded, so it does not
+                reach the caller.
+        """
         scenario = reliability.FaultScenario.MEMORY_EXHAUSTION
         allocation = bytearray()
         rejected = False
@@ -404,7 +490,12 @@ class LocalFaultExecutor:
     def run_partial_write(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Interrupt a temporary write before atomic replacement."""
+        """Interrupt a temporary write before atomic replacement.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: write
+                interruption, atomicity check and artifact integrity.
+        """
         scenario = reliability.FaultScenario.PARTIAL_WRITE
         public_path = self.root / "partial-public.json"
         descriptor, temporary_name = tempfile.mkstemp(dir=self.root)
@@ -441,7 +532,12 @@ class LocalFaultExecutor:
     def run_dependency_mismatch(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject a package whose declared dependency identity changed."""
+        """Reject a package whose declared dependency identity changed.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order:
+                environment identity, dependency rejection and run state.
+        """
         scenario = reliability.FaultScenario.DEPENDENCY_MISMATCH
         required = "numpy==2.3.0"
         observed = "numpy==2.4.0"
@@ -470,7 +566,13 @@ class LocalFaultExecutor:
     def run_invalid_signature(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject and quarantine an attestation with a changed signature."""
+        """Reject and quarantine an attestation with a changed signature.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order:
+                signature tampering, verification failure and quarantine
+                record.
+        """
         scenario = reliability.FaultScenario.INVALID_SIGNATURE
         provenance = {
             "run_id": "local-signature",
@@ -510,7 +612,17 @@ class LocalFaultExecutor:
     def run_retry_exhaustion(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Stop after a bounded retry budget and record terminal failure."""
+        """Stop after a bounded retry budget and record terminal failure.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: retry
+                history, terminal event and partial-publication check.
+
+        Raises:
+            OSError: Raised deliberately on every attempt to simulate a
+                failing connector; each is caught and counted, so it does
+                not reach the caller.
+        """
         scenario = reliability.FaultScenario.RETRY_EXHAUSTION
         attempts = 0
         for attempt in range(3):
@@ -547,7 +659,12 @@ class LocalFaultExecutor:
     def run_duplicate_event(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Prove duplicate event IDs are ignored by a durable ledger."""
+        """Prove duplicate event IDs are ignored by a durable ledger.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order:
+                duplicate event, idempotency key and state transition.
+        """
         scenario = reliability.FaultScenario.DUPLICATE_EVENT
         path = self.root / "duplicate-events.json"
         ledger = incremental.IncrementalIngestionLedger(path, "local-source")
@@ -590,7 +707,12 @@ class LocalFaultExecutor:
     def run_incomplete_lineage(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Block a graph edge whose required lifecycle node is absent."""
+        """Block a graph edge whose required lifecycle node is absent.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: lineage
+                gap, release block and audit record.
+        """
         scenario = reliability.FaultScenario.INCOMPLETE_LINEAGE
         graph = lineage.EvidenceGraph(
             (
@@ -628,7 +750,12 @@ class LocalFaultExecutor:
     def run_rejected_approval(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Block a rejected promotion approval before alias movement."""
+        """Block a rejected promotion approval before alias movement.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: approval
+                rejection, release block and audit record.
+        """
         scenario = reliability.FaultScenario.REJECTED_APPROVAL
         approval = model_registry.PromotionApproval(
             model="local-model",
@@ -671,7 +798,12 @@ class LocalFaultExecutor:
     def run_changed_snapshot(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject a snapshot whose data identity changed under one ID."""
+        """Reject a snapshot whose data identity changed under one ID.
+
+        Returns:
+            The three evidence artifacts of the scenario, in order: snapshot
+                digest change, run invalidation and lineage record.
+        """
         scenario = reliability.FaultScenario.CHANGED_SNAPSHOT
         previous = source_registry.SourceSnapshot(
             source_id="source",

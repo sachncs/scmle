@@ -29,7 +29,13 @@ class FaultArtifact:
     observation: str
 
     def __post_init__(self) -> None:
-        """Reject evidence that cannot be persisted and reviewed."""
+        """Reject evidence that cannot be persisted and reviewed.
+
+        Raises:
+            TypeError: If `observed_outcome` is not an `EvidenceOutcome`.
+            ValueError: If the evidence type is blank or not a path-safe name,
+                the content is not non-empty bytes, or the observation is blank.
+        """
         if not self.evidence_type.strip():
             raise ValueError("evidence_type must not be empty")
         if "/" in self.evidence_type or "\\" in self.evidence_type:
@@ -53,7 +59,22 @@ class FaultInjectionHarness:
         reviewer: str,
         recorded_at: str,
     ) -> None:
-        """Initialize a harness with explicit evidence identity."""
+        """Initialize a harness with explicit evidence identity.
+
+        Args:
+            registry: The plan registry that receives the evidence.
+            artifact_root: Directory the evidence files are written to; it is
+                created if missing.
+            execution_id: Identifier of this execution; it must be a path-safe
+                name.
+            reviewer: Who records the evidence.
+            recorded_at: When the evidence is recorded.
+
+        Raises:
+            TypeError: If `registry` is not a `FaultInjectionPlanRegistry`.
+            ValueError: If the execution id, reviewer or time is blank, or the
+                execution id is not a path-safe name.
+        """
         if not isinstance(registry, reliability.FaultInjectionPlanRegistry):
             raise TypeError("registry must be FaultInjectionPlanRegistry")
         for name, value in (
@@ -85,6 +106,21 @@ class FaultInjectionHarness:
         declared by the scenario. Missing or unexpected evidence remains
         ``INCONCLUSIVE`` or raises from the registry; it never becomes a
         passing release claim by omission.
+
+        Args:
+            scenario: The fault scenario to run.
+            executor: Called with the scenario; returns the evidence artifacts
+                as a tuple.
+
+        Returns:
+            The scenario's plan, updated with the recorded evidence.
+
+        Raises:
+            ReliabilityError: If the executor fails.
+            TypeError: If `scenario` is not a `FaultScenario` or the executor
+                does not return a tuple of `FaultArtifact` values.
+            ValueError: If the executor returns duplicate evidence types or
+                types the scenario does not declare; nothing is published.
         """
         if not isinstance(scenario, reliability.FaultScenario):
             raise TypeError("scenario must be FaultScenario")
@@ -136,7 +172,14 @@ class FaultInjectionHarness:
 
     @staticmethod
     def digest(path: str | pathlib.Path) -> str:
-        """Return the SHA-256 digest of a persisted evidence artifact."""
+        """Return the SHA-256 digest of a persisted evidence artifact.
+
+        Args:
+            path: The artifact file.
+
+        Returns:
+            The hex digest of the file's bytes.
+        """
         digest = hashlib.sha256()
         with pathlib.Path(path).open("rb") as handle:
             for chunk in iter(lambda: handle.read(1 << 20), b""):
@@ -145,7 +188,12 @@ class FaultInjectionHarness:
 
     @staticmethod
     def write_atomically(path: pathlib.Path, content: bytes) -> None:
-        """Write an evidence artifact using flush, fsync, and replace."""
+        """Write an evidence artifact using flush, fsync, and replace.
+
+        Args:
+            path: The destination; parent directories are created.
+            content: The bytes to write.
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
             dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"

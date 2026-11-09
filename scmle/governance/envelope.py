@@ -54,7 +54,12 @@ class EnvelopeRefused(errors.ArtifactError):
     """No envelope allows the requested action."""
 
     def __init__(self, action: str, reason: str) -> None:
-        """Records the action and why every envelope was refused."""
+        """Records the action and why every envelope was refused.
+
+        Args:
+            action: The refused action.
+            reason: Why no envelope allows it.
+        """
         super().__init__(f"no envelope allows {action}: {reason}")
         self.action = action
         self.reason = reason
@@ -92,7 +97,15 @@ class EnvelopeGuard:
             self.on_write()
 
     def signature_ok(self, grant: ledger_module.Envelope) -> bool:
-        """Whether the signature verifies, when keys were supplied."""
+        """Whether the signature verifies, when keys were supplied.
+
+        Args:
+            grant: The envelope whose signature is checked.
+
+        Returns:
+            True if no verification keys were supplied, or the grant's key is
+            known and its signature verifies.
+        """
         if self.verification_keys is None:
             return True
         key = self.verification_keys.get(grant.key_id)
@@ -101,10 +114,17 @@ class EnvelopeGuard:
     def grant(self, envelope: ledger_module.Envelope) -> dict[str, Any]:
         """Writes a person's signed envelope to the ledger.
 
+        The ledger refuses a taken identifier or a key the system holds (with
+        a `DeploymentLedgerError`).
+
+        Args:
+            envelope: The signed envelope.
+
+        Returns:
+            The ledger row that was written.
+
         Raises:
             EnvelopeRefused: If the signature does not verify.
-            DeploymentLedgerError: If the id is taken or the key is one the
-                system holds.
         """
         if not self.signature_ok(envelope):
             raise EnvelopeRefused(
@@ -115,7 +135,15 @@ class EnvelopeGuard:
         return row
 
     def revoke(self, envelope_id: str, reason: str) -> dict[str, Any]:
-        """Removes an envelope's authority."""
+        """Removes an envelope's authority.
+
+        Args:
+            envelope_id: Identifier of the envelope.
+            reason: Why it is revoked.
+
+        Returns:
+            The ledger row recording the revocation.
+        """
         row = self.ledger.commit(
             ledger_module.ENVELOPE_REVOKED,
             {"envelope_id": envelope_id, "reason": reason},
@@ -124,7 +152,15 @@ class EnvelopeGuard:
         return row
 
     def remaining(self, envelope_id: str) -> dict[str, int]:
-        """Uses left per action; empty for an unknown or revoked envelope."""
+        """Uses left per action; empty for an unknown or revoked envelope.
+
+        Args:
+            envelope_id: Identifier of the envelope.
+
+        Returns:
+            A mapping from each action the envelope covers to the uses left,
+            never below zero.
+        """
         grant = self.ledger.envelopes.get(envelope_id)
         if grant is None or envelope_id in self.ledger.envelope_revoked:
             return {}
@@ -137,7 +173,19 @@ class EnvelopeGuard:
     def refusal(
         self, identity: str, grant: Mapping[str, Any], action: str, scope: str
     ) -> str | None:
-        """Why one envelope does not allow the request, or None if it does."""
+        """Why one envelope does not allow the request, or None if it does.
+
+        Args:
+            identity: Identifier of the envelope.
+            grant: The envelope's stored record.
+            action: The requested action.
+            scope: The scope of the request.
+
+        Returns:
+            A short reason (revoked, different scope, action not covered, not
+            valid today, signature fails, uses spent), or None if the envelope
+            allows the request.
+        """
         if identity in self.ledger.envelope_revoked:
             return "revoked"
         if grant["scope"] != scope:

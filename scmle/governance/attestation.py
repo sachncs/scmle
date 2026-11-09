@@ -14,7 +14,14 @@ from scmle.contracts.signing import SIGNATURE_ALGORITHM
 
 
 def canonical_digest(record: Mapping[str, Any]) -> str:
-    """Return the SHA-256 digest of a JSON-native governance record."""
+    """Return the SHA-256 digest of a JSON-native governance record.
+
+    Args:
+        record: The record; keys are sorted and the JSON is compact.
+
+    Returns:
+        The hex digest of the canonical JSON.
+    """
     serialized = json.dumps(
         record,
         ensure_ascii=True,
@@ -25,7 +32,19 @@ def canonical_digest(record: Mapping[str, Any]) -> str:
 
 
 def required_text(record: Mapping[str, Any], path: str) -> str:
-    """Return a required string from a nested governance record."""
+    """Return a required string from a nested governance record.
+
+    Args:
+        record: The record to read.
+        path: Dot-separated path of the field.
+
+    Returns:
+        The non-empty string at that path.
+
+    Raises:
+        ValueError: If the path is absent or its value is not non-empty
+            text.
+    """
     value: Any = record
     for component in path.split("."):
         if not isinstance(value, Mapping) or component not in value:
@@ -48,7 +67,13 @@ class ReleaseAttestation:
     attestation_signature: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject incomplete identity or signature claims."""
+        """Reject incomplete identity or signature claims.
+
+        Raises:
+            TypeError: If `signature_present` is not a bool.
+            ValueError: If an identity or digest field is blank, or the
+                signature is blank text.
+        """
         for field_name in (
             "run_id",
             "model_manifest_sha256",
@@ -73,7 +98,22 @@ class ReleaseAttestation:
         sbom: Mapping[str, Any],
         signing_key: str | bytes | None = None,
     ) -> Self:
-        """Build an attestation from the records emitted by a package run."""
+        """Build an attestation from the records emitted by a package run.
+
+        Args:
+            provenance: The provenance record of the run.
+            sbom: The software bill of materials of the run.
+            signing_key: The key to sign with, or None for the configured
+                default; the attestation is unsigned if no key exists.
+
+        Returns:
+            The attestation binding the run, its model manifest, provenance
+            and SBOM digests.
+
+        Raises:
+            ValueError: If the provenance has no boolean signature presence or
+                lacks a required field.
+        """
         signature = provenance.get("signature")
         if not isinstance(signature, Mapping) or not isinstance(
             signature.get("present"), bool
@@ -98,7 +138,19 @@ class ReleaseAttestation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Parse a persisted release attestation without trusting its claims."""
+        """Parse a persisted release attestation without trusting its claims.
+
+        Args:
+            record: The persisted attestation.
+
+        Returns:
+            The attestation.
+
+        Raises:
+            ValueError: If the subjects or signature are not objects, the
+                signature algorithm is unsupported or its value is blank, or a
+                required field is missing.
+        """
         subjects = record.get("subjects")
         if not isinstance(subjects, Mapping):
             raise ValueError("attestation.subjects must be an object")
@@ -155,7 +207,18 @@ class ReleaseAttestation:
         sbom: Mapping[str, Any],
         signing_key: str | bytes | None = None,
     ) -> bool:
-        """Verify that the attestation still matches its source records."""
+        """Verify that the attestation still matches its source records.
+
+        Args:
+            provenance: The provenance record of the run.
+            sbom: The software bill of materials of the run.
+            signing_key: The key to verify with, or None for the configured
+                default.
+
+        Returns:
+            True if the attestation matches records rebuilt from the inputs and
+            its signature matches (or both are unsigned); False otherwise.
+        """
         try:
             expected = type(self).from_records(provenance, sbom, signing_key)
         except (TypeError, ValueError):

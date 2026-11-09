@@ -16,7 +16,17 @@ PACKAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
 def normalize_name(name: str) -> str:
-    """Return a canonical PyPI package name for an SBOM component."""
+    """Return a canonical PyPI package name for an SBOM component.
+
+    Args:
+        name: A distribution name.
+
+    Returns:
+        The name stripped, lower-cased, with underscores as hyphens.
+
+    Raises:
+        ValueError: If the result is empty or not a valid distribution name.
+    """
     value = name.strip().lower().replace("_", "-")
     if not value or PACKAGE_NAME.fullmatch(value) is None:
         raise ValueError(f"invalid distribution name: {name!r}")
@@ -24,7 +34,18 @@ def normalize_name(name: str) -> str:
 
 
 def component_ref(name: str, version: str) -> str:
-    """Return a stable package URL used as the component reference."""
+    """Return a stable package URL used as the component reference.
+
+    Args:
+        name: A distribution name.
+        version: The pinned version.
+
+    Returns:
+        A `pkg:pypi/<name>@<version>` URL with the normalized name.
+
+    Raises:
+        ValueError: If the name is invalid or the version is empty.
+    """
     normalized = normalize_name(name)
     version_value = version.strip()
     if not version_value:
@@ -44,6 +65,21 @@ def build(
     The function records package identities and versions only. License and
     vulnerability claims require authoritative package metadata and scanners,
     so this artifact does not invent either field.
+
+    Args:
+        distributions: Mapping from distribution name to pinned version.
+        run_id: Identifier of the run, recorded as a property and used to
+            derive the serial number.
+        software_version: Version of the software the SBOM describes.
+        observed_at: ISO 8601 timestamp for the metadata; the current time
+            if None.
+
+    Returns:
+        The SBOM document, with the components sorted by name.
+
+    Raises:
+        ValueError: If the run id, the software version or the
+            distributions are empty, or a name or version is invalid.
     """
     if not run_id.strip():
         raise ValueError("run_id must not be empty")
@@ -99,7 +135,15 @@ def build(
 
 
 def parse_pins(text: str) -> dict[str, str]:
-    """Reads `name==version` lines of a lock file; comments are skipped."""
+    """Reads `name==version` lines of a lock file; comments are skipped.
+
+    Args:
+        text: The lock file content.
+
+    Returns:
+        A mapping from normalized name to version; lines without `==` are
+        ignored.
+    """
     pins = {}
     for line in text.splitlines():
         entry = line.split("#", 1)[0].strip()
@@ -111,7 +155,11 @@ def parse_pins(text: str) -> dict[str, str]:
 
 
 def source_timestamp() -> str:
-    """The build time: `SOURCE_DATE_EPOCH` if set, else the current time."""
+    """The build time: `SOURCE_DATE_EPOCH` if set, else the current time.
+
+    Returns:
+        An ISO 8601 UTC timestamp.
+    """
     epoch = os.environ.get("SOURCE_DATE_EPOCH")
     if epoch is not None and epoch.isdigit():
         moment = datetime.datetime.fromtimestamp(int(epoch), datetime.UTC)
@@ -135,6 +183,23 @@ def build_service(
     SHA-256 of its manifest) and the base image (by reference; the digest is
     recorded in the build's attestation once the base image is resolved), and
     a dependency edge from the service to each of them.
+
+    Args:
+        distributions: Mapping from distribution name to pinned version.
+        model_name: Name of the packaged model.
+        model_version: Version of the packaged model.
+        bundle_digest: `sha256:`-prefixed digest of the bundle manifest.
+        base_image: Reference of the base container image.
+        software_version: Version of the software the SBOM describes.
+        observed_at: ISO 8601 timestamp; the build time if None.
+
+    Returns:
+        The SBOM document with the model and the image as extra components
+        and one dependency edge from the service to every component.
+
+    Raises:
+        ValueError: If `bundle_digest` is not a `sha256:` digest, or the
+            underlying SBOM inputs are invalid.
     """
     if not bundle_digest.startswith("sha256:"):
         raise ValueError("bundle_digest must be a sha256: digest")

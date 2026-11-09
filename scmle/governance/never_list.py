@@ -1,4 +1,4 @@
-"""The actions the loop must not take without a person (F13, "never list").
+"""The actions the loop must not take without a person (the "never list").
 
 Each of the eleven actions has a guard: called without a valid attestation in
 the deployment ledger, `Guard.require` writes an `escalation` row (once per
@@ -34,7 +34,7 @@ Limits. The guard is code around the entry points of this package. It cannot
 stop a person or a process with file or interpreter access from calling the
 registry, the custody API or the filesystem directly, and it cannot enforce
 key custody: that the signing key is not held by the system is a deployment
-requirement (canon P6).
+requirement.
 """
 
 from collections.abc import Callable
@@ -48,7 +48,7 @@ from scmle.governance import deployment_ledger as ledger_module
 
 
 class NeverAction(enum.StrEnum):
-    """The eleven actions that need an attestation, in the order of F13."""
+    """The eleven actions that need an attestation, in a fixed order."""
 
     MOVE_CHAMPION = "move_champion_or_roll_back"
     REOPEN_SEALED = "reopen_sealed_set"
@@ -74,7 +74,12 @@ class AttestationRequired(errors.ArtifactError):
     """An action on the never list was requested without an attestation."""
 
     def __init__(self, action: NeverAction, escalation_id: str) -> None:
-        """Records the action and the escalation that now waits."""
+        """Records the action and the escalation that now waits.
+
+        Args:
+            action: The never-list action that was refused.
+            escalation_id: Identifier of the pending escalation.
+        """
         super().__init__(
             f"{action.value} (never-list item {ITEM_NUMBER[action]}) needs a "
             f"valid human attestation; escalation {escalation_id} is pending"
@@ -86,7 +91,16 @@ class AttestationRequired(errors.ArtifactError):
 def question_for(
     action: NeverAction, detail: Mapping[str, Any], scope: str
 ) -> dict[str, Any]:
-    """The question an attestation must answer for this exact action."""
+    """The question an attestation must answer for this exact action.
+
+    Args:
+        action: The never-list action.
+        detail: Facts that identify this instance of the action.
+        scope: The scope the attestation must carry.
+
+    Returns:
+        The question as a dict of action, detail and scope.
+    """
     return {"action": action.value, "detail": dict(detail), "scope": scope}
 
 
@@ -120,7 +134,15 @@ class Guard:
     def valid_attestation(
         self, question: Mapping[str, Any]
     ) -> ledger_module.Attestation | None:
-        """The first valid attestation for `question`, or None."""
+        """The first valid attestation for `question`, or None.
+
+        Args:
+            question: The question, as built by `question_for`.
+
+        Returns:
+            The first unused attestation to an escalation of exactly this
+            question that is currently acceptable, or None.
+        """
         digest = ledger_module.question_hash(question)
         for identity, row in self.ledger.escalations.items():
             if row["question_hash"] != digest:
@@ -134,7 +156,17 @@ class Guard:
         return None
 
     def accepts(self, reply: ledger_module.Attestation, scope: str) -> bool:
-        """Whether `reply` allows an action in `scope` today."""
+        """Whether `reply` allows an action in `scope` today.
+
+        Args:
+            reply: The attestation.
+            scope: The scope of the action.
+
+        Returns:
+            True if the decision allows it, the scope matches, today lies
+            within its validity dates, the key is not one the system holds, and,
+            when verification keys are configured, its signature verifies.
+        """
         if reply.decision not in ALLOWING or reply.scope != scope:
             return False
         today = self.today()
@@ -150,7 +182,14 @@ class Guard:
         return True
 
     def pending_for(self, question: Mapping[str, Any]) -> str | None:
-        """Id of a pending escalation with this exact question, if any."""
+        """Id of a pending escalation with this exact question, if any.
+
+        Args:
+            question: The question, as built by `question_for`.
+
+        Returns:
+            The identifier of the first pending escalation, or None.
+        """
         digest = ledger_module.question_hash(question)
         for row in self.ledger.pending():
             if row["question_hash"] == digest:
@@ -222,8 +261,19 @@ class Guard:
     ) -> Any:
         """Runs `do()` only with a valid attestation.
 
-        Raises:
-            AttestationRequired: Without one; `do` is not called.
+        Without one the call is refused with `AttestationRequired` and `do` is
+        not called.
+
+        Args:
+            action: The never-list action.
+            detail: Facts that identify this instance of the action.
+            scope: The scope the attestation must carry.
+            do: The action to perform.
+            proposed_default: What happens by default while the escalation is
+                pending.
+
+        Returns:
+            Whatever `do` returns.
         """
         self.require(action, detail, scope, proposed_default)
         return do()

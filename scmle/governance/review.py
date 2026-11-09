@@ -35,7 +35,18 @@ class ReviewClaimKind(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return a non-empty release-review string."""
+    """Return a non-empty release-review string.
+
+    Args:
+        value: The candidate text.
+        field_name: The field name, for the error message.
+
+    Returns:
+        `value` with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If `value` is not a string or is blank.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must not be empty")
     return value.strip()
@@ -54,7 +65,11 @@ class ReviewClaim:
     notes: str
 
     def __post_init__(self) -> None:
-        """Validate the claim's identity and independent evidence link."""
+        """Validate the claim's identity and independent evidence link.
+
+        Raises:
+            TypeError: If `passed` is not a bool.
+        """
         for field_name in (
             "criterion_id",
             "observed",
@@ -82,7 +97,14 @@ class ReviewClaim:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a claim from a persisted record."""
+        """Rebuild a claim from a persisted record.
+
+        Args:
+            record: A mapping with the claim's fields.
+
+        Returns:
+            The claim.
+        """
         return cls(
             criterion_id=str(record["criterion_id"]),
             kind=ReviewClaimKind(record["kind"]),
@@ -112,7 +134,15 @@ class IndependentReleaseReview:
     signature: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject reviews that cannot establish independence or replay."""
+        """Reject reviews that cannot establish independence or replay.
+
+        Raises:
+            TypeError: If a claim is not a `ReviewClaim`.
+            ValueError: If an identity or digest field is missing, there are no
+                implementers, the reviewer is one of them, commands, claims or
+                artifact digests are empty or malformed, a criterion repeats,
+                or the observation time has no timezone.
+        """
         for field_name in (
             "release_id",
             "source_commit",
@@ -186,7 +216,14 @@ class IndependentReleaseReview:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a review from a persisted JSON-native record."""
+        """Rebuild a review from a persisted JSON-native record.
+
+        Args:
+            record: A mapping with the review's fields.
+
+        Returns:
+            The review.
+        """
         claims = tuple(
             ReviewClaim.from_dict(item) for item in record.get("claims", ())
         )
@@ -217,7 +254,14 @@ class IndependentReleaseReview:
         )
 
     def sign(self, signing_key: str | bytes) -> Self:
-        """Return this review signed over its immutable content."""
+        """Return this review signed over its immutable content.
+
+        Args:
+            signing_key: The key to sign with.
+
+        Returns:
+            A copy of the review carrying the signature.
+        """
         return dataclasses.replace(
             self,
             signature=attestation.sign_payload(
@@ -226,14 +270,25 @@ class IndependentReleaseReview:
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
-        """Verify the review signature without trusting its decision."""
+        """Verify the review signature without trusting its decision.
+
+        Args:
+            signing_key: The key to verify with.
+
+        Returns:
+            True if the review is signed and the signature matches its content.
+        """
         if self.signature is None:
             return False
         expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def write(self, path: str | Path) -> None:
-        """Persist the review atomically and flush its directory entry."""
+        """Persist the review atomically and flush its directory entry.
+
+        Args:
+            path: The file to write; parent directories are created.
+        """
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
@@ -257,7 +312,17 @@ class IndependentReleaseReview:
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
-        """Load and validate a persisted review record."""
+        """Load and validate a persisted review record.
+
+        Args:
+            path: The file written by `write`.
+
+        Returns:
+            The review.
+
+        Raises:
+            ValueError: If the file does not hold a JSON object.
+        """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
             raise ValueError("release review must be a JSON object")
@@ -269,7 +334,17 @@ class IndependentReleaseReview:
         required_kinds: Iterable[ReviewClaimKind],
         signing_key: str | bytes,
     ) -> bool:
-        """Return whether this signed review satisfies release proof gates."""
+        """Return whether this signed review satisfies release proof gates.
+
+        Args:
+            source_commit: The commit the release is built from.
+            required_kinds: The claim kinds the release requires.
+            signing_key: The key to verify the signature with.
+
+        Returns:
+            True if the review is of that commit, approved, correctly signed,
+            every claim passed and every required kind is covered.
+        """
         if self.source_commit != require_text(source_commit, "source_commit"):
             return False
         if self.decision is not ReviewDecision.APPROVED:

@@ -192,7 +192,15 @@ class ReleaseRegistry:
     # -- the state file --------------------------------------------------
 
     def read(self) -> dict[str, Any]:
-        """Loads the state file (empty when new)."""
+        """Loads the state file (empty when new).
+
+        Returns:
+            The state document, with a `models` mapping; a fresh one if the
+            file does not exist.
+
+        Raises:
+            ArtifactError: If the file's format is not the supported one.
+        """
         path = self.store.root / STATE_FILE
         if not path.exists():
             return {"format": STATE_FORMAT, "models": {}}
@@ -202,14 +210,27 @@ class ReleaseRegistry:
         return dict(state)
 
     def write(self, state: dict[str, Any]) -> None:
-        """Writes the state atomically."""
+        """Writes the state atomically.
+
+        Args:
+            state: The complete state document.
+        """
         durability.write_atomically(
             self.store.root / STATE_FILE,
             json.dumps(state, indent=2, sort_keys=True).encode("utf-8"),
         )
 
     def entry(self, state: dict[str, Any], model: str) -> dict[str, Any]:
-        """The model's entry in ``state`` (created when absent)."""
+        """The model's entry in ``state`` (created when absent).
+
+        Args:
+            state: The state document, changed in place when the entry is
+                created.
+            model: Model name.
+
+        Returns:
+            The entry, holding the model's `versions` and `environments`.
+        """
         entry: dict[str, Any] = state["models"].setdefault(
             model, {"versions": {}, "environments": {}}
         )
@@ -218,8 +239,15 @@ class ReleaseRegistry:
     def state_of(self, model: str, version: int) -> ReleaseState:
         """The release state of a registered version (default candidate).
 
-        Raises:
-            ArtifactError: If the version is not registered.
+        The version must be registered; the store refuses an unknown one with
+        an `ArtifactError`.
+
+        Args:
+            model: Model name.
+            version: Registered version number.
+
+        Returns:
+            The recorded state, or `candidate` if none has been recorded.
         """
         self.store.resolve(model, version)
         found = (
@@ -231,7 +259,14 @@ class ReleaseRegistry:
         return ReleaseState(found["state"]) if found else ReleaseState.CANDIDATE
 
     def states(self, model: str) -> dict[int, ReleaseState]:
-        """The state of every registered version."""
+        """The state of every registered version.
+
+        Args:
+            model: Model name.
+
+        Returns:
+            A mapping from version number to its release state.
+        """
         return {
             v.version: self.state_of(model, v.version)
             for v in self.store.versions(model)
@@ -240,7 +275,16 @@ class ReleaseRegistry:
     def environment(
         self, model: str, environment: str
     ) -> dict[str, Any] | None:
-        """What the registry records as running in an environment."""
+        """What the registry records as running in an environment.
+
+        Args:
+            model: Model name.
+            environment: Environment name.
+
+        Returns:
+            A copy of the record (version, revision, image digest, confirmation
+            time and known-good history), or None if nothing is recorded.
+        """
         found = (
             self.read()["models"]
             .get(model, {})
@@ -257,7 +301,15 @@ class ReleaseRegistry:
         reason: str,
         current: ReleaseState,
     ) -> None:
-        """Sets a version's state and appends to its history (in memory)."""
+        """Sets a version's state and appends to its history (in memory).
+
+        Args:
+            entry: The model's state entry, changed in place.
+            version: Version number.
+            target: The state to set.
+            reason: Why the state changes.
+            current: The state the version is in, recorded as the origin.
+        """
         record = entry["versions"].setdefault(
             str(version), {"state": current.value, "history": []}
         )
@@ -280,6 +332,12 @@ class ReleaseRegistry:
 
         ``approved`` needs `approve`; ``production`` needs `promote` or
         `rollback`, because only the runtime can confirm it.
+
+        Args:
+            model: Model name.
+            version: Registered version number.
+            target: The state to move to.
+            reason: Why the version moves.
 
         Raises:
             ArtifactError: For a state set by hand that is not allowed, or
@@ -319,6 +377,12 @@ class ReleaseRegistry:
     ) -> None:
         """Marks a version approved after checking its approval.
 
+        Args:
+            model: Model name.
+            version: Registered version number.
+            approval: The independent approval of this exact bundle.
+            signing_key: Key that verifies the approval's signature.
+
         Raises:
             ArtifactError: If the bundle is unsigned, the approval is
                 missing, rejected, not independent, not signed under the key
@@ -357,7 +421,13 @@ class ReleaseRegistry:
     # -- the ledger --------------------------------------------------------
 
     def record_event(self, body: dict[str, Any]) -> None:
-        """Appends a deployment row to the ledger, if there is one."""
+        """Appends a deployment row to the ledger, if there is one.
+
+        The event is always written to the store's audit trail.
+
+        Args:
+            body: The event fields, as built by `body`.
+        """
         self.store.audit("release_event", **body)
         if self.ledger is not None:
             self.ledger.commit(deployment_ledger.DEPLOYMENT, body)
@@ -377,6 +447,9 @@ class ReleaseRegistry:
     ) -> Outcome:
         """Releases an approved version through the control plane.
 
+        A refusal or an unconfirmed step does not raise: it returns an
+        unsuccessful `Outcome`.
+
         Args:
             model: Model name.
             version: An approved registry version.
@@ -395,7 +468,9 @@ class ReleaseRegistry:
             revision restored.
 
         Raises:
-            ArtifactError: If the version is not registered.
+            RuntimeUnconfirmed: Raised inside the rollout when a health check
+                stops it; it is caught and reported as ``done=False``, so it
+                does not reach the caller.
             ConfigError: If ``steps`` is not increasing and ending in 100, or
                 the digest is not a digest.
         """
@@ -492,7 +567,17 @@ class ReleaseRegistry:
     def refusal(
         self, model: str, version: int, signing_key: str | bytes | None
     ) -> list[str]:
-        """Reasons the version may not be released, empty if it may."""
+        """Reasons the version may not be released, empty if it may.
+
+        Args:
+            model: Model name.
+            version: Registered version number.
+            signing_key: Key that verifies the stored approval.
+
+        Returns:
+            One message for each unmet condition: not approved, unsigned
+            bundle, no stored approval, or an invalid approval.
+        """
         record = self.store.resolve(model, version)
         reasons = []
         current = self.state_of(model, version)
@@ -524,7 +609,17 @@ class ReleaseRegistry:
     def present(
         revision: str, image_digest: str
     ) -> Callable[[observation_module.Observation], list[str]]:
-        """A check that the revision exists and runs the digest (any share)."""
+        """A check that the revision exists and runs the digest (any share).
+
+        Args:
+            revision: Revision name expected on the platform.
+            image_digest: Digest the revision must run.
+
+        Returns:
+            A function taking a platform observation and returning the reasons
+            the check fails; empty if the revision is reported and runs the
+            digest.
+        """
 
         def check(seen: observation_module.Observation) -> list[str]:
             digest = seen.digest_of(revision)
@@ -539,7 +634,17 @@ class ReleaseRegistry:
     def restore(
         self, plane: control.ControlPlane, previous: dict[str, Any] | None
     ) -> bool | None:
-        """Puts the previous revision back and confirms it (best effort)."""
+        """Puts the previous revision back and confirms it (best effort).
+
+        Args:
+            plane: The platform.
+            previous: The record of the revision to restore, or None.
+
+        Returns:
+            None if there is nothing to restore, True if the previous revision
+            was restored and confirmed with all traffic, False if the platform
+            did not confirm it.
+        """
         if previous is None:
             return None
         try:
@@ -571,7 +676,23 @@ class ReleaseRegistry:
         reasons: list[str],
         restored: bool | None = None,
     ) -> dict[str, Any]:
-        """The ledger row for an event."""
+        """The ledger row for an event.
+
+        Args:
+            model: Model name.
+            version: Version number.
+            environment: Environment name.
+            plane: The platform, whose provider is recorded.
+            event: The event name (for example `promoted`).
+            revision: The platform revision involved, if any.
+            image_digest: Digest of the image.
+            reasons: Why the event happened or was refused.
+            restored: Whether the previous revision was restored; None if not
+                applicable.
+
+        Returns:
+            The event fields as a dict.
+        """
         return {
             "event": event,
             "model": model,
@@ -600,6 +721,16 @@ class ReleaseRegistry:
         to the state file until it has; if the registry refuses the alias the
         state file is left as it was and the error propagates, so the caller
         restores the platform.
+
+        Args:
+            model: Model name.
+            version: The promoted version.
+            environment: Environment name.
+            revision: The platform revision now serving.
+            image_digest: Digest of the image it runs.
+            previous: The record previously in the environment, or None; it
+                joins the known-good history.
+            signing_key: Key that verifies the stored approval.
         """
         with self.store.lock:
             state = self.read()
@@ -672,6 +803,13 @@ class ReleaseRegistry:
 
         The registry changes only after the platform confirms the previous
         revision runs its recorded digest with all traffic.
+
+        Args:
+            model: Model name.
+            environment: Environment name.
+            plane: The platform.
+            signing_key: Key that verifies the stored approval of the version
+                returned to.
 
         Returns:
             An `Outcome`; ``done=False`` leaves the registry as it was.
@@ -751,7 +889,16 @@ class ReleaseRegistry:
         target: dict[str, Any],
         signing_key: str | bytes | None,
     ) -> None:
-        """Changes the registry after the runtime confirmed the rollback."""
+        """Changes the registry after the runtime confirmed the rollback.
+
+        Args:
+            model: Model name.
+            environment: Environment name.
+            current: The record currently in the environment.
+            target: The known-good record being restored.
+            signing_key: Key that verifies the stored approval of the
+                restored version.
+        """
         with self.store.lock:
             state = self.read()
             entry = self.entry(state, model)
@@ -815,6 +962,14 @@ class ReleaseRegistry:
     ) -> int:
         """The version the registry says is deployed, if the runtime agrees.
 
+        Args:
+            model: Model name.
+            environment: Environment name.
+            seen: What the platform reports.
+
+        Returns:
+            The version recorded for the environment.
+
         Raises:
             RuntimeDisagrees: If the registry records no deployment or any
                 finding of `reconcile` applies.
@@ -833,7 +988,16 @@ class ReleaseRegistry:
     def last_ledger_event(
         self, model: str, environment: str
     ) -> dict[str, Any] | None:
-        """The newest confirmed ledger event for the environment."""
+        """The newest confirmed ledger event for the environment.
+
+        Args:
+            model: Model name.
+            environment: Environment name.
+
+        Returns:
+            A copy of the newest promoted or rolled-back event for the model
+            and environment, or None if there is no ledger or no such event.
+        """
         if self.ledger is None:
             return None
         for row in reversed(self.ledger.rows):
@@ -856,6 +1020,14 @@ class ReleaseRegistry:
         """Compares the registry and the ledger with a platform observation.
 
         Every disagreement is a finding; none is repaired.
+
+        Args:
+            model: Model name.
+            environment: Environment name.
+            seen: What the platform reports.
+
+        Returns:
+            The report listing every disagreement; consistent if there is none.
         """
         findings: list[Finding] = []
         recorded = self.environment(model, environment)

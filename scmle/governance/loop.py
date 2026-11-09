@@ -1,4 +1,4 @@
-"""The closed loop: drift, retrain, gated promotion and asking a person (F13).
+"""The closed loop: drift, retrain, gated promotion and asking a person.
 
     loop = Loop.open(deploy_dir, charter, policy)
     routing = loop.observe(batch, predictions, decisions)
@@ -114,7 +114,7 @@ class LoopPolicy:
         c_max: Largest escalated share of a batch.
         alarm_gates_retrain: Whether an L1 alarm may trigger a retrain. Set
             it True only if the loop certificate for the detection delay
-            (H2: a rise of `2 * tolerance` found within the charter's
+            (a rise of `2 * tolerance` found within the charter's
             `D_max` with probability at least 0.9) passed for these
             settings; otherwise an alarm records an `alarm` row and
             escalates (`investigate`), and nothing is retrained.
@@ -164,7 +164,14 @@ class LoopPolicy:
     scope: str = "stream"
 
     def __post_init__(self) -> None:
-        """Validates ranges."""
+        """Validates ranges.
+
+        Raises:
+            ValueError: If a probability-like field is outside (0, 1), epsilon
+                or c_max is out of range, the loss bound is not positive or the
+                window negative, the reference risk plus tolerance is outside
+                (0, scale), or the safe default or scope is blank.
+        """
         for name in ("alpha_alarm", "alpha_rb", "r_star", "delta"):
             if not 0.0 < getattr(self, name) < 1.0:
                 raise ValueError(f"{name} must be strictly between 0 and 1")
@@ -190,14 +197,26 @@ class LoopPolicy:
         return self.loss_bound
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """JSON-ready record.
+
+        Returns:
+            The policy's fields as a dict, with the high-impact actions as a
+            list.
+        """
         record = dataclasses.asdict(self)
         record["high_impact_actions"] = list(self.high_impact_actions)
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "LoopPolicy":
-        """Rebuilds a policy from `to_dict`."""
+        """Rebuilds a policy from `to_dict`.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The policy with the same field values.
+        """
         values = dict(record)
         values["high_impact_actions"] = tuple(
             values.get("high_impact_actions", ())
@@ -292,7 +311,15 @@ class Hooks:
 
 
 def json_ready(value: Any) -> Any:
-    """Converts numpy scalars and arrays inside a structure for JSON."""
+    """Converts numpy scalars and arrays inside a structure for JSON.
+
+    Args:
+        value: A scalar, array, dict, list or tuple, possibly nested.
+
+    Returns:
+        The structure with numpy values as Python values, tuples as lists,
+        dict keys as strings and non-finite floats as None.
+    """
     if isinstance(value, np.ndarray):
         return [json_ready(item) for item in value.tolist()]
     if isinstance(value, np.generic):
@@ -319,7 +346,18 @@ class Loop:
         verification_keys: Mapping[str, str | bytes],
         today: Callable[[], datetime.date],
     ) -> None:
-        """Use `Loop.open`."""
+        """Use `Loop.open`.
+
+        Args:
+            directory: Directory of the ledger and loop state files.
+            ledger: The deployment ledger.
+            policy: The pre-registered policy.
+            guard: The never-list guard.
+            hooks: Optional callbacks.
+            verification_keys: Map from key id to the key that verifies a
+                person's attestation.
+            today: Clock, replaceable in tests.
+        """
         self.directory = directory
         self.ledger = ledger
         self.policy = policy
@@ -372,13 +410,16 @@ class Loop:
             hooks: Optional callbacks.
             verification_keys: Map from key id (`key_fingerprint`) to the
                 key that verifies a person's attestation. The system must not
-                hold the signing side of these keys (canon P6).
+                hold the signing side of these keys.
             system_keys: Keys the system itself holds; attestations signed
                 with them (or with `SCMLE_SIGNING_KEY`) are refused.
             today: Clock, replaceable in tests.
             single_use_attestations: Spend an attestation on the first action
                 it allows (an `attestation_used` row) instead of leaving it
                 valid until it expires.
+
+        Returns:
+            The open loop, with its saved state loaded.
 
         Raises:
             DeploymentLedgerError: If an existing ledger fails verification
@@ -440,11 +481,22 @@ class Loop:
         """Opens an existing deployment from what its ledger records.
 
         The charter hash and the policy (with its recorded amendments) are
-        read from the ledger, so a command line needs only the directory.
+        read from the ledger, so a command line needs only the directory. A
+        missing ledger, or one that fails verification, is refused by the
+        ledger with a `DeploymentLedgerError`.
 
-        Raises:
-            DeploymentLedgerError: If there is no ledger or it fails
-                verification.
+        Args:
+            deploy_dir: Directory of the deployment ledger.
+            hooks: Optional callbacks.
+            verification_keys: Map from key id to the key that verifies a
+                person's attestation.
+            system_keys: Keys the system itself holds.
+            today: Clock, replaceable in tests.
+            single_use_attestations: Spend an attestation on the first action
+                it allows.
+
+        Returns:
+            The open loop.
         """
         path = Path(deploy_dir) / ledger_module.FILE_NAME
         ledger = ledger_module.DeploymentLedger.load(path)
@@ -621,7 +673,12 @@ class Loop:
     # --------------------------------------------------------------- helpers
 
     def verify_ledger(self) -> bool:
-        """Re-checks the ledger file; enters a halt (in memory) if it fails."""
+        """Re-checks the ledger file; enters a halt (in memory) if it fails.
+
+        Returns:
+            True if the ledger verifies; False if it fails, in which case the
+            loop is halted in memory.
+        """
         try:
             self.ledger.verify()
         except ledger_module.DeploymentLedgerError:
@@ -631,7 +688,11 @@ class Loop:
         return True
 
     def pending_escalations(self) -> list[Escalation]:
-        """Escalations with no reply and no timeout, oldest first."""
+        """Escalations with no reply and no timeout, oldest first.
+
+        Returns:
+            The unanswered, un-timed-out escalations, oldest first.
+        """
         return [
             Escalation(
                 id=str(row["id"]),
@@ -650,9 +711,18 @@ class Loop:
         evidence: tuple[str, ...] = (),
         proposed_default: str | None = None,
     ) -> Escalation | None:
-        """Writes an escalation row for a system-level question (E2).
+        """Writes an escalation row for a system-level question.
 
-        Returns None if an identical question is already pending.
+        Args:
+            action: The never-list action or other question name.
+            detail: Facts that identify the question.
+            evidence: Names of the evidence files the person should read.
+            proposed_default: What happens while the question is open; the
+                policy's safe default if None.
+
+        Returns:
+            The new escalation, or None if an identical question is already
+            pending.
         """
         name = (
             action.value
@@ -683,7 +753,14 @@ class Loop:
         return next(e for e in self.pending_escalations() if e.id == identity)
 
     def enter_halt(self, reason: str, detail: Mapping[str, Any]) -> None:
-        """Enters the halted state once and opens an incident, if hooked."""
+        """Enters the halted state once and opens an incident, if hooked.
+
+        Does nothing if the ledger is already halted.
+
+        Args:
+            reason: Why the loop halts.
+            detail: Facts recorded with the halt.
+        """
         if self.ledger.halted:
             return
         self.ledger.commit(
@@ -706,6 +783,9 @@ class Loop:
         It records that a person must look; it is not the SLO incident
         workflow of `scmle.monitoring.incidents`, which needs an SLO
         evaluation that a halt does not have.
+
+        Args:
+            reason: Why the incident is opened.
         """
         self.ledger.commit(
             ledger_module.INCIDENT,
@@ -735,6 +815,10 @@ class Loop:
         Returns:
             The routing and the action taken per case. While halted, every
             case is escalated. Cases beyond `c_max` get the safe default.
+
+        Raises:
+            ValueError: If the batch is empty or the predictions or decisions
+                do not have one entry per row.
         """
         size = len(batch)
         if len(predictions) != size or len(decisions) != size or size == 0:
@@ -812,7 +896,15 @@ class Loop:
 
     @staticmethod
     def flag(frame: pd.DataFrame, name: str) -> np.ndarray:
-        """A boolean column, or all False."""
+        """A boolean column, or all False.
+
+        Args:
+            frame: The batch.
+            name: Column name.
+
+        Returns:
+            The column as a boolean array, or all False if it is absent.
+        """
         if name in frame:
             return np.asarray(frame[name], dtype=bool)
         return np.zeros(len(frame), dtype=bool)
@@ -866,7 +958,14 @@ class Loop:
     # ------------------------------------------------------------ challengers
 
     def register_challenger(self, name: str) -> int:
-        """Registers a challenger in the ledger before it is scored."""
+        """Registers a challenger in the ledger before it is scored.
+
+        Args:
+            name: Name of the challenger.
+
+        Returns:
+            The number of challengers now queued.
+        """
         self.ledger.commit(
             ledger_module.CHALLENGER_RESULT,
             {
@@ -913,7 +1012,17 @@ class Loop:
         observed: np.ndarray,
         mask: np.ndarray | None = None,
     ) -> labels.BatchEstimate:
-        """Horvitz-Thompson estimate of a matured batch (or a subset)."""
+        """Horvitz-Thompson estimate of a matured batch (or a subset).
+
+        Args:
+            record: The stored batch, with its propensities and audit flags.
+            losses: The loss of each case.
+            observed: Whether each case's label is observed.
+            mask: Cases to include; all if None.
+
+        Returns:
+            The estimate of the mean loss with its label mechanism.
+        """
         keep = np.ones(len(observed), dtype=bool) if mask is None else mask
         propensity = record["propensity"]
         audit = record["audit"]
@@ -933,7 +1042,17 @@ class Loop:
         observed: np.ndarray,
         mask: np.ndarray,
     ) -> labels.BatchEstimate:
-        """Like `estimate`, for values in ``[-loss_bound, loss_bound]``."""
+        """Like `estimate`, for values in ``[-loss_bound, loss_bound]``.
+
+        Args:
+            record: The stored batch, with its propensities and audit flags.
+            values: The signed value of each case.
+            observed: Whether each case's label is observed.
+            mask: Cases to include.
+
+        Returns:
+            The estimate of the mean value with its label mechanism.
+        """
         propensity = record["propensity"]
         audit = record["audit"]
         return labels.estimate_batch(
@@ -988,7 +1107,20 @@ class Loop:
         return StepResult(status, events, newest, self.mechanism)
 
     def process_batch(self, record: dict[str, Any]) -> bool:
-        """Feeds one matured batch to the monitors; False if unusable."""
+        """Feeds one matured batch to the monitors; False if unusable.
+
+        Args:
+            record: The stored batch with its matured labels.
+
+        Returns:
+            False if fewer than the minimum number of model cases have a
+            label; otherwise True. When the label mechanism does not permit
+            action, the batch only feeds the naive alarm.
+
+        Raises:
+            ScmleError: If the estimate has no mean although the mechanism
+                permits action.
+        """
         ids = record["ids"]
         stored = record["labels"]
         observed = np.array([i in stored for i in ids])
@@ -1028,7 +1160,15 @@ class Loop:
         observed: np.ndarray,
         model_cases: np.ndarray,
     ) -> None:
-        """Feeds the e-processes with Horvitz-Thompson paired differences."""
+        """Feeds the e-processes with Horvitz-Thompson paired differences.
+
+        Args:
+            record: The stored batch with its challenger losses.
+            ids: Case identifiers of the batch.
+            losses: The served model's loss per case.
+            observed: Whether each case's label is observed.
+            model_cases: Cases that went through the model.
+        """
         needed = observed & model_cases
         for name, other in record["challenger_losses"].items():
             holder: Any
@@ -1059,7 +1199,12 @@ class Loop:
     # -------------------------------------------------------------- decisions
 
     def decide(self) -> Escalation | None:
-        """Applies the decision map to what the monitors now say."""
+        """Applies the decision map to what the monitors now say.
+
+        Returns:
+            The newest escalation opened by the decisions, or None if none was
+            opened.
+        """
         newest: Escalation | None = None
         batch = self.batch - 1
         verified = labels.permits_action(self.mechanism)
@@ -1148,7 +1293,11 @@ class Loop:
         return newest
 
     def retrain_challenger(self, batch: int) -> None:
-        """Records a retrain request and registers the hook's challenger."""
+        """Records a retrain request and registers the hook's challenger.
+
+        Args:
+            batch: Index of the batch whose alarm triggered the request.
+        """
         name = None
         skipped = None
         if self.queue:
@@ -1163,7 +1312,11 @@ class Loop:
             self.register_challenger(name)
 
     def decide_rollback(self) -> Escalation | None:
-        """Turns a crossed reverse process into a rollback proposal."""
+        """Turns a crossed reverse process into a rollback proposal.
+
+        Returns:
+            The escalation opened after two consecutive rollbacks, else None.
+        """
         watch = self.rollback_watch
         if watch is None or not watch["process"].crossed:
             return None
@@ -1186,7 +1339,12 @@ class Loop:
         return None
 
     def decide_queue(self) -> Escalation | None:
-        """Decides challengers in registration order with e-LOND."""
+        """Decides challengers in registration order with e-LOND.
+
+        Returns:
+            The newest escalation opened for a challenger whose evidence was
+            insufficient, or None.
+        """
         newest: Escalation | None = None
         sequence = self.ledger.require_promotion()
         while self.queue:
@@ -1241,7 +1399,11 @@ class Loop:
         return newest
 
     def time_out(self) -> Escalation | None:
-        """Closes unanswered escalations with the safe default."""
+        """Closes unanswered escalations with the safe default.
+
+        Returns:
+            Always None; the closed escalations are recorded in the ledger.
+        """
         for row in list(self.ledger.pending()):
             identity = str(row["id"])
             opened = self.escalation_batch.setdefault(identity, self.batch)
@@ -1270,8 +1432,14 @@ class Loop:
 
         The first calibration, and any raise of `tau`, is free. Lowering `tau`
         after the first calibration relaxes the rule and needs an attestation
-        (never-list item 5), except as the recalibration that ends a halt,
-        which must itself pass the fixed-sequence test (`tau` finite).
+        (the relax-threshold action), except as the recalibration that ends a
+        halt, which must itself pass the fixed-sequence test (`tau` finite).
+
+        Args:
+            score: The escalation score of each calibration case.
+            loss: The loss of each case.
+            weights: Optional case weights.
+            confidence: Optional per-case confidence.
 
         Returns:
             The result, also written to the ledger and `risk_coverage.json`.
@@ -1484,9 +1652,18 @@ class Loop:
     ) -> Any:
         """Runs `do()` only with a valid attestation for this exact action.
 
-        Raises:
-            AttestationRequired: Without one; an escalation row is written
-                and `do` is not called.
+        Without one the guard refuses with `AttestationRequired`, an
+        escalation row is written and `do` is not called.
+
+        Args:
+            action: The never-list action.
+            detail: Facts that identify this instance of the action.
+            do: The action to perform.
+            proposed_default: What happens by default while the escalation is
+                pending.
+
+        Returns:
+            Whatever `do` returns.
         """
         try:
             return self.guard.perform(
@@ -1502,6 +1679,9 @@ class Loop:
         of a `LifecycleManager` over this registry then need an attestation,
         as `move_champion` does. Moving the alias by editing the registry's
         files is not stopped.
+
+        Args:
+            registry: The model registry to guard.
         """
         registry.attach_guard(self.guard, self.policy.scope)
 
@@ -1513,9 +1693,19 @@ class Loop:
         approval: Any,
         signing_key: str | bytes | None = None,
     ) -> Any:
-        """Item 1: moves the champion alias.
+        """Moves the champion alias (never-list action: move champion).
 
         The registry still checks its own signed approval underneath.
+
+        Args:
+            registry: The model registry.
+            model: Model name.
+            version: Version to make champion.
+            approval: The registry approval of that version.
+            signing_key: Key that verifies the approval.
+
+        Returns:
+            Whatever the registry's `promote` returns.
         """
         return self.perform(
             never_list.NeverAction.MOVE_CHAMPION,
@@ -1528,7 +1718,15 @@ class Loop:
     def execute_rollback(
         self, do: Callable[[], Any], detail: Mapping[str, Any]
     ) -> Any:
-        """Item 1: executes a rollback."""
+        """Executes a rollback (never-list action: move champion).
+
+        Args:
+            do: The rollback to perform.
+            detail: Facts that identify it.
+
+        Returns:
+            Whatever `do` returns.
+        """
         return self.perform(
             never_list.NeverAction.MOVE_CHAMPION, {"rollback": dict(detail)}, do
         )
@@ -1536,7 +1734,15 @@ class Loop:
     def reopen_sealed(
         self, do: Callable[[], Any], detail: Mapping[str, Any]
     ) -> Any:
-        """Item 2: opens `C` or `F` again, or touches a sealed set."""
+        """Opens `C` or `F` again, or touches a sealed set.
+
+        Args:
+            do: The action to perform.
+            detail: Facts that identify it.
+
+        Returns:
+            Whatever `do` returns.
+        """
         return self.perform(
             never_list.NeverAction.REOPEN_SEALED, dict(detail), do
         )
@@ -1544,19 +1750,43 @@ class Loop:
     def rewrite_ledger(
         self, do: Callable[[], Any], detail: Mapping[str, Any]
     ) -> Any:
-        """Item 4: edits, deletes, reorders or truncates ledger rows."""
+        """Edits, deletes, reorders or truncates ledger rows.
+
+        Args:
+            do: The action to perform.
+            detail: Facts that identify it.
+
+        Returns:
+            Whatever `do` returns.
+        """
         return self.perform(
             never_list.NeverAction.EDIT_LEDGER, dict(detail), do
         )
 
     def act_on_unverified(self, kind: str, do: Callable[[], Any]) -> Any:
-        """Item 6: retrains, promotes or rolls back on an unverified stream."""
+        """Retrains, promotes or rolls back on an unverified stream.
+
+        Args:
+            kind: The kind of action.
+            do: The action to perform.
+
+        Returns:
+            Whatever `do` returns.
+        """
         return self.perform(
             never_list.NeverAction.ACT_ON_UNVERIFIED, {"kind": kind}, do
         )
 
     def silence_alert(self, name: str, do: Callable[[], Any]) -> Any:
-        """Item 8: suppresses, silences or reroutes an alert or incident."""
+        """Suppresses, silences or reroutes an alert or incident.
+
+        Args:
+            name: Name of the alert.
+            do: The action to perform.
+
+        Returns:
+            Whatever `do` returns.
+        """
         return self.perform(
             never_list.NeverAction.SUPPRESS_ALERT, {"alert": name}, do
         )
@@ -1564,13 +1794,29 @@ class Loop:
     def change_label_policy(
         self, change: Mapping[str, Any], do: Callable[[], Any]
     ) -> Any:
-        """Item 9: changes the labelling or randomization policy."""
+        """Changes the labelling or randomization policy.
+
+        Args:
+            change: The change, as recorded.
+            do: The action to perform.
+
+        Returns:
+            Whatever `do` returns.
+        """
         return self.perform(
             never_list.NeverAction.CHANGE_LABEL_POLICY, dict(change), do
         )
 
     def delete_or_send(self, what: str, do: Callable[[], Any]) -> Any:
-        """Item 10: deletes data, models, artifacts, or sends something out."""
+        """Deletes data, models, artifacts, or sends something out.
+
+        Args:
+            what: What is deleted or sent.
+            do: The action to perform.
+
+        Returns:
+            Whatever `do` returns.
+        """
         return self.perform(
             never_list.NeverAction.DELETE_OR_EXTERNAL, {"what": what}, do
         )
@@ -1578,14 +1824,20 @@ class Loop:
     def amend_policy(self, **changes: Any) -> LoopPolicy:
         """Changes the policy: tightening is free, anything else is gated.
 
-        A numeric tolerance moved to a stricter value needs no attestation
-        (item 5 allows tightening). A looser value needs one (item 5), and so
-        does any other field (item 3: safe defaults, high-impact actions,
-        scope). The change is recorded in the ledger and restarts the
-        monitors.
+        A numeric tolerance moved to a stricter value needs no attestation.
+        A looser value needs one (the relax-threshold action), and so does any
+        other field (the change-charter action: safe defaults, high-impact
+        actions, scope). The change is recorded in the ledger and restarts the
+        monitors. A gated change without an attestation is refused with
+        `AttestationRequired`.
+
+        Args:
+            **changes: New values of policy fields, by field name.
+
+        Returns:
+            The updated policy.
 
         Raises:
-            AttestationRequired: For a gated change without an attestation.
             ValueError: For an unknown field.
         """
         names = {f.name for f in dataclasses.fields(LoopPolicy)}

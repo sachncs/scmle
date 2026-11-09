@@ -1,4 +1,4 @@
-"""Selective prediction: when to stop and ask a human (F13, E1).
+"""Selective prediction: when to stop and ask a human.
 
 Cases are routed to a human when a score ``g`` is below a threshold ``tau``.
 Coverage is ``phi(tau) = P(g >= tau)`` and selective risk
@@ -11,7 +11,7 @@ risk is at most the target ``r*`` with probability at least ``1 - delta`` over
 an i.i.d. labelled sample (their Theorem 3.2; an i.i.d. assumption, not only
 exchangeability).
 
-Score. `set_size_score` turns the F12 conformal set size and the novelty flag
+Score. `set_size_score` turns the conformal set size and the novelty flag
 into ``g = 1 / |set|`` (0 for an empty or unbounded set, or a novel case). The
 set carries a finite-sample marginal coverage statement; a softmax margin does
 not.
@@ -71,6 +71,9 @@ def set_size_score(set_sizes: Any, novel: Any = None) -> np.ndarray:
     Returns:
         ``1 / size`` in ``(0, 1]``, or 0 for a case with no usable set or a
         novel case.
+
+    Raises:
+        ValueError: If `novel` does not have the shape of `set_sizes`.
     """
     sizes = np.asarray(set_sizes, dtype=float)
     usable = np.isfinite(sizes) & (sizes >= 1.0)
@@ -84,7 +87,17 @@ def set_size_score(set_sizes: Any, novel: Any = None) -> np.ndarray:
 
 
 def binomial_p_value(errors: int, cases: int, r_star: float) -> float:
-    """Exact p-value of ``H: R > r*``: ``P(Bin(cases, r*) <= errors)``."""
+    """Exact p-value of ``H: R > r*``: ``P(Bin(cases, r*) <= errors)``.
+
+    Args:
+        errors: Number of errors observed.
+        cases: Number of cases.
+        r_star: The risk bound under the hypothesis.
+
+    Returns:
+        The binomial probability of at most `errors` errors in `cases`
+        cases at risk `r_star`; 1.0 when there are no cases.
+    """
     if cases <= 0:
         return 1.0
     return float(stats.binom.cdf(errors, cases, r_star))
@@ -137,7 +150,11 @@ class ThresholdResult:
         return math.isinf(self.tau)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record (``+inf`` is written as ``null``)."""
+        """JSON-ready record (``+inf`` is written as ``null``).
+
+        Returns:
+            The result's fields, with an infinite threshold written as None.
+        """
         return {
             "tau": None if self.everything_escalates else self.tau,
             "coverage": self.coverage,
@@ -152,7 +169,22 @@ class ThresholdResult:
 def validate_calibration(
     score: Any, loss: Any, weights: Any = None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
-    """Checks a calibration set and returns it as arrays."""
+    """Checks a calibration set and returns it as arrays.
+
+    Args:
+        score: The score of each case, in [0, 1].
+        loss: The non-negative loss of each case.
+        weights: Optional positive weights, one per case.
+
+    Returns:
+        The scores, the losses and the weights (None if none were given) as
+        float arrays.
+
+    Raises:
+        ValueError: If the score and loss are not aligned and
+            one-dimensional, a value is non-finite or out of range, or the
+            weights are not positive and aligned.
+    """
     g = np.asarray(score, dtype=float)
     l_values = np.asarray(loss, dtype=float)
     if g.shape != l_values.shape or g.ndim != 1:
@@ -280,7 +312,12 @@ class RiskCoverage:
     aurc: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """JSON-ready record.
+
+        Returns:
+            The grid, coverage and risk as lists and the area under the
+            risk-coverage curve.
+        """
         return {
             "tau": self.tau.tolist(),
             "coverage": self.coverage.tolist(),
@@ -292,7 +329,18 @@ class RiskCoverage:
 def risk_coverage(
     score: Any, loss: Any, weights: Any = None, points: int = DEFAULT_GRID
 ) -> RiskCoverage:
-    """Risk-coverage curve on a fixed grid, optionally weighted."""
+    """Risk-coverage curve on a fixed grid, optionally weighted.
+
+    Args:
+        score: The score of each case, in [0, 1].
+        loss: The non-negative loss of each case.
+        weights: Optional positive weights, one per case.
+        points: Number of thresholds on the grid, from 1 down to 0.
+
+    Returns:
+        The weighted coverage and risk at each threshold and the area under
+        the curve; risk is NaN where nothing is answered.
+    """
     g, losses, w = validate_calibration(score, loss, weights)
     grid = np.linspace(1.0, 0.0, points)
     weight = np.ones_like(g) if w is None else w
@@ -362,6 +410,15 @@ def chow_check(
         review_cost: Cost of a human review, `c_h`.
         error_cost: Cost of an error, `c_e`.
         tolerance: Disagreement tolerated before it is called inconsistent.
+
+    Returns:
+        The cut implied by the costs, the share of cases on which Chow's
+        rule and the score rule disagree, and whether that share is within
+        the tolerance.
+
+    Raises:
+        ValueError: If a cost is not positive or `confidence` and `score`
+            are not aligned.
     """
     if review_cost <= 0 or error_cost <= 0:
         raise ValueError("costs must be positive")
@@ -420,6 +477,9 @@ def route(
     Returns:
         The routing. Escalations beyond ``floor(c_max * n)`` go to the safe
         default, lowest scores first to the humans; `tau` is never changed.
+
+    Raises:
+        ValueError: If `c_max` is outside [0, 1].
     """
     g = np.asarray(score, dtype=float)
     if not 0.0 <= c_max <= 1.0:

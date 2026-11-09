@@ -1,4 +1,4 @@
-"""The deployment ledger: a hash-chained record of the closed loop (F13).
+"""The deployment ledger: a hash-chained record of the closed loop.
 
 The hypothesis ledger (`scmle.data.ledger.ledger`) closes at its
 confirmation, so a production loop cannot append to it. This ledger has its
@@ -37,7 +37,7 @@ Row kinds (``open`` first and only once):
     workflow (`scmle.monitoring.incidents` wants an SLO evaluation, which a
     halt does not have).
 ``rollout_experiment``, ``rollout_assignment``, ``rollout_decision``
-    The decision layer's rollout (F11): an experiment is started with the
+    The decision layer's rollout: an experiment is started with the
     level the `DecisionBudget` assigned and the budget after the assignment;
     each batch of units is logged with the arm and the probability that arm
     had (the propensity), and only for a started experiment; the decision
@@ -161,13 +161,28 @@ class ReplyDecision(enum.StrEnum):
 
 
 def key_fingerprint(key: str | bytes) -> str:
-    """A short public fingerprint of a signing key (never the key)."""
+    """A short public fingerprint of a signing key (never the key).
+
+    Args:
+        key: The signing key.
+
+    Returns:
+        The first 16 hex characters of a domain-separated SHA-256 of the
+        key; it cannot be used to recover the key.
+    """
     raw = key.encode() if isinstance(key, str) else key
     return hashlib.sha256(b"scmle-key-fingerprint:" + raw).hexdigest()[:16]
 
 
 def parse_date(value: str, name: str) -> datetime.date:
     """A ``YYYY-MM-DD`` date.
+
+    Args:
+        value: The text to parse.
+        name: The field name, for the error message.
+
+    Returns:
+        The date.
 
     Raises:
         DeploymentLedgerError: If `value` is not such a date.
@@ -179,7 +194,14 @@ def parse_date(value: str, name: str) -> datetime.date:
 
 
 def question_hash(question: Mapping[str, Any]) -> str:
-    """SHA-256 of the canonical JSON of a question."""
+    """SHA-256 of the canonical JSON of a question.
+
+    Args:
+        question: The question as a mapping.
+
+    Returns:
+        The hex digest.
+    """
     return ledger_module.digest(question)
 
 
@@ -191,7 +213,7 @@ class Attestation:
     what date, for what scope. The signature covers every
     other field, so a reply cannot be moved to another question, scope or
     date. HMAC is symmetric: whoever can verify can also sign, so the verifier
-    must keep the key where the system cannot read it (canon P6); the ledger
+    must keep the key where the system cannot read it; the ledger
     refuses the fingerprints of keys the system declared as its own.
 
     Attributes:
@@ -223,7 +245,13 @@ class Attestation:
     signature: str = ""
 
     def __post_init__(self) -> None:
-        """Validates the record's shape."""
+        """Validates the record's shape.
+
+        Raises:
+            DeploymentLedgerError: If a required text field is blank, the
+                decision is not a `ReplyDecision`, a date is not
+                ``YYYY-MM-DD``, or the expiry is before the date.
+        """
         for name in (
             "escalation_id",
             "question_hash",
@@ -243,14 +271,23 @@ class Attestation:
             raise DeploymentLedgerError("expires is before the date")
 
     def unsigned_dict(self) -> dict[str, Any]:
-        """The signed content."""
+        """The signed content.
+
+        Returns:
+            The record's fields, with the decision as text and without the
+            signature.
+        """
         record = dataclasses.asdict(self)
         record["decision"] = self.decision.value
         del record["signature"]
         return record
 
     def to_dict(self) -> dict[str, Any]:
-        """The full record."""
+        """The full record.
+
+        Returns:
+            The signed content plus the signature.
+        """
         return {**self.unsigned_dict(), "signature": self.signature}
 
     @classmethod
@@ -260,6 +297,9 @@ class Attestation:
         Args:
             key: Signing key; its fingerprint becomes `key_id`.
             **fields: The other fields (`decision` may be a string).
+
+        Returns:
+            The signed reply.
         """
         fields["decision"] = ReplyDecision(fields["decision"])
         unsigned = cls(key_id=key_fingerprint(key), **fields)
@@ -268,7 +308,17 @@ class Attestation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a reply from `to_dict`."""
+        """Rebuilds a reply from `to_dict`.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The reply.
+
+        Raises:
+            DeploymentLedgerError: If the fields differ from the reply's fields.
+        """
         names = {f.name for f in dataclasses.fields(cls)}
         if set(record) != names:
             raise DeploymentLedgerError("unexpected or missing reply fields")
@@ -277,7 +327,15 @@ class Attestation:
         return cls(**values)
 
     def verify(self, key: str | bytes) -> bool:
-        """Whether the signature matches under `key`."""
+        """Whether the signature matches under `key`.
+
+        Args:
+            key: The verification key.
+
+        Returns:
+            True if the reply is signed, was made with a key of this
+            fingerprint and the signature matches its content.
+        """
         if not self.signature or self.key_id != key_fingerprint(key):
             return False
         expected = signing.sign_payload(self.unsigned_dict(), key)
@@ -293,7 +351,7 @@ class Envelope:
     `ENVELOPE_ACTIONS`. It bounds what the unattended controller may do by
     action, scope, count and time, and the signature covers every other
     field. HMAC is symmetric, so the verifier must keep the key where the
-    system cannot read it (canon P6); the ledger refuses the fingerprints of
+    system cannot read it; the ledger refuses the fingerprints of
     keys the system declared as its own.
 
     Attributes:
@@ -321,7 +379,14 @@ class Envelope:
     signature: str = ""
 
     def __post_init__(self) -> None:
-        """Validates the record's shape."""
+        """Validates the record's shape.
+
+        Raises:
+            DeploymentLedgerError: If a required text field is blank, no action
+                is permitted, an action cannot be put in an envelope, a limit is
+                not a positive integer, a date is not ``YYYY-MM-DD``, or the
+                expiry is before the date.
+        """
         for name in (
             "envelope_id",
             "statement",
@@ -355,33 +420,68 @@ class Envelope:
             raise DeploymentLedgerError("expires is before the date")
 
     def unsigned_dict(self) -> dict[str, Any]:
-        """The signed content."""
+        """The signed content.
+
+        Returns:
+            The record's fields without the signature.
+        """
         record = dataclasses.asdict(self)
         record["limits"] = dict(self.limits)
         del record["signature"]
         return record
 
     def to_dict(self) -> dict[str, Any]:
-        """The full record."""
+        """The full record.
+
+        Returns:
+            The signed content plus the signature.
+        """
         return {**self.unsigned_dict(), "signature": self.signature}
 
     @classmethod
     def create(cls, key: str | bytes, **fields: Any) -> Self:
-        """Builds and signs an envelope with `key` (the person's key)."""
+        """Builds and signs an envelope with `key` (the person's key).
+
+        Args:
+            key: Signing key; its fingerprint becomes `key_id`.
+            **fields: The other envelope fields.
+
+        Returns:
+            The signed envelope.
+        """
         unsigned = cls(key_id=key_fingerprint(key), **fields)
         signature = signing.sign_payload(unsigned.unsigned_dict(), key)
         return dataclasses.replace(unsigned, signature=signature)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds an envelope from `to_dict`."""
+        """Rebuilds an envelope from `to_dict`.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The envelope.
+
+        Raises:
+            DeploymentLedgerError: If the fields differ from the envelope's
+                fields.
+        """
         names = {f.name for f in dataclasses.fields(cls)}
         if set(record) != names:
             raise DeploymentLedgerError("unexpected or missing envelope fields")
         return cls(**dict(record))
 
     def verify(self, key: str | bytes) -> bool:
-        """Whether the signature matches under `key`."""
+        """Whether the signature matches under `key`.
+
+        Args:
+            key: The verification key.
+
+        Returns:
+            True if the envelope is signed, was made with a key of this
+            fingerprint and the signature matches its content.
+        """
         if not self.signature or self.key_id != key_fingerprint(key):
             return False
         expected = signing.sign_payload(self.unsigned_dict(), key)
@@ -392,7 +492,11 @@ class DeploymentLedger:
     """The ledger of one deployment (file-backed or in memory)."""
 
     def __init__(self, path: Path | None) -> None:
-        """Creates an empty, unopened ledger; use `create` or `load`."""
+        """Creates an empty, unopened ledger; use `create` or `load`.
+
+        Args:
+            path: File to persist rows to, or None for an in-memory ledger.
+        """
         self.path = path
         self.rows: list[dict[str, Any]] = []
         self.header: dict[str, Any] = {}
@@ -434,6 +538,9 @@ class DeploymentLedger:
             system_keys: Fingerprints of keys the system holds; attestations
                 signed with them are refused.
 
+        Returns:
+            The new ledger, holding its `open` row.
+
         Raises:
             DeploymentLedgerError: If the file exists.
         """
@@ -462,6 +569,9 @@ class DeploymentLedger:
             path: The file.
             expected_head: Head recorded elsewhere; detects deleted rows at
                 the end.
+
+        Returns:
+            The ledger with every row applied.
 
         Raises:
             DeploymentLedgerError: On a missing file, a broken chain, an
@@ -498,7 +608,15 @@ class DeploymentLedger:
         return str(self.rows[-1]["hash"]) if self.rows else GENESIS
 
     def commit(self, kind: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        """Chains a row, ingests it and persists it."""
+        """Chains a row, ingests it and persists it.
+
+        Args:
+            kind: The row kind.
+            body: The row content.
+
+        Returns:
+            The row, with its sequence number, previous hash and own hash.
+        """
         content = {
             "seq": len(self.rows),
             "kind": kind,
@@ -516,9 +634,14 @@ class DeploymentLedger:
     def ingest(self, row: Mapping[str, Any]) -> None:
         """Checks one row against the chain and the rules, then applies it.
 
+        Args:
+            row: A row with `seq`, `kind`, `body`, `prev` and `hash`.
+
         Raises:
             DeploymentLedgerError: On a broken link, wrong order, an invalid
                 body or a replay mismatch.
+            TypeError: Raised for a body that is not an object; it is caught
+                and re-raised as `DeploymentLedgerError`.
         """
         if set(row) != {"seq", "kind", "body", "prev", "hash"}:
             raise DeploymentLedgerError(
@@ -568,10 +691,22 @@ class DeploymentLedger:
         self.rows.append(dict(row))
 
     def apply_free(self, body: Mapping[str, Any]) -> None:
-        """Rows without a state machine are chained as they are."""
+        """Rows without a state machine are chained as they are.
+
+        Args:
+            body: The row content; not interpreted.
+        """
 
     def apply_open(self, body: Mapping[str, Any]) -> None:
-        """Reads the header and builds the e-LOND sequence."""
+        """Reads the header and builds the e-LOND sequence.
+
+        Args:
+            body: The `open` row content.
+
+        Raises:
+            DeploymentLedgerError: If the ledger version is unsupported or the
+                policy does not match its hash.
+        """
         if body["ledger_version"] != LEDGER_VERSION:
             raise DeploymentLedgerError("unsupported ledger version")
         if body["policy_hash"] != ledger_module.digest(body["policy"]):
@@ -581,13 +716,30 @@ class DeploymentLedger:
         self.promotion = sequential_tests.PromotionSequence(body["alpha_promo"])
 
     def require_promotion(self) -> sequential_tests.PromotionSequence:
-        """The e-LOND sequence, which exists once `open` is in."""
+        """The e-LOND sequence, which exists once `open` is in.
+
+        Returns:
+            The e-LOND sequence.
+
+        Raises:
+            DeploymentLedgerError: If there is no `open` row yet.
+        """
         if self.promotion is None:
             raise DeploymentLedgerError("ledger has no open row")
         return self.promotion
 
     def apply_challenger(self, body: Mapping[str, Any]) -> None:
-        """Registration precedes the decision; the decision is replayed."""
+        """Registration precedes the decision; the decision is replayed.
+
+        Args:
+            body: The challenger-result row content.
+
+        Raises:
+            DeploymentLedgerError: If the challenger is registered twice, the
+                phase is neither registered nor decided, a decision names an
+                unregistered challenger or an invalid e-value, or the replay of
+                the e-LOND step differs from what was recorded.
+        """
         name = str(body["name"])
         sequence = self.require_promotion()
         if body["phase"] == REGISTERED:
@@ -616,7 +768,17 @@ class DeploymentLedger:
         self.decided[name] = dict(body)
 
     def apply_escalation(self, body: Mapping[str, Any]) -> None:
-        """Opens an escalation or closes it with the safe default."""
+        """Opens an escalation or closes it with the safe default.
+
+        Args:
+            body: The escalation row content.
+
+        Raises:
+            DeploymentLedgerError: If an opening row's question does not match
+                its hash, its id is not its row number or it lacks evidence or a
+                proposed default, the phase is neither open nor timeout, or a
+                timeout names an escalation that is not pending.
+        """
         number = len(self.rows)
         if body["phase"] == PHASE_OPEN:
             question = body["question"]
@@ -639,7 +801,16 @@ class DeploymentLedger:
         self.closed[identity] = PHASE_TIMEOUT
 
     def apply_attestation(self, body: Mapping[str, Any]) -> None:
-        """Binds a reply to one pending escalation and its question hash."""
+        """Binds a reply to one pending escalation and its question hash.
+
+        Args:
+            body: The attestation row content.
+
+        Raises:
+            DeploymentLedgerError: If the reply answers no escalation, the
+                escalation is already closed, the reply is bound to a different
+                question, or it is signed with a key the system holds.
+        """
         reply = Attestation.from_dict(body)
         escalation = self.escalations.get(reply.escalation_id)
         if escalation is None:
@@ -658,7 +829,15 @@ class DeploymentLedger:
         self.attestations[reply.escalation_id] = dict(body)
 
     def apply_used(self, body: Mapping[str, Any]) -> None:
-        """Marks an answered escalation's attestation as spent, once."""
+        """Marks an answered escalation's attestation as spent, once.
+
+        Args:
+            body: The attestation-used row content.
+
+        Raises:
+            DeploymentLedgerError: If the attestation was not recorded or is
+                already spent.
+        """
         identity = str(body["escalation_id"])
         if identity not in self.attestations:
             raise DeploymentLedgerError(
@@ -669,7 +848,15 @@ class DeploymentLedger:
         self.used[identity] = dict(body)
 
     def apply_envelope(self, body: Mapping[str, Any]) -> None:
-        """Records a granted envelope once, never under a system key."""
+        """Records a granted envelope once, never under a system key.
+
+        Args:
+            body: The envelope row content.
+
+        Raises:
+            DeploymentLedgerError: If the envelope was already granted or is
+                signed with a key the system holds.
+        """
         grant = Envelope.from_dict(body)
         if grant.envelope_id in self.envelopes:
             raise DeploymentLedgerError(
@@ -683,7 +870,15 @@ class DeploymentLedger:
         self.envelope_uses[grant.envelope_id] = {}
 
     def apply_envelope_used(self, body: Mapping[str, Any]) -> None:
-        """Counts one use, refusing what the envelope does not allow."""
+        """Counts one use, refusing what the envelope does not allow.
+
+        Args:
+            body: The envelope-use row content.
+
+        Raises:
+            DeploymentLedgerError: If the envelope is unknown or revoked, does
+                not cover the action, the scope differs or its uses are spent.
+        """
         identity = str(body["envelope_id"])
         action = str(body["action"])
         grant = self.envelopes.get(identity)
@@ -707,7 +902,15 @@ class DeploymentLedger:
         self.envelope_uses[identity][action] = used + 1
 
     def apply_envelope_revoked(self, body: Mapping[str, Any]) -> None:
-        """Removes an envelope's authority, once."""
+        """Removes an envelope's authority, once.
+
+        Args:
+            body: The revocation row content.
+
+        Raises:
+            DeploymentLedgerError: If the envelope is unknown or already
+                revoked.
+        """
         identity = str(body["envelope_id"])
         if identity not in self.envelopes:
             raise DeploymentLedgerError(f"envelope {identity!r} is unknown")
@@ -716,7 +919,16 @@ class DeploymentLedger:
         self.envelope_revoked[identity] = dict(body)
 
     def apply_controller(self, body: Mapping[str, Any]) -> None:
-        """Keeps the controller's journal: each input digest is applied once."""
+        """Keeps the controller's journal: each input digest is applied once.
+
+        Args:
+            body: The controller row content.
+
+        Raises:
+            DeploymentLedgerError: If the phase or input kind is not allowed,
+                the input was already applied, an intent repeats, or an input is
+                applied without an intent.
+        """
         phase = body["phase"]
         if phase not in CONTROLLER_PHASES:
             raise DeploymentLedgerError(
@@ -747,7 +959,15 @@ class DeploymentLedger:
             self.rejected[digest] = dict(body)
 
     def apply_experiment(self, body: Mapping[str, Any]) -> None:
-        """Starts an experiment once, at a positive level."""
+        """Starts an experiment once, at a positive level.
+
+        Args:
+            body: The experiment row content.
+
+        Raises:
+            DeploymentLedgerError: If the experiment already started or its
+                level is not in (0, 1).
+        """
         name = str(body["experiment_id"])
         if name in self.experiments:
             raise DeploymentLedgerError(f"experiment {name!r} already started")
@@ -756,7 +976,16 @@ class DeploymentLedger:
         self.experiments[name] = dict(body)
 
     def apply_assignment(self, body: Mapping[str, Any]) -> None:
-        """Checks a batch of propensity-logged assignments."""
+        """Checks a batch of propensity-logged assignments.
+
+        Args:
+            body: The assignment row content.
+
+        Raises:
+            DeploymentLedgerError: If the experiment was not started, the lists
+                differ in length, an arm is not 0 or 1, or a probability is not
+                strictly in (0, 1).
+        """
         name = str(body["experiment_id"])
         if name not in self.experiments:
             raise DeploymentLedgerError(
@@ -773,7 +1002,14 @@ class DeploymentLedger:
             )
 
     def apply_rollout_decision(self, body: Mapping[str, Any]) -> None:
-        """A decision names a started experiment or a monitored champion."""
+        """A decision names a started experiment or a monitored champion.
+
+        Args:
+            body: The decision row content.
+
+        Raises:
+            DeploymentLedgerError: If the experiment was not started.
+        """
         name = str(body["experiment_id"])
         if name not in self.experiments:
             raise DeploymentLedgerError(
@@ -781,7 +1017,16 @@ class DeploymentLedger:
             )
 
     def apply_halt(self, body: Mapping[str, Any]) -> None:
-        """Enters or leaves the halted state."""
+        """Enters or leaves the halted state.
+
+        Args:
+            body: The halt row content.
+
+        Raises:
+            DeploymentLedgerError: If a release occurs without a halt or
+                without a passing recalibration, or the phase is neither enter
+                nor release.
+        """
         if body["phase"] == ENTER:
             self.halted = True
         elif body["phase"] == RELEASE:
@@ -796,7 +1041,12 @@ class DeploymentLedger:
             raise DeploymentLedgerError("phase must be enter or release")
 
     def pending(self) -> list[dict[str, Any]]:
-        """Escalations with no reply and no timeout, oldest first."""
+        """Escalations with no reply and no timeout, oldest first.
+
+        Returns:
+            The open escalation rows that have no reply and no timeout, oldest
+            first.
+        """
         return [
             row
             for identity, row in self.escalations.items()

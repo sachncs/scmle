@@ -13,7 +13,15 @@ from scmle.data.splitting import splitters
 
 
 def digest_of(row_ids: list[Any]) -> dict[str, Any]:
-    """Row count and digest in the format trials record."""
+    """Row count and digest in the format trials record.
+
+    Args:
+        row_ids: Row identifiers; their order is ignored.
+
+    Returns:
+        A dict with `rows`, the number of identifiers, and `digest`, the
+        first 16 hex characters of the SHA-256 of the sorted identifiers.
+    """
     ordered = sorted(map(str, row_ids))
     digest = hashlib.sha256("\x1f".join(ordered).encode()).hexdigest()
     return {"rows": len(ordered), "digest": digest[:16]}
@@ -28,6 +36,10 @@ def observed_access(
     positions passed to `fit` and to scoring. They must equal the manifest's
     training and validation positions for that fold, and none may be a
     locked-test row.
+
+    Args:
+        split: The split, whose manifest lists the folds and partitions.
+        trials: The trials, each with the row digests it recorded per fold.
 
     Returns:
         Counts of checked folds and the verdicts.

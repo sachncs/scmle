@@ -33,14 +33,36 @@ class KeyState(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return a non-empty string suitable for a key record."""
+    """Return a non-empty string suitable for a key record.
+
+    Args:
+        value: The candidate text.
+        field_name: The field name, for the error message.
+
+    Returns:
+        `value` with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If `value` is not a string or is blank.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must not be empty")
     return value.strip()
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse an offset-aware ISO-8601 timestamp."""
+    """Parse an offset-aware ISO-8601 timestamp.
+
+    Args:
+        value: The timestamp; a trailing ``Z`` means UTC.
+        field_name: The field name, for the error message.
+
+    Returns:
+        The timestamp as a timezone-aware datetime.
+
+    Raises:
+        ValueError: If the timestamp is malformed or has no timezone.
+    """
     timestamp = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
     if timestamp.tzinfo is None or timestamp.utcoffset() is None:
         raise ValueError(f"{field_name} must include timezone information")
@@ -61,7 +83,14 @@ class SigningKeyRecord:
     replacement_key_id: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate lifecycle transitions and time boundaries."""
+        """Validate lifecycle transitions and time boundaries.
+
+        Raises:
+            ValueError: If the key id, owner or a timestamp is invalid, the key
+                expires at or before its creation, a non-active key has no
+                change time or reason, the change precedes creation, or the
+                replacement key is the key itself.
+        """
         require_text(self.key_id, "key_id")
         require_text(self.owner, "owner")
         created = parse_timestamp(self.created_at, "created_at")
@@ -86,7 +115,15 @@ class SigningKeyRecord:
                 raise ValueError("replacement_key_id must differ from key_id")
 
     def can_sign(self, observed_at: str) -> bool:
-        """Return whether this key may create a signature now."""
+        """Return whether this key may create a signature now.
+
+        Args:
+            observed_at: The time of signing, as an offset-aware timestamp.
+
+        Returns:
+            True if the key is active, already created and not yet expired at
+            that time.
+        """
         observed = parse_timestamp(observed_at, "observed_at")
         created = parse_timestamp(self.created_at, "created_at")
         expires = (
@@ -111,6 +148,15 @@ class SigningKeyRecord:
         Revocation is immediate and cannot be bypassed by historical mode.
         Retired or expired keys can verify an artifact signed before the
         transition only when the caller explicitly requests historical proof.
+
+        Args:
+            signed_at: When the signature was made.
+            observed_at: When it is being checked.
+            historical: Whether to accept signatures made before a retirement
+                or expiry.
+
+        Returns:
+            True if the signature is acceptable under the key's lifecycle.
         """
         signed = parse_timestamp(signed_at, "signed_at")
         observed = parse_timestamp(observed_at, "observed_at")
@@ -145,7 +191,15 @@ class SigningKeyRecord:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild key metadata from a JSON object."""
+        """Rebuild key metadata from a JSON object.
+
+        Args:
+            record: A mapping with the key's fields; the state defaults to
+                active.
+
+        Returns:
+            The key record.
+        """
         return cls(
             key_id=str(record["key_id"]),
             owner=str(record["owner"]),
@@ -180,7 +234,12 @@ class SignatureEnvelope:
     algorithm: str = attestation.SIGNATURE_ALGORITHM
 
     def __post_init__(self) -> None:
-        """Validate signature identity and algorithm."""
+        """Validate signature identity and algorithm.
+
+        Raises:
+            ValueError: If the key id or value is blank, the timestamp is
+                invalid, or the algorithm is unsupported.
+        """
         require_text(self.key_id, "key_id")
         parse_timestamp(self.signed_at, "signed_at")
         require_text(self.value, "value")
@@ -198,7 +257,15 @@ class SignatureEnvelope:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a signature envelope from JSON."""
+        """Rebuild a signature envelope from JSON.
+
+        Args:
+            record: A mapping with the key id, signing time, value and
+                algorithm.
+
+        Returns:
+            The signature envelope.
+        """
         return cls(
             key_id=str(record["key_id"]),
             signed_at=str(record["signed_at"]),
@@ -211,14 +278,26 @@ class SigningKeyRegistry:
     """Metadata registry that enforces signing and verification policy."""
 
     def __init__(self, records: Iterable[SigningKeyRecord] = ()) -> None:
-        """Create a registry from unique key records."""
+        """Create a registry from unique key records.
+
+        Args:
+            records: The key records to register.
+        """
         self.lock = threading.RLock()
         self.records: dict[str, SigningKeyRecord] = {}
         for record in records:
             self.register(record)
 
     def register(self, record: SigningKeyRecord) -> None:
-        """Add a key record without replacing an existing identity."""
+        """Add a key record without replacing an existing identity.
+
+        Args:
+            record: The key record.
+
+        Raises:
+            TypeError: If `record` is not a `SigningKeyRecord`.
+            ValueError: If the key id is already registered.
+        """
         if not isinstance(record, SigningKeyRecord):
             raise TypeError("record must be SigningKeyRecord")
         with self.lock:
@@ -227,7 +306,17 @@ class SigningKeyRegistry:
             self.records[record.key_id] = record
 
     def get(self, key_id: str) -> SigningKeyRecord:
-        """Return metadata for a key or fail closed."""
+        """Return metadata for a key or fail closed.
+
+        Args:
+            key_id: Identifier of the key.
+
+        Returns:
+            The key's record.
+
+        Raises:
+            ValueError: If the key is not registered.
+        """
         try:
             return self.records[key_id]
         except KeyError as error:
@@ -240,7 +329,17 @@ class SigningKeyRegistry:
         reason: str,
         replacement_key_id: str | None = None,
     ) -> SigningKeyRecord:
-        """Stop new signatures while retaining historical verification."""
+        """Stop new signatures while retaining historical verification.
+
+        Args:
+            key_id: Identifier of the key.
+            changed_at: When the key is retired.
+            reason: Why it is retired.
+            replacement_key_id: The active key that takes over, if any.
+
+        Returns:
+            The updated record.
+        """
         return self.transition(
             key_id,
             KeyState.RETIRED,
@@ -252,7 +351,16 @@ class SigningKeyRegistry:
     def revoke(
         self, key_id: str, changed_at: str, reason: str
     ) -> SigningKeyRecord:
-        """Immediately invalidate signatures made by a compromised key."""
+        """Immediately invalidate signatures made by a compromised key.
+
+        Args:
+            key_id: Identifier of the key.
+            changed_at: When the key is revoked.
+            reason: Why it is revoked.
+
+        Returns:
+            The updated record.
+        """
         return self.transition(key_id, KeyState.REVOKED, changed_at, reason)
 
     def transition(
@@ -263,7 +371,22 @@ class SigningKeyRegistry:
         reason: str,
         replacement_key_id: str | None = None,
     ) -> SigningKeyRecord:
-        """Apply one explicit lifecycle transition."""
+        """Apply one explicit lifecycle transition.
+
+        Args:
+            key_id: Identifier of the key.
+            state: The state to move to; it cannot be active.
+            changed_at: When the state changes.
+            reason: Why it changes.
+            replacement_key_id: The active key that takes over, if any.
+
+        Returns:
+            The updated record.
+
+        Raises:
+            ValueError: If the key is not active, the target state is active,
+                or the replacement key is not active.
+        """
         with self.lock:  # Read, validate and replace as one step.
             current = self.get(key_id)
             if current.state is not KeyState.ACTIVE:
@@ -293,7 +416,21 @@ class SigningKeyRegistry:
         secret: str | bytes,
         signed_at: str,
     ) -> SignatureEnvelope:
-        """Create a signature only with an active, non-expired key."""
+        """Create a signature only with an active, non-expired key.
+
+        Args:
+            payload: The content to sign.
+            key_id: Identifier of the key.
+            secret: The key's secret.
+            signed_at: The time of signing.
+
+        Returns:
+            The signature envelope.
+
+        Raises:
+            ValueError: If the key is not registered or may not sign at that
+                time.
+        """
         record = self.get(key_id)
         if not record.can_sign(signed_at):
             raise ValueError(f"signing key cannot sign: {key_id}")
@@ -311,7 +448,23 @@ class SigningKeyRegistry:
         observed_at: str,
         historical: bool = False,
     ) -> bool:
-        """Verify a signature against lifecycle state and external custody."""
+        """Verify a signature against lifecycle state and external custody.
+
+        Args:
+            payload: The signed content.
+            envelope: The signature to check.
+            secrets: The secrets the verifier holds, by key id.
+            observed_at: When the check is made.
+            historical: Whether to accept signatures made before a retirement
+                or expiry.
+
+        Returns:
+            True if the key is known, its secret is held, its lifecycle accepts
+            the signature and the signature matches the payload.
+
+        Raises:
+            TypeError: If `envelope` is not a `SignatureEnvelope`.
+        """
         if not isinstance(envelope, SignatureEnvelope):
             raise TypeError("envelope must be SignatureEnvelope")
         record = self.records.get(envelope.key_id)
@@ -344,7 +497,18 @@ class SigningKeyRegistry:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a registry from JSON-native metadata."""
+        """Rebuild and validate a registry from JSON-native metadata.
+
+        Args:
+            record: A mapping with `schema_version` 1 and a list of `keys`.
+
+        Returns:
+            The registry.
+
+        Raises:
+            ValueError: If the schema version is unsupported or the keys are not
+                a list.
+        """
         if record.get("schema_version") != 1:
             raise ValueError("unsupported signing-key registry schema version")
         keys = record.get("keys")
@@ -354,14 +518,28 @@ class SigningKeyRegistry:
 
     @classmethod
     def from_json(cls, value: str) -> Self:
-        """Parse and validate registry JSON."""
+        """Parse and validate registry JSON.
+
+        Args:
+            value: The JSON text.
+
+        Returns:
+            The registry.
+
+        Raises:
+            ValueError: If the JSON is not an object.
+        """
         record = json.loads(value)
         if not isinstance(record, Mapping):
             raise ValueError("signing-key registry must be an object")
         return cls.from_dict(record)
 
     def write(self, path: str | Path) -> None:
-        """Atomically persist metadata and flush the containing directory."""
+        """Atomically persist metadata and flush the containing directory.
+
+        Args:
+            path: The file to write; parent directories are created.
+        """
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
@@ -383,7 +561,14 @@ class SigningKeyRegistry:
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
-        """Read and validate a persisted registry."""
+        """Read and validate a persisted registry.
+
+        Args:
+            path: The file written by `write`.
+
+        Returns:
+            The registry.
+        """
         return cls.from_json(Path(path).read_text(encoding="utf-8"))
 
 

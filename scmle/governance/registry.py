@@ -54,7 +54,14 @@ class PromotionApproval:
     signature: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the review record before it can authorize promotion."""
+        """Validate the review record before it can authorize promotion.
+
+        Raises:
+            TypeError: If `independent` is not a bool.
+            ValueError: If a required text field is blank, the version is not
+                positive, the evidence is empty or has blank references, or the
+                signature is blank.
+        """
         for name in (
             "model",
             "content_id",
@@ -95,7 +102,14 @@ class PromotionApproval:
         }
 
     def sign(self, signing_key: str | bytes) -> Self:
-        """Return this approval with a content-bound HMAC signature."""
+        """Return this approval with a content-bound HMAC signature.
+
+        Args:
+            signing_key: The key to sign with.
+
+        Returns:
+            A copy of the approval carrying the signature.
+        """
         return dataclasses.replace(
             self,
             signature=attestation.sign_payload(
@@ -104,7 +118,16 @@ class PromotionApproval:
         )
 
     def verify(self, signing_key: str | bytes | None = None) -> bool:
-        """Verify the approval signature using an explicit or env key."""
+        """Verify the approval signature using an explicit or env key.
+
+        Args:
+            signing_key: The key to verify with, or None for the configured
+                default.
+
+        Returns:
+            True if the approval is signed, a key is available and the
+            signature matches the content.
+        """
         if self.signature is None:
             return False
         key = attestation.resolve_key(signing_key)
@@ -120,7 +143,20 @@ class PromotionApproval:
         content_id: str,
         signing_key: str | bytes | None = None,
     ) -> None:
-        """Require exact identity, independence, and a valid signature."""
+        """Require exact identity, independence, and a valid signature.
+
+        Args:
+            model: Expected model name.
+            version: Expected version.
+            content_id: Expected content address of the bundle.
+            signing_key: The key to verify with, or None for the configured
+                default.
+
+        Raises:
+            ValueError: If the approval names another bundle, the reviewer
+                rejected it, the review was not independent, or the signature
+                is not valid.
+        """
         if (self.model, self.version, self.content_id) != (
             model,
             version,
@@ -174,7 +210,14 @@ class VersionRecord:
 
 
 def content_id_of(bundle_directory: str | pathlib.Path) -> str:
-    """Content address of a bundle: the hash of its checksummed manifest."""
+    """Content address of a bundle: the hash of its checksummed manifest.
+
+    Args:
+        bundle_directory: A saved bundle directory.
+
+    Returns:
+        The SHA-256 of the bundle's manifest file.
+    """
     manifest = pathlib.Path(bundle_directory) / bundle_module.MANIFEST_FILE
     return bundle_module.file_sha256(manifest)
 
@@ -213,25 +256,43 @@ class ModelRegistryStore:
         self.scope = scope
 
     def attach_guard(self, guard: never_list.Guard | None, scope: str) -> None:
-        """Routes champion moves through `guard` (None removes it)."""
+        """Routes champion moves through `guard` (None removes it).
+
+        Args:
+            guard: The never-list guard, or None to remove it.
+            scope: The scope attestations must carry.
+        """
         self.guard = guard
         self.scope = scope
 
     def read_index(self) -> dict[str, Any]:
-        """Loads the registry index (empty when new)."""
+        """Loads the registry index (empty when new).
+
+        Returns:
+            The registry index; a fresh one without models if none is stored.
+        """
         path = self.root / INDEX_FILE
         if not path.exists():
             return {"models": {}}
         return json.loads(path.read_text(encoding="utf-8"))
 
     def write_index(self, index: dict[str, Any]) -> None:
-        """Writes the index atomically (temp file + rename)."""
+        """Writes the index atomically (temp file + rename).
+
+        Args:
+            index: The complete registry index.
+        """
         durability.write_atomically(
             self.root / INDEX_FILE, json.dumps(index, indent=2).encode("utf-8")
         )
 
     def audit(self, action: str, **details: Any) -> None:
-        """Appends an audit record."""
+        """Appends an audit record.
+
+        Args:
+            action: The audit action name.
+            **details: Further fields of the record.
+        """
         record = {
             "timestamp": events.utc_timestamp(),
             "action": action,
@@ -256,6 +317,8 @@ class ModelRegistryStore:
         The bundle is verified (checksums, compatibility, and authenticity)
         before it is copied. Bundles are pickle-based, so an unsigned bundle
         is refused unless the registrant vouches for it with `trusted=True`.
+        A bundle that fails verification, or is unauthenticated and not
+        vouched for, is refused with an `ArtifactError`.
 
         Args:
             model: Model name.
@@ -271,10 +334,6 @@ class ModelRegistryStore:
             The new version's record, or the existing one when a bundle with
             identical content is already registered (registration is
             idempotent for the same content).
-
-        Raises:
-            ArtifactError: If the bundle fails verification or is
-                unauthenticated and not vouched for.
         """
         bundle_module.ModelBundle.load(
             bundle_directory, trusted=trusted, signing_key=signing_key
@@ -304,7 +363,21 @@ class ModelRegistryStore:
         config: dict[str, Any] | None,
         run_id: str,
     ) -> VersionRecord:
-        """Assigns the next version and writes it, holding the lock."""
+        """Assigns the next version and writes it, holding the lock.
+
+        Args:
+            model: Model name.
+            bundle_directory: A saved bundle directory, copied into the store.
+            content_id: Content address of the bundle.
+            signed: Whether the bundle's signature verified.
+            metrics: Held-out metrics to record, or None.
+            config: Training configuration to record, or None.
+            run_id: Originating run identifier.
+
+        Returns:
+            The record of the new version, or of the existing one with the same
+            content.
+        """
         index = self.read_index()
         entry = index["models"].setdefault(
             model, {"versions": {}, "aliases": {}}
@@ -332,7 +405,17 @@ class ModelRegistryStore:
         return record
 
     def versions(self, model: str) -> list[VersionRecord]:
-        """Lists a model's versions, oldest first."""
+        """Lists a model's versions, oldest first.
+
+        Args:
+            model: Model name.
+
+        Returns:
+            The version records in ascending version order.
+
+        Raises:
+            ArtifactError: If the model is not registered.
+        """
         entry = self.read_index()["models"].get(model)
         if entry is None:
             raise errors.ArtifactError(f"unknown model '{model}'")
@@ -342,7 +425,14 @@ class ModelRegistryStore:
         ]
 
     def aliases(self, model: str) -> dict[str, int]:
-        """Returns alias -> version for a model."""
+        """Returns alias -> version for a model.
+
+        Args:
+            model: Model name.
+
+        Returns:
+            A mapping from alias to version; empty if the model has none.
+        """
         entry = self.read_index()["models"].get(model, {"aliases": {}})
         return {alias: int(v) for alias, v in entry["aliases"].items()}
 
@@ -357,6 +447,12 @@ class ModelRegistryStore:
     ) -> None:
         """Points `alias` at `version`.
 
+        A missing model or version, or a champion promotion without valid
+        independent approval, is refused with an `ArtifactError`. If the
+        registry has a guard and the champion move has no valid attestation,
+        the guard raises `AttestationRequired` (an escalation is written and
+        nothing is moved).
+
         Args:
             model: Model name.
             version: Registered version number.
@@ -369,13 +465,6 @@ class ModelRegistryStore:
             guard_detail: What the attestation must name when the registry
                 has a guard and `alias` is the champion; defaults to the
                 model and version. A rollback names itself here.
-
-        Raises:
-            ArtifactError: If the model or version does not exist, or if a
-                champion promotion lacks valid independent approval.
-            AttestationRequired: If the registry has a guard and the champion
-                move has no valid attestation (an escalation is written and
-                nothing is moved).
         """
         if alias == CHAMPION and self.guard is not None:
             self.guard.require(
@@ -394,7 +483,19 @@ class ModelRegistryStore:
         approval: PromotionApproval | None,
         signing_key: str | bytes | None,
     ) -> None:
-        """Moves the alias while holding the lock."""
+        """Moves the alias while holding the lock.
+
+        Args:
+            model: Model name.
+            version: Registered version number.
+            alias: Alias to move.
+            approval: The independent approval, required for the champion.
+            signing_key: HMAC key for the approval signature.
+
+        Raises:
+            ArtifactError: If the version is not registered, a champion move
+                has no approval, or the approval is not valid for the bundle.
+        """
         index = self.read_index()
         entry = index["models"].get(model)
         if entry is None or str(version) not in entry["versions"]:
@@ -431,6 +532,13 @@ class ModelRegistryStore:
     def resolve(self, model: str, ref: str | int = CHAMPION) -> VersionRecord:
         """Resolves an alias or version number to a record.
 
+        Args:
+            model: Model name.
+            ref: A version number (or its digits) or an alias.
+
+        Returns:
+            The record of the version.
+
         Raises:
             ArtifactError: If it cannot be resolved.
         """
@@ -461,6 +569,9 @@ class ModelRegistryStore:
             model: Model name.
             ref: Alias or version number.
             signing_key: HMAC key for signed bundles.
+
+        Returns:
+            The loaded bundle.
         """
         record = self.resolve(model, ref)
         return bundle_module.ModelBundle.load(

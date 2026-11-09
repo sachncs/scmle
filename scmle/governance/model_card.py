@@ -35,7 +35,12 @@ class ModelCard:
     )
 
     def __post_init__(self) -> None:
-        """Validate the fields required for a useful review record."""
+        """Validate the fields required for a useful review record.
+
+        Raises:
+            ValueError: If a required text field is blank, the schema version is
+                below 1, or the out-of-scope or limitations list is empty.
+        """
         for name in (
             "model_name",
             "model_version",
@@ -67,7 +72,22 @@ class ModelCard:
         evaluation: Mapping[str, Any],
         model_fingerprint: str,
     ) -> "ModelCard":
-        """Build a card from the exact data, model, and evaluation records."""
+        """Build a card from the exact data, model, and evaluation records.
+
+        Args:
+            manifest: The dataset manifest, supplying the dataset and snapshot
+                identifiers.
+            profile: The dataset profile, supplying the feature names.
+            bundle: The packaged model bundle, supplying the model identity,
+                task and metric.
+            evaluation: The evaluation document; its cross-validation scores,
+                test metrics, release evaluation and resources are copied in.
+            model_fingerprint: Digest identifying the packaged model.
+
+        Returns:
+            A card whose limitations include that it needs human review, and
+            that the release evaluation is blocked when it is.
+        """
         release = evaluation.get("release_evaluation", {})
         limitations = [
             "This machine-generated card requires human review before release.",

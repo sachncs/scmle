@@ -32,6 +32,11 @@ def serve(
     A `bind` message fixes a digest. From then on `open` releases the rows
     only to a caller that presents the same digest, so the release cannot be
     spent on a selection other than the one that was bound.
+
+    Args:
+        channel: Connection to the caller; the loop ends when it closes.
+        token: Secret that every message must present.
+        rows: The features and target held in custody and released once.
     """
     released = False
     binding: str | None = None

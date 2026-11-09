@@ -1,4 +1,4 @@
-"""The decision layer's rollout, run through the lifecycle manager (F11).
+"""The decision layer's rollout, run through the lifecycle manager.
 
 `scmle.decision.rollout` decides from an e-process; it knows nothing of
 registries. This hook is the one place that joins the two:
@@ -6,7 +6,7 @@ registries. This hook is the one place that joins the two:
 * an experiment is started with the level the `DecisionBudget` assigns, spent
   whether or not the experiment promotes (the budget after the assignment is
   written to the deployment ledger);
-* units are assigned by the salted hash of the plan and every batch is
+* units are assigned by the salted hash of the rollout plan and every batch is
   written to the deployment ledger with the arm and the probability that arm
   had (the propensity), and to the hash-chained decision log;
 * a `promote` decision is a proposal row; the alias moves only through
@@ -17,9 +17,10 @@ registries. This hook is the one place that joins the two:
   longer decide promotion or rollback, and the hook's `review` and
   `check_rollback` write their results to the decision log as
   `bootstrap_diagnostic` rows with `descriptive: true` and `decides: false`;
-* a promoted champion gets its rollback monitor at the plan's rollback level
-  (once per champion); a rollback decision is a proposal row, and the alias
-  moves back only through `LifecycleManager.restore_previous`.
+* a promoted champion gets its rollback monitor at the rollout plan's
+  rollback level (once per champion); a rollback decision is a proposal
+  row, and the alias moves back only through
+  `LifecycleManager.restore_previous`.
 
 The statistical guarantees are those of `scmle.decision.rollout`: a false
 promotion has probability at most the experiment's level, and the levels sum
@@ -61,8 +62,8 @@ class RolloutHook:
             manager: The model's lifecycle manager.
             plan: The pre-registered rollout plan.
             ledger: The deployment ledger the rows are chained in.
-            budget: The decision budget so far (the plan's fresh one when
-                omitted).
+            budget: The decision budget so far (the rollout plan's fresh one
+                when omitted).
             log: The decision log to continue (a new one when omitted).
         """
         self.manager = manager
@@ -80,7 +81,15 @@ class RolloutHook:
         self.units = 0
 
     def diagnose(self, stage: str, comparison: Any) -> None:
-        """Logs a bootstrap result as a descriptive diagnostic."""
+        """Logs a bootstrap result as a descriptive diagnostic.
+
+        Args:
+            stage: Which review the result belongs to (for example `review` or
+                `rollback`).
+            comparison: The bootstrap comparison, or None; its decision,
+                advantage and interval are recorded when present. It decides
+                nothing.
+        """
         body: dict[str, Any] = {
             "stage": stage,
             "descriptive": True,
@@ -105,6 +114,15 @@ class RolloutHook:
 
         The challenger is staged for the rollout; the bootstrap comparison
         decides nothing and goes to the decision log as a diagnostic.
+
+        Args:
+            fresh: Fresh labelled rows.
+            target: Name of the target column.
+            retrain: Whether the manager may retrain a challenger.
+            project_options: Options for the retraining project.
+
+        Returns:
+            The lifecycle manager's outcome.
         """
         outcome = self.manager.review(fresh, target, retrain, project_options)
         if outcome.comparison is not None:
@@ -123,6 +141,16 @@ class RolloutHook:
 
         Nothing moves, whatever the approval: only `watch` and `roll_back`
         take the previous champion back.
+
+        Args:
+            fresh: Fresh labelled rows.
+            target: Name of the target column.
+            policy: The rollback policy, or None for the default.
+            approval: A promotion approval, accepted but not acted on here.
+            signing_key: Key that verifies the approval.
+
+        Returns:
+            The lifecycle manager's rollback outcome.
         """
         outcome = self.manager.check_rollback(
             fresh, target, policy, approval, signing_key
@@ -134,6 +162,9 @@ class RolloutHook:
     def started(self) -> rollout.Rollout:
         """The running experiment.
 
+        Returns:
+            The experiment started by `start`.
+
         Raises:
             ScmleError: If none was started.
         """
@@ -144,18 +175,16 @@ class RolloutHook:
     def start(self, experiment_id: str) -> float:
         """Starts an experiment of the staged challenger against the champion.
 
-        The level is assigned before any traffic and is spent now.
+        The level is assigned before any traffic and is spent now. A reused
+        id is refused (`ValueError`), an exhausted budget with
+        `BudgetExhaustedError`, and a missing staged challenger with
+        `ArtifactError`.
 
         Args:
             experiment_id: A new identifier.
 
         Returns:
             The level assigned from the decision budget.
-
-        Raises:
-            ValueError: If the id was used.
-            BudgetExhaustedError: If the budget cannot cover another level.
-            ArtifactError: If no challenger is staged.
         """
         challenger = self.manager.registry.resolve(
             self.manager.model, registry_module.CHALLENGER
@@ -227,6 +256,14 @@ class RolloutHook:
         """Adds a batch of outcomes and records the decision so far.
 
         A promotion also writes a proposal row; nothing moves.
+
+        Args:
+            arm: The arm of each unit (0 or 1).
+            primary: The primary outcome of each unit.
+            guardrails: Guardrail outcomes, if any.
+
+        Returns:
+            The experiment's decision so far.
         """
         experiment = self.started()
         decision = experiment.observe(arm, primary, guardrails)
@@ -260,9 +297,18 @@ class RolloutHook:
     ) -> registry_module.VersionRecord:
         """Moves the champion alias after a `promote` decision, with approval.
 
+        Without a valid independent approval the registry refuses with an
+        `ArtifactError`.
+
+        Args:
+            approval: The independent approval of the challenger bundle.
+            signing_key: Key that verifies the approval.
+
+        Returns:
+            The record of the version now champion.
+
         Raises:
             ScmleError: If the experiment did not end in `promote`.
-            ArtifactError: Without a valid independent approval.
         """
         if self.decision is None or self.decision.status != rollout.PROMOTE:
             raise errors.ScmleError(
@@ -289,6 +335,14 @@ class RolloutHook:
 
     def watch(self, arm: ArrayLike, outcome: ArrayLike) -> str:
         """Feeds the promoted champion's rollback monitor on fresh traffic.
+
+        Args:
+            arm: The arm of each unit (0 or 1).
+            outcome: The outcome of each unit.
+
+        Returns:
+            The monitor's status; a rollback decision is also recorded in the
+            ledger and the decision log.
 
         Raises:
             ScmleError: If nothing was promoted through this hook.
@@ -330,9 +384,18 @@ class RolloutHook:
     ) -> int:
         """Restores the previous champion after a rollback decision.
 
+        Without a valid independent approval the registry refuses with an
+        `ArtifactError`.
+
+        Args:
+            approval: The independent approval of the restored bundle.
+            signing_key: Key that verifies the approval.
+
+        Returns:
+            The version number restored as champion.
+
         Raises:
             ScmleError: If the monitor has not decided a rollback.
-            ArtifactError: Without a valid independent approval.
         """
         if self.monitor is None or self.monitor.status != rollout.ROLLBACK:
             raise errors.ScmleError(

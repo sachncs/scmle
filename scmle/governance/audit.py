@@ -98,7 +98,15 @@ class RunAuditor:
 
     @staticmethod
     def check_log(records: list[dict[str, Any]]) -> list[AuditFinding]:
-        """Checks ordering and consistency of the log itself."""
+        """Checks ordering and consistency of the log itself.
+
+        Args:
+            records: The event records, in log order.
+
+        Returns:
+            A finding if timestamps go backwards and one if the records
+            belong to more than one run; empty if neither occurs.
+        """
         found = []
         stamps = [r["timestamp"] for r in records]
         if stamps != sorted(stamps):
@@ -112,7 +120,15 @@ class RunAuditor:
 
     @staticmethod
     def check_states(records: list[dict[str, Any]]) -> list[AuditFinding]:
-        """Checks that state events follow the lifecycle and end terminal."""
+        """Checks that state events follow the lifecycle and end terminal.
+
+        Args:
+            records: The event records, in log order.
+
+        Returns:
+            A finding for each state entered out of order or after a terminal
+            state, and one if the last state is not terminal.
+        """
         found = []
         current: state.RunState | None = None
         for record in records:
@@ -149,7 +165,16 @@ class RunAuditor:
 
     @staticmethod
     def check_test_access(records: list[dict[str, Any]]) -> list[AuditFinding]:
-        """Checks that the locked test set was opened once, and late enough."""
+        """Checks that the locked test set was opened once, and late enough.
+
+        Args:
+            records: The event records, in log order.
+
+        Returns:
+            Findings for a test set opened more than once, opened before the
+            selection was frozen, or followed by trial events; empty if it
+            was never opened or none applies.
+        """
         kinds = [r["kind"] for r in records]
         opened = [i for i, kind in enumerate(kinds) if kind == TEST_OPENED]
         if not opened:
@@ -187,7 +212,15 @@ class RunAuditor:
     def check_artifacts(
         root: pathlib.Path, records: list[dict[str, Any]]
     ) -> list[AuditFinding]:
-        """Checks that every artifact an event refers to exists."""
+        """Checks that every artifact an event refers to exists.
+
+        Args:
+            root: The run directory.
+            records: The event records, each listing its artifacts.
+
+        Returns:
+            One finding per referenced artifact that is absent, sorted by path.
+        """
         missing = sorted(
             {
                 artifact
@@ -207,7 +240,18 @@ class RunAuditor:
     def decisions(
         root: pathlib.Path, records: list[dict[str, Any]]
     ) -> tuple[dict[str, Any], ...]:
-        """Collects the automated decisions in the order they were taken."""
+        """Collects the automated decisions in the order they were taken.
+
+        Args:
+            root: The run directory, whose decision log holds the planner's
+                decisions.
+            records: The event records, from which the selection, test opening
+                and strategy, ensemble, plan and approval events are taken.
+
+        Returns:
+            The planner's decisions first, then the matching events in log
+            order.
+        """
         found: list[dict[str, Any]] = []
         log = root / DECISION_LOG
         if log.exists():

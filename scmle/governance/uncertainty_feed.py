@@ -1,4 +1,4 @@
-"""The prediction sets of a served bundle as input to the closed loop (F13).
+"""The prediction sets of a served bundle as input to the closed loop.
 
 `Loop.observe` routes a batch by a score that grows with the size of the
 conformal set and with novelty, and `Loop.mature` feeds the loop's coverage
@@ -43,6 +43,9 @@ class UncertaintyFeed:
             loop: The closed loop that receives the batches.
             bundle: A classification bundle with conformal calibration.
             nominal: Coverage of the sets served and tested.
+
+        Raises:
+            ValueError: If `nominal` is not strictly between 0 and 1.
         """
         if not 0.0 < nominal < 1.0:
             raise ValueError("nominal must lie strictly between 0 and 1")
@@ -60,8 +63,20 @@ class UncertaintyFeed:
     ) -> Any:
         """Routes a served batch by its set sizes and novelty.
 
+        A bundle without classification sets fails when the sets are
+        requested (with an `ArtifactError`).
+
+        Args:
+            features: The served rows.
+            predictions: The served predictions, one per row.
+            decisions: The decisions taken, one per row.
+            case_ids: One identifier per row; the sets are remembered by it.
+
+        Returns:
+            The loop's outcome for the batch, as returned by `Loop.observe`.
+
         Raises:
-            ArtifactError: For a bundle without classification sets.
+            ValueError: If there is not one case id per row.
         """
         if len(case_ids) != len(features):
             raise ValueError("one case id per row")
