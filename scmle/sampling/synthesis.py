@@ -135,7 +135,10 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         values = numpy.clip(values, RIDGE, None)
         repaired = (vectors * values) @ vectors.T
         scale = numpy.sqrt(numpy.diag(repaired))
-        return repaired / numpy.outer(scale, scale)
+        repaired_correlation: numpy.ndarray = repaired / numpy.outer(
+            scale, scale
+        )
+        return repaired_correlation
 
     def sample(
         self, rows: int, rng: numpy.random.Generator

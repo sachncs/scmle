@@ -197,7 +197,8 @@ class JitterOverSampler(RandomOverSampler):
 
 
 class PreprocessedResamplingClassifier(
-    base.ClassifierMixin, base.BaseEstimator
+    base.ClassifierMixin,  # type: ignore[misc]  # scikit-learn is untyped
+    base.BaseEstimator,  # type: ignore[misc]  # scikit-learn is untyped
 ):
     """Resamples in *feature space*, after preprocessing, inside `fit`.
 
@@ -260,7 +261,10 @@ class PreprocessedResamplingClassifier(
         Returns:
             The predicted labels.
         """
-        return self.estimator_.predict(self.preprocessor_.transform(features))
+        predictions: numpy.ndarray = self.estimator_.predict(
+            self.preprocessor_.transform(features)
+        )
+        return predictions
 
     def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities (no resampling).
@@ -272,12 +276,13 @@ class PreprocessedResamplingClassifier(
             Class probabilities, one row per input row, columns in the
             order of `classes_`.
         """
-        return self.estimator_.predict_proba(
+        probabilities: numpy.ndarray = self.estimator_.predict_proba(
             self.preprocessor_.transform(features)
         )
+        return probabilities
 
 
-class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
+class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a classifier on a resampled copy of its training data.
 
     Attributes:
@@ -335,7 +340,8 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             The predicted labels.
         """
-        return self.estimator_.predict(features)
+        predictions: numpy.ndarray = self.estimator_.predict(features)
+        return predictions
 
     def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities (no resampling).
@@ -347,10 +353,11 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
             Class probabilities, one row per input row, columns in the
             order of `classes_`.
         """
-        return self.estimator_.predict_proba(features)
+        probabilities: numpy.ndarray = self.estimator_.predict_proba(features)
+        return probabilities
 
 
-class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
+class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a regression pipeline with weights that favour rare target values.
 
     Rows whose target falls in a sparsely populated region of the target's
@@ -402,7 +409,8 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         counts = numpy.bincount(index, minlength=len(edges) - 1).astype(float)
         raw = 1.0 / counts[index]
         raw = numpy.minimum(raw, raw.min() * self.max_weight)
-        return raw * len(raw) / raw.sum()
+        weights: numpy.ndarray = raw * len(raw) / raw.sum()
+        return weights
 
     def fit(self, features: Any, target: Any) -> Self:
         """Fits the pipeline with density weights on the model step.
@@ -429,4 +437,5 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         Returns:
             The predicted target values.
         """
-        return self.estimator_.predict(features)
+        predictions: numpy.ndarray = self.estimator_.predict(features)
+        return predictions
