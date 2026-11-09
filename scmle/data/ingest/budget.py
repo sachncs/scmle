@@ -1,4 +1,4 @@
-"""Cost and time budgets for ingestion (F9 section 7).
+"""Cost and time budgets for ingestion.
 
 Each stage estimates its cost from catalog row counts and runs only if the
 estimate fits what is left. When it does not, the stage stops at a declared
@@ -23,7 +23,7 @@ class IngestBudget:
         max_rows_scanned: Rows the source is estimated to scan. Bytes are not
             observable through DB-API, so the unit is rows.
         max_seconds: Wall time allowed (see `BudgetMeter` for repeatability).
-        max_features: `B_feat`, the cap on synthesized features.
+        max_features: Cap on synthesized features.
     """
 
     max_queries: int | None = None
@@ -32,7 +32,11 @@ class IngestBudget:
     max_features: int = 200
 
     def __post_init__(self) -> None:
-        """Validates the limits."""
+        """Validates the limits.
+
+        Raises:
+            ValueError: If any limit is negative.
+        """
         for name in ("max_queries", "max_rows_scanned"):
             value = getattr(self, name)
             if value is not None and value < 0:
@@ -43,7 +47,11 @@ class IngestBudget:
             raise ValueError("max_features must be non-negative")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the limits.
+
+        Returns:
+            A JSON-ready mapping of limit name to value.
+        """
         return dataclasses.asdict(self)
 
 
@@ -62,7 +70,11 @@ class StopBoundary:
     reason: str
 
     def to_dict(self) -> dict[str, str]:
-        """JSON-ready record."""
+        """Serializes the boundary.
+
+        Returns:
+            A JSON-ready mapping of the stage, unit and reason.
+        """
         return dataclasses.asdict(self)
 
 
@@ -80,7 +92,13 @@ class BudgetMeter:
         budget: IngestBudget,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        """Starts the meter at zero spend."""
+        """Starts the meter at zero spend.
+
+        Args:
+            budget: The limits to charge against.
+            clock: Source of wall time in seconds; read once now and again
+                whenever `seconds` is needed.
+        """
         self.budget = budget
         self.clock = clock
         self.started = clock()
@@ -90,16 +108,25 @@ class BudgetMeter:
 
     @property
     def seconds(self) -> float:
-        """Wall time spent so far."""
+        """The wall time, in seconds, since the meter started."""
         return self.clock() - self.started
 
     @property
     def partial(self) -> bool:
-        """Whether any stage stopped early."""
+        """Whether any stage has stopped at a boundary."""
         return bool(self.stops)
 
     def shortfall(self, rows: int, queries: int = 1) -> str | None:
-        """The limit that `rows` and `queries` more would break, if any."""
+        """Finds the limit that more spending would break.
+
+        Args:
+            rows: Rows the next step would scan.
+            queries: Queries the next step would run.
+
+        Returns:
+            `queries`, `rows` or `seconds` for the first limit exceeded, in
+            that order of checking, or None when the step fits.
+        """
         limit = self.budget
         if (
             limit.max_queries is not None
@@ -120,6 +147,17 @@ class BudgetMeter:
 
         Once a stage has stopped it stays stopped, so a later, cheaper step of
         the same stage does not run past the declared boundary.
+
+        Args:
+            stage: Name of the stage taking the step.
+            unit: What the step covers (a table, a lattice level).
+            rows: Rows the step is estimated to scan.
+            queries: Queries the step will run.
+
+        Returns:
+            True if the step was charged and may run; False if the stage had
+            already stopped or the step would break a limit (the boundary is
+            then recorded).
         """
         if any(stop.stage == stage for stop in self.stops):
             return False
@@ -132,7 +170,13 @@ class BudgetMeter:
         return True
 
     def to_dict(self) -> dict[str, Any]:
-        """`ingest_budget.json`: spent versus allowed, and the stop points."""
+        """Serializes spend against limits, for `ingest_budget.json`.
+
+        Returns:
+            A JSON-ready mapping with the allowed limits, the spent queries,
+            rows and seconds, whether the run is partial, and the stop
+            boundaries.
+        """
         return {
             "allowed": self.budget.to_dict(),
             "spent": {

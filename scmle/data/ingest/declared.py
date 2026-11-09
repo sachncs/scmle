@@ -1,4 +1,4 @@
-"""Reconciliation of the extract to totals the charter declared (F9).
+"""Reconciliation of the extract to totals the charter declared.
 
 The charter's `reconcile` block states, before any data is read, what the
 source system says each extracted view contains: a row count, column sums and
@@ -40,6 +40,12 @@ def key_checksum(values: pd.Series) -> str:
 
     The order of the rows does not matter; a changed, missing or repeated
     value does.
+
+    Args:
+        values: The key column.
+
+    Returns:
+        The hex digest.
     """
     text = "\n".join(sorted(str(v) for v in values.tolist()))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -48,7 +54,19 @@ def key_checksum(values: pd.Series) -> str:
 def check(
     name: str, extract: Any, source: Any, gap: float, limit: float
 ) -> dict:
-    """One compared quantity."""
+    """Builds the record of one compared quantity.
+
+    Args:
+        name: Name of the quantity, e.g. `view.row_count`.
+        extract: Value found in the extract.
+        source: Value declared or queried from the source.
+        gap: Size of the difference (absolute or relative, as the caller
+            defines it).
+        limit: Largest gap that still passes.
+
+    Returns:
+        A mapping of the arguments plus `passed`, True when `gap <= limit`.
+    """
     return {
         "name": name,
         "extract": extract,
@@ -60,7 +78,19 @@ def check(
 
 
 def column_of(frame: pd.DataFrame, view: str, column: str) -> pd.Series:
-    """A column of a view, or a `ConfigError` naming it."""
+    """Takes a column of a view.
+
+    Args:
+        frame: The extracted view.
+        view: Name of the view, for the error message.
+        column: Column to take.
+
+    Returns:
+        The column.
+
+    Raises:
+        ConfigError: If the view lacks the column.
+    """
     if column not in frame.columns:
         raise errors.ConfigError(
             f"the reconcile block names column {column!r} that view "
@@ -145,10 +175,20 @@ def reconcile(
 def source_check(
     name: str, extract: Any, source: Any, tolerance: float
 ) -> dict:
-    """One quantity compared with the source's own answer.
+    """Compares one quantity with the source's own answer.
 
     Counts and checksums are exact (`tolerance` 0); a source total of zero is
     compared as an absolute gap.
+
+    Args:
+        name: Name of the quantity.
+        extract: Value found in the extract.
+        source: Value the source database gave.
+        tolerance: Largest relative gap that passes.
+
+    Returns:
+        The comparison record, as `check` forms it, with the gap relative to
+        the source value.
     """
     gap = abs(float(extract) - float(source))
     denominator = abs(float(source)) or 1.0
@@ -169,6 +209,22 @@ def source_totals(
     `reconcile.reconcile_extract`; a quantity whose source total is zero (so
     that function forms no ratio) is compared as an absolute gap instead of
     being skipped. The checksum is computed over the source's own column.
+    A quantity that `reconcile.reconcile_extract` does not return (including
+    when it raises `ValueError`) is compared against a source value of zero.
+    A view that lacks a declared column makes `column_of` raise
+    `ConfigError`, which propagates.
+
+    Args:
+        view: Name of the extracted view.
+        frame: The extracted view.
+        table: Source table the view comes from.
+        totals: The declared sum columns and checksum column for the view.
+        source: The source to query.
+        tolerance: Relative gap a sum may have.
+
+    Returns:
+        One comparison record per quantity: row count, each sum and, when
+        declared, the key checksum.
     """
     measures = [total.column for total in totals.sums]
     numeric = pd.DataFrame(
@@ -270,8 +326,12 @@ def reconcile_source(
 def require(report: Mapping[str, Any]) -> None:
     """Stops the run when any declared or source-queried total differs.
 
+    Args:
+        report: The reconciliation document, with `checks` and optionally
+            `source_checks`.
+
     Raises:
-        BlockedError: Naming each quantity that differs.
+        BlockedError: If any check failed; names each quantity that differs.
     """
     failed = [c for c in report["checks"] if not c["passed"]]
     queried = [c for c in report.get("source_checks", []) if not c["passed"]]

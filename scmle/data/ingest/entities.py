@@ -23,7 +23,8 @@ above the lower threshold into one group, which errs toward keeping more rows
 together, and never merges attribute values.
 
 What matters to the instrument is cross-split link recall: the share of
-true-match pairs that end in one group, because F2 splits by group.
+true-match pairs that end in one group, because the evaluation splits the
+data by group.
 """
 
 from collections.abc import Callable
@@ -63,14 +64,31 @@ Labeler = Callable[[int, int], bool]
 
 
 def normalize(value: Any) -> str:
-    """Lower-case alphanumerics of a value; empty for a missing one."""
+    """Normalizes a value for comparison.
+
+    Args:
+        value: Any value; None and NaN count as missing.
+
+    Returns:
+        The lower-case alphanumerics of the value as text, or an empty
+        string for a missing value.
+    """
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return ""
     return CLEAN.sub("", str(value).lower())
 
 
 def jaro(a: str, b: str) -> float:
-    """Jaro similarity of two strings."""
+    """Computes the Jaro similarity of two strings.
+
+    Args:
+        a: First string.
+        b: Second string.
+
+    Returns:
+        A similarity in [0, 1]; 1.0 for equal strings and 0.0 when either
+        is empty (and they differ) or no characters match.
+    """
     if a == b:
         return 1.0
     if not a or not b:
@@ -93,7 +111,16 @@ def jaro(a: str, b: str) -> float:
 
 
 def jaro_winkler(a: str, b: str) -> float:
-    """Jaro-Winkler similarity with the usual 0.1 prefix scale."""
+    """Computes the Jaro-Winkler similarity with the usual 0.1 prefix scale.
+
+    Args:
+        a: First string.
+        b: Second string.
+
+    Returns:
+        The Jaro similarity raised for a common prefix of up to four
+        characters; in [0, 1].
+    """
     base = jaro(a, b)
     prefix = 0
     for x, y in zip(a[:4], b[:4], strict=False):
@@ -104,7 +131,15 @@ def jaro_winkler(a: str, b: str) -> float:
 
 
 def soundex(text: str) -> str:
-    """American Soundex of the letters in `text`; empty for no letters."""
+    """Computes the American Soundex code of the letters in a text.
+
+    Args:
+        text: The text; non-letters are ignored.
+
+    Returns:
+        A four-character code (a letter and three digits), or an empty
+        string when the text has no letters.
+    """
     letters = [c for c in text if c.isalpha()]
     if not letters:
         return ""
@@ -148,7 +183,18 @@ class Pass:
     size: int = 3
 
     def key(self, value: Any) -> str:
-        """Block key of one value; empty means the record is not blocked."""
+        """Builds the block key of one value.
+
+        Args:
+            value: The field value of a record.
+
+        Returns:
+            The key for this pass; an empty string means the record is not
+            blocked in this pass.
+
+        Raises:
+            ValueError: If `kind` is not `exact`, `prefix` or `soundex`.
+        """
         text = normalize(value)
         if not text:
             return ""
@@ -164,11 +210,20 @@ class Pass:
 def candidate_pairs(
     records: pd.DataFrame, passes: Sequence[Pass], max_block: int = MAX_BLOCK
 ) -> tuple[list[Pair], int]:
-    """Pairs sharing a block key in any pass, and blocks skipped as too big.
+    """Finds pairs of records sharing a block key in any pass.
 
     A block larger than `max_block` is skipped whole and counted, because its
     pair count would dominate the work; the loss shows up in pair
     completeness, never silently.
+
+    Args:
+        records: One row per record.
+        passes: Blocking passes.
+        max_block: Largest block that is compared.
+
+    Returns:
+        The sorted, distinct record-index pairs, and the number of blocks
+        skipped as too big.
     """
     pairs: set[Pair] = set()
     skipped = 0
@@ -189,7 +244,17 @@ def candidate_pairs(
 def compare(
     records: pd.DataFrame, fields: Sequence[Field], pairs: Sequence[Pair]
 ) -> np.ndarray:
-    """Comparison level of every pair on every field, `MISSING` if empty."""
+    """Compares every pair on every field.
+
+    Args:
+        records: One row per record.
+        fields: Fields compared.
+        pairs: Record-index pairs.
+
+    Returns:
+        An int8 array of shape (pairs, fields) holding `AGREE`, `SIMILAR`
+        or `DISAGREE`, or `MISSING` where either value is empty.
+    """
     columns = {f.name: [normalize(v) for v in records[f.name]] for f in fields}
     out = np.full((len(pairs), len(fields)), MISSING, dtype=np.int8)
     for row, (i, j) in enumerate(pairs):
@@ -223,7 +288,15 @@ class Model:
     iterations: int
 
     def weights(self, levels: np.ndarray) -> np.ndarray:
-        """Log2 likelihood-ratio weight of each pair; missing fields add 0."""
+        """Computes the log2 likelihood-ratio weight of each pair.
+
+        Args:
+            levels: Comparison levels, shape (pairs, fields), as `compare`
+                returns them.
+
+        Returns:
+            One weight per pair; missing fields add 0.
+        """
         total = np.zeros(len(levels))
         for col in range(levels.shape[1]):
             seen = levels[:, col] != MISSING
@@ -240,6 +313,15 @@ def fit_em(
 
     Starting values are fixed (m favours agreement, u favours disagreement),
     so the fit is deterministic. Parameters are floored away from 0 and 1.
+
+    Args:
+        levels: Comparison levels, shape (pairs, fields), as `compare`
+            returns them.
+        iterations: Largest number of EM iterations.
+        tol: Stop when no parameter moves by this much or more.
+
+    Returns:
+        The fitted model, with the number of iterations run.
     """
     pairs, fields = levels.shape
     m = np.tile([0.05, 0.15, 0.80], (fields, 1))
@@ -285,7 +367,16 @@ def fit_em(
 
 
 def components(count: int, links: Sequence[Pair]) -> list[int]:
-    """Group id of every record: connected components of the links."""
+    """Groups records into connected components of the links.
+
+    Args:
+        count: Number of records.
+        links: Linked record-index pairs.
+
+    Returns:
+        The group id of each record; the id is the smallest record index in
+        its component.
+    """
     parent = list(range(count))
 
     def find(x: int) -> int:
@@ -303,7 +394,15 @@ def components(count: int, links: Sequence[Pair]) -> list[int]:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BandEstimate:
-    """Clerical-sample result for one score band."""
+    """Clerical-sample result for one score band.
+
+    Attributes:
+        low: Lowest weight in the band.
+        high: Highest weight in the band.
+        pairs: Pairs in the band.
+        sampled: Pairs labelled.
+        matches: Labelled pairs that were true matches.
+    """
 
     low: float
     high: float
@@ -312,7 +411,11 @@ class BandEstimate:
     matches: int
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the band.
+
+        Returns:
+            A JSON-ready mapping of the fields.
+        """
         return dataclasses.asdict(self)
 
 
@@ -335,7 +438,12 @@ class Estimate:
     reviewer: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the estimate.
+
+        Returns:
+            A JSON-ready mapping with precision, recall, bands and the
+            reviewer.
+        """
         return {
             "precision": list(self.precision),
             "recall": list(self.recall),
@@ -350,6 +458,14 @@ def geometric_bands(order: np.ndarray, bands: int) -> list[np.ndarray]:
     The top band holds the highest `2^-(bands-1)` share of the pairs, the next
     one twice that, and so on; the bottom band takes the rest. Matches are
     rare and sit at the top, so equal-count bands would hide them in one band.
+
+    Args:
+        order: Pair indices sorted by ascending weight.
+        bands: Number of bands wanted; fewer come back if the sizes
+            collapse.
+
+    Returns:
+        The bands from lowest to highest weight; empty bands are dropped.
     """
     total = len(order)
     edges = [0]
@@ -371,12 +487,28 @@ def stratified_estimate(
     bands: int = BANDS,
     draws: int = 2000,
 ) -> Estimate:
-    """Precision and recall of `weight >= threshold` from a stratified sample.
+    """Estimates precision and recall of `weight >= threshold` by sampling.
 
-    Pairs are cut into `bands` equal-count score bands; `per_band` pairs are
-    drawn in each (all, if fewer) and labelled by `labeler`. Each band's match
-    rate gets a Beta posterior with the Jeffreys prior and the intervals come
-    from 2000 seeded joint draws, which is an approximation, not exact.
+    Pairs are cut into `bands` score bands (`geometric_bands`, thinning out
+    toward the top); `per_band` pairs are drawn in each (all, if fewer) and
+    labelled by `labeler`. Each band's match rate gets a Beta posterior with
+    the Jeffreys prior and the intervals come from `draws` seeded joint
+    draws, which is an approximation, not exact.
+
+    Args:
+        weights: Pair weights, aligned with `pairs`.
+        pairs: Record-index pairs.
+        threshold: Pairs with weight at or above it count as linked.
+        labeler: Gives the true match status of a pair.
+        reviewer: Who labelled the sample.
+        per_band: Pairs sampled per band.
+        seed: Seed of the sample and the draws.
+        bands: Number of score bands.
+        draws: Number of posterior draws for the intervals.
+
+    Returns:
+        Precision and recall, each as (point, lower, upper) with a 95
+        percent interval, the per-band sample and the reviewer.
     """
     rng = randomness.component_rng(seed, "ingest.entities.clerical", 0)
     order = np.argsort(weights, kind="stable")
@@ -437,8 +569,8 @@ class Resolution:
     """Result of resolving a record set.
 
     Attributes:
-        groups: Group id per record (link-then-group); use as F2's group
-            column.
+        groups: Group id per record (link-then-group); use as the group
+            column for splitting.
         links: Pairs at or above the grouping threshold.
         t_group: Weight threshold used for grouping.
         t_match: Weight above which a pair is called a match.
@@ -462,7 +594,12 @@ class Resolution:
     tier: qualification.Tier
 
     def to_dict(self) -> dict[str, Any]:
-        """`entity_resolution.json`."""
+        """Serializes the resolution, for `entity_resolution.json`.
+
+        Returns:
+            A JSON-ready mapping with the tier, thresholds, counts, model
+            and estimate.
+        """
         return {
             "tier": self.tier.value,
             "t_group": self.t_group,
@@ -513,6 +650,9 @@ def resolve(
         The resolution. Grouping uses the lower threshold `t_group`, the
         smallest weight at which sampled precision is still above half, so
         possible matches are grouped too.
+
+    Raises:
+        ValueError: If a labeler is given without a non-blank reviewer.
     """
     if labeler is not None and not reviewer.strip():
         raise ValueError("a labeler needs a named reviewer")
@@ -583,7 +723,15 @@ def resolve(
 
 
 def lowest_weight(weights: np.ndarray, keep: np.ndarray) -> float:
-    """Smallest weight among selected pairs; infinity when none."""
+    """Finds the smallest weight among selected pairs.
+
+    Args:
+        weights: Pair weights.
+        keep: Boolean mask of the selected pairs.
+
+    Returns:
+        The smallest selected weight, or infinity when none is selected.
+    """
     chosen = weights[keep]
     return float(chosen.min()) if len(chosen) else math.inf
 
@@ -591,12 +739,20 @@ def lowest_weight(weights: np.ndarray, keep: np.ndarray) -> float:
 def thresholds_from_bands(
     bands: Sequence[BandEstimate], min_precision: float
 ) -> tuple[float, float]:
-    """`(t_match, t_group)` from the labelled bands.
+    """Derives the match and group thresholds from the labelled bands.
 
     Bands are scanned from the top. `t_match` is the lowest band edge such
     that the cumulative sampled precision from the top stays at or above
     `min_precision`; `t_group` the lowest edge whose own sampled match rate
     is at least one half.
+
+    Args:
+        bands: Labelled bands, from lowest to highest weight.
+        min_precision: Cumulative precision the match call must keep.
+
+    Returns:
+        The pair `(t_match, t_group)`; each is infinity if no band
+        qualifies.
     """
     t_match = math.inf
     t_group = math.inf
@@ -638,7 +794,14 @@ def measure_quality(
 ) -> Quality:
     """Compares groups with the true entity of each record.
 
-    `pairs` are the compared pairs, to give pair completeness.
+    Args:
+        entity: True entity of each record, by record index.
+        resolution: The resolution to judge.
+        pairs: The compared pairs, to give pair completeness.
+
+    Returns:
+        The measures against truth; pair completeness and link recall are
+        1.0 when there are no true-match pairs.
     """
     by_entity: dict[Any, list[int]] = {}
     for index, key in enumerate(entity):

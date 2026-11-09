@@ -1,4 +1,4 @@
-"""Reconciliation of an assembled table to source totals (F9 section 6).
+"""Reconciliation of an assembled table to source totals.
 
 Extends `admissibility.reconciliation`: the source side of every `Item` comes
 from a query pushed down to the source instead of a number typed by a person.
@@ -82,11 +82,16 @@ class ExtractReconciliation:
 
     @property
     def passed(self) -> bool:
-        """No unexplained gap and nothing left unreconciled."""
+        """Whether there is no unexplained gap and nothing unreconciled."""
         return self.result.passed and not self.not_reconciled
 
     def to_dict(self) -> dict[str, Any]:
-        """`reconciliation.json`, extended."""
+        """Serializes the reconciliation, for `reconciliation.json`.
+
+        Returns:
+            The ordinary reconciliation mapping plus `not_reconciled` and
+            the overall `passed`.
+        """
         return {
             **self.result.to_dict(),
             "not_reconciled": list(self.not_reconciled),
@@ -119,6 +124,10 @@ def reconcile_extract(
 
     Returns:
         The reconciliation and the quantities that could not be formed.
+
+    Raises:
+        ValueError: If no quantity could be formed because every source
+            total was zero or null.
     """
     items = []
     skipped = []
@@ -167,12 +176,24 @@ def reconcile_extract(
 
 
 def code_digest() -> str:
-    """Hash of this module's source, the key of its certificate."""
+    """Hashes this module's source, the key of its certificate.
+
+    Returns:
+        The code hash computed by `certificates.code_hash`.
+    """
     return certificates.code_hash(sys.modules[__name__])
 
 
 def blocks(report: ExtractReconciliation) -> bool:
-    """Whether the reconciliation should stop the run (gate is decisive)."""
+    """Checks whether the reconciliation should stop the run.
+
+    Args:
+        report: The reconciliation to inspect.
+
+    Returns:
+        True if any check carries a blocking decision, which happens only
+        when the gate is decisive.
+    """
     return any(
         check.decision is qualification.Decision.BLOCK
         for check in report.result.checks

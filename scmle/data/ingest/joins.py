@@ -1,4 +1,4 @@
-"""Join discovery by exact inclusion dependencies (F9 section 3).
+"""Join discovery by exact inclusion dependencies.
 
 A candidate link is a child column set `A`, a parent key `B` (an approximate
 key from `grain`), compatible value kinds, and containment
@@ -45,7 +45,12 @@ class DeclaredKey:
     parent_columns: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Checks the column lists pair up."""
+        """Checks the column lists pair up.
+
+        Raises:
+            ValueError: If the child columns are empty or differ in length
+                from the parent columns.
+        """
         if not self.child_columns or len(self.child_columns) != len(
             self.parent_columns
         ):
@@ -86,11 +91,15 @@ class Link:
 
     @property
     def joinable(self) -> bool:
-        """Whether synthesis may traverse the link."""
+        """Whether synthesis may traverse the link (it was accepted)."""
         return self.decision == ACCEPTED
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the link.
+
+        Returns:
+            A JSON-ready mapping of the fields plus `joinable`.
+        """
         return {
             **dataclasses.asdict(self),
             "child_columns": list(self.child_columns),
@@ -101,21 +110,26 @@ class Link:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Step:
-    """One hop of a path: along a link, up to the parent or down to children."""
+    """One hop of a path: along a link, up to the parent or down to children.
+
+    Attributes:
+        link: The link the hop follows.
+        direction: `up` (child to parent) or `down` (parent to children).
+    """
 
     link: Link
     direction: str
 
     @property
     def source(self) -> str:
-        """Table the hop starts from."""
+        """The name of the table the hop starts from."""
         if self.direction == "up":
             return self.link.child
         return self.link.parent
 
     @property
     def target(self) -> str:
-        """Table the hop reaches."""
+        """The name of the table the hop reaches."""
         if self.direction == "up":
             return self.link.parent
         return self.link.child
@@ -123,17 +137,30 @@ class Step:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class JoinGraph:
-    """Measured links, as `join_graph.json`."""
+    """Measured links, as `join_graph.json`.
+
+    Attributes:
+        links: Every measured link, best score first.
+        partial: True when the budget stopped the search early.
+    """
 
     links: tuple[Link, ...]
     partial: bool = False
 
     def accepted(self) -> tuple[Link, ...]:
-        """Links synthesis may traverse."""
+        """Selects the links synthesis may traverse.
+
+        Returns:
+            The accepted links, in graph order.
+        """
         return tuple(link for link in self.links if link.joinable)
 
     def questions(self) -> list[str]:
-        """Links a person must settle."""
+        """Lists the links a person must settle.
+
+        Returns:
+            One sentence per `candidate` or `declared_violated` link.
+        """
         return [
             f"{item.child}{list(item.child_columns)} -> "
             f"{item.parent}{list(item.parent_columns)}: {item.why}"
@@ -142,7 +169,12 @@ class JoinGraph:
         ]
 
     def to_dict(self) -> dict[str, Any]:
-        """`join_graph.json`."""
+        """Serializes the graph, for `join_graph.json`.
+
+        Returns:
+            A JSON-ready mapping with `partial`, the links and the
+            questions.
+        """
         return {
             "partial": self.partial,
             "links": [link.to_dict() for link in self.links],
@@ -160,6 +192,14 @@ def name_supports(
     True when the child and parent column names are the same identifier, or
     the child column names the parent table (`customer_id` to `customers`).
     A bare `id` or a shared non-key name (`label`) never corroborates.
+
+    Args:
+        child_columns: Child column names.
+        parent: Parent table name.
+        parent_columns: Parent column names.
+
+    Returns:
+        True if the names corroborate the link.
     """
     if len(child_columns) != 1:
         return list(child_columns) == list(parent_columns)
@@ -184,7 +224,19 @@ def contained(
     parent: str,
     parent_columns: Sequence[str],
 ) -> int:
-    """Distinct child values with no parent match (an anti-join count)."""
+    """Counts distinct child values with no parent match (an anti-join).
+
+    Args:
+        source: Read-only source.
+        child: Child table.
+        child_columns: Child columns; rows with a null in any are ignored.
+        parent: Parent table.
+        parent_columns: Parent columns, paired with the child columns.
+
+    Returns:
+        The number of distinct non-null child combinations that no parent
+        row matches; 0 if the budget refused the query.
+    """
     present = " AND ".join(
         f"c.{profile.quote(c)} IS NOT NULL" for c in child_columns
     )
@@ -209,7 +261,16 @@ def contained(
 def distinct_of(
     source: profile.SqlSource, table: str, columns: Sequence[str]
 ) -> int:
-    """Distinct non-null combinations of a column set."""
+    """Counts the distinct non-null combinations of a column set.
+
+    Args:
+        source: Read-only source.
+        table: Table name.
+        columns: The column set.
+
+    Returns:
+        The count; 0 if the budget refused the query.
+    """
     present = " AND ".join(f"{profile.quote(c)} IS NOT NULL" for c in columns)
     return int(
         source.scalar(
@@ -231,7 +292,18 @@ def kinds_match(
     parent: str,
     parent_columns: Sequence[str],
 ) -> bool:
-    """Whether paired columns hold the same kind of value."""
+    """Checks that paired columns hold the same kind of value.
+
+    Args:
+        catalog: Profiles of the tables.
+        child: Child table.
+        child_columns: Child columns.
+        parent: Parent table.
+        parent_columns: Parent columns, paired with the child columns.
+
+    Returns:
+        True if every pair has equal kinds and none is `empty` or `other`.
+    """
     for a, b in zip(child_columns, parent_columns, strict=True):
         left = catalog.table(child).column(a).kind
         right = catalog.table(parent).column(b).kind
@@ -330,7 +402,25 @@ def measure_link(
     is_declared: bool,
     eps_fk: float,
 ) -> Link | None:
-    """Measures one candidate pair; None when it is clearly not a link."""
+    """Measures one candidate pair.
+
+    Args:
+        source: Read-only source.
+        catalog: Profiles of the tables.
+        scans: Key scan of each table.
+        child: Child table.
+        a: Child columns.
+        parent: Parent table.
+        b: Parent columns.
+        is_declared: Whether the schema declares this key.
+        eps_fk: Largest share of child values allowed to lack a parent.
+
+    Returns:
+        The measured link with its decision, or None when the pair is
+        clearly not a link: kinds differ (undeclared), the child has no
+        values, the parent columns are not a key, or an undeclared pair's
+        containment is below `1 - eps_fk`.
+    """
     if not is_declared and not kinds_match(catalog, child, a, parent, b):
         return None
     distinct = distinct_of(source, child, a)
@@ -386,6 +476,13 @@ def resolve_competition(links: Sequence[Link]) -> list[Link]:
     If several parents are accepted for the same child columns without a
     declaration, only a single parent whose table name the child column
     mentions keeps the acceptance; otherwise all become candidates.
+
+    Args:
+        links: The measured links.
+
+    Returns:
+        The links with competing accepts demoted to `candidate`, sorted by
+        descending score, then child and parent name.
     """
     groups: dict[tuple[str, tuple[str, ...]], list[Link]] = {}
     for link in links:
@@ -427,6 +524,16 @@ def many_to_many(
     queries) under the stage `many_to_many` before it is measured. When the
     budget cannot cover the next pair the search stops at that pair, the
     boundary is on the meter, and the pairs found so far are returned.
+
+    Args:
+        source: Read-only source.
+        catalog: Profiles of the tables.
+        scans: Key scan of each table.
+        eps_fk: Largest share of left values allowed to lack a match.
+
+    Returns:
+        One `many_to_many` link per overlapping pair, where neither column
+        is a key and the kinds match.
     """
     found: list[Link] = []
     for left in catalog.tables:
@@ -484,6 +591,15 @@ def paths(
     Hops go up (child to parent, many-to-one) or down (parent to children,
     one-to-many, to be aggregated through the as-of view). A path never
     revisits a table. Many-to-many links are not in `accepted()`.
+
+    Args:
+        graph: The join graph.
+        target: Table the paths start from.
+        depth: Largest number of hops.
+
+    Returns:
+        Every path of one to `depth` hops, each a tuple of steps; empty if
+        `depth` is below 1.
     """
     if depth < 1:
         return []

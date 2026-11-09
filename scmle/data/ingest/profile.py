@@ -1,4 +1,4 @@
-"""Push-down profile and consistent reads (F9 section 1).
+"""Push-down profile and consistent reads.
 
 Uniqueness and inclusion are universal statements: a sample can refute them
 but cannot confirm them. So every statistic here is an aggregate query run in
@@ -32,6 +32,12 @@ ORDER_BY = re.compile(r"\border\s+by\b", re.IGNORECASE)
 def quote(name: str) -> str:
     """Quotes one SQL identifier.
 
+    Args:
+        name: The identifier.
+
+    Returns:
+        The identifier wrapped in double quotes.
+
     Raises:
         ValueError: On an empty name or one with a NUL or double quote.
     """
@@ -41,7 +47,16 @@ def quote(name: str) -> str:
 
 
 def quote_all(names: Sequence[str]) -> str:
-    """Comma-separated quoted identifiers."""
+    """Quotes several SQL identifiers and joins them.
+
+    An unsafe name makes `quote` raise `ValueError`, which propagates.
+
+    Args:
+        names: The identifiers.
+
+    Returns:
+        The quoted identifiers separated by commas.
+    """
     return ", ".join(quote(name) for name in names)
 
 
@@ -50,6 +65,13 @@ def statement(template: str, **parts: str) -> str:
 
     Only identifiers and clauses built from them are ever interpolated,
     never values, so the string-built statement cannot be injected.
+
+    Args:
+        template: SQL text with `{name}` placeholders.
+        **parts: Text for each placeholder, already quoted.
+
+    Returns:
+        The statement with the placeholders filled.
     """
     return template.format(**parts)  # nosec B608
 
@@ -68,7 +90,15 @@ class SqlSource:
         uri: str = "sqlite://ingest",
         read_only_statement: str | None = None,
     ) -> None:
-        """Initializes the source around an injected DB-API factory."""
+        """Initializes the source around an injected DB-API factory.
+
+        Args:
+            connection_factory: Callable returning a DB-API connection.
+            meter: Budget meter to charge, or None for no budget.
+            uri: Source URI, used in error messages.
+            read_only_statement: Statement that puts the session in
+                query-only mode, or None to use the connector's default.
+        """
         self.connector = connectors.DbApiConnector(
             uri,
             "SELECT 1",
@@ -87,12 +117,18 @@ class SqlSource:
     ) -> list[tuple[Any, ...]] | None:
         """Runs one read-only query.
 
-        Returns:
-            The rows, or None when the budget refused the step (the boundary
-            is on the meter).
+        A statement that is not a single read-only query is refused by
+        `connectors.refuse_writes`, whose `ConnectorError` propagates.
 
-        Raises:
-            ConnectorError: If the statement is not a read-only query.
+        Args:
+            sql: The statement.
+            stage: Budget stage to charge; with no stage nothing is charged.
+            unit: What the query covers, for the stop boundary.
+            cost_rows: Rows the query is estimated to scan.
+
+        Returns:
+            The rows as tuples, or None when the budget refused the step
+            (the boundary is on the meter).
         """
         connectors.refuse_writes(sql, self.connector.source_uri)
         if (
@@ -106,12 +142,34 @@ class SqlSource:
             return [tuple(row) for row in cursor.fetchall()]
 
     def scalar(self, sql: str, stage: str = "", unit: str = "") -> Any | None:
-        """The first cell of the first row, or None if refused or empty."""
+        """Runs a query and takes its first cell.
+
+        Args:
+            sql: The statement.
+            stage: Budget stage to charge.
+            unit: What the query covers.
+
+        Returns:
+            The first cell of the first row, or None if the budget refused
+            the query or it returned no rows.
+        """
         rows = self.fetch(sql, stage, unit)
         return rows[0][0] if rows else None
 
     def columns(self, table: str, stage: str = "") -> tuple[str, ...]:
-        """Column names of a table, in order (one metadata query)."""
+        """Reads the column names of a table with one metadata query.
+
+        An unsafe table name makes `quote` raise `ValueError`, which
+        propagates.
+
+        Args:
+            table: The table name.
+            stage: Budget stage to charge; with no stage nothing is charged.
+
+        Returns:
+            The column names in table order, or an empty tuple if the budget
+            refused the query.
+        """
         sql = statement("SELECT * FROM {t} WHERE 1 = 0", t=quote(table))
         connectors.refuse_writes(sql, self.connector.source_uri)
         if (
@@ -126,7 +184,15 @@ class SqlSource:
 
 
 def value_kind(value: Any) -> str:
-    """`number`, `text`, `other` or `empty` for a column's minimum value."""
+    """Classifies the kind of a column from its minimum value.
+
+    Args:
+        value: The column's minimum, as returned by the source.
+
+    Returns:
+        `empty` for None, `number` for a non-boolean int or float, `text`
+        for a string, otherwise `other`.
+    """
     if value is None:
         return "empty"
     if isinstance(value, bool):
@@ -159,27 +225,52 @@ class ColumnProfile:
     maximum: str | None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the profile.
+
+        Returns:
+            A JSON-ready mapping of the fields.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class TableProfile:
-    """Row count and column profiles of one table."""
+    """Row count and column profiles of one table.
+
+    Attributes:
+        name: Table name.
+        rows: Number of rows.
+        columns: Profile of each column, in table order.
+    """
 
     name: str
     rows: int
     columns: tuple[ColumnProfile, ...]
 
     def column(self, name: str) -> ColumnProfile:
-        """The profile of one column."""
+        """Looks up the profile of one column.
+
+        Args:
+            name: Column name.
+
+        Returns:
+            The profile of that column.
+
+        Raises:
+            KeyError: If the table has no such column.
+        """
         for item in self.columns:
             if item.name == name:
                 return item
         raise KeyError(f"{self.name} has no column {name!r}")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the table profile.
+
+        Returns:
+            A JSON-ready mapping with the name, row count and column
+            records.
+        """
         return {
             "name": self.name,
             "rows": self.rows,
@@ -204,21 +295,36 @@ class Catalog:
 
     @property
     def fingerprint(self) -> str:
-        """Digest of the aggregates in this catalog."""
+        """The SHA-256 hex digest of the aggregates in this catalog."""
         document = json.dumps(
             [t.to_dict() for t in self.tables], sort_keys=True
         )
         return hashlib.sha256(document.encode("utf-8")).hexdigest()
 
     def table(self, name: str) -> TableProfile:
-        """The profile of one table."""
+        """Looks up the profile of one table.
+
+        Args:
+            name: Table name.
+
+        Returns:
+            The profile of that table.
+
+        Raises:
+            KeyError: If the table was not profiled.
+        """
         for item in self.tables:
             if item.name == name:
                 return item
         raise KeyError(f"table {name!r} was not profiled")
 
     def to_dict(self) -> dict[str, Any]:
-        """`ingest_catalog.json`."""
+        """Serializes the catalog, for `ingest_catalog.json`.
+
+        Returns:
+            A JSON-ready mapping with `partial`, the fingerprint and the
+            table records.
+        """
         return {
             "partial": self.partial,
             "fingerprint": self.fingerprint,
@@ -229,7 +335,16 @@ class Catalog:
 def profile_table(
     source: SqlSource, table: str, stage: str = "profile"
 ) -> TableProfile | None:
-    """Profiles one table by aggregate queries; None if the budget stops it."""
+    """Profiles one table by aggregate queries.
+
+    Args:
+        source: The source to query.
+        table: Table name.
+        stage: Budget stage to charge.
+
+    Returns:
+        The table profile, or None if the budget stopped any of its queries.
+    """
     quoted = quote(table)
     count = source.scalar(
         statement("SELECT COUNT(*) FROM {t}", t=quoted), stage, table
@@ -277,6 +392,14 @@ def profile_catalog(
 
     A table whose profile the budget cannot finish is left out whole, so every
     profile in the catalog is complete; `partial` says some were not done.
+
+    Args:
+        source: The source to query.
+        tables: Table names, profiled in this order.
+        stage: Budget stage to charge.
+
+    Returns:
+        The catalog of the tables profiled before any stop.
     """
     done = []
     partial = False
@@ -293,7 +416,13 @@ class TornReadError(connectors.ConnectorError):
     """The source changed while it was being read."""
 
     def __init__(self, source_uri: str, attempts: int, reason: str) -> None:
-        """Records how many attempts were made and why the last failed."""
+        """Records how many attempts were made and why the last failed.
+
+        Args:
+            source_uri: URI of the source that changed.
+            attempts: Number of reads attempted.
+            reason: Why the last attempt was rejected.
+        """
         super().__init__(
             "torn_read",
             f"source changed during the read ({reason}) after "
@@ -323,7 +452,14 @@ class ConsistentRead:
 
 
 def has_total_order(query: str) -> bool:
-    """Whether the query text has an `ORDER BY` outside quoted text."""
+    """Checks for a total order in a query.
+
+    Args:
+        query: The SQL text.
+
+    Returns:
+        True if `ORDER BY` appears outside quoted text and comments.
+    """
     cleaned = connectors.LITERALS_AND_COMMENTS.sub(" ", query)
     return ORDER_BY.search(cleaned) is not None
 
@@ -331,7 +467,15 @@ def has_total_order(query: str) -> bool:
 def read_once(
     connector: connectors.SourceConnector, batch_rows: int
 ) -> pd.DataFrame:
-    """Reads every batch of a connector into one frame."""
+    """Reads every batch of a connector into one frame.
+
+    Args:
+        connector: The source to read.
+        batch_rows: Rows per batch.
+
+    Returns:
+        All rows, with the column names of the source schema.
+    """
     rows: list[tuple[Any, ...]] = []
     checkpoint = None
     names: list[str] = []
@@ -365,9 +509,15 @@ def consistent_read(
         require_order: Refuse a query with no `ORDER BY`, because batches of
             an unordered query are not a function of the offset.
 
+    Returns:
+        The rows, the snapshot token, whether it was verified and the number
+        of attempts made.
+
     Raises:
         ConnectorError: `unordered_query` when the order is missing.
         TornReadError: When every attempt saw a change.
+        CheckpointError: When the connector reports a checkpoint problem
+            other than `source_changed`.
     """
     query = getattr(connector, "query", None)
     if require_order and isinstance(query, str) and not has_total_order(query):

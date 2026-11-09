@@ -1,18 +1,18 @@
-"""Feature synthesis through the as-of view (F9 section 5).
+"""Feature synthesis through the as-of view.
 
 A fixed grammar, Deep Feature Synthesis style: ten primitives over the rows of
 a related table in declared windows, parent-attribute lookups, and depth-2
 nesting (an aggregate of per-row aggregates of a grandchild table). The
 grammar, the windows and the cap `B_feat` are declared; the family size is
 fixed before exploration and every kept feature is registered in the ledger
-as a `synthesized` hypothesis, so the multiplicity the ledger plans for is
-the multiplicity that exists.
+as a `synthesized` hypothesis, so the multiplicity the ledger corrects for
+is the multiplicity that exists.
 
 This module never touches a table. It receives `AsOfView` objects and asks
 them for the rows visible at each target row's cutoff; `tests` hold it to
 that by checking its imports. Label-free filters (constant, mostly missing,
-duplicate of an earlier feature) run first because P3 lets them read all
-rows; nothing here reads the target.
+duplicate of an earlier feature) run first; they use no labels, and nothing
+here reads the target.
 """
 
 from collections.abc import Sequence
@@ -83,7 +83,11 @@ class Source:
     role: str = CHILD
 
     def __post_init__(self) -> None:
-        """Validates the role."""
+        """Validates the role.
+
+        Raises:
+            ValueError: If `role` is neither `child` nor `parent`.
+        """
         if self.role not in (CHILD, PARENT):
             raise ValueError("role must be child or parent")
 
@@ -94,7 +98,7 @@ class Nest:
 
     Attributes:
         mid: The child table of the target.
-        leaf: As-of view of the grandchild table, keyed by `leaf_link`.
+        leaf: As-of view of the grandchild table, joined on its `key`.
         mid_id: Column of the mid table the leaf rows link to.
     """
 
@@ -128,7 +132,11 @@ class FeatureSpec:
     inner: str | None = None
 
     def expression(self) -> str:
-        """The feature as text, for the manifest."""
+        """Writes the feature as text, for the manifest.
+
+        Returns:
+            The primitive, value column and window as a readable expression.
+        """
         window = "all" if self.window_days is None else f"{self.window_days:g}d"
         if self.kind == "nested":
             return (
@@ -139,12 +147,30 @@ class FeatureSpec:
 
 
 def window_label(window: float | None) -> str:
-    """Window text used in feature names."""
+    """Writes a window as text for feature names.
+
+    Args:
+        window: Window in days, or None for all visible rows.
+
+    Returns:
+        `all` for None, otherwise the days followed by `d`, e.g. `30d`.
+    """
     return "all" if window is None else f"{window:g}d"
 
 
 def candidate_columns(source: Source) -> tuple[list[str], list[str]]:
-    """(numeric, other) value columns of a source, excluding structure."""
+    """Finds the value columns of a source, excluding structure.
+
+    Key, time, reserved and identifier-like (`id`, `*_id`) columns are
+    skipped.
+
+    Args:
+        source: The related table.
+
+    Returns:
+        The numeric non-boolean columns and the other columns, each in
+        table order.
+    """
     view = source.view
     frame = view.reader()
     skip = {
@@ -171,7 +197,17 @@ def propose(
     nests: Sequence[Nest] = (),
     windows: Sequence[float | None] = WINDOWS_DAYS,
 ) -> list[FeatureSpec]:
-    """Every feature of the grammar for these sources, in a fixed order."""
+    """Lists every feature of the grammar for these sources.
+
+    Args:
+        sources: Related tables as views; a `parent` source gives lookups,
+            a `child` source gives windowed aggregates.
+        nests: Depth-2 routes; each `mid` must be one of `sources`.
+        windows: Windows in days; None means all visible rows.
+
+    Returns:
+        The feature specifications in a fixed order.
+    """
     specs: list[FeatureSpec] = []
     for index, source in enumerate(sources):
         table = source.view.name
@@ -258,7 +294,19 @@ def propose(
 def target_frame(
     targets: pd.DataFrame, key: str, moment: str, lag_days: float, view: Any
 ) -> pd.DataFrame:
-    """Targets renamed for a view: join key, row label and cutoff in days."""
+    """Builds the target frame a view is asked about.
+
+    Args:
+        targets: One row per prediction case.
+        key: Column of `targets` joined to the view's key.
+        moment: Column holding each case's prediction moment.
+        lag_days: Gap between the cutoff and the moment.
+        view: The as-of view the frame is for.
+
+    Returns:
+        A frame with the view's key column, `TARGET_COLUMN` (the row
+        position) and `CUTOFF_COLUMN` (moment minus lag, in days).
+    """
     cutoff = asof_view.to_days(targets[moment]) - lag_days
     return pd.DataFrame(
         {
@@ -290,6 +338,10 @@ def reduce_rows(
     Returns:
         A float (or object, for `last` of non-numeric values) series indexed
         by target row `0..count-1`.
+
+    Raises:
+        ValueError: If the primitive is unknown, or it needs a value column
+            and `value` is None.
     """
     if primitive not in PRIMITIVES:
         raise ValueError(f"unknown primitive: {primitive}")
@@ -341,7 +393,17 @@ def reduce_rows(
 
 
 def slope(rows: pd.DataFrame, value: str) -> pd.Series:
-    """OLS slope of value on event time per target row (days)."""
+    """Fits the OLS slope of a value on event time per target row.
+
+    Args:
+        rows: Visible rows with `TARGET_COLUMN`, `EVENT_COLUMN` and the
+            value column.
+        value: Numeric value column.
+
+    Returns:
+        The slope per target row, in value units per day; NaN for a target
+        with fewer than two rows or no spread in event time.
+    """
     label = asof_view.TARGET_COLUMN
     x = rows[asof_view.EVENT_COLUMN]
     y = rows[value]
@@ -364,7 +426,22 @@ def evaluate(
     nests: Sequence[Nest],
     lag_days: float,
 ) -> pd.Series:
-    """Computes one feature for every target row."""
+    """Computes one feature for every target row.
+
+    Args:
+        spec: The feature.
+        targets: One row per prediction case.
+        moment: Column holding each case's prediction moment.
+        sources: Related tables as views.
+        nests: Depth-2 routes.
+        lag_days: Gap between the cutoff and the moment.
+
+    Returns:
+        The feature values, one per target row in order.
+
+    Raises:
+        ScmleError: If a `nested` spec lacks its nest or inner primitive.
+    """
     source = sources[spec.source]
     view = source.view
     count = len(targets)
@@ -401,7 +478,16 @@ def evaluate(
 def tables_read(
     spec: FeatureSpec, sources: Sequence[Source], nests: Sequence[Nest]
 ) -> list[asof_view.AsOfView]:
-    """Views a feature reads."""
+    """Lists the views a feature reads.
+
+    Args:
+        spec: The feature.
+        sources: Related tables as views.
+        nests: Depth-2 routes.
+
+    Returns:
+        The source view and, for a nested feature, the leaf view.
+    """
     views = [sources[spec.source].view]
     if spec.nest is not None:
         views.append(nests[spec.nest].leaf)
@@ -425,11 +511,20 @@ class FeatureSet:
     declared_family_size: int
 
     def kept(self) -> list[dict[str, Any]]:
-        """Manifest records of the kept features."""
+        """Selects the manifest records of the kept features.
+
+        Returns:
+            The records whose `kept` flag is true, in manifest order.
+        """
         return [m for m in self.manifest if m["kept"]]
 
     def to_dict(self) -> dict[str, Any]:
-        """`feature_manifest.json`."""
+        """Serializes the set, for `feature_manifest.json`.
+
+        Returns:
+            A JSON-ready mapping with the declared family size, the number
+            of proposals and the manifest.
+        """
         return {
             "declared_family_size": self.declared_family_size,
             "proposed": len(self.manifest),
@@ -438,7 +533,14 @@ class FeatureSet:
 
 
 def fingerprint(column: pd.Series) -> str:
-    """Digest of a feature column, equal for identical values."""
+    """Digests a feature column.
+
+    Args:
+        column: The feature values.
+
+    Returns:
+        A SHA-256 hex digest, equal for identical values (NaN equals NaN).
+    """
     values = column.to_numpy()
     if values.dtype == object:
         text = repr(list(values)).encode("utf-8")
@@ -467,8 +569,8 @@ def synthesize(
         nests: Depth-2 routes; each `mid` must be one of `sources`.
         lag_days: Gap between the cutoff and the moment (`t_i - lag`).
         windows: Declared windows in days; None means all visible rows.
-        max_features: `B_feat`. Proposals beyond it are dropped in grammar
-            order and listed.
+        max_features: Cap on proposals. Proposals beyond it are dropped in
+            grammar order and listed.
         max_null_rate: Features missing more often are dropped.
         strict: Drop features whose weakest source tier is `unverified`.
 
@@ -476,6 +578,9 @@ def synthesize(
         The feature set. Every dropped proposal is in the manifest with its
         reason: `cap`, `no as-of rule`, `unverified (strict)`, `constant`,
         `mostly missing` or `duplicate of <name>`.
+
+    Raises:
+        ValueError: If `lag_days` is negative.
     """
     if lag_days < 0:
         raise ValueError("lag_days must be non-negative")
@@ -538,17 +643,20 @@ def feature_provenance(
     views: Sequence[asof_view.AsOfView],
     today: datetime.date | None = None,
 ) -> provenance.ProvenanceTable:
-    """Provenance table of the kept features for F4.
+    """Builds the provenance table of the kept features.
 
     Each feature inherits the weakest source among the tables it reads. A
     feature whose weakest source is unverified gets an unknown as-of rule, so
-    F4 tiers it `unverified` and strict mode excludes it.
+    admissibility tiers it `unverified` and strict mode excludes it.
 
     Args:
         features: The feature set.
         lag_days: Lag used in synthesis.
         views: Every view that was used, to look up each table's rule.
         today: Day on which attestations must be valid.
+
+    Returns:
+        One record per kept feature, in manifest order.
     """
     by_name = {v.name: v for v in views}
     records = []
@@ -600,8 +708,15 @@ def register_family(
 ) -> list[ledger_module.Hypothesis]:
     """Registers every kept feature as a `synthesized` hypothesis.
 
-    Raises:
-        MultiplicityError: If the number registered is not the declared size.
+    If the number registered then differs from the declared size,
+    `check_multiplicity` raises `MultiplicityError`, which propagates.
+
+    Args:
+        ledger: The hypothesis ledger.
+        features: The feature set whose kept features are registered.
+
+    Returns:
+        The registered hypotheses, in manifest order.
     """
     registered = []
     for entry in features.kept():
@@ -625,6 +740,13 @@ def register_family(
 
 def check_multiplicity(declared: int, ledger: ledger_module.Ledger) -> int:
     """Requires the registered `synthesized` count to equal the declared one.
+
+    Args:
+        declared: The declared family size.
+        ledger: The hypothesis ledger.
+
+    Returns:
+        The number of `synthesized` hypotheses registered.
 
     Raises:
         MultiplicityError: On a mismatch; the run must fail.

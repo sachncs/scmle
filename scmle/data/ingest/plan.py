@@ -1,16 +1,12 @@
-"""`IngestPlan`: runs the F9 stages in order and writes their artifacts.
+"""`IngestPlan`: runs the ingestion stages in order and writes their artifacts.
 
 Stages: `profile` (catalog), `infer_grain` (keys and the unit verdict),
 `discover_joins` (link graph), each under one budget. Artifacts, written
 atomically into the run directory: `ingest_catalog.json`, `grain_report.json`,
 `join_graph.json`, `ingest_budget.json`. Entity resolution, the as-of views
 and synthesis take frames and views and are called from code
-(`entities.resolve`, `synthesize.synthesize`); the plan records their
-artifacts through `write_artifact`.
-
-Nothing here is wired into a charter run yet: the charter format, the stage
-hook before `custody` and the hand-off of the group column to F2 are listed
-as open in the phase plan.
+(`entities.resolve`, `synthesize.synthesize`); `write_artifact` records
+their artifacts.
 """
 
 from collections.abc import Callable
@@ -60,7 +56,12 @@ class IngestSettings:
     declared: tuple[joins.DeclaredKey, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validates scope."""
+        """Validates scope.
+
+        Raises:
+            ValueError: If `tables` is empty, or a unit is given and
+                `target_table` is not one of `tables`.
+        """
         if not self.tables:
             raise ValueError("tables must not be empty")
         if self.unit is not None and self.target_table not in self.tables:
@@ -70,7 +71,16 @@ class IngestSettings:
 def write_artifact(
     run_dir: pathlib.Path, name: str, document: dict[str, Any]
 ) -> pathlib.Path:
-    """Writes a JSON artifact atomically and returns its path."""
+    """Writes a JSON artifact atomically.
+
+    Args:
+        run_dir: Run directory; created if missing.
+        name: File name of the artifact.
+        document: The content, written as sorted, indented JSON.
+
+    Returns:
+        The path of the written file.
+    """
     path = run_dir / name
     run_dir.mkdir(parents=True, exist_ok=True)
     durability.write_atomically(
@@ -90,7 +100,17 @@ class IngestPlan:
         budget: budgets.IngestBudget | None = None,
         clock: Callable[[], float] | None = None,
     ) -> None:
-        """Opens the plan; nothing is read yet."""
+        """Opens the ingestion; nothing is read yet.
+
+        Args:
+            run_dir: Directory the artifacts are written to.
+            connection_factory: Callable returning a DB-API connection to
+                the source.
+            settings: Tolerances and scope.
+            budget: Limits for the run; unlimited when None.
+            clock: Wall-time source for the budget meter; the meter's
+                default clock when None.
+        """
         self.run_dir = pathlib.Path(run_dir)
         self.settings = settings
         limits = budget or budgets.IngestBudget()
@@ -106,7 +126,11 @@ class IngestPlan:
         self.graph: joins.JoinGraph | None = None
 
     def run_profile(self) -> profile.Catalog:
-        """Profiles the tables and writes `ingest_catalog.json`."""
+        """Profiles the tables and writes `ingest_catalog.json`.
+
+        Returns:
+            The catalog of the profiled tables.
+        """
         self.catalog = profile.profile_catalog(
             self.source, self.settings.tables
         )
@@ -114,7 +138,17 @@ class IngestPlan:
         return self.catalog
 
     def infer_grain(self) -> dict[str, grain.KeyScan]:
-        """Finds keys per table, judges the unit, writes `grain_report.json`."""
+        """Finds keys per table, judges the unit, writes `grain_report.json`.
+
+        Profiles first if that has not been done.
+
+        Returns:
+            The key scan of each profiled table, by table name.
+
+        Raises:
+            ScmleError: If a unit is set and the target table was scanned
+                but `target_table` is None.
+        """
         catalog = self.catalog or self.run_profile()
         self.scans = {}
         for table in catalog.tables:
@@ -155,7 +189,13 @@ class IngestPlan:
         return self.scans
 
     def discover_joins(self) -> joins.JoinGraph:
-        """Measures links, writes `join_graph.json`."""
+        """Measures links, writes `join_graph.json`.
+
+        Profiles and infers grain first if that has not been done.
+
+        Returns:
+            The join graph over the tables that have a key scan.
+        """
         catalog = self.catalog or self.run_profile()
         if not self.scans:
             self.infer_grain()
@@ -174,14 +214,24 @@ class IngestPlan:
         return self.graph
 
     def run_all(self) -> dict[str, Any]:
-        """Runs every stage and writes `ingest_budget.json`."""
+        """Runs every stage and writes `ingest_budget.json`.
+
+        Returns:
+            The summary from `finish`.
+        """
         self.run_profile()
         self.infer_grain()
         self.discover_joins()
         return self.finish()
 
     def finish(self) -> dict[str, Any]:
-        """Writes the budget artifact and returns a one-screen summary."""
+        """Writes the budget artifact and summarizes the run.
+
+        Returns:
+            A mapping with `partial`, the number of source queries, the unit
+            verdict (None if none), the number of accepted links and the
+            open questions.
+        """
         document = self.meter.to_dict()
         document["source_queries"] = self.source.queries
         write_artifact(self.run_dir, BUDGET, document)
@@ -199,7 +249,14 @@ class IngestPlan:
 def sqlite_factory(
     path: str | pathlib.Path,
 ) -> Callable[[], sqlite3.Connection]:
-    """Factory of read-only connections to a SQLite file."""
+    """Builds a factory of read-only connections to a SQLite file.
+
+    Args:
+        path: The SQLite file.
+
+    Returns:
+        A callable that opens a new read-only connection on each call.
+    """
     address = f"file:{pathlib.Path(path).resolve()}?mode=ro"
 
     def connect() -> sqlite3.Connection:
@@ -211,7 +268,15 @@ def sqlite_factory(
 def declared_from_json(
     items: Sequence[dict[str, Any]],
 ) -> tuple[joins.DeclaredKey, ...]:
-    """Foreign keys from `[{child, child_columns, parent, parent_columns}]`."""
+    """Builds declared keys from `[{child, child_columns, parent, ...}]`.
+
+    Args:
+        items: Mappings with `child`, `child_columns`, `parent` and
+            `parent_columns`.
+
+    Returns:
+        One declared key per mapping, in order.
+    """
     return tuple(
         joins.DeclaredKey(
             str(i["child"]),

@@ -1,4 +1,4 @@
-"""The as-of view: the only read path to a non-target table (F9 section 5).
+"""The as-of view: the only read path to a non-target table.
 
 Every feature read of another table goes through `AsOfView.visible`, which
 returns only rows whose recorded `known_time` is at or before the target
@@ -58,9 +58,17 @@ class NoAsOfRuleError(ValueError):
 
 
 def to_days(values: pd.Series) -> np.ndarray:
-    """Times as float days: datetimes from the Unix epoch, numbers as given.
+    """Converts times to float days.
 
-    Strings are parsed as timestamps. Missing values become NaN.
+    Datetimes are measured from the Unix epoch, numbers are taken as given,
+    and strings are parsed as timestamps (timezone-aware values are converted
+    to UTC). Missing values become NaN.
+
+    Args:
+        values: The column of times.
+
+    Returns:
+        A float64 array of days, one per value, in the order of `values`.
     """
     if pd.api.types.is_datetime64_any_dtype(values):
         stamps = values
@@ -96,7 +104,13 @@ class TimeRule:
     log_check: provenance.LogCheck | None = None
 
     def __post_init__(self) -> None:
-        """Validates the combination of fields."""
+        """Validates the combination of fields.
+
+        Raises:
+            ValueError: If `mode` is `transaction` without `known_column`,
+                is `event_delay` without `delta_rec_days`, is not one of
+                the three modes, or if `delta_rec_days` is negative.
+        """
         if self.mode == TRANSACTION and not self.known_column:
             raise ValueError("transaction mode needs known_column")
         if self.mode == EVENT_DELAY and self.delta_rec_days is None:
@@ -107,11 +121,18 @@ class TimeRule:
             raise ValueError("delta_rec_days must be non-negative")
 
     def tier(self, today: datetime.date | None = None) -> qualification.Tier:
-        """Evidence tier of the rule.
+        """Gives the evidence tier of the rule.
 
         `confirmed` needs a passing log check and a recorded-time column; a
         delay rule is `attested` at best; a table without history, or a rule
         nobody vouches for, is `unverified`.
+
+        Args:
+            today: Date on which the attestation must be valid. When None,
+                the attestation's validity dates are not checked.
+
+        Returns:
+            The tier of the rule.
         """
         if self.mode == NON_VERSIONED:
             return qualification.Tier.UNVERIFIED
@@ -130,7 +151,15 @@ class TimeRule:
 
 
 def weakest(tiers: list[qualification.Tier]) -> qualification.Tier:
-    """The lowest tier in the list; `unverified` for an empty list."""
+    """Finds the lowest tier in a list.
+
+    Args:
+        tiers: The tiers to compare.
+
+    Returns:
+        The weakest tier by evidence order (`unverified` < `attested` <
+        `confirmed`), or `unverified` for an empty list.
+    """
     if not tiers:
         return qualification.Tier.UNVERIFIED
     return min(tiers, key=TIER_ORDER.__getitem__)
@@ -148,7 +177,7 @@ class AsOfView:
         name: str = "",
         permissive: bool = False,
     ) -> None:
-        """Opens a view.
+        """Opens a view on a table.
 
         Args:
             frame: The table.
@@ -160,7 +189,8 @@ class AsOfView:
             permissive: Allow a `non_versioned` read (unverified).
 
         Raises:
-            ValueError: On a missing column or a reserved column name.
+            ValueError: If the table uses a reserved column name, lacks a
+                needed column, or is versioned but has no `event_time`.
         """
         clash = [c for c in RESERVED if c in frame.columns]
         if clash:
@@ -182,7 +212,22 @@ class AsOfView:
         self.reader = self.freeze(frame)
 
     def freeze(self, frame: pd.DataFrame) -> Callable[[], pd.DataFrame]:
-        """Prepares the rows once and returns a closure over them."""
+        """Prepares the rows once and returns a closure over them.
+
+        Rows with a missing key are dropped, and the event and known times
+        are added as `EVENT_COLUMN` and `KNOWN_COLUMN`. In a transaction
+        table a missing recorded time falls back to the event time plus
+        `delta_rec_days`.
+
+        Args:
+            frame: The table.
+
+        Returns:
+            A function that returns the prepared rows.
+
+        Raises:
+            ScmleError: If the rule is `transaction` without a known column.
+        """
         rows = frame.loc[frame[self.key].notna()].reset_index(drop=True)
         rows = rows.copy()
         if self.event_time is not None:
@@ -209,11 +254,11 @@ class AsOfView:
 
     @property
     def tier(self) -> qualification.Tier:
-        """Evidence tier of this table's as-of rule."""
+        """The evidence tier of this table's as-of rule."""
         return self.rule.tier()
 
     def visible(self, targets: pd.DataFrame) -> pd.DataFrame:
-        """Rows readable by each target row.
+        """Selects the rows readable by each target row.
 
         Args:
             targets: Columns `key` (the join value), `TARGET_COLUMN` (an
@@ -244,7 +289,16 @@ class AsOfView:
         return joined.loc[keep].reset_index(drop=True)
 
     def evidence(self, today: datetime.date | None = None) -> dict[str, Any]:
-        """The rule and its tier, for the feature manifest."""
+        """Describes the rule and its tier, for the feature manifest.
+
+        Args:
+            today: Date on which the attestation must be valid, or None to
+                skip the date check.
+
+        Returns:
+            A mapping with the table name, rule mode, known column,
+            recording delay in days and the tier value.
+        """
         return {
             "table": self.name,
             "mode": self.rule.mode,
@@ -266,8 +320,21 @@ class AsOfView:
     ) -> "AsOfView":
         """Reads a table through `consistent_read` and opens a view on it.
 
-        Raises:
-            TornReadError: If the source changed during the read.
+        A source that changes during the read is rejected by
+        `consistent_read` with `TornReadError`, which propagates.
+
+        Args:
+            connector: The source to read completely.
+            key: Column joining the table to its target rows.
+            rule: How known time is obtained.
+            event_time: Column of when the fact happened; required unless
+                the table is `non_versioned`.
+            name: Table name, for provenance and messages.
+            permissive: Allow a `non_versioned` read (unverified).
+            batch_rows: Rows per read batch.
+
+        Returns:
+            A view over the rows that were read.
         """
         read = profile.consistent_read(connector, batch_rows)
         return cls(read.frame, key, rule, event_time, name, permissive)

@@ -1,4 +1,4 @@
-"""Grain and key inference (F9 section 2).
+"""Grain and key inference.
 
 A level-wise search over column sets of size at most `L` (default 3) for
 approximate keys, with the tolerance measure `g3(X)`: the smallest fraction of
@@ -39,20 +39,45 @@ CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 
 def stem(word: str) -> str:
-    """Strips a plural `s`; nothing cleverer, so matching stays auditable."""
+    """Strips a plural `s`; nothing cleverer, so matching stays auditable.
+
+    Args:
+        word: A lower-case word.
+
+    Returns:
+        The word without a final `s`, unless it is three letters or fewer or
+        ends in `ss`.
+    """
     if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
         return word[:-1]
     return word
 
 
 def name_tokens(name: str) -> tuple[str, ...]:
-    """Lower-case stemmed words of an identifier (snake or camel case)."""
+    """Splits an identifier into lower-case stemmed words.
+
+    Args:
+        name: An identifier in snake or camel case.
+
+    Returns:
+        The stemmed words in order of appearance.
+    """
     spaced = CAMEL.sub("_", name).lower()
     return tuple(stem(w) for w in SPLIT.split(spaced) if w)
 
 
 def unit_components(unit: str) -> tuple[str, ...]:
-    """The grain words of a unit text, e.g. `customer-month` gives two."""
+    """Extracts the grain words of a unit text.
+
+    For example, `customer-month` gives two words. Stop words, joiners and
+    numbers are dropped.
+
+    Args:
+        unit: The unit text.
+
+    Returns:
+        The distinct stemmed words, in order of first appearance.
+    """
     words = [w for w in SPLIT.split(unit.lower()) if w]
     kept = [
         stem(w)
@@ -83,11 +108,19 @@ class KeyCandidate:
     small_n: bool
 
     def rank(self) -> tuple[Any, ...]:
-        """Sort key: fewer columns, then lower g3, then fewer nulls."""
+        """Builds the sort key: fewer columns, lower g3, fewer nulls.
+
+        Returns:
+            A tuple of column count, g3, null rate and the columns.
+        """
         return (len(self.columns), self.g3, self.null_rate, self.columns)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the candidate.
+
+        Returns:
+            A JSON-ready mapping of the fields, with columns as a list.
+        """
         return {**dataclasses.asdict(self), "columns": list(self.columns)}
 
 
@@ -116,14 +149,23 @@ class KeyScan:
     eps_null: float
 
     def ties(self) -> list[list[tuple[str, ...]]]:
-        """Groups of keys equal in size, g3 and null rate (to be asked)."""
+        """Finds keys that tie, to be put to a person.
+
+        Returns:
+            Groups of two or more keys equal in size, g3 and null rate; each
+            group is a list of column tuples.
+        """
         groups: dict[tuple[Any, ...], list[tuple[str, ...]]] = {}
         for key in self.keys:
             groups.setdefault(key.rank()[:3], []).append(key.columns)
         return [g for g in groups.values() if len(g) > 1]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the scan.
+
+        Returns:
+            A JSON-ready mapping with the keys, ties and search state.
+        """
         return {
             "table": self.table,
             "rows": self.rows,
@@ -137,7 +179,16 @@ class KeyScan:
 
 
 def is_key(g3: float, null_rate: float, scan: KeyScan) -> bool:
-    """Whether the measures pass the key tolerances of the scan."""
+    """Checks measures against the key tolerances of a scan.
+
+    Args:
+        g3: The g3 measure of a column set.
+        null_rate: The null rate of the column set.
+        scan: The scan whose tolerances apply.
+
+    Returns:
+        True if `g3` and `null_rate` are within `eps_key` and `eps_null`.
+    """
     return g3 <= scan.eps_key and null_rate <= scan.eps_null
 
 
@@ -147,7 +198,20 @@ def measure(
     columns: Sequence[str],
     rows: int,
 ) -> tuple[float, float]:
-    """`(g3, null_rate)` of a column set by two grouped queries."""
+    """Measures a column set by two grouped queries.
+
+    An unsafe name makes `profile.quote` raise `ValueError`, which
+    propagates.
+
+    Args:
+        source: Read-only source.
+        table: Table name.
+        columns: The column set.
+        rows: Row count of the table.
+
+    Returns:
+        The pair `(g3, null_rate)`; `(1.0, 0.0)` for an empty table.
+    """
     names = profile.quote_all(columns)
     present = " AND ".join(f"{profile.quote(c)} IS NOT NULL" for c in columns)
     absent = " OR ".join(f"{profile.quote(c)} IS NULL" for c in columns)
@@ -173,12 +237,20 @@ def measure(
 def bound_ok(
     table: profile.TableProfile, columns: Sequence[str], eps_key: float
 ) -> bool:
-    """Label-free test: could `columns` reach `g3 <= eps_key` at all?
+    """Tests without a query whether `columns` could reach `g3 <= eps_key`.
 
     The distinct count of a set is at most the product of its columns'
     distinct counts and at most the smallest non-null count. When either
     bound is below `N (1 - eps_key)` the set cannot be a key and no query
     is spent on it.
+
+    Args:
+        table: Profile of the table.
+        columns: The column set; each must be in the profile.
+        eps_key: Largest `g3` accepted as a key.
+
+    Returns:
+        False if the set cannot be a key, True if it still might.
     """
     need = table.rows * (1.0 - eps_key)
     capacity = 1
@@ -212,6 +284,10 @@ def infer_keys(
         The scan. Level 1 needs no query (the profile has the counts); each
         later level is admitted to the budget as a whole before it runs, so a
         stop is always at a level boundary.
+
+    Raises:
+        ValueError: If `eps_key` or `eps_null` is outside [0, 1], or
+            `max_size` is below 1.
     """
     for name, value in (("eps_key", eps_key), ("eps_null", eps_null)):
         if not 0.0 <= value <= 1.0:
@@ -312,11 +388,18 @@ class UnitVerdict:
 
     @property
     def blocks(self) -> bool:
-        """Whether the run must stop or ask: anything but `match` or `finer`."""
+        """Whether the run must stop or ask.
+
+        True for any verdict but `match` or `finer`.
+        """
         return self.verdict in (COARSER, UNKNOWN)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the verdict.
+
+        Returns:
+            A JSON-ready mapping of the fields plus `blocks`.
+        """
         return {
             **dataclasses.asdict(self),
             "unit_columns": list(self.unit_columns),
@@ -328,7 +411,21 @@ class UnitVerdict:
 def match_columns(
     unit: str, table: profile.TableProfile
 ) -> tuple[tuple[str, ...], list[str]]:
-    """Columns for each unit word, and the questions left open."""
+    """Matches each unit word to one column of the table.
+
+    A word with several matching columns prefers those with an identifier
+    word in their name; a word that still has zero or several matches raises
+    a question.
+
+    Args:
+        unit: The unit text.
+        table: Profile of the table.
+
+    Returns:
+        The matched columns in table order and the open questions. When
+        there are questions, or the unit has no grain words, the columns are
+        empty.
+    """
     questions = []
     chosen: list[str] = []
     components = unit_components(unit)
@@ -364,6 +461,15 @@ def unit_verdict(
     key: `match`. Else if some key was found: `finer` (aggregation to the unit
     is needed). Else `unknown`. A table that is `coarser` is never reported as
     `match`, whatever the tolerances: subsets are checked first.
+
+    Args:
+        source: Read-only source, queried for column sets not yet measured.
+        table: Profile of the table.
+        unit: The charter unit text.
+        scan: The key scan of the table; measures made here are added to it.
+
+    Returns:
+        The verdict. It is `unknown` when the budget stops a check.
     """
     columns, questions = match_columns(unit, table)
     if not columns:

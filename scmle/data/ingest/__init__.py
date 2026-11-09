@@ -1,4 +1,4 @@
-"""Raw-data ingestion and feature construction (feature F9).
+"""Raw-data ingestion and feature construction.
 
 Reads relational sources by aggregate queries run in the source, infers the
 grain, keys and joins of the tables, resolves duplicate entities, and builds
