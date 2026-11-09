@@ -43,13 +43,26 @@ def canonical(value: Any) -> str:
         return "null"
     if hasattr(value, "item") and not isinstance(value, pandas.Timestamp):
         value = value.item()
+    if isinstance(value, float) and math.isnan(value):
+        return "null"
+    return tagged(value)
+
+
+def tagged(value: Any) -> str:
+    """Renders a present value as text tagged with its type.
+
+    Args:
+        value: A bool, int, float, Timestamp or anything else.
+
+    Returns:
+        A type tag and the value (`b:`, `i:`, `f:` with the round-trip
+        `repr`, `t:` ISO 8601, or `s:`).
+    """
     if isinstance(value, bool):
         return f"b:{int(value)}"
     if isinstance(value, int):
         return f"i:{value}"
     if isinstance(value, float):
-        if math.isnan(value):
-            return "null"
         return f"f:{value!r}"
     if isinstance(value, pandas.Timestamp):
         return f"t:{value.isoformat()}"
