@@ -9,7 +9,6 @@ trees and nearest neighbours.
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
-from typing import ClassVar
 
 from sklearn import ensemble
 
@@ -28,11 +27,11 @@ class Bagging(models.Model):
     """Bags a base model family.
 
     Attributes:
-        base: Adapter class of the model that is bagged.
+        base: Adapter of the model that is bagged.
     """
 
     family = "bagging"
-    base: ClassVar[type[models.Model]]
+    base: models.Model
     search_space = search.SearchSpace(
         (
             search.IntParameter("n_estimators", 10, 60),
@@ -78,7 +77,7 @@ class Bagging(models.Model):
         given = dict(params or {})
         bag = {name: given.pop(name) for name in BAG_PARAMS if name in given}
         bag.setdefault("n_estimators", DEFAULT_MEMBERS)
-        member = self.base().build(task, seed, given)
+        member = self.base.build(task, seed, given)
         bagger = (
             ensemble.BaggingClassifier
             if task.is_classification
@@ -91,21 +90,21 @@ class BaggedTree(Bagging):
     """Bagged deep decision trees."""
 
     name = "bagged_decision_tree"
-    base = classical.DecisionTree
+    base = classical.DECISION_TREE
 
 
 class BaggedKnn(Bagging):
     """Bagged nearest neighbours."""
 
     name = "bagged_knn"
-    base = classical.Knn
+    base = classical.KNN
 
 
 class BaggedLogistic(Bagging):
     """Bagged logistic regression."""
 
     name = "bagged_logistic_regression"
-    base = classical.LogisticRegression
+    base = classical.LOGISTIC_REGRESSION
 
 
 BAGGING_ADAPTERS: tuple[type[models.Model], ...] = (

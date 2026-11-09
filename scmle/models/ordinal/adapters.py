@@ -3,7 +3,6 @@
 from collections.abc import Mapping
 import types
 from typing import Any
-from typing import ClassVar
 
 from sklearn import ensemble
 from sklearn import linear_model
@@ -25,8 +24,8 @@ class Ordinal(classical.Learner):
     training fold missing the top level still yields a full probability row.
     """
 
-    conformance_params: ClassVar[Mapping[str, Any] | None] = (
-        types.MappingProxyType({LEVELS: 3})
+    conformance_params: Mapping[str, Any] | None = types.MappingProxyType(
+        {LEVELS: 3}
     )
 
     def build(
