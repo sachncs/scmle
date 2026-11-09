@@ -120,6 +120,7 @@ class PositiveLabelMetric(Metric):
             return super().scorer(None)
         return sk_metrics.make_scorer(
             self.score_function,
+            greater_is_better=self.greater_is_better,
             response_method=self.response_methods,
             pos_label=positive,
         )

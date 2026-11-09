@@ -298,3 +298,28 @@ def test_a_rope_makes_negligible_gains_ties(registry):
     )
 
     assert winner.model_name == "decision_tree"
+
+
+def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
+    from sklearn import metrics as sk_metrics
+
+    from scmle.contracts import metrics as metric_contracts
+
+    metric = metric_contracts.PositiveLabelMetric(
+        "false_f1",
+        "f1",
+        False,
+        frozenset({tasks.TaskType.BINARY}),
+        sk_metrics.f1_score,
+        ("predict",),
+    )
+    target = pd.Series(["a", "b", "a", "b"])
+    features = pd.DataFrame({"x": [0.0, 1.0, 0.0, 1.0]})
+    fitted = dummy.DummyClassifier(strategy="most_frequent").fit(
+        features, target
+    )
+
+    scorer = metric.scorer("a")
+
+    assert scorer(fitted, features, target) <= 0
+    assert metric.score(fitted, features, target, "a") >= 0
