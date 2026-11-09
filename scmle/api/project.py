@@ -76,7 +76,7 @@ def publish_curation_artifact(path: pathlib.Path, content: bytes) -> None:
         durability.sync_directory(path.parent)
     finally:
         with contextlib.suppress(FileNotFoundError):
-            os.unlink(temporary_name)
+            pathlib.Path(temporary_name).unlink()
 
 
 PARAMETER_ESTIMATION_DECLARATION_ARTIFACT = (
@@ -142,33 +142,26 @@ def parameter_estimation_declaration_digest(
     ).hexdigest()
 
 
-def restore_parameter_estimation_declaration(
-    run_directory: str | pathlib.Path,
+def read_declaration_envelope(
+    artifact_path: pathlib.Path,
     expected_config_hash: str,
-) -> tuple[
-    parameter_estimation.Estimand | None,
-    parameter_estimation.Config | None,
-]:
-    """Validates and reconstructs the scientific declaration for resume.
+) -> dict[str, Any]:
+    """Reads a run's declaration and checks its digest, schema and hash.
 
     Args:
-        run_directory: Directory of the run holding the declaration and its lock
-            file.
+        artifact_path: Directory of the run holding the declaration and its
+            lock file.
         expected_config_hash: Configuration hash the declaration must have been
             written for.
 
     Returns:
-        The estimand and the policy, or a pair of None if estimation was
-        disabled for the run.
+        The declaration without its digest.
 
     Raises:
         ArtifactError: If the declaration or its lock is missing, unreadable,
             not an object, lacks a digest, fails the digest check, has an
-            unsupported schema or another configuration hash, has fields that do
-            not match its enabled state, or describes an invalid estimand or
-            policy.
+            unsupported schema or has another configuration hash.
     """
-    artifact_path = pathlib.Path(run_directory)
     report_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_ARTIFACT
     lock_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_LOCK
     try:
@@ -212,6 +205,72 @@ def restore_parameter_estimation_declaration(
             "configuration",
             {"run_dir": str(artifact_path)},
         )
+    return envelope
+
+
+def rebuild_policy_values(
+    policy_values: dict[str, Any],
+) -> dict[str, Any]:
+    """Turns the stored policy record back into configuration values.
+
+    Args:
+        policy_values: The policy as stored in the declaration; changed in
+            place.
+
+    Returns:
+        The same mapping, with its prior, assumption lists and variance
+        bounds restored to their configuration types.
+    """
+    if "prior" in policy_values:
+        prior_values = dict(policy_values["prior"])
+        policy_values["prior"] = parameter_estimation.BayesianPrior(
+            mean=tuple(prior_values["mean"]),
+            precision=tuple(tuple(row) for row in prior_values["precision"]),
+            shape=prior_values.get("shape", 2.0),
+            scale=prior_values.get("scale", 1.0),
+        )
+    for field in (
+        "causal_assumptions",
+        "continuous_treatment_assumptions",
+        "hierarchical_assumptions",
+    ):
+        if field in policy_values:
+            policy_values[field] = tuple(policy_values[field])
+    if "reml_variance_bounds" in policy_values:
+        policy_values["reml_variance_bounds"] = tuple(
+            policy_values["reml_variance_bounds"]
+        )
+    return policy_values
+
+
+def restore_parameter_estimation_declaration(
+    run_directory: str | pathlib.Path,
+    expected_config_hash: str,
+) -> tuple[
+    parameter_estimation.Estimand | None,
+    parameter_estimation.Config | None,
+]:
+    """Validates and reconstructs the scientific declaration for resume.
+
+    Args:
+        run_directory: Directory of the run holding the declaration and its lock
+            file.
+        expected_config_hash: Configuration hash the declaration must have been
+            written for.
+
+    Returns:
+        The estimand and the policy, or a pair of None if estimation was
+        disabled for the run.
+
+    Raises:
+        ArtifactError: If the declaration or its lock is missing, unreadable,
+            not an object, lacks a digest, fails the digest check, has an
+            unsupported schema or another configuration hash, has fields that do
+            not match its enabled state, or describes an invalid estimand or
+            policy.
+    """
+    artifact_path = pathlib.Path(run_directory)
+    envelope = read_declaration_envelope(artifact_path, expected_config_hash)
     enabled = envelope.get("enabled")
     if enabled is False:
         if set(envelope) != {
@@ -246,29 +305,9 @@ def restore_parameter_estimation_declaration(
             assumptions=tuple(estimand_record["assumptions"]),
             description=estimand_record.get("description", ""),
         )
-        policy_values = dict(envelope["policy"])
-        if "prior" in policy_values:
-            prior_values = dict(policy_values["prior"])
-            policy_values["prior"] = parameter_estimation.BayesianPrior(
-                mean=tuple(prior_values["mean"]),
-                precision=tuple(
-                    tuple(row) for row in prior_values["precision"]
-                ),
-                shape=prior_values.get("shape", 2.0),
-                scale=prior_values.get("scale", 1.0),
-            )
-        for field in (
-            "causal_assumptions",
-            "continuous_treatment_assumptions",
-            "hierarchical_assumptions",
-        ):
-            if field in policy_values:
-                policy_values[field] = tuple(policy_values[field])
-        if "reml_variance_bounds" in policy_values:
-            policy_values["reml_variance_bounds"] = tuple(
-                policy_values["reml_variance_bounds"]
-            )
-        policy = parameter_estimation.Config(**policy_values)
+        policy = parameter_estimation.Config(
+            **rebuild_policy_values(dict(envelope["policy"]))
+        )
     except (KeyError, TypeError, ValueError) as error:
         raise errors.ArtifactError(
             "parameter estimation declaration is invalid",
@@ -413,6 +452,44 @@ def persist_parameter_estimation_evidence(
     result.estimation = verified
 
 
+def require_treatment_column(
+    orchestrator: scmle.core.orchestrator.Orchestrator,
+    estimand: parameter_estimation.Estimand,
+    policy: parameter_estimation.Config,
+) -> str:
+    """Returns the treatment column a treatment-based estimator needs.
+
+    Args:
+        orchestrator: The orchestrator holding the project's spec.
+        estimand: The declared population quantity.
+        policy: The declared estimation policy.
+
+    Returns:
+        The spec's treatment column.
+
+    Raises:
+        ConfigError: If the spec has no treatment column, the estimand does
+            not list it as a feature, or the policy's treatment position does
+            not match its place among the features.
+    """
+    treatment_column = orchestrator.spec.data.treatment_column
+    if treatment_column is None:
+        raise errors.ConfigError(
+            f"{policy.estimator} parameter estimation requires treatment_column"
+        )
+    if treatment_column not in estimand.feature_names:
+        raise errors.ConfigError(
+            "treatment_column must be included in estimand feature_names"
+        )
+    treatment_position = estimand.feature_names.index(treatment_column)
+    if policy.treatment_position != treatment_position:
+        raise errors.ConfigError(
+            "treatment_position must match treatment_column in "
+            "estimand feature_names"
+        )
+    return treatment_column
+
+
 def estimate_parameters_for_project(
     orchestrator: scmle.core.orchestrator.Orchestrator,
     estimand: parameter_estimation.Estimand,
@@ -458,22 +535,9 @@ def estimate_parameters_for_project(
         "aipw_ate",
         "continuous_ipw_ate",
     }:
-        treatment_column = orchestrator.spec.data.treatment_column
-        if treatment_column is None:
-            raise errors.ConfigError(
-                f"{policy.estimator} parameter estimation requires "
-                "treatment_column"
-            )
-        if treatment_column not in estimand.feature_names:
-            raise errors.ConfigError(
-                "treatment_column must be included in estimand feature_names"
-            )
-        treatment_position = estimand.feature_names.index(treatment_column)
-        if policy.treatment_position != treatment_position:
-            raise errors.ConfigError(
-                "treatment_position must match treatment_column in "
-                "estimand feature_names"
-            )
+        treatment_column = require_treatment_column(
+            orchestrator, estimand, policy
+        )
         declared.append(treatment_column)
     if policy.cluster_name is not None:
         declared.append(policy.cluster_name)
@@ -1201,6 +1265,82 @@ class ModalityProject:
         return self.lifecycle.declaration(self.report)
 
 
+def check_manifest_matches_adapter(
+    manifest: scmle.contracts.data.ModalityManifest,
+    modality: str,
+    dataset_hash: str,
+    sample_count: int,
+) -> None:
+    """Checks that a modality manifest describes the adapter's dataset.
+
+    Args:
+        manifest: The manifest to check.
+        modality: The adapter's modality name.
+        dataset_hash: The adapter's dataset hash.
+        sample_count: The adapter's number of samples.
+
+    Raises:
+        ValueError: If the manifest's modality, content hash or sample count
+            differs from the adapter's.
+    """
+    if manifest.modality != modality:
+        raise ValueError("manifest modality must match adapter")
+    if manifest.content_hash != dataset_hash:
+        raise ValueError("manifest content_hash must match adapter")
+    if manifest.sample_count != sample_count:
+        raise ValueError("manifest sample_count must match adapter")
+
+
+def verify_existing_curation(
+    path: pathlib.Path,
+    signing_key: str | bytes,
+    candidate: modality_lifecycle.Curation,
+) -> modality_lifecycle.Curation:
+    """Verifies an existing curation artifact against a new candidate.
+
+    Args:
+        path: Location of the existing artifact.
+        signing_key: Key that authenticates the evidence.
+        candidate: The curation the current adapter produced.
+
+    Returns:
+        The verified existing curation.
+
+    Raises:
+        ValueError: If the artifact is unreadable, is not an object, or
+            differs from the candidate in modality, dataset hash, sample count
+            or canonical content.
+    """
+    existing = modality_lifecycle.Curation.read_verified(path, signing_key)
+    if existing.modality != candidate.modality:
+        raise ValueError(
+            "existing curation modality does not match current adapter"
+        ) from None
+    if existing.dataset_hash != candidate.dataset_hash:
+        raise ValueError(
+            "existing curation dataset_hash does not match current adapter"
+        ) from None
+    if existing.sample_count != candidate.sample_count:
+        raise ValueError(
+            "existing curation sample_count does not match current adapter"
+        ) from None
+    try:
+        existing_record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as error:
+        raise ValueError("existing curation artifact is unreadable") from error
+    if not isinstance(existing_record, dict):
+        raise ValueError(
+            "existing curation artifact must be an object"
+        ) from None
+    if attestation.canonical_digest(existing_record) != (
+        attestation.canonical_digest(candidate.to_dict())
+    ):
+        raise ValueError(
+            "existing curation canonical content does not match current adapter"
+        ) from None
+    return existing
+
+
 class Curator:
     """Curates and documents a modality without forcing a model fit.
 
@@ -1275,12 +1415,9 @@ class Curator:
         dataset_hash = self.adapter.dataset_hash
         sample_count = len(samples)
         if self.manifest is not None:
-            if self.manifest.modality != modality:
-                raise ValueError("manifest modality must match adapter")
-            if self.manifest.content_hash != dataset_hash:
-                raise ValueError("manifest content_hash must match adapter")
-            if self.manifest.sample_count != sample_count:
-                raise ValueError("manifest sample_count must match adapter")
+            check_manifest_matches_adapter(
+                self.manifest, modality, dataset_hash, sample_count
+            )
         report = self.adapter.curate()
         if not isinstance(
             report,
@@ -1334,39 +1471,5 @@ class Curator:
         try:
             publish_curation_artifact(path, serialized_payload)
         except FileExistsError:
-            existing = modality_lifecycle.Curation.read_verified(
-                path, self.signing_key
-            )
-            if existing.modality != candidate.modality:
-                raise ValueError(
-                    "existing curation modality does not match current adapter"
-                ) from None
-            if existing.dataset_hash != candidate.dataset_hash:
-                raise ValueError(
-                    "existing curation dataset_hash does not match current "
-                    "adapter"
-                ) from None
-            if existing.sample_count != candidate.sample_count:
-                raise ValueError(
-                    "existing curation sample_count does not match current "
-                    "adapter"
-                ) from None
-            try:
-                existing_record = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, TypeError, ValueError) as error:
-                raise ValueError(
-                    "existing curation artifact is unreadable"
-                ) from error
-            if not isinstance(existing_record, dict):
-                raise ValueError(
-                    "existing curation artifact must be an object"
-                ) from None
-            if attestation.canonical_digest(existing_record) != (
-                attestation.canonical_digest(candidate.to_dict())
-            ):
-                raise ValueError(
-                    "existing curation canonical content does not match "
-                    "current adapter"
-                ) from None
-            return existing
+            return verify_existing_curation(path, self.signing_key, candidate)
         return candidate

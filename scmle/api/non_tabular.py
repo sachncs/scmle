@@ -9,20 +9,23 @@ path remains experimental until the external release gates are satisfied.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 import dataclasses
 from pathlib import Path
 from typing import Any
 from typing import cast
 from typing import Literal
-
-import numpy
+from typing import TYPE_CHECKING
 
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import performance
 from scmle.models import modality_lifecycle
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import numpy
 
 NON_TABULAR_MODEL_REPORT = "modality_lifecycle.json"
 NON_TABULAR_MODEL_DIRECTORY = "model"
@@ -172,6 +175,163 @@ class Predictor:
         }
 
 
+def video_scope(adapter: modality_lifecycle.VideoPreparer) -> Scope:
+    """Returns the capability of a video adapter.
+
+    Args:
+        adapter: The video adapter to describe.
+
+    Returns:
+        A scope that depends on whether a frame decoder is set.
+    """
+    decoder_policy = (
+        "caller-owned bounded frame decoder"
+        if adapter.frame_decoder is not None
+        else "probed container metadata; no frame decoder"
+    )
+    representation = (
+        "bounded_decoded_frame_statistics"
+        if adapter.frame_decoder is not None
+        else "bounded_container_metadata"
+    )
+    return Scope(
+        modality="video",
+        representation=representation,
+        decoder_policy=decoder_policy,
+        limitations=(
+            (
+                "Metadata-only video does not claim visual modelling; a "
+                "frame decoder is required for frame evidence."
+            ),
+            (
+                "This is not audio-video understanding, motion recognition, "
+                "or temporal event localization."
+            ),
+        ),
+    )
+
+
+def raster_scope(adapter: modality_lifecycle.RasterPreparer) -> Scope:
+    """Returns the capability of a raster adapter.
+
+    Args:
+        adapter: The raster adapter to describe.
+
+    Returns:
+        A scope that depends on whether a raster decoder is set.
+    """
+    decoder_policy = (
+        f"caller-owned raster decoder {adapter.decoder_name}"
+        if adapter.decoder is not None
+        else "metadata-only raster representation"
+    )
+    representation = (
+        "bounded_decoded_pixel_summary"
+        if adapter.decoder is not None
+        else "bounded_raster_metadata"
+    )
+    return Scope(
+        modality="raster",
+        representation=representation,
+        decoder_policy=decoder_policy,
+        limitations=(
+            (
+                "Metadata-only rasters do not claim pixel modelling; a "
+                "decoder is required for pixel evidence."
+            ),
+            (
+                "This is not raster foundation-model, reprojection, or "
+                "spatial causal support."
+            ),
+        ),
+    )
+
+
+def fixed_scope(
+    adapter: modality_lifecycle.Preparer,
+) -> Scope | None:
+    """Returns the capability of an adapter whose scope never varies.
+
+    Args:
+        adapter: The adapter to describe.
+
+    Returns:
+        The capability for a document, text, image, audio, graph or
+        geospatial adapter of an exact built-in type, or None for any
+        other type.
+    """
+    adapter_type = type(adapter)
+    if adapter_type in {
+        modality_lifecycle.DocumentPreparer,
+        modality_lifecycle.TextPreparer,
+    }:
+        return Scope(
+            modality=modalities.modality_value(adapter.modality),
+            representation="bounded_character_and_token_counts",
+            decoder_policy="caller-decoded text or document samples",
+            limitations=(
+                (
+                    "This is a lexical baseline, not OCR, layout, table, or "
+                    "semantic document understanding."
+                ),
+                "The model is associational and not a causal explanation.",
+            ),
+        )
+    if adapter_type is modality_lifecycle.ImagePreparer:
+        return Scope(
+            modality="image",
+            representation="decoded_resized_rgb_pixels",
+            decoder_policy="built-in bounded RGB decoder",
+            limitations=(
+                (
+                    "This is a pixel baseline, not object detection, semantic "
+                    "segmentation, or validated saliency."
+                ),
+                "The model is associational and not a causal explanation.",
+            ),
+        )
+    if adapter_type is modality_lifecycle.AudioPreparer:
+        return Scope(
+            modality="audio",
+            representation="bounded_decoded_wav_signal_statistics",
+            decoder_policy="built-in WAV decoder; other codecs are rejected",
+            limitations=(
+                (
+                    "This representation does not provide transcript, "
+                    "speaker, or semantic event understanding."
+                ),
+                "The model is associational and not a causal explanation.",
+            ),
+        )
+    if adapter_type is modality_lifecycle.GraphPreparer:
+        return Scope(
+            modality="graph",
+            representation="declared_inductive_node_features",
+            decoder_policy="caller-declared graph nodes and features",
+            limitations=(
+                (
+                    "Edges are retained for evidence but are not model "
+                    "inputs; this is not GNN or topology attribution support."
+                ),
+                "The model is associational and not a causal explanation.",
+            ),
+        )
+    if adapter_type is modality_lifecycle.GeospatialPreparer:
+        return Scope(
+            modality="geospatial",
+            representation="declared_crs_geometry_features",
+            decoder_policy="caller-declared geometries and CRS",
+            limitations=(
+                (
+                    "This is a bounded geometry baseline, not a geospatial "
+                    "foundation model or spatial causal analysis."
+                ),
+                "CRS and spatial split policy remain domain responsibilities.",
+            ),
+        )
+    return None
+
+
 def capability_for_adapter(
     adapter: modality_lifecycle.Preparer,
 ) -> Scope:
@@ -198,110 +358,13 @@ def capability_for_adapter(
     if not isinstance(adapter, modality_lifecycle.Preparer):
         raise TypeError("adapter must be a Preparer")
     adapter_type = type(adapter)
-    if adapter_type in {
-        modality_lifecycle.DocumentPreparer,
-        modality_lifecycle.TextPreparer,
-    }:
-        return Scope(
-            modality=modalities.modality_value(adapter.modality),
-            representation="bounded_character_and_token_counts",
-            decoder_policy="caller-decoded text or document samples",
-            limitations=(
-                "This is a lexical baseline, not OCR, layout, table, or "
-                "semantic document understanding.",
-                "The model is associational and not a causal explanation.",
-            ),
-        )
-    if adapter_type is modality_lifecycle.ImagePreparer:
-        return Scope(
-            modality="image",
-            representation="decoded_resized_rgb_pixels",
-            decoder_policy="built-in bounded RGB decoder",
-            limitations=(
-                "This is a pixel baseline, not object detection, semantic "
-                "segmentation, or validated saliency.",
-                "The model is associational and not a causal explanation.",
-            ),
-        )
-    if adapter_type is modality_lifecycle.AudioPreparer:
-        return Scope(
-            modality="audio",
-            representation="bounded_decoded_wav_signal_statistics",
-            decoder_policy="built-in WAV decoder; other codecs are rejected",
-            limitations=(
-                "This representation does not provide transcript, speaker, "
-                "or semantic event understanding.",
-                "The model is associational and not a causal explanation.",
-            ),
-        )
     if adapter_type is modality_lifecycle.VideoPreparer:
-        video_adapter = cast(modality_lifecycle.VideoPreparer, adapter)
-        decoder_policy = (
-            "caller-owned bounded frame decoder"
-            if video_adapter.frame_decoder is not None
-            else "probed container metadata; no frame decoder"
-        )
-        representation = (
-            "bounded_decoded_frame_statistics"
-            if video_adapter.frame_decoder is not None
-            else "bounded_container_metadata"
-        )
-        return Scope(
-            modality="video",
-            representation=representation,
-            decoder_policy=decoder_policy,
-            limitations=(
-                "Metadata-only video does not claim visual modelling; a "
-                "frame decoder is required for frame evidence.",
-                "This is not audio-video understanding, motion recognition, "
-                "or temporal event localization.",
-            ),
-        )
-    if adapter_type is modality_lifecycle.GraphPreparer:
-        return Scope(
-            modality="graph",
-            representation="declared_inductive_node_features",
-            decoder_policy="caller-declared graph nodes and features",
-            limitations=(
-                "Edges are retained for evidence but are not model inputs; "
-                "this is not GNN or topology attribution support.",
-                "The model is associational and not a causal explanation.",
-            ),
-        )
-    if adapter_type is modality_lifecycle.GeospatialPreparer:
-        return Scope(
-            modality="geospatial",
-            representation="declared_crs_geometry_features",
-            decoder_policy="caller-declared geometries and CRS",
-            limitations=(
-                "This is a bounded geometry baseline, not a geospatial "
-                "foundation model or spatial causal analysis.",
-                "CRS and spatial split policy remain domain responsibilities.",
-            ),
-        )
+        return video_scope(cast("modality_lifecycle.VideoPreparer", adapter))
     if adapter_type is modality_lifecycle.RasterPreparer:
-        raster_adapter = cast(modality_lifecycle.RasterPreparer, adapter)
-        decoder_policy = (
-            f"caller-owned raster decoder {raster_adapter.decoder_name}"
-            if raster_adapter.decoder is not None
-            else "metadata-only raster representation"
-        )
-        representation = (
-            "bounded_decoded_pixel_summary"
-            if raster_adapter.decoder is not None
-            else "bounded_raster_metadata"
-        )
-        return Scope(
-            modality="raster",
-            representation=representation,
-            decoder_policy=decoder_policy,
-            limitations=(
-                "Metadata-only rasters do not claim pixel modelling; a "
-                "decoder is required for pixel evidence.",
-                "This is not raster foundation-model, reprojection, or "
-                "spatial causal support.",
-            ),
-        )
+        return raster_scope(cast("modality_lifecycle.RasterPreparer", adapter))
+    scope = fixed_scope(adapter)
+    if scope is not None:
+        return scope
     raise UnsupportedNonTabularModelError(
         "adapter type is not allowlisted for bounded non-tabular modelling; "
         "exact built-in Preparer types are required",
@@ -313,6 +376,56 @@ def capability_for_adapter(
             "supported_boundary": "exact built-in Preparer types",
         },
     )
+
+
+def check_observed_adapter(
+    adapter: modality_lifecycle.Preparer,
+    observed_adapter: modality_lifecycle.Preparer,
+    capability: Scope,
+) -> None:
+    """Checks that an observed adapter matches the reference adapter.
+
+    Args:
+        adapter: The reference adapter holding the training samples.
+        observed_adapter: The adapter of later observed samples.
+        capability: The capability of the reference adapter.
+
+    Raises:
+        UnsupportedNonTabularModelError: If the observed adapter has another
+            capability or, for video and raster adapters, another decoder
+            object.
+    """
+    observed_capability = capability_for_adapter(observed_adapter)
+    if observed_capability != capability:
+        raise UnsupportedNonTabularModelError(
+            "observed adapter must use the same bounded capability",
+            {
+                "reference": capability.to_dict(),
+                "observed": observed_capability.to_dict(),
+            },
+        )
+    if isinstance(adapter, modality_lifecycle.VideoPreparer) and (
+        adapter.frame_decoder
+        is not cast(
+            "modality_lifecycle.VideoPreparer", observed_adapter
+        ).frame_decoder
+    ):
+        raise UnsupportedNonTabularModelError(
+            "reference and observed video adapters must share the "
+            "same frame decoder object",
+            {"modality": capability.modality},
+        )
+    if isinstance(adapter, modality_lifecycle.RasterPreparer) and (
+        adapter.decoder
+        is not cast(
+            "modality_lifecycle.RasterPreparer", observed_adapter
+        ).decoder
+    ):
+        raise UnsupportedNonTabularModelError(
+            "reference and observed raster adapters must share the "
+            "same decoder object",
+            {"modality": capability.modality},
+        )
 
 
 class Modeler:
@@ -411,37 +524,7 @@ class Modeler:
         if not isinstance(resume, bool):
             raise TypeError("resume must be bool")
         if observed_adapter is not None:
-            observed_capability = capability_for_adapter(observed_adapter)
-            if observed_capability != self.capability:
-                raise UnsupportedNonTabularModelError(
-                    "observed adapter must use the same bounded capability",
-                    {
-                        "reference": self.capability.to_dict(),
-                        "observed": observed_capability.to_dict(),
-                    },
-                )
-            if isinstance(adapter, modality_lifecycle.VideoPreparer) and (
-                adapter.frame_decoder
-                is not cast(
-                    modality_lifecycle.VideoPreparer, observed_adapter
-                ).frame_decoder
-            ):
-                raise UnsupportedNonTabularModelError(
-                    "reference and observed video adapters must share the "
-                    "same frame decoder object",
-                    {"modality": self.capability.modality},
-                )
-            if isinstance(adapter, modality_lifecycle.RasterPreparer) and (
-                adapter.decoder
-                is not cast(
-                    modality_lifecycle.RasterPreparer, observed_adapter
-                ).decoder
-            ):
-                raise UnsupportedNonTabularModelError(
-                    "reference and observed raster adapters must share the "
-                    "same decoder object",
-                    {"modality": self.capability.modality},
-                )
+            check_observed_adapter(adapter, observed_adapter, self.capability)
         if cancellation is not None and not isinstance(
             cancellation, modality_lifecycle.Cancellation
         ):
