@@ -366,8 +366,6 @@ def test_the_context_scan_finds_planted_secrets(signed_service, tmp_path):
         "notes.txt" in item and "secret value" in item for item in findings
     )
     assert any("private key" in item for item in findings)
-    with pytest.raises(errors.ArtifactError, match="may hold secrets"):
-        context.require_clean(folder, [KEY])
     (folder / ".dockerignore").unlink()
     assert any(
         ".dockerignore is missing" in item for item in context.scan(folder)

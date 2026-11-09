@@ -550,20 +550,6 @@ class ServiceMetrics:
         """
         return self.registry.total(self.REQUESTS)
 
-    def count_where(self, predicate_statuses: set[int]) -> float:
-        """Counts the requests whose status is in the set.
-
-        Args:
-            predicate_statuses: HTTP statuses to count.
-
-        Returns:
-            The number of requests with one of those statuses.
-        """
-        return sum(
-            self.registry.total(self.REQUESTS, status=str(status))
-            for status in predicate_statuses
-        )
-
     def summary(self) -> dict[str, float | None]:
         """Cumulative request count, error rates, availability, latency.
 

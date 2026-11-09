@@ -47,8 +47,8 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     runbook="https://runbooks.example/prediction-latency",
     alert_route="on-call",
 )
-evaluation = SLOMonitor().evaluate(target, metrics, observed_at=now)`}</code></pre>
-  <p>Use the result's status, remaining error budget, owner, runbook, and route in the incident record. The monitor uses the worst observation in the window so a breach cannot disappear inside an average.</p>
+evaluation = slo.evaluate(target, metrics, observed_at=now)`}</code></pre>
+  <p>Use the result's status, remaining error budget, owner, runbook, and route in the incident record. The evaluation uses the worst observation in the window so a breach cannot disappear inside an average.</p>
 
   <h2>Deliver the alert once</h2>
   <p><code>AlertDispatcher</code> keeps the SLO decision separate from delivery. It derives a stable alert identity from the evidence, records successful delivery, and deduplicates replays. Use the local JSONL sink for an operator handoff or the bounded HTTPS webhook sink for an authenticated incident gateway.</p>

@@ -7,12 +7,10 @@ from typing import Any
 
 import numpy
 import pandas
-import pyarrow
 
 import scmle.artifacts.bundle
 from scmle.contracts import experiments
 import scmle.contracts.data
-from scmle.data.readers import interchange
 from scmle.evaluation import fit_health
 from scmle.evaluation import parameter_estimation
 
@@ -112,22 +110,6 @@ class Run:
             ascending=not self.evaluation["metric_greater_is_better"],
         )
         return pandas.concat([ranked, board[~succeeded]]).reset_index(drop=True)
-
-    def leaderboard_arrow(self) -> pyarrow.Table:
-        """Returns the leaderboard as an Arrow table.
-
-        Returns:
-            The table form of `leaderboard()`.
-        """
-        return interchange.to_arrow(self.leaderboard())
-
-    def load_best_model(self) -> scmle.artifacts.bundle.Bundle:
-        """Returns the packaged best model.
-
-        Returns:
-            The model bundle of the selected model.
-        """
-        return self.bundle
 
     def save(
         self,

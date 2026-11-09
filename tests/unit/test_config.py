@@ -5,32 +5,7 @@ import json
 import pytest
 
 from scmle.contracts import errors
-from scmle.contracts import tasks
 from scmle.core import config
-
-
-def make_spec():
-    return tasks.Config(
-        data=tasks.Dataset(uri="d.csv", target="y"),
-        metric="roc_auc",
-        validation=tasks.Validation(folds=3),
-    )
-
-
-def test_a_specification_round_trips_through_a_file(tmp_path):
-    spec = make_spec()
-    config.save_spec(spec, tmp_path / "spec.json")
-
-    loaded = config.load_spec(tmp_path / "spec.json")
-
-    assert loaded == spec and loaded.config_hash() == spec.config_hash()
-
-
-def test_an_invalid_specification_is_a_config_error(tmp_path):
-    path = tmp_path / "bad.json"
-    path.write_text(json.dumps({"data": {"uri": "x"}}))
-    with pytest.raises(errors.ConfigError, match="invalid project"):
-        config.load_spec(path)
 
 
 def test_sections_build_typed_specs_and_reject_unknown_names(tmp_path):

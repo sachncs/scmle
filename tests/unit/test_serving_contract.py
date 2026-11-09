@@ -62,6 +62,12 @@ def call(*args, **kwargs):
     return call_full(*args, **kwargs)[:2]
 
 
+def wait_until_settled(adapter, timeout):
+    """Joins the background loader and reports whether the service is ready."""
+    adapter.loading.join(timeout)
+    return adapter.readiness.ready
+
+
 @pytest.fixture
 def running(bundle):
     adapter = serving.HttpServing(bundle)
@@ -377,7 +383,7 @@ def test_readiness_follows_verify_then_load_then_warm_up(golden, bundle):
     adapter = serving.HttpServing(loader=loader)
     adapter.start()
     try:
-        assert adapter.wait_until_settled(20)
+        assert wait_until_settled(adapter, 20)
         status, body = call(f"{adapter.address}/readyz")
         assert status == 200 and body["ready"] is True
         assert set(body["completed"]) == {"verifying", "loading", "warming"}
@@ -404,7 +410,7 @@ def test_a_failed_verification_keeps_the_service_alive_but_never_ready(
     adapter = serving.HttpServing(loader=loader)
     adapter.start()
     try:
-        assert not adapter.wait_until_settled(20)
+        assert not wait_until_settled(adapter, 20)
         assert call(f"{adapter.address}/livez")[0] == 200
         status, body, headers = call_full(f"{adapter.address}/readyz")
         assert status == 503 and body["ready"] is False
@@ -439,7 +445,7 @@ def test_not_ready_while_the_loader_is_still_running(bundle):
         status, body = call(f"{adapter.address}/readyz")
         assert status == 503 and body["phase"] == "verifying"
         release.set()
-        assert adapter.wait_until_settled(20)
+        assert wait_until_settled(adapter, 20)
         assert call(f"{adapter.address}/readyz")[0] == 200
     finally:
         release.set()

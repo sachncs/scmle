@@ -87,26 +87,17 @@ def test_a_regressor_matches_on_scaled_values(tmp_path):
 
     path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
-    scorer = onnx_export.OnnxScorer(bundle, path)
-    numpy.testing.assert_allclose(
-        scorer.predict(features),
-        bundle.predict(features),
-        rtol=1e-3,
-        atol=1e-3,
-    )
+    assert path.exists()
+    assert onnx_export.verify(bundle, path, features)["max_difference"] < 1e-3
 
 
-def test_the_scorer_returns_probabilities_in_class_order(tmp_path):
+def test_the_exported_classifier_agrees_in_class_order(tmp_path):
     bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
     path = bundle.export_onnx(tmp_path / "m.onnx")
 
-    scorer = onnx_export.OnnxScorer(bundle, path)
+    result = onnx_export.verify(bundle, path, features)
 
-    numpy.testing.assert_allclose(
-        scorer.predict_proba(features),
-        bundle.predict_proba(features),
-        atol=1e-4,
-    )
+    assert result["label_agreement"] == 1.0
     assert list(bundle.classes) == ["no", "yes"]
 
 
@@ -158,9 +149,8 @@ def test_boosted_models_export_and_decode_their_string_labels(name, tmp_path):
 
     path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
-    scorer = onnx_export.OnnxScorer(bundle, path)
-    assert set(scorer.predict(features)) <= {"no", "yes"}
-    assert (scorer.predict(features) == bundle.predict(features)).mean() >= 0.99
+    result = onnx_export.verify(bundle, path, features)
+    assert result["label_agreement"] >= 0.99
 
 
 @needs_boosters

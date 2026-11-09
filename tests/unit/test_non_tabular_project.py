@@ -183,7 +183,7 @@ def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
 
 def test_capability_reports_existing_metadata_representation():
     """Metadata-only video is explicit and does not imply visual modelling."""
-    capability = scmle.api.non_tabular.Modeler.capability_for_adapter(
+    capability = scmle.api.non_tabular.capability_for_adapter(
         metadata_video_adapter()
     )
 
@@ -206,7 +206,7 @@ def test_capability_allowlist_uses_existing_feature_representations(
     factory, representation: str
 ):
     """Every admitted built-in branch names the representation it consumes."""
-    capability = scmle.api.non_tabular.Modeler.capability_for_adapter(factory())
+    capability = scmle.api.non_tabular.capability_for_adapter(factory())
 
     assert capability.representation == representation
     assert capability.status == "experimental"
@@ -215,7 +215,7 @@ def test_capability_allowlist_uses_existing_feature_representations(
 def test_capability_rejects_non_modelling_curation_adapter():
     """Curation-only extension adapters cannot cross the modelling boundary."""
     with pytest.raises(TypeError, match="Preparer"):
-        scmle.api.non_tabular.Modeler.capability_for_adapter(  # type: ignore[arg-type]
+        scmle.api.non_tabular.capability_for_adapter(  # type: ignore[arg-type]
             object()
         )
 
@@ -237,7 +237,7 @@ def test_project_rejects_mismatched_observed_representation(tmp_path: Path):
 
 def test_public_capability_record_is_json_native():
     """The representation claim can travel with release evidence."""
-    record = scmle.api.non_tabular.Modeler.capability_for_adapter(
+    record = scmle.api.non_tabular.capability_for_adapter(
         text_adapter()
     ).to_dict()
 

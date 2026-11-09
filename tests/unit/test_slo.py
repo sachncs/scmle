@@ -34,7 +34,7 @@ def metric(value: float, timestamp: str) -> observability.MetricSample:
 
 def test_slo_passes_and_records_owner_runbook_and_budget():
     """A complete healthy window is auditable by an operator."""
-    result = slo.SLOMonitor().evaluate(
+    result = slo.evaluate(
         target(),
         (
             metric(100.0, "2026-10-19T12:00:00+00:00"),
@@ -51,7 +51,7 @@ def test_slo_passes_and_records_owner_runbook_and_budget():
 
 def test_slo_breach_preserves_incident_path_and_uses_worst_sample():
     """One bad observation cannot be averaged away."""
-    result = slo.SLOMonitor().evaluate(
+    result = slo.evaluate(
         target(),
         (
             metric(100.0, "2026-10-19T12:00:00+00:00"),
@@ -68,13 +68,12 @@ def test_slo_breach_preserves_incident_path_and_uses_worst_sample():
 
 def test_slo_is_not_green_when_data_is_missing_or_future():
     """Missing and temporally invalid telemetry fail closed."""
-    monitor = slo.SLOMonitor()
-    missing = monitor.evaluate(
+    missing = slo.evaluate(
         target(),
         (metric(100.0, "2026-10-20T12:00:00+00:00"),),
         observed_at="2026-10-20T12:00:00+00:00",
     )
-    future = monitor.evaluate(
+    future = slo.evaluate(
         target(),
         (
             metric(100.0, "2026-10-19T12:00:00+00:00"),

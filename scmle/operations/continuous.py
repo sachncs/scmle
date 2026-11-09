@@ -1020,42 +1020,6 @@ class ContinuousEvaluation:
             if r["kind"] == deployment_ledger.PROMOTION_PROPOSAL
         ]
 
-    def compare_offline(
-        self,
-        champion: Any,
-        challenger: Any,
-        data: pandas.DataFrame,
-        outcomes: pandas.Series,
-        metric_name: str | None = None,
-        seed: int = 0,
-    ) -> scmle.monitoring.champion.Comparison:
-        """Compares two bundles on rows with known outcomes and records it.
-
-        This is the offline check (`ChampionChallenger`). The sequential
-        evidence on live traffic is the loop's own e-process. The comparison
-        is written to the history as ``offline_comparison``.
-
-        Args:
-            champion: The current model bundle.
-            challenger: The candidate bundle.
-            data: Rows with the model inputs.
-            outcomes: The observed outcome of each row.
-            metric_name: The metric to compare; the default if None.
-            seed: Seed of the bootstrap.
-
-        Returns:
-            The comparison.
-        """
-        result = scmle.monitoring.champion.ChampionChallenger(
-            champion, challenger, seed=seed
-        ).compare(data, outcomes, metric_name)
-        self.history.record(
-            "offline_comparison",
-            self.clock(),
-            **dataclasses.asdict(result),
-        )
-        return result
-
     # -- replacement -------------------------------------------------------
 
     def replace(

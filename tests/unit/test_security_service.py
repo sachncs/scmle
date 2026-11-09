@@ -265,7 +265,7 @@ def test_a_failed_activation_is_audited(tmp_path):
     adapter = serving.HttpServing(loader=failing, gateway=gateway)
     adapter.start()
     try:
-        adapter.wait_until_settled(10)
+        adapter.loading.join(10)
     finally:
         adapter.stop()
     row = gateway.audit.rows(audit.ACTIVATION)[0]["body"]

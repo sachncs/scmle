@@ -1173,7 +1173,7 @@ def evaluate_release(
     references = required_evidence_references(policy)
     for reference in references:
         record = (
-            evidence_index.find(reference)
+            evidence_index.records.get(reference)
             if isinstance(evidence_index, evidence.Index)
             else None
         )

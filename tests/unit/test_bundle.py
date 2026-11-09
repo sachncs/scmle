@@ -204,7 +204,8 @@ def test_run_store_allocates_unique_directories(tmp_path):
     assert first.run_id != second.run_id and first.directory.is_dir()
     first.write_json("a.json", {"x": 1})
     first.write_text("b.txt", "hi")
-    sub = first.make_directory("trials")
+    sub = first.path("trials")
+    sub.mkdir()
     assert json.loads(first.path("a.json").read_text()) == {"x": 1}
     assert sub.is_dir() and first.path("b.txt").read_text() == "hi"
     assert not list(first.directory.glob(".b.txt.*"))

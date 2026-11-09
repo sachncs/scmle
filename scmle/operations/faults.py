@@ -793,21 +793,6 @@ def secret_rotation() -> recovery.Outcome:
 # ---- storage -----------------------------------------------------------
 
 
-def upload(base: str, folder: pathlib.Path, prefix: str) -> dict[str, str]:
-    """Uploads every file of a service folder to the object store.
-
-    Args:
-        base: Base URL of the object store.
-        folder: The service folder to upload.
-        prefix: Key prefix for the uploaded objects.
-
-    Returns:
-        A mapping from each file's path relative to `folder` to the entity
-        tag the store returned (not the full object key with `prefix`).
-    """
-    return demo.upload_folder(base, folder, prefix)
-
-
 def object_store_loss() -> recovery.Outcome:
     """The store goes away; the service keeps serving; access returns.
 
@@ -829,7 +814,7 @@ def object_store_loss() -> recovery.Outcome:
         store = mocks.ObjectStore(base / "objects", port=port)
         fleet.serve(store)
         url = store.address
-        etags = upload(url, service, "models/m/v1")
+        etags = demo.upload_folder(url, service, "models/m/v1")
         fetched = base / "fetched"
         demo.download_folder(url, "models/m/v1", etags, fetched)
         running = fleet.start(fetched)

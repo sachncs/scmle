@@ -29,11 +29,12 @@ def kinds(run_dir):
 
 
 def test_auto_approval_runs_and_audits_both_gates(binary_frame, tmp_path):
-    result = project(binary_frame, tmp_path, policies.Approver()).run()
+    approve = policies.Callback(lambda review: True)
+    result = project(binary_frame, tmp_path, approve).run()
     events = kinds(result.run_dir)
     approvals = [e for e in events if e["kind"] == "policy.approved"]
     assert [a["data"]["gate"] for a in approvals] == ["PLANNING", "SELECTING"]
-    assert all(a["data"]["reviewer"] == "auto" for a in approvals)
+    assert all(a["data"]["reviewer"] == "callback" for a in approvals)
 
 
 def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
@@ -114,7 +115,8 @@ def test_a_blocked_run_can_be_resumed_once_approved(binary_frame, tmp_path):
 
 def test_checkpoints_do_not_change_results(binary_frame, tmp_path):
     plain = project(binary_frame, tmp_path / "a").run()
-    gated = project(binary_frame, tmp_path / "b", policies.Approver()).run()
+    approve = policies.Callback(lambda review: True)
+    gated = project(binary_frame, tmp_path / "b", approve).run()
     assert gated.selected_model == plain.selected_model
     assert gated.evaluation["selected_cv_score"] == pytest.approx(
         plain.evaluation["selected_cv_score"]

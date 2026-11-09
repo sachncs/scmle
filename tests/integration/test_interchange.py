@@ -43,7 +43,7 @@ def test_polars_frames_and_lazyframes_are_accepted(binary_frame, tmp_path):
 
 def test_results_export_to_arrow(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path)
-    table = result.leaderboard_arrow()
+    table = interchange.to_arrow(result.leaderboard())
     assert isinstance(table, pyarrow.Table) and table.num_rows == len(
         result.trials
     )

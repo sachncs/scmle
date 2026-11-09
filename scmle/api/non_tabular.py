@@ -544,20 +544,6 @@ class Modeler:
         """Requests cancellation at the next lifecycle check."""
         self.cancellation.cancel()
 
-    @classmethod
-    def capability_for_adapter(
-        cls, adapter: modality_lifecycle.Preparer
-    ) -> Scope:
-        """Returns the capability without opting into a model run.
-
-        Args:
-            adapter: The adapter to describe.
-
-        Returns:
-            The capability of the adapter's exact type.
-        """
-        return capability_for_adapter(adapter)
-
 
 __all__ = [
     "NON_TABULAR_MODEL_DIRECTORY",

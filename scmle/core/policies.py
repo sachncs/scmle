@@ -68,21 +68,6 @@ class Reviewer(abc.ABC):
         """
 
 
-class Approver(Reviewer):
-    """Approves everything (fully automatic operation)."""
-
-    def review(self, review: GateReview) -> Approval:
-        """Always approves.
-
-        Args:
-            review: The gate review; not consulted.
-
-        Returns:
-            An approval by reviewer "auto".
-        """
-        return Approval(True, "auto", "automatic approval")
-
-
 class Callback(Reviewer):
     """Delegates the decision to a function (a UI, a ticket, a script)."""
 
