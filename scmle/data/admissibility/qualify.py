@@ -225,11 +225,15 @@ def attestation_check(
 
     Returns:
         A warning-level check on the exploration set whose statistic and
-        effect are the largest statistic among `findings` (0 if none) and
+        effect are the largest finite statistic among `findings` (0 if none) and
         whose p-value is the smallest (1 if none), clipped to [0, 1].
     """
     given = item.attestation
     p_value = min((f.p_value for f in findings), default=1.0)
+    statistic = max(
+        (f.statistic for f in findings if math.isfinite(f.statistic)),
+        default=0.0,
+    )
     return qualification.Check(
         check_id=f"leakage.attestation:{item.column}",
         null_hypothesis=(
@@ -238,10 +242,10 @@ def attestation_check(
             f"by {given.name_or_id} ({given.role}) on {given.date}, valid to "
             f"{given.expires}, evidence: {given.evidence}"
         ),
-        statistic=max((f.statistic for f in findings), default=0.0),
+        statistic=statistic,
         p_value=min(max(p_value, 0.0), 1.0),
         interval=None,
-        effect=max((f.statistic for f in findings), default=0.0),
+        effect=statistic,
         n=rows,
         decision=qualification.Decision.WARN,
         set_id=qualification.SetId.EXPLORATION,

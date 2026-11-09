@@ -12,6 +12,8 @@ from scmle.data.admissibility import attestations
 from scmle.data.admissibility import provenance
 from scmle.data.admissibility import qualify
 from scmle.data.admissibility import rules
+from scmle.data.admissibility import screen
+from scmle.data.detectors import certificates
 
 SCOPE = "charter-hash-1"
 TODAY = datetime.date(2026, 6, 1)
@@ -160,3 +162,20 @@ def test_a_lead_that_is_not_a_number_is_a_value_error(lead):
 
     with pytest.raises(ValueError, match="lead_seconds"):
         attestations.LeakageAttestation.from_dict(record)
+
+
+def test_an_attestation_check_ignores_a_non_finite_statistic():
+    def finding(statistic):
+        return screen.Finding(
+            "copy", "skill", statistic, 0.01, 0.02, True, 0.5, True, True,
+            certificates.GateStatus.GATING,
+        )
+
+    check = qualify.attestation_check(
+        attest(), [finding(float("nan")), finding(0.7)], 100, 0, 0
+    )
+    assert check.statistic == 0.7 and check.effect == 0.7
+    only_bad = qualify.attestation_check(
+        attest(), [finding(float("inf"))], 100, 0, 0
+    )
+    assert only_bad.statistic == 0.0
