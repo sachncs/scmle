@@ -1,4 +1,4 @@
-"""Run directory management (the evidence plane's local backend)."""
+"""Run directory management, the local backend for run evidence."""
 
 import datetime
 import json
@@ -12,7 +12,12 @@ from scmle import durability
 
 
 class RunStore:
-    """A uniquely named run directory with typed write helpers."""
+    """A uniquely named run directory with typed write helpers.
+
+    Attributes:
+        run_id: Identifier of the run.
+        directory: The run directory.
+    """
 
     def __init__(self, run_id: str, directory: pathlib.Path) -> None:
         """Initializes the store over an existing directory.
@@ -65,11 +70,25 @@ class RunStore:
         return cls(path.name, path)
 
     def path(self, relative: str) -> pathlib.Path:
-        """Returns an absolute path inside the run directory."""
+        """Returns an absolute path inside the run directory.
+
+        Args:
+            relative: Path relative to the run directory.
+
+        Returns:
+            The path (the file need not exist).
+        """
         return self.directory / relative
 
     def make_directory(self, relative: str) -> pathlib.Path:
-        """Creates (if needed) and returns a subdirectory."""
+        """Creates (if needed) and returns a subdirectory.
+
+        Args:
+            relative: Directory path relative to the run directory.
+
+        Returns:
+            The directory path.
+        """
         target = self.path(relative)
         target.mkdir(parents=True, exist_ok=True)
         return target
@@ -78,6 +97,10 @@ class RunStore:
         """Writes `payload` as indented JSON, creating parent directories.
 
         Unknown value types are rendered as strings.
+
+        Args:
+            relative: File path relative to the run directory.
+            payload: The JSON-serializable value to write.
         """
         self.write_text(relative, json.dumps(payload, indent=2, default=str))
 
@@ -86,6 +109,10 @@ class RunStore:
 
         The temporary file is created beside the destination so `os.replace`
         remains atomic on the supported operating systems and filesystems.
+
+        Args:
+            relative: File path relative to the run directory.
+            text: The text to write, encoded as UTF-8 with LF line endings.
         """
         target = self.path(relative)
         target.parent.mkdir(parents=True, exist_ok=True)

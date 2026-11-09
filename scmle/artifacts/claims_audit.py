@@ -10,13 +10,13 @@ the files agree with each other, from the files alone:
   and the confirmed set that the sealed ledger holds;
 * the multiplicity rule, replayed on the p-values of `C`, gives the recorded
   adjusted p-values and tiers;
-* the second-stage accounting (family and its hash) is consistent, no
+* the withdrawal accounting (family and its hash) is consistent, no
   withdrawn survivor was tested on `C`, and the custody log recorded the
   family hash before `C` opened, and `C` opened at most once;
-* the claims registered by hash (the F8 baseline comparison, the F10 primary
+* the claims registered by hash (the baseline comparison and the primary
   causal hypothesis) are stated by the confirmation row, and the report
   files they produced hash to the values the sealed ledger holds;
-* the four decision files of F11 (threshold, net benefit, policy value,
+* the four decision files (threshold, net benefit, policy value,
   rollout design) hash to what the custody log registered when they were
   written; an edited, removed or added file fails with its name;
 * the coverage claim (levels, methods, rule) hashes to what the custody log
@@ -34,7 +34,7 @@ the files agree with each other, from the files alone:
 
 It proves consistency of the artifacts, not that they were produced by the
 run they describe: someone who can rewrite every file consistently can pass
-it, and the custody log is tamper-evident, not adversary-proof (canon P6).
+it, and the custody log is tamper-evident, not adversary-proof.
 Statistics are not recomputed from data, which the run directory does not hold.
 """
 
@@ -86,7 +86,11 @@ class Finding:
     detail: str
 
     def to_dict(self) -> dict[str, str]:
-        """JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict with `name`, `status` and `detail`.
+        """
         return dataclasses.asdict(self)
 
 
@@ -109,11 +113,15 @@ class Verification:
 
     @property
     def verified(self) -> int:
-        """Number of steps that passed."""
+        """The number of steps that passed."""
         return sum(1 for f in self.findings if f.status == PASS)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict with the directory, `ok`, the pass count and the findings.
+        """
         return {
             "run_dir": self.run_dir,
             "ok": self.ok,
@@ -124,6 +132,12 @@ class Verification:
 
 def read_claims(run_dir: str | Path) -> dict[str, Any]:
     """Reads ``confirmed_claims.json`` of a run.
+
+    Args:
+        run_dir: The run directory.
+
+    Returns:
+        The parsed claims document.
 
     Raises:
         ArtifactError: If the file is missing or is not a JSON object.
@@ -141,6 +155,12 @@ def read_claims(run_dir: str | Path) -> dict[str, Any]:
 def read_ledger(run_dir: str | Path) -> ledger_module.Ledger:
     """Loads the run's ledger (verifying its chain and replaying it).
 
+    Args:
+        run_dir: The run directory.
+
+    Returns:
+        The loaded ledger.
+
     Raises:
         ArtifactError: If the ledger is missing or fails verification.
     """
@@ -153,13 +173,29 @@ def read_ledger(run_dir: str | Path) -> ledger_module.Ledger:
 
 
 def column_of(ledger: ledger_module.Ledger, claim_id: str) -> str | None:
-    """The feature a claim's hypothesis tests."""
+    """Finds the feature a claim's hypothesis tests.
+
+    Args:
+        ledger: The run's ledger.
+        claim_id: The claim identifier.
+
+    Returns:
+        The column name, or None if the ledger has no such hypothesis.
+    """
     hypothesis = ledger.hypotheses.get(claim_id)
     return None if hypothesis is None else hypothesis.spec.column
 
 
 def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
-    """One row per claim: id, feature, tier, adjusted p-value, effect."""
+    """Lists the claims of a run.
+
+    Args:
+        run_dir: The run directory.
+
+    Returns:
+        One row per claim: id, feature, tier, adjusted p-value, effect and
+        whether it was withdrawn, followed by the claims registered by hash.
+    """
     document = read_claims(run_dir)
     ledger = read_ledger(run_dir)
     stage_two = document.get("stage_two") or {}
@@ -181,10 +217,18 @@ def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
 def registered_rows(
     run_dir: str | Path, ledger: ledger_module.Ledger
 ) -> list[dict[str, Any]]:
-    """One row per claim registered by hash (baseline, causal primary).
+    """Lists one row per claim registered by hash (baseline, causal primary).
 
-    The tier and status come from the report files the sealed ledger binds;
-    a file that is missing is reported as such rather than guessed.
+    The tier and status come from the report files the sealed ledger binds; a
+    file that is missing is reported as such rather than guessed.
+
+    Args:
+        run_dir: The run directory.
+        ledger: The run's ledger.
+
+    Returns:
+        One row per registered claim, with its kind, tier (`unverified` if no
+        report states one), status and identification detail.
     """
     folder = Path(run_dir)
     stated = (ledger.confirmation or {}).get("claims", {})
@@ -218,7 +262,15 @@ def registered_rows(
 
 
 def read_optional(path: Path) -> dict[str, Any] | None:
-    """A JSON object file, or None when it is missing or unreadable."""
+    """Reads a JSON object file.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The object, or None when the file is missing, unreadable or not a JSON
+        object.
+    """
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -227,7 +279,17 @@ def read_optional(path: Path) -> dict[str, Any] | None:
 
 
 def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
-    """Everything the run recorded about one claim.
+    """Shows everything the run recorded about one claim.
+
+    Args:
+        run_dir: The run directory.
+        claim_id: The claim identifier.
+
+    Returns:
+        For a claim registered by hash, its registration, status and the run
+        outcome. For another claim, the claim record, its hypothesis, the
+        exploration result, the check on `C`, any withdrawal reason and the run
+        outcome.
 
     Raises:
         ArtifactError: If the claim is unknown.
@@ -269,14 +331,31 @@ def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
 
 
 def step(name: str, status: str, detail: str) -> Finding:
-    """A finding."""
+    """Builds a finding.
+
+    Args:
+        name: What was checked.
+        status: `pass`, `fail` or `skipped`.
+        detail: One sentence.
+
+    Returns:
+        The finding.
+    """
     return Finding(name, status, detail)
 
 
 def check_ledger_head(
     document: dict[str, Any], ledger: ledger_module.Ledger
 ) -> Finding:
-    """The claims file names the ledger's current head."""
+    """Checks that the claims file names the ledger's current head.
+
+    Args:
+        document: The claims document.
+        ledger: The run's ledger.
+
+    Returns:
+        A passing finding if the heads agree, otherwise a failing one.
+    """
     name = "claims file names the ledger head"
     if document.get("ledger_head") == ledger.head:
         return step(name, PASS, f"head {ledger.head[:12]}")
@@ -290,7 +369,18 @@ def check_charter(
     ledger: ledger_module.Ledger,
     signing_key: str | bytes | None,
 ) -> list[Finding]:
-    """The charter file verifies and is the ledger's charter."""
+    """Checks that the charter file verifies and is the ledger's charter.
+
+    Args:
+        run_dir: The run directory.
+        ledger: The run's ledger.
+        signing_key: Key for the charter signature, or None.
+
+    Returns:
+        A finding for the charter (skipped if the file is absent, failing if it
+        does not verify or names another hash), plus one for the chartered rules
+        (skipped if the charter fixes none).
+    """
     path = run_dir / CHARTER_FILE
     name = "charter verifies and matches the ledger"
     if not path.exists():
@@ -333,7 +423,17 @@ def check_charter(
 def check_claims_against_ledger(
     document: dict[str, Any], ledger: ledger_module.Ledger
 ) -> Finding:
-    """Survivors, outcome and the confirmed set agree with the sealed ledger."""
+    """Checks that survivors, outcome and confirmed set agree with the ledger.
+
+    Args:
+        document: The claims document.
+        ledger: The run's ledger.
+
+    Returns:
+        A passing finding if the claims file agrees with the sealed ledger;
+        otherwise a failing one listing what differs (also failing if the ledger
+        is not sealed).
+    """
     name = "claims agree with the sealed ledger"
     sealed_row = ledger.confirmation
     survivors = ledger.survivor_set
@@ -368,12 +468,28 @@ def check_claims_against_ledger(
 
 
 def is_confirmed(claim: dict[str, Any]) -> bool:
-    """Whether a claim record has tier `confirmed`."""
+    """Reports whether a claim record has tier `confirmed`.
+
+    Args:
+        claim: A claim record.
+
+    Returns:
+        True if its tier is `confirmed`.
+    """
     return claim.get("tier") == "confirmed"
 
 
 def check_replay(document: dict[str, Any]) -> Finding:
-    """The multiplicity rule, replayed on the p-values of `C`."""
+    """Replays the multiplicity rule on the p-values of `C`.
+
+    Args:
+        document: The claims document.
+
+    Returns:
+        A passing finding if the recorded adjusted p-values and tiers are
+        reproduced; skipped if the outcome is not `confirmed`; failing if they
+        differ or the replay is impossible.
+    """
     name = "confirmation replays from the p-values on C"
     if document.get("outcome") != confirm.CONFIRMED:
         return step(name, SKIPPED, f"outcome is {document.get('outcome')!r}")
@@ -404,7 +520,17 @@ def check_replay(document: dict[str, Any]) -> Finding:
 def check_stage_two(
     document: dict[str, Any], ledger: ledger_module.Ledger
 ) -> Finding:
-    """The family accounting is consistent and withdrawn ids were not tested."""
+    """Checks the withdrawal accounting and that withdrawn ids were not tested.
+
+    Args:
+        document: The claims document.
+        ledger: The run's ledger.
+
+    Returns:
+        A finding: skipped if no withdrawal rule ran, passing if the family, its
+        hash and the checks on `C` are consistent with the frozen survivors,
+        otherwise failing with the problems.
+    """
     name = "second-stage accounting is consistent"
     record = document.get("stage_two")
     if record is None:
@@ -448,7 +574,19 @@ def check_custody(
     document: dict[str, Any],
     signing_key: str | bytes | None,
 ) -> Finding:
-    """The custody log verifies, froze the selection first and opened C once."""
+    """Checks the custody log: selection frozen first, `C` opened once.
+
+    Args:
+        run_dir: The run directory.
+        document: The claims document.
+        signing_key: Key for the custody log MACs, or None.
+
+    Returns:
+        A finding: skipped if there is no custody log, failing if the log is
+        invalid, `C` was opened more than once, a confirmed outcome has no open
+        event, the selection was not frozen exactly once before the open, or the
+        frozen hashes differ from the claims; otherwise passing.
+    """
     name = "custody log: selection frozen before C opened, C opened once"
     path = run_dir / CUSTODY_FILE
     if not path.exists():
@@ -486,9 +624,17 @@ def check_custody(
 def check_decision_files(
     run_dir: Path, signing_key: str | bytes | None
 ) -> Finding | None:
-    """The four decision files hash to what the custody log registered.
+    """Checks that decision files hash to what the custody log registered.
 
-    None when the run registered no decision files and holds none.
+    Args:
+        run_dir: The run directory.
+        signing_key: Key for the custody log MACs, or None.
+
+    Returns:
+        A finding, or None when the run registered no decision files and holds
+        none. It is skipped for an older run that holds files without a
+        registration, and failing for an invalid log, a double registration, or
+        a file that is unregistered, missing, unreadable or changed.
     """
     name = "decision files: hashes match the custody log"
     path = run_dir / CUSTODY_FILE
@@ -540,9 +686,18 @@ def check_decision_files(
 def check_coverage_claim(
     run_dir: Path, signing_key: str | bytes | None
 ) -> Finding | None:
-    """The coverage claim hashes to its registration and the report names it.
+    """Checks that the coverage claim hashes to its registration.
 
-    None when the run holds neither the claim nor a coverage report.
+    Args:
+        run_dir: The run directory.
+        signing_key: Key for the custody log MACs, or None.
+
+    Returns:
+        A finding, or None when the run holds neither the claim nor a coverage
+        report. The report must name the claim's hash. It is skipped without a
+        custody log, and failing if the claim is unreadable, not registered
+        exactly once, differs from the registered hash, or the report names
+        another claim.
     """
     name = "coverage claim: registered before the rows were read"
     claim_path = run_dir / coverage_run.CLAIM_FILE
@@ -593,9 +748,18 @@ def check_coverage_claim(
 def check_coverage_confirmation(
     run_dir: Path, ledger: ledger_module.Ledger
 ) -> Finding | None:
-    """The coverage claim on `C`: registered, recomputed and consistent.
+    """Checks the coverage claim on `C`: registered, recomputed and consistent.
 
-    None when the run holds no `coverage_confirmation.json`.
+    Args:
+        run_dir: The run directory.
+        ledger: The run's ledger.
+
+    Returns:
+        A finding, or None when the run holds no `coverage_confirmation.json`.
+        It is skipped when the claim could not be tested on `C`, and failing if
+        the claim is not registered, the document is malformed, the registration
+        or claim hash differs, the p-value or status does not recompute, or the
+        status differs from the sealed ledger row.
     """
     name = "coverage claim on C: registered, recomputed, status matches"
     document = read_optional(run_dir / coverage_confirm.DOCUMENT)
@@ -650,7 +814,18 @@ def check_coverage_confirmation(
 def check_registered(
     run_dir: Path, document: dict[str, Any], ledger: ledger_module.Ledger
 ) -> Finding:
-    """Registered claims are stated at the seal and their files match it."""
+    """Checks that registered claims are stated at the seal and match.
+
+    Args:
+        run_dir: The run directory.
+        document: The claims document.
+        ledger: The run's ledger.
+
+    Returns:
+        A passing finding if the registrations, attachment hashes and baseline
+        report agree with the sealed ledger; otherwise a failing one listing the
+        problems.
+    """
     name = "registered claims: files hash to the sealed ledger"
     sealed_row = ledger.confirmation or {}
     attachments = sealed_row.get("attachments", {})
@@ -687,7 +862,16 @@ def check_registered(
 
 
 def check_control(run_dir: Path, ledger: ledger_module.Ledger) -> Finding:
-    """The negative-control file is the one the ledger recorded."""
+    """Checks that the negative-control file is the one the ledger recorded.
+
+    Args:
+        run_dir: The run directory.
+        ledger: The run's ledger.
+
+    Returns:
+        A finding: skipped without a control file or control row, passing if the
+        file's hash equals the ledger's, otherwise failing.
+    """
     name = "negative control matches the ledger"
     path = run_dir / CONTROL_FILE
     if not path.exists() or ledger.control is None:
@@ -704,7 +888,19 @@ def check_control(run_dir: Path, ledger: ledger_module.Ledger) -> Finding:
 def check_attestations(
     run_dir: Path, signing_key: str | bytes | None
 ) -> Finding:
-    """A claim above `unverified` rests on verified, charter-named attestors."""
+    """Checks that a claim above `unverified` rests on verified attestors.
+
+    Args:
+        run_dir: The run directory.
+        signing_key: Key for the attestation signatures, or None.
+
+    Returns:
+        A finding: skipped without causal claims, a charter file or a causal
+        block, or when no key is available to check the signatures; failing if a
+        tier is raised without attestors or an accepted attestation is
+        malformed, not permitted, for another charter, outside its validity
+        window or has an invalid signature; otherwise passing.
+    """
     name = "causal attestations verify"
     claims = read_optional(run_dir / CAUSAL_FILE)
     record = read_optional(run_dir / CHARTER_FILE)
@@ -783,7 +979,9 @@ def verify(
         signing_key: Key for the charter signature and the custody log MACs.
 
     Returns:
-        Every step with its status; `ok` is false if any step failed.
+        Every step with its status; `ok` is false if any step failed. The result
+        holds a single failing step if the ledger cannot be loaded, and stops
+        after the claims file if that cannot be read.
     """
     folder = Path(run_dir)
     chain = "ledger chain verifies and decisions replay"

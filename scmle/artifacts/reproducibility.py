@@ -43,7 +43,17 @@ class ReplayVerdict:
 
 
 def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
-    """Reads the comparable facts of a finished run from its directory."""
+    """Reads the comparable facts of a finished run from its directory.
+
+    Args:
+        directory: A completed run directory.
+
+    Returns:
+        A dict with the configuration, dataset manifest, split fingerprint,
+        trials, the selected candidate, the environment lock text (empty if
+        absent) and the parameter-estimation digest (None if the run has no such
+        report).
+    """
     root = pathlib.Path(directory)
     trials = [
         json.loads(path.read_text(encoding="utf-8"))

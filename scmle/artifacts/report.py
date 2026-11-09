@@ -86,7 +86,15 @@ class HtmlReport:
 
     @staticmethod
     def reliability(result: results.RunResult) -> str:
-        """Summarizes fit health, shift, robustness and weak subgroups."""
+        """Summarizes fit health, shift, robustness and weak subgroups.
+
+        Args:
+            result: The completed run.
+
+        Returns:
+            HTML paragraphs, one per check that has results, or a single
+            paragraph saying no checks were available.
+        """
         escape = html.escape
         lines = []
         health = result.evaluation.get("fit_health")

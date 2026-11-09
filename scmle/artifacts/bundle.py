@@ -89,7 +89,12 @@ TRACKED_LIBRARIES = (
 
 
 def installed_distributions() -> dict[str, str]:
-    """Every installed distribution and its version (for the lock)."""
+    """Lists every installed distribution and its version (for the lock).
+
+    Returns:
+        A mapping from normalized distribution name (lower case, with `_`
+        replaced by `-`) to version, sorted by name.
+    """
     found = {}
     for distribution in importlib.metadata.distributions():
         name = distribution.metadata["Name"]
@@ -99,7 +104,13 @@ def installed_distributions() -> dict[str, str]:
 
 
 def installed_versions() -> dict[str, str]:
-    """Versions of the tracked libraries that are installed."""
+    """Reports the versions of the tracked libraries that are installed.
+
+    Returns:
+        A mapping from library name in `TRACKED_LIBRARIES` to its version
+        (`unknown` if it has none); libraries that cannot be imported are left
+        out.
+    """
     found = {}
     for name in TRACKED_LIBRARIES:
         try:
@@ -113,13 +124,30 @@ def installed_versions() -> dict[str, str]:
 def brier(
     probabilities: np.ndarray, labels: np.ndarray, classes: tuple[Any, ...]
 ) -> float:
-    """Mean squared error between probabilities and one-hot labels."""
+    """Computes the mean squared error between probabilities and one-hot labels.
+
+    Args:
+        probabilities: Predicted class probabilities, one row per sample.
+        labels: True labels.
+        classes: Class labels in probability-column order.
+
+    Returns:
+        The multiclass Brier score: the mean over samples of the summed squared
+        differences (0 is perfect).
+    """
     truth = (labels[:, None] == np.asarray(classes)[None, :]).astype(float)
     return float(np.mean(np.sum((probabilities - truth) ** 2, axis=1)))
 
 
 def file_sha256(path: pathlib.Path) -> str:
-    """Returns the SHA-256 of a file, streamed."""
+    """Returns the SHA-256 of a file, streamed.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The hex digest.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
@@ -128,12 +156,27 @@ def file_sha256(path: pathlib.Path) -> str:
 
 
 def minor_version(version: str) -> list[str]:
-    """Returns the `[major, minor]` components of a version string."""
+    """Returns the `[major, minor]` components of a version string.
+
+    Args:
+        version: A dotted version string.
+
+    Returns:
+        The first two dot-separated parts as strings (fewer if the version has
+        fewer).
+    """
     return version.split(".")[:2]
 
 
 def resolve_key(signing_key: str | bytes | None) -> bytes | None:
-    """Returns the signing key from the argument or the environment."""
+    """Returns the signing key from the argument or the environment.
+
+    Args:
+        signing_key: The key, or None to read `$SCMLE_SIGNING_KEY`.
+
+    Returns:
+        The key as bytes, or None if none is available or it is empty.
+    """
     key = (
         signing_key
         if signing_key is not None
@@ -145,7 +188,17 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
 
 
 def sign_manifest(manifest_bytes: bytes, key: bytes) -> str:
-    """HMAC-SHA256 of the manifest (which carries every file checksum)."""
+    """Computes the HMAC-SHA256 of the manifest.
+
+    The manifest carries the checksum of every stored file.
+
+    Args:
+        manifest_bytes: The manifest text as bytes.
+        key: The HMAC key.
+
+    Returns:
+        The hex digest.
+    """
     return hmac.new(key, manifest_bytes, hashlib.sha256).hexdigest()
 
 
@@ -159,11 +212,12 @@ def verify_signature(
         signing_key: HMAC key (defaults to the environment).
 
     Returns:
-        True when a signature exists and verifies; False when the bundle
-        is unsigned or no key is available.
+        True when a signature exists and verifies; False when the bundle is
+        unsigned or no key is available.
 
     Raises:
-        ArtifactError: If a signature exists but does not verify.
+        ArtifactError: If a signature exists but is unreadable, uses an
+            unsupported algorithm or does not verify.
     """
     signature_path = root / SIGNATURE_FILE
     key = resolve_key(signing_key)
@@ -241,7 +295,12 @@ class BundleInfo:
     platform: str = ""
 
     def environment_lock(self) -> str:
-        """The build environment as a pinned requirements listing."""
+        """Renders the build environment as a pinned requirements listing.
+
+        Returns:
+            Header comment lines (Python version, platform, framework version)
+            followed by one `name==version` line per installed distribution.
+        """
         header = [
             "# scmle environment lock",
             f"# python {self.python}",
@@ -254,11 +313,20 @@ class BundleInfo:
         return "\n".join([*header, *pins]) + "\n"
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A dict of all fields.
+        """
         return dataclasses.asdict(self)
 
     def compatibility_problems(self) -> list[str]:
-        """Lists dependency mismatches with the running environment."""
+        """Lists dependency mismatches with the running environment.
+
+        Returns:
+            One message per difference in the minor version of scikit-learn,
+            Python, pandas or a tracked library; empty if all agree.
+        """
         problems = []
         if minor_version(self.sklearn) != minor_version(sklearn.__version__):
             problems.append(
@@ -280,7 +348,24 @@ class BundleInfo:
 
 
 class ModelBundle:
-    """A fitted pipeline plus the schema and metadata needed to serve it."""
+    """A fitted pipeline plus the schema and metadata needed to serve it.
+
+    Attributes:
+        pipeline: Fitted preprocessing and estimator pipeline.
+        schema: Input contract.
+        info: Provenance metadata.
+        reference: Training-time distributions for monitoring, if any.
+        history: Recent rows per entity for series features, if any.
+        calibrator: Probability calibrator, if one was fitted.
+        conformal: Conformal calibrator, if any.
+        novelty: Novelty detector, if any.
+        quantile: Quantile interval models, if any.
+        cv_plus: CV+ fold models, if any.
+        shift_weights: Covariate-shift weights, if attached.
+        coverage_report: Measured coverage of the stored intervals or sets on
+            the final test rows, if any.
+        history_lock: Serializes updates of the history.
+    """
 
     def __init__(
         self,
@@ -503,17 +588,16 @@ class ModelBundle:
     ) -> dict[str, Any]:
         """Predicts and reports the schema diagnostics in one structured result.
 
+        Required columns that are missing or malformed raise `SchemaError`.
+
         Args:
             data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
-            Predictions, class probabilities for classifiers, the model
-            version, whether the input satisfied the schema, and diagnostics
-            (ignored columns, missing-value counts, unseen categories).
-
-        Raises:
-            SchemaError: If required columns are missing or malformed.
+            Predictions, class probabilities for classifiers, the model version,
+            whether the input satisfied the schema, and diagnostics (ignored
+            columns, missing-value counts, unseen categories).
         """
         frame = self.read_frame(data)
         if mapping is not None:
@@ -630,7 +714,12 @@ class ModelBundle:
         }
 
     def series_builder(self) -> feature_graph.SeriesFeatureBuilder:
-        """The builder for this model's series features, with its history."""
+        """Builds the series feature builder for this model, with its history.
+
+        Returns:
+            A builder over the schema's series features, group and time columns
+            and the stored history.
+        """
         return feature_graph.SeriesFeatureBuilder(
             [tasks.FeatureNode(**node) for node in self.schema.series],
             self.schema.group_column,
@@ -780,6 +869,20 @@ class ModelBundle:
         The current signature must verify before the new signature is written.
         Rotation changes only ``signature.json`` and uses an atomic replace, so
         a failed rotation leaves the previously valid signature in place.
+
+        Args:
+            directory: Bundle directory.
+            current_key: The key the bundle is currently signed with.
+            new_key: The key to sign with from now on.
+
+        Returns:
+            The bundle directory.
+
+        Raises:
+            ArtifactError: If either key is empty, the manifest cannot be read,
+                or the bundle's current signature is absent. A signature that
+                exists but does not verify raises the same error from
+                `verify_signature`.
         """
         root = pathlib.Path(directory)
         old = resolve_key(current_key)
@@ -1069,7 +1172,14 @@ class ModelBundle:
     def read_frame(
         self, data: str | pathlib.Path | pd.DataFrame
     ) -> pd.DataFrame:
-        """Loads inference input from a path or copies a DataFrame."""
+        """Loads inference input from a path or copies a DataFrame.
+
+        Args:
+            data: A supported tabular path, or an in-memory table.
+
+        Returns:
+            The data as a pandas frame.
+        """
         if isinstance(data, (str, pathlib.Path)):
             return tabular.read_table(data)
         return interchange.to_pandas(data)
@@ -1100,13 +1210,16 @@ class ModelBundle:
     ) -> pd.DataFrame:
         """Validates input and returns the feature columns.
 
+        Missing columns, or non-numeric values in numeric columns, raise
+        `SchemaError`.
+
         Args:
             data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
 
-        Raises:
-            SchemaError: On missing columns or non-numeric values in numeric
-                columns.
+        Returns:
+            The pipeline's input columns (with series features computed and any
+            optional inputs that are present), in schema order.
         """
         frame = self.read_frame(data)
         if mapping is not None:
@@ -1134,6 +1247,11 @@ class ModelBundle:
         Args:
             data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            One prediction per row (labels for classifiers, class labels mapped
+            back from codes for ordinal tasks, values for regression, one column
+            per target for multi-target models).
         """
         predictions = self.pipeline.predict(self.prepare_frame(data, mapping))
         if self.schema.targets:
@@ -1148,7 +1266,14 @@ class ModelBundle:
         data: str | pathlib.Path | pd.DataFrame,
         mapping: mapping_module.ColumnMapping | None = None,
     ) -> pd.DataFrame:
-        """Predictions of a multi-target model, one named column per target.
+        """Predicts a multi-target model, one named column per target.
+
+        Args:
+            data: DataFrame or path to a supported tabular dataset.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            A frame with one column per target.
 
         Raises:
             ArtifactError: For single-target models.
@@ -1169,6 +1294,10 @@ class ModelBundle:
         Args:
             data: DataFrame or path to a supported tabular dataset.
             mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            One row per input row and one column per class, calibrated if a
+            calibrator is attached.
 
         Raises:
             ArtifactError: For regression models or estimators without
@@ -1226,6 +1355,15 @@ class ModelBundle:
             estimator = self.calibrator or self.pipeline
 
             def score(frame: pd.DataFrame) -> np.ndarray:
+                """Scores rows for the explained output.
+
+                Args:
+                    frame: Rows to score.
+
+                Returns:
+                    The probability of the explained class (calibrated if a
+                    calibrator is attached).
+                """
                 return np.asarray(estimator.predict_proba(frame))[:, column]
 
         return local.OcclusionExplainer(score, self.schema.features).explain(
@@ -1320,24 +1458,26 @@ class ModelBundle:
     ) -> shift_weights_module.StoredShiftWeights:
         """Estimates and stores likelihood ratios for weighted conformal.
 
+        A discriminator is fitted between the calibration rows and the target
+        rows; an effective sample size that is too small refuses the weights
+        (`WeightRefusedError`) and none are stored.
+
         Args:
-            calibration_rows: The rows the stored conformal scores came from,
-                in score order (development rows in the order of the
-                held-out positions of the split's folds).
+            calibration_rows: The rows the stored conformal scores came from, in
+                score order (development rows in the order of the held-out
+                positions of the split's folds).
             target_rows: Unlabeled rows of the population to predict for.
-            columns: Numeric feature columns for the discriminator; all
-                numeric schema features if omitted.
+            columns: Numeric feature columns for the discriminator; all numeric
+                schema features if omitted.
             clip: Upper bound on the ratio.
 
         Returns:
             The stored weights (also kept on the bundle and saved with it).
 
         Raises:
-            ArtifactError: Without a regression conformal calibration, on a
-                row count that differs from the stored scores, or on
-                columns that are not numeric features of the schema.
-            WeightRefusedError: When the effective sample size is below
-                `MIN_EFFECTIVE_SIZE`; no weights are stored then.
+            ArtifactError: Without a regression conformal calibration, on a row
+                count that differs from the stored scores, or on columns that
+                are not numeric features of the schema.
         """
         calibrator = self.require_conformal("regression")
         if len(calibration_rows) != len(calibrator.scores):
@@ -1379,7 +1519,20 @@ class ModelBundle:
         coverage: float,
         mapping: mapping_module.ColumnMapping | None,
     ) -> pd.DataFrame:
-        """Weighted conformal intervals with the stored shift weights."""
+        """Computes weighted conformal intervals with the stored shift weights.
+
+        Args:
+            calibrator: The regression conformal calibrator.
+            data: DataFrame or path to a supported tabular dataset.
+            coverage: Share of new rows the interval should contain.
+            mapping: Explicit column-name policy; exact names if omitted.
+
+        Returns:
+            Columns `prediction`, `lower` and `upper`.
+
+        Raises:
+            ArtifactError: If no shift weights are attached.
+        """
         if self.shift_weights is None:
             raise errors.ArtifactError(
                 "this bundle has no shift weights; call attach_shift_weights"
@@ -1444,21 +1597,54 @@ class ModelBundle:
             column = list(self.schema.classes).index(desired)
 
             def progress(rows: pd.DataFrame) -> np.ndarray:
+                """Measures how close rows are to the wanted class.
+
+                Args:
+                    rows: Candidate rows.
+
+                Returns:
+                    The predicted probability of the wanted class.
+                """
                 return np.asarray(self.predict_proba(rows))[:, column]
 
             def reached(rows: pd.DataFrame) -> np.ndarray:
+                """Tests whether rows are predicted as the wanted class.
+
+                Args:
+                    rows: Candidate rows.
+
+                Returns:
+                    A boolean per row.
+                """
                 return np.asarray(self.predict(rows)) == desired
 
         else:
             low, high = desired
 
             def progress(rows: pd.DataFrame) -> np.ndarray:
+                """Measures how close rows are to the wanted range.
+
+                Args:
+                    rows: Candidate rows.
+
+                Returns:
+                    Minus the distance of each prediction from the wanted range
+                    (0 inside it).
+                """
                 values = np.asarray(self.predict(rows), dtype=float)
                 return -(
                     np.maximum(low - values, 0) + np.maximum(values - high, 0)
                 )
 
             def reached(rows: pd.DataFrame) -> np.ndarray:
+                """Tests whether rows have a prediction inside the wanted range.
+
+                Args:
+                    rows: Candidate rows.
+
+                Returns:
+                    A boolean per row.
+                """
                 values = np.asarray(self.predict(rows), dtype=float)
                 return (values >= low) & (values <= high)
 
@@ -1517,6 +1703,9 @@ class ModelBundle:
     ) -> pathlib.Path:
         """Writes the pipeline as an ONNX graph (`onnx` extra).
 
+        Models that cannot be exported faithfully, a probability calibrator that
+        is attached, or a failed check raise `ArtifactError`.
+
         Args:
             path: Destination file.
             check: Rows to score with both the graph and the pipeline; the
@@ -1525,10 +1714,6 @@ class ModelBundle:
 
         Returns:
             The path written.
-
-        Raises:
-            ArtifactError: For models that cannot be exported faithfully, when
-                a probability calibrator is attached, or on a failed check.
         """
         written = onnx_export.export(self, path)
         if check is not None:
@@ -1735,21 +1920,20 @@ class ModelBundle:
     ) -> list[list[Any]]:
         """Prediction sets with a stated coverage (classification).
 
+        Regression models, or bundles saved without conformal scores, raise
+        `ArtifactError`.
+
         Args:
             data: DataFrame or path to a supported tabular dataset.
             coverage: Share of new rows whose true label the set contains.
             mapping: Explicit column-name policy; exact names if omitted.
-            conditional: `None` for a pooled margin (coverage on average
-                over classes) or `class` for one margin per true class
-                (coverage within each class). A class with too few
-                calibration rows is kept in every set.
+            conditional: `None` for a pooled margin (coverage on average over
+                classes) or `class` for one margin per true class (coverage
+                within each class). A class with too few calibration rows is
+                kept in every set.
 
         Returns:
             For each row the labels that cannot be ruled out.
-
-        Raises:
-            ArtifactError: For regression models or bundles saved without
-                conformal scores.
         """
         calibrator = self.require_conformal("classification")
         return calibrator.sets(
@@ -1759,7 +1943,19 @@ class ModelBundle:
     def require_conformal(
         self, kind: str
     ) -> conformal_module.ConformalCalibrator:
-        """Returns the calibrator of the right kind or explains its absence."""
+        """Returns the calibrator of the right kind or explains its absence.
+
+        Args:
+            kind: `regression` or `classification`.
+
+        Returns:
+            The conformal calibrator.
+
+        Raises:
+            ArtifactError: If the bundle has no calibrator of that kind (the run
+                skips it when the time budget is spent or too few held-out rows
+                exist).
+        """
         if self.conformal is None or self.conformal.kind != kind:
             raise errors.ArtifactError(
                 f"this bundle has no {kind} conformal calibration; the run "

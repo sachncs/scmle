@@ -18,17 +18,18 @@ class ExplanationHtmlReport:
     ) -> str:
         """Builds an escaped, privacy-aware explanation report.
 
+        The renderer does not make evidence links active. Artifact URI schemes
+        are useful to a local viewer but are not safe to turn into arbitrary
+        browser navigations without a caller-owned trust policy.
+
         Args:
             evidence: Validated portable explanation evidence.
             title: Optional document title. The method name is used by default.
 
         Returns:
             A self-contained HTML document with a summary, output, links, and
-            the canonical evidence record.
-
-        The renderer does not make evidence links active. Artifact URI schemes
-        are useful to a local viewer but are not safe to turn into arbitrary
-        browser navigations without a caller-owned trust policy.
+            the canonical evidence record. If the privacy decision is `denied`,
+            the output is replaced by a withheld notice with the reason.
         """
         record = evidence.to_dict()
         privacy = cast(dict[str, Any], record["privacy_decision"])
@@ -62,10 +63,32 @@ class ExplanationHtmlReport:
         evidence_links: list[dict[str, Any]],
         record: dict[str, Any],
     ) -> str:
-        """Builds the deterministic HTML document from JSON-native fields."""
+        """Builds the deterministic HTML document from JSON-native fields.
+
+        Args:
+            title: Document title.
+            method_name: Name of the explanation method.
+            parameters: The method's parameters.
+            output: The explanation output (or the withheld notice).
+            limitations: Statements of what the explanation does not show.
+            privacy: The privacy decision with its `decision` and `reason`.
+            evidence_links: Links with a `relation` and a `uri`, shown as text.
+            record: The canonical evidence record shown in full.
+
+        Returns:
+            The HTML document.
+        """
         escape = html.escape
 
         def pretty(value: Any) -> str:
+            """Formats a value as escaped, indented JSON.
+
+            Args:
+                value: A JSON-native value without NaN or infinity.
+
+            Returns:
+                The HTML-escaped JSON text with sorted keys.
+            """
             return escape(
                 json.dumps(value, allow_nan=False, indent=2, sort_keys=True)
             )
