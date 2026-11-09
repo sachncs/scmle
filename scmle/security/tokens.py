@@ -83,6 +83,12 @@ class TokenError(errors.ScmleError):
 def decode_segment(text: str) -> bytes:
     """Decodes one base64url segment; padding is optional.
 
+    Args:
+        text: The segment.
+
+    Returns:
+        The decoded bytes.
+
     Raises:
         TokenError: If the segment is not base64url.
     """
@@ -94,12 +100,26 @@ def decode_segment(text: str) -> bytes:
 
 
 def encode_segment(raw: bytes) -> str:
-    """Encodes bytes as an unpadded base64url segment."""
+    """Encodes bytes as an unpadded base64url segment.
+
+    Args:
+        raw: The bytes.
+
+    Returns:
+        The segment.
+    """
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
 def int_from_segment(text: str) -> int:
-    """A big-endian unsigned integer from a base64url segment."""
+    """Decodes a big-endian unsigned integer from a base64url segment.
+
+    Args:
+        text: The segment.
+
+    Returns:
+        The integer. A segment that is not base64url raises `TokenError`.
+    """
     return int.from_bytes(decode_segment(text), "big")
 
 
@@ -158,6 +178,12 @@ class VerificationKey:
         RS256. The extension fields `nbf` and `exp` (epoch seconds) bound the
         key's validity.
 
+        Args:
+            entry: The JWK object.
+
+        Returns:
+            The key.
+
         Raises:
             ConfigError: If the entry is malformed.
         """
@@ -188,14 +214,30 @@ class VerificationKey:
         raise errors.ConfigError(f"unsupported JWK type {kind!r}")
 
     def check_window(self, now: float) -> None:
-        """Raises if the key is outside its validity window."""
+        """Raises if the key is outside its validity window.
+
+        Args:
+            now: Epoch seconds.
+
+        Raises:
+            TokenError: `key_not_yet_valid` before `not_before`, `key_expired`
+                from `expires` on.
+        """
         if self.not_before is not None and now < self.not_before:
             raise TokenError(KEY_NOT_YET_VALID)
         if self.expires is not None and now >= self.expires:
             raise TokenError(KEY_EXPIRED)
 
     def verify(self, signing_input: bytes, signature: bytes) -> bool:
-        """Whether `signature` is valid for `signing_input`."""
+        """Checks a signature.
+
+        Args:
+            signing_input: The signed bytes (`header.payload`).
+            signature: The signature bytes.
+
+        Returns:
+            True if `signature` is valid for `signing_input` under this key.
+        """
         if self.algorithm == HS256:
             expected = hmac.new(self.secret, signing_input, "sha256").digest()
             return hmac.compare_digest(expected, signature)
@@ -215,12 +257,23 @@ class VerificationKey:
 
 
 def optional_float(value: Any) -> float | None:
-    """A float, or None when absent."""
+    """Converts a value to a float unless it is absent.
+
+    Args:
+        value: A number or None.
+
+    Returns:
+        The float, or None when `value` is None.
+    """
     return None if value is None else float(value)
 
 
 class KeySet:
-    """The keys currently trusted, by `kid`; replaced as a whole on rotation."""
+    """The keys currently trusted, by `kid`; replaced as a whole on rotation.
+
+    Attributes:
+        keys: The trusted keys by `kid`.
+    """
 
     def __init__(self, keys: Sequence[VerificationKey]) -> None:
         """Initializes the set.
@@ -240,7 +293,18 @@ class KeySet:
 
     @classmethod
     def from_jwks(cls, document: Mapping[str, Any]) -> Self:
-        """Builds a set from a JWKS document (`{"keys": [...]}`)."""
+        """Builds a set from a JWKS document (`{"keys": [...]}`).
+
+        Args:
+            document: The parsed JWKS document.
+
+        Returns:
+            The key set.
+
+        Raises:
+            ConfigError: If the document has no `keys` list. A malformed entry
+                is refused with the same error.
+        """
         entries = document.get("keys")
         if not isinstance(entries, list):
             raise errors.ConfigError("a JWKS document needs a keys list")
@@ -249,6 +313,12 @@ class KeySet:
     @classmethod
     def from_file(cls, path: str | pathlib.Path) -> Self:
         """Reads a JWKS file.
+
+        Args:
+            path: The file.
+
+        Returns:
+            The key set.
 
         Raises:
             ConfigError: If the file is unreadable or malformed.
@@ -260,7 +330,13 @@ class KeySet:
             raise errors.ConfigError(f"cannot read key set {path}") from error
 
     def get(self, kid: str) -> VerificationKey:
-        """The key with this id.
+        """Looks up the key with this id.
+
+        Args:
+            kid: The key id.
+
+        Returns:
+            The key.
 
         Raises:
             TokenError: If no such key is trusted.
@@ -272,7 +348,13 @@ class KeySet:
 
 
 class RevocationList:
-    """Tokens (`jti`), subjects and keys (`kid`) that are no longer accepted."""
+    """Tokens (`jti`), subjects and keys (`kid`) that are no longer accepted.
+
+    Attributes:
+        tokens: Revoked `jti` values.
+        subjects: Revoked `sub` values.
+        key_ids: Revoked `kid` values.
+    """
 
     def __init__(
         self,
@@ -295,6 +377,12 @@ class RevocationList:
     def from_file(cls, path: str | pathlib.Path) -> Self:
         """Reads `{"tokens": [], "subjects": [], "key_ids": []}`.
 
+        Args:
+            path: The file.
+
+        Returns:
+            The list.
+
         Raises:
             ConfigError: If the file is unreadable or malformed.
         """
@@ -313,7 +401,15 @@ class RevocationList:
     def revokes(
         self, header: Mapping[str, Any], claims: Mapping[str, Any]
     ) -> bool:
-        """Whether the token is revoked."""
+        """Reports whether the token is revoked.
+
+        Args:
+            header: The token's header.
+            claims: The token's claims.
+
+        Returns:
+            True if its `kid` or `sub` is revoked, or its `jti` is.
+        """
         return (
             header.get("kid") in self.key_ids
             or claims.get("sub") in self.subjects
@@ -343,7 +439,17 @@ class Principal:
 
 
 class TokenVerifier:
-    """Verifies bearer tokens against a key set and a revocation list."""
+    """Verifies bearer tokens against a key set and a revocation list.
+
+    Attributes:
+        keys: Trusted keys; replace to rotate.
+        issuer: Required `iss`.
+        audience: Required member of `aud`.
+        revocations: A list, or a callable returning the current list.
+        tenant_claim: Name of the tenant claim.
+        leeway: Clock skew tolerated, in seconds.
+        clock: Source of epoch seconds.
+    """
 
     def __init__(
         self,
@@ -386,7 +492,14 @@ class TokenVerifier:
         self.clock = clock
 
     def current_revocations(self) -> RevocationList | None:
-        """The revocation list now in force."""
+        """Returns the revocation list now in force.
+
+        Returns:
+            The list, or None if no revocations are configured.
+
+        Raises:
+            TokenError: `revocation_unavailable` if the list cannot be obtained.
+        """
         if callable(self.revocations):
             try:
                 return self.revocations()
@@ -430,7 +543,17 @@ class TokenVerifier:
         return self.check_claims(header, claims, key, now)
 
     def parse_object(self, segment: str) -> dict[str, Any]:
-        """A JSON object from a base64url segment."""
+        """Parses a JSON object from a base64url segment.
+
+        Args:
+            segment: A token segment.
+
+        Returns:
+            The JSON object.
+
+        Raises:
+            TokenError: `malformed` if the segment is not a JSON object.
+        """
         try:
             value = json.loads(decode_segment(segment))
         except (ValueError, UnicodeError) as error:
@@ -446,7 +569,22 @@ class TokenVerifier:
         key: VerificationKey,
         now: float,
     ) -> Principal:
-        """Checks the registered claims of a token with a valid signature."""
+        """Checks the registered claims of a token with a valid signature.
+
+        Args:
+            header: The token's header.
+            claims: The token's claims.
+            key: The key that verified the signature.
+            now: Epoch seconds.
+
+        Returns:
+            The verified caller.
+
+        Raises:
+            TokenError: If the issuer or audience differs, `sub` or `exp` is
+                missing, the token is expired or not yet valid, or it is
+                revoked.
+        """
         if claims.get("iss") != self.issuer:
             raise TokenError(BAD_ISSUER)
         audience = claims.get("aud")
@@ -479,7 +617,18 @@ class TokenVerifier:
 
 
 def number_claim(claims: Mapping[str, Any], name: str) -> float | None:
-    """An optional numeric claim; a non-number is a malformed token."""
+    """Reads an optional numeric claim.
+
+    Args:
+        claims: The token's claims.
+        name: The claim name.
+
+    Returns:
+        The claim as a float, or None if absent.
+
+    Raises:
+        TokenError: `malformed` if the claim is not a number.
+    """
     if name not in claims:
         return None
     value = claims[name]
@@ -489,7 +638,18 @@ def number_claim(claims: Mapping[str, Any], name: str) -> float | None:
 
 
 def require_number(claims: Mapping[str, Any], name: str) -> float:
-    """A required numeric claim."""
+    """Reads a required numeric claim.
+
+    Args:
+        claims: The token's claims.
+        name: The claim name.
+
+    Returns:
+        The claim as a float.
+
+    Raises:
+        TokenError: `missing_claim` if absent.
+    """
     value = number_claim(claims, name)
     if value is None:
         raise TokenError(MISSING_CLAIM, name)
@@ -497,7 +657,14 @@ def require_number(claims: Mapping[str, Any], name: str) -> float:
 
 
 def scopes_of(claims: Mapping[str, Any]) -> frozenset[str]:
-    """Scopes from `scope` (space separated) or `scp` (list)."""
+    """Collects scopes from `scope` (space separated) or `scp` (list).
+
+    Args:
+        claims: The token's claims.
+
+    Returns:
+        The union of both; empty if neither is present.
+    """
     found: set[str] = set()
     text = claims.get("scope")
     if isinstance(text, str):

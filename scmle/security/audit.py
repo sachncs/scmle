@@ -28,7 +28,13 @@ SERVICE_CHARTER = "service-audit"
 
 
 class AuditLog:
-    """Appends audit rows to a deployment ledger, one at a time."""
+    """Appends audit rows to a deployment ledger, one at a time.
+
+    Attributes:
+        ledger: The ledger rows are committed to.
+        clock: Source of epoch seconds.
+        lock: Serializes commits.
+    """
 
     def __init__(
         self,
@@ -57,8 +63,9 @@ class AuditLog:
             path: Ledger file, or None for an in-memory ledger.
             clock: Source of epoch seconds.
 
-        Raises:
-            DeploymentLedgerError: If an existing file is broken.
+        Returns:
+            The log. An existing file that is broken raises
+            `DeploymentLedgerError` from the ledger's loader.
         """
         if path is not None and pathlib.Path(path).exists():
             ledger = deployment_ledger.DeploymentLedger.load(path)
@@ -95,7 +102,16 @@ class AuditLog:
     def activation(
         self, model_version: str, artifact_digest: str, **facts: Any
     ) -> dict[str, Any]:
-        """Records that a model became ready to serve."""
+        """Records that a model became ready to serve.
+
+        Args:
+            model_version: Version of the model.
+            artifact_digest: Digest of the model artifact.
+            **facts: Further JSON-ready facts.
+
+        Returns:
+            The chained row.
+        """
         return self.record(
             ACTIVATION,
             actor="service",
@@ -114,7 +130,19 @@ class AuditLog:
         reason: str,
         request_id: str,
     ) -> dict[str, Any]:
-        """Records an access decision."""
+        """Records an access decision.
+
+        Args:
+            principal: The verified caller, or None if authentication failed.
+            route: The request path.
+            outcome: `allowed` or `denied`.
+            status: HTTP status given.
+            reason: The precise cause.
+            request_id: Request id.
+
+        Returns:
+            The chained row.
+        """
         return self.record(
             ACCESS,
             actor=None if principal is None else principal.subject,
@@ -129,13 +157,30 @@ class AuditLog:
         )
 
     def admin(self, actor: str, action: str, **detail: Any) -> dict[str, Any]:
-        """Records an administrative action such as a key rotation."""
+        """Records an administrative action such as a key rotation.
+
+        Args:
+            actor: Who acted.
+            action: What was done.
+            **detail: Further JSON-ready facts.
+
+        Returns:
+            The chained row.
+        """
         return self.record(
             ADMIN, actor=actor, action=action, outcome=ALLOWED, **detail
         )
 
     def rows(self, event: str | None = None) -> list[dict[str, Any]]:
-        """Audit rows so far, optionally of one event kind."""
+        """Lists the audit rows so far, optionally of one event kind.
+
+        Args:
+            event: `activation`, `access` or `admin` to keep only that kind;
+                None for all.
+
+        Returns:
+            The chained rows, in ledger order.
+        """
         found = [
             row
             for row in self.ledger.rows

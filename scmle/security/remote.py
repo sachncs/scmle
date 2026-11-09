@@ -1,4 +1,4 @@
-"""Keys and revocations fetched over the network (F14 item 4).
+"""Keys and revocations fetched over the network.
 
 `tokens.KeySet.from_file` and `RevocationList.from_file` read files. This
 module adds the pull side, with the standard library only:
@@ -53,6 +53,15 @@ def fetch_json(
 ) -> Any:
     """Fetches and parses one JSON document.
 
+    Args:
+        url: Where to fetch it.
+        timeout: Seconds to wait.
+        max_bytes: Largest body accepted.
+        allow_http: Permit plain http (tests only).
+
+    Returns:
+        The parsed JSON value.
+
     Raises:
         ConfigError: For a disallowed scheme, a failed request, an oversized
             body or a body that is not JSON.
@@ -84,11 +93,19 @@ def discover(
     allow_http: bool = False,
     fetch: Callable[..., Any] = fetch_json,
 ) -> dict[str, Any]:
-    """The discovery document of `issuer`, checked to name that issuer.
+    """Fetches the discovery document of `issuer`, checked to name that issuer.
+
+    Args:
+        issuer: The issuer URL.
+        allow_http: Permit plain http (tests only).
+        fetch: The JSON fetcher.
+
+    Returns:
+        The discovery document.
 
     Raises:
-        ConfigError: If it cannot be fetched, is not an object, names
-            another issuer or has no `jwks_uri`.
+        ConfigError: If it cannot be fetched, is not an object, names another
+            issuer or has no `jwks_uri`.
     """
     document = fetch(issuer.rstrip("/") + DISCOVERY_PATH, allow_http=allow_http)
     if not isinstance(document, dict):
@@ -101,7 +118,18 @@ def discover(
 
 
 class RemoteKeySet(tokens.KeySet):
-    """A key set that refreshes itself from a JWKS URL."""
+    """A key set that refreshes itself from a JWKS URL.
+
+    Attributes:
+        uri: Where the JWKS document is served.
+        ttl: Seconds a fetched set is used before it is refetched.
+        min_refresh: Least seconds between fetches caused by an unknown `kid`.
+        max_stale: Seconds a set may be served after its refresh began to fail.
+        clock: Epoch seconds.
+        allow_http: Whether plain http is permitted.
+        fetcher: The JSON fetcher.
+        fetched_at: Clock reading of the last successful fetch.
+    """
 
     def __init__(
         self,
@@ -116,6 +144,9 @@ class RemoteKeySet(tokens.KeySet):
     ) -> None:
         """Fetches the key set once; it must succeed.
 
+        A first fetch that fails, or a document that is bad, raises
+        `ConfigError`.
+
         Args:
             jwks_uri: Where the JWKS document is served.
             ttl: Seconds a fetched set is used before it is refetched.
@@ -126,9 +157,6 @@ class RemoteKeySet(tokens.KeySet):
             clock: Epoch seconds (injectable for tests).
             allow_http: Permit plain http (tests only).
             fetch: The JSON fetcher (injectable).
-
-        Raises:
-            ConfigError: If the first fetch fails or the document is bad.
         """
         self.uri = jwks_uri
         self.ttl = ttl
@@ -144,13 +172,22 @@ class RemoteKeySet(tokens.KeySet):
         self.fetched_at = self.clock()
 
     def load(self) -> tokens.KeySet:
-        """Fetches and parses the JWKS document."""
+        """Fetches and parses the JWKS document.
+
+        Returns:
+            The key set in the document.
+        """
         return tokens.KeySet.from_jwks(
             self.fetcher(self.uri, allow_http=self.allow_http)
         )
 
     def refresh(self) -> bool:
-        """Replaces the keys; False (keys unchanged) if the fetch failed."""
+        """Replaces the keys from the JWKS document.
+
+        Returns:
+            True if the keys were replaced; False, with the keys unchanged, if
+            the fetch failed.
+        """
         try:
             loaded = self.load()
         except errors.ConfigError:
@@ -160,7 +197,16 @@ class RemoteKeySet(tokens.KeySet):
         return True
 
     def get(self, kid: str) -> tokens.VerificationKey:
-        """The key with this id, refreshing the set when it is due.
+        """Looks up the key with this id, refreshing the set when it is due.
+
+        The set is refetched when older than `ttl`, and also for an unknown
+        `kid` when older than `min_refresh`.
+
+        Args:
+            kid: The key id.
+
+        Returns:
+            The key.
 
         Raises:
             TokenError: `unknown_key` for a key the set does not hold, or
@@ -178,7 +224,18 @@ class RemoteKeySet(tokens.KeySet):
 
 
 class RemoteRevocations:
-    """A pulled revocation list, usable as `TokenVerifier(revocations=...)`."""
+    """A pulled revocation list, usable as `TokenVerifier(revocations=...)`.
+
+    Attributes:
+        url: Where the revocation document is served.
+        ttl: Seconds a fetched list is used.
+        max_stale: Seconds a list may be served after its refresh began to fail.
+        clock: Epoch seconds.
+        allow_http: Whether plain http is permitted.
+        fetcher: The JSON fetcher.
+        current: The list in force, or None before the first fetch.
+        fetched_at: Clock reading of the last successful fetch.
+    """
 
     def __init__(
         self,
@@ -212,11 +269,16 @@ class RemoteRevocations:
         self.fetched_at = 0.0
 
     def __call__(self) -> tokens.RevocationList:
-        """The list in force.
+        """Returns the list in force, refreshing it when due.
+
+        Returns:
+            The cached list while it is younger than `ttl`; otherwise a freshly
+            fetched list, or the cached one if the fetch failed and it is
+            younger than `ttl + max_stale`.
 
         Raises:
-            ConfigError: If the list is malformed, or cannot be refreshed and
-                is older than `ttl + max_stale`.
+            ConfigError: If the list is malformed, or cannot be refreshed and is
+                older than `ttl + max_stale`.
         """
         now = self.clock()
         if self.current is not None and now - self.fetched_at < self.ttl:

@@ -48,7 +48,15 @@ MAX_TRACKED_CLIENTS = 10_000
 
 
 def is_loopback(host: str) -> bool:
-    """Whether a bind address is reachable only from this machine."""
+    """Reports whether a bind address is reachable only from this machine.
+
+    Args:
+        host: A host name or IP address.
+
+    Returns:
+        True for `localhost` and for loopback IP addresses; False for any other
+        name or address, including a string that is not an IP address.
+    """
     if host == "localhost":
         return True
     try:
@@ -123,7 +131,7 @@ class AccessDenied(errors.ScmleError):
 
     @property
     def headers(self) -> dict[str, str]:
-        """Response headers: the challenge or the retry delay."""
+        """The response headers: the challenge or the retry delay."""
         if self.status == 401:
             return {"WWW-Authenticate": 'Bearer realm="scmle"'}
         if self.status == 429:
@@ -135,10 +143,17 @@ class AccessDenied(errors.ScmleError):
 class RateLimiter:
     """A token bucket per key, with an injectable clock.
 
-    Each key may make `rate` requests per second on average and bursts of up
-    to `burst`. State is kept in memory for at most `MAX_TRACKED_CLIENTS`
-    keys; when full the least recently refilled half is dropped, which can
-    only make the limiter more lenient to those keys, never lock one out.
+    Each key may make `rate` requests per second on average and bursts of up to
+    `burst`. State is kept in memory for at most `MAX_TRACKED_CLIENTS` keys;
+    when full the least recently refilled half is dropped, which can only make
+    the limiter more lenient to those keys, never lock one out.
+
+    Attributes:
+        rate: Requests per second refilled.
+        burst: Bucket capacity.
+        clock: Monotonic seconds.
+        buckets: Level and last-refill time of each tracked key.
+        lock: Guards the buckets.
     """
 
     def __init__(
@@ -168,6 +183,9 @@ class RateLimiter:
     def take(self, key: str) -> float | None:
         """Takes one token.
 
+        Args:
+            key: The bucket to take from (for example a subject or client key).
+
         Returns:
             None if allowed, otherwise seconds until a token is available.
         """
@@ -183,7 +201,10 @@ class RateLimiter:
             return (1.0 - level) / self.rate
 
     def trim(self) -> None:
-        """Bounds memory by dropping the stalest half of the keys."""
+        """Bounds memory by dropping the stalest half of the keys.
+
+        Nothing is dropped while at most `MAX_TRACKED_CLIENTS` keys are tracked.
+        """
         if len(self.buckets) <= MAX_TRACKED_CLIENTS:
             return
         stale = sorted(self.buckets, key=lambda name: self.buckets[name][1])
@@ -192,7 +213,15 @@ class RateLimiter:
 
 
 def bearer_token(header: str | None) -> str | None:
-    """The token of an ``Authorization: Bearer <token>`` header, or None."""
+    """Extracts the token of an ``Authorization: Bearer <token>`` header.
+
+    Args:
+        header: The header value, or None.
+
+    Returns:
+        The token, or None if the header is absent, is not a bearer credential,
+        or has an empty token.
+    """
     if header is None:
         return None
     scheme, separator, value = header.partition(" ")
@@ -202,12 +231,28 @@ def bearer_token(header: str | None) -> str | None:
 
 
 def client_key(remote: str) -> str:
-    """A fixed-size key for a remote address."""
+    """Derives a fixed-size key for a remote address.
+
+    Args:
+        remote: The peer address.
+
+    Returns:
+        The first 16 hex characters of its SHA-256.
+    """
     return hashlib.sha256(remote.encode()).hexdigest()[:16]
 
 
 class Gateway:
-    """Authenticates, authorizes and rate-limits requests, and audits them."""
+    """Authenticates, authorizes and rate-limits requests, and audits them.
+
+    Attributes:
+        verifier: Verifies bearer tokens.
+        tenant: The one tenant this deployment serves, or None.
+        routes: Scope needed per `(method, path)`.
+        limiter: Per-subject request limit.
+        failure_limiter: Per-client limit on refused attempts.
+        audit: Where decisions are recorded, or None.
+    """
 
     def __init__(
         self,
@@ -290,7 +335,22 @@ class Gateway:
         authorization: str | None,
         remote: str,
     ) -> tokens.Principal:
-        """The decision itself; raises `AccessDenied`."""
+        """Makes the decision itself.
+
+        Args:
+            method: HTTP method.
+            route: Request path without query string.
+            authorization: The ``Authorization`` header value, if any.
+            remote: The peer address.
+
+        Returns:
+            The verified caller.
+
+        Raises:
+            AccessDenied: With status 401 for missing or invalid credentials,
+                403 for a route not in the table, a missing scope or a tenant
+                mismatch, and 429 when the caller or the client is rate-limited.
+        """
         token = bearer_token(authorization)
         if token is None:
             self.refuse(401, "no_credentials", remote)
@@ -313,7 +373,17 @@ class Gateway:
         return principal
 
     def refuse(self, status: int, reason: str, remote: str) -> NoReturn:
-        """Counts a refused attempt, then raises (429 when guessing)."""
+        """Counts a refused attempt, then raises (429 when guessing).
+
+        Args:
+            status: The status to refuse with.
+            reason: The precise cause, for the audit log.
+            remote: The peer address, counted against the failure limit.
+
+        Raises:
+            AccessDenied: With the given status, or with 429 if the client has
+                made too many refused attempts.
+        """
         wait = self.failure_limiter.take(client_key(remote))
         if wait is not None:
             raise AccessDenied(429, "too_many_failures", wait)
@@ -363,7 +433,14 @@ class AuthSettings:
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str]) -> "AuthSettings":
-        """Reads `SCMLE_AUTH_*` variables."""
+        """Reads `SCMLE_AUTH_*` variables.
+
+        Args:
+            environ: The environment; absent variables read as empty.
+
+        Returns:
+            The settings.
+        """
         names = {
             "keys_file": "SCMLE_AUTH_KEYS_FILE",
             "hs256_secret": "SCMLE_AUTH_HS256_SECRET",  # nosec B105 - a name
@@ -384,12 +461,17 @@ class AuthSettings:
 def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
     """Builds the gateway the environment asks for.
 
+    Args:
+        environ: The environment (`SCMLE_AUTH_*`, `SCMLE_TENANT`,
+            `SCMLE_AUDIT_FILE`).
+
     Returns:
-        None if no key source is configured.
+        The gateway, or None if no key source is configured.
 
     Raises:
-        ConfigError: If keys are configured without an issuer and audience,
-            or the key material is unusable.
+        ConfigError: If keys are configured without an issuer and audience.
+            Unusable key material or revocations are refused with the same error
+            by their loaders.
     """
     settings = AuthSettings.from_environment(environ)
     if not settings.configured:
@@ -414,6 +496,11 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
         path = settings.revoked_file
 
         def revocations() -> tokens.RevocationList:
+            """Reads the revocation list from its file.
+
+            Returns:
+                The revocations currently in the file.
+            """
             return tokens.RevocationList.from_file(path)
 
         revocation_source = revocations
