@@ -132,9 +132,7 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
     from scmle.core import stages
 
     context = SimpleNamespace(
-        spec=SimpleNamespace(
-            selection=SimpleNamespace(sensitivity_repeats=3)
-        ),
+        spec=SimpleNamespace(selection=SimpleNamespace(sensitivity_repeats=3)),
         task=tasks.TaskType.REGRESSION,
         resource_governor=SimpleNamespace(skip_reason=lambda first: None),
         split=SimpleNamespace(dev_target=np.arange(10.0)),

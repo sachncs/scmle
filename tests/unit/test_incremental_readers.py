@@ -96,7 +96,9 @@ def test_accepting_only_late_events_never_moves_the_checkpoint_back():
         incremental.LateDataPolicy.ACCEPT,
     )
     checkpoint = incremental.EventCheckpoint(
-        source.source_identity, sequence=5, watermark="2026-10-20T10:01:00+00:00"
+        source.source_identity,
+        sequence=5,
+        watermark="2026-10-20T10:01:00+00:00",
     )
 
     batch = source.read_events(checkpoint)

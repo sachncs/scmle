@@ -122,7 +122,5 @@ def test_monotonic_signs_that_missing_indicators_would_misalign_are_refused():
             adapter,
             tasks.TaskType.BINARY,
             0,
-            options=dataclasses.replace(
-                options, missing="median", select=True
-            ),
+            options=dataclasses.replace(options, missing="median", select=True),
         )

@@ -545,7 +545,7 @@ class LifecycleManager:
         restore = worse and approval is not None
         restored = False
         try:
-            if restore:
+            if restore and approval is not None:
                 self.restore_previous(
                     approval,
                     signing_key,

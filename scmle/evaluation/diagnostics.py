@@ -531,9 +531,7 @@ def resample_rows(
         return np.concatenate([members[labels[i]] for i in drawn])
     if temporal:
         length = max(5, int(np.sqrt(rows)))
-        starts = rng.integers(
-            0, max(rows - length + 1, 1), -(-rows // length)
-        )
+        starts = rng.integers(0, max(rows - length + 1, 1), -(-rows // length))
         blocks = np.concatenate(
             [np.arange(s, min(s + length, rows)) for s in starts]
         )

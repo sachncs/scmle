@@ -401,16 +401,16 @@ class SigningKeyRegistry:
 
         Raises:
             ValueError: If the key or the replacement key is unknown, the key
-                is not active (a retired key may only be revoked), the target state is active, the replacement key
-                is not active, or the new record is invalid (for example a
-                malformed time, a blank reason or the key as its own
-                replacement). Nothing changes in that case.
+                is not active (a retired key may only be revoked), the target
+                state is active, the replacement key is not active, or the new
+                record is invalid (for example a malformed time, a blank reason
+                or the key as its own replacement). Nothing changes in that
+                case.
         """
         with self.lock:  # Read, validate and replace as one step.
             current = self.get(key_id)
             if current.state is not KeyState.ACTIVE and not (
-                current.state is KeyState.RETIRED
-                and state is KeyState.REVOKED
+                current.state is KeyState.RETIRED and state is KeyState.REVOKED
             ):
                 raise ValueError(
                     f"key is already {current.state.value}: {key_id}"

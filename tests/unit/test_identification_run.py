@@ -392,9 +392,7 @@ class StubAdapter(run.Adapter):
 
 def test_replication_leaves_the_adapter_design_and_weak_flag_unchanged():
     spec = block()
-    frame = pd.DataFrame(
-        {"region": ["a"] * 60 + ["b"] * 80, "y": 0.0, "t": 0}
-    )
+    frame = pd.DataFrame({"region": ["a"] * 60 + ["b"] * 80, "y": 0.0, "t": 0})
     adapter = StubAdapter(spec, frame, 0, "linear", 0.05)
     adapter.design = {"overlap_on_c": "pooled"}
     run.replication(adapter, frame, 0.95, 1.0, 0.05)

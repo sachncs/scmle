@@ -467,9 +467,9 @@ class ModelRegistryStore:
         registry has a guard and the champion move has no valid attestation,
         the guard raises `AttestationRequired` (an escalation is written and
         nothing is moved); the guard is asked after the model, version and
-        approval are checked, so a refused request spends no attestation. When the champion moves to a
-        different version, the version it replaced becomes `previous`. The
-        move is recorded in the audit log.
+        approval are checked, so a refused request spends no attestation. When
+        the champion moves to a different version, the version it replaced
+        becomes `previous`. The move is recorded in the audit log.
 
         Args:
             model: Model name.

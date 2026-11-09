@@ -167,7 +167,15 @@ def test_a_lead_that_is_not_a_number_is_a_value_error(lead):
 def test_an_attestation_check_ignores_a_non_finite_statistic():
     def finding(statistic):
         return screen.Finding(
-            "copy", "skill", statistic, 0.01, 0.02, True, 0.5, True, True,
+            "copy",
+            "skill",
+            statistic,
+            0.01,
+            0.02,
+            True,
+            0.5,
+            True,
+            True,
             certificates.GateStatus.GATING,
         )
 

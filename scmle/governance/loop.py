@@ -1804,6 +1804,7 @@ class Loop:
         Returns:
             Whatever the registry's `promote` returns.
         """
+
         def move() -> Any:
             return registry.promote(
                 model, version, approval=approval, signing_key=signing_key
