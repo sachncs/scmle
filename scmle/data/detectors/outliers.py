@@ -165,9 +165,9 @@ def triage(
     ]
     scores = row_scores(frame, numeric)
     candidate = scores >= cutoff
-    error = pandas.Series(False, index=frame.index)
-    population = pandas.Series(False, index=frame.index)
-    permitted = pandas.Series(False, index=frame.index)
+    error = pandas.Series(data=False, index=frame.index)
+    population = pandas.Series(data=False, index=frame.index)
+    permitted = pandas.Series(data=False, index=frame.index)
     for name, info in known.items():
         if name not in frame.columns:
             raise ValueError(f"provenance names unknown column '{name}'")

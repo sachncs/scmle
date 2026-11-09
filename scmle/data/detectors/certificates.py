@@ -45,6 +45,8 @@ DOCSTRING_OWNERS = (
     ast.ClassDef,
 )
 
+PAIR_LENGTH = 2
+
 
 class CertificateError(ValueError):
     """A certificate is missing, malformed or does not permit gating."""
@@ -288,7 +290,7 @@ def interval_pair(value: Any, name: str) -> tuple[float, float]:
         ValueError: If `value` is not a pair, or a limit is not a finite
             number.
     """
-    if not isinstance(value, list | tuple) or len(value) != 2:
+    if not isinstance(value, list | tuple) or len(value) != PAIR_LENGTH:
         raise ValueError(f"{name} must hold (low, high)")
     return (
         qualification.finite(value[0], name),
