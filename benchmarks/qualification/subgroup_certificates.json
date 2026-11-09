@@ -3,7 +3,7 @@
   "gates": {
     "subgroup_holm": {
       "alpha": 0.050000000000000044,
-      "code_hash": "5247c96846d62de21c7365ef8dc68dea55c9db2de78f645820059244b8479311",
+      "code_hash": "7d26da25ae5c5117ca69b56ba3c6bd4dec18e0fb4bd7ff5336019f37902314cd",
       "familywise_bound": 0.059746794344809014,
       "familywise_error_null": {
         "hits": 111,
@@ -117,7 +117,7 @@
       },
       "power_replicates": 500,
       "replicates": 2000,
-      "seconds": 20.6,
+      "seconds": 20.7,
       "seeds": [
         0,
         2000

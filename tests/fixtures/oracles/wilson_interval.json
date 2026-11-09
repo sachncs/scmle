@@ -121,9 +121,9 @@
    }
   }
  ],
- "content_sha256": "4b44c557060330297c745ac488c464fdcb110df8f77434bcc7f80abaec7ed3be",
+ "content_sha256": "8c1b1aed465e341da042497318958e1ab4ef9fee4cd1ef7862feeedcb7630c01",
  "generator": "benchmarks/qualification/make_oracles.py",
- "generator_sha256": "6841ec9eb770339c722a64cae28ebe8354066c9c1669b04015362d7e0995b11e",
+ "generator_sha256": "03f5204945ad416a91ce669f0d92656d0d0325e2c7fb70b073a77f43c4806edb",
  "oracle": "wilson_interval",
  "reference": "scipy.stats.binomtest(k, n).proportion_ci(method='wilson')",
  "tolerance": {

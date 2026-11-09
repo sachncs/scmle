@@ -91,9 +91,9 @@
    }
   }
  ],
- "content_sha256": "b96bb3b52d907208e0f71d25b8e231c2b15f10c3a116c4fcd5702bc8c047d3e5",
+ "content_sha256": "b0c04d369aa563a1aa6c6d2ab621aff43e487e08a369a1b80f0ddc5ebeabb3d0",
  "generator": "benchmarks/qualification/make_oracles.py",
- "generator_sha256": "6841ec9eb770339c722a64cae28ebe8354066c9c1669b04015362d7e0995b11e",
+ "generator_sha256": "03f5204945ad416a91ce669f0d92656d0d0325e2c7fb70b073a77f43c4806edb",
  "oracle": "harmonic_number",
  "reference": "scipy.special.digamma(n + 1) + numpy.euler_gamma",
  "tolerance": {

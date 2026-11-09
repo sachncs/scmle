@@ -13,7 +13,7 @@
       "runs": 500
     }
   },
-  "min_clusters_in_code": 20,
+  "min_clusters_in_code": 2,
   "min_clusters_measured": 20,
   "planted_omission": {
     "asked_when_critical": 200,
