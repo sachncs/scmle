@@ -379,8 +379,9 @@ class ReferenceProfile:
             reference_metrics: Held-out metrics at training time.
 
         Returns:
-            The profile, with a reference for each planned numeric and
-            categorical column present in `features` and one for the output.
+            The profile, with a reference for each numeric and
+            categorical column of `plan` present in `features`, and one for
+            the output.
         """
         references: dict[str, DistributionReference] = {}
         for column in plan.numeric:
