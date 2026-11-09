@@ -2,6 +2,7 @@
 
 import io
 import random
+from typing import Any
 
 import joblib
 import numpy
@@ -137,6 +138,79 @@ def check_declared_capabilities(
             )
 
 
+def check_estimator_interface(
+    name: str, estimator: Any, features: Any, target: Any
+) -> None:
+    """Verifies a built estimator offers the interface and fits and predicts.
+
+    Args:
+        name: Adapter name, for the messages.
+        estimator: Estimator built by the adapter.
+        features: Toy feature matrix.
+        target: Toy target.
+
+    Raises:
+        ConfigError: If a method is missing or `predict` returns the wrong
+            number of rows.
+    """
+    for method in ("fit", "predict", "get_params", "set_params"):
+        if not hasattr(estimator, method):
+            raise errors.ConfigError(f"{name}: estimator lacks '{method}'")
+    estimator.fit(features, target)
+    if len(numpy.asarray(estimator.predict(features))) != len(features):
+        raise errors.ConfigError(f"{name}: predict returned wrong length")
+
+
+def check_probabilities(name: str, estimator: Any, features: Any) -> None:
+    """Verifies a classifier's probabilities exist and rows sum to one.
+
+    Args:
+        name: Adapter name, for the messages.
+        estimator: Fitted classifier built by the adapter.
+        features: Toy feature matrix.
+
+    Raises:
+        ConfigError: If `predict_proba` is missing or its rows do not sum
+            to one.
+    """
+    if not hasattr(estimator, "predict_proba"):
+        raise errors.ConfigError(
+            f"{name}: declares probabilities but lacks predict_proba"
+        )
+    proba = numpy.asarray(estimator.predict_proba(features))
+    if not numpy.allclose(proba.sum(axis=1), 1.0, atol=1e-6):
+        raise errors.ConfigError(f"{name}: predict_proba rows must sum to 1")
+
+
+def check_search_space(
+    adapter: models.Model, task: tasks.Task, features: Any, target: Any
+) -> None:
+    """Verifies a sampled search point is applied by `build` and trains.
+
+    Args:
+        adapter: Adapter under test.
+        task: Task to build for.
+        features: Toy feature matrix.
+        target: Toy target.
+
+    Raises:
+        ConfigError: If a sampled parameter is not applied by `build`.
+    """
+    space = adapter.search_space
+    if space is None:
+        return
+    sampled = space.sample(random.Random(0))  # noqa: S311 -- seeded, not security
+    tuned = adapter.build(task, 0, sampled)
+    applied = tuned.get_params(deep=True)
+    for key, value in sampled.items():
+        nested = [v for k, v in applied.items() if k.endswith(f"__{key}")]
+        if applied.get(key, *nested[:1]) != value:
+            raise errors.ConfigError(
+                f"{adapter.name}: search parameter '{key}' not applied by build"
+            )
+    tuned.fit(features, target)
+
+
 def check_conformance(adapter: models.Model) -> None:
     """Verifies an adapter honours its declared capabilities.
 
@@ -152,36 +226,10 @@ def check_conformance(adapter: models.Model) -> None:
     for task in adapter.capabilities.tasks:
         features, target = toy_problem(task)
         estimator = adapter.build(task, 0, adapter.conformance_params)
-        for method in ("fit", "predict", "get_params", "set_params"):
-            if not hasattr(estimator, method):
-                raise errors.ConfigError(f"{name}: estimator lacks '{method}'")
-        estimator.fit(features, target)
-        if len(numpy.asarray(estimator.predict(features))) != len(features):
-            raise errors.ConfigError(f"{name}: predict returned wrong length")
+        check_estimator_interface(name, estimator, features, target)
         if task.is_classification and adapter.capabilities.probabilities:
-            if not hasattr(estimator, "predict_proba"):
-                raise errors.ConfigError(
-                    f"{name}: declares probabilities but lacks predict_proba"
-                )
-            proba = numpy.asarray(estimator.predict_proba(features))
-            if not numpy.allclose(proba.sum(axis=1), 1.0, atol=1e-6):
-                raise errors.ConfigError(
-                    f"{name}: predict_proba rows must sum to 1"
-                )
-        space = adapter.search_space
-        if space is not None:
-            sampled = space.sample(random.Random(0))  # nosec B311 - seeded, not security
-            tuned = adapter.build(task, 0, sampled)
-            applied = tuned.get_params(deep=True)
-            for key, value in sampled.items():
-                nested = [
-                    v for k, v in applied.items() if k.endswith(f"__{key}")
-                ]
-                if applied.get(key, *nested[:1]) != value:
-                    raise errors.ConfigError(
-                        f"{name}: search parameter '{key}' not applied by build"
-                    )
-            tuned.fit(features, target)
+            check_probabilities(name, estimator, features)
+        check_search_space(adapter, task, features, target)
         check_declared_capabilities(adapter, task, features, target)
         first = adapter.build(task, 7, adapter.conformance_params)
         second = adapter.build(task, 7, adapter.conformance_params)

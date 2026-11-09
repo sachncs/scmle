@@ -204,13 +204,13 @@ def write_service(
     # Imported here so that `python -m scmle.deploy.<tool>`, which the
     # generated build.sh runs, does not find its module already loaded by the
     # package import.
-    from scmle.deploy import attest
-    from scmle.deploy import base_image
-    from scmle.deploy import context
-    from scmle.deploy import lockfile
-    from scmle.deploy import provenance
-    from scmle.deploy import vuln_gate
-    from scmle.governance import sbom
+    from scmle.deploy import attest  # noqa: PLC0415 -- lazy, see above
+    from scmle.deploy import base_image  # noqa: PLC0415 -- lazy, see above
+    from scmle.deploy import context  # noqa: PLC0415 -- lazy, see above
+    from scmle.deploy import lockfile  # noqa: PLC0415 -- lazy, see above
+    from scmle.deploy import provenance  # noqa: PLC0415 -- lazy, see above
+    from scmle.deploy import vuln_gate  # noqa: PLC0415 -- lazy, see above
+    from scmle.governance import sbom  # noqa: PLC0415 -- lazy, see above
 
     root = pathlib.Path(destination)
     if (root / "model").exists():

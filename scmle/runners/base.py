@@ -40,6 +40,7 @@ from scmle.runners import checkpoint
 from scmle.runners import roles
 
 MANIFEST_FORMAT = 1
+MAX_RUN_ID_LENGTH = 64
 RUN_ID_PATTERN = (
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
 )
@@ -228,7 +229,7 @@ class Job:
         """
         if (
             not self.run_id
-            or len(self.run_id) > 64
+            or len(self.run_id) > MAX_RUN_ID_LENGTH
             or set(self.run_id) - set(RUN_ID_PATTERN)
         ):
             raise errors.ConfigError(

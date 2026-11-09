@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from typing import Any
 
+from sklearn import ensemble
+
 from scmle.contracts import models
 from scmle.contracts import search
 from scmle.contracts import tasks
@@ -22,7 +24,7 @@ class Pointwise(models.Model):
 
     def build(
         self,
-        task: tasks.Task,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -36,8 +38,6 @@ class Pointwise(models.Model):
         Returns:
             A pointwise ranker around a histogram gradient-boosting regressor.
         """
-        from sklearn import ensemble
-
         return estimators.PointwiseRanker(
             ensemble.HistGradientBoostingRegressor(
                 random_state=seed, **dict(params or {})
@@ -99,7 +99,7 @@ class Ranker(models.Model):
 
     def build(
         self,
-        task: tasks.Task,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:

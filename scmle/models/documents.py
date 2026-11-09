@@ -29,6 +29,10 @@ from sklearn.metrics import log_loss
 from scmle import durability
 from scmle.data.modalities import document
 
+NGRAM_BOUND_COUNT = 2
+MIN_CLASS_COUNT = 2
+BINARY_CLASS_COUNT = 2
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Config:
@@ -61,7 +65,7 @@ class Config:
         """
         if self.max_features < 1:
             raise ValueError("max_features must be positive")
-        if len(self.ngram_range) != 2 or not (
+        if len(self.ngram_range) != NGRAM_BOUND_COUNT or not (
             1 <= self.ngram_range[0] <= self.ngram_range[1]
         ):
             raise ValueError("ngram_range must contain positive ordered bounds")
@@ -308,7 +312,7 @@ class Classifier:
         if any(sample.label is None for sample in values):
             raise ValueError("every training document must have a label")
         labels = [sample.label for sample in values]
-        if len(set(labels)) < 2:
+        if len(set(labels)) < MIN_CLASS_COUNT:
             raise ValueError("training documents must contain two classes")
 
         vectorizer = TfidfVectorizer(
@@ -316,7 +320,7 @@ class Classifier:
             max_features=self.config.max_features,
             ngram_range=self.config.ngram_range,
             min_df=self.config.min_df,
-            token_pattern=r"(?u)\b\w\w+\b",  # nosec B106 - regex, not a secret
+            token_pattern=r"(?u)\b\w\w+\b",  # noqa: S106 -- regex, not a secret
         )
         matrix = vectorizer.fit_transform([sample.content for sample in values])
         if matrix.shape[1] == 0:
@@ -494,7 +498,7 @@ class Classifier:
         class_index = int(
             numpy.flatnonzero(estimator.classes_ == predicted_label)[0]
         )
-        if len(estimator.classes_) == 2:
+        if len(estimator.classes_) == BINARY_CLASS_COUNT:
             coefficients = estimator.coef_[0]
             if class_index == 0:
                 coefficients = -coefficients
@@ -567,9 +571,9 @@ class Classifier:
         predicted = estimator.predict(matrix)[0]
         class_index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
         coefficients = estimator.coef_[0]
-        if len(estimator.classes_) == 2 and class_index == 0:
+        if len(estimator.classes_) == BINARY_CLASS_COUNT and class_index == 0:
             coefficients = -coefficients
-        elif len(estimator.classes_) > 2:
+        elif len(estimator.classes_) > BINARY_CLASS_COUNT:
             coefficients = estimator.coef_[class_index]
         candidates = sorted(
             (
@@ -692,7 +696,7 @@ class Classifier:
                 stream.flush()
                 os.fsync(stream.fileno())
             durability.sync_directory(temporary_directory)
-            os.replace(temporary_directory, target)
+            pathlib.Path(temporary_directory).replace(target)
             durability.sync_directory(target.parent)
         except Exception:
             if temporary_directory is not None:

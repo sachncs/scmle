@@ -199,9 +199,11 @@ class Dummy(models.Model):
                 (params or {}).get("levels"),
                 seed,
             )
-        if task.is_classification:
-            return dummy.DummyClassifier(strategy="prior")
-        return dummy.DummyRegressor(strategy="mean")
+        return (
+            dummy.DummyClassifier(strategy="prior")
+            if task.is_classification
+            else dummy.DummyRegressor(strategy="mean")
+        )
 
 
 class HistGradientBoosting(Learner):

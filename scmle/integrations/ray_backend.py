@@ -41,7 +41,7 @@ class RayBackend(scheduler.Executor):
             ConfigError: If Ray is not installed.
         """
         try:
-            import ray
+            import ray  # noqa: PLC0415 -- optional dependency
         except ImportError as error:
             raise errors.ConfigError(
                 "RayBackend needs the 'distributed' extra (ray)"

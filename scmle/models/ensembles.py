@@ -357,7 +357,7 @@ class Stacking(models.Model):
             estimators, final_estimator=meta, cv=inner
         )
 
-    def meta_learner(self, task: tasks.Task, members: int) -> Any:
+    def meta_learner(self, task: tasks.Task, members: int) -> Any:  # noqa: ARG002 -- override point of the stacking template
         """Creates the model that combines the members' out-of-fold predictions.
 
         Args:

@@ -3,7 +3,6 @@
 import hashlib
 import hmac
 import io
-import os
 import pathlib
 import tempfile
 from typing import Any
@@ -213,7 +212,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
                 temporary,
             )
             durability.sync_file(temporary)
-            os.replace(temporary, destination)
+            pathlib.Path(temporary).replace(destination)
             durability.sync_directory(destination.parent)
         except BaseException:
             if temporary is not None:

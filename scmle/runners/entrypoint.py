@@ -104,6 +104,21 @@ def spec_from_store(store: objectstore.ObjectStore, run_id: str) -> base.Job:
     )
 
 
+def require_started_spec(spec: base.Job, expected: str | None) -> None:
+    """Checks that the stored spec is the one that was started.
+
+    Args:
+        spec: The spec read from the store.
+        expected: The digest the launcher recorded; empty or None skips the
+            check.
+
+    Raises:
+        ConfigError: If `expected` is set and the spec's digest differs.
+    """
+    if expected and spec.digest() != expected:
+        raise errors.ConfigError("the stored spec is not the one started")
+
+
 def main(environ: Mapping[str, str], store: Any = None) -> int:
     """Runs the job described by `environ`.
 
@@ -116,21 +131,15 @@ def main(environ: Mapping[str, str], store: Any = None) -> int:
         store: The training store; opened from `SCMLE_STORE_URI` if None.
 
     Returns:
-        0 if the workload returned, otherwise 1.
-
-    Raises:
-        ConfigError: Raised when the stored spec's digest differs from
-            `SCMLE_SPEC_DIGEST`, but caught inside the function and reported on
-            stderr with exit status 1; it never reaches the caller.
+        0 if the workload returned, otherwise 1. That includes a stored spec
+        whose digest differs from `SCMLE_SPEC_DIGEST`.
     """
     try:
         run_id = environ["SCMLE_RUN_ID"]
         attempt = int(environ.get("SCMLE_ATTEMPT", "1"))
         training_store = store or open_store(environ["SCMLE_STORE_URI"])
         spec = spec_from_store(training_store, run_id)
-        expected = environ.get("SCMLE_SPEC_DIGEST")
-        if expected and spec.digest() != expected:
-            raise errors.ConfigError("the stored spec is not the one started")
+        require_started_spec(spec, environ.get("SCMLE_SPEC_DIGEST"))
         context = local.JobContext(
             roles.RoleStore(training_store, roles.TRAINING_ROLE),
             run_id,
@@ -139,8 +148,8 @@ def main(environ: Mapping[str, str], store: Any = None) -> int:
             checkpoint.CheckpointStore(training_store, run_id),
         )
         load_workload(environ.get("SCMLE_WORKLOAD", DEFAULT_WORKLOAD))(context)
-    except Exception as error:
-        print(f"{type(error).__name__}: {error}", file=sys.stderr)
+    except Exception as error:  # noqa: BLE001 -- process boundary
+        sys.stderr.write(f"{type(error).__name__}: {error}\n")
         return 1
     return 0
 

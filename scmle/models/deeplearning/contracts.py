@@ -14,6 +14,8 @@ import numpy
 
 from scmle.contracts import capabilities
 
+ATTRIBUTION_MATRIX_RANK = 2
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class CheckpointContract:
@@ -171,7 +173,7 @@ class FeatureExplanation:
                 the method or target is blank.
         """
         values = numpy.asarray(self.values, dtype=numpy.float64)
-        if values.ndim != 2:
+        if values.ndim != ATTRIBUTION_MATRIX_RANK:
             raise ValueError(
                 "explanation values must be a two-dimensional matrix"
             )
@@ -347,15 +349,18 @@ TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
     checkpoint=CheckpointContract(
-        "scmle.tabular-transformer.v1", 1, True, True
+        format="scmle.tabular-transformer.v1",
+        schema_version=1,
+        trusted_local_storage=True,
+        atomic_replace=True,
     ),
     inference=InferenceContract(
-        capabilities.Modality.TABULAR,
-        2,
-        "float32",
-        ("predict", "predict_proba"),
-        "prediction or class probability",
-        True,
+        modality=capabilities.Modality.TABULAR,
+        input_rank=2,
+        input_dtype="float32",
+        methods=("predict", "predict_proba"),
+        output="prediction or class probability",
+        deterministic=True,
     ),
     explanation=ExplanationContract(
         "gradient_x_input",
@@ -380,14 +385,19 @@ TABULAR_JEPA_CONTRACT = ModelFamilyContract(
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
-    checkpoint=CheckpointContract("scmle.tabular-jepa.v2", 1, True, True),
+    checkpoint=CheckpointContract(
+        format="scmle.tabular-jepa.v2",
+        schema_version=1,
+        trusted_local_storage=True,
+        atomic_replace=True,
+    ),
     inference=InferenceContract(
-        capabilities.Modality.TABULAR,
-        2,
-        "float32",
-        ("transform", "encode"),
-        "context embedding",
-        True,
+        modality=capabilities.Modality.TABULAR,
+        input_rank=2,
+        input_dtype="float32",
+        methods=("transform", "encode"),
+        output="context embedding",
+        deterministic=True,
     ),
     explanation=ExplanationContract(
         "embedding_gradient_x_input",
@@ -412,14 +422,19 @@ TABULAR_TORCH_CONTRACT = ModelFamilyContract(
     status=capabilities.Status.SUPPORTED,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
-    checkpoint=CheckpointContract("scmle.tabular-torch.v1", 1, True, True),
+    checkpoint=CheckpointContract(
+        format="scmle.tabular-torch.v1",
+        schema_version=1,
+        trusted_local_storage=True,
+        atomic_replace=True,
+    ),
     inference=InferenceContract(
-        capabilities.Modality.TABULAR,
-        2,
-        "float32",
-        ("predict", "predict_proba"),
-        "prediction or class probability",
-        True,
+        modality=capabilities.Modality.TABULAR,
+        input_rank=2,
+        input_dtype="float32",
+        methods=("predict", "predict_proba"),
+        output="prediction or class probability",
+        deterministic=True,
     ),
     explanation=ExplanationContract(
         "gradient_x_input",

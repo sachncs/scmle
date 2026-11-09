@@ -52,7 +52,7 @@ class Uplift(models.Model):
 
     def build(
         self,
-        task: tasks.Task,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:

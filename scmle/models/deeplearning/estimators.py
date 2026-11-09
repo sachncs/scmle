@@ -9,7 +9,6 @@ and caches them. Pickling therefore stores only numpy data.
 import hashlib
 import hmac
 import io
-import os
 import pathlib
 import tempfile
 from typing import Any
@@ -329,7 +328,7 @@ class NetworkEstimator(base.BaseEstimator):
                 temporary = pathlib.Path(handle.name)
             joblib.dump(envelope, temporary)
             durability.sync_file(temporary)
-            os.replace(temporary, destination)
+            pathlib.Path(temporary).replace(destination)
             durability.sync_directory(destination.parent)
         except BaseException:
             if temporary is not None:

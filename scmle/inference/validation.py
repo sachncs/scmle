@@ -79,21 +79,19 @@ class InputValidator:
                 unseen_values[column] = values.notna() & ~values.astype(
                     str
                 ).isin(known)
-        rows = []
-        for position in range(len(frame)):
-            rows.append(
-                {
-                    "missing": [
-                        c for c in wanted if bool(null_mask.iloc[position][c])
-                    ],
-                    "unseen": {
-                        column: str(frame[column].iloc[position])
-                        for column, flags in unseen_values.items()
-                        if bool(flags.iloc[position])
-                    },
-                }
-            )
-        return rows
+        return [
+            {
+                "missing": [
+                    c for c in wanted if bool(null_mask.iloc[position][c])
+                ],
+                "unseen": {
+                    column: str(frame[column].iloc[position])
+                    for column, flags in unseen_values.items()
+                    if bool(flags.iloc[position])
+                },
+            }
+            for position in range(len(frame))
+        ]
 
     def check(self, frame: pandas.DataFrame) -> None:
         """Raises when required columns are missing or numeric ones are bad.

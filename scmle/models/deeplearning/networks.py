@@ -18,12 +18,14 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import search
 from scmle.contracts import tasks
+from scmle.data.curation import preprocessing
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import foundation
 from scmle.models.deeplearning import jepa
 from scmle.models.deeplearning import worker
 
+MIN_JEPA_ROWS = 16
 COMMON_SPACE = (
     search.FloatParameter("dropout", 0.0, 0.4),
     search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
@@ -278,7 +280,7 @@ class Jepa(Network):
         reason = super().rejection_reason(task, row_count)
         if reason is not None:
             return reason
-        if row_count is not None and row_count < 16:
+        if row_count is not None and row_count < MIN_JEPA_ROWS:
             return (
                 "tabular JEPA requires at least 16 rows for its training "
                 "and validation boundaries"
@@ -377,8 +379,6 @@ class Jepa(Network):
             An unfitted pipeline: the feature front end followed by the JEPA
             representation and prediction head.
         """
-        from scmle.data.curation import preprocessing
-
         options = preprocessing.default_options(plan, self)
         front_end = preprocessing.build_front_end(plan, options)
         representation_pipeline = self.build(task, seed, params)

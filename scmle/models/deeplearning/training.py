@@ -18,6 +18,7 @@ EXPLODE_FACTOR = 100.0
 EXPLODE_FLOOR = 1e3
 VANISH_NORM = 1e-7
 STALL_IMPROVEMENT = 0.01
+MIN_EPOCHS_FOR_TREND = 3
 
 
 def resolve_batch_size(setting: int | str, rows: int) -> int:
@@ -143,7 +144,10 @@ class Monitor:
             verdict = "exploding"
         elif median < VANISH_NORM:
             verdict = "vanishing"
-        elif improvement < STALL_IMPROVEMENT and len(self.losses) > 2:
+        elif (
+            improvement < STALL_IMPROVEMENT
+            and len(self.losses) >= MIN_EPOCHS_FOR_TREND
+        ):
             verdict = "stalled"
         else:
             verdict = "ok"

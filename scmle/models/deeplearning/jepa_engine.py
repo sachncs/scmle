@@ -6,6 +6,9 @@ from typing import Any
 
 import numpy
 
+FEATURE_MATRIX_RANK = 2
+MIN_FIT_ROWS = 8
+
 
 class JepaNetwork:
     """Context encoder, target encoder, and predictor for tabular JEPA."""
@@ -39,7 +42,7 @@ class JepaNetwork:
             module.Linear(hidden_size, embedding_size),
         )
         for parameter in self.module.target_encoder.parameters():
-            parameter.requires_grad_(False)
+            parameter.requires_grad_(requires_grad=False)
 
     def parameters(self) -> Any:
         """Returns trainable context and predictor parameters."""
@@ -107,42 +110,45 @@ class Trainer:
         self.device = device
         self.random_state = random_state
 
-    def fit(
-        self,
-        features: Any,
-        target: Any = None,
-        sample_weight: Any = None,
-    ) -> "Trainer":
-        """Fits context prediction without consuming labels.
+    @staticmethod
+    def validated_matrix(features: Any) -> numpy.ndarray:
+        """Converts the features to a finite float32 matrix with enough rows.
 
         Args:
-            features: Finite numeric matrix with at least 8 rows and 1 column.
-            target: Ignored.
-            sample_weight: Ignored.
+            features: Candidate numeric 2-D feature matrix.
 
         Returns:
-            This fitted engine.
+            The float32 matrix.
 
         Raises:
-            ValueError: If the features are not a finite numeric 2-D matrix with
-                at least 8 rows and one column, a hyperparameter is outside its
-                valid range, or a CUDA device is requested but unavailable.
+            ValueError: If the features are not a finite numeric 2-D matrix
+                with at least 8 rows and one column.
         """
-        del target, sample_weight
         try:
             matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
             raise ValueError(
                 "tabular JEPA requires a numeric 2-D feature matrix"
             ) from error
-        if matrix.ndim != 2:
+        if matrix.ndim != FEATURE_MATRIX_RANK:
             raise ValueError("tabular JEPA requires a 2-D feature matrix")
-        if len(matrix) < 8:
+        if len(matrix) < MIN_FIT_ROWS:
             raise ValueError("tabular JEPA needs at least 8 rows")
         if matrix.shape[1] < 1:
             raise ValueError("tabular JEPA needs at least one feature")
         if not numpy.isfinite(matrix).all():
             raise ValueError("tabular JEPA requires finite numeric features")
+        return matrix
+
+    def check_hyperparameters(self) -> None:
+        """Rejects hyperparameters outside their valid range.
+
+        Raises:
+            ValueError: If a layer size, the mask probability, the EMA
+                decay, the learning rate, the weight decay, the epochs, the
+                batch size, the variance weight or the device name is
+                invalid.
+        """
         if (
             not isinstance(self.hidden_size, (int, numpy.integer))
             or isinstance(self.hidden_size, bool)
@@ -185,12 +191,139 @@ class Trainer:
             or self.variance_weight < 0.0
         ):
             raise ValueError("variance_weight must be finite and non-negative")
-        if (
-            self.device != "auto"
-            and self.device != "cpu"
-            and not str(self.device).startswith("cuda")
-        ):
+        if self.device not in {"auto", "cpu"} and not str(
+            self.device
+        ).startswith("cuda"):
             raise ValueError("device must be auto, cpu, or cuda")
+
+    def resolve_device(self, torch: Any) -> str:
+        """Chooses the device the training runs on.
+
+        Args:
+            torch: The imported torch module.
+
+        Returns:
+            `cuda` for `auto` when CUDA is available, `cpu` for `auto`
+            otherwise, and the requested device in any other case.
+        """
+        device = (
+            "cuda"
+            if self.device == "auto" and torch.cuda.is_available()
+            else self.device
+        )
+        return "cpu" if device == "auto" else device
+
+    def train_batch(
+        self,
+        torch: Any,
+        network: JepaNetwork,
+        optimizer: Any,
+        batch: Any,
+        mask: Any,
+    ) -> float:
+        """Takes one optimizer step on a masked-context prediction batch.
+
+        Args:
+            torch: The imported torch module.
+            network: The two-tower network being trained.
+            optimizer: Optimizer over the network's trainable parameters.
+            batch: The unmasked rows.
+            mask: Boolean tensor of the values hidden from the context view.
+
+        Returns:
+            The batch loss.
+        """
+        context = batch.masked_fill(mask, 0.0)
+        context_embedding = network.module.context_encoder(context)
+        prediction = network.module.predictor(context_embedding)
+        with torch.no_grad():
+            target_embedding = network.module.target_encoder(batch)
+        prediction = torch.nn.functional.normalize(prediction, dim=1)
+        target_embedding = torch.nn.functional.normalize(
+            target_embedding, dim=1
+        )
+        alignment = (prediction - target_embedding).pow(2).mean()
+        variance = torch.relu(1.0 - prediction.std(dim=0)).mean()
+        loss = alignment + self.variance_weight * variance
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 5.0)
+        optimizer.step()
+        with torch.no_grad():
+            for target, source in zip(
+                network.module.target_encoder.parameters(),
+                network.module.context_encoder.parameters(),
+                strict=True,
+            ):
+                target.mul_(self.ema_decay).add_(
+                    source, alpha=1.0 - self.ema_decay
+                )
+        return float(loss.detach().cpu())
+
+    def train_epoch(
+        self,
+        torch: Any,
+        network: JepaNetwork,
+        optimizer: Any,
+        tensor: Any,
+        generator: Any,
+        device: str,
+        batch_rows: int,
+    ) -> float:
+        """Runs one shuffled pass over the rows.
+
+        Args:
+            torch: The imported torch module.
+            network: The two-tower network being trained.
+            optimizer: Optimizer over the network's trainable parameters.
+            tensor: All rows, on the training device.
+            generator: Random generator for the shuffle and the masks.
+            device: Device the rows and the generator live on.
+            batch_rows: Rows per step.
+
+        Returns:
+            The mean batch loss of the epoch.
+        """
+        rows = len(tensor)
+        order = torch.randperm(rows, generator=generator, device=device)
+        epoch_losses: list[float] = []
+        for start in range(0, rows, batch_rows):
+            batch = tensor[order[start : start + batch_rows]]
+            mask = (
+                torch.rand(batch.shape, generator=generator, device=device)
+                < self.mask_probability
+            )
+            epoch_losses.append(
+                self.train_batch(torch, network, optimizer, batch, mask)
+            )
+        return float(numpy.mean(epoch_losses))
+
+    def fit(
+        self,
+        features: Any,
+        target: Any = None,
+        sample_weight: Any = None,
+    ) -> "Trainer":
+        """Fits context prediction without consuming labels.
+
+        Args:
+            features: Finite numeric matrix with at least 8 rows and 1 column.
+            target: Ignored.
+            sample_weight: Ignored.
+
+        Returns:
+            This fitted engine.
+
+        Raises:
+            ValueError: If a CUDA device is requested but unavailable. The
+                features must also be a finite numeric 2-D matrix with at
+                least 8 rows and one column, and every hyperparameter inside
+                its valid range; `validated_matrix` and
+                `check_hyperparameters` raise `ValueError` otherwise.
+        """
+        del target, sample_weight
+        matrix = self.validated_matrix(features)
+        self.check_hyperparameters()
         torch = importlib.import_module("torch")
         if (
             str(self.device).startswith("cuda")
@@ -198,13 +331,7 @@ class Trainer:
         ):
             raise ValueError("requested CUDA device is not available")
         torch.manual_seed(self.random_state)
-        device = (
-            "cuda"
-            if self.device == "auto" and torch.cuda.is_available()
-            else self.device
-        )
-        if device == "auto":
-            device = "cpu"
+        device = self.resolve_device(torch)
         self.input_width_ = matrix.shape[1]
         network = JepaNetwork(
             torch, self.input_width_, self.hidden_size, self.embedding_size
@@ -216,54 +343,20 @@ class Trainer:
             weight_decay=self.weight_decay,
         )
         tensor = torch.from_numpy(matrix).to(device)
-        rows = len(matrix)
         batch_rows = (
-            rows
+            len(matrix)
             if self.batch_size == "auto"
-            else min(int(self.batch_size), rows)
+            else min(int(self.batch_size), len(matrix))
         )
         generator = torch.Generator(device=device).manual_seed(
             self.random_state + 1
         )
-        losses: list[float] = []
-        epoch_number = 0
-        while epoch_number < self.epochs:
-            order = torch.randperm(rows, generator=generator, device=device)
-            epoch_losses: list[float] = []
-            for start in range(0, rows, batch_rows):
-                batch = tensor[order[start : start + batch_rows]]
-                mask = (
-                    torch.rand(batch.shape, generator=generator, device=device)
-                    < self.mask_probability
-                )
-                context = batch.masked_fill(mask, 0.0)
-                context_embedding = network.module.context_encoder(context)
-                prediction = network.module.predictor(context_embedding)
-                with torch.no_grad():
-                    target_embedding = network.module.target_encoder(batch)
-                prediction = torch.nn.functional.normalize(prediction, dim=1)
-                target_embedding = torch.nn.functional.normalize(
-                    target_embedding, dim=1
-                )
-                alignment = (prediction - target_embedding).pow(2).mean()
-                variance = torch.relu(1.0 - prediction.std(dim=0)).mean()
-                loss = alignment + self.variance_weight * variance
-                optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(network.parameters(), 5.0)
-                optimizer.step()
-                with torch.no_grad():
-                    for target, source in zip(
-                        network.module.target_encoder.parameters(),
-                        network.module.context_encoder.parameters(),
-                        strict=True,
-                    ):
-                        target.mul_(self.ema_decay).add_(
-                            source, alpha=1.0 - self.ema_decay
-                        )
-                epoch_losses.append(float(loss.detach().cpu()))
-            losses.append(float(numpy.mean(epoch_losses)))
-            epoch_number += 1
+        losses = [
+            self.train_epoch(
+                torch, network, optimizer, tensor, generator, device, batch_rows
+            )
+            for epoch in range(self.epochs)
+        ]
         network.module.eval().cpu()
         self.network_ = network
         self.n_iter_ = self.epochs
@@ -301,7 +394,7 @@ class Trainer:
                 "tabular JEPA requires a numeric 2-D feature matrix"
             ) from error
         if (
-            matrix.ndim != 2
+            matrix.ndim != FEATURE_MATRIX_RANK
             or matrix.shape[1] != self.input_width_
             or not numpy.isfinite(matrix).all()
         ):
@@ -338,7 +431,7 @@ class Trainer:
                 "tabular JEPA requires a numeric 2-D feature matrix"
             ) from error
         if (
-            matrix.ndim != 2
+            matrix.ndim != FEATURE_MATRIX_RANK
             or matrix.shape[1] != self.input_width_
             or not numpy.isfinite(matrix).all()
         ):
@@ -346,7 +439,7 @@ class Trainer:
                 "features must be finite and have shape "
                 f"(rows, {self.input_width_})"
             )
-        tensor = torch.from_numpy(matrix).requires_grad_(True)
+        tensor = torch.from_numpy(matrix).requires_grad_(requires_grad=True)
         embedding = self.network_.module.context_encoder(tensor)
         energy = embedding.pow(2).mean(dim=1)
         gradient = torch.autograd.grad(energy.sum(), tensor)[0]

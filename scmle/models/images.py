@@ -26,6 +26,10 @@ from sklearn.metrics import log_loss
 from scmle import durability
 from scmle.data.modalities import image
 
+PATCH_DIMENSION_COUNT = 2
+MIN_CLASS_COUNT = 2
+BINARY_CLASS_COUNT = 2
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Config:
@@ -302,7 +306,7 @@ class Classifier:
         labels = tuple(sample.label for sample in training_data.samples)
         if any(label is None for label in labels):
             raise ValueError("every training image must have a label")
-        if len(set(labels)) < 2:
+        if len(set(labels)) < MIN_CLASS_COUNT:
             raise ValueError("training images must contain two classes")
         features = training_data.prepare_tabular_features(
             self.config.target_size,
@@ -434,8 +438,10 @@ class Classifier:
             terms=tuple((name, float(value)) for name, value in selected),
             limitations=(
                 "Pixel weights are associational, not causal.",
-                "Resize, color mode, and corpus composition constrain the "
-                "explanation.",
+                (
+                    "Resize, color mode, and corpus composition constrain the "
+                    "explanation."
+                ),
             ),
         )
 
@@ -471,9 +477,9 @@ class Classifier:
             numpy.flatnonzero(estimator.classes_ == predicted_label)[0]
         )
         coefficients = estimator.coef_[0]
-        if len(estimator.classes_) == 2 and class_index == 0:
+        if len(estimator.classes_) == BINARY_CLASS_COUNT and class_index == 0:
             coefficients = -coefficients
-        elif len(estimator.classes_) > 2:
+        elif len(estimator.classes_) > BINARY_CLASS_COUNT:
             coefficients = estimator.coef_[class_index]
         contributions = sorted(
             zip(
@@ -522,7 +528,9 @@ class Classifier:
         """
         if top_k < 1:
             raise ValueError("top_k must be positive")
-        if len(patch_size) != 2 or any(size < 1 for size in patch_size):
+        if len(patch_size) != PATCH_DIMENSION_COUNT or any(
+            size < 1 for size in patch_size
+        ):
             raise ValueError("patch_size must contain positive dimensions")
         self.require_fitted()
         features = self.transform(image.Dataset((sample,)))
@@ -638,7 +646,7 @@ class Classifier:
                 stream.flush()
                 os.fsync(stream.fileno())
             durability.sync_directory(temporary_directory)
-            os.replace(temporary_directory, target)
+            pathlib.Path(temporary_directory).replace(target)
             durability.sync_directory(target.parent)
         except Exception:
             if temporary_directory is not None:
@@ -720,8 +728,10 @@ class Classifier:
         names = []
         for row in range(height):
             for column in range(width):
-                for channel in range(channels):
-                    names.append(f"pixel[{row},{column},{channel}]")
+                names.extend(
+                    f"pixel[{row},{column},{channel}]"
+                    for channel in range(channels)
+                )
         return tuple(names)
 
     def require_fitted(self) -> None:

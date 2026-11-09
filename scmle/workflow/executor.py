@@ -389,9 +389,10 @@ class Executor:
         ).encode()
         try:
             self.store.put(key, body, if_absent=True)
-            return
         except objectstore.AlreadyExistsError:
             pass
+        else:
+            return
         held = self.read(key) or {"expires": 0.0}
         if held["expires"] > self.clock():
             raise RunInFlightError(f"run {run_id} is held by {held['owner']}")
@@ -559,15 +560,7 @@ class Executor:
         Returns:
             The run record with its final state, step states, cost and end time.
         """
-        states: dict[str, str] = {}
-        outputs: dict[str, Mapping[str, Any]] = {}
-        for step in self.workflow.steps:
-            saved = self.step_record(run_id, step.name)
-            if saved is not None and saved["state"] == StepState.SUCCEEDED:
-                states[step.name] = StepState.SUCCEEDED.value
-                outputs[step.name] = saved["outputs"]
-            else:
-                states[step.name] = StepState.PENDING.value
+        states, outputs = self.saved_progress(run_id)
         record["cost"] = self.recorded_cost(run_id)
         budget_hit = False
         group_use: dict[str, int] = {}
@@ -578,76 +571,240 @@ class Executor:
             max_workers=self.workflow.max_parallel
         ) as pool:
             while True:
-                changed = False
                 self.renew_lease(run_id)
                 budget = self.workflow.cost_budget
                 if budget is not None and record["cost"] > budget:
                     budget_hit = True
-                for name in self.workflow.order():
-                    step = self.workflow.step(name)
-                    if states[name] != StepState.PENDING.value or budget_hit:
-                        continue
-                    parents = [states[d] for d in step.depends_on]
-                    if any(
-                        p
-                        in (
-                            StepState.FAILED,
-                            StepState.SKIPPED,
-                            StepState.REJECTED,
-                            StepState.EXPIRED,
-                        )
-                        for p in parents
-                    ):
-                        states[name] = StepState.SKIPPED.value
-                        self.save_step(
-                            run_id, step, StepState.SKIPPED, reason="upstream"
-                        )
-                        changed = True
-                        continue
-                    if any(p != StepState.SUCCEEDED for p in parents):
-                        continue
-                    group = step.concurrency_group
-                    if group is not None and group_use.get(
-                        group, 0
-                    ) >= self.workflow.group_limit(group):
-                        continue
-                    if step.kind is definition.StepKind.APPROVAL:
-                        settled = self.settle_approval(run_id, step, record)
-                        states[name] = settled.value
-                        if settled is StepState.SUCCEEDED:
-                            saved = self.step_record(run_id, name) or {}
-                            outputs[name] = saved.get("outputs", {})
-                        changed = changed or settled is not StepState.WAITING
-                        continue
-                    if len(in_flight) >= self.workflow.max_parallel:
-                        continue
-                    states[name] = StepState.RUNNING.value
-                    if group is not None:
-                        group_use[group] = group_use.get(group, 0) + 1
-                    future = pool.submit(
-                        self.run_step,
-                        run_id,
-                        step,
-                        {d: outputs[d] for d in step.depends_on},
-                        record["cost"],
-                    )
-                    in_flight[future] = step
+                changed = self.schedule_ready_steps(
+                    run_id,
+                    record,
+                    states,
+                    outputs,
+                    group_use,
+                    in_flight,
+                    pool,
+                    budget_hit=budget_hit,
+                )
                 if not in_flight and not changed:
                     break
                 if not in_flight:
                     continue
-                done, ignored = concurrent.futures.wait(
-                    in_flight, return_when=concurrent.futures.FIRST_COMPLETED
+                self.collect_finished_steps(
+                    record, states, outputs, group_use, in_flight
                 )
-                for future in done:
-                    step = in_flight.pop(future)
-                    state, result, cost = future.result()
-                    states[step.name] = state
-                    record["cost"] = round(record["cost"] + cost, 6)
-                    if state == StepState.SUCCEEDED.value:
-                        outputs[step.name] = result
-                    if step.concurrency_group is not None:
-                        group_use[step.concurrency_group] -= 1
+        return self.close_run(run_id, record, states, budget_hit=budget_hit)
+
+    def saved_progress(
+        self, run_id: str
+    ) -> tuple[dict[str, str], dict[str, Mapping[str, Any]]]:
+        """Reads which steps already succeeded in an earlier attempt.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The state value of every step (succeeded or pending), and the
+            saved outputs of the steps that succeeded.
+        """
+        states: dict[str, str] = {}
+        outputs: dict[str, Mapping[str, Any]] = {}
+        for step in self.workflow.steps:
+            saved = self.step_record(run_id, step.name)
+            if saved is not None and saved["state"] == StepState.SUCCEEDED:
+                states[step.name] = StepState.SUCCEEDED.value
+                outputs[step.name] = saved["outputs"]
+            else:
+                states[step.name] = StepState.PENDING.value
+        return states, outputs
+
+    def skip_if_upstream_failed(
+        self, run_id: str, step: definition.Step, states: dict[str, str]
+    ) -> bool:
+        """Skips a step when one of the steps it depends on did not succeed.
+
+        Args:
+            run_id: The run.
+            step: The pending step.
+            states: Step state value by step name, updated in place.
+
+        Returns:
+            True when the step was skipped.
+        """
+        parents = [states[d] for d in step.depends_on]
+        if not any(
+            p
+            in (
+                StepState.FAILED,
+                StepState.SKIPPED,
+                StepState.REJECTED,
+                StepState.EXPIRED,
+            )
+            for p in parents
+        ):
+            return False
+        states[step.name] = StepState.SKIPPED.value
+        self.save_step(run_id, step, StepState.SKIPPED, reason="upstream")
+        return True
+
+    def can_start(
+        self,
+        step: definition.Step,
+        states: Mapping[str, str],
+        group_use: Mapping[str, int],
+    ) -> bool:
+        """Checks that the step's parents succeeded and its group has room.
+
+        Args:
+            step: The pending step.
+            states: Step state value by step name.
+            group_use: Running steps per concurrency group.
+
+        Returns:
+            True when every step it depends on succeeded and its
+            concurrency group (if any) is below its limit.
+        """
+        if any(states[d] != StepState.SUCCEEDED for d in step.depends_on):
+            return False
+        group = step.concurrency_group
+        return group is None or group_use.get(
+            group, 0
+        ) < self.workflow.group_limit(group)
+
+    def settle_approval_step(
+        self,
+        run_id: str,
+        step: definition.Step,
+        states: dict[str, str],
+        outputs: dict[str, Mapping[str, Any]],
+    ) -> bool:
+        """Settles an approval step and records its outputs when approved.
+
+        Args:
+            run_id: The run.
+            step: The approval step.
+            states: Step state value by step name, updated in place.
+            outputs: Step outputs by step name, updated in place.
+
+        Returns:
+            True when the step's state changed from waiting.
+        """
+        settled = self.settle_approval(run_id, step)
+        states[step.name] = settled.value
+        if settled is StepState.SUCCEEDED:
+            saved = self.step_record(run_id, step.name) or {}
+            outputs[step.name] = saved.get("outputs", {})
+        return settled is not StepState.WAITING
+
+    def schedule_ready_steps(
+        self,
+        run_id: str,
+        record: Mapping[str, Any],
+        states: dict[str, str],
+        outputs: dict[str, Mapping[str, Any]],
+        group_use: dict[str, int],
+        in_flight: dict[concurrent.futures.Future[Outcome], definition.Step],
+        pool: concurrent.futures.Executor,
+        *,
+        budget_hit: bool,
+    ) -> bool:
+        """Starts, skips or settles every pending step that is ready.
+
+        Args:
+            run_id: The run.
+            record: The run record; its cost is the cost so far.
+            states: Step state value by step name, updated in place.
+            outputs: Step outputs by step name, updated in place.
+            group_use: Running steps per concurrency group, updated in place.
+            in_flight: Running steps by their future, updated in place.
+            pool: Executor that runs the steps.
+            budget_hit: Whether the run budget is already exceeded, in which
+                case nothing new starts.
+
+        Returns:
+            True when a step was skipped or an approval step left waiting.
+        """
+        changed = False
+        for name in self.workflow.order():
+            step = self.workflow.step(name)
+            if states[name] != StepState.PENDING.value or budget_hit:
+                continue
+            if self.skip_if_upstream_failed(run_id, step, states):
+                changed = True
+                continue
+            if not self.can_start(step, states, group_use):
+                continue
+            if step.kind is definition.StepKind.APPROVAL:
+                changed = (
+                    self.settle_approval_step(run_id, step, states, outputs)
+                    or changed
+                )
+                continue
+            if len(in_flight) >= self.workflow.max_parallel:
+                continue
+            states[name] = StepState.RUNNING.value
+            group = step.concurrency_group
+            if group is not None:
+                group_use[group] = group_use.get(group, 0) + 1
+            future = pool.submit(
+                self.run_step,
+                run_id,
+                step,
+                {d: outputs[d] for d in step.depends_on},
+                record["cost"],
+            )
+            in_flight[future] = step
+        return changed
+
+    def collect_finished_steps(
+        self,
+        record: dict[str, Any],
+        states: dict[str, str],
+        outputs: dict[str, Mapping[str, Any]],
+        group_use: dict[str, int],
+        in_flight: dict[concurrent.futures.Future[Outcome], definition.Step],
+    ) -> None:
+        """Waits for at least one running step and records the finished ones.
+
+        Args:
+            record: The run record; its cost is increased in place.
+            states: Step state value by step name, updated in place.
+            outputs: Step outputs by step name, updated in place.
+            group_use: Running steps per concurrency group, updated in place.
+            in_flight: Running steps by their future; finished ones are
+                removed in place.
+        """
+        done, ignored = concurrent.futures.wait(
+            in_flight, return_when=concurrent.futures.FIRST_COMPLETED
+        )
+        for future in done:
+            step = in_flight.pop(future)
+            state, result, cost = future.result()
+            states[step.name] = state
+            record["cost"] = round(record["cost"] + cost, 6)
+            if state == StepState.SUCCEEDED.value:
+                outputs[step.name] = result
+            if step.concurrency_group is not None:
+                group_use[step.concurrency_group] -= 1
+
+    def close_run(
+        self,
+        run_id: str,
+        record: dict[str, Any],
+        states: dict[str, str],
+        *,
+        budget_hit: bool,
+    ) -> dict[str, Any]:
+        """Settles the run's final state once no step can run any more.
+
+        Args:
+            run_id: The run.
+            record: The run record, updated in place.
+            states: Step state value by step name.
+            budget_hit: Whether the run budget was exceeded during the run.
+
+        Returns:
+            The run record with its final state, step states and end time.
+        """
         if budget_hit or (
             self.workflow.cost_budget is not None
             and record["cost"] > self.workflow.cost_budget
@@ -823,7 +980,6 @@ class Executor:
                     outputs=result,
                     cost=round(total, 6),
                 )
-                return StepState.SUCCEEDED.value, result, total
             except retry.TransientError as error:
                 total += context.spent
                 last_error = f"{type(error).__name__}: {error}"
@@ -843,13 +999,15 @@ class Executor:
                     {"attempt": attempt, "state": "failed", "error": last_error}
                 )
                 break
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 -- handler boundary
                 total += context.spent
                 last_error = f"{type(error).__name__}: {error}"[:300]
                 attempts.append(
                     {"attempt": attempt, "state": "failed", "error": last_error}
                 )
                 break
+            else:
+                return StepState.SUCCEEDED.value, result, total
         self.save_step(
             run_id,
             step,
@@ -959,9 +1117,7 @@ class Executor:
             raise ApprovalError("a decision is already recorded")
         self.write(f"{self.base(run_id)}approvals/{name}.json", dict(decision))
 
-    def settle_approval(
-        self, run_id: str, step: definition.Step, record: Mapping[str, Any]
-    ) -> StepState:
+    def settle_approval(self, run_id: str, step: definition.Step) -> StepState:
         """Determines the approval step's state now.
 
         A recorded decision settles the step to succeeded (approve) or rejected;
@@ -971,7 +1127,6 @@ class Executor:
         Args:
             run_id: The run.
             step: The approval step.
-            record: The run record. Unused.
 
         Returns:
             The step's new state.

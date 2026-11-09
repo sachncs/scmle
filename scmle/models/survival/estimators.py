@@ -119,7 +119,7 @@ class MarginalSurvival(SurvivalEstimator):
         curve_: Survival just after each event time.
     """
 
-    def fit(self, features: Any, duration: Any, event: Any = None) -> Self:
+    def fit(self, features: Any, duration: Any, event: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the survival estimators
         """Fits the Kaplan-Meier curve.
 
         Args:

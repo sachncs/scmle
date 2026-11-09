@@ -177,11 +177,8 @@ def is_token_imputer(step: Any) -> bool:
     )
 
 
-def passthrough(step: Any) -> Any:
+def passthrough() -> Any:
     """Returns an identity that stands in for steps done before the graph.
-
-    Args:
-        step: The step being replaced; unused.
 
     Returns:
         A fitted identity function transformer.
@@ -213,7 +210,7 @@ def without_casts(model: Any) -> Any:
                 if isinstance(
                     step, preprocessing.FunctionTransformer
                 ) or is_token_imputer(step):
-                    node.steps[index] = (name, passthrough(step))
+                    node.steps[index] = (name, passthrough())
                 else:
                     stack.append(step)
         elif hasattr(node, "transformers_"):
@@ -221,7 +218,7 @@ def without_casts(model: Any) -> Any:
                 if isinstance(
                     step, preprocessing.FunctionTransformer
                 ) or is_token_imputer(step):
-                    node.transformers_[index] = (name, passthrough(step), cols)
+                    node.transformers_[index] = (name, passthrough(), cols)
                 elif not isinstance(step, str):
                     stack.append(step)
     return clone

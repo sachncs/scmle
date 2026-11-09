@@ -86,13 +86,13 @@ class Multitarget(models.Model):
         """
         classify = task is tasks.Task.MULTILABEL
         kind = self.classifier if classify else self.regressor
-        assert kind is not None  # nosec B101 - capability guard
+        assert kind is not None  # noqa: S101 -- capability guard, unreachable
         settings = dict(params or {})
         try:
             inner = kind(random_state=seed, **settings)
         except TypeError:
             inner = kind(**settings)
-        return estimators.PerTarget(inner, classify)
+        return estimators.PerTarget(inner, classify=classify)
 
 
 class MultilabelLogistic(Multitarget):
@@ -109,7 +109,7 @@ class MultilabelLogistic(Multitarget):
 
     def build(
         self,
-        task: tasks.Task,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -127,7 +127,7 @@ class MultilabelLogistic(Multitarget):
             linear_model.LogisticRegression(
                 max_iter=1000, random_state=seed, **dict(params or {})
             ),
-            True,
+            classify=True,
         )
 
 
@@ -145,8 +145,8 @@ class MultioutputRidge(Multitarget):
 
     def build(
         self,
-        task: tasks.Task,
-        seed: int,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
+        seed: int,  # noqa: ARG002 -- required by Model.build
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
         """One ridge regression per quantity.
@@ -160,7 +160,7 @@ class MultioutputRidge(Multitarget):
             An unfitted estimator with one ridge regression per quantity.
         """
         return estimators.PerTarget(
-            linear_model.Ridge(**dict(params or {})), False
+            linear_model.Ridge(**dict(params or {})), classify=False
         )
 
 
@@ -192,7 +192,7 @@ class MultiForest(models.Model):
         self,
         task: tasks.Task,
         seed: int,
-        params: Mapping[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,  # noqa: ARG002 -- required by Model.build
     ) -> models.Estimator:
         """The forest for the task's kind of target.
 

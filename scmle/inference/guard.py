@@ -35,6 +35,7 @@ class Phase(enum.StrEnum):
 
 
 STEPS = (Phase.VERIFYING, Phase.LOADING, Phase.WARMING)
+STEP_COUNT = len(STEPS)
 
 
 class NotReadyError(errors.ScmleError):
@@ -83,7 +84,9 @@ class Readiness:
         """
         with self.lock:
             index = STEPS.index(step)
-            expected = STEPS[len(self.done)] if len(self.done) < 3 else None
+            expected = (
+                STEPS[len(self.done)] if len(self.done) < STEP_COUNT else None
+            )
             if self.phase is Phase.FAILED or step is not expected:
                 raise errors.ScmleError(
                     f"cannot begin {step.value} from {self.phase.value}"
