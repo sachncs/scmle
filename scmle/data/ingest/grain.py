@@ -14,6 +14,7 @@ unit with the table only through column names and uniqueness, and says
 `unknown` when the names do not settle it.
 """
 
+from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 import itertools
@@ -24,6 +25,7 @@ from scmle.data.ingest import profile
 
 LEVELS = 3
 SMALL_N = 1000
+SHORT_WORD_LETTERS = 3
 MATCH = "match"
 FINER = "finer"
 COARSER = "coarser"
@@ -48,7 +50,11 @@ def stem(word: str) -> str:
         The word without a final `s`, unless it is three letters or fewer or
         ends in `ss`.
     """
-    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+    if (
+        len(word) > SHORT_WORD_LETTERS
+        and word.endswith("s")
+        and not word.endswith("ss")
+    ):
         return word[:-1]
     return word
 
@@ -262,6 +268,148 @@ def bound_ok(
     return capacity >= need and smallest >= need
 
 
+def scan_single_columns(
+    table: profile.TableProfile, usable: Sequence[str], scan: KeyScan
+) -> set[tuple[str, ...]]:
+    """Runs level 1 of the lattice from the profile counts, with no query.
+
+    Args:
+        table: Profile of the table.
+        usable: Columns that vary and have values.
+        scan: The scan; gets the measures and the keys found.
+
+    Returns:
+        The single columns that are not keys but may still join one.
+    """
+    n = table.rows
+    nonkey: set[tuple[str, ...]] = set()
+    for name in usable:
+        column = table.column(name)
+        g3 = (n - column.distinct) / n if n else 1.0
+        nulls = (n - column.non_null) / n if n else 0.0
+        scan.measured[(name,)] = (g3, nulls)
+        if is_key(g3, nulls, scan):
+            scan.keys.append(
+                KeyCandidate(
+                    (name,), g3, nulls, column.distinct, n, n < SMALL_N
+                )
+            )
+        elif nulls <= scan.eps_null:
+            nonkey.add((name,))
+    return nonkey
+
+
+def level_candidates(
+    usable: Sequence[str],
+    nonkey: set[tuple[str, ...]],
+    size: int,
+    table: profile.TableProfile,
+    eps_key: float,
+) -> tuple[list[tuple[str, ...]], list[tuple[str, ...]]]:
+    """Builds the column sets of one lattice level.
+
+    Args:
+        usable: Columns that vary and have values.
+        nonkey: The sets of the level below that are not keys.
+        size: Size of the sets of this level.
+        table: Profile of the table.
+        eps_key: Largest `g3` accepted as a key.
+
+    Returns:
+        The candidate sets (every subset one smaller is a non-key), and the
+        ones among them whose counts leave room for a key and so need a
+        query.
+    """
+    order = {name: k for k, name in enumerate(usable)}
+    candidates = sorted(
+        {
+            tuple(sorted((*base, extra), key=order.__getitem__))
+            for base in nonkey
+            for extra in usable
+            if extra not in base
+        },
+        key=lambda cols: [order[c] for c in cols],
+    )
+    candidates = [
+        cols
+        for cols in candidates
+        if all(sub in nonkey for sub in itertools.combinations(cols, size - 1))
+    ]
+    runnable = [c for c in candidates if bound_ok(table, c, eps_key)]
+    return candidates, runnable
+
+
+def level_admitted(
+    source: profile.SqlSource,
+    stage: str,
+    size: int,
+    rows: int,
+    runnable: Sequence[tuple[str, ...]],
+) -> bool:
+    """Asks the budget to admit a whole level before it runs.
+
+    Args:
+        source: Read-only source, which carries the budget meter.
+        stage: Budget stage name.
+        size: Size of the sets of the level.
+        rows: Row count of the table.
+        runnable: The sets that need a query.
+
+    Returns:
+        False when the budget refuses the level; True when it admits it,
+        when no set needs a query, or when there is no budget.
+    """
+    budget = source.meter
+    if not runnable or budget is None:
+        return True
+    return bool(
+        budget.admit(
+            stage,
+            f"level {size}",
+            rows * 2 * len(runnable),
+            2 * len(runnable),
+        )
+    )
+
+
+def measure_level(
+    source: profile.SqlSource,
+    table: profile.TableProfile,
+    candidates: Sequence[tuple[str, ...]],
+    runnable: Sequence[tuple[str, ...]],
+    scan: KeyScan,
+) -> set[tuple[str, ...]]:
+    """Queries the runnable sets of a level and records the keys.
+
+    Args:
+        source: Read-only source.
+        table: Profile of the table.
+        candidates: The sets of the level.
+        runnable: The sets among them that need a query.
+        scan: The scan; gets the measures and the keys found.
+
+    Returns:
+        The sets that are not keys but may still join one; a candidate
+        that was not queried stays in.
+    """
+    n = table.rows
+    found: set[tuple[str, ...]] = set()
+    for cols in candidates:
+        if cols in runnable:
+            g3, nulls = measure(source, table.name, cols, n)
+            scan.measured[cols] = (g3, nulls)
+            if is_key(g3, nulls, scan):
+                distinct = n - round(g3 * n)
+                scan.keys.append(
+                    KeyCandidate(cols, g3, nulls, distinct, n, n < SMALL_N)
+                )
+                continue
+            if nulls > scan.eps_null:
+                continue
+        found.add(cols)
+    return found
+
+
 def infer_keys(
     source: profile.SqlSource,
     table: profile.TableProfile,
@@ -294,73 +442,29 @@ def infer_keys(
             raise ValueError(f"{name} must be in [0, 1]")
     if max_size < 1:
         raise ValueError("max_size must be at least 1")
-    scan = KeyScan(table.name, table.rows, [], {}, 0, False, eps_key, eps_null)
-    n = table.rows
+    scan = KeyScan(
+        table=table.name,
+        rows=table.rows,
+        keys=[],
+        measured={},
+        levels_done=0,
+        partial=False,
+        eps_key=eps_key,
+        eps_null=eps_null,
+    )
     usable = [
         c.name for c in table.columns if c.distinct > 1 and c.non_null > 0
     ]
-    nonkey: set[tuple[str, ...]] = set()
-    for name in usable:
-        column = table.column(name)
-        g3 = (n - column.distinct) / n if n else 1.0
-        nulls = (n - column.non_null) / n if n else 0.0
-        scan.measured[(name,)] = (g3, nulls)
-        if is_key(g3, nulls, scan):
-            scan.keys.append(
-                KeyCandidate(
-                    (name,), g3, nulls, column.distinct, n, n < SMALL_N
-                )
-            )
-        elif nulls <= eps_null:
-            nonkey.add((name,))
+    nonkey = scan_single_columns(table, usable, scan)
     scan.levels_done = 1
     for size in range(2, max_size + 1):
-        order = {name: k for k, name in enumerate(usable)}
-        candidates = sorted(
-            {
-                tuple(sorted((*base, extra), key=order.__getitem__))
-                for base in nonkey
-                for extra in usable
-                if extra not in base
-            },
-            key=lambda cols: [order[c] for c in cols],
+        candidates, runnable = level_candidates(
+            usable, nonkey, size, table, eps_key
         )
-        candidates = [
-            cols
-            for cols in candidates
-            if all(
-                sub in nonkey for sub in itertools.combinations(cols, size - 1)
-            )
-        ]
-        runnable = [c for c in candidates if bound_ok(table, c, eps_key)]
-        budget = source.meter
-        if (
-            runnable
-            and budget is not None
-            and not budget.admit(
-                stage,
-                f"level {size}",
-                n * 2 * len(runnable),
-                2 * len(runnable),
-            )
-        ):
+        if not level_admitted(source, stage, size, table.rows, runnable):
             scan.partial = True
             break
-        found: set[tuple[str, ...]] = set()
-        for cols in candidates:
-            if cols in runnable:
-                g3, nulls = measure(source, table.name, cols, n)
-                scan.measured[cols] = (g3, nulls)
-                if is_key(g3, nulls, scan):
-                    distinct = n - round(g3 * n)
-                    scan.keys.append(
-                        KeyCandidate(cols, g3, nulls, distinct, n, n < SMALL_N)
-                    )
-                    continue
-                if nulls > eps_null:
-                    continue
-            found.add(cols)
-        nonkey = found
+        nonkey = measure_level(source, table, candidates, runnable, scan)
         scan.levels_done = size
         if not nonkey:
             break
@@ -435,7 +539,7 @@ def match_columns(
         hits = [c.name for c in table.columns if word in name_tokens(c.name)]
         if len(hits) > 1:
             ids = [h for h in hits if ID_WORDS & set(name_tokens(h))]
-            hits = ids if ids else hits
+            hits = ids or hits
         if len(hits) != 1:
             kind = "no column" if not hits else f"columns {hits}"
             questions.append(f"which column is {word!r}? found {kind}")
@@ -445,6 +549,45 @@ def match_columns(
         return (), questions
     order = [c.name for c in table.columns]
     return tuple(sorted(set(chosen), key=order.index)), []
+
+
+def subset_verdict(
+    unit: str,
+    columns: tuple[str, ...],
+    key_like: Callable[[tuple[str, ...]], bool | None],
+) -> UnitVerdict | None:
+    """Looks for a strict subset of the unit columns that is already a key.
+
+    Args:
+        unit: The charter unit text.
+        columns: Columns the unit text was matched to.
+        key_like: Whether a column set is a key; None when the budget stops
+            the check.
+
+    Returns:
+        `unknown` when the budget stops a check, `coarser` for the first
+        subset that is a key, otherwise None.
+    """
+    for size in range(1, len(columns)):
+        for subset in itertools.combinations(columns, size):
+            state = key_like(subset)
+            if state is None:
+                return UnitVerdict(
+                    UNKNOWN,
+                    unit,
+                    columns,
+                    "budget stopped the unit check",
+                    ("raise the ingest budget",),
+                )
+            if state:
+                return UnitVerdict(
+                    COARSER,
+                    unit,
+                    columns,
+                    f"{list(subset)} is already a key, so rows are coarser "
+                    "than the unit",
+                )
+    return None
 
 
 def unit_verdict(
@@ -494,25 +637,9 @@ def unit_verdict(
         g3, nulls = scan.measured[cols]
         return is_key(g3, nulls, scan)
 
-    for size in range(1, len(columns)):
-        for subset in itertools.combinations(columns, size):
-            state = key_like(subset)
-            if state is None:
-                return UnitVerdict(
-                    UNKNOWN,
-                    unit,
-                    columns,
-                    "budget stopped the unit check",
-                    ("raise the ingest budget",),
-                )
-            if state:
-                return UnitVerdict(
-                    COARSER,
-                    unit,
-                    columns,
-                    f"{list(subset)} is already a key, so rows are coarser "
-                    "than the unit",
-                )
+    coarser = subset_verdict(unit, columns, key_like)
+    if coarser is not None:
+        return coarser
     state = key_like(columns)
     if state is None:
         return UnitVerdict(

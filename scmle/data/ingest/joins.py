@@ -26,6 +26,7 @@ MANY_TO_MANY = "many_to_many"
 VIOLATED = "declared_violated"
 ONE_TO_ONE = "one_to_one"
 MANY_TO_ONE = "many_to_one"
+MIN_COMPETING_LINKS = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -312,6 +313,33 @@ def kinds_match(
     return True
 
 
+def single_column_pairs(
+    catalog: profile.Catalog, scans: Mapping[str, grain.KeyScan]
+) -> list[tuple[str, tuple[str, ...], str, tuple[str, ...]]]:
+    """Pairs every column with every single-column key of another table.
+
+    Args:
+        catalog: Profiles of the tables.
+        scans: Key scan of each table.
+
+    Returns:
+        Tuples of child table, child columns, parent table and parent key
+        columns.
+    """
+    pairs: list[tuple[str, tuple[str, ...], str, tuple[str, ...]]] = []
+    for child in catalog.tables:
+        for parent in catalog.tables:
+            if parent.name == child.name:
+                continue
+            for key in scans[parent.name].keys:
+                if len(key.columns) == 1:
+                    pairs.extend(
+                        (child.name, (column.name,), parent.name, key.columns)
+                        for column in child.columns
+                    )
+    return pairs
+
+
 def discover(
     source: profile.SqlSource,
     catalog: profile.Catalog,
@@ -339,23 +367,7 @@ def discover(
         (d.child, d.child_columns, d.parent, d.parent_columns): d
         for d in declared
     }
-    pairs: list[tuple[str, tuple[str, ...], str, tuple[str, ...]]] = []
-    for child in catalog.tables:
-        for parent in catalog.tables:
-            if parent.name == child.name:
-                continue
-            for key in scans[parent.name].keys:
-                size = len(key.columns)
-                if size == 1:
-                    for column in child.columns:
-                        pairs.append(
-                            (
-                                child.name,
-                                (column.name,),
-                                parent.name,
-                                key.columns,
-                            )
-                        )
+    pairs = single_column_pairs(catalog, scans)
     pairs.extend(declared_set)
     pairs = list(dict.fromkeys(pairs))
     measured: list[Link] = []
@@ -490,7 +502,7 @@ def resolve_competition(links: Sequence[Link]) -> list[Link]:
             groups.setdefault((link.child, link.child_columns), []).append(link)
     demote: set[Link] = set()
     for group in groups.values():
-        if len(group) < 2:
+        if len(group) < MIN_COMPETING_LINKS:
             continue
         named = [
             item
@@ -500,15 +512,16 @@ def resolve_competition(links: Sequence[Link]) -> list[Link]:
         ]
         keep = named[0] if len(named) == 1 else None
         demote.update(item for item in group if item is not keep)
-    out = []
-    for link in links:
-        if link in demote:
-            link = dataclasses.replace(
-                link,
-                decision=CANDIDATE,
-                why="several parents fit; ambiguous, asked not joined",
-            )
-        out.append(link)
+    out = [
+        dataclasses.replace(
+            link,
+            decision=CANDIDATE,
+            why="several parents fit; ambiguous, asked not joined",
+        )
+        if link in demote
+        else link
+        for link in links
+    ]
     return sorted(out, key=lambda item: (-item.score, item.child, item.parent))
 
 
@@ -575,11 +588,11 @@ def many_to_many(
                             containment,
                             distinct,
                             MANY_TO_MANY,
-                            False,
-                            True,
-                            containment,
-                            MANY_TO_MANY,
-                            "neither side is a key; reported, never joined",
+                            declared=False,
+                            name_support=True,
+                            score=containment,
+                            decision=MANY_TO_MANY,
+                            why="neither side is a key; reported, never joined",
                         )
                     )
     return found

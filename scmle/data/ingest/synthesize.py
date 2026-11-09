@@ -61,6 +61,7 @@ FAMILY = "synthesized"
 STATISTIC = "spearman"
 CHILD = "child"
 PARENT = "parent"
+MIN_SLOPE_ROWS = 2
 
 
 class MultiplicityError(ValueError):
@@ -192,6 +193,139 @@ def candidate_columns(source: Source) -> tuple[list[str], list[str]]:
     return numeric, other
 
 
+def lookup_features(
+    index: int, table: str, columns: Sequence[str]
+) -> list[Feature]:
+    """Lists the lookups of a parent source.
+
+    Args:
+        index: Position of the source.
+        table: Name of the source's view.
+        columns: The columns to look up.
+
+    Returns:
+        One lookup feature per column, taking the last value.
+    """
+    return [
+        Feature(
+            f"{table}__lookup__{column}",
+            "lookup",
+            index,
+            LAST,
+            column,
+            None,
+        )
+        for column in columns
+    ]
+
+
+def aggregate_features(
+    index: int,
+    table: str,
+    numeric: Sequence[str],
+    other: Sequence[str],
+    windows: Sequence[float | None],
+) -> list[Feature]:
+    """Lists the windowed aggregates of a child source.
+
+    Args:
+        index: Position of the source.
+        table: Name of the source's view.
+        numeric: The numeric candidate columns.
+        other: The other candidate columns.
+        windows: Windows in days; None means all visible rows.
+
+    Returns:
+        For each window, the value-free primitives, the numeric primitives
+        of each numeric column and the distinct count of every column.
+    """
+    specs: list[Feature] = []
+    for window in windows:
+        label = window_label(window)
+        specs.extend(
+            Feature(
+                f"{table}__{primitive}__{label}",
+                "aggregate",
+                index,
+                primitive,
+                None,
+                window,
+            )
+            for primitive in VALUE_FREE
+        )
+        specs.extend(
+            Feature(
+                f"{table}__{primitive}__{column}__{label}",
+                "aggregate",
+                index,
+                primitive,
+                column,
+                window,
+            )
+            for column in numeric
+            for primitive in (*NUMERIC_ONLY, LAST)
+        )
+        specs.extend(
+            Feature(
+                f"{table}__{NUNIQUE}__{column}__{label}",
+                "aggregate",
+                index,
+                NUNIQUE,
+                column,
+                window,
+            )
+            for column in (*numeric, *other)
+        )
+    return specs
+
+
+def nested_features(
+    sources: Sequence[Source],
+    nests: Sequence[Nest],
+    windows: Sequence[float | None],
+) -> list[Feature]:
+    """Lists the depth-2 aggregates of the nests.
+
+    Args:
+        sources: Related tables as views; each nest's `mid` is one of them.
+        nests: Depth-2 routes.
+        windows: Windows in days; None means all visible rows.
+
+    Returns:
+        For each nest and window, every outer primitive over every inner
+        primitive of the leaf's numeric columns (of no column, for a count).
+    """
+    specs: list[Feature] = []
+    for position, nest in enumerate(nests):
+        mid_index = next(k for k, s in enumerate(sources) if s is nest.mid)
+        leaf = Source(nest.leaf, nest.leaf.key)
+        numeric, others = candidate_columns(leaf)
+        del others
+        for window in windows:
+            label = window_label(window)
+            for inner in NESTED_INNER:
+                for outer in NESTED_OUTER:
+                    picks: list[str | None] = (
+                        [None] if inner == COUNT else list(numeric)
+                    )
+                    specs.extend(
+                        Feature(
+                            f"{nest.mid.view.name}__{outer}__of__"
+                            f"{nest.leaf.name}__{inner}__"
+                            f"{pick or '*'}__{label}",
+                            "nested",
+                            mid_index,
+                            outer,
+                            pick,
+                            window,
+                            nest=position,
+                            inner=inner,
+                        )
+                        for pick in picks
+                    )
+    return specs
+
+
 def propose(
     sources: Sequence[Source],
     nests: Sequence[Nest] = (),
@@ -213,81 +347,10 @@ def propose(
         table = source.view.name
         numeric, other = candidate_columns(source)
         if source.role == PARENT:
-            for column in (*numeric, *other):
-                specs.append(
-                    Feature(
-                        f"{table}__lookup__{column}",
-                        "lookup",
-                        index,
-                        LAST,
-                        column,
-                        None,
-                    )
-                )
+            specs.extend(lookup_features(index, table, (*numeric, *other)))
             continue
-        for window in windows:
-            label = window_label(window)
-            for primitive in VALUE_FREE:
-                specs.append(
-                    Feature(
-                        f"{table}__{primitive}__{label}",
-                        "aggregate",
-                        index,
-                        primitive,
-                        None,
-                        window,
-                    )
-                )
-            for column in numeric:
-                for primitive in (*NUMERIC_ONLY, LAST):
-                    specs.append(
-                        Feature(
-                            f"{table}__{primitive}__{column}__{label}",
-                            "aggregate",
-                            index,
-                            primitive,
-                            column,
-                            window,
-                        )
-                    )
-            for column in (*numeric, *other):
-                specs.append(
-                    Feature(
-                        f"{table}__{NUNIQUE}__{column}__{label}",
-                        "aggregate",
-                        index,
-                        NUNIQUE,
-                        column,
-                        window,
-                    )
-                )
-    for position, nest in enumerate(nests):
-        mid_index = next(k for k, s in enumerate(sources) if s is nest.mid)
-        leaf = Source(nest.leaf, nest.leaf.key)
-        numeric, others = candidate_columns(leaf)
-        del others
-        for window in windows:
-            label = window_label(window)
-            for inner in NESTED_INNER:
-                for outer in NESTED_OUTER:
-                    picks: list[str | None] = (
-                        [None] if inner == COUNT else list(numeric)
-                    )
-                    for pick in picks:
-                        specs.append(
-                            Feature(
-                                f"{nest.mid.view.name}__{outer}__of__"
-                                f"{nest.leaf.name}__{inner}__"
-                                f"{pick or '*'}__{label}",
-                                "nested",
-                                mid_index,
-                                outer,
-                                pick,
-                                window,
-                                nest=position,
-                                inner=inner,
-                            )
-                        )
+        specs.extend(aggregate_features(index, table, numeric, other, windows))
+    specs.extend(nested_features(sources, nests, windows))
     return specs
 
 
@@ -372,9 +435,34 @@ def reduce_rows(
         )
         return ordered.groupby(label)[value].last().reindex(index)
     valid = rows.loc[rows[value].notna()]
-    grouped = valid.groupby(label)[value]
     if primitive == NUNIQUE:
+        grouped = valid.groupby(label)[value]
         return grouped.nunique().reindex(index, fill_value=0).astype(float)
+    return reduce_numeric(valid, primitive, value, index)
+
+
+def reduce_numeric(
+    valid: pandas.DataFrame,
+    primitive: str,
+    value: str,
+    index: pandas.RangeIndex,
+) -> pandas.Series:
+    """One numeric primitive per target row over rows that have a value.
+
+    Args:
+        valid: Visible rows whose value is present, with `TARGET_COLUMN`
+            and the value column.
+        primitive: One of `sum`, `mean`, `min`, `max`, `std` or `slope`.
+        value: Value column, converted to float here.
+        index: Target rows `0..count-1`.
+
+    Returns:
+        A float series indexed by target row.
+
+    Raises:
+        ValueError: If the primitive is not one of those listed.
+    """
+    label = asof_view.TARGET_COLUMN
     numbers = valid.assign(**{value: valid[value].astype(float)})
     grouped = numbers.groupby(label)[value]
     if primitive == SUM:
@@ -415,7 +503,7 @@ def slope(rows: pandas.DataFrame, value: str) -> pandas.Series:
     size = rows.groupby(label).size()
     spread = x.groupby(rows[label]).max() - x.groupby(rows[label]).min()
     result = sxy / sxx.where(spread > 0.0)
-    return result.where(size >= 2)
+    return result.where(size >= MIN_SLOPE_ROWS)
 
 
 def evaluate(
@@ -623,7 +711,7 @@ def synthesize(
         if values.isna().mean() > max_null_rate:
             record["dropped"] = "mostly missing"
             continue
-        if values.nunique(dropna=False) <= 1:
+        if values.nunique(dropna=False) <= 1:  # noqa: PD101 -- counts NaN as a value and accepts an empty series, which an equality check cannot reproduce
             record["dropped"] = "constant"
             continue
         digest = fingerprint(values)
@@ -718,22 +806,21 @@ def register_family(
     Returns:
         The registered hypotheses, in manifest order.
     """
-    registered = []
-    for entry in features.kept():
-        registered.append(
-            ledger.register(
-                scmle.data.ledger.ledger.Test.create(
-                    name=f"{entry['name']}~target",
-                    family=FAMILY,
-                    statistic=STATISTIC,
-                    null=(
-                        f"{entry['name']} is not monotonically associated "
-                        "with the target"
-                    ),
-                    column=entry["name"],
-                )
+    registered = [
+        ledger.register(
+            scmle.data.ledger.ledger.Test.create(
+                name=f"{entry['name']}~target",
+                family=FAMILY,
+                statistic=STATISTIC,
+                null=(
+                    f"{entry['name']} is not monotonically associated "
+                    "with the target"
+                ),
+                column=entry["name"],
             )
         )
+        for entry in features.kept()
+    ]
     check_multiplicity(features.declared_family_size, ledger)
     return registered
 

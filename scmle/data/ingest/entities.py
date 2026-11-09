@@ -47,6 +47,7 @@ MISSING = -1
 DISAGREE = 0
 SIMILAR = 1
 AGREE = 2
+GROUP_PROBABILITY = 0.5
 SIMILAR_AT = 0.88
 MAX_BLOCK = 200
 BANDS = 10
@@ -471,8 +472,10 @@ def geometric_bands(order: numpy.ndarray, bands: int) -> list[numpy.ndarray]:
     """
     total = len(order)
     edges = [0]
-    for k in range(bands - 1, 0, -1):
-        edges.append(total - total // 2**k if k > 0 else total)
+    edges.extend(
+        total - total // 2**k if k > 0 else total
+        for k in range(bands - 1, 0, -1)
+    )
     edges.append(total)
     edges = sorted(set(edges))
     return [order[a:b] for a, b in itertools.pairwise(edges) if b > a]
@@ -705,7 +708,7 @@ def resolve(
         )
         posterior = posterior_odds / (1.0 + posterior_odds)
         t_match = lowest_weight(weights, posterior >= min_precision)
-        t_group = lowest_weight(weights, posterior >= 0.5)
+        t_group = lowest_weight(weights, posterior >= GROUP_PROBABILITY)
     t_group = min(t_group, t_match)
     links = tuple(
         p for p, w in zip(pairs, weights, strict=True) if w >= t_group
@@ -765,7 +768,7 @@ def thresholds_from_bands(
         true += rate * band.pairs
         if linked and true / linked >= min_precision:
             t_match = band.low
-        if rate >= 0.5:
+        if rate >= GROUP_PROBABILITY:
             t_group = band.low
     return t_match, t_group
 
