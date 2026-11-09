@@ -96,7 +96,8 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
         """Learns the vocabulary and term weights from the training texts.
 
         Unigrams and bigrams occurring in at least two texts are used; if
-        that leaves no term, unigrams of any frequency are used instead.
+        that leaves no term, unigrams of any frequency are used instead,
+        without sublinear term-frequency scaling.
 
         Args:
             texts: The training texts.

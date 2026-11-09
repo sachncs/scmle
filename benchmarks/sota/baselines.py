@@ -404,7 +404,8 @@ def run_all(args: argparse.Namespace) -> int:
     """Runs the requested jobs sequentially and appends their records.
 
     Jobs whose key is already in the output file are skipped, so a rerun
-    resumes.
+    resumes. The task ids are first checked with `check_tasks`, and its
+    refusals (hold-out or unknown tasks) propagate to the caller.
 
     Args:
         args: Parsed `run` arguments (tasks, systems, budgets, lite, output,
@@ -738,8 +739,8 @@ def work(job: Job, cpus: int) -> Outcome:
         cpus: Number of CPUs to use.
 
     Returns:
-        An `ok` outcome with the test score, the fitting time and the
-        package versions.
+        An `ok` outcome with the test score, the elapsed time of fitting and
+        predicting, and the package versions.
     """
     task, features, target, train, test = load_split(
         job.task_id, job.fold, job.repeat

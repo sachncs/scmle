@@ -219,7 +219,7 @@ class DatasetField:
     data_type: str
 
     def __post_init__(self) -> None:
-        """Validates schema field names and types.
+        """Validates schema field names and types, and strips their spaces.
 
         Raises:
             ValueError: If ``name`` or ``data_type`` is not a string or is
@@ -838,11 +838,13 @@ class DatasetCatalog:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a catalog from content without trusting its digest.
+        """Rebuilds a catalog from content without trusting its digest.
 
         Args:
             record: A mapping of catalog content as produced by ``to_dict``.
-                Any ``catalog_digest`` is not checked here.
+                Any ``catalog_digest`` is not checked here. A missing
+                required entry other than ``schema_version`` raises
+                ``KeyError``; ``release_blockers`` may be absent.
 
         Returns:
             The reconstructed catalog.

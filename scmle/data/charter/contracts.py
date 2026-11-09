@@ -587,8 +587,8 @@ class AnalysisCharter:
 
         The optional blocks (`cost_model`, `rules`, `decision`,
         `unit_of_prediction`, `ingest`, `uncertainty`) are included only
-        when set, so a charter without them serializes, and hashes, as it
-        did before they existed.
+        when set, so a charter that leaves them out keeps the same
+        serialization and hash.
 
         Returns:
             A JSON-ready dict of the charter; fractions in the error budget

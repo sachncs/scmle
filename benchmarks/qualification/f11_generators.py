@@ -287,12 +287,15 @@ def threshold_world(
 def threshold_oracle(shift: float, t: float, prevalence: float = 0.3) -> float:
     """Best net benefit of group cuts with equal true-positive rates.
 
-    For a common rate `r` group `g` cuts at `mu_g + z(1 - r)`; the net
-    benefit is maximised over a fine grid of `r` (the closed form of each
-    value, a one-dimensional search for the maximum).
+    Both groups are weighted equally. For a common true-positive rate `r`,
+    group `g` cuts at `mu_g + z(1 - r)`, where `mu_g` is its positive mean
+    (`1.5 - shift * g`) and `z` is the standard normal quantile function. The
+    net benefit is computed in closed form for 4000 evenly spaced values of
+    `r` from 0.0005 to 0.9995, and the largest is returned.
 
     Args:
-        shift: As in `threshold_world`.
+        shift: How much lower group 1's positive mean is, as in
+            `threshold_world`.
         t: Threshold probability in (0, 1).
         prevalence: Share of positives.
 

@@ -259,13 +259,13 @@ def causal_admissibility(
     store: certificates.CertificateStore | None,
     notes: list[str],
 ) -> Qualification:
-    """Applies the graph rules to every candidate and test the graph.
+    """Applies the graph rules to every candidate and tests the graph.
 
     Each candidate gets `rules.decide_causal` (descendants of the treatment
     and colliders are quarantined), the declared adjustment set is checked
     member by member, and the graph's implied independences are tested on
     `X` only. More candidates than `MAX_SEARCH_CANDIDATES` with no declared
-    adjustment set leaves the claim `attested` at best, and says so.
+    adjustment set adds a note that the claim is `attested` at best.
 
     Args:
         frame: Exploration data with the candidates and the target.
@@ -278,7 +278,8 @@ def causal_admissibility(
         store: Detector certificates used, to carry into the return value.
         notes: Notes so far. This list is appended to in place when the graph
             rules or the falsification cannot run, when the declared
-            adjustment set holds a refused member, or when the graph has
+            adjustment set holds a refused member, when there are too many
+            candidates and no declared adjustment set, or when the graph has
             falsified implications.
 
     Returns:

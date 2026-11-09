@@ -250,9 +250,9 @@ def check_permutation_scope(
         block_size: Rows per time block, or None.
 
     Raises:
-        ValueError: If both scopes are given or `groups` does not have one
-            entry per row (a `block_size` below 2 is rejected by
-            `qualification.count`).
+        ValueError: If both `groups` and `block_size` are given, `groups` does
+            not have one entry per row, or `block_size` is not an integer of at
+            least 2 (rejected by `qualification.count`).
     """
     if groups is not None and block_size is not None:
         raise ValueError("use groups or block_size, not both")

@@ -109,7 +109,10 @@ def size_bound(runs: int = RUNS) -> float:
 
 
 def power_floor(runs: int = RUNS) -> float:
-    """Smallest empirical power accepted where the closed form allows it.
+    """Returns the lowest empirical power that passes at `runs` replicates.
+
+    The floor is the target power of 0.80 less two binomial standard errors
+    at that power.
 
     Args:
         runs: Number of replicates the power is observed over.

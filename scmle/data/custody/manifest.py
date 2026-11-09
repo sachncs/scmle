@@ -205,7 +205,8 @@ class CustodyManifest:
         """Rebuilds the manifest and verifies its hash.
 
         Unknown or missing fields raise ValueError from
-        `qualification.require_fields`.
+        `qualification.require_fields`; only `notes` and `row_roots` may be
+        absent. The version is checked before the fields.
 
         Args:
             record: A parsed manifest record as written by `to_dict`.

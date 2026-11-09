@@ -94,9 +94,10 @@ class LeakageAttestation:
         """Builds the provenance record the admissibility rules consume.
 
         Returns:
-            A record for the column with a `lag` as-of rule of
-            `lead_seconds`, source `attested`, serving availability `yes`
-            and all other properties unknown.
+            A record for the column with origin `derived`, `WRITER` as its
+            writer, a `lag` as-of rule of `lead_seconds` whose source is
+            `attested`, serving availability `yes`, no definition history, an
+            unknown write time and overwrite status, and this attestation.
         """
         return provenance.FieldProvenance(
             name=self.column,
@@ -126,7 +127,7 @@ class LeakageAttestation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild the record, rejecting unknown or missing fields.
+        """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
             record: A mapping with `column`, `lead_seconds` and the fields

@@ -110,7 +110,10 @@ def monotonic_signs(
 
     The encoded matrix starts with the specially encoded high-cardinality
     columns (`offset` of them, one column each), then the numeric features
-    in plan order; later columns are unconstrained.
+    in plan order; later columns are unconstrained. The function only builds
+    the sign vector from that assumed layout and does not inspect the fitted
+    matrix, so it does not follow a reordering of the numeric columns or the
+    removal of columns after encoding.
 
     Args:
         plan: Feature plan with the numeric columns and their monotonic

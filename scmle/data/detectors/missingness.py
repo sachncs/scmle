@@ -363,13 +363,16 @@ def little_mcar_test(
     """Little's test of missing completely at random.
 
     Args:
-        frame: Table; only numeric columns are used.
-        columns: Columns to use; defaults to all non-constant numeric ones.
+        frame: Table.
+        columns: Numeric columns to use; defaults to all non-constant,
+            non-boolean numeric ones.
         transform: `normal_scores` or `none`.
 
     Returns:
-        The result, or None when no variable has any missing value or the
-        degrees of freedom are zero.
+        The result, or None when fewer than two columns are used, no value is
+        missing (a non-finite value counts as missing, and rows with every
+        value missing are dropped first), or the degrees of freedom are not
+        positive.
 
     Raises:
         ValueError: On an unknown transform or non-numeric column.

@@ -930,8 +930,9 @@ def development_look() -> dict[str, Any]:
     """A small run on development seeds. Writes nothing.
 
     Returns:
-        The raw results of a few torn-read, reconciliation, unit-verdict and
-        late-arrival worlds.
+        The raw results under the keys `torn` (six worlds), `reconcile` (four
+        fan-out worlds), `unit` (six worlds) and `late` (the count of late
+        rows the view leaks, for six worlds).
     """
     base = ingest_worlds.DEV_SEED_BASE
     return {

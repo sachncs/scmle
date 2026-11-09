@@ -52,7 +52,7 @@ def load_split() -> dict[str, Any]:
 
 
 def check_task_ids(task_ids: list[int], open_holdout: bool = False) -> None:
-    """Refuses hold-out tasks unless explicitly opened.
+    """Refuses hold-out tasks unless explicitly opened, and unknown tasks.
 
     Args:
         task_ids: OpenML task ids requested.

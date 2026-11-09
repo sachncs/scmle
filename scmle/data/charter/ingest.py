@@ -392,8 +392,10 @@ class IngestSpec:
         feature_budget: `B_feat`, the cap on synthesized features.
         windows: Declared windows in days.
         lag: Days between the cutoff and the prediction moment.
-        delta_rec: Relative gap in the extract reconciliation that needs no
-            explanation.
+        delta_rec: Serves two purposes: the relative gap a declared sum may
+            have in the extract reconciliation, and the recording delay in
+            days that applies to a view's time rule when the rule states
+            none.
         eps_key: Largest `g3` accepted as a key.
         eps_null: Largest null rate accepted in a key.
         eps_fk: Largest share of child values without a parent for a link.

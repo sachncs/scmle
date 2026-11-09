@@ -802,8 +802,9 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
     Returns:
         The full-data reference value and interval, the policy cut, the
         treated share, the coverage of the doubly robust interval with its
-        Wilson interval, the mean subsample size, the data hash and
-        `passed`; or a not-run result when the data file is absent.
+        Wilson interval, the mean subsample size, the data hash, the number
+        of subsamples and `passed` (coverage at least 0.90); or a not-run
+        result when the data file is absent.
     """
     frame = load_hillstrom()
     if frame is None:
@@ -2020,7 +2021,7 @@ def gate_b10(runs: int, base: int = 0) -> dict[str, Any]:
 
     Returns:
         The digest, whether the repeat is equal, the forbidden imports, the
-        interpreter measured and `passed`.
+        interpreter measured, the replicate count (2) and `passed`.
     """
     first, second = battery_digest(base), battery_digest(base)
     forbidden = forbidden_imports()

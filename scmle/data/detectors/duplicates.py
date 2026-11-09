@@ -165,7 +165,9 @@ def duplicate_flags(frame: pd.DataFrame, cut: float = DEFAULT_CUT) -> pd.Series:
 
     Args:
         frame: Table; every column defines a record.
-        cut: Near-duplicate distance cut.
+        cut: Largest root-mean-square standardized distance over the numeric
+            columns at which two rows are near duplicates; rows must also
+            match exactly on the non-numeric columns.
 
     Returns:
         A boolean Series on the index of `frame`.

@@ -133,13 +133,16 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
 
     The matrix should be scaled so the penalty treats columns alike. At
     least one column always survives: when the penalty zeroes everything, the
-    column with the largest weight before shrinkage is kept.
+    column with the largest absolute coefficient of a ridge fit with
+    `alpha=1` (class labels coded as integers) is kept.
 
     Attributes:
         classification: Whether the target is a class label.
         strength: Inverse penalty for classification (larger keeps more).
         alpha: Penalty for regression (smaller keeps more).
+        random_state: Seed for the sparse model.
         support_: Boolean mask of kept columns, set by fit.
+        n_features_in_: Number of columns seen in fit.
     """
 
     def __init__(

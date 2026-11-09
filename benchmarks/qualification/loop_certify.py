@@ -359,13 +359,16 @@ def sequence_gaps(
 
 
 def eprocess_paths(gaps: np.ndarray) -> np.ndarray:
-    """Log-capital paths of paired processes for rows of batch gaps.
+    """Log-capital paths of a mixture betting test run on each row of gaps.
+
+    Each gap is mapped from [-1, 1] to [0, 1] and tested against the null
+    mean for the promotion margin, one test per row.
 
     Args:
-        gaps: Batch mean gaps, shape (challengers, batches).
+        gaps: Batch mean gaps in [-1, 1], shape (challengers, batches).
 
     Returns:
-        The log capital after each batch, same shape.
+        The log capital of each row's test after each batch, same shape.
     """
     count, batches = gaps.shape
     test = seq.MixtureTest(

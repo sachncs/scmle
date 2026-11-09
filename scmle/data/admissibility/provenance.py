@@ -151,7 +151,7 @@ class AsOf:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a rule from a record, rejecting unknown or missing fields.
+        """Rebuilds a rule from a record, rejecting unknown or missing fields.
 
         Args:
             record: A mapping with exactly `kind` and `lead_seconds`.
@@ -247,7 +247,7 @@ class Attestation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild the record, rejecting unknown or missing fields.
+        """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
             record: A mapping holding exactly the record's fields.
@@ -308,7 +308,7 @@ class LogCheck:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild the record, rejecting unknown or missing fields.
+        """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
             record: A mapping holding exactly the record's fields.
@@ -548,7 +548,7 @@ class ProvenanceTable:
         return cls(tuple(by_name.get(c) or undeclared(c) for c in columns))
 
     def get(self, name: str) -> FieldProvenance:
-        """Look up the record of a field.
+        """Looks up the record of a field.
 
         Args:
             name: Column name.

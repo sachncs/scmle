@@ -218,7 +218,7 @@ def discontinuity(
     Args:
         rng: Random generator.
         n: Number of rows.
-        tau: Effect at the cutoff of 0.
+        tau: Jump of the outcome `y` at the cutoff of 0.
         sorting: Share of units in (-0.2, 0) that move above the cutoff.
         jump: Jump of the covariate `z` at the cutoff.
 

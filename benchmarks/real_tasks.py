@@ -494,7 +494,9 @@ def ranking_case(root: pathlib.Path) -> Row:
     from huggingface_hub import hf_hub_download
 
     def load() -> pd.DataFrame:
-        """Downloads the first 700 queries of the MSLR-WEB10k validation file.
+        """Reads the first 700 queries of the MSLR-WEB10k validation file.
+
+        The file is downloaded into `CACHE` unless it is already there.
 
         Returns:
             One row per document with `query`, `relevance` and features `f0`...
@@ -854,10 +856,15 @@ def format_table(rows: list[Row]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the selected real-data cases.
+    """Runs the selected real-data cases and writes their rows to a JSON file.
+
+    A case that raises is recorded as a row with its traceback and the run
+    continues.
 
     Args:
-        argv: Command-line arguments; `None` reads `sys.argv`.
+        argv: Command-line arguments (`--only` names the cases, `--budget`
+            sets the time budget, `--output` the result file); `None` reads
+            `sys.argv`.
 
     Returns:
         Process exit status: 0 when no case failed, otherwise 1.

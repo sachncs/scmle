@@ -200,7 +200,7 @@ def reconcile_item(
     set_id: qualification.SetId = qualification.SetId.ALL,
     seed_path: qualification.SeedPath = (0, DETECTOR_ID, 0),
 ) -> ItemResult:
-    """Reconcile one quantity.
+    """Reconciles one quantity.
 
     A gap equal to the tolerance matches. The check blocks when the gap is
     unexplained and `gate` is `GATING`; otherwise it warns.

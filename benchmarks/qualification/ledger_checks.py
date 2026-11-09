@@ -547,16 +547,18 @@ def drift_world(
 ) -> WorldDraw:
     """Independent random walks: a spurious regression between slow drifts.
 
-    The labels cut the rows into `blocks` contiguous blocks. The block must
-    be short against the timescale of the drift: with 10 blocks of 30 rows
-    the within-block permutation exceeded the control in about 7.7% of
-    worlds (above the 5% target); with 20 blocks, about 3.7%.
+    The labels cut the rows into contiguous blocks of `rows // blocks` rows
+    (at least 2). The block must be short against the timescale of the
+    drift: with 10 blocks of 30 rows the within-block permutation exceeded
+    the control in about 7.7% of worlds (above the 5% target); with 20
+    blocks, about 3.7%.
 
     Args:
         rng: Random generator.
         rows: Number of rows.
         columns: Number of feature walks.
-        blocks: Number of contiguous blocks the rows are cut into.
+        blocks: Target number of blocks; the block size is `rows // blocks`,
+            at least 2.
 
     Returns:
         The feature walks, the outcome walk and the block label of each row.

@@ -249,7 +249,13 @@ def decide_causal(
 ) -> FieldDecision:
     """Decides the admissibility of one field as a covariate.
 
-    Applies the predictive timing rule first, then the graph rule.
+    Applies the predictive timing rule first, then the graph rule. A field
+    the timing rule quarantines keeps that decision. Otherwise a field that
+    is not in the graph is quarantined in strict mode and admitted with a
+    flag in permissive mode, a descendant of the treatment is quarantined, a
+    field is admitted with a flag when no observed adjustment set is valid,
+    and a field whose addition to the smallest valid adjustment set breaks
+    the back-door criterion (a collider) is quarantined.
 
     Args:
         record: The field's provenance.
@@ -265,10 +271,10 @@ def decide_causal(
     Returns:
         The decision. The treatment and outcome themselves are not
         covariates and are decided on timing alone. A negative or
-        non-finite lag is rejected with a `ValueError`, as is a
-        treatment or outcome that is not a node of `graph` or a search for
-        the adjustment set that `Dag.adjustment_set` refuses as too large,
-        when the graph rule is reached.
+        non-finite lag is rejected with a `ValueError`, as is, when the graph
+        rule is reached, a treatment or outcome that is not a node of
+        `graph`, the same node given as both, or a search for the adjustment
+        set that `Dag.adjustment_set` refuses as too large.
     """
     timing = decide_predictive(
         record, mode, declared_lag_seconds, today, suspect, leakage_gate

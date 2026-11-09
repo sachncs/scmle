@@ -356,7 +356,11 @@ class CustodyVault:
         target: pd.Series,
         ids: tuple[int, ...],
     ) -> SealedSet:
-        """Moves rows into custody and keeps only their ids here.
+        """Locks the rows as a named set behind the custody protocol.
+
+        The rows are held by a vault process when `process` is True and by an
+        in-process locked set otherwise. A set name that is already sealed is
+        rejected with the `ValueError` of `adopt`.
 
         Args:
             set_id: Name of the set.
@@ -365,8 +369,7 @@ class CustodyVault:
             ids: Row ids of the rows.
 
         Returns:
-            The sealed set; its rows are in a vault process when `process`
-            is True, otherwise in this process behind the token protocol.
+            The sealed set wrapping the locked rows.
         """
         locked: splitters.LockedTestSet = (
             vault_module.SealedTestSet(features, target, ids)

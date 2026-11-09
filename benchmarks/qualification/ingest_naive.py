@@ -325,7 +325,7 @@ def nested_feature(
     lag_days: float,
     delta_rec_days: float,
 ) -> list[float]:
-    """Compute a depth-2 nested feature per target row, in order.
+    """Computes a depth-2 nested feature per target row, in order.
 
     Args:
         targets: Target frame.

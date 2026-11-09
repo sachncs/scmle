@@ -677,8 +677,12 @@ def strata_labels(
     """Strata for the conditional permutation: leaves of a small tree.
 
     The tree predicts the feature from the other features (a crude estimate
-    of its conditional mean or class). Missingness is not a stratum: a
-    feature recorded only for some outcomes must be able to move.
+    of its conditional mean or class): a regression tree for a numeric,
+    non-boolean feature, whose missing values are filled with the median for
+    the fit, and a classification tree otherwise. The strata depend only on
+    the other features, so missingness of the feature is not itself a
+    stratum: a feature recorded only for some outcomes must be able to move.
+    With no other features there is one stratum.
 
     Args:
         feature: The feature to be permuted.
@@ -686,7 +690,8 @@ def strata_labels(
         cfg: Settings (`n_strata`, `min_samples_leaf`).
 
     Returns:
-        An integer label per row.
+        An integer label per row (the tree leaf of the row, at most
+        `n_strata` distinct values).
     """
     if others.shape[1] == 0:
         return np.zeros(len(feature), dtype="int64")
@@ -1043,7 +1048,7 @@ def assess_feature(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class LeakageReport:
-    """Leakage tests for many features, as `leakage_suspicions.json`.
+    """Leakage tests for many features, reported as suspicions only.
 
     Attributes:
         assessments: One per feature, in the order given.

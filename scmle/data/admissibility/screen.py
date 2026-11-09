@@ -280,7 +280,9 @@ def oof_fit(values: np.ndarray, phi: np.ndarray, splits: Splits) -> np.ndarray:
         splits: Cross-fitting (train, test) positions.
 
     Returns:
-        Array of shape (B, n) of predictions for rows of each held-out fold.
+        Array of shape (B, n) of predictions for rows of each held-out fold;
+        a row in no test fold is left uninitialised, so the folds must cover
+        every row.
     """
     n, p = phi.shape
     total_cross = values @ phi
@@ -1201,7 +1203,7 @@ def build_problem(
     groups: np.ndarray | None,
     block_size: int | None,
 ) -> Problem:
-    """Encodes the outcome and fix the folds.
+    """Encodes the outcome and fixes the folds.
 
     Args:
         target: The outcome.
