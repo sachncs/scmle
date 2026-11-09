@@ -1296,29 +1296,6 @@ class Bundle:
             return labels[numpy.asarray(predictions).astype(int)]
         return predictions
 
-    def predict_frame(
-        self,
-        data: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> pandas.DataFrame:
-        """Predicts a multi-target model, one named column per target.
-
-        Args:
-            data: DataFrame or path to a supported tabular dataset.
-            mapping: Explicit column-name policy; exact names if omitted.
-
-        Returns:
-            A frame with one column per target.
-
-        Raises:
-            ArtifactError: For single-target models.
-        """
-        if not self.schema.targets:
-            raise errors.ArtifactError("this bundle has a single target")
-        return pandas.DataFrame(
-            self.predict(data, mapping), columns=list(self.schema.targets)
-        )
-
     def predict_proba(
         self,
         data: str | pathlib.Path | pandas.DataFrame,

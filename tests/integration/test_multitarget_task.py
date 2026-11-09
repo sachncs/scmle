@@ -65,17 +65,19 @@ def multioutput(tmp_path_factory):
 def test_a_multilabel_bundle_predicts_one_column_per_label(multilabel):
     rows = labelled(30, seed=5)[["a", "b"]]
 
-    frame = multilabel.bundle.predict_frame(rows)
+    predicted = multilabel.bundle.predict(rows)
 
-    assert list(frame.columns) == LABELS
-    assert frame.shape == (30, 3)
-    assert set(numpy.unique(frame.to_numpy())) <= {0, 1}
+    assert list(multilabel.bundle.schema.targets) == LABELS
+    assert predicted.shape == (30, 3)
+    assert set(numpy.unique(predicted)) <= {0, 1}
     assert multilabel.bundle.predict_proba(rows).shape == (30, 3)
 
 
 def test_the_model_beats_the_per_label_prior_on_every_label(multilabel):
     fresh = labelled(2000, seed=9)
-    predicted = multilabel.bundle.predict_frame(fresh[["a", "b"]])
+    predicted = pandas.DataFrame(
+        multilabel.bundle.predict(fresh[["a", "b"]]), columns=LABELS
+    )
 
     for label in ("common", "other"):
         accuracy = (predicted[label] == fresh[label]).mean()
@@ -106,9 +108,12 @@ def test_the_other_targets_are_never_features(multilabel, multioutput):
 
 def test_multioutput_predicts_every_quantity_with_a_good_fit(multioutput):
     fresh = quantities(1000, seed=8)
-    predicted = multioutput.bundle.predict_frame(fresh[["a", "b"]])
+    predicted = pandas.DataFrame(
+        multioutput.bundle.predict(fresh[["a", "b"]]),
+        columns=["first", "second"],
+    )
 
-    assert list(predicted.columns) == ["first", "second"]
+    assert list(multioutput.bundle.schema.targets) == ["first", "second"]
     assert multioutput.evaluation["test_metrics"]["r2_mean"] > 0.8
     for column in ("first", "second"):
         assert numpy.corrcoef(predicted[column], fresh[column])[0, 1] > 0.9

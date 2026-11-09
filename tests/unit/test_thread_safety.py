@@ -311,7 +311,7 @@ def trained(tmp_path_factory):
 
 
 def test_concurrent_predict_on_one_bundle_matches_sequential(trained):
-    bundle = trained.load_best_model()
+    bundle = trained.bundle
     batches = [frame(40 + index, seed=50 + index) for index in range(THREADS)]
     want = [bundle.predict(batch) for batch in batches]
     want_proba = [bundle.predict_proba(batch) for batch in batches]
@@ -620,7 +620,7 @@ def test_concurrent_prediction_log_appends_whole_lines(tmp_path):
 
 
 def test_shadow_evaluator_keeps_observations_aligned(trained):
-    bundle = trained.load_best_model()
+    bundle = trained.bundle
     evaluator = shadow.ShadowEvaluator(bundle, bundle)
     batches = [frame(10 + index, seed=70 + index) for index in range(THREADS)]
 
