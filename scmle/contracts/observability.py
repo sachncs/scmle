@@ -60,7 +60,7 @@ def validate_timestamp(value: str, field_name: str) -> str:
     """
     require_text(value, field_name)
     try:
-        parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
         raise ValueError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None or parsed.utcoffset() is None:

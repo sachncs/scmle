@@ -787,46 +787,7 @@ class Registry:
 
         capability = self.find(key)
         if capability is None:
-            family = self.find_model_family(key.model_family)
-            family_status = None if family is None else family.status.value
-            family_diagnostics = [
-                Reason(
-                    code="missing_declaration",
-                    message=(
-                        "no declaration exists for this complete capability"
-                    ),
-                    expected=key.to_dict(),
-                    observed={"model_family_status": family_status},
-                )
-            ]
-            if family is not None and not family.supports_modality(
-                key.modality
-            ):
-                family_diagnostics.append(
-                    Reason(
-                        code="model_family_modality_unsupported",
-                        message=(
-                            "model family is not declared for the requested "
-                            "modality"
-                        ),
-                        expected=[item.value for item in family.modalities],
-                        observed=key.modality.value,
-                    )
-                )
-            if family is not None and family.status not in statuses:
-                family_diagnostics.append(
-                    Reason(
-                        code="model_family_status_not_allowed",
-                        message=(
-                            f"model family is registered as "
-                            f"{family.status.value}; accepted statuses do "
-                            "not include it"
-                        ),
-                        expected=sorted(status.value for status in statuses),
-                        observed=family.status.value,
-                    )
-                )
-            return tuple(family_diagnostics)
+            return self.undeclared_diagnostics(key, statuses)
 
         diagnostics: list[Reason] = []
         if capability.status not in statuses:
@@ -850,6 +811,57 @@ class Registry:
                 self.resource_diagnostics(capability, None, row_count)
             )
         return tuple(diagnostics)
+
+    def undeclared_diagnostics(
+        self, key: Coordinate, statuses: frozenset[Status]
+    ) -> tuple[Reason, ...]:
+        """Returns the rejections for a request that has no declaration.
+
+        Args:
+            key: Complete capability request.
+            statuses: Statuses the caller accepts.
+
+        Returns:
+            A missing declaration entry plus, when the model family is
+            catalogued, an entry for an unsupported modality or a disallowed
+            family status.
+        """
+        family = self.find_model_family(key.model_family)
+        family_status = None if family is None else family.status.value
+        family_diagnostics = [
+            Reason(
+                code="missing_declaration",
+                message=("no declaration exists for this complete capability"),
+                expected=key.to_dict(),
+                observed={"model_family_status": family_status},
+            )
+        ]
+        if family is not None and not family.supports_modality(key.modality):
+            family_diagnostics.append(
+                Reason(
+                    code="model_family_modality_unsupported",
+                    message=(
+                        "model family is not declared for the requested "
+                        "modality"
+                    ),
+                    expected=[item.value for item in family.modalities],
+                    observed=key.modality.value,
+                )
+            )
+        if family is not None and family.status not in statuses:
+            family_diagnostics.append(
+                Reason(
+                    code="model_family_status_not_allowed",
+                    message=(
+                        f"model family is registered as "
+                        f"{family.status.value}; accepted statuses do "
+                        "not include it"
+                    ),
+                    expected=sorted(status.value for status in statuses),
+                    observed=family.status.value,
+                )
+            )
+        return tuple(family_diagnostics)
 
     def resource_diagnostics(
         self,

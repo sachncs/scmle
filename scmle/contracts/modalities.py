@@ -220,6 +220,22 @@ class StageEvidence:
         }
 
 
+def check_no_blank_values(
+    fields: tuple[tuple[str, tuple[str, ...]], ...],
+) -> None:
+    """Checks that none of the named text collections holds a blank value.
+
+    Args:
+        fields: Pairs of a field name and its values.
+
+    Raises:
+        ValueError: If any value is blank.
+    """
+    for field_name, values in fields:
+        if any(not value.strip() for value in values):
+            raise ValueError(f"{field_name} must not contain empty values")
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Declaration:
     """Declared lifecycle support and evidence boundary for one modality.
@@ -276,13 +292,13 @@ class Declaration:
         stages = [record.stage for record in self.stage_evidence]
         if len(stages) != len(set(stages)):
             raise ValueError("stage_evidence must not contain duplicate stages")
-        for field_name, values in (
-            ("required_extras", self.required_extras),
-            ("failure_modes", self.failure_modes),
-            ("limitations", self.limitations),
-        ):
-            if any(not value.strip() for value in values):
-                raise ValueError(f"{field_name} must not contain empty values")
+        check_no_blank_values(
+            (
+                ("required_extras", self.required_extras),
+                ("failure_modes", self.failure_modes),
+                ("limitations", self.limitations),
+            )
+        )
         if not self.failure_modes:
             raise ValueError("failure_modes must declare at least one value")
         if (

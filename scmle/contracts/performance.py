@@ -9,6 +9,8 @@ import statistics
 from typing import Any
 from typing import Self
 
+MIN_REFERENCE_RUNS = 2
+
 
 class Operation(enum.StrEnum):
     """Lifecycle operation whose resource cost can be released."""
@@ -33,7 +35,7 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     Raises:
         ValueError: If the timestamp is malformed or has no timezone.
     """
-    timestamp = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    timestamp = datetime.datetime.fromisoformat(value)
     if timestamp.tzinfo is None or timestamp.utcoffset() is None:
         raise ValueError(f"{field_name} must include timezone information")
     return timestamp
@@ -234,7 +236,7 @@ class Baseline:
                 more than one environment.
         """
         runs = tuple(self.reference_runs)
-        if len(runs) < 2:
+        if len(runs) < MIN_REFERENCE_RUNS:
             raise ValueError(
                 "performance baseline requires at least two reference runs"
             )
@@ -320,22 +322,7 @@ class Baseline:
             observation.operation
             for observation in self.reference_runs[0].observations
         }
-        if operations != expected:
-            missing = sorted(
-                operation.value for operation in expected - operations
-            )
-            extra = sorted(
-                operation.value for operation in operations - expected
-            )
-            details = []
-            if missing:
-                details.append(f"missing={missing}")
-            if extra:
-                details.append(f"extra={extra}")
-            raise ValueError(
-                "performance comparison operations differ: "
-                + ", ".join(details)
-            )
+        check_same_operations(operations, expected)
 
         reference_environment = (
             self.reference_runs[0].observations[0].machine,
@@ -356,25 +343,9 @@ class Baseline:
                 ),
             )
 
-        sample_count_violations_list: list[str] = []
-        for operation in sorted(expected, key=lambda item: item.value):
-            baseline_observation = self.reference_runs[0].observation(operation)
-            current_observation = current.observation(operation)
-            if baseline_observation is None or current_observation is None:
-                raise RuntimeError(
-                    "validated sample-count observation disappeared: "
-                    f"{operation.value}"
-                )
-            if (
-                current_observation.sample_count
-                != baseline_observation.sample_count
-            ):
-                sample_count_violations_list.append(
-                    f"{operation.value} sample count differs from baseline: "
-                    f"expected {baseline_observation.sample_count}, "
-                    f"observed {current_observation.sample_count}"
-                )
-        sample_count_violations = tuple(sample_count_violations_list)
+        sample_count_violations = self.sample_count_violations(
+            current, expected
+        )
         if sample_count_violations:
             return Comparison(
                 passed=False,
@@ -387,72 +358,10 @@ class Baseline:
         regressions: dict[str, dict[str, float | None]] = {}
         violations: list[str] = []
         for operation in sorted(expected, key=lambda item: item.value):
-            current_observation = current.observation(operation)
-            if current_observation is None:
-                raise RuntimeError(
-                    "validated performance observation disappeared: "
-                    f"{operation.value}"
-                )
-            reference_observations = [
-                run.observation(operation) for run in self.reference_runs
-            ]
-            if any(
-                observation is None for observation in reference_observations
-            ):
-                raise RuntimeError(
-                    "validated baseline observation disappeared: "
-                    f"{operation.value}"
-                )
-            reference_times = [
-                observation.elapsed_seconds
-                for observation in reference_observations
-                if observation is not None
-            ]
-            time_regression = relative_change(
-                statistics.median(reference_times),
-                current_observation.elapsed_seconds,
+            regressions[operation.value], found = self.operation_regression(
+                operation, current
             )
-            memory_regression: float | None = None
-            reference_memory = [
-                observation.peak_memory_gb
-                for observation in reference_observations
-                if observation is not None
-            ]
-            if all(value is not None for value in reference_memory):
-                if current_observation.peak_memory_gb is None:
-                    violations.append(
-                        f"missing peak memory observation: {operation.value}"
-                    )
-                else:
-                    memory_regression = relative_change(
-                        statistics.median(
-                            [
-                                value
-                                for value in reference_memory
-                                if value is not None
-                            ]
-                        ),
-                        current_observation.peak_memory_gb,
-                    )
-            regressions[operation.value] = {
-                "elapsed_seconds": time_regression,
-                "peak_memory_gb": memory_regression,
-            }
-            if time_regression > self.max_relative_regression:
-                violations.append(
-                    f"{operation.value} time regression "
-                    f"{time_regression:.2%} exceeds "
-                    f"{self.max_relative_regression:.2%}"
-                )
-            if (
-                memory_regression is not None
-                and memory_regression > self.max_relative_regression
-            ):
-                violations.append(
-                    f"{operation.value} memory regression "
-                    f"{memory_regression:.2%} exceeds "
-                    f"{self.max_relative_regression:.2%}"
-                )
+            violations.extend(found)
         return Comparison(
             passed=not violations,
             baseline_run_count=len(self.reference_runs),
@@ -461,12 +370,157 @@ class Baseline:
             violations=tuple(violations),
         )
 
+    def sample_count_violations(
+        self, current: Run, expected: set[Operation]
+    ) -> tuple[str, ...]:
+        """Lists the operations whose sample count differs from the baseline.
+
+        Args:
+            current: The run to judge.
+            expected: The operations of the baseline, which `current` shares.
+
+        Returns:
+            One message per operation whose sample count differs from that of
+            the first reference run; empty if none does.
+
+        Raises:
+            RuntimeError: If an observation that construction guarantees is
+                missing (defensive; not reachable for validated runs).
+        """
+        violations: list[str] = []
+        for operation in sorted(expected, key=lambda item: item.value):
+            baseline_observation = self.reference_runs[0].observation(operation)
+            current_observation = current.observation(operation)
+            if baseline_observation is None or current_observation is None:
+                raise RuntimeError(
+                    "validated sample-count observation disappeared: "
+                    f"{operation.value}"
+                )
+            if (
+                current_observation.sample_count
+                != baseline_observation.sample_count
+            ):
+                violations.append(
+                    f"{operation.value} sample count differs from baseline: "
+                    f"expected {baseline_observation.sample_count}, "
+                    f"observed {current_observation.sample_count}"
+                )
+        return tuple(violations)
+
+    def operation_regression(
+        self, operation: Operation, current: Run
+    ) -> tuple[dict[str, float | None], list[str]]:
+        """Compares one operation of a run with the baseline median.
+
+        Args:
+            operation: The operation to compare.
+            current: The run to judge.
+
+        Returns:
+            The relative regressions, with ``elapsed_seconds`` and
+            ``peak_memory_gb`` entries, and the violations of the operation.
+
+        Raises:
+            RuntimeError: If an observation that construction guarantees is
+                missing (defensive; not reachable for validated runs).
+        """
+        violations: list[str] = []
+        current_observation = current.observation(operation)
+        if current_observation is None:
+            raise RuntimeError(
+                "validated performance observation disappeared: "
+                f"{operation.value}"
+            )
+        reference_observations = [
+            run.observation(operation) for run in self.reference_runs
+        ]
+        if any(observation is None for observation in reference_observations):
+            raise RuntimeError(
+                f"validated baseline observation disappeared: {operation.value}"
+            )
+        reference_times = [
+            observation.elapsed_seconds
+            for observation in reference_observations
+            if observation is not None
+        ]
+        time_regression = relative_change(
+            statistics.median(reference_times),
+            current_observation.elapsed_seconds,
+        )
+        memory_regression: float | None = None
+        reference_memory = [
+            observation.peak_memory_gb
+            for observation in reference_observations
+            if observation is not None
+        ]
+        if all(value is not None for value in reference_memory):
+            if current_observation.peak_memory_gb is None:
+                violations.append(
+                    f"missing peak memory observation: {operation.value}"
+                )
+            else:
+                memory_regression = relative_change(
+                    statistics.median(
+                        [
+                            value
+                            for value in reference_memory
+                            if value is not None
+                        ]
+                    ),
+                    current_observation.peak_memory_gb,
+                )
+        regression = {
+            "elapsed_seconds": time_regression,
+            "peak_memory_gb": memory_regression,
+        }
+        if time_regression > self.max_relative_regression:
+            violations.append(
+                f"{operation.value} time regression "
+                f"{time_regression:.2%} exceeds "
+                f"{self.max_relative_regression:.2%}"
+            )
+        if (
+            memory_regression is not None
+            and memory_regression > self.max_relative_regression
+        ):
+            violations.append(
+                f"{operation.value} memory regression "
+                f"{memory_regression:.2%} exceeds "
+                f"{self.max_relative_regression:.2%}"
+            )
+        return regression, violations
+
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native baseline policy and reference evidence."""
         return {
             "max_relative_regression": self.max_relative_regression,
             "reference_runs": [run.to_dict() for run in self.reference_runs],
         }
+
+
+def check_same_operations(
+    operations: set[Operation], expected: set[Operation]
+) -> None:
+    """Checks that a run covers exactly the operations of the baseline.
+
+    Args:
+        operations: The operations of the run.
+        expected: The operations of the baseline.
+
+    Raises:
+        ValueError: If the operations differ.
+    """
+    if operations != expected:
+        missing = sorted(operation.value for operation in expected - operations)
+        extra = sorted(operation.value for operation in operations - expected)
+        details = []
+        if missing:
+            details.append(f"missing={missing}")
+        if extra:
+            details.append(f"extra={extra}")
+        raise ValueError(
+            "performance comparison operations differ: " + ", ".join(details)
+        )
 
 
 def relative_change(reference: float, current: float) -> float:

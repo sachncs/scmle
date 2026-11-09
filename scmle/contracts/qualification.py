@@ -20,6 +20,7 @@ from scmle.contracts import evidence
 
 SeedPath = tuple[str | int, ...]
 DEFAULT_CONFIDENCE = 0.95
+INTERVAL_LENGTH = 2
 
 
 class Tier(enum.StrEnum):
@@ -33,7 +34,7 @@ class Tier(enum.StrEnum):
 class Decision(enum.StrEnum):
     """Action a check triggers."""
 
-    PASS = "pass"  # nosec B105 - check outcome, not a credential
+    PASS = "pass"  # noqa: S105 -- check outcome, not a credential # nosec B105
     WARN = "warn"
     QUARANTINE = "quarantine"
     BLOCK = "block"
@@ -196,7 +197,7 @@ class Check:
             probability(self.p_value, "p_value")
         if self.interval is not None:
             require_tuple(self.interval, "interval")
-            if len(self.interval) != 2:
+            if len(self.interval) != INTERVAL_LENGTH:
                 raise ValueError("interval must hold (low, high)")
             low = finite(self.interval[0], "interval")
             high = finite(self.interval[1], "interval")

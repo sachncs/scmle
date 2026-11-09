@@ -49,7 +49,10 @@ class Metric:
         """
         return True
 
-    def scorer(self, positive: Any = None) -> Any:
+    def scorer(
+        self,
+        positive: Any = None,  # noqa: ARG002 -- shared scorer signature
+    ) -> Any:
         """Returns the scikit-learn scorer named by `scorer_name`.
 
         Args:
@@ -152,7 +155,10 @@ class FunctionMetric(Metric):
             "sample_weight" in inspect.signature(self.score_function).parameters
         )
 
-    def scorer(self, positive: Any = None) -> Any:
+    def scorer(
+        self,
+        positive: Any = None,  # noqa: ARG002 -- shared scorer signature
+    ) -> Any:
         """Builds a scorer that applies the user function.
 
         Args:

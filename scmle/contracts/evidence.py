@@ -16,7 +16,7 @@ from scmle.contracts import signing
 class Outcome(enum.StrEnum):
     """Observed result of one release criterion."""
 
-    PASS = "pass"  # nosec B105 - evidence status, not a credential
+    PASS = "pass"  # noqa: S105 -- evidence status, not a credential # nosec B105
     FAIL = "fail"
     WAIVED = "waived"
 
@@ -109,9 +109,7 @@ class Record:
             object.__setattr__(self, "result", Outcome(self.result))
         if not isinstance(self.decision, Disposition):
             object.__setattr__(self, "decision", Disposition(self.decision))
-        timestamp = datetime.datetime.fromisoformat(
-            self.observed_at.replace("Z", "+00:00")
-        )
+        timestamp = datetime.datetime.fromisoformat(self.observed_at)
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError("observed_at must include timezone information")
 
