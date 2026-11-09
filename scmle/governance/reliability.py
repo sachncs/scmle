@@ -153,8 +153,8 @@ class FaultInjectionHarness:
             raise ValueError(
                 "executor evidence does not match the scenario contract; "
                 "no artifacts were published ("
-                + f"unexpected={','.join(unexpected)}"
-                + ")"
+                f"unexpected={','.join(unexpected)}"
+                ")"
             )
         evidence: list[reliability.Evidence] = []
         for artifact in artifacts:
@@ -209,9 +209,9 @@ class FaultInjectionHarness:
                 handle.write(content)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary_name, path)
+            pathlib.Path(temporary_name).replace(path)
             durability.sync_directory(path.parent)
         except Exception:
             with contextlib.suppress(FileNotFoundError):
-                os.unlink(temporary_name)
+                pathlib.Path(temporary_name).unlink()
             raise

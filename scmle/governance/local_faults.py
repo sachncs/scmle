@@ -6,7 +6,6 @@ local and bounded: it does not pretend to reproduce a cloud broker outage,
 physical disk exhaustion, or a kernel-wide OOM event.
 """
 
-from collections.abc import Callable
 import dataclasses
 import errno
 import hashlib
@@ -18,6 +17,8 @@ import subprocess  # nosec B404 - bounded child process is the fault target.
 import sys
 import tempfile
 from typing import Any
+from typing import NoReturn
+from typing import TYPE_CHECKING
 
 from scmle.contracts import lineage
 from scmle.contracts import reliability
@@ -26,6 +27,47 @@ import scmle.data.readers.registry
 from scmle.governance import attestation
 import scmle.governance.registry
 import scmle.governance.reliability
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+DISK_BUDGET_BYTES = 8  # the fixed budget a disk-full payload exceeds
+MEMORY_BUDGET_BYTES = 1024  # the fixed budget the memory fault exceeds
+
+
+def reject_over_budget(payload: bytes) -> None:
+    """Refuses a payload larger than the fixed disk budget, as a full disk.
+
+    Args:
+        payload: The bytes about to be written.
+
+    Raises:
+        OSError: With ENOSPC if the payload exceeds `DISK_BUDGET_BYTES`.
+    """
+    if len(payload) > DISK_BUDGET_BYTES:
+        raise OSError(errno.ENOSPC, "controlled capacity exhausted")
+
+
+def reject_over_memory_budget(allocation: bytearray) -> None:
+    """Refuses an allocation larger than the fixed memory budget.
+
+    Args:
+        allocation: The bytes held so far.
+
+    Raises:
+        MemoryError: If the allocation exceeds `MEMORY_BUDGET_BYTES`.
+    """
+    if len(allocation) > MEMORY_BUDGET_BYTES:
+        raise MemoryError("controlled memory budget exhausted")
+
+
+def fail_connector() -> NoReturn:
+    """Fails like a connector that cannot reach its destination.
+
+    Raises:
+        OSError: Always.
+    """
+    raise OSError("controlled connector failure")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -322,8 +364,7 @@ class LocalFaultExecutor:
         payload = b"x" * 32
         rejected = False
         try:
-            if len(payload) > 8:
-                raise OSError(errno.ENOSPC, "controlled capacity exhausted")
+            reject_over_budget(payload)
             destination.write_bytes(payload)
         except OSError as error:
             rejected = error.errno == errno.ENOSPC
@@ -373,7 +414,7 @@ class LocalFaultExecutor:
         actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
         mismatch = not hmac.compare_digest(expected, actual)
         if mismatch:
-            os.replace(artifact_path, quarantine_path)
+            artifact_path.replace(quarantine_path)
         return (
             self.artifact(
                 scenario,
@@ -497,8 +538,7 @@ class LocalFaultExecutor:
         try:
             for value in range(9):
                 allocation.extend(b"x" * 256)
-                if len(allocation) > 1024:
-                    raise MemoryError("controlled memory budget exhausted")
+                reject_over_memory_budget(allocation)
                 del value
         except MemoryError:
             rejected = True
@@ -678,7 +718,7 @@ class LocalFaultExecutor:
         for attempt in range(3):
             attempts = attempt + 1
             try:
-                raise OSError("controlled connector failure")
+                fail_connector()
             except OSError:
                 continue
         terminal = self.root / "retry-terminal.json"

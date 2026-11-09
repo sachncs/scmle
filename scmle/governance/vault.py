@@ -19,6 +19,7 @@ from scmle.core import ipc
 from scmle.data.splitting import splitters
 
 OPEN = "open"
+HEADER_LENGTH = 2  # the operation and the presented token; extras follow
 BIND = "bind"
 
 
@@ -51,7 +52,7 @@ def serve(
         except EOFError:
             return
         operation, presented = message[0], message[1]
-        extra = message[2] if len(message) > 2 else None
+        extra = message[2] if len(message) > HEADER_LENGTH else None
         if operation not in (OPEN, BIND) or not secrets.compare_digest(
             presented, token
         ):

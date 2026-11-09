@@ -280,7 +280,15 @@ def select_threshold(
         else:
             used = 0
         if used < needed:
-            steps.append(Step(float(tau), used, 0, 1.0, False))
+            steps.append(
+                Step(
+                    tau=float(tau),
+                    cases=used,
+                    errors=0,
+                    p_value=1.0,
+                    rejected=False,
+                )
+            )
             continue
         if w is None:
             errors = math.ceil(float(losses[answered].sum()) - 1e-12)

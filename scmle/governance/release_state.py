@@ -41,10 +41,12 @@ separate file next to ``registry.json`` and does not change its format.
 """
 
 from collections.abc import Callable
+from collections.abc import Sequence
 import dataclasses
 import enum
 import json
 from typing import Any
+from typing import NoReturn
 
 from scmle import durability
 from scmle.contracts import errors
@@ -59,6 +61,7 @@ from scmle.governance import registry
 STATE_FILE = "release_state.json"
 STATE_FORMAT = 1
 PRODUCTION_ENVIRONMENT = "production"
+FULL_ROLLOUT = 100  # percent of traffic when a revision serves everything
 
 
 class ReleaseState(enum.StrEnum):
@@ -133,6 +136,38 @@ class Reconciliation:
             "consistent": self.consistent,
             "findings": [item.to_dict() for item in self.findings],
         }
+
+
+def stop_rollout(percent: int, reasons: Sequence[str]) -> NoReturn:
+    """Stops a rollout because the health check objected.
+
+    Args:
+        percent: The traffic share at which the check objected.
+        reasons: What the health check reported.
+
+    Raises:
+        RuntimeUnconfirmed: Always.
+    """
+    raise control.RuntimeUnconfirmed(
+        f"health stopped the rollout at {percent}%: " + "; ".join(reasons)
+    )
+
+
+def require_previous(previous: dict[str, Any] | None) -> dict[str, Any]:
+    """Returns the previous revision a staged rollout splits traffic with.
+
+    Args:
+        previous: What the registry records as running, or None.
+
+    Returns:
+        `previous`, unchanged.
+
+    Raises:
+        ConfigError: If there is no previous revision.
+    """
+    if previous is None:
+        raise errors.ConfigError("a staged rollout needs a previous revision")
+    return previous
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -486,7 +521,11 @@ class ReleaseRegistry:
                 caught and reported.)
         """
         contract.require_digest(image_digest, "image_digest")
-        if not steps or steps[-1] != 100 or list(steps) != sorted(set(steps)):
+        if (
+            not steps
+            or steps[-1] != FULL_ROLLOUT
+            or list(steps) != sorted(set(steps))
+        ):
             raise errors.ConfigError("steps must increase and end in 100")
         refusal = self.refusal(model, version, signing_key)
         if refusal:
@@ -502,7 +541,7 @@ class ReleaseRegistry:
                     refusal,
                 )
             )
-            return Outcome(False, tuple(refusal))
+            return Outcome(done=False, reasons=tuple(refusal))
         previous = self.environment(model, environment)
         revision: str | None = None
         try:
@@ -512,12 +551,10 @@ class ReleaseRegistry:
             )
             for percent in steps:
                 allocation = {revision: percent}
-                if percent < 100:
-                    if previous is None:
-                        raise errors.ConfigError(
-                            "a staged rollout needs a previous revision"
-                        )
-                    allocation[previous["revision"]] = 100 - percent
+                if percent < FULL_ROLLOUT:
+                    allocation[require_previous(previous)["revision"]] = (
+                        FULL_ROLLOUT - percent
+                    )
                 plane.set_traffic(allocation)
                 seen = control.confirm(
                     plane,
@@ -527,10 +564,7 @@ class ReleaseRegistry:
                 if health is not None:
                     stop = health(seen, percent)
                     if stop:
-                        raise control.RuntimeUnconfirmed(
-                            f"health stopped the rollout at {percent}%: "
-                            + "; ".join(stop)
-                        )
+                        stop_rollout(percent, stop)
             self.commit_promotion(
                 model,
                 version,
@@ -560,7 +594,7 @@ class ReleaseRegistry:
                     restored,
                 )
             )
-            return Outcome(False, reasons, restored)
+            return Outcome(done=False, reasons=reasons, restored=restored)
         self.record_event(
             self.body(
                 model,
@@ -573,7 +607,13 @@ class ReleaseRegistry:
                 [],
             )
         )
-        return Outcome(True, (), None, version, revision)
+        return Outcome(
+            done=True,
+            reasons=(),
+            restored=None,
+            version=version,
+            revision=revision,
+        )
 
     def refusal(
         self, model: str, version: int, signing_key: str | bytes | None
@@ -837,10 +877,13 @@ class ReleaseRegistry:
         """
         current = self.environment(model, environment)
         if current is None or not current.get("known_good"):
-            return Outcome(False, ("there is no previous known-good revision",))
+            return Outcome(
+                done=False,
+                reasons=("there is no previous known-good revision",),
+            )
         target = current["known_good"][-1]
         try:
-            plane.set_traffic({target["revision"]: 100})
+            plane.set_traffic({target["revision"]: FULL_ROLLOUT})
             control.confirm(
                 plane,
                 control.expecting(
@@ -867,7 +910,7 @@ class ReleaseRegistry:
                     restored,
                 )
             )
-            return Outcome(False, (str(error),), restored)
+            return Outcome(done=False, reasons=(str(error),), restored=restored)
         try:
             self.commit_rollback(
                 model, environment, current, target, signing_key
@@ -887,7 +930,7 @@ class ReleaseRegistry:
                     restored,
                 )
             )
-            return Outcome(False, (str(error),), restored)
+            return Outcome(done=False, reasons=(str(error),), restored=restored)
         self.record_event(
             self.body(
                 model,
@@ -900,7 +943,13 @@ class ReleaseRegistry:
                 [],
             )
         )
-        return Outcome(True, (), None, target["version"], target["revision"])
+        return Outcome(
+            done=True,
+            reasons=(),
+            restored=None,
+            version=target["version"],
+            revision=target["revision"],
+        )
 
     def commit_rollback(
         self,
@@ -1037,6 +1086,78 @@ class ReleaseRegistry:
                 return dict(body)
         return None
 
+    def recorded_findings(
+        self,
+        model: str,
+        environment: str,
+        recorded: dict[str, Any],
+        seen: observation.Observation,
+    ) -> list[Finding]:
+        """Compares what the registry records with a platform observation.
+
+        Args:
+            model: Model name.
+            environment: Environment name.
+            recorded: What the registry records as running there.
+            seen: What the platform reports.
+
+        Returns:
+            One finding per disagreement in revision, digest, traffic share or
+            release state.
+        """
+        findings: list[Finding] = []
+        if seen.revision != recorded["revision"]:
+            findings.append(
+                Finding(
+                    "revision_mismatch",
+                    f"registry says {recorded['revision']}, the platform "
+                    f"serves {seen.revision}",
+                )
+            )
+        if seen.image_digest != recorded["image_digest"]:
+            findings.append(
+                Finding(
+                    "digest_mismatch",
+                    f"registry says {recorded['image_digest']}, the "
+                    f"platform runs {seen.image_digest}",
+                )
+            )
+        share = seen.share_of(recorded["revision"])
+        if share != FULL_ROLLOUT:
+            findings.append(
+                Finding(
+                    "traffic_split",
+                    f"the recorded revision holds {share}% of traffic",
+                )
+            )
+        states = self.states(model)
+        production = environment == PRODUCTION_ENVIRONMENT
+        if (
+            production
+            and states.get(recorded["version"]) is not ReleaseState.PRODUCTION
+        ):
+            findings.append(
+                Finding(
+                    "state_mismatch",
+                    f"v{recorded['version']} is deployed but its state "
+                    f"is {states.get(recorded['version'], 'unknown')}",
+                )
+            )
+        for number, state in states.items():
+            if (
+                production
+                and state is ReleaseState.PRODUCTION
+                and number != recorded["version"]
+            ):
+                findings.append(
+                    Finding(
+                        "state_mismatch",
+                        f"v{number} is in production state but the "
+                        f"environment records v{recorded['version']}",
+                    )
+                )
+        return findings
+
     def reconcile(
         self,
         model: str,
@@ -1069,57 +1190,9 @@ class ReleaseRegistry:
                 )
             )
         else:
-            if seen.revision != recorded["revision"]:
-                findings.append(
-                    Finding(
-                        "revision_mismatch",
-                        f"registry says {recorded['revision']}, the platform "
-                        f"serves {seen.revision}",
-                    )
-                )
-            if seen.image_digest != recorded["image_digest"]:
-                findings.append(
-                    Finding(
-                        "digest_mismatch",
-                        f"registry says {recorded['image_digest']}, the "
-                        f"platform runs {seen.image_digest}",
-                    )
-                )
-            share = seen.share_of(recorded["revision"])
-            if share != 100:
-                findings.append(
-                    Finding(
-                        "traffic_split",
-                        f"the recorded revision holds {share}% of traffic",
-                    )
-                )
-            states = self.states(model)
-            production = environment == PRODUCTION_ENVIRONMENT
-            if (
-                production
-                and states.get(recorded["version"])
-                is not ReleaseState.PRODUCTION
-            ):
-                findings.append(
-                    Finding(
-                        "state_mismatch",
-                        f"v{recorded['version']} is deployed but its state "
-                        f"is {states.get(recorded['version'], 'unknown')}",
-                    )
-                )
-            for number, state in states.items():
-                if (
-                    production
-                    and state is ReleaseState.PRODUCTION
-                    and number != recorded["version"]
-                ):
-                    findings.append(
-                        Finding(
-                            "state_mismatch",
-                            f"v{number} is in production state but the "
-                            f"environment records v{recorded['version']}",
-                        )
-                    )
+            findings.extend(
+                self.recorded_findings(model, environment, recorded, seen)
+            )
         if not seen.ready:
             findings.append(
                 Finding("not_ready", "the platform does not report ready")

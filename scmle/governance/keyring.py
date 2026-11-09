@@ -63,7 +63,7 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     Raises:
         ValueError: If the timestamp is malformed or has no timezone.
     """
-    timestamp = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    timestamp = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))  # noqa: FURB162 -- keeps the exact set of accepted inputs
     if timestamp.tzinfo is None or timestamp.utcoffset() is None:
         raise ValueError(f"{field_name} must include timezone information")
     return timestamp
@@ -585,7 +585,7 @@ class SigningKeyRegistry:
                 stream.write(json.dumps(self.to_dict(), indent=2) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, target)
+            temporary.replace(target)
             durability.sync_directory(target.parent)
         except Exception:
             if temporary.exists():

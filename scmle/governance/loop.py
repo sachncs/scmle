@@ -72,6 +72,7 @@ STATE_FILE = "loop_state.json"
 RISK_COVERAGE_FILE = "risk_coverage.json"
 LABEL_MECHANISM_FILE = "label_mechanism.json"
 STATE_VERSION = 1
+ESCALATING_ROLLBACKS = 2  # consecutive rollbacks that force an escalation
 OK = "ok"
 HALTED = "halted"
 INSUFFICIENT_LABELS = "insufficient_labels"
@@ -1416,7 +1417,7 @@ class Loop:
             self.tau = min(1.0, self.tau + self.policy.tighten_step)
         self.rollback_watch = None
         self.consecutive_rollbacks += 1
-        if self.consecutive_rollbacks >= 2:
+        if self.consecutive_rollbacks >= ESCALATING_ROLLBACKS:
             return self.escalate(
                 "two_consecutive_rollbacks", {"batch": self.batch - 1}
             )
@@ -1520,7 +1521,7 @@ class Loop:
         score: Any,
         loss: Any,
         weights: Any = None,
-        confidence: numpy.ndarray | None = None,
+        confidence: numpy.ndarray | None = None,  # noqa: ARG002 -- public parameter, documented as not used
     ) -> escalation.Threshold:
         """Selects `tau` on matured calibration cases and applies it.
 
