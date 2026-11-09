@@ -20,6 +20,8 @@ from urllib.parse import quote
 from urllib.request import Request
 from urllib.request import urlopen
 
+COMMIT_SHA_LENGTH = 40
+
 
 def artifact_records(directory: Path) -> list[dict[str, Any]]:
     """Returns deterministic digests for the wheel and source archives.
@@ -123,6 +125,90 @@ def retry_json(
     raise failure
 
 
+def github_asset_records(
+    local: list[dict[str, Any]],
+    release: dict[str, Any],
+    timeout: float,
+    failures: list[str],
+) -> list[dict[str, Any]]:
+    """Downloads each local artifact's public GitHub asset and compares it.
+
+    Args:
+        local: The local artifact records.
+        release: The GitHub release JSON.
+        timeout: Seconds to wait for each download.
+        failures: The failure list; a missing asset, a missing public URL or
+            a digest mismatch is appended to it.
+
+    Returns:
+        The name and SHA-256 of every asset that was downloaded.
+    """
+    assets = {
+        str(asset.get("name")): asset
+        for asset in release.get("assets", [])
+        if isinstance(asset, dict) and asset.get("name")
+    }
+    github_records: list[dict[str, Any]] = []
+    for record in local:
+        asset = assets.get(record["name"])
+        if asset is None:
+            failures.append(
+                f"GitHub release is missing asset: {record['name']}"
+            )
+            continue
+        download_url = asset.get("browser_download_url")
+        if not isinstance(download_url, str) or not download_url:
+            failures.append(f"GitHub asset has no public URL: {record['name']}")
+            continue
+        published = hashlib.sha256(
+            request_bytes(download_url, timeout=timeout)
+        ).hexdigest()
+        github_records.append({"name": record["name"], "sha256": published})
+        if published != record["sha256"]:
+            failures.append(f"GitHub asset digest mismatch: {record['name']}")
+    return github_records
+
+
+def pypi_file_records(
+    local: list[dict[str, Any]],
+    pypi: dict[str, Any],
+    tag: str,
+    failures: list[str],
+) -> list[dict[str, Any]]:
+    """Compares the PyPI version and files with the local artifacts.
+
+    Args:
+        local: The local artifact records.
+        pypi: The PyPI release JSON.
+        tag: Release tag, starting with `v`.
+        failures: The failure list; a version mismatch, a missing file or a
+            digest mismatch is appended to it.
+
+    Returns:
+        The name and SHA-256 PyPI reports for every file it lists.
+    """
+    if pypi.get("info", {}).get("version") != tag[1:]:
+        failures.append(
+            f"PyPI version mismatch: {pypi.get('info', {}).get('version')!r}"
+        )
+    pypi_files = {
+        str(item.get("filename")): item
+        for item in pypi.get("urls", [])
+        if isinstance(item, dict) and item.get("filename")
+    }
+    pypi_records: list[dict[str, Any]] = []
+    for record in local:
+        file_record = pypi_files.get(record["name"])
+        if file_record is None:
+            failures.append(f"PyPI is missing file: {record['name']}")
+            continue
+        digest = file_record.get("digests", {}).get("sha256")
+        pypi_records.append({"name": record["name"], "sha256": digest})
+        if digest != record["sha256"]:
+            failures.append(f"PyPI digest mismatch: {record['name']}")
+    return pypi_records
+
+
 def verify_external_release(
     repository: str,
     tag: str,
@@ -165,7 +251,7 @@ def verify_external_release(
         raise ValueError("repository must be in owner/name form")
     if not tag.startswith("v"):
         raise ValueError("tag must start with v")
-    if not source_commit or len(source_commit) != 40:
+    if not source_commit or len(source_commit) != COMMIT_SHA_LENGTH:
         raise ValueError("source_commit must be a 40-character commit SHA")
     local = artifact_records(artifact_directory)
     names = {record["name"] for record in local}
@@ -188,54 +274,14 @@ def verify_external_release(
         failures.append(
             f"GitHub commit mismatch: {commit.get('sha')!r} != {source_commit}"
         )
-    assets = {
-        str(asset.get("name")): asset
-        for asset in release.get("assets", [])
-        if isinstance(asset, dict) and asset.get("name")
-    }
-    github_records: list[dict[str, Any]] = []
-    for record in local:
-        asset = assets.get(record["name"])
-        if asset is None:
-            failures.append(
-                f"GitHub release is missing asset: {record['name']}"
-            )
-            continue
-        download_url = asset.get("browser_download_url")
-        if not isinstance(download_url, str) or not download_url:
-            failures.append(f"GitHub asset has no public URL: {record['name']}")
-            continue
-        published = hashlib.sha256(
-            request_bytes(download_url, timeout=timeout)
-        ).hexdigest()
-        github_records.append({"name": record["name"], "sha256": published})
-        if published != record["sha256"]:
-            failures.append(f"GitHub asset digest mismatch: {record['name']}")
+    github_records = github_asset_records(local, release, timeout, failures)
 
     pypi_url = (
         f"{pypi_api.rstrip('/')}/{quote(pypi_project, safe='')}/"
         f"{quote(tag[1:], safe='')}/json"
     )
     pypi = retry_json(pypi_url, attempts, delay, timeout)
-    if pypi.get("info", {}).get("version") != tag[1:]:
-        failures.append(
-            f"PyPI version mismatch: {pypi.get('info', {}).get('version')!r}"
-        )
-    pypi_files = {
-        str(item.get("filename")): item
-        for item in pypi.get("urls", [])
-        if isinstance(item, dict) and item.get("filename")
-    }
-    pypi_records: list[dict[str, Any]] = []
-    for record in local:
-        file_record = pypi_files.get(record["name"])
-        if file_record is None:
-            failures.append(f"PyPI is missing file: {record['name']}")
-            continue
-        digest = file_record.get("digests", {}).get("sha256")
-        pypi_records.append({"name": record["name"], "sha256": digest})
-        if digest != record["sha256"]:
-            failures.append(f"PyPI digest mismatch: {record['name']}")
+    pypi_records = pypi_file_records(local, pypi, tag, failures)
     return {
         "schema_version": 1,
         "repository": repository,

@@ -32,6 +32,8 @@ LONG_LIVED_CREDENTIALS = (
 ACTION_REFERENCE = re.compile(
     r"^\s*(?:-\s+)?uses:\s+(?P<action>[^\s@]+)@(?P<revision>[^\s#]+)"
 )
+HTTP_SUCCESS_FIRST = 200
+HTTP_SUCCESS_END = 300
 SHA256_REVISION = re.compile(r"^[0-9a-f]{40}$")
 WORKFLOW_NAMES = (
     "ci.yml",
@@ -59,6 +61,52 @@ PAGES_ROUTES = (
     "/docs/migrations/",
     "/docs/troubleshooting/",
 )
+
+REQUIRED_MARKERS = {
+    "ci.yml": (
+        "name: ci",
+        "permissions:\n  contents: read",
+        "scripts/check_pytest_skips.py",
+        "scripts/verify_hosted_controls.py",
+        "scripts/verify_release_artifacts.sh",
+        "-W error::ResourceWarning",
+    ),
+    "site.yml": (
+        "name: site",
+        "configure-pages@",
+        "npm audit --omit=dev --audit-level=high",
+        "npm run check:a11y",
+        "npm run check:links",
+        "scripts/verify_hosted_controls.py",
+    ),
+    "pages.yml": (
+        "name: Deploy documentation site",
+        "configure-pages@",
+        "upload-pages-artifact@",
+        "deploy-pages@",
+        "pages: write",
+        "id-token: write",
+        "environment:",
+        "name: github-pages",
+        "needs: deploy",
+        "scripts/verify_hosted_controls.py",
+        "curl --fail",
+    ),
+    "full-suite.yml": (
+        "name: full-suite",
+        "scripts/check_test_stability.py",
+        "exact-SHA clean-clone rehearsal",
+    ),
+    "release.yml": (
+        "name: release",
+        'tags: ["v*"]',
+        "scripts/verify_release_artifacts.sh",
+        "scripts/verify_external_release.py",
+        "twine check dist/*",
+        "id-token: write",
+        "contents: write",
+    ),
+}
 
 
 def read_text(path: Path) -> str:
@@ -116,6 +164,111 @@ def action_references(content: str) -> list[dict[str, str]]:
     return references
 
 
+def load_workflows(workflow_root: Path, failures: list[str]) -> dict[str, str]:
+    """Reads every expected workflow that exists.
+
+    Args:
+        workflow_root: The `.github/workflows` folder.
+        failures: The failure list; a missing or unreadable workflow is
+            appended to it.
+
+    Returns:
+        The text of each readable workflow, by file name.
+    """
+    contents: dict[str, str] = {}
+    for name in WORKFLOW_NAMES:
+        path = workflow_root / name
+        if not path.is_file():
+            failures.append(f"missing workflow: {path}")
+            continue
+        try:
+            contents[name] = read_text(path)
+        except ValueError as error:
+            failures.append(str(error))
+    return contents
+
+
+def pinning_failures(contents: dict[str, str]) -> list[str]:
+    """Returns the unpinned actions and `pull_request_target` uses.
+
+    Args:
+        contents: The workflow text by file name.
+
+    Returns:
+        One message per action not pinned to a 40-character commit and per
+        workflow that uses `pull_request_target`.
+    """
+    failures: list[str] = []
+    for name, content in contents.items():
+        failures.extend(
+            f"{name}:{reference['line']} action is not pinned to a "
+            f"40-character commit SHA: {reference['action']}"
+            for reference in action_references(content)
+            if not SHA256_REVISION.fullmatch(reference["revision"])
+        )
+        if "pull_request_target:" in content:
+            failures.append(f"{name} uses pull_request_target")
+    return failures
+
+
+def credential_failures(contents: dict[str, str]) -> list[str]:
+    """Returns the workflows that refer to a long-lived credential.
+
+    Args:
+        contents: The workflow text by file name.
+
+    Returns:
+        One message per workflow and credential marker found.
+    """
+    return [
+        f"{name} refers to a long-lived credential: {marker}"
+        for name, content in contents.items()
+        for marker in LONG_LIVED_CREDENTIALS
+        if marker in content
+    ]
+
+
+def marker_failures(contents: dict[str, str]) -> list[str]:
+    """Returns the required control markers that a workflow lacks.
+
+    Args:
+        contents: The workflow text by file name.
+
+    Returns:
+        One message per missing marker; a missing workflow lacks them all.
+    """
+    return [
+        f"{name} is missing required control: {marker}"
+        for name, markers in REQUIRED_MARKERS.items()
+        for marker in markers
+        if marker not in contents.get(name, "")
+    ]
+
+
+def site_configuration_failures(root: Path) -> list[str]:
+    """Returns the failures of the documentation site configuration.
+
+    Args:
+        root: The repository root.
+
+    Returns:
+        A message when the Astro configuration is missing or lacks the site
+        or base setting.
+    """
+    astro_config = root / "website" / "astro.config.mjs"
+    if not astro_config.is_file():
+        return [f"missing site configuration: {astro_config}"]
+    astro_content = read_text(astro_config)
+    return [
+        f"website/astro.config.mjs is missing: {marker}"
+        for marker in (
+            'site: "https://sachncs.github.io/scmle"',
+            'base: "/scmle"',
+        )
+        if marker not in astro_content
+    ]
+
+
 def workflow_failures(root: Path) -> list[str]:
     """Returns static workflow-control failures for a repository root.
 
@@ -130,100 +283,12 @@ def workflow_failures(root: Path) -> list[str]:
     Returns:
         One message per failure; empty when all controls hold.
     """
-    workflow_root = root / ".github" / "workflows"
     failures: list[str] = []
-    contents: dict[str, str] = {}
-    for name in WORKFLOW_NAMES:
-        path = workflow_root / name
-        if not path.is_file():
-            failures.append(f"missing workflow: {path}")
-            continue
-        try:
-            contents[name] = read_text(path)
-        except ValueError as error:
-            failures.append(str(error))
-
-    for name, content in contents.items():
-        for reference in action_references(content):
-            if not SHA256_REVISION.fullmatch(reference["revision"]):
-                failures.append(
-                    f"{name}:{reference['line']} action is not pinned to a "
-                    f"40-character commit SHA: {reference['action']}"
-                )
-        if "pull_request_target:" in content:
-            failures.append(f"{name} uses pull_request_target")
-
-    for name, content in contents.items():
-        for marker in LONG_LIVED_CREDENTIALS:
-            if marker in content:
-                failures.append(
-                    f"{name} refers to a long-lived credential: {marker}"
-                )
-
-    required_markers = {
-        "ci.yml": (
-            "name: ci",
-            "permissions:\n  contents: read",
-            "scripts/check_pytest_skips.py",
-            "scripts/verify_hosted_controls.py",
-            "scripts/verify_release_artifacts.sh",
-            "-W error::ResourceWarning",
-        ),
-        "site.yml": (
-            "name: site",
-            "configure-pages@",
-            "npm audit --omit=dev --audit-level=high",
-            "npm run check:a11y",
-            "npm run check:links",
-            "scripts/verify_hosted_controls.py",
-        ),
-        "pages.yml": (
-            "name: Deploy documentation site",
-            "configure-pages@",
-            "upload-pages-artifact@",
-            "deploy-pages@",
-            "pages: write",
-            "id-token: write",
-            "environment:",
-            "name: github-pages",
-            "needs: deploy",
-            "scripts/verify_hosted_controls.py",
-            "curl --fail",
-        ),
-        "full-suite.yml": (
-            "name: full-suite",
-            "scripts/check_test_stability.py",
-            "exact-SHA clean-clone rehearsal",
-        ),
-        "release.yml": (
-            "name: release",
-            'tags: ["v*"]',
-            "scripts/verify_release_artifacts.sh",
-            "scripts/verify_external_release.py",
-            "twine check dist/*",
-            "id-token: write",
-            "contents: write",
-        ),
-    }
-    for name, markers in required_markers.items():
-        content = contents.get(name, "")
-        for marker in markers:
-            if marker not in content:
-                failures.append(f"{name} is missing required control: {marker}")
-
-    astro_config = root / "website" / "astro.config.mjs"
-    if astro_config.is_file():
-        astro_content = read_text(astro_config)
-        for marker in (
-            'site: "https://sachncs.github.io/scmle"',
-            'base: "/scmle"',
-        ):
-            if marker not in astro_content:
-                failures.append(
-                    f"website/astro.config.mjs is missing: {marker}"
-                )
-    else:
-        failures.append(f"missing site configuration: {astro_config}")
+    contents = load_workflows(root / ".github" / "workflows", failures)
+    failures.extend(pinning_failures(contents))
+    failures.extend(credential_failures(contents))
+    failures.extend(marker_failures(contents))
+    failures.extend(site_configuration_failures(root))
     return failures
 
 
@@ -304,7 +369,7 @@ def public_page_evidence(
             "bytes": len(body),
         }
         records.append(record)
-        if status < 200 or status >= 300:
+        if not HTTP_SUCCESS_FIRST <= status < HTTP_SUCCESS_END:
             failures.append(f"{route}: HTTP {status}")
         if not body:
             failures.append(f"{route}: empty response")
@@ -329,7 +394,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify hosted CI and public GitHub Pages controls."
     )
-    parser.add_argument("--root", type=Path, default=Path("."))
+    parser.add_argument("--root", type=Path, default=Path())
     parser.add_argument("--pages-url")
     parser.add_argument("--timeout", type=float, default=15.0)
     parser.add_argument("--output", type=Path)

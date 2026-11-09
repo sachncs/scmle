@@ -37,6 +37,7 @@ class TestStatus(enum.StrEnum):
 
 
 STRICT_PYTEST_ARGUMENTS = ("-W", "error::ResourceWarning")
+MINIMUM_RUNS = 2
 """Pytest options shared by every repeated stability attempt."""
 
 
@@ -95,7 +96,10 @@ class QuarantineEntry:
         Returns:
             True when the expiry date is before today.
         """
-        return parse_date(self.expires_at) < datetime.date.today()
+        return (
+            parse_date(self.expires_at)
+            < datetime.datetime.now().astimezone().date()
+        )
 
     def to_dict(self) -> dict[str, str]:
         """Returns JSON-native quarantine evidence.
@@ -262,7 +266,7 @@ class StabilityPolicy:
             ValueError: If fewer than two runs are given.
         """
         normalized_runs = tuple(runs)
-        if len(normalized_runs) < 2:
+        if len(normalized_runs) < MINIMUM_RUNS:
             raise ValueError("stability policy requires at least two runs")
         inventory = set(normalized_runs[0].tests)
         inventory_changes = sorted(
@@ -437,7 +441,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", default="test-stability.json")
     parser.add_argument("tests", nargs=argparse.REMAINDER)
     arguments = parser.parse_args(argv)
-    if arguments.runs < 2:
+    if arguments.runs < MINIMUM_RUNS:
         parser.error("--runs must be at least 2")
     test_arguments = tuple(arguments.tests) or ("tests/unit",)
     if test_arguments and test_arguments[0] == "--":

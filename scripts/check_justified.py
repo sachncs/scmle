@@ -52,6 +52,8 @@ SHAPES = (
 )
 INTERFACE_BASES = frozenset({"ABC", "Protocol"})
 SINGLE_USE_LINES = 5
+MAXIMUM_NAME_REFERENCE_LENGTH = 120
+ENTRY_FIELDS = 3
 FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
 
 
@@ -112,7 +114,10 @@ def count(sources: dict[pathlib.Path, ast.Module]) -> collections.Counter:
             elif isinstance(node, ast.Constant) and isinstance(node.value, str):
                 text = node.value.strip()
                 tail = text.replace(":", ".").split(".")[-1]
-                if tail.isidentifier() and len(text) < 120:
+                if (
+                    tail.isidentifier()
+                    and len(text) < MAXIMUM_NAME_REFERENCE_LENGTH
+                ):
                     used[tail] += 1
     return used
 
@@ -232,10 +237,10 @@ def declared(path: pathlib.Path) -> list[tuple[str, str]]:
         return []
     patterns = []
     for line in path.read_text(encoding="utf-8").splitlines():
-        parts = line.split(None, 2)
+        parts = line.split(None, ENTRY_FIELDS - 1)
         if line.startswith("#") or not parts:
             continue
-        if len(parts) < 3:
+        if len(parts) < ENTRY_FIELDS:
             raise SystemExit(f"{path}: entry without a reason: {line!r}")
         patterns.append((parts[0], parts[1]))
     return patterns
