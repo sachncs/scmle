@@ -170,8 +170,8 @@ def observe_memory_gb() -> tuple[float | None, str]:
     it is read from ``psutil`` (a Windows-only core dependency).
     """
     try:
-        pages = os.sysconf("SC_PHYS_PAGES")
-        page_size = os.sysconf("SC_PAGE_SIZE")
+        pages: object = os.sysconf("SC_PHYS_PAGES")
+        page_size: object = os.sysconf("SC_PAGE_SIZE")
     except (AttributeError, OSError, ValueError):
         return observe_windows_memory_gb() if WINDOWS else (None, "unknown")
     if not isinstance(pages, int) or not isinstance(page_size, int):

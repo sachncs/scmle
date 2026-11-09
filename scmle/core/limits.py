@@ -19,6 +19,7 @@ from collections.abc import Callable
 from collections.abc import Iterator
 import contextlib
 import dataclasses
+import importlib
 import multiprocessing
 from multiprocessing import connection
 import os
@@ -33,10 +34,11 @@ from typing import Any
 from scmle.contracts import errors
 from scmle.contracts import tasks
 
+resource: Any  # the `resource` module, or None where it is missing
 try:
-    import resource
+    resource = importlib.import_module("resource")
 except ImportError:  # Windows has no `resource` module.
-    resource = None  # type: ignore[assignment]
+    resource = None
 
 WINDOWS = sys.platform == "win32"
 KILL_SIGNAL = signal.SIGTERM if WINDOWS else signal.SIGKILL  # type: ignore[attr-defined,unused-ignore]
@@ -109,11 +111,13 @@ def peak_memory_gb() -> float:
     if resource is None:
         import psutil  # noqa: PLC0415 -- Windows-only dependency
 
-        return psutil.Process().memory_info().peak_wset / BYTES_PER_GB
+        peak_wset: float = psutil.Process().memory_info().peak_wset
+        return peak_wset / BYTES_PER_GB
     scale = 1 if sys.platform == "darwin" else KILOBYTES  # macOS reports bytes
     own = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * scale
     children = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss * scale
-    return max(own, children) / BYTES_PER_GB
+    peak: float = max(own, children) / BYTES_PER_GB
+    return peak
 
 
 def proc_table() -> dict[int, tuple[int, int]]:
