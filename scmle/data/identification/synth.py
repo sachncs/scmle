@@ -86,7 +86,8 @@ def fit_weights(target: numpy.ndarray, donors: numpy.ndarray) -> numpy.ndarray:
         return float(numpy.sum((target - donors @ w) ** 2))
 
     def gradient(w: numpy.ndarray) -> numpy.ndarray:
-        return -2.0 * donors.T @ (target - donors @ w)
+        slope: numpy.ndarray = -2.0 * donors.T @ (target - donors @ w)
+        return slope
 
     result = optimize.minimize(
         loss,
@@ -98,7 +99,8 @@ def fit_weights(target: numpy.ndarray, donors: numpy.ndarray) -> numpy.ndarray:
         options={"maxiter": 500, "ftol": 1e-12},
     )
     weights = numpy.clip(result.x, 0.0, None)
-    return weights / weights.sum()
+    shares: numpy.ndarray = weights / weights.sum()
+    return shares
 
 
 def ratio_for(
