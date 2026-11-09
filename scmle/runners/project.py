@@ -49,7 +49,17 @@ CONFIG_NAMES = ("config.json", "spec.json")
 
 
 class WorkdirSync:
-    """Mirrors a local directory to ``<prefix>`` in a store, and back."""
+    """Mirrors a local directory to ``<prefix>`` in a store, and back.
+
+    Attributes:
+        store: Where the mirror lives.
+        prefix: Key prefix of the mirror.
+        directory: The local directory.
+        uploaded: SHA-256 of each file as last uploaded or restored, by relative
+            path.
+        stop: Set to end the periodic push.
+        thread: The periodic push thread, once started.
+    """
 
     def __init__(
         self,
@@ -72,7 +82,13 @@ class WorkdirSync:
         self.thread: threading.Thread | None = None
 
     def push(self) -> int:
-        """Uploads new and changed files; returns how many."""
+        """Uploads new and changed files.
+
+        Files that cannot be read are skipped.
+
+        Returns:
+            The number of files uploaded.
+        """
         sent = 0
         for path in sorted(self.directory.rglob("*")):
             if not path.is_file():
@@ -91,7 +107,11 @@ class WorkdirSync:
         return sent
 
     def restore(self) -> int:
-        """Downloads the mirror into the directory; returns how many files."""
+        """Downloads the mirror into the directory.
+
+        Returns:
+            The number of files downloaded.
+        """
         count = 0
         for meta in self.store.list_objects(self.prefix):
             relative = meta.key.removeprefix(self.prefix)
@@ -104,9 +124,17 @@ class WorkdirSync:
         return count
 
     def start(self, interval: float) -> None:
-        """Pushes every `interval` seconds on a daemon thread."""
+        """Pushes every `interval` seconds on a daemon thread.
+
+        A push that fails with a store error is skipped and tried again at the
+        next interval.
+
+        Args:
+            interval: Seconds between pushes.
+        """
 
         def loop() -> None:
+            """Pushes until `stop` is set."""
             while not self.stop.wait(interval):
                 try:
                     self.push()
@@ -125,7 +153,15 @@ class WorkdirSync:
 
 
 def saved_run(directory: pathlib.Path) -> pathlib.Path | None:
-    """The run directory inside a restored workdir, if there is one."""
+    """Finds the run directory inside a restored workdir.
+
+    Args:
+        directory: The restored workdir.
+
+    Returns:
+        The directory holding the first `config.json` or `spec.json` found, or
+        None if there is none.
+    """
     for config in sorted(directory.rglob("*.json")):
         if config.name in CONFIG_NAMES:
             return config.parent
@@ -133,10 +169,16 @@ def saved_run(directory: pathlib.Path) -> pathlib.Path | None:
 
 
 def project_options(options: Mapping[str, Any]) -> dict[str, Any]:
-    """Keyword arguments for `MLProject` from a JSON mapping.
+    """Builds keyword arguments for `MLProject` from a JSON mapping.
 
     The nested sections (`search`, `models`, ...) arrive as mappings and are
     turned into their specification types; everything else passes through.
+
+    Args:
+        options: The `options` of the project specification.
+
+    Returns:
+        The keyword arguments.
     """
     converted = dict(options)
     for name, kind in SECTIONS.items():
@@ -150,20 +192,20 @@ def run_project(
     sync_seconds: float = SYNC_SECONDS,
     on_start: Callable[[Any], None] | None = None,
 ) -> None:
-    """The workload: run (or resume) the job's project and record its result.
+    """Runs (or resumes) the job's project and records its result.
 
-    The scratch directory has the same path on every attempt, because a
-    saved run refers to its data by path. If the run is cancelled the job is
-    reported interrupted, so the supervisor retries and the retry resumes.
-    If a previous attempt finished the project but not the job, the saved
-    run cannot be resumed ("already completed") and the project runs again
-    from scratch into a new run directory.
+    The scratch directory has the same path on every attempt, because a saved
+    run refers to its data by path. If the run is cancelled the job is reported
+    interrupted, so the supervisor retries and the retry resumes. If a previous
+    attempt finished the project but not the job, the saved run cannot be
+    resumed ("already completed") and the project runs again from scratch into a
+    new run directory.
 
     Args:
         context: The job context; its spec's `project` is the mapping above.
         sync_seconds: Seconds between mirrors of the run directory.
-        on_start: Called with the `MLProject` just before it runs (a hook
-            for cancellation).
+        on_start: Called with the `MLProject` just before it runs (a hook for
+            cancellation).
 
     Raises:
         ConfigError: If the project mapping lacks `data` or `target`.
@@ -207,7 +249,23 @@ def execute(
     restored: bool,
     on_start: Callable[[Any], None] | None,
 ) -> tuple[Any, bool]:
-    """Resumes a restored run or starts a new one; returns result, resumed."""
+    """Resumes a restored run or starts a new one.
+
+    Args:
+        spec: The project specification.
+        data_path: Local copy of the training data.
+        workdir: Directory for the run, possibly restored from the store.
+        restored: Whether the workdir was restored from earlier attempts.
+        on_start: Called with a newly started `MLProject` before it runs.
+
+    Returns:
+        The run result and whether it was resumed.
+
+    Raises:
+        ConfigError: If resuming the saved run fails for any reason other than
+            that the run had already completed (in which case a new run is
+            started).
+    """
     previous = saved_run(workdir) if restored else None
     if previous is not None:
         try:
@@ -227,7 +285,17 @@ def execute(
 
 
 def summarize(result: Any, resumed: bool) -> dict[str, Any]:
-    """The JSON result recorded for a finished project."""
+    """Summarizes a finished project as the JSON result to record.
+
+    Args:
+        result: The project's run result.
+        resumed: Whether the run was resumed.
+
+    Returns:
+        A dict with the run id, state, whether it was resumed, the selected
+        model, the metric, its cross-validation score and test metrics, each
+        trial's model and status, and the result summary.
+    """
     evaluation = result.evaluation
     return {
         "run_id": result.run_id,

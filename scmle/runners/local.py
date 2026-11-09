@@ -49,21 +49,33 @@ class JobContext:
     hook: Callable[[int], None] = lambda step: None
 
     def resume(self) -> checkpoint.Checkpoint | None:
-        """The newest checkpoint that verifies, or None at a fresh start."""
+        """Finds where to resume.
+
+        Returns:
+            The newest checkpoint that verifies, or None at a fresh start.
+        """
         return self.checkpoints.latest()
 
     def step(self, number: int, state: Any) -> None:
         """Saves a checkpoint, then lets the supervisor act.
 
-        Raises:
-            JobInterruptedError: If the platform interrupts after this step.
-            JobStoppedError: If the budget or timeout stops the job.
+        The hook may then raise `JobInterruptedError` (the platform interrupts
+        after this step) or `JobStoppedError` (the budget or timeout stops the
+        job).
+
+        Args:
+            number: Step number.
+            state: JSON-serializable state to save.
         """
         self.checkpoints.save(number, state)
         self.hook(number)
 
     def finish(self, result: Mapping[str, Any]) -> None:
-        """Records the job's result (metrics, trial results, evidence)."""
+        """Records the job's result (metrics, trial results, evidence).
+
+        Args:
+            result: JSON-serializable mapping, stored as the run's result.
+        """
         body = json.dumps(dict(result), indent=2, sort_keys=True).encode()
         self.store.put(f"runs/{self.run_id}/result.json", body)
 
@@ -74,13 +86,23 @@ Interruption = Callable[[int, int], bool]
 
 @dataclasses.dataclass(slots=True)
 class LocalJob:
-    """A finished local attempt."""
+    """A finished local attempt.
+
+    Attributes:
+        status: How the attempt ended.
+    """
 
     status: base.JobStatus
 
 
 class LocalRunner(base.Runner):
-    """Runs the workload inline, as the job."""
+    """Runs the workload inline, as the job.
+
+    Attributes:
+        workload: The training function.
+        interruptions: Decides which steps are interrupted, or None.
+        jobs: Outcome of each submitted attempt, by job id.
+    """
 
     kind = "local"
 
@@ -109,10 +131,32 @@ class LocalRunner(base.Runner):
         self.jobs: dict[str, LocalJob] = {}
 
     def submit(self, spec: base.JobSpec, attempt: int) -> base.JobHandle:
-        """Runs the workload to completion and remembers how it ended."""
+        """Runs the workload to completion and remembers how it ended.
+
+        An interruption becomes `INTERRUPTED`, a supervisor stop `CANCELLED`, a
+        transient error a retryable `FAILED`, and any other exception a
+        non-retryable `FAILED` carrying its type and message.
+
+        Args:
+            spec: The job.
+            attempt: Attempt number, from 1.
+
+        Returns:
+            The handle of the finished attempt.
+        """
         handle = base.JobHandle(f"local-{spec.run_id}-{attempt}", attempt)
 
         def hook(step: int) -> None:
+            """Lets the supervisor act after a checkpoint.
+
+            Args:
+                step: The step just saved.
+
+            Raises:
+                JobStoppedError: If the supervisor wants the job stopped.
+                JobInterruptedError: If the injected interruption strikes at
+                    this attempt and step.
+            """
             if self.watcher() is not None:
                 raise JobStoppedError()
             if self.interruptions and self.interruptions(attempt, step):
@@ -144,8 +188,20 @@ class LocalRunner(base.Runner):
         return handle
 
     def poll(self, handle: base.JobHandle) -> base.JobStatus:
-        """The remembered outcome."""
+        """Reports the remembered outcome.
+
+        Args:
+            handle: The attempt.
+
+        Returns:
+            The status the attempt ended with.
+        """
         return self.jobs[handle.job_id].status
 
     def cancel(self, handle: base.JobHandle, reason: str) -> None:
-        """Nothing to cancel: the attempt already ended."""
+        """Does nothing: the attempt already ended.
+
+        Args:
+            handle: The attempt. Unused.
+            reason: Why it is stopped. Unused.
+        """

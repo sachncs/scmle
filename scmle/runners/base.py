@@ -47,7 +47,16 @@ SECRET_WORDS = ("SECRET", "PASSWORD", "TOKEN", "CREDENTIAL", "PRIVATE", "KEY")
 
 
 class JobState(enum.StrEnum):
-    """Where one attempt is."""
+    """Where one attempt is.
+
+    Attributes:
+        PENDING: Submitted, not yet running.
+        RUNNING: Executing.
+        SUCCEEDED: Ended successfully.
+        FAILED: Ended with an error.
+        INTERRUPTED: Taken away by the platform (for example preemption).
+        CANCELLED: Stopped on request.
+    """
 
     PENDING = "pending"
     RUNNING = "running"
@@ -68,7 +77,17 @@ TERMINAL = frozenset(
 
 
 class RunState(enum.StrEnum):
-    """How a whole run ended (or that it has not)."""
+    """How a whole run ended (or that it has not).
+
+    Attributes:
+        STARTED: Not finished.
+        SUCCEEDED: An attempt succeeded and left a result.
+        FAILED: An attempt failed without a retry, or ended without a result.
+        BUDGET_STOPPED: Cancelled because the estimated cost passed the budget.
+        TIMED_OUT: Cancelled because an attempt passed its time limit.
+        RETRIES_EXHAUSTED: Every allowed attempt was interrupted or failed
+            retryably.
+    """
 
     STARTED = "started"
     SUCCEEDED = "succeeded"
@@ -132,7 +151,16 @@ class CostRate:
     per_gpu_hour: float = 0.0
 
     def cost(self, resources: Resources, seconds: float) -> float:
-        """The estimated cost of `seconds` of these resources."""
+        """Estimates the cost of running resources for some time.
+
+        Args:
+            resources: The resources used.
+            seconds: Elapsed seconds; a negative value counts as zero.
+
+        Returns:
+            The hourly price of the resources times the elapsed hours, in the
+            currency of the rate.
+        """
         hourly = (
             resources.cpu * self.per_cpu_hour
             + resources.memory_mb / 1024 * self.per_gb_hour
@@ -154,7 +182,11 @@ class CostBudget:
     rate: CostRate
 
     def __post_init__(self) -> None:
-        """Validates the ceiling."""
+        """Validates the ceiling.
+
+        Raises:
+            ConfigError: If `max_cost` is not positive.
+        """
         if self.max_cost <= 0:
             raise errors.ConfigError("max_cost must be positive")
 
@@ -191,8 +223,9 @@ class JobSpec:
         """Validates the spec.
 
         Raises:
-            ConfigError: If the id is unsafe, the timeout not positive or the
-                environment holds something secret-looking.
+            ConfigError: If the id is unsafe, the timeout is not positive, the
+                identity is empty or the environment holds something
+                secret-looking.
         """
         if (
             not self.run_id
@@ -215,12 +248,17 @@ class JobSpec:
 
     @property
     def project_digest(self) -> str:
-        """SHA-256 of the canonical project specification."""
+        """The SHA-256 of the canonical project specification."""
         text = json.dumps(self.project, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode()).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form (stored with the run)."""
+        """Builds the JSON-ready form that is stored with the run.
+
+        Returns:
+            A dict of all fields, plus the project digest, with nested objects
+            as dicts.
+        """
         return {
             "run_id": self.run_id,
             "name": self.name,
@@ -240,7 +278,11 @@ class JobSpec:
         }
 
     def digest(self) -> str:
-        """SHA-256 of the whole spec."""
+        """Digests the whole spec.
+
+        Returns:
+            The hex SHA-256 of the key-sorted JSON of `to_dict()`.
+        """
         text = json.dumps(self.to_dict(), sort_keys=True)
         return hashlib.sha256(text.encode()).hexdigest()
 
@@ -274,7 +316,12 @@ class JobStatus:
 
 
 class Clock:
-    """Time source for supervision; tests replace both functions."""
+    """Time source for supervision; tests replace both functions.
+
+    Attributes:
+        now: Returns monotonic seconds.
+        sleep: Waits for the given seconds.
+    """
 
     def __init__(
         self,
@@ -292,13 +339,28 @@ class Clock:
 
 
 def stamp() -> str:
-    """The current UTC time, ISO 8601."""
+    """Formats the current time.
+
+    Returns:
+        The current UTC time as an ISO 8601 string with second resolution.
+    """
     return datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
 
 
 @dataclasses.dataclass(slots=True)
 class Attempt:
-    """The record of one attempt in the manifest."""
+    """The record of one attempt in the manifest.
+
+    Attributes:
+        attempt: Attempt number, from 1.
+        job_id: The platform's id of the attempt.
+        state: Final (or current) `JobState` value.
+        started_at: UTC start time.
+        ended_at: UTC end time; empty while running.
+        seconds: Elapsed seconds.
+        cost: Estimated cost of this attempt.
+        reason: Why the attempt ended as it did.
+    """
 
     attempt: int
     job_id: str
@@ -312,7 +374,25 @@ class Attempt:
 
 @dataclasses.dataclass(slots=True)
 class RunManifest:
-    """The durable record of a run."""
+    """The durable record of a run.
+
+    Attributes:
+        run_id: The run.
+        runner: Kind of the runner that executed it.
+        spec_digest: Digest of the job spec.
+        project_digest: Digest of the project specification.
+        identity: The training identity.
+        state: `RunState` value.
+        attempts: One record per attempt.
+        total_cost: Estimated cost across attempts.
+        budget: The cost ceiling, or None if there was none.
+        checkpoints: Step and SHA-256 of each verified checkpoint at the end.
+        result_sha256: Digest of the result object; empty if none.
+        evidence: Key, SHA-256 and size of every other object stored under the
+            run at the end.
+        started_at: UTC time the run was registered.
+        ended_at: UTC time the run ended; empty while running.
+    """
 
     run_id: str
     runner: str
@@ -330,21 +410,37 @@ class RunManifest:
     ended_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Builds the JSON-ready form.
+
+        Returns:
+            A dict of all fields plus the manifest format number.
+        """
         record = dataclasses.asdict(self)
         record["format"] = MANIFEST_FORMAT
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "RunManifest":
-        """Rebuilds a manifest from its stored form."""
+        """Rebuilds a manifest from its stored form.
+
+        Args:
+            record: A dict produced by `to_dict`.
+
+        Returns:
+            The manifest.
+        """
         fields = {k: v for k, v in record.items() if k != "format"}
         fields["attempts"] = [Attempt(**a) for a in fields["attempts"]]
         return cls(**fields)
 
 
 class BudgetMeter:
-    """Accumulates the estimated cost of a run across attempts."""
+    """Accumulates the estimated cost of a run across attempts.
+
+    Attributes:
+        spec: The job.
+        spent: Cost accumulated by finished attempts.
+    """
 
     def __init__(self, spec: JobSpec, spent: float = 0.0) -> None:
         """Initializes the meter.
@@ -357,25 +453,58 @@ class BudgetMeter:
         self.spent = spent
 
     def cost_of(self, seconds: float) -> float:
-        """The cost of `seconds` of this attempt on top of `spent`."""
+        """Estimates the run's cost including a running attempt.
+
+        Args:
+            seconds: Elapsed seconds of the current attempt.
+
+        Returns:
+            The cost already spent plus the cost of this attempt; just the cost
+            already spent if the job has no budget.
+        """
         if self.spec.budget is None:
             return self.spent
         rate = self.spec.budget.rate
         return self.spent + rate.cost(self.spec.resources, seconds)
 
     def exceeded(self, seconds: float) -> bool:
-        """Whether the run's cost passed its ceiling."""
+        """Reports whether the run's cost passed its ceiling.
+
+        Args:
+            seconds: Elapsed seconds of the current attempt.
+
+        Returns:
+            True if the job has a budget and `cost_of(seconds)` is above its
+            ceiling.
+        """
         budget = self.spec.budget
         return budget is not None and self.cost_of(seconds) > budget.max_cost
 
     def close(self, seconds: float) -> float:
-        """Adds a finished attempt's cost and returns the new total."""
+        """Adds a finished attempt's cost.
+
+        Args:
+            seconds: Elapsed seconds of the finished attempt.
+
+        Returns:
+            The new total cost.
+        """
         self.spent = self.cost_of(seconds)
         return self.spent
 
 
 class Runner(abc.ABC):
-    """Runs a `JobSpec` in one place, with the shared supervision."""
+    """Runs a `JobSpec` in one place, with the shared supervision.
+
+    Attributes:
+        kind: Name of the kind of runner, recorded in the manifest.
+        store: Durable storage.
+        serving_identity: The identity a job may not run as.
+        clock: Time source.
+        poll_seconds: Seconds between status polls.
+        stop_reason: Why the supervisor stopped the current attempt, if it did.
+        watcher: Returns the stop reason of the current attempt, or None.
+    """
 
     kind = "runner"
 
@@ -406,35 +535,87 @@ class Runner(abc.ABC):
 
     @abc.abstractmethod
     def submit(self, spec: JobSpec, attempt: int) -> JobHandle:
-        """Starts one attempt."""
+        """Starts one attempt.
+
+        Args:
+            spec: The job.
+            attempt: Attempt number, from 1.
+
+        Returns:
+            The handle of the started attempt.
+        """
 
     @abc.abstractmethod
     def poll(self, handle: JobHandle) -> JobStatus:
-        """Reports the attempt's state."""
+        """Reports the attempt's state.
+
+        Args:
+            handle: The attempt.
+
+        Returns:
+            The state the platform reports.
+        """
 
     @abc.abstractmethod
     def cancel(self, handle: JobHandle, reason: str) -> None:
-        """Asks the platform to stop the attempt."""
+        """Asks the platform to stop the attempt.
+
+        Args:
+            handle: The attempt.
+            reason: Why it is stopped.
+        """
 
     def manifest_key(self, run_id: str) -> str:
-        """Where a run's manifest lives."""
+        """Builds the key of a run's manifest.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The object key.
+        """
         return f"runs/{run_id}/manifest.json"
 
     def spec_key(self, run_id: str) -> str:
-        """Where a run's spec lives."""
+        """Builds the key of a run's spec.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The object key.
+        """
         return f"runs/{run_id}/spec.json"
 
     def result_key(self, run_id: str) -> str:
-        """Where a workload leaves its result."""
+        """Builds the key where a workload leaves its result.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The object key.
+        """
         return f"runs/{run_id}/result.json"
 
     def save(self, manifest: RunManifest) -> None:
-        """Writes the manifest atomically."""
+        """Writes the manifest atomically.
+
+        Args:
+            manifest: The manifest to store.
+        """
         body = json.dumps(manifest.to_dict(), indent=2, sort_keys=True)
         self.store.put(self.manifest_key(manifest.run_id), body.encode())
 
     def load(self, run_id: str) -> RunManifest | None:
-        """The stored manifest, if the run exists."""
+        """Reads a run's manifest.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The stored manifest, or None if the run has none.
+        """
         try:
             data, ignored = self.store.get(self.manifest_key(run_id))
         except objectstore.NotFoundError:
@@ -444,9 +625,17 @@ class Runner(abc.ABC):
     def register(self, spec: JobSpec) -> RunManifest:
         """Stores the spec, or recognises the same run, or refuses a clash.
 
+        The job's identity is first checked against the serving identity, which
+        refuses a job that would run as the serving side with a `ConfigError`.
+
+        Args:
+            spec: The job.
+
+        Returns:
+            The run's stored manifest, or a new one if the run is new.
+
         Raises:
             RunConflictError: If the id exists with a different spec.
-            ConfigError: If the job would run as the serving identity.
         """
         roles.check_distinct(spec.identity, self.serving_identity)
         body = json.dumps(spec.to_dict(), indent=2, sort_keys=True).encode()
@@ -476,20 +665,18 @@ class Runner(abc.ABC):
     def run(self, spec: JobSpec) -> RunManifest:
         """Runs the spec to a final state, resuming and retrying as declared.
 
-        Calling it again with the same spec after the run finished returns
-        the recorded manifest and starts nothing; after an interruption of
-        the caller itself it continues the numbering and resumes from the
-        run's checkpoints.
+        Calling it again with the same spec after the run finished returns the
+        recorded manifest and starts nothing; after an interruption of the
+        caller itself it continues the numbering and resumes from the run's
+        checkpoints. A spec that clashes with the stored one is refused with
+        `RunConflictError`, and a job that would run as the serving identity
+        with `ConfigError`.
 
         Args:
             spec: The job.
 
         Returns:
             The final manifest.
-
-        Raises:
-            RunConflictError: If the id belongs to a different spec.
-            ConfigError: If the job would run as the serving identity.
         """
         manifest = self.register(spec)
         if manifest.state in {s.value for s in FINAL}:
@@ -512,11 +699,30 @@ class Runner(abc.ABC):
         meter: BudgetMeter,
         number: int,
     ) -> RunState | None:
-        """Runs one attempt; returns a final state, or None to retry."""
+        """Runs one attempt.
+
+        Args:
+            spec: The job.
+            manifest: The run's manifest, updated in place.
+            meter: The run's cost meter, updated in place.
+            number: Attempt number, from 1.
+
+        Returns:
+            The final state of the run if the attempt ended it (success,
+            failure, timeout or budget stop), or None if the attempt was
+            interrupted or failed retryably and another attempt may follow.
+        """
         started = self.clock.now()
         self.stop_reason = None
 
         def watch() -> RunState | None:
+            """Checks the budget and the timeout of the running attempt.
+
+            Returns:
+                The reason the attempt must stop (`BUDGET_STOPPED` or
+                `TIMED_OUT`), or None if it may continue; the reason is also
+                kept as `stop_reason`.
+            """
             elapsed = self.clock.now() - started
             if meter.exceeded(elapsed):
                 self.stop_reason = RunState.BUDGET_STOPPED
@@ -562,7 +768,15 @@ class Runner(abc.ABC):
         return RunState.FAILED
 
     def confirm_stopped(self, handle: JobHandle) -> JobStatus:
-        """Polls a cancelled attempt a few times for its terminal state."""
+        """Polls a cancelled attempt a few times for its terminal state.
+
+        Args:
+            handle: The cancelled attempt.
+
+        Returns:
+            The terminal status if it appears within about six polls; otherwise
+            a `CANCELLED` status with the reason `cancel requested`.
+        """
         status = self.poll(handle)
         for ignored in range(5):
             if status.state in TERMINAL:
@@ -574,7 +788,18 @@ class Runner(abc.ABC):
     def finish(
         self, spec: JobSpec, manifest: RunManifest, state: RunState
     ) -> RunManifest:
-        """Seals the manifest with checkpoints, the result and the state."""
+        """Seals the manifest with checkpoints, the result and the state.
+
+        A run that succeeded but left no result is recorded as failed.
+
+        Args:
+            spec: The job.
+            manifest: The run's manifest, updated in place.
+            state: The final state of the run.
+
+        Returns:
+            The saved manifest.
+        """
         checkpoints = checkpoint_module.CheckpointStore(self.store, spec.run_id)
         manifest.checkpoints = [
             {"step": step, "sha256": found.sha256}

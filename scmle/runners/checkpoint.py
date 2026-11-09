@@ -42,13 +42,27 @@ class Checkpoint:
 
 
 def content_digest(step: int, state: Any) -> str:
-    """Digest of the canonical JSON of a step and its state."""
+    """Digests the canonical JSON of a step and its state.
+
+    Args:
+        step: Step number.
+        state: JSON-serializable state.
+
+    Returns:
+        The hex SHA-256 digest.
+    """
     body = json.dumps({"step": step, "state": state}, sort_keys=True)
     return hashlib.sha256(body.encode()).hexdigest()
 
 
 class CheckpointStore:
-    """The checkpoints of one run."""
+    """The checkpoints of one run.
+
+    Attributes:
+        store: Durable storage.
+        prefix: Key prefix of this run's checkpoints.
+        skipped: Keys of damaged checkpoints passed over by the last `latest`.
+    """
 
     def __init__(self, store: objectstore.ObjectStore, run_id: str) -> None:
         """Initializes the store view.
@@ -62,7 +76,14 @@ class CheckpointStore:
         self.skipped: list[str] = []
 
     def key(self, step: int) -> str:
-        """The object key for a step."""
+        """Builds the object key for a step.
+
+        Args:
+            step: Step number.
+
+        Returns:
+            The key, with the step zero-padded to `STEP_WIDTH` digits.
+        """
         return f"{self.prefix}{step:0{STEP_WIDTH}d}.json"
 
     def save(self, step: int, state: Any) -> Checkpoint:
@@ -93,7 +114,12 @@ class CheckpointStore:
         return Checkpoint(step, state, digest)
 
     def steps(self) -> list[int]:
-        """Steps that have an object, ascending."""
+        """Lists the steps that have an object.
+
+        Returns:
+            The step numbers in ascending order; damaged checkpoints are
+            included.
+        """
         found = []
         for meta in self.store.list_objects(self.prefix):
             stem = meta.key.removeprefix(self.prefix).removesuffix(".json")
@@ -102,7 +128,20 @@ class CheckpointStore:
         return sorted(found)
 
     def load(self, step: int) -> Checkpoint | None:
-        """A verified checkpoint, or None if absent or damaged."""
+        """Loads a verified checkpoint.
+
+        Args:
+            step: Step number.
+
+        Returns:
+            The checkpoint, or None if it is absent or damaged (unreadable, not
+            JSON, a different step, or a digest that does not match).
+
+        Raises:
+            ValueError: Raised on a digest mismatch, but caught inside the
+                method and turned into the None result; it never reaches the
+                caller.
+        """
         try:
             data, ignored = self.store.get(self.key(step))
             document = json.loads(data)
@@ -115,7 +154,12 @@ class CheckpointStore:
             return None
 
     def latest(self) -> Checkpoint | None:
-        """The newest checkpoint that verifies (damaged ones are skipped)."""
+        """Finds the newest checkpoint that verifies (damaged ones are skipped).
+
+        Returns:
+            The checkpoint, or None if there is none that verifies. The keys of
+            the damaged ones passed over are kept in `skipped`.
+        """
         self.skipped = []
         for step in reversed(self.steps()):
             found = self.load(step)

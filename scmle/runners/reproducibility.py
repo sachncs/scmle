@@ -37,7 +37,14 @@ class Tolerances:
             raise errors.ConfigError("tolerances must be finite and >= 0")
 
     def for_metric(self, name: str) -> float:
-        """The tolerance of one metric."""
+        """Looks up the tolerance of one metric.
+
+        Args:
+            name: Metric name.
+
+        Returns:
+            The allowed absolute difference: the listed one, or `default`.
+        """
         return self.absolute.get(name, self.default)
 
 

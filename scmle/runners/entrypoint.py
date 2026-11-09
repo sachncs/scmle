@@ -32,6 +32,12 @@ DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
 def open_store(uri: str) -> objectstore.ObjectStore:
     """Opens a `file://` store.
 
+    Args:
+        uri: Store URI.
+
+    Returns:
+        A local object store at the path of the URI.
+
     Raises:
         ConfigError: If the scheme is not supported.
     """
@@ -46,7 +52,17 @@ def open_store(uri: str) -> objectstore.ObjectStore:
 
 
 def load_workload(name: str) -> Callable[[local.JobContext], None]:
-    """Imports ``module:function``."""
+    """Imports ``module:function``.
+
+    Args:
+        name: The workload as `module:function`.
+
+    Returns:
+        The function.
+
+    Raises:
+        ConfigError: If the name has no `:`.
+    """
     module_name, separator, function = name.partition(":")
     if not separator:
         raise errors.ConfigError("SCMLE_WORKLOAD must be module:function")
@@ -58,7 +74,15 @@ def load_workload(name: str) -> Callable[[local.JobContext], None]:
 def spec_from_store(
     store: objectstore.ObjectStore, run_id: str
 ) -> base.JobSpec:
-    """Rebuilds the stored spec."""
+    """Rebuilds the stored spec.
+
+    Args:
+        store: Durable storage.
+        run_id: The run.
+
+    Returns:
+        The job spec stored at `runs/<run_id>/spec.json`.
+    """
     data, ignored = store.get(f"runs/{run_id}/spec.json")
     record = json.loads(data)
     budget = record["budget"]
@@ -80,7 +104,24 @@ def spec_from_store(
 
 
 def main(environ: Mapping[str, str], store: Any = None) -> int:
-    """Runs the job described by `environ`; returns the exit status."""
+    """Runs the job described by `environ`.
+
+    Any exception from loading the spec or running the workload is printed to
+    stderr as its type and message instead of being raised.
+
+    Args:
+        environ: The environment (`SCMLE_RUN_ID`, `SCMLE_ATTEMPT`,
+            `SCMLE_STORE_URI`, `SCMLE_SPEC_DIGEST`, `SCMLE_WORKLOAD`).
+        store: The training store; opened from `SCMLE_STORE_URI` if None.
+
+    Returns:
+        0 if the workload returned, otherwise 1.
+
+    Raises:
+        ConfigError: Raised when the stored spec's digest differs from
+            `SCMLE_SPEC_DIGEST`, but caught inside the function and reported on
+            stderr with exit status 1; it never reaches the caller.
+    """
     try:
         run_id = environ["SCMLE_RUN_ID"]
         attempt = int(environ.get("SCMLE_ATTEMPT", "1"))
