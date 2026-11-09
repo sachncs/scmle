@@ -50,7 +50,7 @@ MIN_CLUSTERS = 20
 CHECK_PREFIX = "baseline"
 CLAIM_ID = "baseline_vs_current_process"
 NOT_COMPUTED = "not_computed"
-MIN_CLUSTERS = 2
+MIN_VARIANCE_CLUSTERS = 2
 
 
 class BaselineError(errors.ArtifactError):
@@ -150,7 +150,7 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
     if codes.shape != values.shape:
         raise ValueError("d and clusters must have the same length")
     g = int(numpy.max(codes)) + 1
-    if g < MIN_CLUSTERS:
+    if g < MIN_VARIANCE_CLUSTERS:
         raise ValueError("at least two clusters are needed")
     n = values.size
     mean = float(values.mean())

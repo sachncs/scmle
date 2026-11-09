@@ -13,7 +13,7 @@
       "runs": 500
     }
   },
-  "min_clusters_in_code": 2,
+  "min_clusters_in_code": 20,
   "min_clusters_measured": 20,
   "planted_omission": {
     "asked_when_critical": 200,
@@ -37,7 +37,7 @@
     "accepted": 0,
     "malformed": 1000
   },
-  "seconds": 8.0,
+  "seconds": 7.5,
   "selective_labels": {
     "alpha": 0.01,
     "clean": 500,
