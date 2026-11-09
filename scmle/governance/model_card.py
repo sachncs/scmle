@@ -35,7 +35,7 @@ class ModelCard:
     )
 
     def __post_init__(self) -> None:
-        """Validates the fields required for a useful review record.
+        """Checks the fields required for a useful review record.
 
         Raises:
             ValueError: If a required text field is blank, the schema version is
@@ -85,8 +85,12 @@ class ModelCard:
             model_fingerprint: Digest identifying the packaged model.
 
         Returns:
-            A card whose limitations include that it needs human review, and
-            that the release evaluation is blocked when it is.
+            A card with fixed intended-use, out-of-scope and evidence-file
+            texts and the review status ``machine_generated_unreviewed``. Its
+            feature names are the profile's features, text columns and extra
+            inputs without repeats. Its limitations state that the card needs
+            human review, and, when the release evaluation is blocked, that
+            it is blocked.
         """
         release = evaluation.get("release_evaluation", {})
         limitations = [

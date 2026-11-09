@@ -56,10 +56,13 @@ class PromotionApproval:
     def __post_init__(self) -> None:
         """Validates the review record before it can authorize promotion.
 
+        A `decision` given as text is converted to a `PromotionDecision`.
+
         Raises:
             TypeError: If `independent` is not a bool.
             ValueError: If a required text field is blank, the version is not
-                positive, the evidence is empty or has blank references, or the
+                positive, the decision is not a valid `PromotionDecision`
+                value, the evidence is empty or has blank references, or the
                 signature is blank.
         """
         for name in (
@@ -104,6 +107,9 @@ class PromotionApproval:
     def sign(self, signing_key: str | bytes) -> Self:
         """Returns this approval with a content-bound HMAC signature.
 
+        The signature covers `unsigned_dict`. An empty key is refused by the
+        signing helper with a `ValueError`.
+
         Args:
             signing_key: The key to sign with.
 
@@ -118,15 +124,15 @@ class PromotionApproval:
         )
 
     def verify(self, signing_key: str | bytes | None = None) -> bool:
-        """Verifies the approval signature using an explicit or env key.
+        """Checks the approval signature against an explicit or env key.
 
         Args:
             signing_key: The key to verify with, or None for the configured
                 default.
 
         Returns:
-            True if the approval is signed, a key is available and the
-            signature matches the content.
+            True if the approval is signed, a key is available (explicit, or
+            ``$SCMLE_SIGNING_KEY``) and the signature matches the content.
         """
         if self.signature is None:
             return False
@@ -143,7 +149,7 @@ class PromotionApproval:
         content_id: str,
         signing_key: str | bytes | None = None,
     ) -> None:
-        """Require exact identity, independence, and a valid signature.
+        """Checks exact identity, approval, independence and the signature.
 
         Args:
             model: Expected model name.
@@ -210,7 +216,10 @@ class VersionRecord:
 
 
 def content_id_of(bundle_directory: str | pathlib.Path) -> str:
-    """Content address of a bundle: the hash of its checksummed manifest.
+    """Returns the content address of a bundle.
+
+    It is the hash of the bundle's manifest, which records the checksum of
+    every stored file.
 
     Args:
         bundle_directory: A saved bundle directory.
@@ -231,7 +240,7 @@ class ModelRegistryStore:
         guard: never_list.Guard | None = None,
         scope: str = "stream",
     ) -> None:
-        """Opens (creating if needed) a registry.
+        """Opens a registry, creating its root directory if needed.
 
         Changes take a per-directory lock shared by every store object over
         the same root, so threads of one process never interleave a
@@ -316,9 +325,11 @@ class ModelRegistryStore:
 
         The bundle is verified (checksums, compatibility, and authenticity)
         before it is copied. Bundles are pickle-based, so an unsigned bundle
-        is refused unless the registrant vouches for it with `trusted=True`.
+        is refused unless the registrant vouches for it with `trusted=True`
+        (which is itself refused when ``$SCMLE_ENV`` is ``production``).
         A bundle that fails verification, or is unauthenticated and not
-        vouched for, is refused with an `ArtifactError`.
+        vouched for, is refused with an `ArtifactError`. A copy is made under
+        the registry root and an audit record is appended.
 
         Args:
             model: Model name.
@@ -363,7 +374,11 @@ class ModelRegistryStore:
         config: dict[str, Any] | None,
         run_id: str,
     ) -> VersionRecord:
-        """Assigns the next version and writes it, holding the lock.
+        """Assigns the next version and writes it; the caller holds the lock.
+
+        Copies the bundle into the store, updates the index and appends an
+        audit record. A model that already has a version with the same
+        content id gets no new version.
 
         Args:
             model: Model name.
@@ -451,7 +466,10 @@ class ModelRegistryStore:
         independent approval, is refused with an `ArtifactError`. If the
         registry has a guard and the champion move has no valid attestation,
         the guard raises `AttestationRequired` (an escalation is written and
-        nothing is moved).
+        nothing is moved); the guard is asked first, before the model,
+        version or approval is checked. When the champion moves to a
+        different version, the version it replaced becomes `previous`. The
+        move is recorded in the audit log.
 
         Args:
             model: Model name.
@@ -483,7 +501,11 @@ class ModelRegistryStore:
         approval: PromotionApproval | None,
         signing_key: str | bytes | None,
     ) -> None:
-        """Moves the alias while holding the lock.
+        """Moves the alias; the caller holds the lock.
+
+        Checks the version and, for the champion, the approval, then updates
+        the index (setting `previous` when the champion changes version) and
+        appends an audit record.
 
         Args:
             model: Model name.
@@ -540,7 +562,8 @@ class ModelRegistryStore:
             The record of the version.
 
         Raises:
-            ArtifactError: If it cannot be resolved.
+            ArtifactError: If the model is unknown, the alias is not set or
+                the version is not registered.
         """
         versions = {v.version: v for v in self.versions(model)}
         if isinstance(ref, int) or str(ref).isdigit():
@@ -563,7 +586,9 @@ class ModelRegistryStore:
         """Loads a registered bundle by alias or version.
 
         A bundle registered as signed is authenticated again with the key; one
-        the registrant vouched for is loaded as the registrant vouched.
+        the registrant vouched for is loaded as vouched (refused when
+        ``$SCMLE_ENV`` is ``production``). An unresolvable `ref` or a bundle
+        that fails verification raises `ArtifactError`.
 
         Args:
             model: Model name.

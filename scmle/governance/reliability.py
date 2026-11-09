@@ -29,7 +29,7 @@ class FaultArtifact:
     observation: str
 
     def __post_init__(self) -> None:
-        """Rejects evidence that cannot be persisted and reviewed.
+        """Checks that the evidence can be persisted and reviewed.
 
         Raises:
             TypeError: If `observed_outcome` is not an `EvidenceOutcome`.
@@ -59,7 +59,7 @@ class FaultInjectionHarness:
         reviewer: str,
         recorded_at: str,
     ) -> None:
-        """Initialize a harness with explicit evidence identity.
+        """Initializes a harness with explicit evidence identity.
 
         Args:
             registry: The plan registry that receives the evidence.
@@ -100,12 +100,18 @@ class FaultInjectionHarness:
             [reliability.FaultScenario], tuple[FaultArtifact, ...]
         ],
     ) -> reliability.FaultScenarioPlan:
-        """Runs an injected executor and record durable evidence.
+        """Runs an injected executor and records durable evidence.
 
         The executor must return one artifact for each evidence requirement
-        declared by the scenario. Missing or unexpected evidence remains
-        ``INCONCLUSIVE`` or raises from the registry; it never becomes a
-        passing release claim by omission.
+        declared by the scenario. Evidence missing for a requirement leaves
+        the scenario ``INCONCLUSIVE`` (``FAILED`` if another artifact reports
+        an unsafe outcome); evidence of an undeclared type is refused before
+        anything is written. Neither becomes a passing release claim by
+        omission. Each artifact is written under `artifact_root` before the
+        registry records the evidence, so files remain if the registry then
+        refuses it (for example an empty tuple, or an ``inconclusive``
+        outcome on a complete set); a scenario the registry has no plan for
+        raises `KeyError`.
 
         Args:
             scenario: The fault scenario to run.

@@ -12,9 +12,12 @@ What the loop does by itself, and how each rule behaves:
 * L1. A betting alarm on the matured, propensity-weighted mean loss
   (`RiskAlarm`): false alarm probability at most ``alpha_alarm`` over all time
   for the first alarm of an episode. On an alarm with a verified label
-  mechanism it records a `retrain` request (and calls the `retrain` hook, if
-  given, which must train and stage a challenger and return its name). With an
-  unverified mechanism it halts and escalates; it never retrains.
+  mechanism it records an `alarm` row. If ``alarm_gates_retrain`` is set it
+  then records a `retrain` request (and calls the `retrain` hook, if given,
+  which must train and stage a challenger and return its name); otherwise it
+  escalates for investigation and retrains nothing. When the naive
+  (unweighted) alarm crosses on an unverified mechanism it halts and
+  escalates; it never retrains.
 * L2. Each challenger is registered in the ledger before it is scored, scored
   by an e-process on paired losses, and decided in registration order by
   e-LOND. A crossing becomes a `promotion_proposal`; the signed approval of
@@ -97,9 +100,10 @@ class ReplyRefused(errors.ArtifactError):
 
 @dataclasses.dataclass(frozen=True)
 class LoopPolicy:
-    """Pre-registered inputs of the loop (fixed before the run).
+    """Pre-registered inputs of the loop (changed only by `Loop.amend_policy`).
 
-    Rates and tolerances are in loss units; times are in batches.
+    Risks, tolerances and margins are in loss units, ``alpha_*`` and ``delta``
+    are probabilities, and times are counted in batches.
 
     Attributes:
         reference_risk: Reference risk `r_ref` of the bundle.
@@ -126,12 +130,14 @@ class LoopPolicy:
         safe_default: Action for cases the model must not answer.
         reply_timeout: Batches after which an unanswered escalation closes
             with the safe default.
-        min_matured: Fewest matured cases a batch needs to be used.
+        min_matured: Fewest labelled cases decided by the model (not bypassed)
+            that a matured batch needs to be used.
         challenger_budget: Matured batches a challenger gets.
         coverage_target: Nominal coverage of the conformal sets, or None.
         novelty_bound: Largest tolerated share of out-of-support cases.
         high_impact_actions: Decision values the charter classes high impact.
-        tighten_step: Amount `tau` rises by on a rollback proposal.
+        tighten_step: Amount `tau` rises by on a rollback proposal (the
+            result is capped at 1).
         initial_tau: Starting threshold; None escalates everything until
             `Loop.calibrate`.
         scope: Model version hash and stream id that attestations name.
@@ -164,7 +170,7 @@ class LoopPolicy:
     scope: str = "stream"
 
     def __post_init__(self) -> None:
-        """Validates ranges.
+        """Checks the ranges of the fields.
 
         Raises:
             ValueError: If a probability-like field is outside (0, 1), epsilon
@@ -265,11 +271,13 @@ class StepResult:
 
     Attributes:
         status: `ok`, `halted` or `insufficient_labels`.
-        events: Ledger rows written by this step, as (kind, summary).
+        events: Ledger rows written by this step other than observation
+            summaries, as (kind, reason); the reason is the row's `reason`
+            or `rule`, else an empty string.
         escalation: The newest escalation opened by this step, if any.
-        mechanism: The label mechanism of the newest usable batch;
-            `unverified` means no retrain, promotion or rollback rests on
-            this stream.
+        mechanism: The label mechanism of the newest batch that had enough
+            labels (unchanged if none had); `unverified` means no retrain,
+            promotion or rollback rests on this stream.
     """
 
     status: str
@@ -300,10 +308,11 @@ class Hooks:
     """Callbacks that act in the world; all optional.
 
     Attributes:
-        retrain: Trains and stages a challenger, returns its name.
-        open_incident: Called with a reason when the loop halts, after the
-            loop has written its own `incident` ledger row (the default
-            implementation, `Loop.record_incident`; it needs no hook).
+        retrain: Trains and stages a challenger and returns its name, or
+            None if it staged none.
+        open_incident: Called with the reason when the loop halts, after the
+            loop has written its own `incident` ledger row
+            (`Loop.record_incident`); the loop needs no hook for that.
     """
 
     retrain: Callable[[], str | None] | None = None
@@ -317,8 +326,10 @@ def json_ready(value: Any) -> Any:
         value: A scalar, array, dict, list or tuple, possibly nested.
 
     Returns:
-        The structure with numpy values as Python values, tuples as lists,
-        dict keys as strings and non-finite floats as None.
+        The structure with numpy arrays as lists, numpy scalars as Python
+        values, tuples as lists, dict keys as strings and non-finite Python
+        floats (also those inside arrays) as None. A non-finite numpy scalar
+        is returned as the Python float, not None.
     """
     if isinstance(value, np.ndarray):
         return [json_ready(item) for item in value.tolist()]
@@ -346,7 +357,10 @@ class Loop:
         verification_keys: Mapping[str, str | bytes],
         today: Callable[[], datetime.date],
     ) -> None:
-        """Uses `Loop.open`.
+        """Builds a loop from parts that `Loop.open` assembles.
+
+        Hooks the guard's ``on_write`` callback to `save_state` and creates
+        the monitors. It does not load the saved state; `Loop.open` does.
 
         Args:
             directory: Directory of the ledger and loop state files.
@@ -402,6 +416,9 @@ class Loop:
     ) -> "Loop":
         """Opens the loop of a deployment, creating its ledger on first use.
 
+        Creates the directory if needed, loads the saved state (halting if it
+        does not match the ledger) and saves the state again.
+
         Args:
             deploy_dir: Directory of `deployment_ledger.jsonl` and
                 `loop_state.json`.
@@ -412,7 +429,10 @@ class Loop:
                 key that verifies a person's attestation. The system must not
                 hold the signing side of these keys.
             system_keys: Keys the system itself holds; attestations signed
-                with them (or with `SCMLE_SIGNING_KEY`) are refused.
+                with them (or with `SCMLE_SIGNING_KEY`) are refused. Their
+                fingerprints are recorded only when the ledger is created; for
+                an existing ledger the ones it already records apply and
+                this argument has no effect.
             today: Clock, replaceable in tests.
             single_use_attestations: Spend an attestation on the first action
                 it allows (an `attestation_used` row) instead of leaving it
@@ -483,14 +503,16 @@ class Loop:
         The charter hash and the policy (with its recorded amendments) are
         read from the ledger, so a command line needs only the directory. A
         missing ledger, or one that fails verification, is refused by the
-        ledger with a `DeploymentLedgerError`.
+        ledger with a `DeploymentLedgerError`. `system_keys` has no effect
+        here, because the ledger already exists (see `open`).
 
         Args:
             deploy_dir: Directory of the deployment ledger.
             hooks: Optional callbacks.
             verification_keys: Map from key id to the key that verifies a
                 person's attestation.
-            system_keys: Keys the system itself holds.
+            system_keys: Keys the system itself holds; ignored, as the
+                ledger records its own.
             today: Clock, replaceable in tests.
             single_use_attestations: Spend an attestation on the first action
                 it allows.
@@ -688,7 +710,7 @@ class Loop:
         return True
 
     def pending_escalations(self) -> list[Escalation]:
-        """Escalations with no reply and no timeout, oldest first.
+        """Lists the escalations with no reply and no timeout, oldest first.
 
         Returns:
             The unanswered, un-timed-out escalations, oldest first.
@@ -717,8 +739,8 @@ class Loop:
             action: The never-list action or other question name.
             detail: Facts that identify the question.
             evidence: Names of the evidence files the person should read.
-            proposed_default: What happens while the question is open; the
-                policy's safe default if None.
+            proposed_default: What happens if nobody answers; the policy's
+                safe default if None.
 
         Returns:
             The new escalation, or None if an identical question is already
@@ -753,9 +775,11 @@ class Loop:
         return next(e for e in self.pending_escalations() if e.id == identity)
 
     def enter_halt(self, reason: str, detail: Mapping[str, Any]) -> None:
-        """Enters the halted state once and opens an incident, if hooked.
+        """Writes a halt row and an incident row, then calls the incident hook.
 
-        Does nothing if the ledger is already halted.
+        Does nothing if the ledger is already halted. Otherwise it commits a
+        halt row, records `reason` as the halt reason, writes the default
+        `incident` row and calls the ``open_incident`` hook, if one was given.
 
         Args:
             reason: Why the loop halts.
@@ -778,7 +802,7 @@ class Loop:
             self.hooks.open_incident(reason)
 
     def record_incident(self, reason: str) -> None:
-        """Default incident: an `incident` ledger row with status ``open``.
+        """Writes an `incident` ledger row with status ``open``.
 
         It records that a person must look; it is not the SLO incident
         workflow of `scmle.monitoring.incidents`, which needs an SLO
@@ -801,6 +825,10 @@ class Loop:
         decisions: Sequence[Any],
     ) -> Observation:
         """Routes a batch of served cases and logs what was decided.
+
+        Verifies the ledger first (a failure halts the loop in memory), then
+        keeps the batch pending until its outcomes mature, commits an
+        observation summary and advances the batch counter.
 
         Args:
             batch: One row per case. Optional columns: `case_id`; `set_size`
@@ -896,7 +924,7 @@ class Loop:
 
     @staticmethod
     def flag(frame: pd.DataFrame, name: str) -> np.ndarray:
-        """A boolean column, or all False.
+        """Returns a boolean column of the batch, or all False.
 
         Args:
             frame: The batch.
@@ -918,7 +946,10 @@ class Loop:
         challengers: Mapping[str, Mapping[str, float] | pd.Series]
         | None = None,
     ) -> int:
-        """Stores outcomes that arrived; they count once their window elapsed.
+        """Stores outcomes that arrived; `step` uses them once the window ends.
+
+        Values for ids that match no pending batch are ignored; a repeated id
+        overwrites the earlier value.
 
         Args:
             losses: Loss in ``[0, loss_bound]`` of the deployed model, by
@@ -930,7 +961,7 @@ class Loop:
                 same cases.
 
         Returns:
-            Number of cases that matched a pending batch.
+            Number of entries of `losses` that matched a pending batch.
         """
         index: dict[str, dict[str, Any]] = {}
         for record in self.pending_batches:
@@ -964,7 +995,7 @@ class Loop:
             name: Name of the challenger.
 
         Returns:
-            The number of challengers now queued.
+            The number of challengers now queued, including this one.
         """
         self.ledger.commit(
             ledger_module.CHALLENGER_RESULT,
@@ -1012,16 +1043,17 @@ class Loop:
         observed: np.ndarray,
         mask: np.ndarray | None = None,
     ) -> labels.BatchEstimate:
-        """Horvitz-Thompson estimate of a matured batch (or a subset).
+        """Estimates the Horvitz-Thompson mean loss of a batch or a subset.
 
         Args:
             record: The stored batch, with its propensities and audit flags.
             losses: The loss of each case.
             observed: Whether each case's label is observed.
-            mask: Cases to include; all if None.
+            mask: Boolean per case, True for those to include; all if None.
 
         Returns:
-            The estimate of the mean loss with its label mechanism.
+            The estimate of the mean loss with its label mechanism. Its mean
+            is None if the mechanism is `unverified`.
         """
         keep = np.ones(len(observed), dtype=bool) if mask is None else mask
         propensity = record["propensity"]
@@ -1048,10 +1080,11 @@ class Loop:
             record: The stored batch, with its propensities and audit flags.
             values: The signed value of each case.
             observed: Whether each case's label is observed.
-            mask: Cases to include.
+            mask: Boolean per case, True for those to include.
 
         Returns:
-            The estimate of the mean value with its label mechanism.
+            The estimate of the mean value with its label mechanism. Its mean
+            is None if the mechanism is `unverified`.
         """
         propensity = record["propensity"]
         audit = record["audit"]
@@ -1068,10 +1101,16 @@ class Loop:
     def step(self) -> StepResult:
         """Processes matured batches and applies the decision map.
 
+        A batch is processed once ``outcome_window`` batches have passed since
+        it was observed; younger batches stay pending. If the ledger fails
+        verification the step stops at once and writes nothing to the ledger.
+
         Returns:
-            The result: status, ledger events written, the newest escalation
-            opened (if any) and the label mechanism of the newest usable
-            batch.
+            The result. Its status is `halted` if the loop is halted (also
+            when the ledger fails verification, with the single event
+            ``("halt", reason)``), else `ok` if at least one matured batch
+            had enough labels, else `insufficient_labels`. Its events, newest
+            escalation and mechanism are described by `StepResult`.
         """
         if not self.verify_ledger():
             self.save_state()
@@ -1109,13 +1148,21 @@ class Loop:
     def process_batch(self, record: dict[str, Any]) -> bool:
         """Feeds one matured batch to the monitors; False if unusable.
 
+        When the label mechanism permits action, the batch feeds the loss
+        alarm, the selective-risk alarm (answered cases), the coverage test
+        (if the batch has coverage values) and the challenger e-processes;
+        otherwise it feeds only the naive alarm, which sets a flag on
+        crossing. Records the batch's label mechanism on the loop. A
+        ``ValueError`` from the estimator (a labelled loss outside
+        ``[0, loss_bound]``) propagates.
+
         Args:
             record: The stored batch with its matured labels.
 
         Returns:
-            False if fewer than the minimum number of model cases have a
-            label; otherwise True. When the label mechanism does not permit
-            action, the batch only feeds the naive alarm.
+            False if fewer than ``min_matured`` cases decided by the model
+            (not bypassed) have a label, in which case nothing is fed;
+            otherwise True.
 
         Raises:
             ScmleError: If the estimate has no mean although the mechanism
@@ -1162,6 +1209,12 @@ class Loop:
     ) -> None:
         """Feeds the e-processes with Horvitz-Thompson paired differences.
 
+        Only challengers registered with the loop, and the previous champion
+        under a rollback watch, are fed. A challenger is skipped for this
+        batch if it lacks a loss for any labelled model case or the estimate
+        has no mean. The batch mean is clamped to the policy's scale, and an
+        active challenger's matured-batch count rises by one.
+
         Args:
             record: The stored batch with its challenger losses.
             ids: Case identifiers of the batch.
@@ -1200,6 +1253,14 @@ class Loop:
 
     def decide(self) -> Escalation | None:
         """Applies the decision map to what the monitors now say.
+
+        Acts on a naive alarm under an unverified mechanism (halt and
+        escalate), an L1 alarm (alarm row, then an investigation escalation or
+        a retrain request, by ``alarm_gates_retrain``), a selective-risk alarm
+        (halt and escalate) and a crossed coverage or novelty test
+        (escalate). Each crossed monitor is replaced by a fresh one. When the
+        mechanism permits action it also decides rollback proposals and the
+        challenger queue.
 
         Returns:
             The newest escalation opened by the decisions, or None if none was
@@ -1295,6 +1356,11 @@ class Loop:
     def retrain_challenger(self, batch: int) -> None:
         """Records a retrain request and registers the hook's challenger.
 
+        If a challenger is already queued, the hook is not called and the
+        request is recorded as skipped. Otherwise the ``retrain`` hook, if
+        any, is called. A returned name not yet registered in the ledger is
+        registered as a challenger.
+
         Args:
             batch: Index of the batch whose alarm triggered the request.
         """
@@ -1314,8 +1380,13 @@ class Loop:
     def decide_rollback(self) -> Escalation | None:
         """Turns a crossed reverse process into a rollback proposal.
 
+        If the watch has crossed, commits the proposal, raises `tau` by
+        ``tighten_step`` (capped at 1) and ends the watch.
+
         Returns:
-            The escalation opened after two consecutive rollbacks, else None.
+            The escalation opened for a second consecutive rollback proposal,
+            or None if there is none, no proposal was made or an identical
+            question is already pending.
         """
         watch = self.rollback_watch
         if watch is None or not watch["process"].crossed:
@@ -1341,9 +1412,14 @@ class Loop:
     def decide_queue(self) -> Escalation | None:
         """Decides challengers in registration order with e-LOND.
 
+        Decides the first queued challenger once its evidence reaches the
+        current e-LOND level or it has used ``challenger_budget`` matured
+        batches, then the next, and stops at the first that is neither. A
+        rejection writes a promotion proposal.
+
         Returns:
-            The newest escalation opened for a challenger whose evidence was
-            insufficient, or None.
+            The newest escalation opened for a challenger that used its budget
+            without enough evidence, or None.
         """
         newest: Escalation | None = None
         sequence = self.ledger.require_promotion()
@@ -1399,7 +1475,12 @@ class Loop:
         return newest
 
     def time_out(self) -> Escalation | None:
-        """Closes unanswered escalations with the safe default.
+        """Closes escalations unanswered for ``reply_timeout`` batches.
+
+        Each is closed with a timeout row that applies its own proposed
+        default (the safe default unless the escalation proposed another).
+        An escalation the loop has no opening batch for counts from the
+        current batch.
 
         Returns:
             Always None; the closed escalations are recorded in the ledger.
@@ -1432,17 +1513,23 @@ class Loop:
 
         The first calibration, and any raise of `tau`, is free. Lowering `tau`
         after the first calibration relaxes the rule and needs an attestation
-        (the relax-threshold action), except as the recalibration that ends a
-        halt, which must itself pass the fixed-sequence test (`tau` finite).
+        (the relax-threshold action; without one the guard raises
+        `AttestationRequired` and `tau` is unchanged), except as the
+        recalibration that ends a halt, which must itself pass the
+        fixed-sequence test (`tau` finite). While the ledger stays halted,
+        `tau` is not changed. Every call also clears the in-memory halt that
+        a failed ledger verification or a state mismatch sets.
 
         Args:
             score: The escalation score of each calibration case.
             loss: The loss of each case.
-            weights: Optional case weights.
-            confidence: Optional per-case confidence.
+            weights: Optional Horvitz-Thompson weights ``1 / propensity``.
+            confidence: Not used.
 
         Returns:
-            The result, also written to the ledger and `risk_coverage.json`.
+            The result of the threshold selection. It is written to
+            `risk_coverage.json` first, then to the ledger: as the halt
+            release when it ends a halt, otherwise as an observation summary.
         """
         result = escalation.select_threshold(
             score, loss, self.policy.r_star, self.policy.delta, weights
@@ -1510,7 +1597,8 @@ class Loop:
             model_features: Next-period features of model-decided cases.
 
         Returns:
-            The check.
+            The bypass test's result, as a check with its statistic and
+            p-value.
 
         Raises:
             ValueError: If the policy declares no bypass slice.
@@ -1584,6 +1672,9 @@ class Loop:
     ) -> ReplyOutcome:
         """Records a person's signed reply to a pending escalation.
 
+        On success the attestation is committed as a ledger row, which closes
+        the escalation.
+
         Args:
             escalation_id: The escalation answered.
             attestation: The signed reply.
@@ -1591,14 +1682,17 @@ class Loop:
                 registered for the reply's `key_id` at `open`.
 
         Returns:
-            The tier of the dependent decision: `attested` if the person
-            allowed the action, `unverified` (safe default) otherwise.
+            The outcome: tier `attested` if the person approved or overrode,
+            else `unverified` with the safe default applying; also the
+            decision itself.
 
         Raises:
             ReplyRefused: If the escalation is not pending, the reply is
-                bound to another escalation, question or scope, is expired
-                or dated in the future, does not verify, or was signed with a
-                key the system holds.
+                bound to another escalation, question or scope, was signed
+                with a key the system holds (or is verified by one), no
+                verification key is known for its key id, it does not verify,
+                or it is expired or dated in the future. A malformed date
+                raises the ledger's `DeploymentLedgerError` instead.
         """
         pending = {e.id: e for e in self.pending_escalations()}
         target = pending.get(escalation_id)
@@ -1652,8 +1746,9 @@ class Loop:
     ) -> Any:
         """Runs `do()` only with a valid attestation for this exact action.
 
-        Without one the guard refuses with `AttestationRequired`, an
-        escalation row is written and `do` is not called.
+        Without one the guard raises `AttestationRequired` and `do` is not
+        called; an `escalation` row is written unless an identical question
+        is already pending. The loop state is saved either way.
 
         Args:
             action: The never-list action.
@@ -1693,7 +1788,7 @@ class Loop:
         approval: Any,
         signing_key: str | bytes | None = None,
     ) -> Any:
-        """Moves the champion alias (never-list action: move champion).
+        """Promotes a version to champion, with an attestation for that move.
 
         The registry still checks its own signed approval underneath.
 
@@ -1718,7 +1813,7 @@ class Loop:
     def execute_rollback(
         self, do: Callable[[], Any], detail: Mapping[str, Any]
     ) -> Any:
-        """Executes a rollback (never-list action: move champion).
+        """Runs a rollback, with an attestation for the move-champion action.
 
         Args:
             do: The rollback to perform.
@@ -1734,7 +1829,9 @@ class Loop:
     def reopen_sealed(
         self, do: Callable[[], Any], detail: Mapping[str, Any]
     ) -> Any:
-        """Opens `C` or `F` again, or touches a sealed set.
+        """Runs `do()` that reopens `C` or `F` or touches a sealed set.
+
+        It runs only with an attestation for that exact detail.
 
         Args:
             do: The action to perform.
@@ -1750,7 +1847,9 @@ class Loop:
     def rewrite_ledger(
         self, do: Callable[[], Any], detail: Mapping[str, Any]
     ) -> Any:
-        """Edits, deletes, reorders or truncates ledger rows.
+        """Runs `do()` that edits, deletes, reorders or truncates ledger rows.
+
+        It runs only with an attestation for that exact detail.
 
         Args:
             do: The action to perform.
@@ -1764,7 +1863,9 @@ class Loop:
         )
 
     def act_on_unverified(self, kind: str, do: Callable[[], Any]) -> Any:
-        """Retrains, promotes or rolls back on an unverified stream.
+        """Runs `do()` that retrains, promotes or rolls back unverified.
+
+        It runs only with an attestation naming the kind of action.
 
         Args:
             kind: The kind of action.
@@ -1778,7 +1879,9 @@ class Loop:
         )
 
     def silence_alert(self, name: str, do: Callable[[], Any]) -> Any:
-        """Suppresses, silences or reroutes an alert or incident.
+        """Runs `do()` that suppresses, silences or reroutes an alert.
+
+        It runs only with an attestation naming the alert.
 
         Args:
             name: Name of the alert.
@@ -1794,7 +1897,9 @@ class Loop:
     def change_label_policy(
         self, change: Mapping[str, Any], do: Callable[[], Any]
     ) -> Any:
-        """Changes the labelling or randomization policy.
+        """Runs `do()` that changes the labelling or randomization policy.
+
+        It runs only with an attestation for exactly this change.
 
         Args:
             change: The change, as recorded.
@@ -1808,7 +1913,9 @@ class Loop:
         )
 
     def delete_or_send(self, what: str, do: Callable[[], Any]) -> Any:
-        """Deletes data, models, artifacts, or sends something out.
+        """Runs `do()` that deletes data, models or artifacts, or sends out.
+
+        It runs only with an attestation naming what is deleted or sent.
 
         Args:
             what: What is deleted or sent.
@@ -1824,12 +1931,14 @@ class Loop:
     def amend_policy(self, **changes: Any) -> LoopPolicy:
         """Changes the policy: tightening is free, anything else is gated.
 
-        A numeric tolerance moved to a stricter value needs no attestation.
-        A looser value needs one (the relax-threshold action), and so does any
-        other field (the change-charter action: safe defaults, high-impact
-        actions, scope). The change is recorded in the ledger and restarts the
-        monitors. A gated change without an attestation is refused with
-        `AttestationRequired`.
+        A field in ``NUMERIC_ORIENTATION`` (for example ``r_star`` or
+        ``tolerance``) moved to a stricter or equal value needs no
+        attestation. A looser value needs one (the relax-threshold action),
+        and so does any other field, or setting such a field to None (the
+        change-charter action: safe defaults, high-impact actions, scope).
+        The change is recorded in the ledger and restarts the monitors with
+        fresh state. A gated change without an attestation is refused with
+        `AttestationRequired`, and nothing is changed.
 
         Args:
             **changes: New values of policy fields, by field name.
@@ -1838,7 +1947,8 @@ class Loop:
             The updated policy.
 
         Raises:
-            ValueError: For an unknown field.
+            ValueError: For an unknown field, or a new value the policy's
+                range checks reject.
         """
         names = {f.name for f in dataclasses.fields(LoopPolicy)}
         unknown = set(changes) - names

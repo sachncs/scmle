@@ -6,9 +6,10 @@ registries. This hook is the one place that joins the two:
 * an experiment is started with the level the `DecisionBudget` assigns, spent
   whether or not the experiment promotes (the budget after the assignment is
   written to the deployment ledger);
-* units are assigned by the salted hash of the rollout plan and every batch is
-  written to the deployment ledger with the arm and the probability that arm
-  had (the propensity), and to the hash-chained decision log;
+* units are assigned by the salted hash of the rollout plan and every
+  assigned batch is written to the deployment ledger with the arm and the
+  probability that arm had (the propensity); each decision is written to the
+  deployment ledger and to the hash-chained decision log;
 * a `promote` decision is a proposal row; the alias moves only through
   `LifecycleManager.promote_challenger`, which still needs the registry's
   independent signed approval (and the attestation of a guarded registry);
@@ -56,7 +57,10 @@ class RolloutHook:
         budget: budget_module.DecisionBudget | None = None,
         log: rollout.DecisionLog | None = None,
     ) -> None:
-        """Binds the hook.
+        """Binds the hook to a manager, a plan and a deployment ledger.
+
+        Also switches the manager to defer promotion and rollback decisions
+        to the rollout (`LifecycleManager.defer_to_rollout`).
 
         Args:
             manager: The model's lifecycle manager.
@@ -82,6 +86,9 @@ class RolloutHook:
 
     def diagnose(self, stage: str, comparison: Any) -> None:
         """Logs a bootstrap result as a descriptive diagnostic.
+
+        Appends a ``bootstrap_diagnostic`` entry to the decision log (not to
+        the deployment ledger).
 
         Args:
             stage: Which review the result belongs to (for example `review` or
@@ -112,8 +119,9 @@ class RolloutHook:
     ) -> lifecycle.LifecycleOutcome:
         """Runs `LifecycleManager.review` and logs its comparison.
 
-        The challenger is staged for the rollout; the bootstrap comparison
-        decides nothing and goes to the decision log as a diagnostic.
+        When a retrain runs, the challenger is staged for the rollout whatever
+        its bootstrap comparison says; the comparison, if there is one, goes
+        to the decision log as a diagnostic and decides nothing.
 
         Args:
             fresh: Fresh labelled rows.
@@ -160,7 +168,7 @@ class RolloutHook:
         return outcome
 
     def started(self) -> rollout.Rollout:
-        """The running experiment.
+        """Returns the running experiment.
 
         Returns:
             The experiment started by `start`.
@@ -176,9 +184,11 @@ class RolloutHook:
         """Starts an experiment of the staged challenger against the champion.
 
         The level is assigned before any traffic and is spent now. A reused
-        id is refused (`ValueError`), an exhausted budget with
+        or blank id is refused (`ValueError`), an exhausted budget with
         `BudgetExhaustedError`, and a missing staged challenger with
-        `ArtifactError`.
+        `ArtifactError`. Any previous decision and the unit count are reset,
+        and the start is written to the deployment ledger and the decision
+        log.
 
         Args:
             experiment_id: A new identifier.
@@ -223,11 +233,15 @@ class RolloutHook:
     def assign(self, unit_ids: ArrayLike) -> NDArray[np.float64]:
         """Assigns units and writes the propensity-logged batch.
 
+        Writes one assignment row to the deployment ledger with the arm of
+        each unit and the probability of the arm it got. No experiment
+        started raises `ScmleError`.
+
         Args:
             unit_ids: Identifiers of the randomisation unit.
 
         Returns:
-            1 for the challenger and 0 for the champion, per unit.
+            1.0 for the challenger and 0.0 for the champion, per unit.
         """
         self.started()
         names = [str(u) for u in np.asarray(unit_ids).ravel()]
@@ -255,7 +269,10 @@ class RolloutHook:
     ) -> rollout.Decision:
         """Adds a batch of outcomes and records the decision so far.
 
-        A promotion also writes a proposal row; nothing moves.
+        Each call writes a rollout decision row to the deployment ledger and
+        the decision to the decision log. A `promote` decision also writes a
+        proposal row; nothing moves. No experiment started raises
+        `ScmleError`.
 
         Args:
             arm: The arm of each unit (0 or 1).
@@ -298,7 +315,10 @@ class RolloutHook:
         """Moves the champion alias after a `promote` decision, with approval.
 
         Without a valid independent approval the registry refuses with an
-        `ArtifactError`.
+        `ArtifactError`, and a guarded registry also needs an attestation.
+        After the move the new champion's rollback monitor is started (a
+        champion that was already monitored raises `ValueError` at that
+        point, after the alias has moved).
 
         Args:
             approval: The independent approval of the challenger bundle.
@@ -341,8 +361,10 @@ class RolloutHook:
             outcome: The outcome of each unit.
 
         Returns:
-            The monitor's status; a rollback decision is also recorded in the
-            ledger and the decision log.
+            The monitor's status, `hold` or `rollback`. Each call that
+            returns `rollback`, including repeated ones after the monitor
+            has rolled back, records a rollback proposal and decision in the
+            ledger and a rollback decision in the decision log.
 
         Raises:
             ScmleError: If nothing was promoted through this hook.
@@ -385,7 +407,7 @@ class RolloutHook:
         """Restores the previous champion after a rollback decision.
 
         Without a valid independent approval the registry refuses with an
-        `ArtifactError`.
+        `ArtifactError`, and a guarded registry also needs an attestation.
 
         Args:
             approval: The independent approval of the restored bundle.

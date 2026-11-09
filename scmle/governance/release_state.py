@@ -24,10 +24,10 @@ Rules this module enforces:
 
 * ``promote`` asks a `ControlPlane` to deploy and to move traffic, step by
   step, and reads the platform back after each request. The registry state,
-  the champion alias and the ledger change only after the last read shows
-  the revision, its image digest, readiness and the full share of traffic.
-  If any read disagrees, nothing in the registry changes and the previous
-  revision is restored.
+  the champion alias and the `promoted` ledger event change only after the
+  last read shows the revision, its image digest, readiness and the full
+  share of traffic. If any read disagrees, nothing in the registry changes,
+  a `rejected` event is recorded and the previous revision is restored.
 * ``rollback`` restores the previous known-good revision and changes the
   registry only after the platform confirms it.
 * ``deployed_version`` answers "what does the registry say is deployed" only
@@ -144,8 +144,9 @@ class Outcome:
         reasons: Why not, when it was not done.
         restored: Whether the previous revision was confirmed back in place
             after a failed attempt (None when there was nothing to restore).
-        version: The version now in production, if the call succeeded.
-        revision: The revision that holds the traffic after the call.
+        version: The version now serving, if the call succeeded.
+        revision: The revision now holding all traffic, if the call
+            succeeded.
     """
 
     done: bool
@@ -221,7 +222,7 @@ class ReleaseRegistry:
         )
 
     def entry(self, state: dict[str, Any], model: str) -> dict[str, Any]:
-        """The model's entry in ``state`` (created when absent).
+        """Returns the model's entry in ``state``, creating it when absent.
 
         Args:
             state: The state document, changed in place when the entry is
@@ -237,7 +238,7 @@ class ReleaseRegistry:
         return entry
 
     def state_of(self, model: str, version: int) -> ReleaseState:
-        """The release state of a registered version (default candidate).
+        """Returns the release state of a registered version.
 
         The version must be registered; the store refuses an unknown one with
         an `ArtifactError`.
@@ -259,7 +260,7 @@ class ReleaseRegistry:
         return ReleaseState(found["state"]) if found else ReleaseState.CANDIDATE
 
     def states(self, model: str) -> dict[int, ReleaseState]:
-        """The state of every registered version.
+        """Returns the release state of every registered version.
 
         Args:
             model: Model name.
@@ -275,15 +276,16 @@ class ReleaseRegistry:
     def environment(
         self, model: str, environment: str
     ) -> dict[str, Any] | None:
-        """What the registry records as running in an environment.
+        """Returns what the registry records as running in an environment.
 
         Args:
             model: Model name.
             environment: Environment name.
 
         Returns:
-            A copy of the record (version, revision, image digest, confirmation
-            time and known-good history), or None if nothing is recorded.
+            A shallow copy of the record (version, revision, image digest,
+            confirmation time and known-good history), or None if nothing is
+            recorded.
         """
         found = (
             self.read()["models"]
@@ -340,8 +342,9 @@ class ReleaseRegistry:
             reason: Why the version moves.
 
         Raises:
-            ArtifactError: For a state set by hand that is not allowed, or
-                for retiring the version an environment is serving.
+            ArtifactError: If the version is unknown, `target` is a state
+                that cannot be set by hand, or the version's current state
+                does not allow the move.
         """
         if target not in MANUAL:
             raise errors.ArtifactError(
@@ -384,9 +387,10 @@ class ReleaseRegistry:
             signing_key: Key that verifies the approval's signature.
 
         Raises:
-            ArtifactError: If the bundle is unsigned, the approval is
-                missing, rejected, not independent, not signed under the key
-                or for another bundle, or the transition is not allowed.
+            ArtifactError: If the version is unknown, the bundle is unsigned,
+                the approval is rejected, not independent, not signed under
+                the key or for another bundle, or the version's state does
+                not allow approval (only candidate and challenger do).
         """
         record = self.store.resolve(model, version)
         if not record.signed:
@@ -448,7 +452,8 @@ class ReleaseRegistry:
         """Releases an approved version through the control plane.
 
         A refusal or an unconfirmed step does not raise: it returns an
-        unsuccessful `Outcome`.
+        unsuccessful `Outcome`. An unknown model or version raises
+        `ArtifactError` before anything is asked of the platform.
 
         Args:
             model: Model name.
@@ -457,22 +462,28 @@ class ReleaseRegistry:
             environment: Environment name; ``production`` also moves the
                 champion alias.
             image_digest: Digest of the image that serves this version.
-            steps: Traffic shares to pass through, ending in 100.
+            steps: Strictly increasing traffic shares, in percent, to pass
+                through, ending in 100. A share below 100 splits traffic with
+                the revision recorded for the environment, which must exist.
             health: Called after each step; non-empty reasons stop the
                 rollout.
             signing_key: Key that verifies the stored approval.
 
         Returns:
-            An `Outcome`. A refusal or an unconfirmed step returns
+            An `Outcome`. A refusal returns ``done=False`` with the reasons
+            and no call to the platform. An unconfirmed step returns
             ``done=False`` with the registry unchanged and the previous
-            revision restored.
+            revision restored, where there is one (see `Outcome.restored`).
 
         Raises:
             RuntimeUnconfirmed: Raised inside the rollout when a health check
-                stops it; it is caught and reported as ``done=False``, so it
-                does not reach the caller.
+                stops it. It is caught and reported as ``done=False``, so it
+                does not reach the caller; neither do the platform's other
+                confirmation or support errors.
             ConfigError: If ``steps`` is not increasing and ending in 100, or
-                the digest is not a digest.
+                the digest is not a digest. (A staged first step with no
+                previous revision raises it inside the rollout, where it is
+                caught and reported.)
         """
         contract.require_digest(image_digest, "image_digest")
         if not steps or steps[-1] != 100 or list(steps) != sorted(set(steps)):
@@ -567,7 +578,9 @@ class ReleaseRegistry:
     def refusal(
         self, model: str, version: int, signing_key: str | bytes | None
     ) -> list[str]:
-        """Reasons the version may not be released, empty if it may.
+        """Lists the reasons the version may not be released.
+
+        An unknown model or version raises `ArtifactError`.
 
         Args:
             model: Model name.
@@ -575,8 +588,9 @@ class ReleaseRegistry:
             signing_key: Key that verifies the stored approval.
 
         Returns:
-            One message for each unmet condition: not approved, unsigned
-            bundle, no stored approval, or an invalid approval.
+            One message for each unmet condition (not approved, unsigned
+            bundle, no stored approval, or an invalid approval); empty if the
+            version may be released.
         """
         record = self.store.resolve(model, version)
         reasons = []
@@ -609,7 +623,9 @@ class ReleaseRegistry:
     def present(
         revision: str, image_digest: str
     ) -> Callable[[observation_module.Observation], list[str]]:
-        """A check that the revision exists and runs the digest (any share).
+        """Builds a check that the revision exists and runs the digest.
+
+        The check ignores the share of traffic and readiness.
 
         Args:
             revision: Revision name expected on the platform.
@@ -676,7 +692,7 @@ class ReleaseRegistry:
         reasons: list[str],
         restored: bool | None = None,
     ) -> dict[str, Any]:
-        """The ledger row for an event.
+        """Builds the ledger row for an event.
 
         Args:
             model: Model name.
@@ -717,10 +733,12 @@ class ReleaseRegistry:
     ) -> None:
         """Changes the registry after the runtime confirmed (under the lock).
 
-        The champion alias moves first inside the lock but nothing is written
-        to the state file until it has; if the registry refuses the alias the
-        state file is left as it was and the error propagates, so the caller
-        restores the platform.
+        In the production environment the champion alias moves first, with
+        the version's stored approval, and the previous version is retired;
+        nothing is written to the state file until the alias has moved. If
+        the registry refuses the alias, the state file is left as it was and
+        the error propagates, so the caller restores the platform. The
+        environment record keeps at most the last ten known-good revisions.
 
         Args:
             model: Model name.
@@ -802,7 +820,9 @@ class ReleaseRegistry:
         """Restores the previous known-good revision.
 
         The registry changes only after the platform confirms the previous
-        revision runs its recorded digest with all traffic.
+        revision runs its recorded digest with all traffic. With no recorded
+        known-good revision, it returns an unsuccessful `Outcome` without
+        touching the platform or recording an event.
 
         Args:
             model: Model name.
@@ -812,7 +832,8 @@ class ReleaseRegistry:
                 returned to.
 
         Returns:
-            An `Outcome`; ``done=False`` leaves the registry as it was.
+            An `Outcome`; ``done=False`` leaves the registry as it was and
+            puts the revision that was serving back.
         """
         current = self.environment(model, environment)
         if current is None or not current.get("known_good"):
@@ -891,6 +912,11 @@ class ReleaseRegistry:
     ) -> None:
         """Changes the registry after the runtime confirmed the rollback.
 
+        In the production environment the champion alias moves back with the
+        restored version's stored approval; if that version has no stored
+        approval the alias is not moved. The registry's refusal (approval or
+        guard) propagates before anything is written.
+
         Args:
             model: Model name.
             environment: Environment name.
@@ -960,7 +986,7 @@ class ReleaseRegistry:
         environment: str,
         seen: observation_module.Observation,
     ) -> int:
-        """The version the registry says is deployed, if the runtime agrees.
+        """Returns the version the registry says is deployed, if confirmed.
 
         Args:
             model: Model name.
@@ -988,7 +1014,7 @@ class ReleaseRegistry:
     def last_ledger_event(
         self, model: str, environment: str
     ) -> dict[str, Any] | None:
-        """The newest confirmed ledger event for the environment.
+        """Returns the newest confirmed ledger event for the environment.
 
         Args:
             model: Model name.
@@ -1019,7 +1045,10 @@ class ReleaseRegistry:
     ) -> ReconcileReport:
         """Compares the registry and the ledger with a platform observation.
 
-        Every disagreement is a finding; none is repaired.
+        Every disagreement is a finding; none is repaired. The finding kinds
+        are `no_registry_record`, `revision_mismatch`, `digest_mismatch`,
+        `traffic_split`, `state_mismatch`, `not_ready`, `alias_not_deployed`,
+        `ledger_missing` and `ledger_disagrees`.
 
         Args:
             model: Model name.

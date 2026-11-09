@@ -65,10 +65,14 @@ class ReviewClaim:
     notes: str
 
     def __post_init__(self) -> None:
-        """Validates the claim's identity and independent evidence link.
+        """Checks the claim's identity and independent evidence link.
+
+        A `kind` given as text is converted to a `ReviewClaimKind`.
 
         Raises:
             TypeError: If `passed` is not a bool.
+            ValueError: If a text field is blank or not a string, or the kind
+                is not a valid `ReviewClaimKind` value.
         """
         for field_name in (
             "criterion_id",
@@ -97,7 +101,11 @@ class ReviewClaim:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a claim from a persisted record.
+        """Rebuilds a claim from a persisted record.
+
+        Text fields are converted with ``str``; `passed` is taken as is and
+        must be a bool. A missing key raises `KeyError`, and the validation
+        of `__post_init__` applies.
 
         Args:
             record: A mapping with the claim's fields.
@@ -136,12 +144,16 @@ class IndependentReleaseReview:
     def __post_init__(self) -> None:
         """Rejects reviews that cannot establish independence or replay.
 
+        A `decision` given as text is converted to a `ReviewDecision`.
+
         Raises:
             TypeError: If a claim is not a `ReviewClaim`.
             ValueError: If an identity or digest field is missing, there are no
                 implementers, the reviewer is one of them, commands, claims or
                 artifact digests are empty or malformed, a criterion repeats,
-                or the observation time has no timezone.
+                the decision is not a valid `ReviewDecision` value, the
+                signature is blank, or the observation time is not an ISO 8601
+                time or has no timezone.
         """
         for field_name in (
             "release_id",
@@ -216,7 +228,10 @@ class IndependentReleaseReview:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a review from a persisted JSON-native record.
+        """Rebuilds a review from a persisted JSON-native record.
+
+        A missing key (other than `claims` and `signature`) raises
+        `KeyError`, and the validation of `__post_init__` applies.
 
         Args:
             record: A mapping with the review's fields.
@@ -270,7 +285,10 @@ class IndependentReleaseReview:
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
-        """Verifies the review signature without trusting its decision.
+        """Checks the review signature without trusting its decision.
+
+        An empty key is refused by the signing helper with a `ValueError`
+        rather than returning False.
 
         Args:
             signing_key: The key to verify with.
@@ -284,7 +302,10 @@ class IndependentReleaseReview:
         return hmac.compare_digest(self.signature, expected)
 
     def write(self, path: str | Path) -> None:
-        """Persist the review atomically and flush its directory entry.
+        """Persists the review atomically and flushes its directory entry.
+
+        The temporary file is removed and the error re-raised if writing
+        fails.
 
         Args:
             path: The file to write; parent directories are created.
@@ -314,6 +335,9 @@ class IndependentReleaseReview:
     def read(cls, path: str | Path) -> Self:
         """Loads and validates a persisted review record.
 
+        A missing file raises `OSError`, invalid JSON raises a `ValueError`
+        subclass, and the checks of `from_dict` apply.
+
         Args:
             path: The file written by `write`.
 
@@ -335,6 +359,10 @@ class IndependentReleaseReview:
         signing_key: str | bytes,
     ) -> bool:
         """Returns whether this signed review satisfies release proof gates.
+
+        A blank `source_commit`, a `required_kinds` entry that is not a claim
+        kind, or an empty key raises `ValueError` (the key only once the
+        commit and decision checks have passed).
 
         Args:
             source_commit: The commit the release is built from.

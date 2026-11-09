@@ -91,7 +91,7 @@ class AttestationRequired(errors.ArtifactError):
 def question_for(
     action: NeverAction, detail: Mapping[str, Any], scope: str
 ) -> dict[str, Any]:
-    """The question an attestation must answer for this exact action.
+    """Builds the question an attestation must answer for this exact action.
 
     Args:
         action: The never-list action.
@@ -120,10 +120,11 @@ class Guard:
             ledger: The deployment ledger.
             today: Clock, replaceable in tests.
             verification_keys: Optional map from key id to the key that
-                verifies attestations signed under it. When given, an
-                attestation whose key id is missing or whose signature does
-                not verify is not valid.
-            single_use: Whether an attestation allows one action only.
+                verifies attestations signed under it. When non-empty, an
+                attestation whose key id is missing from it or whose
+                signature does not verify is not valid.
+            single_use: Whether an attestation is spent by the first action
+                it allows (`require` then writes an `attestation_used` row).
         """
         self.ledger = ledger
         self.single_use = single_use
@@ -134,14 +135,14 @@ class Guard:
     def valid_attestation(
         self, question: Mapping[str, Any]
     ) -> ledger_module.Attestation | None:
-        """The first valid attestation for `question`, or None.
+        """Finds the first valid attestation for `question`.
 
         Args:
             question: The question, as built by `question_for`.
 
         Returns:
-            The first unused attestation to an escalation of exactly this
-            question that is currently acceptable, or None.
+            The first unused attestation, in ledger order, to an escalation
+            of exactly this question that `accepts` today, or None.
         """
         digest = ledger_module.question_hash(question)
         for identity, row in self.ledger.escalations.items():
@@ -182,13 +183,14 @@ class Guard:
         return True
 
     def pending_for(self, question: Mapping[str, Any]) -> str | None:
-        """Id of a pending escalation with this exact question, if any.
+        """Finds a pending escalation with this exact question.
 
         Args:
             question: The question, as built by `question_for`.
 
         Returns:
-            The identifier of the first pending escalation, or None.
+            The identifier of the oldest pending escalation with this
+            question, or None.
         """
         digest = ledger_module.question_hash(question)
         for row in self.ledger.pending():
@@ -206,12 +208,18 @@ class Guard:
     ) -> ledger_module.Attestation:
         """Returns the valid attestation, or escalates and raises.
 
+        With `single_use`, using an attestation first commits an
+        `attestation_used` row for it.
+
         Args:
             action: The never-list action.
             detail: JSON-ready description of the exact request.
             scope: Model version hash and stream id.
             proposed_default: What happens if nobody answers.
             evidence: References to the evidence behind the request.
+
+        Returns:
+            The valid attestation.
 
         Raises:
             AttestationRequired: If there is no valid attestation; an
