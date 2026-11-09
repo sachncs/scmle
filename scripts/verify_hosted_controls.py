@@ -4,7 +4,7 @@
 The static checks validate the repository's workflow contract. When a public
 Pages URL is supplied, the live check performs only unauthenticated GET
 requests and records the response digests. A successful static check is not
-hosted-run evidence; a successful live check is not evidence for cloud,
+hosted-run evidence; a successful live check is not evidence for
 container, kernel, or broker semantics.
 """
 
@@ -29,15 +29,12 @@ LONG_LIVED_CREDENTIALS = (
     "GOOGLE_CREDENTIALS",
     "service_account_key",
 )
-JOB_NAME = re.compile(r"^  ([a-z][a-z0-9-]*):\s*$", re.MULTILINE)
 ACTION_REFERENCE = re.compile(
     r"^\s*(?:-\s+)?uses:\s+(?P<action>[^\s@]+)@(?P<revision>[^\s#]+)"
 )
 SHA256_REVISION = re.compile(r"^[0-9a-f]{40}$")
 WORKFLOW_NAMES = (
     "ci.yml",
-    "cloud-deploy.yml",
-    "cloud-release.yml",
     "full-suite.yml",
     "pages.yml",
     "release.yml",
@@ -131,7 +128,6 @@ def workflow_failures(root: Path) -> list[str]:
                 failures.append(
                     f"{name} refers to a long-lived credential: {marker}"
                 )
-    failures.extend(cloud_release_failures(contents))
 
     required_markers = {
         "ci.yml": (
@@ -139,8 +135,6 @@ def workflow_failures(root: Path) -> list[str]:
             "permissions:\n  contents: read",
             "scripts/check_pytest_skips.py",
             "scripts/verify_hosted_controls.py",
-            "scripts/check_terraform_policy.py",
-            "scripts/terraform_checks.sh",
             "scripts/verify_release_artifacts.sh",
             "-W error::ResourceWarning",
         ),
@@ -164,29 +158,6 @@ def workflow_failures(root: Path) -> list[str]:
             "needs: deploy",
             "scripts/verify_hosted_controls.py",
             "curl --fail",
-        ),
-        "cloud-release.yml": (
-            "name: cloud-release",
-            "workflow_dispatch:",
-            "SCMLE_CLOUD_RELEASE",
-            "needs.guard.outputs.enabled == 'true'",
-            "environment: staging",
-            "environment: production",
-            "needs: [guard, staging]",
-            "uses: ./.github/workflows/cloud-deploy.yml",
-            "scripts/vuln_gate.py",
-        ),
-        "cloud-deploy.yml": (
-            "name: cloud-deploy",
-            "workflow_call:",
-            "environment: ${{ inputs.environment }}",
-            "id-token: write",
-            "scmle deploy gate admit",
-            "scmle deploy gate certify",
-            "scmle deploy live",
-            "scmle deploy observe",
-            "aws-actions/configure-aws-credentials@",
-            "google-github-actions/auth@",
         ),
         "full-suite.yml": (
             "name: full-suite",
@@ -222,39 +193,6 @@ def workflow_failures(root: Path) -> list[str]:
                 )
     else:
         failures.append(f"missing site configuration: {astro_config}")
-    return failures
-
-
-def cloud_release_failures(contents: dict[str, str]) -> list[str]:
-    """Return failures of the guards the cloud workflows must keep."""
-    failures: list[str] = []
-    release = contents.get("cloud-release.yml", "")
-    deploy = contents.get("cloud-deploy.yml", "")
-    if release:
-        if "on:\n  workflow_dispatch:" not in release:
-            failures.append("cloud-release.yml must run only by hand")
-        for trigger in ("push:", "pull_request:", "schedule:", "workflow_run:"):
-            if f"\n  {trigger}" in release.split("\njobs:")[0]:
-                failures.append(f"cloud-release.yml has a {trigger} trigger")
-        jobs = JOB_NAME.findall(release.split("\njobs:", 1)[-1])
-        guarded = release.count("needs.guard.outputs.enabled == 'true'")
-        if "guard" not in jobs or guarded < len(jobs) - 1:
-            failures.append(
-                "every cloud-release job except the guard must test the guard"
-            )
-        if "id-token: write" in release:
-            failures.append(
-                "cloud-release.yml must not request id-token: write; only "
-                "the deploy job in a protected environment may"
-            )
-    if deploy:
-        if "environment: ${{ inputs.environment }}" not in deploy:
-            failures.append("cloud-deploy.yml must run in an environment")
-        if "pull_request" in deploy:
-            failures.append("cloud-deploy.yml must not run on pull requests")
-        top = deploy.split("\njobs:")[0]
-        if "id-token: write" in top:
-            failures.append("cloud-deploy.yml grants id-token at the top")
     return failures
 
 

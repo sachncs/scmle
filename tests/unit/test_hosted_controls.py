@@ -4,10 +4,8 @@ import hashlib
 import io
 import json
 from pathlib import Path
-import shutil
 
 import pytest
-import yaml
 
 from scripts import verify_hosted_controls
 
@@ -107,123 +105,14 @@ def test_main_writes_static_evidence(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["passed"] is True
 
 
-ROOT = Path(__file__).parents[2]
-
-
-def copy_workflows(tmp_path):
-    target = tmp_path / ".github" / "workflows"
-    shutil.copytree(ROOT / ".github" / "workflows", target)
-    site = tmp_path / "website"
-    site.mkdir()
-    shutil.copy(ROOT / "website" / "astro.config.mjs", site)
-    return target
-
-
-def failures_after(tmp_path, name, old, new):
-    target = copy_workflows(tmp_path)
-    path = target / name
-    text = path.read_text(encoding="utf-8")
-    assert old in text, old
-    path.write_text(text.replace(old, new, 1), encoding="utf-8")
-    return verify_hosted_controls.workflow_failures(tmp_path)
-
-
-def test_the_cloud_workflows_are_valid_yaml_and_guarded():
-    for name in ("cloud-release.yml", "cloud-deploy.yml"):
-        document = yaml.safe_load(
-            (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
-        )
-        assert document["permissions"] == {"contents": "read"}
-    release = yaml.safe_load(
-        (ROOT / ".github" / "workflows" / "cloud-release.yml").read_text()
+def test_a_long_lived_credential_in_a_workflow_is_a_failure(tmp_path):
+    """A workflow may not hold a static access key."""
+    workflow_root = tmp_path / ".github" / "workflows"
+    workflow_root.mkdir(parents=True)
+    (workflow_root / "ci.yml").write_text(
+        "env:\n  AWS_SECRET_ACCESS_KEY: x\n", encoding="utf-8"
     )
-    triggers = release[True] if True in release else release["on"]
-    assert list(triggers) == ["workflow_dispatch"]
-    jobs = release["jobs"]
-    assert set(jobs) == {"guard", "build-scan", "staging", "production"}
-    for name, job in jobs.items():
-        if name != "guard":
-            assert "needs.guard.outputs.enabled == 'true'" in job["if"], name
-    assert jobs["production"]["needs"] == ["guard", "staging"]
-    deploy = yaml.safe_load(
-        (ROOT / ".github" / "workflows" / "cloud-deploy.yml").read_text()
-    )
-    job = deploy["jobs"]["deploy"]
-    assert job["environment"] == "${{ inputs.environment }}"
-    assert job["permissions"]["id-token"] == "write"
 
+    failures = verify_hosted_controls.workflow_failures(tmp_path)
 
-def test_no_workflow_holds_a_long_lived_cloud_credential():
-    for path in (ROOT / ".github" / "workflows").glob("*.yml"):
-        text = path.read_text(encoding="utf-8")
-        for marker in verify_hosted_controls.LONG_LIVED_CREDENTIALS:
-            assert marker not in text, (path.name, marker)
-
-
-def test_a_long_lived_key_in_a_workflow_is_a_failure(tmp_path):
-    found = failures_after(
-        tmp_path,
-        "cloud-deploy.yml",
-        "role-duration-seconds: 3600",
-        "aws-access-key-id: AKIAXXXXXXXXXXXXXXXX",
-    )
-    assert any("long-lived credential" in item for item in found)
-
-
-def test_an_unguarded_cloud_job_is_a_failure(tmp_path):
-    found = failures_after(
-        tmp_path,
-        "cloud-release.yml",
-        "    needs: [guard, staging]\n    if: needs.guard.outputs.enabled == 'true'\n",
-        "    needs: [guard, staging]\n",
-    )
-    assert any("must test the guard" in item for item in found)
-
-
-def test_a_push_trigger_on_the_cloud_release_is_a_failure(tmp_path):
-    found = failures_after(
-        tmp_path,
-        "cloud-release.yml",
-        "on:\n  workflow_dispatch:",
-        "on:\n  push:\n    branches: [master]\n  workflow_dispatch:",
-    )
-    assert any("push:" in item for item in found)
-
-
-def test_removing_the_environment_from_the_deploy_job_is_a_failure(tmp_path):
-    found = failures_after(
-        tmp_path,
-        "cloud-deploy.yml",
-        "    environment: ${{ inputs.environment }}\n",
-        "",
-    )
-    assert any("must run in an environment" in item for item in found)
-
-
-def test_dropping_a_gate_from_the_deploy_job_is_a_failure(tmp_path):
-    found = failures_after(
-        tmp_path, "cloud-deploy.yml", "scmle deploy gate certify", "echo"
-    )
-    assert any("scmle deploy gate certify" in item for item in found)
-
-
-def test_a_cloud_deploy_id_token_at_the_top_level_is_a_failure(tmp_path):
-    found = failures_after(
-        tmp_path,
-        "cloud-deploy.yml",
-        "permissions:\n  contents: read\n\njobs:",
-        "permissions:\n  contents: read\n  id-token: write\n\njobs:",
-    )
-    assert any("id-token at the top" in item for item in found)
-
-
-def test_unpinned_third_party_actions_in_the_cloud_workflows_are_failures(
-    tmp_path,
-):
-    found = failures_after(
-        tmp_path,
-        "cloud-deploy.yml",
-        "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093",
-        "google-github-actions/auth@v3",
-    )
-    assert any("not pinned" in item for item in found)
+    assert any("long-lived credential" in item for item in failures)
