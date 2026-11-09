@@ -194,18 +194,6 @@ def parse_date(value: str, name: str) -> datetime.date:
         raise DeploymentLedgerError(f"{name} must be YYYY-MM-DD") from error
 
 
-def question_hash(question: Mapping[str, Any]) -> str:
-    """SHA-256 of the canonical JSON of a question.
-
-    Args:
-        question: The question as a mapping.
-
-    Returns:
-        The hex digest.
-    """
-    return ledger.digest(question)
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class Attestation:
     """A person's signed reply to one escalation.
@@ -803,7 +791,7 @@ class DeploymentLedger:
         number = len(self.rows)
         if body["phase"] == PHASE_OPEN:
             question = body["question"]
-            if body["question_hash"] != question_hash(question):
+            if body["question_hash"] != ledger.digest(question):
                 raise DeploymentLedgerError(
                     "escalation question does not match its hash"
                 )

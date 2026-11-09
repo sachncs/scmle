@@ -61,6 +61,7 @@ import pandas
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
+import scmle.data.ledger.ledger
 from scmle.governance import deployment_ledger
 from scmle.governance import escalation
 from scmle.governance import never_list
@@ -767,7 +768,7 @@ class Loop:
                 "phase": deployment_ledger.PHASE_OPEN,
                 "id": identity,
                 "question": question,
-                "question_hash": deployment_ledger.question_hash(question),
+                "question_hash": scmle.data.ledger.ledger.digest(question),
                 "evidence": list(evidence),
                 "proposed_default": proposed_default
                 or self.policy.safe_default,

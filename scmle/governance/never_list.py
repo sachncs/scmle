@@ -44,6 +44,7 @@ import enum
 from typing import Any
 
 from scmle.contracts import errors
+import scmle.data.ledger.ledger
 from scmle.governance import deployment_ledger
 
 
@@ -144,7 +145,7 @@ class Guard:
             The first unused attestation, in ledger order, to an escalation
             of exactly this question that `accepts` today, or None.
         """
-        digest = deployment_ledger.question_hash(question)
+        digest = scmle.data.ledger.ledger.digest(question)
         for identity, row in self.ledger.escalations.items():
             if row["question_hash"] != digest:
                 continue
@@ -192,7 +193,7 @@ class Guard:
             The identifier of the oldest pending escalation with this
             question, or None.
         """
-        digest = deployment_ledger.question_hash(question)
+        digest = scmle.data.ledger.ledger.digest(question)
         for row in self.ledger.pending():
             if row["question_hash"] == digest:
                 return str(row["id"])
@@ -249,7 +250,7 @@ class Guard:
                     "phase": deployment_ledger.PHASE_OPEN,
                     "id": pending,
                     "question": question,
-                    "question_hash": deployment_ledger.question_hash(question),
+                    "question_hash": scmle.data.ledger.ledger.digest(question),
                     "evidence": list(evidence),
                     "proposed_default": proposed_default,
                     "never_list_item": ITEM_NUMBER[action],
