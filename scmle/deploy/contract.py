@@ -57,7 +57,19 @@ class DeploymentEnvironment(enum.StrEnum):
 
 
 def require_digest(value: str, field_name: str) -> str:
-    """Returns `value` if it is a `sha256:<64 hex>` digest."""
+    """Returns `value` if it is a `sha256:<64 hex>` digest.
+
+    Args:
+        value: The candidate digest.
+        field_name: Name used in the error message.
+
+    Returns:
+        `value`, unchanged.
+
+    Raises:
+        ConfigError: If `value` is not `sha256:` followed by 64 lowercase hex
+            characters (a tag is not a digest).
+    """
     if not isinstance(value, str) or DIGEST_PATTERN.fullmatch(value) is None:
         raise errors.ConfigError(
             f"{field_name} must be 'sha256:' followed by 64 lowercase hex "
@@ -67,14 +79,37 @@ def require_digest(value: str, field_name: str) -> str:
 
 
 def require_name(value: str, field_name: str) -> str:
-    """Returns `value` if it is a plain identifier."""
+    """Returns `value` if it is a plain identifier.
+
+    Args:
+        value: The candidate name.
+        field_name: Name used in the error message.
+
+    Returns:
+        `value`, unchanged.
+
+    Raises:
+        ConfigError: If `value` does not match `NAME_PATTERN`.
+    """
     if not isinstance(value, str) or NAME_PATTERN.fullmatch(value) is None:
         raise errors.ConfigError(f"{field_name} is not a valid name: {value!r}")
     return value
 
 
 def require_positive(value: float, field_name: str) -> float:
-    """Returns `value` if it is a positive finite number."""
+    """Returns `value` if it is a positive finite number.
+
+    Args:
+        value: The candidate number (a bool is refused).
+        field_name: Name used in the error message.
+
+    Returns:
+        `value`, unchanged.
+
+    Raises:
+        ConfigError: If `value` is not an int or float, is not finite, or is not
+            greater than zero.
+    """
     if (
         isinstance(value, bool)
         or not isinstance(value, int | float)
@@ -86,13 +121,27 @@ def require_positive(value: float, field_name: str) -> float:
 
 
 def looks_secret(name: str) -> bool:
-    """Whether an environment variable name suggests a secret value."""
+    """Reports whether an environment variable name suggests a secret value.
+
+    Args:
+        name: The variable name.
+
+    Returns:
+        True if the upper-cased name contains any of `SECRET_WORDS`.
+    """
     return any(word in name.upper() for word in SECRET_WORDS)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageRef:
-    """A container image pinned by digest, with the platforms it covers."""
+    """A container image pinned by digest, with the platforms it covers.
+
+    Attributes:
+        repository: Image repository name.
+        digest: Image digest as `sha256:<64 hex>`.
+        architectures: CPU architectures the image is built for; non-empty and
+            unique.
+    """
 
     repository: str
     digest: str
@@ -102,7 +151,12 @@ class ImageRef:
     )
 
     def __post_init__(self) -> None:
-        """Validates the reference."""
+        """Validates the reference.
+
+        Raises:
+            ConfigError: If the repository or digest is invalid, or the
+                architectures are empty or repeated.
+        """
         require_name(self.repository, "image.repository")
         require_digest(self.digest, "image.digest")
         converted = tuple(Architecture(item) for item in self.architectures)
@@ -118,7 +172,12 @@ class ImageRef:
         return f"{self.repository}@{self.digest}"
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible record."""
+        """Builds a JSON-compatible record.
+
+        Returns:
+            A dict with `repository`, `digest` and the sorted architecture
+            names.
+        """
         return {
             "repository": self.repository,
             "digest": self.digest,
@@ -127,7 +186,14 @@ class ImageRef:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the reference from a record."""
+        """Rebuilds the reference from a record.
+
+        Args:
+            record: A record produced by `to_dict`.
+
+        Returns:
+            The reference.
+        """
         return cls(
             repository=record["repository"],
             digest=record["digest"],
@@ -139,7 +205,14 @@ class ImageRef:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BundleRef:
-    """A model bundle pinned by the digest of its manifest."""
+    """A model bundle pinned by the digest of its manifest.
+
+    Attributes:
+        model: Model name.
+        model_version: Model version string.
+        digest: Manifest digest as `sha256:<64 hex>`.
+        signed: Whether the bundle carries a verified signature.
+    """
 
     model: str
     model_version: str
@@ -147,7 +220,13 @@ class BundleRef:
     signed: bool
 
     def __post_init__(self) -> None:
-        """Validates the reference."""
+        """Validates the reference.
+
+        Raises:
+            ConfigError: If the version is not valid or `signed` is not a
+                boolean; an invalid model name or digest is refused with the
+                same error.
+        """
         require_name(self.model, "bundle.model")
         if VERSION_PATTERN.fullmatch(str(self.model_version)) is None:
             raise errors.ConfigError("bundle.model_version is not valid")
@@ -156,12 +235,23 @@ class BundleRef:
             raise errors.ConfigError("bundle.signed must be a boolean")
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible record."""
+        """Builds a JSON-compatible record.
+
+        Returns:
+            A dict of the four fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the reference from a record."""
+        """Rebuilds the reference from a record.
+
+        Args:
+            record: A record produced by `to_dict`.
+
+        Returns:
+            The reference.
+        """
         return cls(
             model=record["model"],
             model_version=record["model_version"],
@@ -177,6 +267,12 @@ class SecretRef:
     `name` is the environment variable the service sees. `locator` is an
     environment variable name (`env`), an absolute path (`file`) or an opaque
     identifier in a secret store (`store`).
+
+    Attributes:
+        name: Upper-case variable name the service sees.
+        source: Where the secret is read from.
+        locator: Reference to the secret, interpreted according to `source`.
+        required: Whether the service cannot run without the secret.
     """
 
     name: str
@@ -185,7 +281,14 @@ class SecretRef:
     required: bool = True
 
     def __post_init__(self) -> None:
-        """Validates the reference and refuses anything that looks inline."""
+        """Validates the reference and refuses anything that looks inline.
+
+        Raises:
+            ConfigError: If the name is not an upper-case variable, or the
+                locator is blank, padded, multi-line, contains `=` or key
+                material, or does not suit its source (a variable name for
+                `env`, an absolute path for `file`).
+        """
         if VARIABLE_PATTERN.fullmatch(self.name) is None:
             raise errors.ConfigError(
                 f"secret name must be an upper-case variable: {self.name!r}"
@@ -218,7 +321,11 @@ class SecretRef:
             require_name(text, f"secret {self.name} locator")
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible record."""
+        """Builds a JSON-compatible record.
+
+        Returns:
+            A dict with `name`, `source` (its value), `locator` and `required`.
+        """
         return {
             "name": self.name,
             "source": self.source.value,
@@ -228,7 +335,14 @@ class SecretRef:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the reference from a record."""
+        """Rebuilds the reference from a record.
+
+        Args:
+            record: A record produced by `to_dict`; `required` defaults to True.
+
+        Returns:
+            The reference.
+        """
         return cls(
             name=record["name"],
             source=SecretSource(record["source"]),
@@ -239,7 +353,19 @@ class SecretRef:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Resources:
-    """Compute limits and the isolation the container runs with."""
+    """Compute limits and the isolation the container runs with.
+
+    Attributes:
+        cpu_request: CPUs requested.
+        cpu_limit: CPUs allowed; at least `cpu_request`.
+        memory_request_mb: Memory requested, in megabytes.
+        memory_limit_mb: Memory allowed, in megabytes; at least the request.
+        scratch_mb: Size of the writable scratch space, in megabytes.
+        read_only_root: Whether the root filesystem is read-only (must be True).
+        run_as_non_root: Whether the container runs as a non-root user (must be
+            True).
+        max_concurrent_requests: Requests served at the same time.
+    """
 
     cpu_request: float
     cpu_limit: float
@@ -251,7 +377,13 @@ class Resources:
     max_concurrent_requests: int = 8
 
     def __post_init__(self) -> None:
-        """Validates that limits dominate requests and isolation holds."""
+        """Validates that limits dominate requests and isolation holds.
+
+        Raises:
+            ConfigError: If a limit is smaller than its request, or the root is
+                writable or the container runs as root. Non-positive values are
+                refused with the same error.
+        """
         require_positive(self.cpu_request, "resources.cpu_request")
         require_positive(self.cpu_limit, "resources.cpu_limit")
         require_positive(self.memory_request_mb, "resources.memory_request_mb")
@@ -272,18 +404,40 @@ class Resources:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible record."""
+        """Builds a JSON-compatible record.
+
+        Returns:
+            A dict of all fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the limits from a record."""
+        """Rebuilds the limits from a record.
+
+        Args:
+            record: A record produced by `to_dict`.
+
+        Returns:
+            The limits.
+        """
         return cls(**record)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class HealthSpec:
-    """Liveness and readiness probes and their timing."""
+    """Liveness and readiness probes and their timing.
+
+    Attributes:
+        liveness_path: URL path of the liveness probe.
+        readiness_path: URL path of the readiness probe; differs from the
+            liveness path.
+        period_seconds: Seconds between probes.
+        timeout_seconds: Seconds a probe may take; at most the period.
+        failure_threshold: Consecutive failures before the service is judged
+            unhealthy.
+        startup_grace_seconds: Seconds allowed for the service to start.
+    """
 
     liveness_path: str = "/livez"
     readiness_path: str = "/readyz"
@@ -293,7 +447,13 @@ class HealthSpec:
     startup_grace_seconds: float = 60.0
 
     def __post_init__(self) -> None:
-        """Validates distinct paths and positive timings."""
+        """Validates distinct paths and positive timings.
+
+        Raises:
+            ConfigError: If a path does not start with `/`, the two paths are
+                the same, or the probe timeout exceeds the period. Non-positive
+                timings are refused with the same error.
+        """
         for name in ("liveness_path", "readiness_path"):
             if not getattr(self, name).startswith("/"):
                 raise errors.ConfigError(f"health.{name} must start with '/'")
@@ -311,17 +471,36 @@ class HealthSpec:
             raise errors.ConfigError("probe timeout exceeds the probe period")
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible record."""
+        """Builds a JSON-compatible record.
+
+        Returns:
+            A dict of all fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the probes from a record."""
+        """Rebuilds the probes from a record.
+
+        Args:
+            record: A record produced by `to_dict`.
+
+        Returns:
+            The probes.
+        """
         return cls(**record)
 
 
 def canonical_json(payload: Mapping[str, Any]) -> bytes:
-    """Returns the deterministic JSON bytes used for digests."""
+    """Serializes a payload deterministically.
+
+    Args:
+        payload: A JSON-serializable mapping.
+
+    Returns:
+        Compact, key-sorted, ASCII-only JSON encoded as UTF-8; the bytes used
+        for digests.
+    """
     return json.dumps(
         payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True
     ).encode("utf-8")
@@ -329,7 +508,19 @@ def canonical_json(payload: Mapping[str, Any]) -> bytes:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DeploymentSpec:
-    """Everything a provider needs to run one version of one service."""
+    """Everything a provider needs to run one version of one service.
+
+    Attributes:
+        version: Version label of the deployment.
+        environment: Environment the spec targets.
+        image: The container image to run.
+        bundle: The model bundle to serve.
+        resources: Compute limits and isolation.
+        health: Liveness and readiness probes.
+        config: Plain (non-secret) environment variables, sorted by name.
+        secrets: References to the secrets the service may read.
+        port: Port the service listens on.
+    """
 
     version: str
     environment: DeploymentEnvironment
@@ -342,7 +533,15 @@ class DeploymentSpec:
     port: int = 8000
 
     def __post_init__(self) -> None:
-        """Validates the whole spec, including cross-field rules."""
+        """Validates the whole spec, including cross-field rules.
+
+        Raises:
+            ConfigError: If the version or port is invalid; a config key is not
+                an upper-case variable, its value is not text, its name looks
+                like a secret or its value holds key material; secret names
+                repeat or collide with config names; or, in production, the
+                service is marked trusted or the bundle is unsigned.
+        """
         if VERSION_PATTERN.fullmatch(str(self.version)) is None:
             raise errors.ConfigError("version is not valid")
         object.__setattr__(
@@ -384,7 +583,12 @@ class DeploymentSpec:
             raise errors.ConfigError("production requires a signed bundle")
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a deterministic JSON-compatible record."""
+        """Builds a deterministic JSON-compatible record.
+
+        Returns:
+            A dict that includes the spec format number; secrets are sorted by
+            name.
+        """
         return {
             "format": SPEC_FORMAT,
             "version": self.version,
@@ -403,7 +607,17 @@ class DeploymentSpec:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a spec; refuses other formats."""
+        """Rebuilds a spec; refuses other formats.
+
+        Args:
+            record: A record produced by `to_dict`.
+
+        Returns:
+            The spec.
+
+        Raises:
+            ConfigError: If the record's format is not `SPEC_FORMAT`.
+        """
         if record.get("format") != SPEC_FORMAT:
             raise errors.ConfigError(
                 f"unsupported deployment spec format {record.get('format')}"
@@ -421,7 +635,12 @@ class DeploymentSpec:
         )
 
     def digest(self) -> str:
-        """The `sha256:` digest of the canonical spec."""
+        """Computes the digest of the canonical spec.
+
+        Returns:
+            `sha256:` followed by the hex SHA-256 of the canonical JSON of
+            `to_dict()`.
+        """
         return (
             "sha256:"
             + hashlib.sha256(canonical_json(self.to_dict())).hexdigest()
@@ -430,7 +649,20 @@ class DeploymentSpec:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RuntimeReport:
-    """What a platform says is running, in the spec's own terms."""
+    """What a platform says is running, in the spec's own terms.
+
+    Attributes:
+        spec_digest: Digest of the spec the runtime was started from.
+        image_digest: Digest of the running image.
+        bundle_digest: Digest of the running model bundle.
+        model_version: Version of the running model.
+        ready: Whether the service reports itself ready.
+        secret_names: Names of the secrets mounted.
+        read_only_root: Whether the root filesystem is read-only.
+        run_as_non_root: Whether the container runs as a non-root user.
+        memory_limit_mb: Memory limit actually applied; None if unknown.
+        cpu_limit: CPU limit actually applied; None if unknown.
+    """
 
     spec_digest: str
     image_digest: str
@@ -457,6 +689,13 @@ def conformance_problems(
 
     An empty list means the platform runs exactly what the spec says. The
     comparison is on digests and limits, never on tags or names.
+
+    Args:
+        spec: What was meant to run.
+        report: What the platform says is running.
+
+    Returns:
+        One message per difference; empty if the runtime conforms.
     """
     problems = []
     if report.spec_digest != spec.digest():
@@ -498,24 +737,49 @@ def conformance_problems(
 
 
 class ProviderAdapter(abc.ABC):
-    """What a platform adapter implements; nothing else is provider-specific."""
+    """What a platform adapter implements; nothing else is provider-specific.
+
+    Attributes:
+        provider: Name of the platform, used in messages.
+    """
 
     provider: str = ""
 
     @abc.abstractmethod
     def supported_architectures(self) -> tuple[Architecture, ...]:
-        """Architectures the platform can run."""
+        """Lists the architectures the platform can run.
+
+        Returns:
+            The supported architectures.
+        """
 
     @abc.abstractmethod
     def apply(self, spec: DeploymentSpec) -> RuntimeReport:
-        """Makes the platform run `spec` and reports what runs."""
+        """Makes the platform run `spec` and reports what runs.
+
+        Args:
+            spec: The deployment to run.
+
+        Returns:
+            The state the platform reports after applying the spec.
+        """
 
     @abc.abstractmethod
     def observe(self) -> RuntimeReport:
-        """Reads the running state back from the platform."""
+        """Reads the running state back from the platform.
+
+        Returns:
+            The state the platform currently reports.
+        """
 
     def deploy(self, spec: DeploymentSpec) -> RuntimeReport:
         """Applies `spec` and refuses a platform that does not conform.
+
+        Args:
+            spec: The deployment to run.
+
+        Returns:
+            The runtime report after the spec was applied and found to conform.
 
         Raises:
             ConfigError: If the platform cannot run an image architecture.

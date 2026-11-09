@@ -70,7 +70,14 @@ class DeploymentRecord:
     signature: str = ""
 
     def __post_init__(self) -> None:
-        """Validates every field that a reader will rely on."""
+        """Validates every field that a reader will rely on.
+
+        Raises:
+            ConfigError: If the commit is not 40 hex characters, the environment
+                is not staging or production, a required text field is blank,
+                the model version is below 1, or there is no evidence. A
+                malformed digest is refused with the same error.
+        """
         if COMMIT_PATTERN.fullmatch(self.source_commit) is None:
             raise errors.ConfigError("source_commit must be 40 hex characters")
         for name in ("model_digest", "container_digest", "config_digest"):
@@ -98,7 +105,12 @@ class DeploymentRecord:
             contract.require_digest(digest, f"evidence[{check}]")
 
     def unsigned_dict(self) -> dict[str, Any]:
-        """The signed content."""
+        """Builds the signed content.
+
+        Returns:
+            All fields except the signature, with the evidence as a dict and the
+            record format number added.
+        """
         record = dataclasses.asdict(self)
         del record["signature"]
         record["evidence"] = dict(self.evidence)
@@ -106,22 +118,46 @@ class DeploymentRecord:
         return record
 
     def to_dict(self) -> dict[str, Any]:
-        """The full record."""
+        """Builds the full record.
+
+        Returns:
+            The signed content plus the signature.
+        """
         return {**self.unsigned_dict(), "signature": self.signature}
 
     def digest(self) -> str:
-        """Digest of the signed record, for the ledger and the next release."""
+        """Digests the signed record, for the ledger and the next release.
+
+        Returns:
+            `sha256:` followed by the hex SHA-256 of the record's key-sorted
+            JSON.
+        """
         payload = json.dumps(self.to_dict(), sort_keys=True).encode()
         return "sha256:" + hashlib.sha256(payload).hexdigest()
 
     def signed(self, key: str | bytes) -> Self:
-        """Returns this record carrying its signature under ``key``."""
+        """Returns this record carrying its signature under ``key``.
+
+        Args:
+            key: The HMAC key.
+
+        Returns:
+            A copy of the record with `signature` set.
+        """
         return dataclasses.replace(
             self, signature=signing.sign_payload(self.unsigned_dict(), key)
         )
 
     def verify(self, key: str | bytes) -> bool:
-        """Whether the signature matches under ``key``."""
+        """Checks the signature under ``key``.
+
+        Args:
+            key: The HMAC key.
+
+        Returns:
+            True if the record is signed and the signature matches; False if it
+            is unsigned or does not match.
+        """
         if not self.signature:
             return False
         expected = signing.sign_payload(self.unsigned_dict(), key)
@@ -130,6 +166,12 @@ class DeploymentRecord:
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a record from `to_dict`.
+
+        Args:
+            record: A record produced by `to_dict`.
+
+        Returns:
+            The record, with whatever signature the dict carried (not verified).
 
         Raises:
             ConfigError: If fields are missing, extra or of a newer format.
@@ -148,7 +190,12 @@ class DeploymentRecord:
 
 
 def write_record(path: str | pathlib.Path, record: DeploymentRecord) -> None:
-    """Writes the record as JSON."""
+    """Writes the record as JSON.
+
+    Args:
+        path: Destination file; its directory is created.
+        record: The record to write.
+    """
     target = pathlib.Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
@@ -159,7 +206,19 @@ def write_record(path: str | pathlib.Path, record: DeploymentRecord) -> None:
 
 
 def read_record(path: str | pathlib.Path) -> DeploymentRecord:
-    """Reads a record; the caller still verifies the signature."""
+    """Reads a record; the caller still verifies the signature.
+
+    Args:
+        path: File written by `write_record`.
+
+    Returns:
+        The record.
+
+    Raises:
+        ArtifactError: If the file cannot be read or does not hold a JSON
+            object. A malformed record is refused by `from_dict` with
+            `ConfigError`.
+    """
     try:
         data = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError) as error:

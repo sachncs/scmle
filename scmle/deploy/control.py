@@ -50,7 +50,11 @@ class ConfirmPolicy:
     sleep: Callable[[float], None] = time.sleep
 
     def __post_init__(self) -> None:
-        """Validates the policy."""
+        """Validates the policy.
+
+        Raises:
+            ConfigError: If `attempts` is below 1 or `delay` is negative.
+        """
         if self.attempts < 1:
             raise errors.ConfigError("attempts must be at least 1")
         if self.delay < 0:
@@ -58,26 +62,43 @@ class ConfirmPolicy:
 
 
 class ControlPlane(abc.ABC):
-    """What a release needs from a platform; nothing provider-specific else."""
+    """What a release needs from a platform; nothing provider-specific else.
+
+    Attributes:
+        provider: Name of the platform.
+    """
 
     provider: str = ""
 
     @abc.abstractmethod
     def observe(self) -> observation_module.Observation:
-        """Reads what is running and how traffic is split."""
+        """Reads what is running and how traffic is split.
+
+        Returns:
+            The platform's current state.
+        """
 
     @abc.abstractmethod
     def deploy(self, image_digest: str) -> str:
         """Starts a revision of the image and returns its identifier.
 
         A platform that can hold a revision without traffic does so; one that
-        cannot (a rolling update) sends it all the traffic, which is why
-        the caller confirms and can restore the previous revision.
+        cannot (a rolling update) sends it all the traffic, which is why the
+        caller confirms and can restore the previous revision.
+
+        Args:
+            image_digest: Digest of the image to run, as `sha256:<hex>`.
+
+        Returns:
+            The identifier of the new revision.
         """
 
     @abc.abstractmethod
     def set_traffic(self, allocation: Mapping[str, int]) -> None:
         """Requests a split (revision to percent, summing to 100).
+
+        Args:
+            allocation: Percent of traffic per revision identifier.
 
         Raises:
             Unsupported: If the platform cannot make that split.
@@ -91,10 +112,13 @@ def confirm(
 ) -> observation_module.Observation:
     """Reads the platform until ``check`` finds nothing wrong.
 
+    An observation that cannot be read counts as a failed attempt.
+
     Args:
         plane: The platform.
-        check: Returns the reasons an observation is not yet what was asked.
-        policy: Attempts and delay.
+        check: Returns the reasons an observation is not yet what was asked; an
+            empty list means it is.
+        policy: Attempts and delay; the defaults of `ConfirmPolicy` if None.
 
     Returns:
         The confirming observation.
@@ -124,9 +148,29 @@ def confirm(
 def expecting(
     revision: str, image_digest: str, percent: int
 ) -> Callable[[observation_module.Observation], list[str]]:
-    """A `confirm` check: ``revision`` runs ``image_digest`` at ``percent``."""
+    """Builds a `confirm` check for one revision.
+
+    Args:
+        revision: Identifier of the revision expected.
+        image_digest: Image digest the revision must run.
+        percent: Share of traffic the revision must hold.
+
+    Returns:
+        A function that takes an observation and returns the reasons it does not
+        show ``revision`` running ``image_digest`` at ``percent`` of the traffic
+        with the service ready; empty if it does.
+    """
 
     def check(seen: observation_module.Observation) -> list[str]:
+        """Compares one observation with the expectation.
+
+        Args:
+            seen: The observation to check.
+
+        Returns:
+            The reasons the observation differs from what was expected; empty if
+            it matches.
+        """
         reasons = []
         digest = seen.digest_of(revision)
         if digest is None:

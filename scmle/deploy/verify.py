@@ -26,7 +26,17 @@ SIGNING_KEY = "SCMLE_SIGNING_KEY"
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Verified:
-    """What was established about a service folder before loading."""
+    """What was established about a service folder before loading.
+
+    Attributes:
+        bundle_digest: Digest of the bundle manifest.
+        bundle_signed: Whether the bundle's signature verified.
+        provenance_verified: Whether a provenance statement was present and its
+            signature verified.
+        trusted: Whether the unsigned bundle is loaded on the strength of
+            `SCMLE_TRUSTED=1` (never true for a signed bundle).
+        production: Whether the environment declares itself production.
+    """
 
     bundle_digest: str
     bundle_signed: bool
@@ -46,8 +56,17 @@ def refuse_published_key(
 ) -> None:
     """Raises when production is given a key that is published in the repo.
 
-    `allowed` is the explicit, named opt-out the local demo sets; nothing
-    else should.
+    `allowed` is the explicit, named opt-out the local demo sets; nothing else
+    should.
+
+    Args:
+        key: The signing key in use, or None.
+        production: Whether the environment is production.
+        allowed: Whether the opt-out was set.
+
+    Raises:
+        ArtifactError: If `production` is true, `key` is one of `PUBLISHED_KEYS`
+            and `allowed` is false.
     """
     if production and key in PUBLISHED_KEYS and not allowed:
         raise errors.ArtifactError(
@@ -58,12 +77,28 @@ def refuse_published_key(
 
 
 def is_production(environ: Mapping[str, str]) -> bool:
-    """Whether the environment declares itself production."""
+    """Reports whether the environment declares itself production.
+
+    Args:
+        environ: The environment; `SCMLE_ENV` is read.
+
+    Returns:
+        True if `SCMLE_ENV` is `production`, ignoring case and surrounding
+        blanks.
+    """
     return environ.get(ENVIRONMENT, "").strip().lower() == contract.PRODUCTION
 
 
 def refuse_trusted_in_production(environ: Mapping[str, str]) -> None:
-    """Raises if `SCMLE_TRUSTED=1` is set in a production environment."""
+    """Raises if `SCMLE_TRUSTED=1` is set in a production environment.
+
+    Args:
+        environ: The environment.
+
+    Raises:
+        ArtifactError: If `SCMLE_TRUSTED` is `1` and `SCMLE_ENV` is
+            `production`.
+    """
     if environ.get(TRUSTED) == "1" and is_production(environ):
         raise errors.ArtifactError(
             f"{TRUSTED}=1 is refused when {ENVIRONMENT}=production: sign the "
@@ -72,7 +107,15 @@ def refuse_trusted_in_production(environ: Mapping[str, str]) -> None:
 
 
 def check_listed_files(model_directory: pathlib.Path) -> None:
-    """Checks the checksum of every file the manifest lists, unparsed."""
+    """Checks the checksum of every file the manifest lists, unparsed.
+
+    Args:
+        model_directory: Bundle directory with its manifest.
+
+    Raises:
+        ArtifactError: If the manifest cannot be read or lists no files, a
+            listed file is missing, or a checksum differs.
+    """
     try:
         manifest = json.loads(
             (model_directory / bundle_module.MANIFEST_FILE).read_text(
@@ -98,8 +141,17 @@ def verify_service(
     """Verifies a service folder without deserializing anything.
 
     In production the bundle must be signed, the provenance statement must be
-    present and verify, and `SCMLE_TRUSTED=1` is refused. Elsewhere an
-    unsigned bundle is accepted only with `SCMLE_TRUSTED=1`.
+    present and verify, and `SCMLE_TRUSTED=1` is refused. Elsewhere an unsigned
+    bundle is accepted only with `SCMLE_TRUSTED=1`.
+
+    Args:
+        folder: Service folder with a `model` directory and, optionally, the
+            provenance statement.
+        environ: The environment (`SCMLE_ENV`, `SCMLE_TRUSTED`, the signing key
+            settings).
+
+    Returns:
+        What was established about the folder.
 
     Raises:
         ArtifactError: On any failed check; nothing has been loaded.

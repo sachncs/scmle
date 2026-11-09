@@ -32,7 +32,19 @@ DEFAULT_HOST = "0.0.0.0"  # nosec B104 - a container service binds all interface
 
 
 def number(environ: Mapping[str, str], name: str, default: float) -> float:
-    """Reads a numeric setting; a malformed value is a configuration error."""
+    """Reads a numeric setting; a malformed value is a configuration error.
+
+    Args:
+        environ: The environment.
+        name: Setting name.
+        default: Value used when the setting is absent or empty.
+
+    Returns:
+        The setting as a float, or `default`.
+
+    Raises:
+        ConfigError: If the setting is not a number.
+    """
     raw = environ.get(name)
     if raw is None or raw == "":
         return default
@@ -43,11 +55,19 @@ def number(environ: Mapping[str, str], name: str, default: float) -> float:
 
 
 def settings(environ: Mapping[str, str]) -> dict[str, Any]:
-    """The `HttpServing` keywords an environment asks for.
+    """Builds the `HttpServing` keywords an environment asks for.
 
     The default host is every interface, so a service started without the
     `SCMLE_AUTH_*` settings is refused by `HttpServing` unless `HOST` is a
     loopback address: no container exposes an unauthenticated backend.
+
+    Args:
+        environ: The environment (`HOST`, `PORT`, `SCMLE_*` settings).
+
+    Returns:
+        Keyword arguments for `HttpServing`: host, port, request and concurrency
+        limits, scoring timeout, null and unseen-value policies, and the access
+        gateway.
     """
     return {
         "host": environ.get("HOST", DEFAULT_HOST),
@@ -77,7 +97,16 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
 
 
 def signal_settings(environ: Mapping[str, str]) -> dict[str, Any]:
-    """Where and how often the evaluated signals are written."""
+    """Reads where and how often the evaluated signals are written.
+
+    Args:
+        environ: The environment (`SCMLE_SIGNALS_FILE`,
+            `SCMLE_SIGNALS_INTERVAL`).
+
+    Returns:
+        A dict with `path` (None to use the service log) and `interval` in
+        seconds (60 by default).
+    """
     return {
         "path": environ.get("SCMLE_SIGNALS_FILE") or None,
         "interval": number(environ, "SCMLE_SIGNALS_INTERVAL", 60.0),
@@ -89,9 +118,17 @@ def emit_signals(
     now: float,
     path: pathlib.Path | str | None,
 ) -> int:
-    """Evaluates the monitor and appends one JSON line; returns the count.
+    """Evaluates the monitor and appends one JSON line.
 
     The line goes to `path` when given and to the service log otherwise.
+
+    Args:
+        monitor: The signal monitor to evaluate.
+        now: Evaluation time, in seconds since the epoch.
+        path: File to append to, or None for the log.
+
+    Returns:
+        The number of signals evaluated.
     """
     found = [item.to_dict() for item in monitor.evaluate(now)]
     line = json.dumps({"at": now, "signals": found}, sort_keys=True)
@@ -109,7 +146,17 @@ def signal_loop(
     path: pathlib.Path | str | None,
     interval: float,
 ) -> None:
-    """Evaluates and writes the signals every `interval` seconds."""
+    """Evaluates and writes the signals every `interval` seconds.
+
+    Runs until `stop` is set. A failed evaluation is logged and the loop
+    continues.
+
+    Args:
+        monitor: The signal monitor to evaluate.
+        stop: Event that ends the loop when set.
+        path: File to append to, or None for the log.
+        interval: Seconds between evaluations.
+    """
     while not stop.wait(interval):
         try:
             emit_signals(monitor, time.time(), path)
@@ -120,9 +167,26 @@ def signal_loop(
 def make_loader(
     folder: pathlib.Path, environ: Mapping[str, str]
 ) -> serving.Loader:
-    """Returns the loader that drives the verify and load readiness steps."""
+    """Builds the loader that drives the verify and load readiness steps.
+
+    Args:
+        folder: Service folder holding the `model` directory.
+        environ: The environment (including the signing key).
+
+    Returns:
+        A function that, given the readiness tracker, verifies the folder and
+        loads the model bundle.
+    """
 
     def loader(readiness: guard.Readiness) -> bundle_module.ModelBundle:
+        """Verifies the folder, then loads the model.
+
+        Args:
+            readiness: The readiness tracker updated at each step.
+
+        Returns:
+            The loaded model bundle.
+        """
         readiness.begin(guard.Phase.VERIFYING)
         verified = verify.verify_service(folder, environ)
         readiness.complete(
@@ -144,7 +208,15 @@ def make_loader(
 
 
 def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
-    """Serves the folder until the process is told to stop."""
+    """Serves the folder until the process is told to stop.
+
+    Starts the HTTP server and a background thread that writes the signals, and
+    returns after SIGTERM or a keyboard interrupt, once the server is stopped.
+
+    Args:
+        folder: Service folder.
+        environ: The environment (settings, signing key and access settings).
+    """
     logging.basicConfig(level=logging.INFO)
     monitor = signals.SignalMonitor()
     adapter = serving.HttpServing(
@@ -171,7 +243,15 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
 
 
 def healthcheck(environ: Mapping[str, str]) -> int:
-    """Exit code for a container health check: 0 only when `/readyz` is 200."""
+    """Checks readiness for a container health check.
+
+    Args:
+        environ: The environment; `PORT` names the service port.
+
+    Returns:
+        0 only when `/readyz` on the loopback address answers with success,
+        otherwise 1.
+    """
     port = int(number(environ, "PORT", 8000))
     try:
         with urllib.request.urlopen(  # nosec B310 - fixed loopback URL

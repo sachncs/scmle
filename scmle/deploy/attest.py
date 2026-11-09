@@ -13,8 +13,8 @@ Two statements, in the shape of an in-toto statement (subject, predicate):
 Both are signed with HMAC-SHA256 under the signing key. That proves the
 statement was made by a holder of the key and was not altered; it is not a
 public-key signature, a transparency-log entry or a SLSA level, and it does
-not prove that the build host was honest. Federated, keyless signing is a
-later phase.
+not prove that the build host was honest. Federated, keyless signing is not
+provided.
 """
 
 import argparse
@@ -45,7 +45,16 @@ MATERIAL_FILES = (
 
 
 def material(root: pathlib.Path, name: str) -> dict[str, Any]:
-    """Describes one file of the folder by SHA-256."""
+    """Describes one file of the folder by SHA-256.
+
+    Args:
+        root: Service folder.
+        name: File name relative to `root`; the file must exist.
+
+    Returns:
+        A dict with `name` and `digest`, the latter a dict whose `sha256` is the
+        hex digest without the `sha256:` prefix.
+    """
     digest = provenance.file_digest(root / name)
     return {"name": name, "digest": {"sha256": digest.removeprefix("sha256:")}}
 
@@ -56,7 +65,18 @@ def statement(
     predicate_type: str,
     predicate: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Builds an unsigned statement about one subject."""
+    """Builds an unsigned statement about one subject.
+
+    Args:
+        subject_name: Name of the subject.
+        subject_digest: SHA-256 digest of the subject, with or without the
+            `sha256:` prefix.
+        predicate_type: URI of the predicate type.
+        predicate: Predicate content; copied.
+
+    Returns:
+        An in-toto style statement with one subject.
+    """
     return {
         "_type": STATEMENT_TYPE,
         "subject": [
@@ -73,7 +93,16 @@ def statement(
 def sign_statement(
     body: Mapping[str, Any], signing_key: str | bytes | None
 ) -> dict[str, Any]:
-    """Wraps a statement with its signature; unsigned without a key."""
+    """Wraps a statement with its signature; unsigned without a key.
+
+    Args:
+        body: The statement to sign.
+        signing_key: Signing key, or None to resolve it from the environment.
+
+    Returns:
+        A dict with the `statement`, the signature `algorithm` and the
+        `signature`, which is None when no key could be resolved.
+    """
     key = signing.resolve_key(signing_key)
     return {
         "statement": dict(body),
@@ -87,14 +116,18 @@ def verify_document(
 ) -> tuple[dict[str, Any], bool]:
     """Checks a signed statement.
 
+    Args:
+        document: A document produced by `sign_statement`.
+        signing_key: Signing key, or None to resolve it from the environment.
+
     Returns:
         The statement and whether its signature was verified. A statement
         without a signature, or checked without a key, is returned as
         unverified; the caller decides whether that is acceptable.
 
     Raises:
-        ArtifactError: If the document is malformed or its signature is
-            present and wrong.
+        ArtifactError: If the document is malformed or its signature is present
+            and wrong.
     """
     body = document.get("statement")
     if (
@@ -121,7 +154,18 @@ def verify_document(
 
 
 def read_document(path: pathlib.Path) -> dict[str, Any]:
-    """Reads an attestation file."""
+    """Reads an attestation file.
+
+    Args:
+        path: Path of the JSON file.
+
+    Returns:
+        The parsed JSON object.
+
+    Raises:
+        ArtifactError: If the file cannot be read or parsed, or does not hold a
+            JSON object.
+    """
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -132,7 +176,14 @@ def read_document(path: pathlib.Path) -> dict[str, Any]:
 
 
 def write_document(path: pathlib.Path, document: Mapping[str, Any]) -> None:
-    """Writes an attestation file deterministically."""
+    """Writes an attestation file deterministically.
+
+    Keys are sorted and the file ends with a newline.
+
+    Args:
+        path: Destination file.
+        document: The document to write.
+    """
     path.write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -147,7 +198,20 @@ def write_provenance(
     base_image: str,
     signing_key: str | bytes | None,
 ) -> dict[str, Any]:
-    """Writes `provenance.json` for a packaged service folder."""
+    """Writes `provenance.json` for a packaged service folder.
+
+    The materials are those files of `MATERIAL_FILES` that exist in the folder.
+
+    Args:
+        folder: Service folder.
+        bundle_digest: Manifest digest of the model bundle (the subject).
+        builder: Identifier of the builder, recorded in the predicate.
+        base_image: Pinned base image, recorded in the predicate.
+        signing_key: Signing key, or None to resolve it from the environment.
+
+    Returns:
+        The signed (or unsigned, without a key) document that was written.
+    """
     materials = [
         material(folder, name)
         for name in MATERIAL_FILES
@@ -171,7 +235,16 @@ def write_provenance(
 def material_problems(
     folder: pathlib.Path, body: Mapping[str, Any]
 ) -> list[str]:
-    """Lists materials of a service statement that differ from the folder."""
+    """Lists materials of a service statement that differ from the folder.
+
+    Args:
+        folder: Service folder to check.
+        body: The verified statement, whose predicate lists the materials.
+
+    Returns:
+        One message per material that is missing or whose digest has changed;
+        empty if all match.
+    """
     problems = []
     for item in body.get("predicate", {}).get("materials", []):
         path = folder / str(item.get("name", ""))
@@ -190,7 +263,17 @@ def write_image_attestation(
     base_image_lock: Mapping[str, str],
     signing_key: str | bytes | None,
 ) -> dict[str, Any]:
-    """Writes `image-attestation.json`, binding an image to its provenance."""
+    """Writes `image-attestation.json`, binding an image to its provenance.
+
+    Args:
+        folder: Service folder holding `provenance.json`, which must exist.
+        image_digest: Digest of the built image (the subject).
+        base_image_lock: The base image lock record (image and digest).
+        signing_key: Signing key, or None to resolve it from the environment.
+
+    Returns:
+        The signed (or unsigned, without a key) document that was written.
+    """
     provenance_digest = provenance.file_digest(folder / PROVENANCE_FILE)
     body = statement(
         "image",
@@ -213,6 +296,16 @@ def verify_image(
     require_signature: bool = True,
 ) -> dict[str, Any]:
     """Verifies that `image_digest` was attested for this folder.
+
+    Args:
+        folder: Service folder holding the attestation and provenance files.
+        image_digest: Digest the image is expected to have, as `sha256:<hex>`.
+        signing_key: Signing key, or None to resolve it from the environment.
+        require_signature: Whether an unsigned or unverifiable attestation is
+            refused.
+
+    Returns:
+        The verified attestation statement.
 
     Raises:
         ArtifactError: If the signature is missing or wrong, the image digest
@@ -237,7 +330,15 @@ def verify_image(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Command-line entry point used by the generated `build.sh`."""
+    """Runs the command line used by the generated `build.sh`.
+
+    Args:
+        arguments: Command-line arguments; None reads `sys.argv`.
+
+    Returns:
+        0 after the image attestation is written, 1 if an input cannot be read
+        or the attestation cannot be made (the error goes to stderr).
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     actions = parser.add_subparsers(dest="action", required=True)
     image = actions.add_parser("image", help="attest a built image")

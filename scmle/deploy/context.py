@@ -55,12 +55,23 @@ MAX_SCANNED_BYTES = 64 * 1024 * 1024
 
 
 def dockerignore_text() -> str:
-    """The `.dockerignore` written beside a generated Dockerfile."""
+    """Builds the `.dockerignore` written beside a generated Dockerfile.
+
+    Returns:
+        One pattern per line from `IGNORED`, ending with a newline.
+    """
     return "\n".join(IGNORED) + "\n"
 
 
 def patterns(root: pathlib.Path) -> list[str]:
-    """Reads the patterns of the folder's `.dockerignore`."""
+    """Reads the patterns of the folder's `.dockerignore`.
+
+    Args:
+        root: The folder to be built.
+
+    Returns:
+        The non-blank, non-comment lines; empty if there is no `.dockerignore`.
+    """
     path = root / ".dockerignore"
     if not path.exists():
         return []
@@ -72,7 +83,16 @@ def patterns(root: pathlib.Path) -> list[str]:
 
 
 def excluded(relative: str, ignore: Iterable[str]) -> bool:
-    """Whether `.dockerignore` removes `relative` from the context."""
+    """Reports whether `.dockerignore` removes `relative` from the context.
+
+    Args:
+        relative: POSIX path relative to the build folder.
+        ignore: Glob patterns, matched against the whole path and against each
+            path component.
+
+    Returns:
+        True if any pattern matches.
+    """
     parts = relative.split("/")
     for pattern in ignore:
         if fnmatch.fnmatch(relative, pattern):
@@ -83,7 +103,15 @@ def excluded(relative: str, ignore: Iterable[str]) -> bool:
 
 
 def included_files(root: str | pathlib.Path) -> list[pathlib.Path]:
-    """Files that would be sent to the builder, relative to `root`."""
+    """Lists the files that would be sent to the builder.
+
+    Args:
+        root: The folder to be built.
+
+    Returns:
+        Paths relative to `root`, sorted, for every file that the folder's
+        `.dockerignore` does not exclude.
+    """
     base = pathlib.Path(root)
     ignore = patterns(base)
     return sorted(
@@ -151,6 +179,10 @@ def require_clean(
 ) -> None:
     """Raises if `scan` finds anything.
 
+    Args:
+        root: The folder to be built.
+        secret_values: Secret strings that must not appear in it.
+
     Raises:
         ArtifactError: Listing every finding.
     """
@@ -163,7 +195,14 @@ def require_clean(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Command-line entry point: `python -m scmle.deploy.context check DIR`."""
+    """Runs the command line: `python -m scmle.deploy.context check DIR`.
+
+    Args:
+        arguments: Command-line arguments; None reads `sys.argv`.
+
+    Returns:
+        1 if the scan reports findings (printed to stderr), otherwise 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("action", choices=["check"])
     parser.add_argument("folder", type=pathlib.Path)

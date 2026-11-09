@@ -33,14 +33,24 @@ DENIED = (401, 403)
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Response:
-    """One HTTP answer: status, headers (lower-case names) and body."""
+    """One HTTP answer: status, headers (lower-case names) and body.
+
+    Attributes:
+        status: HTTP status code.
+        headers: Response headers, with lower-case names.
+        body: Raw response body.
+    """
 
     status: int
     headers: Mapping[str, str]
     body: bytes
 
     def json(self) -> dict[str, Any]:
-        """The body as a JSON object, or an empty dict if it is not one."""
+        """Parses the body as JSON.
+
+        Returns:
+            The body as a JSON object, or an empty dict if it is not one.
+        """
         try:
             value = json.loads(self.body)
         except (ValueError, UnicodeError):
@@ -54,7 +64,18 @@ Fetch = Callable[[str, str, Mapping[str, str], bytes | None], Response]
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class CheckResult:
-    """The outcome of one check, bound to the build it ran against."""
+    """The outcome of one check, bound to the build it ran against.
+
+    Attributes:
+        name: Check name (one of `CHECK_NAMES`).
+        passed: Whether the check found no problem.
+        problems: What the check found wrong; empty if it passed.
+        evidence_digest: Digest of the HTTP exchanges the result rests on.
+        environment: Environment the check ran against.
+        source_commit: Source commit of the build checked.
+        container_digest: Digest of the image checked.
+        model_digest: Digest of the model checked.
+    """
 
     name: str
     passed: bool
@@ -66,14 +87,28 @@ class CheckResult:
     model_digest: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict of all fields, with `problems` as a list.
+        """
         record = dataclasses.asdict(self)
         record["problems"] = list(self.problems)
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "CheckResult":
-        """Rebuilds a result from `to_dict`."""
+        """Rebuilds a result from `to_dict`.
+
+        Args:
+            record: A record produced by `to_dict`.
+
+        Returns:
+            The result.
+
+        Raises:
+            ConfigError: If the record's fields are not exactly the result's.
+        """
         names = {f.name for f in dataclasses.fields(cls)}
         if set(record) != names:
             raise errors.ConfigError("unexpected or missing check fields")
@@ -84,7 +119,18 @@ class CheckResult:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Target:
-    """What the checks are run for."""
+    """What the checks are run for.
+
+    Attributes:
+        environment: Environment name.
+        source_commit: Source commit of the build.
+        container_digest: Digest of the deployed image.
+        model_digest: Digest of the deployed model.
+        token: Bearer token of a caller allowed to use the service.
+        base_url: Base URL of the service.
+        read_only_token: Token of a caller that must not reach `/predict`; None
+            skips that check.
+    """
 
     environment: str
     source_commit: str
@@ -96,10 +142,19 @@ class Target:
 
 
 class Recorder:
-    """Wraps ``fetch`` and keeps a digest of every exchange."""
+    """Wraps ``fetch`` and keeps a digest of every exchange.
+
+    Attributes:
+        fetch: The wrapped request function.
+        exchanges: One record per request made so far.
+    """
 
     def __init__(self, fetch: Fetch) -> None:
-        """Starts with no exchanges."""
+        """Starts with no exchanges.
+
+        Args:
+            fetch: The request function to wrap.
+        """
         self.fetch = fetch
         self.exchanges: list[dict[str, Any]] = []
 
@@ -110,7 +165,17 @@ class Recorder:
         headers: Mapping[str, str] | None = None,
         body: bytes | None = None,
     ) -> Response:
-        """Sends a request and remembers what came back (never the token)."""
+        """Sends a request and remembers what came back (never the token).
+
+        Args:
+            method: HTTP method.
+            path: Request path.
+            headers: Request headers; none if None.
+            body: Request body; none if None.
+
+        Returns:
+            The response.
+        """
         response = self.fetch(method, path, dict(headers or {}), body)
         self.exchanges.append(
             {
@@ -123,25 +188,55 @@ class Recorder:
         return response
 
     def digest(self) -> str:
-        """Digest of the exchanges so far."""
+        """Digests the exchanges so far.
+
+        Returns:
+            `sha256:` followed by the hex SHA-256 of the recorded method, path,
+            status and response hash of every exchange.
+        """
         payload = json.dumps(self.exchanges, sort_keys=True).encode()
         return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
 def bearer(token: str | None) -> dict[str, str]:
-    """The Authorization header for ``token``, or none."""
+    """Builds the Authorization header for ``token``, or none.
+
+    Args:
+        token: The bearer token, or None.
+
+    Returns:
+        A one-entry header dict, or an empty dict if ``token`` is None.
+    """
     return {} if token is None else {"Authorization": f"Bearer {token}"}
 
 
 def json_headers(token: str | None) -> dict[str, str]:
-    """Headers of a JSON request."""
+    """Builds the headers of a JSON request.
+
+    Args:
+        token: The bearer token, or None for an anonymous request.
+
+    Returns:
+        A dict with the JSON content type and, if given, the Authorization
+        header.
+    """
     return {"Content-Type": "application/json", **bearer(token)}
 
 
 def finish(
     name: str, target: Target, wire: Recorder, problems: list[str]
 ) -> CheckResult:
-    """Builds the result of one check."""
+    """Builds the result of one check.
+
+    Args:
+        name: Check name.
+        target: What the check was run for.
+        wire: The recorder holding the check's exchanges.
+        problems: What the check found wrong.
+
+    Returns:
+        A result that passes exactly when ``problems`` is empty.
+    """
     return CheckResult(
         name,
         not problems,
@@ -155,7 +250,17 @@ def finish(
 
 
 def check_health(fetch: Fetch, target: Target) -> CheckResult:
-    """`/livez` and `/readyz` answer 200, the model is loaded and named."""
+    """Checks `/livez`, `/readyz` and `/health` and the model identity.
+
+    Args:
+        fetch: The request function.
+        target: What the check is run for.
+
+    Returns:
+        The result; it fails if `/livez` or `/readyz` does not answer 200 or the
+        service is not ready, `/health` is not ok, or the reported artifact
+        digest is not the target's model digest.
+    """
     wire = Recorder(fetch)
     problems: list[str] = []
     live = wire.call("GET", "/livez")
@@ -175,7 +280,17 @@ def check_health(fetch: Fetch, target: Target) -> CheckResult:
 
 
 def check_schema(fetch: Fetch, target: Target) -> CheckResult:
-    """`/schema` serves the contract with a digest and the model identity."""
+    """Checks that `/schema` serves the contract, digest and model identity.
+
+    Args:
+        fetch: The request function.
+        target: What the check is run for.
+
+    Returns:
+        The result; it fails if `/schema` does not answer 200, lacks a schema
+        version, digest or request/response schema, or names a different model
+        digest.
+    """
     wire = Recorder(fetch)
     problems: list[str] = []
     reply = wire.call("GET", "/schema", bearer(target.token))
@@ -202,7 +317,19 @@ def check_inference(
     golden: parity.GoldenSet,
     expected: dict[str, Any],
 ) -> CheckResult:
-    """The golden records score within the declared cross-environment bound."""
+    """Checks that the golden records score within the declared bound.
+
+    Args:
+        fetch: The request function.
+        target: What the check is run for.
+        golden: The golden records and their cross-environment tolerances.
+        expected: The reference predictions and probabilities to compare with.
+
+    Returns:
+        The result; it fails if `/predict` does not answer 200, the response
+        lacks required keys, the scores differ beyond the bound, or the
+        answering model is not the target's.
+    """
     wire = Recorder(fetch)
     problems: list[str] = []
     request = json.dumps({"records": golden.records}).encode()
@@ -228,7 +355,19 @@ def check_inference(
 
 
 def check_security(fetch: Fetch, target: Target) -> CheckResult:
-    """Anonymous and forged callers are refused; transport is TLS."""
+    """Checks that anonymous and forged callers are refused, over TLS.
+
+    Args:
+        fetch: The request function.
+        target: What the check is run for.
+
+    Returns:
+        The result; it fails if the service is reached over plain HTTP outside
+        loopback, a request without a token or with a forged token is not
+        answered 401 or 403 or leaks a traceback, a 401 lacks a WWW-Authenticate
+        header, or the read-only token (when given) is not answered 403 on
+        `/predict`.
+    """
     wire = Recorder(fetch)
     problems: list[str] = []
     host = urllib.parse.urlparse(target.base_url)
@@ -269,7 +408,18 @@ def run_checks(
     golden: parity.GoldenSet,
     expected: dict[str, Any],
 ) -> list[CheckResult]:
-    """Runs the four checks in order; a failing check does not stop the rest."""
+    """Runs the four checks in order; a failing check does not stop the rest.
+
+    Args:
+        fetch: The request function.
+        target: What the checks are run for.
+        golden: The golden records and their cross-environment tolerances.
+        expected: The reference predictions and probabilities for the inference
+            check.
+
+    Returns:
+        The health, schema, inference and security results, in that order.
+    """
     return [
         check_health(fetch, target),
         check_schema(fetch, target),
@@ -279,7 +429,15 @@ def run_checks(
 
 
 def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
-    """A `Fetch` over HTTP(S) to ``base_url`` (no redirects followed).
+    """Builds a `Fetch` over HTTP(S) to ``base_url`` (no redirects followed).
+
+    Args:
+        base_url: Absolute http(s) URL of the service.
+        timeout: Seconds to wait for each request.
+
+    Returns:
+        A function that sends a request and returns the response; HTTP error
+        statuses are returned as responses, not raised.
 
     Raises:
         ConfigError: If the URL is not an absolute http(s) URL.
@@ -293,7 +451,15 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
         """Redirects are answers, not something to follow with a token."""
 
         def redirect_request(self, *arguments: Any, **keywords: Any) -> None:
-            """Refuses to follow."""
+            """Refuses to follow a redirect.
+
+            Args:
+                *arguments: Ignored.
+                **keywords: Ignored.
+
+            Returns:
+                None, so the redirect response is returned to the caller.
+            """
             return None
 
     opener = urllib.request.build_opener(NoRedirect)
@@ -304,6 +470,18 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
         headers: Mapping[str, str],
         body: bytes | None,
     ) -> Response:
+        """Sends one request to the service.
+
+        Args:
+            method: HTTP method.
+            path: Request path, appended to the base URL.
+            headers: Request headers.
+            body: Request body, or None.
+
+        Returns:
+            The response, with lower-case header names. A non-2xx status is
+            returned, not raised.
+        """
         request = urllib.request.Request(
             root + path, data=body, headers=dict(headers), method=method
         )

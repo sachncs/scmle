@@ -33,6 +33,13 @@ DIGEST_HEADER = "X-Content-SHA256"
 def safe_key(raw: str) -> pathlib.PurePosixPath:
     """Validates an object path of the form `bucket/key...`.
 
+    Args:
+        raw: Request path, optionally with a query string.
+
+    Returns:
+        The path without the query string and leading slashes, with at least a
+        bucket and a key component.
+
     Raises:
         ValueError: If the path escapes the store or lacks a bucket and key.
     """
@@ -45,28 +52,55 @@ def safe_key(raw: str) -> pathlib.PurePosixPath:
 
 
 class MockServer:
-    """A background HTTP server with a lifecycle."""
+    """A background HTTP server with a lifecycle.
+
+    Attributes:
+        host: Interface to bind.
+        port: Port to bind; 0 lets the system choose.
+        httpd: The running server, or None when stopped.
+        thread: The serving thread, or None when stopped.
+    """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 0) -> None:
-        """Remembers where to bind; nothing listens until `start`."""
+        """Remembers where to bind; nothing listens until `start`.
+
+        Args:
+            host: Interface to bind.
+            port: Port to bind; 0 lets the system choose.
+        """
         self.host = host
         self.port = port
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
 
     def handler(self) -> type[server.BaseHTTPRequestHandler]:
-        """The request handler class; subclasses provide it."""
+        """Builds the request handler class; subclasses provide it.
+
+        Returns:
+            The handler class the server uses for every request.
+
+        Raises:
+            NotImplementedError: Always, in this base class.
+        """
         raise NotImplementedError
 
     @property
     def address(self) -> str:
-        """Base URL once started."""
+        """The base URL of the running server.
+
+        Raises:
+            ScmleError: If the server is not running.
+        """
         if self.httpd is None:
             raise errors.ScmleError("server is not running")
         return f"http://{self.host}:{self.httpd.server_address[1]}"
 
     def start(self) -> None:
-        """Binds and serves in a daemon thread."""
+        """Binds and serves in a daemon thread.
+
+        Raises:
+            ScmleError: If the server is already running.
+        """
         if self.httpd is not None:
             raise errors.ScmleError("server is already running")
         self.httpd = server.ThreadingHTTPServer(
@@ -88,24 +122,48 @@ class MockServer:
 
 
 class ObjectStore(MockServer):
-    """PUT, GET, HEAD and list over `/<bucket>/<key>`, with SHA-256 etags."""
+    """PUT, GET, HEAD and list over `/<bucket>/<key>`, with SHA-256 etags.
+
+    Attributes:
+        root: Directory under which objects are stored.
+    """
 
     def __init__(
         self, root: str | pathlib.Path, host: str = "127.0.0.1", port: int = 0
     ) -> None:
-        """Stores objects under `root`."""
+        """Stores objects under `root`.
+
+        Args:
+            root: Directory for the objects; created as needed.
+            host: Interface to bind.
+            port: Port to bind; 0 lets the system choose.
+        """
         super().__init__(host, port)
         self.root = pathlib.Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
 
     def handler(self) -> type[server.BaseHTTPRequestHandler]:
-        """Builds the request handler bound to this store."""
+        """Builds the request handler bound to this store.
+
+        Returns:
+            The handler class.
+        """
         store = self
 
         class Handler(server.BaseHTTPRequestHandler):
+            """Serves the object store's requests."""
+
             def reply(
                 self, status: int, body: bytes, headers: dict[str, str]
             ) -> None:
+                """Sends a response.
+
+                Args:
+                    status: HTTP status code.
+                    body: Response body; omitted from the wire for HEAD
+                        requests.
+                    headers: Extra response headers.
+                """
                 self.send_response(status)
                 self.send_header("Content-Length", str(len(body)))
                 for name, value in headers.items():
@@ -115,10 +173,22 @@ class ObjectStore(MockServer):
                     self.wfile.write(body)
 
             def problem(self, status: int, message: str) -> None:
+                """Sends a JSON error response.
+
+                Args:
+                    status: HTTP status code.
+                    message: Text placed under `error` in the body.
+                """
                 body = json.dumps({"error": message}).encode()
                 self.reply(status, body, {"Content-Type": "application/json"})
 
             def target(self) -> pathlib.Path | None:
+                """Maps the request path to a file under the store root.
+
+                Returns:
+                    The file path, or None after a 400 response when the path is
+                    not a valid `/<bucket>/<key>`.
+                """
                 try:
                     relative = safe_key(self.path)
                 except ValueError as error:
@@ -127,6 +197,11 @@ class ObjectStore(MockServer):
                 return store.root.joinpath(*relative.parts)
 
             def do_PUT(self) -> None:
+                """Stores the request body if its size and digest are allowed.
+
+                The stored bytes are written atomically and the response carries
+                their SHA-256 as the `ETag`.
+                """
                 path = self.target()
                 if path is None:
                     return
@@ -145,6 +220,7 @@ class ObjectStore(MockServer):
                 self.reply(200, b"", {"ETag": digest})
 
             def do_GET(self) -> None:
+                """Serves `/healthz`, a listing (`?list`) or one object."""
                 if self.path == "/healthz":
                     self.reply(200, b"ok", {"Content-Type": "text/plain"})
                     return
@@ -180,28 +256,49 @@ class ObjectStore(MockServer):
                 )
 
             def do_HEAD(self) -> None:
+                """Answers like GET, without a body."""
                 self.do_GET()
 
             def log_message(self, format: str, *args: Any) -> None:
-                """Silences per-request logging."""
+                """Silences per-request logging.
+
+                Args:
+                    format: Log message format; ignored.
+                    *args: Format arguments; ignored.
+                """
 
         return Handler
 
 
 class MetricsSink(MockServer):
-    """Accepts metric samples on POST /metrics and replays them on GET."""
+    """Accepts metric samples on POST /metrics and replays them on GET.
+
+    Attributes:
+        file: JSON-lines file the samples are appended to.
+        lock: Guards reads and appends of the file.
+    """
 
     def __init__(
         self, file: str | pathlib.Path, host: str = "127.0.0.1", port: int = 0
     ) -> None:
-        """Appends validated samples to `file` (JSON lines)."""
+        """Appends validated samples to `file` (JSON lines).
+
+        Args:
+            file: JSON-lines file for the samples; its directory is created.
+            host: Interface to bind.
+            port: Port to bind; 0 lets the system choose.
+        """
         super().__init__(host, port)
         self.file = pathlib.Path(file)
         self.file.parent.mkdir(parents=True, exist_ok=True)
         self.lock = threading.Lock()
 
     def samples(self) -> list[dict[str, Any]]:
-        """Every stored sample."""
+        """Reads every stored sample.
+
+        Returns:
+            The samples in the order they were stored; empty if there are none.
+        """
         with self.lock:
             if not self.file.exists():
                 return []
@@ -212,11 +309,23 @@ class MetricsSink(MockServer):
             ]
 
     def handler(self) -> type[server.BaseHTTPRequestHandler]:
-        """Builds the request handler bound to this sink."""
+        """Builds the request handler bound to this sink.
+
+        Returns:
+            The handler class.
+        """
         sink = self
 
         class Handler(server.BaseHTTPRequestHandler):
+            """Serves the metrics sink's requests."""
+
             def reply(self, status: int, payload: dict[str, Any]) -> None:
+                """Sends a JSON response.
+
+                Args:
+                    status: HTTP status code.
+                    payload: Object sent as the body.
+                """
                 body = json.dumps(payload).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
@@ -225,6 +334,7 @@ class MetricsSink(MockServer):
                 self.wfile.write(body)
 
             def do_GET(self) -> None:
+                """Serves `/healthz` and `/metrics`."""
                 if self.path == "/healthz":
                     self.reply(200, {"status": "ok"})
                 elif self.path == "/metrics":
@@ -234,6 +344,12 @@ class MetricsSink(MockServer):
                     self.reply(404, {"error": "not found"})
 
             def do_POST(self) -> None:
+                """Validates and stores the samples posted to `/metrics`.
+
+                The body is one sample or a list. Any invalid sample rejects the
+                whole request with 400 and nothing is stored; the response
+                reports how many were accepted.
+                """
                 if self.path != "/metrics":
                     self.reply(404, {"error": "not found"})
                     return
@@ -257,16 +373,35 @@ class MetricsSink(MockServer):
                 self.reply(200, {"accepted": len(samples)})
 
             def server_file(self) -> Any:
+                """Opens the sample file for appending.
+
+                Returns:
+                    The open text file.
+                """
                 return sink.file.open("a", encoding="utf-8", newline="\n")
 
             def log_message(self, format: str, *args: Any) -> None:
-                """Silences per-request logging."""
+                """Silences per-request logging.
+
+                Args:
+                    format: Log message format; ignored.
+                    *args: Format arguments; ignored.
+                """
 
         return Handler
 
 
 def put_object(base: str, path: str, data: bytes, timeout: float = 30.0) -> str:
-    """Uploads `data` to `base/path`; returns the etag the store computed.
+    """Uploads `data` to `base/path`.
+
+    Args:
+        base: Base URL of the object store.
+        path: Object path, `<bucket>/<key>`.
+        data: Object bytes.
+        timeout: Seconds to wait.
+
+    Returns:
+        The etag the store computed (the SHA-256 digest of the bytes).
 
     Raises:
         ArtifactError: If the store's digest differs from the local one.
@@ -290,6 +425,16 @@ def get_object(
 ) -> bytes:
     """Downloads `base/path`, refusing bytes whose digest is not `expected`.
 
+    Args:
+        base: Base URL of the object store.
+        path: Object path, `<bucket>/<key>`.
+        expected: Digest the bytes must have, or None to check only against the
+            store's etag.
+        timeout: Seconds to wait.
+
+    Returns:
+        The object bytes.
+
     Raises:
         ArtifactError: If the digest differs from `expected` or the store's
             etag.
@@ -307,7 +452,16 @@ def get_object(
 def post_metrics(
     base: str, samples: list[observability.MetricSample], timeout: float = 30.0
 ) -> int:
-    """Sends samples to a sink; returns how many it accepted."""
+    """Sends samples to a sink.
+
+    Args:
+        base: Base URL of the metrics sink.
+        samples: The samples to send.
+        timeout: Seconds to wait.
+
+    Returns:
+        How many samples the sink accepted.
+    """
     request = urllib.request.Request(
         f"{base.rstrip('/')}/metrics",
         json.dumps([sample.to_dict() for sample in samples]).encode(),
@@ -319,7 +473,14 @@ def post_metrics(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Runs one mock service until interrupted."""
+    """Runs one mock service until interrupted.
+
+    Args:
+        arguments: Command-line arguments; None reads `sys.argv`.
+
+    Returns:
+        0 after the service is stopped by a keyboard interrupt.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     actions = parser.add_subparsers(dest="service", required=True)
     store = actions.add_parser("object-store")

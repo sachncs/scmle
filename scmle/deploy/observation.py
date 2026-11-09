@@ -19,13 +19,23 @@ REVISION_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}")
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Traffic:
-    """The share of traffic one revision receives."""
+    """The share of traffic one revision receives.
+
+    Attributes:
+        revision: Revision identifier.
+        percent: Share of traffic from 0 to 100.
+    """
 
     revision: str
     percent: int
 
     def __post_init__(self) -> None:
-        """Validates the share."""
+        """Validates the share.
+
+        Raises:
+            ConfigError: If the revision identifier is malformed or the percent
+                is not an integer from 0 to 100.
+        """
         if REVISION_PATTERN.fullmatch(self.revision) is None:
             raise errors.ConfigError(f"bad revision {self.revision!r}")
         if isinstance(self.percent, bool) or not 0 <= self.percent <= 100:
@@ -57,7 +67,13 @@ class Observation:
     revisions: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
-        """Validates digests and the traffic split."""
+        """Validates digests and the traffic split.
+
+        Raises:
+            ConfigError: If the revision identifier is malformed or the traffic
+                shares do not sum to 100; a malformed image digest is refused
+                with the same error.
+        """
         if REVISION_PATTERN.fullmatch(self.revision) is None:
             raise errors.ConfigError(f"bad revision {self.revision!r}")
         contract.require_digest(self.image_digest, "observation.image_digest")
@@ -65,18 +81,38 @@ class Observation:
             raise errors.ConfigError("traffic shares must sum to 100")
 
     def digest_of(self, revision: str) -> str | None:
-        """The image digest the response named for ``revision``."""
+        """Looks up the image digest of a revision.
+
+        Args:
+            revision: Revision identifier.
+
+        Returns:
+            The digest the response named for the revision; the primary's digest
+            if it is the primary revision; None if the revision is unknown.
+        """
         for name, digest in self.revisions:
             if name == revision:
                 return digest
         return self.image_digest if revision == self.revision else None
 
     def share_of(self, revision: str) -> int:
-        """Percent of traffic ``revision`` holds."""
+        """Sums the traffic a revision holds.
+
+        Args:
+            revision: Revision identifier.
+
+        Returns:
+            Percent of traffic the revision holds; 0 if it is not in the split.
+        """
         return sum(t.percent for t in self.traffic if t.revision == revision)
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict of all fields, with traffic as a list of dicts and revisions
+            as a list of pairs.
+        """
         return {
             "provider": self.provider,
             "service": self.service,

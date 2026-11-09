@@ -48,6 +48,15 @@ Fetcher = Callable[[str, str], str]
 def split_image(image: str) -> tuple[str, str, str]:
     """Splits `repo:tag` into (registry, repository, tag).
 
+    Docker Hub is assumed when no registry is given, and official images get the
+    `library/` prefix.
+
+    Args:
+        image: Image reference in the form `[registry/]repository:tag`.
+
+    Returns:
+        The registry host, the repository and the tag.
+
     Raises:
         ConfigError: If the reference is not `repository:tag` (a digest or a
             missing tag is refused).
@@ -69,7 +78,15 @@ def split_image(image: str) -> tuple[str, str, str]:
 def fetch_registry_digest(image: str, timeout: float = 30.0) -> str:
     """Asks the registry for the digest of the index behind `image`.
 
-    Only Docker Hub-style token authentication is implemented.
+    Only Docker Hub-style token authentication is implemented. This needs
+    network access.
+
+    Args:
+        image: Image reference as `repository:tag`.
+        timeout: Seconds to wait for each registry request.
+
+    Returns:
+        The `Docker-Content-Digest` of the image index.
 
     Raises:
         ArtifactError: If the registry answers with something other than a
@@ -110,9 +127,14 @@ def resolve(
         image: `repository:tag`.
         fetch: Replaces the registry call (tests).
 
+    Returns:
+        A dict with `image`, `digest` and `resolved_at` (an ISO-8601 UTC
+        timestamp).
+
     Raises:
-        ConfigError: If the registry returns something that is not a digest
-            or the placeholder.
+        ConfigError: If the registry returns the placeholder digest. A reply
+            that is not a `sha256:` digest, or an image that is not
+            `repository:tag`, is refused with the same error by the helpers.
     """
     split_image(image)
     digest = (fetch or fetch_registry_digest)(image)
@@ -128,6 +150,12 @@ def resolve(
 
 def read_lock(path: str | pathlib.Path) -> dict[str, str]:
     """Reads and validates a lock; refuses the placeholder.
+
+    Args:
+        path: Path of the lock file written by `resolve`.
+
+    Returns:
+        A dict with the lock's `image` and `digest`.
 
     Raises:
         ArtifactError: If the lock is missing, unreadable or unresolved.
@@ -157,13 +185,27 @@ def read_lock(path: str | pathlib.Path) -> dict[str, str]:
 
 
 def build_argument(lock: dict[str, str]) -> str:
-    """The value for `--build-arg BASE_IMAGE=`."""
+    """Builds the value for `--build-arg BASE_IMAGE=`.
+
+    Args:
+        lock: A lock record with `image` and `digest`.
+
+    Returns:
+        The image repository pinned to the digest, as `repository@digest`.
+    """
     repository = lock["image"].rsplit(":", 1)[0]
     return f"{repository}@{lock['digest']}"
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Command-line entry point."""
+    """Runs the command line (`resolve`, `argument` or `check`).
+
+    Args:
+        arguments: Command-line arguments; None reads `sys.argv`.
+
+    Returns:
+        0 on success, 1 if the action fails (the error goes to stderr).
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     actions = parser.add_subparsers(dest="action", required=True)
     resolve_parser = actions.add_parser("resolve", help="ask the registry")

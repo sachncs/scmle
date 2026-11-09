@@ -40,7 +40,17 @@ REQUIRED = (
 
 
 def read_json(path: pathlib.Path) -> Any:
-    """Reads JSON or raises an `ArtifactError` naming the file."""
+    """Reads JSON or raises an `ArtifactError` naming the file.
+
+    Args:
+        path: JSON file to read.
+
+    Returns:
+        The parsed JSON value.
+
+    Raises:
+        ArtifactError: If the file cannot be read or parsed.
+    """
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError) as error:
@@ -48,7 +58,17 @@ def read_json(path: pathlib.Path) -> Any:
 
 
 def approval_from_dict(record: Mapping[str, Any]) -> registry.PromotionApproval:
-    """Rebuilds a promotion approval from its JSON record."""
+    """Rebuilds a promotion approval from its JSON record.
+
+    Args:
+        record: The approval's fields; `evidence` defaults to empty.
+
+    Returns:
+        The approval.
+
+    Raises:
+        ArtifactError: If the fields do not make a valid approval.
+    """
     values = dict(record)
     values["evidence"] = tuple(values.get("evidence", ()))
     try:
@@ -58,7 +78,14 @@ def approval_from_dict(record: Mapping[str, Any]) -> registry.PromotionApproval:
 
 
 def observation_from_dict(record: Mapping[str, Any]) -> observation.Observation:
-    """Rebuilds an observation from `Observation.to_dict`."""
+    """Rebuilds an observation from `Observation.to_dict`.
+
+    Args:
+        record: A record produced by `Observation.to_dict`.
+
+    Returns:
+        The observation.
+    """
     return observation.Observation(
         provider=record["provider"],
         service=record["service"],
@@ -80,6 +107,14 @@ def scan_result(
 
     An unreadable report, an empty scan or any blocking finding is a failed
     scan, never a pass.
+
+    Args:
+        report: Scanner report file.
+        container_digest: Digest of the scanned image.
+        policy: Policy file; the default policy if None.
+
+    Returns:
+        The scan result, carrying the digest of the report file.
     """
     digest = provenance.file_digest(report)
     try:
@@ -95,6 +130,14 @@ def scan_result(
 def load_candidate(manifest_path: str | pathlib.Path) -> gate.Candidate:
     """Reads a manifest and the evidence it names.
 
+    Args:
+        manifest_path: Release manifest; evidence files are named relative to
+            its folder.
+
+    Returns:
+        The candidate. Evidence that the manifest does not name is left out
+        (None or empty) for the gate to refuse.
+
     Raises:
         ArtifactError: If the manifest or a named file cannot be read, or the
             registry has no such version.
@@ -109,6 +152,15 @@ def load_candidate(manifest_path: str | pathlib.Path) -> gate.Candidate:
     base = path.parent
 
     def file(name: str) -> pathlib.Path | None:
+        """Resolves an optional evidence file named in the manifest.
+
+        Args:
+            name: Manifest key.
+
+        Returns:
+            The path relative to the manifest's folder, or None if the manifest
+            does not name the key.
+        """
         value = manifest.get(name)
         return None if value is None else base / str(value)
 

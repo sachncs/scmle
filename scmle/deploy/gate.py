@@ -41,7 +41,13 @@ STAGING = "staging"
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageScan:
-    """The result of scanning one image."""
+    """The result of scanning one image.
+
+    Attributes:
+        container_digest: Digest of the image that was scanned.
+        passed: Whether the scan passed.
+        report_digest: Digest of the scan report.
+    """
 
     container_digest: str
     passed: bool
@@ -90,14 +96,25 @@ class Candidate:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GateDecision:
-    """The outcome: allowed or not, every reason, and the record if any."""
+    """The outcome: allowed or not, every reason, and the record if any.
+
+    Attributes:
+        allowed: Whether the release may proceed.
+        reasons: Every reason for a refusal; empty when allowed.
+        record: The signed deployment record, present only when `certify`
+            allowed the release.
+    """
 
     allowed: bool
     reasons: tuple[str, ...]
     record: record_module.DeploymentRecord | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict with `allowed`, `reasons` and `record` (a dict or None).
+        """
         return {
             "allowed": self.allowed,
             "reasons": list(self.reasons),
@@ -108,12 +125,28 @@ class GateDecision:
 def model_digest_of(
     store: registry.ModelRegistryStore, version: registry.VersionRecord
 ) -> str:
-    """The digest a service running this registered bundle reports."""
+    """Computes the digest a service running this registered bundle reports.
+
+    Args:
+        store: The model registry holding the bundle.
+        version: The registered version.
+
+    Returns:
+        The bundle digest of the version's directory in the registry.
+    """
     return provenance.bundle_digest(store.root / version.path)
 
 
 def model_problems(candidate: Candidate, key: str | bytes) -> list[str]:
-    """Why the model may not be released, empty if it may."""
+    """Lists why the model may not be released, empty if it may.
+
+    Args:
+        candidate: The release.
+        key: The HMAC key that verifies the approval.
+
+    Returns:
+        One message per problem with the model's signature, approval or digest.
+    """
     problems = []
     if not candidate.model.signed:
         problems.append("the model artifact is unsigned")
@@ -138,7 +171,15 @@ def model_problems(candidate: Candidate, key: str | bytes) -> list[str]:
 
 
 def admit_problems(candidate: Candidate, key: str | bytes) -> list[str]:
-    """Reasons the build may not be deployed to the environment."""
+    """Lists the reasons the build may not be deployed to the environment.
+
+    Args:
+        candidate: The release.
+        key: The HMAC key that verifies approvals and records.
+
+    Returns:
+        One message per problem; empty if the build may be deployed.
+    """
     problems = model_problems(candidate, key)
     if candidate.environment not in record_module.ENVIRONMENTS:
         problems.append(f"unknown environment {candidate.environment!r}")
@@ -161,7 +202,15 @@ def admit_problems(candidate: Candidate, key: str | bytes) -> list[str]:
 
 
 def staging_problems(candidate: Candidate, key: str | bytes) -> list[str]:
-    """Reasons the staging record does not support a production release."""
+    """Lists the reasons the staging record does not support production.
+
+    Args:
+        candidate: The release; its `staging_record` is examined.
+        key: The HMAC key that verifies the record.
+
+    Returns:
+        One message per problem; empty if the record supports the release.
+    """
     staged = candidate.staging_record
     if staged is None:
         return ["production needs a staging deployment record"]
@@ -187,7 +236,15 @@ def staging_problems(candidate: Candidate, key: str | bytes) -> list[str]:
 
 
 def check_problems(candidate: Candidate) -> list[str]:
-    """Reasons the live checks do not support the release."""
+    """Lists the reasons the live checks do not support the release.
+
+    Args:
+        candidate: The release; its `checks` are examined.
+
+    Returns:
+        One message per missing, failed or mis-bound check; empty if all
+        required checks passed for this build.
+    """
     problems = []
     results = {item.name: item for item in candidate.checks}
     for name in livetests.CHECK_NAMES:
@@ -210,7 +267,15 @@ def check_problems(candidate: Candidate) -> list[str]:
 
 
 def runtime_problems(candidate: Candidate) -> list[str]:
-    """Reasons the platform does not show the candidate running."""
+    """Lists the reasons the platform does not show the candidate running.
+
+    Args:
+        candidate: The release; its `observation` is examined.
+
+    Returns:
+        One message per problem; empty if the platform reports the candidate's
+        image, from the same provider, ready.
+    """
     seen = candidate.observation
     if seen is None:
         return ["the platform's running state was not read"]
@@ -245,6 +310,8 @@ def certify(
     candidate: Candidate, key: str | bytes, now: str | None = None
 ) -> GateDecision:
     """Decides whether the deploy passed, and signs its record if so.
+
+    All admission, live-check and runtime problems are collected first.
 
     Args:
         candidate: The release with checks and the platform observation.

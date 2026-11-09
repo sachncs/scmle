@@ -18,24 +18,52 @@ MANIFEST_FILE = "model_manifest.json"
 
 
 def canonical_bytes(payload: Mapping[str, Any]) -> bytes:
-    """Returns the deterministic JSON bytes that digests are taken over."""
+    """Serializes a payload deterministically.
+
+    Args:
+        payload: A JSON-serializable mapping.
+
+    Returns:
+        Compact, key-sorted, ASCII-only JSON encoded as UTF-8, the bytes that
+        digests are taken over.
+    """
     return json.dumps(
         payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True
     ).encode("utf-8")
 
 
 def sha256_digest(data: bytes) -> str:
-    """Returns `sha256:<hex>` for `data`."""
+    """Digests bytes.
+
+    Args:
+        data: The bytes to digest.
+
+    Returns:
+        `sha256:` followed by the hex SHA-256 of `data`.
+    """
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 def manifest_digest(manifest: Mapping[str, Any]) -> str:
-    """Returns the bundle digest of a parsed manifest."""
+    """Digests a parsed bundle manifest.
+
+    Args:
+        manifest: The manifest as parsed from JSON.
+
+    Returns:
+        The bundle digest, the SHA-256 digest of its canonical JSON.
+    """
     return sha256_digest(canonical_bytes(manifest))
 
 
 def bundle_digest(directory: str | pathlib.Path) -> str:
-    """Returns the bundle digest of a bundle directory.
+    """Digests a bundle directory by its manifest.
+
+    Args:
+        directory: Bundle directory containing `model_manifest.json`.
+
+    Returns:
+        The bundle digest of the manifest.
 
     Raises:
         ArtifactError: If the directory has no readable manifest.
@@ -53,7 +81,14 @@ def bundle_digest(directory: str | pathlib.Path) -> str:
 
 
 def file_digest(path: str | pathlib.Path) -> str:
-    """Returns `sha256:<hex>` of a file, streamed."""
+    """Digests a file, reading it in 1 MiB chunks.
+
+    Args:
+        path: File to digest.
+
+    Returns:
+        `sha256:` followed by the hex SHA-256 of the file's bytes.
+    """
     digest = hashlib.sha256()
     with pathlib.Path(path).open("rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):

@@ -74,7 +74,14 @@ FAST_OPTIONS: dict[str, Any] = {
 
 @dataclasses.dataclass
 class Step:
-    """One recorded step of the demo."""
+    """One recorded step of the demo.
+
+    Attributes:
+        name: Description of the step.
+        ok: Whether the step held.
+        seconds: Wall-clock seconds the step took.
+        detail: Measured values and findings of the step.
+    """
 
     name: str
     ok: bool
@@ -83,7 +90,11 @@ class Step:
 
 
 class Transcript:
-    """The ordered record of what the demo did and whether it held."""
+    """The ordered record of what the demo did and whether it held.
+
+    Attributes:
+        steps: The recorded steps, in order.
+    """
 
     def __init__(self) -> None:
         """Starts empty."""
@@ -92,7 +103,15 @@ class Transcript:
     def record(
         self, name: str, started: float, ok: bool, **detail: Any
     ) -> None:
-        """Appends a step and prints it."""
+        """Appends a step and prints it.
+
+        Args:
+            name: Description of the step.
+            started: Value of `time.monotonic()` when the step began.
+            ok: Whether the step held.
+            **detail: Measured values and findings, kept on the step and
+                printed.
+        """
         step = Step(name, ok, round(time.monotonic() - started, 3), detail)
         self.steps.append(step)
         print(
@@ -103,11 +122,15 @@ class Transcript:
 
     @property
     def passed(self) -> bool:
-        """Whether every step held."""
+        """Whether at least one step was recorded and every step held."""
         return bool(self.steps) and all(step.ok for step in self.steps)
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-compatible record."""
+        """Builds a JSON-compatible record.
+
+        Returns:
+            A dict with `passed` and `steps` (each step as a dict).
+        """
         return {
             "passed": self.passed,
             "steps": [dataclasses.asdict(step) for step in self.steps],
@@ -115,12 +138,25 @@ class Transcript:
 
 
 def now() -> str:
-    """The current time as an aware ISO-8601 string."""
+    """Formats the current time.
+
+    Returns:
+        The current UTC time as an ISO-8601 string with a `+00:00` offset and
+        second resolution.
+    """
     return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
 
 
 def train(name: str, data: pathlib.Path) -> scmle.RunResult:
-    """Trains one model on a CSV with the demo's fixed, fast options."""
+    """Trains one model on a CSV with the demo's fixed, fast options.
+
+    Args:
+        name: Prefix of the temporary output directory.
+        data: CSV file holding the features and the target column.
+
+    Returns:
+        The run result, including the model bundle and its evaluation.
+    """
     frame = pd.read_csv(data)
     return scmle.MLProject(
         frame,
@@ -133,7 +169,16 @@ def train(name: str, data: pathlib.Path) -> scmle.RunResult:
 def approval_for(
     record: registry_module.VersionRecord, reason: str, evidence: str
 ) -> registry_module.PromotionApproval:
-    """An approval bound to one registered version, signed with the demo key."""
+    """Builds an approval bound to one registered version.
+
+    Args:
+        record: The registered version being approved.
+        reason: Why the reviewer approves.
+        evidence: Name of the evidence the reviewer cites.
+
+    Returns:
+        An approved promotion by the demo reviewer, signed with the demo key.
+    """
     return registry_module.PromotionApproval(
         model=record.model,
         version=record.version,
@@ -149,7 +194,19 @@ def approval_for(
 def start_service(
     folder: pathlib.Path, port: int, environment: str = "production"
 ) -> subprocess.Popen[bytes]:
-    """Starts a generated `serve.py` as the container would."""
+    """Starts a generated `serve.py` as the container would.
+
+    `SCMLE_TRUSTED` is removed from the environment, and the published demo key
+    is allowed.
+
+    Args:
+        folder: Service folder holding `serve.py`.
+        port: Local port to listen on, on 127.0.0.1.
+        environment: Value of `SCMLE_ENV` for the service.
+
+    Returns:
+        The running process; its stderr is piped and its stdout discarded.
+    """
     env = {
         **os.environ,
         "HOST": "127.0.0.1",
@@ -170,19 +227,37 @@ def start_service(
 
 
 class BearerHandler(urllib.request.BaseHandler):
-    """Adds one bearer token to requests for the listed services only."""
+    """Adds one bearer token to requests for the listed services only.
+
+    Attributes:
+        token: The bearer token.
+        prefixes: URL prefixes the token may be sent to.
+    """
 
     handler_order = 100
 
     def __init__(self, token: str, prefixes: tuple[str, ...]) -> None:
-        """Remembers the token and the URL prefixes it may be sent to."""
+        """Remembers the token and the URL prefixes it may be sent to.
+
+        Args:
+            token: The bearer token.
+            prefixes: URL prefixes the token may be sent to.
+        """
         self.token = token
         self.prefixes = prefixes
 
     def http_request(
         self, request: urllib.request.Request
     ) -> urllib.request.Request:
-        """Attaches the token if the URL is one of the listed services."""
+        """Attaches the token if the URL is one of the listed services.
+
+        Args:
+            request: The outgoing request.
+
+        Returns:
+            The same request, with an `Authorization` header (not carried over
+            redirects) when its URL starts with one of the prefixes.
+        """
         if request.full_url.startswith(self.prefixes):
             request.add_unredirected_header(
                 "Authorization", f"Bearer {self.token}"
@@ -197,6 +272,11 @@ def install_bearer(
 
     The token is minted from the published demo key in `deploy/local/demo.env`
     and sent only to URLs that start with one of `prefixes`.
+
+    Args:
+        environ: Environment holding `SCMLE_AUTH_HS256_SECRET` and, optionally,
+            `SCMLE_AUTH_ISSUER` and `SCMLE_AUTH_AUDIENCE`.
+        prefixes: URL prefixes the token may be sent to.
 
     Returns:
         Whether a token was installed (the demo key was configured).
@@ -223,7 +303,15 @@ def install_bearer(
 
 
 def get_json(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
-    """GETs JSON; HTTP errors return their status and body."""
+    """GETs JSON; HTTP errors return their status and body.
+
+    Args:
+        url: URL to request.
+        timeout: Seconds to wait.
+
+    Returns:
+        The HTTP status and the parsed JSON body.
+    """
     try:
         with urllib.request.urlopen(url, timeout=timeout) as reply:  # nosec B310
             return reply.status, json.loads(reply.read())
@@ -234,7 +322,16 @@ def get_json(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
 def post_json(
     url: str, payload: dict[str, Any], timeout: float = 30.0
 ) -> tuple[int, dict[str, Any]]:
-    """POSTs JSON; HTTP errors return their status and body."""
+    """POSTs JSON; HTTP errors return their status and body.
+
+    Args:
+        url: URL to post to.
+        payload: Object sent as the JSON body.
+        timeout: Seconds to wait.
+
+    Returns:
+        The HTTP status and the parsed JSON body.
+    """
     request = urllib.request.Request(
         url,
         json.dumps(payload).encode(),
@@ -252,7 +349,17 @@ def wait_ready(
     process: subprocess.Popen[bytes] | None = None,
     timeout: float = READY_TIMEOUT_SECONDS,
 ) -> float | None:
-    """Seconds until `/readyz` is 200, or None if it never is in time."""
+    """Waits until `/readyz` answers 200.
+
+    Args:
+        base: Base URL of the service.
+        process: The service process; if it exits, waiting stops.
+        timeout: Seconds to wait.
+
+    Returns:
+        Seconds until `/readyz` was 200, or None if it never was in time or the
+        process exited.
+    """
     started = time.monotonic()
     while time.monotonic() - started < timeout:
         if process is not None and process.poll() is not None:
@@ -268,7 +375,14 @@ def wait_ready(
 
 
 def stop_service(process: subprocess.Popen[bytes] | None) -> None:
-    """Terminates a started service."""
+    """Terminates a started service.
+
+    The process is terminated, then killed if it has not exited after 15
+    seconds, and its stderr pipe is closed.
+
+    Args:
+        process: The process to stop; None does nothing.
+    """
     if process is None:
         return
     process.terminate()
@@ -282,7 +396,11 @@ def stop_service(process: subprocess.Popen[bytes] | None) -> None:
 
 
 def free_port() -> int:
-    """A currently free local TCP port."""
+    """Finds a free local TCP port.
+
+    Returns:
+        A port on 127.0.0.1 that was free when probed.
+    """
     import socket
 
     with socket.socket() as probe:
@@ -293,7 +411,17 @@ def free_port() -> int:
 def upload_folder(
     base: str, folder: pathlib.Path, prefix: str
 ) -> dict[str, str]:
-    """Uploads every file of `folder`; returns key -> etag."""
+    """Uploads every file of `folder`.
+
+    Args:
+        base: Base URL of the object store.
+        folder: Folder whose files are uploaded recursively.
+        prefix: Key prefix under which the files are stored.
+
+    Returns:
+        A mapping from each file's path relative to `folder` to the entity tag
+        the store returned.
+    """
     return {
         path.relative_to(folder).as_posix(): mocks.put_object(
             base,
@@ -308,7 +436,14 @@ def upload_folder(
 def download_folder(
     base: str, prefix: str, expected: dict[str, str], destination: pathlib.Path
 ) -> None:
-    """Fetches the folder back, refusing any file whose digest differs."""
+    """Fetches the folder back, refusing any file whose digest differs.
+
+    Args:
+        base: Base URL of the object store.
+        prefix: Key prefix under which the files are stored.
+        expected: Mapping from relative file path to the expected entity tag.
+        destination: Folder to write the files to; created as needed.
+    """
     for name, etag in expected.items():
         data = mocks.get_object(base, f"{prefix}/{name}", expected=etag)
         target = destination / name
@@ -321,7 +456,20 @@ def prepare(
     data: pathlib.Path = DATA_DIRECTORY,
     transcript: Transcript | None = None,
 ) -> dict[str, Any]:
-    """Trains, evaluates, registers and packages. Returns the paths made."""
+    """Trains, evaluates, registers and packages.
+
+    Writes `evaluation.json` and a model registry into `workdir`, registers the
+    good and the bad model, promotes the good one, and exports the good model
+    and the golden reference model as service folders.
+
+    Args:
+        workdir: Working directory; created as needed.
+        data: Directory holding `train.csv` and `bad_release_train.csv`.
+        transcript: Transcript to record the steps in; a new one if None.
+
+    Returns:
+        A dict with the paths `service` and `golden_service`.
+    """
     log = transcript or Transcript()
     workdir.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
@@ -390,7 +538,19 @@ def predict_checks(
     data: pathlib.Path,
     workdir: pathlib.Path,
 ) -> dict[str, Any]:
-    """Online, batch and golden checks of a running service."""
+    """Compares online, batch and golden predictions with the bundle.
+
+    Args:
+        base: Base URL of the running service.
+        model_directory: Directory of the model bundle the service serves.
+        data: Directory holding `fresh.csv`.
+        workdir: Directory where the batch output is written.
+
+    Returns:
+        A dict with whether the online and batch predictions match the bundle,
+        the largest probability difference, the artifact digests seen in the
+        response and in the batch manifest, and whether they are the same.
+    """
     frame = pd.read_csv(data / "fresh.csv").drop(columns=[TARGET])
     direct = bundle_module.ModelBundle.load(
         model_directory, signing_key=DEMO_SIGNING_KEY
@@ -433,7 +593,16 @@ def predict_checks(
 def corrupted_and_unsigned_stay_unready(
     service: pathlib.Path, workdir: pathlib.Path
 ) -> dict[str, Any]:
-    """A modified and an unsigned copy must be alive but never ready."""
+    """Checks that a modified and an unsigned copy are alive but never ready.
+
+    Args:
+        service: Service folder to copy and damage.
+        workdir: Directory in which the two copies are made.
+
+    Returns:
+        For `corrupted` and `unsigned`, the HTTP statuses of `/livez`, `/readyz`
+        and `/predict` and the reason the service reports.
+    """
     outcomes: dict[str, Any] = {}
     corrupt = workdir / "corrupt-service"
     unsigned = workdir / "unsigned-service"
@@ -485,6 +654,13 @@ def rollback_drill(
 
     The lifecycle manager loads registered bundles with the key from the
     environment, so the demo key is set for the duration of the drill only.
+
+    Args:
+        workdir: Working directory prepared by `prepare`.
+        data: Directory holding `fresh.csv`.
+
+    Returns:
+        The findings of `drill_steps`.
     """
     previous = os.environ.get("SCMLE_SIGNING_KEY")
     os.environ["SCMLE_SIGNING_KEY"] = DEMO_SIGNING_KEY
@@ -498,7 +674,19 @@ def rollback_drill(
 
 
 def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
-    """The drill itself: promote, monitor, roll back, serve."""
+    """Runs the drill itself: promote, monitor, roll back, serve.
+
+    Args:
+        workdir: Working directory prepared by `prepare`.
+        data: Directory holding `fresh.csv`.
+
+    Returns:
+        A dict with the champion version before and after rollback, the
+        monitor's recommendation and reasons, whether the rollback happened and
+        which version was restored, whether the restored model serves the same
+        predictions as the original, whether the audit log has the rollback
+        check, and the bad release's metrics on the fresh data.
+    """
     registry = registry_module.ModelRegistryStore(workdir / "registry")
     manager = lifecycle.LifecycleManager(registry, MODEL, str(workdir / "work"))
     fresh = pd.read_csv(data / "fresh.csv")
@@ -557,7 +745,14 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
 
 
 def records_of(frame: pd.DataFrame) -> list[dict[str, Any]]:
-    """Rows as JSON-ready dictionaries with string keys."""
+    """Converts rows to JSON-ready dictionaries with string keys.
+
+    Args:
+        frame: The data frame to convert.
+
+    Returns:
+        One dict per row.
+    """
     return [
         {str(key): value for key, value in row.items()}
         for row in frame.to_dict("records")
@@ -565,7 +760,15 @@ def records_of(frame: pd.DataFrame) -> list[dict[str, Any]]:
 
 
 def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
-    """Resident memory of a child process in MiB, if `ps` can say."""
+    """Reads the resident memory of a child process.
+
+    Args:
+        process: The process to measure; None gives None.
+
+    Returns:
+        The resident set size in MiB rounded to one decimal, or None if no
+        process was given or `ps` did not report a number.
+    """
     if process is None:
         return None
     result = subprocess.run(  # nosec B603 B607 - fixed arguments
@@ -583,7 +786,20 @@ def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
 def measure_latency(
     base: str, rows: list[dict[str, Any]], count: int = LATENCY_REQUESTS
 ) -> dict[str, float]:
-    """Latency in milliseconds for sequential requests of `rows`."""
+    """Measures latency for sequential requests of `rows`.
+
+    Args:
+        base: Base URL of the service.
+        rows: Records sent in each request.
+        count: Number of requests.
+
+    Returns:
+        The request count and the p50, p95, p99 and mean latency in milliseconds
+        (percentiles by index into the sorted timings).
+
+    Raises:
+        ScmleError: If a request is not answered 200.
+    """
     timings = []
     for attempt in range(count):
         started = time.perf_counter()
@@ -596,6 +812,15 @@ def measure_latency(
     timings.sort()
 
     def percentile(share: float) -> float:
+        """Looks up a latency percentile.
+
+        Args:
+            share: Fraction in [0, 1].
+
+        Returns:
+            The timing at that share of the sorted timings, in milliseconds,
+            rounded to two decimals.
+        """
         return round(
             timings[min(len(timings) - 1, int(share * len(timings)))], 2
         )
@@ -612,7 +837,18 @@ def measure_latency(
 def push_metrics(
     sink: str, values: dict[str, tuple[float, str]], model_version: str
 ) -> int:
-    """Sends named values to the metrics sink; returns how many it took."""
+    """Sends named values to the metrics sink.
+
+    Args:
+        sink: Base URL of the metrics sink.
+        values: Mapping from metric name to its value and unit. A name that
+            starts with `latency` or `memory` is sent as that kind of signal;
+            any other is sent as drift.
+        model_version: Version label attached to every sample.
+
+    Returns:
+        How many samples the sink accepted.
+    """
     kinds = {
         "latency": observability.SignalKind.LATENCY,
         "memory": observability.SignalKind.MEMORY,
@@ -637,7 +873,24 @@ def run(
     store_url: str | None = None,
     metrics_url: str | None = None,
 ) -> Transcript:
-    """Runs the whole demo natively and returns the transcript."""
+    """Runs the whole demo natively.
+
+    Args:
+        workdir: Working directory; created as needed.
+        data: Directory holding the demo datasets.
+        store_url: Base URL of an object store; a local mock is started if None.
+        metrics_url: Base URL of a metrics sink; a local mock is started if
+            None.
+
+    Returns:
+        The transcript. An exception in any step is recorded as a failed final
+        step instead of being raised.
+
+    Raises:
+        ArtifactError: Raised inside the run if the served model does not become
+            ready, but caught by the run's own handler and recorded in the
+            transcript; it does not reach the caller.
+    """
     transcript = Transcript()
     own_store = own_sink = None
     processes: list[subprocess.Popen[bytes]] = []
@@ -798,7 +1051,19 @@ def verify_remote(
     data: pathlib.Path,
     metrics_url: str,
 ) -> Transcript:
-    """The checks the compose test runner makes against running containers."""
+    """Makes the checks the compose test runner makes against containers.
+
+    Args:
+        api: Base URL of the running service.
+        golden_api: Base URL of the service running the golden reference model.
+        workdir: Working directory prepared by `prepare`.
+        data: Directory holding `fresh.csv`.
+        metrics_url: Base URL of the metrics sink.
+
+    Returns:
+        The transcript; it stops after the first step if the services do not
+        become ready.
+    """
     transcript = Transcript()
     install_bearer(os.environ, (api, golden_api))
     started = time.monotonic()
@@ -840,7 +1105,16 @@ def verify_remote(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Command-line entry point."""
+    """Runs the command line (`run`, `prepare` or `verify`).
+
+    Writes `transcript-<action>.json` into the working directory.
+
+    Args:
+        arguments: Command-line arguments; None reads `sys.argv`.
+
+    Returns:
+        0 if every recorded step held, otherwise 1.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     actions = parser.add_subparsers(dest="action", required=True)
     for name in ("run", "prepare", "verify"):

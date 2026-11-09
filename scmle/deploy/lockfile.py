@@ -19,12 +19,27 @@ NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 def canonical(name: str) -> str:
-    """The normalized distribution name."""
+    """Normalizes a distribution name.
+
+    Args:
+        name: Distribution name as written in a requirement.
+
+    Returns:
+        The name lower-cased with each run of `-`, `_` and `.` replaced by `-`.
+    """
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def marker_applies(marker: str) -> bool:
-    """Whether an environment marker holds here (extras never do)."""
+    """Reports whether an environment marker holds here (extras never do).
+
+    Args:
+        marker: A PEP 508 environment marker.
+
+    Returns:
+        True if the marker holds for this environment; False if it mentions an
+        extra or if the `packaging` library is not installed.
+    """
     if "extra" in marker:
         return False
     try:
@@ -35,7 +50,17 @@ def marker_applies(marker: str) -> bool:
 
 
 def requirement_name(line: str) -> tuple[str, str]:
-    """Splits a `Requires-Dist` line into (name, marker)."""
+    """Splits a `Requires-Dist` line into (name, marker).
+
+    Args:
+        line: A requirement such as `numpy>=1.24; python_version >= "3.10"`.
+
+    Returns:
+        The normalized distribution name and the marker text (empty if none).
+
+    Raises:
+        ArtifactError: If no name can be read from the line.
+    """
     parts = line.partition(";")
     match = NAME_PATTERN.match(parts[0].strip())
     if match is None:
@@ -58,14 +83,16 @@ def runtime_closure(
             bundle); the installed version is used for names not listed.
         requires: Replaces `importlib.metadata.requires` (tests).
         installed: Replaces `importlib.metadata.version` (tests).
-        unresolved: If given, receives the names whose own requirements
-            could not be read because they are not installed here; they are
-            still pinned (from `versions`) but their dependencies are not
-            followed.
+        unresolved: If given, receives the names whose own requirements could
+            not be read because they are not installed here; they are still
+            pinned (from `versions`) but their dependencies are not followed.
+
+    Returns:
+        The pinned versions of the roots and of their dependencies whose markers
+        hold here, sorted by name.
 
     Raises:
-        ArtifactError: If a distribution is neither installed nor in
-            `versions`.
+        ArtifactError: If a distribution is neither installed nor in `versions`.
     """
     look_up = requires or (lambda name: metadata.requires(name) or [])
     find = installed or metadata.version
@@ -97,7 +124,16 @@ def runtime_closure(
 
 
 def render(closure: Mapping[str, str], header: Iterable[str] = ()) -> str:
-    """Formats a closure as a pinned requirements file."""
+    """Formats a closure as a pinned requirements file.
+
+    Args:
+        closure: Mapping from distribution name to version.
+        header: Lines written first as comments.
+
+    Returns:
+        The file text: the commented header, then one `name==version` line per
+        entry, ending with a newline.
+    """
     lines = [f"# {line}" for line in header]
     lines += [f"{name}=={version}" for name, version in closure.items()]
     return "\n".join(lines) + "\n"
