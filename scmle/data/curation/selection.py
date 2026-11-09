@@ -44,12 +44,28 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
         columns: tuple[str, ...] = (),
         top: int = DEFAULT_TOP_COLUMNS,
     ) -> None:
-        """Stores the eligible columns and how many to combine."""
+        """Stores the eligible columns and how many to combine.
+
+        Args:
+            columns: The numeric columns eligible for combination.
+            top: How many of them (by association) are combined.
+        """
         self.columns = columns
         self.top = top
 
     def fit(self, features: pd.DataFrame, target: Any = None) -> Self:
-        """Chooses the column pairs from the training fold."""
+        """Chooses the column pairs from the training fold.
+
+        No pairs are chosen when there is no target, fewer than `MIN_ROWS`
+        rows or no eligible column present. Constant columns are skipped.
+
+        Args:
+            features: Training features.
+            target: Training target; class labels are coded as categories.
+
+        Returns:
+            The fitted transformer.
+        """
         self.pairs_: list[tuple[str, str]] = []
         usable = [c for c in self.columns if c in features.columns]
         if target is not None and len(features) >= MIN_ROWS and usable:
@@ -68,7 +84,18 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
         return self
 
     def transform(self, features: pd.DataFrame) -> pd.DataFrame:
-        """Returns the input with the constructed columns appended."""
+        """Returns the input with the constructed columns appended.
+
+        A ratio is missing (NaN) where the denominator is below `EPSILON`
+        in absolute value.
+
+        Args:
+            features: Features containing the columns chosen in fit.
+
+        Returns:
+            The input columns followed by a difference and a ratio column
+            for each chosen pair, with the input's index.
+        """
         built = {}
         for left, right in self.pairs_:
             a = pd.to_numeric(features[left]).to_numpy(dtype=float)
@@ -80,7 +107,16 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
         return pd.concat([features, extra], axis=1)
 
     def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
-        """Names of the output columns."""
+        """Names of the output columns.
+
+        Args:
+            input_features: Names of the input columns; the names seen in fit
+                are used if None.
+
+        Returns:
+            The input names followed by the constructed names, as an object
+            array.
+        """
         names = list(
             self.feature_names_in_ if input_features is None else input_features
         )
@@ -113,14 +149,29 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
         alpha: float = DEFAULT_ALPHA,
         random_state: int = 0,
     ) -> None:
-        """Stores the penalty settings."""
+        """Stores the penalty settings.
+
+        Args:
+            classification: Whether the target is a class label.
+            strength: Inverse penalty for classification (larger keeps more).
+            alpha: Penalty for regression (smaller keeps more).
+            random_state: Seed for the sparse model.
+        """
         self.classification = classification
         self.strength = strength
         self.alpha = alpha
         self.random_state = random_state
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits the sparse model and records which columns it keeps."""
+        """Fits the sparse model and records which columns it keeps.
+
+        Args:
+            features: Scaled feature matrix.
+            target: Training target; class labels when `classification`.
+
+        Returns:
+            The fitted selector, with at least one column kept.
+        """
         model: Any
         if self.classification:
             # liblinear is fast but cannot fit three or more classes.
@@ -152,10 +203,24 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
         return self
 
     def transform(self, features: Any) -> Any:
-        """Returns only the kept columns."""
+        """Returns only the kept columns.
+
+        Args:
+            features: Feature matrix with the fitted column layout.
+
+        Returns:
+            The input restricted to the columns kept in fit.
+        """
         return features[:, self.support_]
 
     def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
-        """Names of the kept columns."""
+        """Names of the kept columns.
+
+        Args:
+            input_features: Names of the input columns.
+
+        Returns:
+            The names of the columns kept in fit, as an object array.
+        """
         names = np.asarray(input_features, dtype=object)
         return names[self.support_]

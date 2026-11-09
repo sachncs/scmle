@@ -12,7 +12,15 @@ from scmle.contracts import tasks
 
 
 def target_names(value: str, horizon: int) -> list[str]:
-    """Names of the future-value targets: `<value>__h1 .. <value>__h<H>`."""
+    """Names of the future-value targets: `<value>__h1 .. <value>__h<H>`.
+
+    Args:
+        value: Name of the value column.
+        horizon: Number of steps ahead to forecast.
+
+    Returns:
+        The `horizon` target names, ordered from one step ahead onward.
+    """
     return [
         f"{value}{tasks.HORIZON_SEPARATOR}{k}" for k in range(1, horizon + 1)
     ]
@@ -28,6 +36,9 @@ def add_targets(frame: pd.DataFrame, data: tasks.DataSpec) -> pd.DataFrame:
     Returns:
         A new frame ordered by entity and time, with `<value>__h1 ..` columns,
         without the rows whose future is not fully known.
+
+    Raises:
+        ValueError: If the specification has no value column or no horizon.
     """
     value, horizon = data.value_column, data.horizon
     if value is None or horizon is None:

@@ -85,7 +85,17 @@ def split_flagged(
 ) -> tuple[list[str], list[str]]:
     """Numeric columns whose gaps are informative, and the rest.
 
-    Without a missingness report every column gets indicators, as before.
+    Without a missingness report every column gets indicators.
+
+    Args:
+        plan: Feature plan; its `informative_missing` lists the flagged
+            columns, or is None when no missingness report exists.
+        selected: The numeric columns to split.
+
+    Returns:
+        A pair `(flagged, rest)`: the columns whose gaps are informative
+        (all of them if there is no report) and the remaining columns, each
+        in the order of `selected`.
     """
     if plan.informative_missing is None:
         return list(selected), []
@@ -101,6 +111,15 @@ def monotonic_signs(
     The encoded matrix starts with the specially encoded high-cardinality
     columns (`offset` of them, one column each), then the numeric features
     in plan order; later columns are unconstrained.
+
+    Args:
+        plan: Feature plan with the numeric columns and their monotonic
+            signs.
+        offset: Number of specially encoded high-cardinality columns.
+
+    Returns:
+        `offset` zeros followed by the sign of each numeric column (+1, -1
+        or 0 where none is declared).
     """
     return (0,) * offset + tuple(
         plan.monotonic.get(column, 0) for column in plan.numeric
@@ -115,6 +134,15 @@ def split_high_cardinality(
 
     They are placed first in the transformed matrix, so their positions are
     `0..len-1`, which native-categorical estimators can be told about.
+
+    Args:
+        plan: Feature plan with the categorical and high-cardinality columns.
+        options: Preprocessing switches; with `onehot` encoding no column
+            is special.
+
+    Returns:
+        The high-cardinality categorical columns, in plan order; empty with
+        `onehot` encoding.
     """
     if options.high_cardinality == "onehot":
         return ()
@@ -133,7 +161,7 @@ def build_front_end(
 
     Returns:
         The column transformer, or a pipeline of graph transformer followed
-        by the column transformer when the plan derives features.
+        by the column transformer when features are derived.
     """
     preprocessor = build_preprocessor(plan, options)
     if not plan.derived:
@@ -155,6 +183,14 @@ def default_options(
     handle missing values, sparse one-hot output for sparse-capable models on
     high-cardinality data, and integer-coded native categoricals where the
     adapter supports them.
+
+    Args:
+        plan: Feature plan, used for its high-cardinality columns and text
+            settings.
+        adapter: Model family whose capabilities decide the switches.
+
+    Returns:
+        The preprocessing options for the adapter.
     """
     caps = adapter.capabilities
     native = bool(
