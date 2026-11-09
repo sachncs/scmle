@@ -542,20 +542,32 @@ class LifecycleManager:
                 f" {'is' if worse else 'is not'} below the tolerance; "
                 "nothing moved, the rollback e-process decides",
             )
-        self.registry.audit(
-            "lifecycle.rollback_check",
-            model=self.model,
-            current=aliases[registry_module.CHAMPION],
-            previous=previous,
-            rollback_required=worse,
-            rolled_back=worse and approval is not None,
-            **dataclasses.asdict(comparison),
-        )
+        restore = worse and approval is not None
+        restored = False
+        try:
+            if restore:
+                self.restore_previous(
+                    approval,
+                    signing_key,
+                    aliases[registry_module.CHAMPION],
+                    previous,
+                )
+                restored = True
+        finally:
+            self.registry.audit(
+                "lifecycle.rollback_check",
+                model=self.model,
+                current=aliases[registry_module.CHAMPION],
+                previous=previous,
+                rollback_required=worse,
+                rolled_back=restored,
+                **dataclasses.asdict(comparison),
+            )
         if not worse:
             return RollbackOutcome(
                 False, comparison, None, "the new champion holds up"
             )
-        if approval is None:
+        if not restore:
             self.registry.audit(
                 "lifecycle.rollback_pending_approval",
                 model=self.model,
@@ -568,9 +580,6 @@ class LifecycleManager:
                 None,
                 "rollback requires independent approval",
             )
-        self.restore_previous(
-            approval, signing_key, aliases[registry_module.CHAMPION], previous
-        )
         return RollbackOutcome(
             True,
             comparison,

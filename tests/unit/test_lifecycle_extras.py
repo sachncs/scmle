@@ -233,3 +233,26 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
         signing_key=APPROVAL_KEY,
     )
     assert "fewer than" in manager.check_rollback(traffic(20), "y").reason
+
+
+def test_a_rollback_that_is_refused_is_not_audited_as_rolled_back(
+    good, tmp_path
+):
+    broken = bundle_of("logistic_regression", traffic(seed=0, flip=True))
+    store, manager = registry_with(tmp_path, good, broken)
+    with pytest.raises(errors.ArtifactError):
+        manager.check_rollback(
+            traffic(1200, seed=20),
+            "y",
+            approval=approval_for(store.resolve("m", 1)),
+            signing_key="wrong-key",
+        )
+    assert store.resolve("m").version == 2
+    lines = [
+        line
+        for line in (store.root / registry_module.AUDIT_FILE)
+        .read_text()
+        .splitlines()
+        if "rollback_check" in line
+    ]
+    assert len(lines) == 1 and '"rolled_back": false' in lines[0]
