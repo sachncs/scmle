@@ -136,7 +136,10 @@ class Log1p(FeatureOp):
         Returns:
             `log(1 + max(x, 0))` per row.
         """
-        return numpy.log1p(columns.to_finite(inputs[0]).clip(lower=0))
+        logged: pandas.Series = numpy.log1p(
+            columns.to_finite(inputs[0]).clip(lower=0)
+        )
+        return logged
 
 
 class Sqrt(FeatureOp):
@@ -160,7 +163,10 @@ class Sqrt(FeatureOp):
         Returns:
             `sqrt(max(x, 0))` per row.
         """
-        return numpy.sqrt(columns.to_finite(inputs[0]).clip(lower=0))
+        roots: pandas.Series = numpy.sqrt(
+            columns.to_finite(inputs[0]).clip(lower=0)
+        )
+        return roots
 
 
 class Square(FeatureOp):
@@ -423,7 +429,10 @@ class Standardize(FeatureOp):
         Returns:
             The z-score per row.
         """
-        return (columns.to_finite(inputs[0]) - state[0]) / state[1]
+        scores: pandas.Series = (
+            columns.to_finite(inputs[0]) - state[0]
+        ) / state[1]
+        return scores
 
 
 class Bin(FeatureOp):
@@ -532,8 +541,10 @@ class DatePart(FeatureOp):
         """
         stamps = pandas.to_datetime(inputs[0], errors="coerce")
         if params["part"] == "timestamp":
-            return (stamps - EPOCH) / pandas.Timedelta(days=1)
-        return getattr(stamps.dt, params["part"]).astype(float)
+            days: pandas.Series = (stamps - EPOCH) / pandas.Timedelta(days=1)
+            return days
+        part: pandas.Series = getattr(stamps.dt, params["part"]).astype(float)
+        return part
 
 
 class OrderedOp(FeatureOp):
@@ -617,7 +628,8 @@ class Lag(OrderedOp):
         Returns:
             The value `k` rows earlier, NaN at the start of each entity.
         """
-        return grouped.shift(int(params["k"]))
+        lagged: pandas.Series = grouped.shift(int(params["k"]))
+        return lagged
 
     def lookback(self, params: Params) -> int | None:
         """Reports the lag distance.
@@ -662,7 +674,10 @@ class Diff(OrderedOp):
             The change versus `k` rows earlier, NaN at the start of each
             entity.
         """
-        return grouped.transform(lambda s: s - s.shift(int(params["k"])))
+        changed: pandas.Series = grouped.transform(
+            lambda s: s - s.shift(int(params["k"]))
+        )
+        return changed
 
     def lookback(self, params: Params) -> int | None:
         """Reports the lag distance.
@@ -693,9 +708,10 @@ class RollingMean(OrderedOp):
             The mean of up to `window` rows ending at the current one.
         """
         window = int(params["window"])
-        return grouped.transform(
+        means: pandas.Series = grouped.transform(
             lambda s: s.rolling(window, min_periods=1).mean()
         )
+        return means
 
     def lookback(self, params: Params) -> int | None:
         """Reports the window size.
@@ -727,9 +743,10 @@ class RollingStd(OrderedOp):
             current one; NaN until two observations exist.
         """
         window = int(params["window"])
-        return grouped.transform(
+        deviations: pandas.Series = grouped.transform(
             lambda s: s.rolling(window, min_periods=2).std()
         )
+        return deviations
 
     def lookback(self, params: Params) -> int | None:
         """Reports the window size.
@@ -758,7 +775,8 @@ class ExpandingMean(OrderedOp):
         Returns:
             The mean of all rows up to and including the current one.
         """
-        return grouped.transform(lambda s: s.expanding().mean())
+        means: pandas.Series = grouped.transform(lambda s: s.expanding().mean())
+        return means
 
     def lookback(self, params: Params) -> int | None:  # noqa: ARG002 -- OrderedOp interface
         """Reports that every earlier row contributes.
@@ -1124,7 +1142,7 @@ class SeriesFeatureBuilder:
         return result
 
 
-class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
+class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Row-wise graph nodes as a fitted scikit-learn transformer.
 
     Statistics for `clip`, `bin` and `standardize` are learned in `fit`
