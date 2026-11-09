@@ -28,8 +28,10 @@ class InputValidator:
             frame: Incoming data with already-normalized column names.
 
         Returns:
-            Missing and extra columns, missing-value counts and categories
-            never seen in training.
+            The required columns that are absent, the extra columns (neither
+            a feature nor the target), the null count of each present
+            feature that has any, and, per categorical column, up to 20
+            sorted values never seen in training.
         """
         wanted = self.schema.features
         present = [c for c in wanted if c in frame.columns]
@@ -94,14 +96,16 @@ class InputValidator:
         return rows
 
     def check(self, frame: pd.DataFrame) -> None:
-        """Raises when the data cannot be scored.
+        """Raises when required columns are missing or numeric ones are bad.
+
+        Unseen categories, nulls and extra columns do not raise.
 
         Args:
             frame: Incoming data with already-normalized column names.
 
         Raises:
-            SchemaError: On missing columns or non-numeric values in numeric
-                columns.
+            SchemaError: If a required column is missing, or a numeric column
+                holds a non-null value that is not a number.
         """
         report = self.report(frame)
         if not report.valid:

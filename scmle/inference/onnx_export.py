@@ -38,7 +38,7 @@ WRAPPERS = (
 
 
 def load_converter() -> tuple[Any, Any]:
-    """Import the converter and runtime, or explain how to install them.
+    """Imports the converter and runtime, or explains how to install them.
 
     Returns:
         The `skl2onnx` module and the `onnxruntime` module.
@@ -178,7 +178,7 @@ def is_token_imputer(step: Any) -> bool:
 
 
 def passthrough(step: Any) -> Any:
-    """Makes an identity that stands in for steps done before the graph runs.
+    """Returns an identity that stands in for steps done before the graph.
 
     Args:
         step: The step being replaced; unused.
@@ -194,7 +194,8 @@ def without_casts(model: Any) -> Any:
 
     Casting columns to float or string, and filling missing text with the
     missing token, happen before the graph runs (see `feed`), because the
-    converter cannot express them.
+    converter cannot express them. Only pipelines and column transformers
+    (found through `transformers_`) are searched, nested to any depth.
 
     Args:
         model: A fitted pipeline.
@@ -227,7 +228,7 @@ def without_casts(model: Any) -> Any:
 
 
 def input_types(bundle: Any, types: Any) -> list[tuple[str, Any]]:
-    """Declare the ONNX inputs: floats for numeric, strings for categorical.
+    """Declares the ONNX inputs: floats for numeric, strings for categorical.
 
     Args:
         bundle: A bundle whose schema lists the numeric and categorical
@@ -246,6 +247,12 @@ def input_types(bundle: Any, types: Any) -> list[tuple[str, Any]]:
 
 def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
     """Writes the bundle's pipeline as an ONNX file.
+
+    Registers LightGBM and XGBoost converters in the converter's global
+    registry when `onnxmltools` is available. Classifiers are exported
+    without the ZipMap output. A model trained on integer class codes gets a
+    `label_codes` entry in the file's metadata so that scoring maps the codes
+    back to labels. The file is written atomically.
 
     Args:
         bundle: A fitted `ModelBundle`.
@@ -334,8 +341,9 @@ def feed(bundle: Any, frame: pd.DataFrame) -> dict[str, np.ndarray]:
         frame: Incoming rows.
 
     Returns:
-        One column array of shape (rows, 1) per input: float32 for numeric
-        columns and strings for categorical ones, with missing categories
+        One column array of shape (rows, 1) per input, keyed by column name:
+        float32 for numeric columns (values that are not numbers become
+        NaN) and strings for categorical ones, with missing categories
         replaced by the missing token.
     """
     prepared = bundle.prepare_frame(frame)
@@ -413,7 +421,10 @@ class OnnxScorer:
     """Scores frames with an exported graph, without the framework pipeline."""
 
     def __init__(self, bundle: Any, path: str | pathlib.Path) -> None:
-        """Opens the graph.
+        """Opens the graph in an ONNX runtime session.
+
+        An `ArtifactError` from `load_converter` is raised when the runtime
+        is not installed.
 
         Args:
             bundle: The bundle the graph was exported from (for its schema).
@@ -424,7 +435,7 @@ class OnnxScorer:
         self.session = runtime.InferenceSession(str(path))
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
-        """Predicts labels or values.
+        """Predicts class labels (classification) or values (regression).
 
         Args:
             frame: Incoming rows.
@@ -436,7 +447,7 @@ class OnnxScorer:
         return decode(self.bundle, self.session, outputs[0]).ravel()
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
-        """Predicts class probabilities.
+        """Predicts class probabilities; classification graphs only.
 
         Args:
             frame: Incoming rows.

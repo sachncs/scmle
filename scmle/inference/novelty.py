@@ -33,7 +33,9 @@ class NoveltyDetector:
 
     Attributes:
         model: Encoder followed by an isolation forest.
-        threshold: Scores below this (more anomalous) count as novel.
+        threshold: Raw isolation-forest score (lower is more anomalous)
+            below which a row counts as novel; the 1% quantile of the
+            training scores.
         fences: For each numeric feature, the (lower, upper) fence.
     """
 
@@ -51,7 +53,10 @@ class NoveltyDetector:
         categorical: tuple[str, ...],
         seed: int = 0,
     ) -> Self | None:
-        """Learn the training distribution.
+        """Learns the training distribution.
+
+        The forest is fitted on at most 20000 rows, a random sample when
+        there are more, and the fences use all of the rows.
 
         Args:
             features: Training features.
@@ -60,7 +65,7 @@ class NoveltyDetector:
             seed: Random seed.
 
         Returns:
-            The detector, or None when there are no usable columns.
+            The detector, or None when both column tuples are empty.
         """
         if not (numeric or categorical):
             return None
@@ -131,8 +136,9 @@ class NoveltyDetector:
             A frame indexed like `features` with `novelty_score` (higher
             means more unusual), `out_of_range_features` (the numeric
             features beyond their far-out fences), and the boolean
-            `out_of_distribution` (score past the threshold or any feature
-            out of range).
+            `out_of_distribution` (raw score below the threshold or any
+            feature out of range; a missing or non-numeric value is never
+            out of range). `novelty_score` is the negated raw score.
         """
         raw = self.model.score_samples(features)
         outside = pd.DataFrame(index=features.index)

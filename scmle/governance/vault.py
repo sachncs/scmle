@@ -27,7 +27,11 @@ def serve(
     token: str,
     rows: tuple[pd.DataFrame, pd.Series],
 ) -> None:
-    """Vault main loop: bind once, release the rows once, on the right token.
+    """Runs the vault loop: bind once, release the rows once.
+
+    Every message is a tuple of an operation, the token and an optional
+    argument. A message with an unknown operation or a wrong token is
+    answered `("denied", "invalid token")`.
 
     A `bind` message fixes a digest. From then on `open` releases the rows
     only to a caller that presents the same digest, so the release cannot be
@@ -35,7 +39,8 @@ def serve(
 
     Args:
         channel: Connection to the caller; the loop ends when it closes.
-        token: Secret that every message must present.
+        token: Secret that every message must present, compared in constant
+            time.
         rows: The features and target held in custody and released once.
     """
     released = False
@@ -69,7 +74,7 @@ def serve(
 
 
 def main() -> None:
-    """Entry point of the vault process.
+    """Runs the vault process after connecting to its parent.
 
     The parent passes the channel address as the first argument and the key
     on standard input, then sends one message with the token and the rows.
@@ -84,8 +89,10 @@ class SealedTestSet(splitters.LockedTestSet):
 
     Attributes:
         ids: Row ids of the test rows (the rows themselves are not here).
-        token: Release token (excluded from repr).
+        token: Release token, a random hex string.
         opened: Whether the rows were released.
+        process: The vault process.
+        channel: The parent end of the connection to the vault.
     """
 
     def __init__(
@@ -116,7 +123,8 @@ class SealedTestSet(splitters.LockedTestSet):
             binding: Digest the vault will require at `open`.
 
         Raises:
-            LeakageError: If already bound, released, or the vault is gone.
+            LeakageError: If the rows were already released, the vault
+                refuses (already bound or released) or the vault is gone.
         """
         if self.opened:
             raise errors.LeakageError("test set is already bound or used")
@@ -137,12 +145,15 @@ class SealedTestSet(splitters.LockedTestSet):
             token: The token from `issue_token`.
             binding: The digest given to `bind`, if one was set.
 
+        On success the vault process is ended after the rows are received.
+
         Returns:
             Test features and labels.
 
         Raises:
-            LeakageError: On a wrong token, a repeated release, or a vault
-                that is gone.
+            LeakageError: If the rows were already released, the vault
+                refuses (wrong token, binding mismatch) or the vault is
+                gone.
         """
         if self.opened:
             raise errors.LeakageError(

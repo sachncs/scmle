@@ -160,7 +160,7 @@ environment the model was built in; `sbom.cdx.json` is the CycloneDX SBOM;
 
 
 def lock_roots(info: Any) -> list[str]:
-    """List the distributions the service needs, by name.
+    """Lists the names of the distributions the service needs.
 
     Args:
         info: The bundle information; its `libraries` are included.
@@ -179,9 +179,16 @@ def write_service(
 ) -> pathlib.Path:
     """Writes a deployable service folder for `bundle`.
 
+    The folder holds the saved bundle in `model`, `requirements.txt`,
+    `requirements.lock`, `environment.lock`, `serve.py`, `Dockerfile`,
+    `.dockerignore`, an executable `build.sh`, `vuln-policy.json`,
+    `sbom.cdx.json`, `provenance.json` and `README.md`. Missing parent
+    directories are created.
+
     Args:
         bundle: A `ModelBundle`.
-        destination: Folder to create (must not already hold a service).
+        destination: Folder to write; it must not already contain a `model`
+            entry.
         scmle_pin: Requirement line for the framework itself; defaults to
             the exact version that built the bundle.
         signing_key: HMAC key that signs the bundle and the provenance
@@ -189,10 +196,10 @@ def write_service(
             folder is unsigned and refuses to load in production.
 
     Returns:
-        The folder.
+        The destination as a path.
 
     Raises:
-        ArtifactError: If the destination already holds a model.
+        ArtifactError: If `destination/model` already exists.
     """
     # Imported here so that `python -m scmle.deploy.<tool>`, which the
     # generated build.sh runs, does not find its module already loaded by the

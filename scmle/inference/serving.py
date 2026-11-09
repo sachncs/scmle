@@ -50,7 +50,10 @@ class ServingAdapter(abc.ABC):
         on_unseen: str = "report",
         warmup_records: list[dict[str, Any]] | None = None,
     ) -> None:
-        """Initialize the adapter.
+        """Initializes the adapter and its readiness tracker.
+
+        With a bundle, the verify and load steps are marked complete at once;
+        the warm-up step is left to `warm_up`.
 
         Args:
             bundle: Model to serve. `None` defers loading to a subclass that
@@ -108,12 +111,13 @@ class ServingAdapter(abc.ABC):
         return serving_contract.schema_digest(self.bundle.schema.to_dict())
 
     def synthetic_record(self) -> dict[str, Any] | None:
-        """Derive a record that is valid for the schema.
+        """Derives a record that is valid for the schema.
 
         Returns:
             A record with 0.0 for every numeric feature and the first known
-            category for every categorical one; None when the schema has
-            series, extra or optional inputs.
+            category (an empty string if none is known) for every
+            categorical one; None when the schema has series, extra or
+            optional inputs.
         """
         schema = self.bundle.schema
         if schema.series or schema.extra_inputs or schema.optional_inputs:
@@ -127,8 +131,11 @@ class ServingAdapter(abc.ABC):
     def warm_up(self) -> None:
         """Scores once so the first request does not pay for initialization.
 
-        Marks the warm-up step done, or the service failed. The warm-up call
-        never feeds series history.
+        Marks the warm-up step complete, or skipped when no record can be
+        derived, or marks the service failed if scoring raises. Warm-up
+        records come from `warmup_records` or `synthetic_record`. The warm-up
+        call never feeds series history. A `ScmleError` from
+        `Readiness.begin` (warm-up started out of order) is not caught.
         """
         self.readiness.begin(guard.Phase.WARMING)
         try:
@@ -153,7 +160,10 @@ class ServingAdapter(abc.ABC):
         self.readiness.complete(guard.Phase.WARMING, note)
 
     def respond(self, records: list[dict[str, Any]]) -> dict[str, Any]:
-        """Scores records and build the structured response.
+        """Scores records and builds the structured response.
+
+        A row that breaks a policy set to `reject` makes `enforce_policy`
+        raise `PolicyError`.
 
         Args:
             records: Feature dictionaries. Every record must carry every
@@ -161,8 +171,8 @@ class ServingAdapter(abc.ABC):
 
         Returns:
             The version 1 response: predictions, probabilities (classifiers),
-            model version, artifact digest, schema digest, schema diagnostics
-            and one `rows` entry per record.
+            model version, artifact digest, schema digest, schema diagnostics,
+            `record_count` and one `rows` entry per record.
 
         Raises:
             SchemaError: If the records do not satisfy the model's schema.
@@ -203,11 +213,14 @@ class ServingAdapter(abc.ABC):
             remember: Whether to add the rows to the bundle's remembered
                 series history after scoring.
 
+        The policies are enforced after scoring and before the rows are
+        remembered, so a rejected batch leaves the history unchanged and
+        `PolicyError` propagates.
+
         Returns:
             The bundle's score response extended with the schema version,
             artifact digest, schema digest, `record_count` and the per-row
-            `rows` report. A row that breaks a policy set to `reject` makes
-            `enforce_policy` raise `PolicyError`.
+            `rows` report.
         """
         with self.lock:
             bundle = self.bundle
@@ -255,11 +268,11 @@ class ServingAdapter(abc.ABC):
 
     @abc.abstractmethod
     def start(self) -> None:
-        """Begin serving."""
+        """Begins serving."""
 
     @abc.abstractmethod
     def stop(self) -> None:
-        """Stops serving and release resources."""
+        """Stops serving and releases resources."""
 
 
 class BatchServing(ServingAdapter):
@@ -277,11 +290,16 @@ class BatchServing(ServingAdapter):
         destination: str | pathlib.Path,
         chunk_rows: int = BATCH_CHUNK_ROWS,
     ) -> int:
-        """Scores a file and write predictions (and probabilities).
+        """Scores a file and writes predictions (and probabilities).
 
-        The output CSV is accompanied by `<destination>.manifest.json`,
-        which carries the model version and artifact digest the whole file
-        was scored with.
+        The output CSV has a `prediction` column and, for classifiers, one
+        `proba_<class>` column per class. It is accompanied by
+        `<destination>.manifest.json`, which carries the model version,
+        artifact digest, schema digest, row count, the SHA-256 of the CSV and
+        the counts of rows with nulls and with unseen categories. Chunks are
+        scored through `respond_frame`, so a policy set to `reject` raises
+        `PolicyError` before anything is written, and the scored rows are
+        added to the bundle's remembered series history.
 
         Args:
             source: Input CSV / Parquet.
@@ -357,7 +375,7 @@ class RequestObserver(Protocol):
         """
 
     def observe_features(self, at: float, frame: pd.DataFrame) -> int:
-        """Observe the rows of a scored batch.
+        """Observes the rows of a scored batch.
 
         Args:
             at: Unix time of the batch.
@@ -404,7 +422,7 @@ class HttpServing(ServingAdapter):
         gateway: access.Gateway | None = None,
         monitor: RequestObserver | None = None,
     ) -> None:
-        """Initialize the adapter.
+        """Initializes the HTTP adapter and its admission limits.
 
         Args:
             bundle: Model to serve, already verified and loaded by the
@@ -434,8 +452,8 @@ class HttpServing(ServingAdapter):
 
         Raises:
             ConfigError: If neither or both of `bundle` and `loader` are
-                given, or `host` is not a loopback address and there is no
-                `gateway`.
+                given, a policy name is unknown, or `host` is not a loopback
+                address and there is no `gateway`.
             ValueError: If a request bound or timeout is not positive.
         """
         if (bundle is None) == (loader is None):
@@ -530,7 +548,10 @@ class HttpServing(ServingAdapter):
         self.announce()
 
     def announce(self) -> None:
-        """Audit the outcome of verify, load and warm-up (activation)."""
+        """Audits the outcome of verify, load and warm-up (activation).
+
+        Does nothing without a gateway that has an audit log.
+        """
         gateway = self.gateway
         if gateway is None or gateway.audit is None:
             return
@@ -548,7 +569,7 @@ class HttpServing(ServingAdapter):
             )
 
     def observe_request(self, route: str, status: int, seconds: float) -> None:
-        """Pass a finished request to the monitor; never raises.
+        """Passes a finished request to the monitor; never raises.
 
         Args:
             route: The request path.
@@ -563,7 +584,7 @@ class HttpServing(ServingAdapter):
             LOGGER.exception("the signal monitor failed on a request")
 
     def observe_rows(self, records: list[dict[str, Any]]) -> None:
-        """Pass the rows of a scored batch to the monitor; never raises.
+        """Passes the rows of a scored batch to the monitor; never raises.
 
         Args:
             records: The scored feature records.
@@ -606,7 +627,7 @@ class HttpServing(ServingAdapter):
         return response
 
     def start(self) -> None:
-        """Bind the socket and serve in a daemon thread.
+        """Binds the socket and serves in a daemon thread.
 
         With a loader, verification, loading and warm-up continue in a
         background thread; otherwise the bundle is warmed up before
@@ -877,7 +898,7 @@ class HttpServing(ServingAdapter):
                     self.fail(500, "internal serving failure", "internal")
 
             def log_message(self, format: str, *args: Any) -> None:
-                """Silence per-request logging.
+                """Silences per-request logging.
 
                 Args:
                     format: Unused log format string.
@@ -899,20 +920,23 @@ class HttpServing(ServingAdapter):
             self.announce()
 
     def wait_until_settled(self, timeout: float = 60.0) -> bool:
-        """Wait for the loader to finish.
+        """Waits for the background loader to finish.
+
+        Returns at once when there is no loader thread.
 
         Args:
             timeout: Seconds to wait for the loading thread.
 
         Returns:
-            True when the service is ready.
+            True when the service is ready, False if it is not (still
+            loading after the timeout, or failed).
         """
         if self.loading is not None:
             self.loading.join(timeout)
         return self.readiness.ready
 
     def stop(self) -> None:
-        """Shut the server down and join its thread."""
+        """Shuts the server down, joins its thread and closes the worker pool."""
         if self.httpd is not None:
             self.httpd.shutdown()
             self.httpd.server_close()

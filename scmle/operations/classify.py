@@ -1,4 +1,4 @@
-"""Tell an infrastructure fault from bad data from a worse model.
+"""Tells an infrastructure fault from bad data from a worse model.
 
 The three have different owners and different responses, so mixing them up
 costs time: restarting a service does not fix a drifted feed, and retraining
@@ -15,11 +15,13 @@ rows and answers with one of
     that arrive, so which came first is a question for the responder, and
     guessing would send them to the wrong runbook.
 ``indeterminate``
-    Not one signal had enough data to be judged.
+    There are signals and every one of them lacked enough data to be
+    judged. An empty list of signals gives ``none``.
 
 Caveats are returned with the verdict where it rests on less than it seems
-to: drift with no labels yet does not show harm, and a performance drop with
-no data-quality signals judged does not exclude a data cause.
+to: drift with no labels yet does not show harm, a performance drop while
+some data-quality signals could not be judged does not exclude a data cause,
+and an infrastructure fault with no loss observed says nothing about quality.
 """
 
 from collections.abc import Mapping
@@ -70,12 +72,16 @@ class Classification:
 
     Attributes:
         verdict: See `Verdict`.
-        categories: Kinds with at least one breached signal.
-        breached: Names of the breached signals.
-        unobserved: Names of signals with too little data.
+        categories: Kinds with at least one breached signal, ordered by
+            value.
+        breached: Names of the breached signals, sorted.
+        unobserved: Names of signals with too little data, sorted.
         caveats: What the verdict does not establish.
-        severity: ``info``, ``warning`` or ``critical``.
-        response: The suggested first step.
+        severity: ``info`` for no breach, ``warning`` for any other verdict
+            (including indeterminate), ``critical`` when `availability` is
+            breached or the verdict is mixed with an infrastructure breach.
+        response: The suggested first step; ``no action`` for no breach and
+            ``collect more data`` for an indeterminate verdict.
     """
 
     verdict: Verdict
@@ -87,7 +93,7 @@ class Classification:
     response: str
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record.
+        """Returns a JSON-ready record.
 
         Returns:
             The verdict, categories, breached and unobserved signal names,
@@ -109,7 +115,7 @@ def caveats_for(
     breached: Mapping[str, signals_module.Signal],
     unobserved: Sequence[str],
 ) -> list[str]:
-    """What a verdict leaves open.
+    """Lists what a verdict leaves open.
 
     Args:
         verdict: The verdict reached.
@@ -117,10 +123,13 @@ def caveats_for(
         unobserved: Names of the signals with insufficient data.
 
     Returns:
-        Messages for what the verdict cannot exclude: drift without outcomes,
-        a data cause not judged for a model-performance verdict, or model
-        quality not observed during an infrastructure fault; empty if none
-        applies.
+        Messages for what the verdict cannot exclude: drift without
+        outcomes (a data-quality verdict whose breaches are only
+        `feature_psi_max` or `unseen_category_rate` while `windowed_loss` is
+        unobserved), a data cause not judged (a model-performance verdict
+        with any data signal unobserved), or model quality not observed
+        (an infrastructure verdict with `windowed_loss` unobserved); empty
+        if none applies.
     """
     found = []
     drift_only = set(breached) <= {"feature_psi_max", "unseen_category_rate"}
@@ -163,7 +172,8 @@ def classify(signals: Sequence[signals_module.Signal]) -> Classification:
 
     Returns:
         The verdict with its categories, breached and unobserved signals,
-        caveats, severity and recommended response.
+        caveats, severity and recommended response. No signals at all gives
+        the ``none`` verdict.
     """
     breached = {s.name: s for s in signals if s.breached}
     unobserved = tuple(
@@ -217,7 +227,7 @@ def notification(
     trace_id: str,
     sent_at: str,
 ) -> dict[str, Any]:
-    """The document a pager or ticket sender posts for a classification.
+    """Builds the document a pager or ticket sender posts.
 
     Args:
         classification: The classification to announce.
@@ -228,8 +238,11 @@ def notification(
         sent_at: Timestamp of the notification.
 
     Returns:
-        The notification fields: severity, verdict, a one-line summary,
-        breached signals, caveats, response and the identifying fields.
+        The notification fields: severity, verdict, a one-line summary
+        (`<verdict>: <breached names>`, or `no breached signal`), breached
+        signals, caveats, response and the identifying fields
+        (`incident_id`, `model_version`, `artifact_digest`, `trace_id`,
+        `sent_at`).
     """
     return {
         "incident_id": incident_id,

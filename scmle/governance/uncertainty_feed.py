@@ -32,7 +32,14 @@ SOURCE = "uncertainty_feed"
 
 
 class UncertaintyFeed:
-    """Feeds one loop from one classification bundle."""
+    """Feeds one loop from one classification bundle.
+
+    Attributes:
+        loop: The closed loop that receives the batches and the violations.
+        bundle: The classification bundle that produces the sets.
+        nominal: Coverage level requested for the sets.
+        sets: Prediction set of every served case, by case id.
+    """
 
     def __init__(
         self, loop: loop_module.Loop, bundle: Any, nominal: float = 0.9
@@ -42,7 +49,8 @@ class UncertaintyFeed:
         Args:
             loop: The closed loop that receives the batches.
             bundle: A classification bundle with conformal calibration.
-            nominal: Coverage of the sets served and tested.
+            nominal: Coverage level requested for the prediction sets, in
+                the open interval (0, 1).
 
         Raises:
             ValueError: If `nominal` is not strictly between 0 and 1.
@@ -63,8 +71,11 @@ class UncertaintyFeed:
     ) -> Any:
         """Routes a served batch by its set sizes and novelty.
 
-        A bundle without classification sets fails when the sets are
-        requested (with an `ArtifactError`).
+        The size of each set is at least 1, and a row is flagged novel when
+        the bundle has a `novelty` detector that marks it out of
+        distribution; without one no row is novel. The set of every row is
+        stored by case id for `mature`. A bundle that cannot produce
+        classification sets fails in `predict_set` (an `ArtifactError`).
 
         Args:
             features: The served rows.
@@ -108,13 +119,20 @@ class UncertaintyFeed:
     ) -> int:
         """Counts coverage violations of arrived outcomes and hands them on.
 
+        Appends an `observe_summary` row to the loop's ledger with the number
+        of cases, the violations and `gates_retrain` false, then calls
+        `Loop.mature` with the losses and the per-case coverage (1.0 when the
+        label is in the stored set, else 0.0). The ledger row records the
+        loop's latest batch index, which need not be the batch of these cases.
+
         Args:
             labels: True label by case id.
-            losses: Loss in the loop's units by case id (the loop uses a
-                batch only when enough losses matured).
+            losses: Loss of the deployed model by case id, passed to
+                `Loop.mature` unchanged.
 
         Returns:
-            The number of violations among the cases this feed served.
+            The number of cases in `labels` whose label was outside the
+            stored set.
 
         Raises:
             ScmleError: If a label belongs to a case this feed did not serve.

@@ -68,7 +68,7 @@ class InferenceEvidenceLink:
 
 
 class InferenceEvidenceLinker:
-    """Append exact-bundle inference nodes to a durable evidence graph."""
+    """Appends exact-bundle inference nodes to a durable evidence graph."""
 
     def link(
         self,
@@ -80,12 +80,13 @@ class InferenceEvidenceLinker:
         bundle_digest: str,
         timestamp: str,
     ) -> InferenceEvidenceLink:
-        """Link an inference event and atomically persist the graph.
+        """Links an inference event and atomically persists the graph.
 
         The caller supplies fingerprints from the serving boundary. The
         linker never infers identity from prediction values or mutable logs.
-        Repeating the exact event is idempotent; reusing an event ID with any
-        changed identity is rejected.
+        Repeating the exact event leaves the graph content unchanged (the
+        file is still rewritten); reusing an event ID with any changed field
+        is rejected.
 
         Args:
             graph_path: Path of the evidence graph JSON file.
@@ -103,7 +104,9 @@ class InferenceEvidenceLinker:
         Raises:
             ValueError: If an identity field is blank, the timestamp is
                 invalid or lacks a timezone, the graph has no bundle node,
-                or `bundle_digest` does not match the graph's bundle.
+                `bundle_digest` does not match the graph's bundle, the event
+                ID is already used with a different identity, or the graph
+                file fails the checks of `load`.
         """
         candidate = InferenceEvidenceLink(
             event_id=event_id,
@@ -175,7 +178,7 @@ class InferenceEvidenceLinker:
         Raises:
             TypeError: If the file does not hold a JSON object.
             ValueError: If the stored `graph_digest` does not match the
-                content.
+                content. A file without `graph_digest` is accepted.
         """
         record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
@@ -188,7 +191,7 @@ class InferenceEvidenceLinker:
 
     @staticmethod
     def write_atomically(path: pathlib.Path, record: dict[str, Any]) -> None:
-        """Persist graph JSON with flushed contents and directory metadata.
+        """Persists graph JSON with flushed contents and directory metadata.
 
         The record is written to a temporary file in the same directory,
         synced, and moved over `path`; the temporary file is removed on any

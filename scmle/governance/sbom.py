@@ -72,10 +72,11 @@ def build(
             derive the serial number.
         software_version: Version of the software the SBOM describes.
         observed_at: ISO 8601 timestamp for the metadata; the current time
-            if None.
+            if None or empty.
 
     Returns:
-        The SBOM document, with the components sorted by name.
+        The SBOM document. Its components follow the order of the given
+        distribution names sorted as written, before normalization.
 
     Raises:
         ValueError: If the run id, the software version or the
@@ -137,12 +138,16 @@ def build(
 def parse_pins(text: str) -> dict[str, str]:
     """Reads `name==version` lines of a lock file; comments are skipped.
 
+    Text after `#` is dropped from each line. The version is the text after
+    `==` up to the first space. A name that is not a valid distribution name
+    makes `normalize_name` raise `ValueError`.
+
     Args:
         text: The lock file content.
 
     Returns:
-        A mapping from normalized name to version; lines without `==` are
-        ignored.
+        A mapping from normalized name to version; blank lines and lines
+        without `==` are ignored.
     """
     pins = {}
     for line in text.splitlines():
@@ -155,7 +160,10 @@ def parse_pins(text: str) -> dict[str, str]:
 
 
 def source_timestamp() -> str:
-    """The build time: `SOURCE_DATE_EPOCH` if set, else the current time.
+    """Returns the build time as `SOURCE_DATE_EPOCH` or the current time.
+
+    The environment variable is used only when it holds digits; any other
+    value falls back to the current time.
 
     Returns:
         An ISO 8601 UTC timestamp.
@@ -180,9 +188,10 @@ def build_service(
     """Builds the CycloneDX SBOM of a packaged service.
 
     On top of the Python distributions it lists the model bundle (by the
-    SHA-256 of its manifest) and the base image (by reference; the digest is
-    recorded in the build's attestation once the base image is resolved), and
-    a dependency edge from the service to each of them.
+    SHA-256 of its manifest) and the base image (by reference only, with no
+    digest), and a single dependency entry whose `ref` is `scmle` and whose
+    `dependsOn` lists every component. The bundle digest also serves as the
+    run id of the underlying SBOM.
 
     Args:
         distributions: Mapping from distribution name to pinned version.
@@ -194,8 +203,9 @@ def build_service(
         observed_at: ISO 8601 timestamp; the build time if None.
 
     Returns:
-        The SBOM document with the model and the image as extra components
-        and one dependency edge from the service to every component.
+        The SBOM document with the model and the image appended as extra
+        components and a `dependencies` entry listing every component
+        reference, sorted.
 
     Raises:
         ValueError: If `bundle_digest` is not a `sha256:` digest, or the

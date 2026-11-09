@@ -59,7 +59,7 @@ class Readiness:
     """Tracks verify, load and warm-up; ready only when all three finished."""
 
     def __init__(self) -> None:
-        """Start in the `starting` phase."""
+        """Starts in the `starting` phase with no step completed."""
         self.lock = threading.Lock()
         self.phase = Phase.STARTING
         self.done: dict[str, float] = {}
@@ -68,7 +68,11 @@ class Readiness:
         self.started = time.monotonic()
 
     def begin(self, step: Phase) -> None:
-        """Enter `step`; steps must run in order and none may be skipped.
+        """Enters `step`; steps must run in order and none may be skipped.
+
+        The step must be the first one not yet completed, so a step that is
+        already in progress may be entered again. A `step` that is not one of
+        the three steps makes the lookup of its position raise `ValueError`.
 
         Args:
             step: The step to begin: verifying, loading or warming.
@@ -87,7 +91,10 @@ class Readiness:
             self.phase = STEPS[index]
 
     def complete(self, step: Phase, note: str = "") -> None:
-        """Mark `step` finished; the last step makes the service ready.
+        """Marks `step` finished; the last step makes the service ready.
+
+        Records the seconds since construction at which the step finished.
+        The phase returns to `starting` between steps.
 
         Args:
             step: The step that finished; it must be the one in progress.
@@ -108,6 +115,9 @@ class Readiness:
 
     def fail(self, reason: str) -> None:
         """Records why the service will not become ready.
+
+        Sets the phase to `failed` from any phase, including `ready`; later
+        `begin` calls are refused.
 
         Args:
             reason: The failure description reported by `snapshot`.
@@ -144,7 +154,7 @@ class AdmissionControl:
     """Bounds concurrent requests and the time one request may take."""
 
     def __init__(self, max_concurrent: int, timeout_seconds: float) -> None:
-        """Creates the limits.
+        """Creates the concurrency slots and a worker pool of that size.
 
         Args:
             max_concurrent: Requests allowed in flight; more get a 429.
@@ -166,7 +176,7 @@ class AdmissionControl:
 
     @contextlib.contextmanager
     def admit(self) -> Iterator[None]:
-        """Takes a slot without waiting, or raise `OverloadedError`.
+        """Takes a slot without waiting, or raises `OverloadedError`.
 
         Yields:
             None, while the slot is held; it is released on exit.
@@ -184,7 +194,11 @@ class AdmissionControl:
             self.slots.release()
 
     def run(self, work: Callable[[], Any]) -> Any:
-        """Runs `work` and wait at most the timeout for its result.
+        """Runs `work` and waits at most the timeout for its result.
+
+        An exception raised by `work` propagates to the caller; a
+        `TimeoutError` raised by `work` itself is also reported as a
+        `DeadlineError`.
 
         Args:
             work: Zero-argument callable executed on a worker thread.
@@ -205,7 +219,10 @@ class AdmissionControl:
             ) from error
 
     def close(self) -> None:
-        """Release the workers without waiting for stuck calls."""
+        """Releases the workers without waiting for stuck calls.
+
+        Calls that have not started are cancelled.
+        """
         self.pool.shutdown(wait=False, cancel_futures=True)
 
 
@@ -216,13 +233,15 @@ def is_valid_request_id(request_id: str) -> bool:
         request_id: The id supplied by the caller.
 
     Returns:
-        True when it matches `REQUEST_ID_PATTERN` in full.
+        True when it matches `REQUEST_ID_PATTERN` in full: 1 to 128
+        characters, starting with a letter or digit, then letters, digits and
+        `.`, `_`, `:` or `-`.
     """
     return REQUEST_ID_PATTERN.fullmatch(request_id) is not None
 
 
 def new_request_id() -> str:
-    """Makes an opaque server-side request id that contains no request data.
+    """Returns an opaque server-side request id with no request data.
 
     Returns:
         A new random id of the form `srv-<32 hex digits>`.

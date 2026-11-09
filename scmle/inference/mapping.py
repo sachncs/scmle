@@ -40,14 +40,20 @@ class ColumnMapping:
         return name.lower() if self.case_insensitive else name
 
     def apply(self, frame: pd.DataFrame, expected: list[str]) -> pd.DataFrame:
-        """Rename incoming columns according to the policy.
+        """Renames incoming columns according to the policy.
+
+        Columns already named as expected are kept. Another column is renamed
+        by an explicit entry of `renames` first, then, if either matching
+        option is set, by its normalized name; columns that match neither way
+        are left unchanged.
 
         Args:
             frame: Incoming data (not modified).
             expected: Column names the model expects.
 
         Returns:
-            A frame whose matching columns carry the expected names.
+            A renamed copy of the frame whose matching columns carry the
+            expected names.
 
         Raises:
             SchemaError: If a rename target is not an expected column, two

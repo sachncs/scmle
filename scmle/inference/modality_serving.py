@@ -32,7 +32,7 @@ REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
 
 class ModalitySampleDecoder(abc.ABC):
-    """Decode one request payload into caller-owned modality samples."""
+    """Decodes one request payload into caller-owned modality samples."""
 
     @abc.abstractmethod
     def decode(self, payload: object) -> tuple[Any, ...]:
@@ -55,12 +55,12 @@ class ModalitySampleDecoder(abc.ABC):
 
 
 class ModalityHttpServing:
-    """Serve a verified modality predictor through a bounded HTTP reference API.
+    """Serves a verified modality predictor over a bounded HTTP reference API.
 
     Endpoints are ``GET /livez``, ``GET /readyz``, ``GET /health``,
     ``GET /schema``, and ``POST /predict`` with ``{"samples": ...}``. The
     predictor is verified when it is loaded, so the service is ready once
-    started; the warm-up step is recorded as skipped because a caller-owned
+    constructed; the warm-up step is recorded as skipped because a caller-owned
     decoder has no synthetic sample. At most 8 requests run at once (429
     beyond) and a scoring call past 30 seconds answers 504; ``set_limits``
     changes both. Every response carries the schema version and the package
@@ -80,10 +80,12 @@ class ModalityHttpServing:
         max_samples: int = MAX_MODALITY_REQUEST_SAMPLES,
         require_lifecycle_report: bool = False,
     ) -> None:
-        """Bind a verified predictor and an explicit sample decoder.
+        """Binds a verified predictor and an explicit sample decoder.
 
-        Authentication is added with `set_gateway`, and `start` refuses a
-        non-loopback ``host`` without one.
+        Marks the verify, load and warm-up steps complete at once. Sets the
+        admission limits to 8 requests in flight and a 30 second scoring
+        time. Authentication is added with `set_gateway`, and `start`
+        refuses a non-loopback ``host`` without one.
 
         Args:
             predictor: The verified modality predictor.
@@ -132,11 +134,12 @@ class ModalityHttpServing:
         self.thread: threading.Thread | None = None
 
     def set_gateway(self, gateway: access.Gateway | None) -> None:
-        """Require a bearer token on every request except the probes.
+        """Sets the gateway that guards every request except the probes.
 
         Args:
             gateway: Authenticates, authorizes, rate-limits and audits
-                requests (`/livez` and `/readyz` stay public).
+                requests (`GET /livez` and `GET /readyz` stay public); None
+                removes authentication.
         """
         self.gateway = gateway
 
@@ -154,10 +157,10 @@ class ModalityHttpServing:
     def set_limits(
         self, max_concurrent: int, scoring_timeout_seconds: float
     ) -> None:
-        """Replace the concurrency and scoring-time limits before `start`.
+        """Replaces the concurrency and scoring-time limits before `start`.
 
         The limits (default 8 in flight, 30 seconds) are not constructor
-        arguments, so they are set here.
+        arguments, so they are set here. The previous worker pool is closed.
 
         Args:
             max_concurrent: Requests allowed in flight.
@@ -179,7 +182,9 @@ class ModalityHttpServing:
         return "sha256:" + self.predictor.package.model_sha256
 
     def response(self, payload: object) -> dict[str, object]:
-        """Decodes samples and return deterministic predictions.
+        """Decodes samples and returns predictions with their probabilities.
+
+        Scoring runs under a lock, so concurrent calls are serialized.
 
         Args:
             payload: The parsed JSON request body.
@@ -192,6 +197,8 @@ class ModalityHttpServing:
         Raises:
             ValueError: If the decoder returns no samples.
             OverflowError: If there are more samples than `max_samples`.
+                Errors raised by the decoder or the predictor also
+                propagate.
         """
         samples = self.decoder.decode(payload)
         if not samples:
@@ -237,7 +244,7 @@ class ModalityHttpServing:
 
     @staticmethod
     def new_server_request_id() -> str:
-        """Makes a bounded, opaque request ID that contains no request data.
+        """Returns a bounded, opaque request ID with no request data.
 
         Returns:
             A new random ID of the form `srv-<32 hex digits>`.
@@ -245,19 +252,20 @@ class ModalityHttpServing:
         return f"srv-{uuid.uuid4().hex}"
 
     def start(self) -> None:
-        """Bind the socket and serve in a daemon thread.
+        """Binds the socket and serves in a daemon thread.
+
+        A non-loopback host without a gateway is refused with a
+        `ConfigError` by `access.require_authentication_for`.
 
         Raises:
-            ScmleError: If the server is already running. A non-loopback
-                host without a gateway is refused by
-                `access.require_authentication_for`.
+            ScmleError: If the server is already running.
         """
         if self.httpd is not None:
             raise errors.ScmleError("server is already running")
         adapter = self
 
         class Handler(server.BaseHTTPRequestHandler):
-            """Handle one modality reference-server request."""
+            """Handles one modality reference-server request."""
 
             def request_identity(self) -> tuple[str, str | None]:
                 """Resolves the request ID of the current request.
@@ -285,7 +293,7 @@ class ModalityHttpServing:
                 request_id: str,
                 headers: dict[str, str] | None = None,
             ) -> None:
-                """Send a JSON response with safe reference-server headers.
+                """Sends a JSON response with safe reference-server headers.
 
                 Args:
                     status: HTTP status code.
@@ -309,7 +317,7 @@ class ModalityHttpServing:
                 self.wfile.write(body)
 
             def authorized(self, method: str, request_id: str) -> bool:
-                """Applies the gateway; answer a refusal with a safe body.
+                """Applies the gateway; answers a refusal with a safe body.
 
                 Args:
                     method: The HTTP method.
@@ -338,7 +346,12 @@ class ModalityHttpServing:
                 return True
 
             def do_GET(self) -> None:
-                """Serve health and decoder-schema evidence."""
+                """Serves the probes, health and decoder-schema endpoints.
+
+                An invalid `X-Request-ID` is answered with 400, a refused
+                gateway check with its own status, and any other path
+                with 404.
+                """
                 request_id, identity_error = self.request_identity()
                 if identity_error is not None:
                     self.send_json(
@@ -390,14 +403,15 @@ class ModalityHttpServing:
             def do_POST(self) -> None:
                 """Decodes and scores a bounded prediction request.
 
-                Failures are answered with an error response (415, 411, 400,
-                413, 422, 429, 504 or 500 as appropriate) rather than
-                propagated.
+                Only `POST /predict` is served; another path gets 404 and a
+                refused gateway check gets its own status. Failures are
+                answered with an error response (415, 411, 400, 413, 422,
+                429, 504 or 500 as appropriate) and not propagated.
 
                 Raises:
-                    OverflowError: Raised for a negative or oversized
-                        `Content-Length`; it is caught within this method
-                        and answered with 413, so it never escapes.
+                    OverflowError: If `Content-Length` is negative or above
+                        the limit, or a request holds too many samples. It
+                        is caught in this method and answered with 413.
                 """
                 request_id, identity_error = self.request_identity()
                 if identity_error is not None:
@@ -525,7 +539,7 @@ class ModalityHttpServing:
                     )
 
             def log_message(self, format: str, *args: Any) -> None:
-                """Suppress per-request reference-server logging.
+                """Suppresses per-request reference-server logging.
 
                 Args:
                     format: Unused log format string.
@@ -541,7 +555,7 @@ class ModalityHttpServing:
         self.thread.start()
 
     def stop(self) -> None:
-        """Shut down the server and join its worker thread."""
+        """Shuts down the server, joins its thread and closes the worker pool."""
         if self.httpd is not None:
             self.httpd.shutdown()
             self.httpd.server_close()

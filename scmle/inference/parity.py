@@ -142,7 +142,8 @@ def load_golden(directory: str | pathlib.Path) -> GoldenSet:
 
     Returns:
         The golden set. A file that cannot be read or is not a JSON object
-        makes `read_json` raise `ArtifactError`.
+        makes `read_json` raise `ArtifactError`; a missing key in a file
+        raises `KeyError`.
     """
     root = pathlib.Path(directory)
     tolerances = read_json(root / "tolerances.json")
@@ -155,7 +156,7 @@ def load_golden(directory: str | pathlib.Path) -> GoldenSet:
 
 
 def to_float(frame: Any) -> Any:
-    """Cast a frame to float; a named function so the pipeline can pickle.
+    """Casts a frame to float; a named function so the pipeline can pickle.
 
     Args:
         frame: Array-like data.
@@ -167,7 +168,7 @@ def to_float(frame: Any) -> Any:
 
 
 def to_object(frame: Any) -> Any:
-    """Cast a frame to object; a named function so the pipeline can pickle.
+    """Casts a frame to object; a named function so the pipeline can pickle.
 
     Args:
         frame: Array-like data.
@@ -187,15 +188,18 @@ def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
     the value from `spec`.
 
     Args:
-        spec: The model specification: columns, categories, medians, means,
-            scales, coefficients, intercept, classes, target and model
+        spec: The model specification: numeric columns, categorical
+            columns (only the first is used), its two categories, medians,
+            means, scales, coefficients, intercept, classes, target and model
             name and version.
 
     Returns:
         The bundle holding the hand-written pipeline.
 
     Raises:
-        ArtifactError: If the reference categories are not sorted.
+        ArtifactError: If `spec` lists more than two categories. The
+            encoder is fitted on the first two only, so its categories then
+            differ from the sorted list in `spec`.
     """
     numeric = list(spec["numeric"])
     categorical = list(spec["categorical"])
@@ -369,12 +373,16 @@ def check_remote(
     level: str = "cross_environment",
     timeout: float = 30.0,
 ) -> dict[str, Any]:
-    """Send the golden records to a running service and compare.
+    """Sends the golden records to a running service and compares.
+
+    Posts the records to `<url>/predict` and compares the answer with
+    `expected.json` from `directory`.
 
     Args:
         url: Base URL of the service.
-        directory: Folder with the golden files.
-        level: `same_process` or `cross_environment` tolerance.
+        directory: Folder with the golden files and `expected.json`.
+        level: `same_process` selects that tolerance; any other value
+            selects the `cross_environment` tolerance.
         timeout: Seconds to wait for the answer.
 
     Returns:
@@ -382,7 +390,9 @@ def check_remote(
         digest and level. The report is marked failed when the response
         lacks any key in `serving_contract.RESPONSE_KEYS`. On an HTTP error
         status only `passed` (False) and `mismatches` are returned. An
-        unreadable golden file raises `ArtifactError` from `read_json`.
+        unreadable golden file raises `ArtifactError` from `read_json`; other
+        network errors and a response without `predictions` or
+        `probabilities` propagate (`KeyError`) instead of being reported.
     """
     root = pathlib.Path(directory)
     golden = load_golden(root)
